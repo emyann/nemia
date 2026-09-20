@@ -420,7 +420,7 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
  * Mirrors `Standing` in apps/api/src/app.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it

@@ -172,6 +172,20 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
+  `apps/api/src/app.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
+  English sentence — for a verb it does not know. Nothing fails: the board draws a `once more` button that copies
+  *"review: enough — go on with what is there; its findings stay on the record, and …:  wf accept r-1 review --message …"*. So an offer
+  the package gains adds its verb and its placeholder to that regex, a label to `DecideCommand` and to `apps/web/src/lib/api.ts`'s
+  mirror, in the same change — with a test that asserts the *bare* command, since one asserting the offer is listed passes either way
+  (learned by the run that let a person accept a loop out of rounds).
+- **A level-triggered ask is not a file a person can simply be told to delete.** The run reads a person's word off disk on
+  every pass — an approval, an acceptance — so deleting the file is how they take it back, but only while nothing has been done
+  on it. Once a tick has filed what the word released, the deletion undoes the *reading* and not the *filing*: the loop reads
+  `rounds exhausted` again and a round files its work under a step already running on it. A retry ask is safe to delete because
+  it is unconsumed by definition; these are not. So a refusal that offers the deletion says when it is safe, and the verb it
+  would let through refuses the state the deletion makes — the wording is not the guard (learned by the run that let a person
+  accept a loop out of rounds, round 2).
 - **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
   `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/app.ts`, by `stepState` in
   `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes

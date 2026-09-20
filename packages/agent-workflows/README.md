@@ -24,6 +24,7 @@ wf retry r-xyz implement --recheck   # its check was killed before it finished: 
 wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
 wf approve r-xyz plan --message "ship the second reading"   # it waits at its gate: let what follows be filed
 wf round r-xyz       # the review still asks for more after the last round it allows: once more
+wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 ```
 
@@ -59,7 +60,8 @@ Definition of done — a closed list, so there is a finish line:
 - [x] **declared outputs** — a step's `output:` schema adds fields to its closeout, and a step that
       names it in `input:` is handed those fields as data. The review travels this way, not as a file.
 - [x] **rounds** — `loop:` on a step runs an earlier step again while the step's closeout says
-      `again: true`, at most `rounds:` times, then a person, whose `wf round` is the once more.
+      `again: true`, at most `rounds:` times, then a person, whose `wf round` is the once more and
+      whose `wf accept` is enough.
       `after` stays a DAG: a round is one more try of the steps the run already has, counted.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
       allowed to answer "these cannot be split, run them in sequence".
@@ -815,7 +817,7 @@ another repository and change that line.
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
 | `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or an ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
-| `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, below |
+| `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
 | `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
 | `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (`claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
@@ -1024,12 +1026,39 @@ rounds: 3
   The looping step is told, every round, what its `again` does and which round it is. A new session of
   the target within a round — `wf retry --fresh`, or a nudge with no session left to continue — is
   handed the round's contract and findings again, off the looping step's try that asked for the round.
-- **At the cap, a person.** `again: true` on the last round files nothing: the step reads
-  `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS EXHAUSTED`, prints
-  the last findings and offers `wf round <run>` — the person's once more. Like `wf retry`, it writes an
-  ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It is refused while a round
-  is running, while the run would go round itself, on a loop that ended with `again: false`, on a
-  step of the loop that stopped (that is `wf retry`'s), and on a cancelled run.
+- **At the cap, a person — and they have two answers.** `again: true` on the last round files nothing:
+  the step reads `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS
+  EXHAUSTED`, prints the last findings and offers both. **Once more** is `wf round <run>`. Like
+  `wf retry`, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
+  is refused while a round is running, while the run would go round itself, on a loop that ended with
+  `again: false`, on a step of the loop that stopped (that is `wf retry`'s), and on a cancelled run.
+- **Enough: `wf accept <run> [<step>] --message "<why>"`.** A reviewer that finds anything says `again:
+  true`, and a large change always has something left to find; a person who has read the findings and
+  judged them follow-up work says so, and the steps that wait on the looping step are filed as if it had
+  said `again: false` — so a gated ending goes to its gate, `awaiting approval`, and is approved or not
+  as ever. The words are not optional: an acceptance is nothing but its reason. It writes
+  `runs/<id>.asks/accept-<step>-<try>`, whole and exclusively, beside the round asks, and the tick reads
+  it with the run on every pass and never copies it into the record — level-triggered, like an approval.
+  The step is named where a folder has several loops, and guessed where it has one. It is keyed by the
+  looping step's *try*, not by its round, so a send-back spends it as it spends an approval: the loop is
+  open again and its findings with it, and the file moves to `done/` whole. Refused by name, exit 2, with
+  nothing written: no words or empty ones, a cancelled run, a step the run does not have, a step with no
+  `loop:`, a folder with no loop or several unnamed, the try already accepted, a round already asked for,
+  a loop below its cap — which goes round by itself — a round held on a budget, where raising the cap is
+  the way on, a loop that ended `again: false`, and a round still running. A file at the acceptance's name
+  that is not one is honoured by no pass, which says so in its notes and leaves the file alone.
+- **Taking it back is only a file to delete until a tick has acted on it.** `wf round` on an accepted loop
+  refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
+  been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.
+  Once a tick has filed what waited, deleting that file does not take the step it filed back — it only makes
+  the loop read `rounds exhausted` again — so the refusal says where the run stands instead, and a round is
+  refused a second time, by the step after the loop that is already filed. The way on there is the run's own:
+  approve the ending, or send the work back through the loop (`wf retry <run> <step> --message`).
+- **What it leaves on the record.** `wf ls` says `round 3 of 3, and it asked again — accepted as it stands
+  <time>, its findings open` beside the looping step — the time, never the person's words, which are free
+  text and would break the column. `wf decide` says it in full, with the words. And the step after the loop
+  is handed `## Accepted` — who ended it, when, and why — then `## From <step>` with the findings the loop
+  left open, minus `again`, so the shipper and whoever reads the merge know what is still outstanding.
 - **A round is a try.** Each step of the loop moves its current try behind it with `then: 'round'`, so
   `steps[name].taskId` and `.check` stay the current try's and ids stay `<run>-<step>-try<n>`. A pass
   that files a round and dies before writing the record is adopted by the next, as a try is. `wf ls`
@@ -1986,7 +2015,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 |---|---|---|---|
 | `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
-| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, and those spent | `wf retry`, `wf round`, `wf approve`; the tick moves them | removed |
+| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry`, `wf round`, `wf approve`, `wf accept`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
 | `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
@@ -2100,7 +2129,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 
 | path | |
 |---|---|
-| `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, and approvals at a gate |
+| `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds |
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |

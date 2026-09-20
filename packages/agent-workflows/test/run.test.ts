@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, tryOf, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -1736,9 +1736,14 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   const d = decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked);
   assert.ok(d.kind === 'awaiting', d.kind);
   assert.deepEqual([d.outcome, d.exhausted, d.failed, d.stuck, d.unsigned], ['blocked', ['review'], [], [], []]);
-  assert.deepEqual(roundLines(LOOP, r, d), ['review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round r-1 review']);
+  // Out of rounds, `wf decide` offers both answers there are, in this order: another round, or the work as it stands with its findings open.
+  assert.deepEqual(roundLines(LOOP, r, d), [
+    'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round r-1 review',
+    'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  wf accept r-1 review --message "<why>"',
+  ]);
   assert.deepEqual(retryLines(LOOP, r, d, ALL_SUCCEEDED, said, asked), [], 'not a try: its work is signed');
-  assert.match(retryRefusal(LOOP, r, 'review', { mode: 'fresh' }, ALL_SUCCEEDED, said, asked)!, /^review asked for another round on the last one `rounds: 3` allows.*Make it: wf round r-1 review\./);
+  // A try is not what an exhausted loop takes, and the refusal names both things that are: the round, and the work as it stands.
+  assert.match(retryRefusal(LOOP, r, 'review', { mode: 'fresh' }, ALL_SUCCEEDED, said, asked)!, /^review asked for another round on the last one `rounds: 3` allows.*Go round once more — wf round r-1 review — or take the work as it stands, its findings open: wf accept r-1 review --message "<why>"\.$/);
 
   // `rounds: 1`: the first round is the last.
   const once = LOOP.map((s) => (s.loop ? { ...s, rounds: 1 } : s));
@@ -1760,6 +1765,120 @@ test("a person's `wf round` takes an exhausted loop once more, once: an ask for 
   assert.deepEqual(listing(LOOP, inRound(4), ALL_SUCCEEDED, saidIn(4, false), asked).steps.map((s) => s.note),
     ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', undefined]);
 });
+
+// ─── enough: a person ends a loop out of rounds as it stands ────────────────
+
+/** Why a person judged a loop's findings later work rather than this run's: the whole reason what waits on the loop was filed. */
+const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
+/** Try `t` of review, accepted as it stands at a known time. */
+const acceptedTry = (t: number, message: string = ENOUGH): Partial<Run> =>
+  ({ acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }] });
+
+test("a person's `wf accept` ends a loop out of rounds on their word: what waits on the looping step is filed as if it had said `again: false`, and the findings stay on the record", () => {
+  const said = saidIn(3, true);
+  const r = inRound(3, acceptedTry(3));
+  assert.equal(tryOf(r, 'review'), 3, 'keyed by the try it was given on, as an approval is');
+
+  // The test above is the same run without the acceptance: nothing filed, ship blocked, the run failed. One word from a person, and every
+  // reader of `again: true` reads the loop as over — the five of them, which is why they all ask one function (`askedAgain`).
+  assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'unverified');
+  const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
+  assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], ['ship'], [], 'running'], 'the step after the loop is filed, and the run runs on');
+  assert.deepEqual(roundsDue(LOOP, r, ALL_SUCCEEDED, said, asked), [], 'and no round is due on the way past');
+
+  const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
+  assert.deepEqual(l.steps.map((s) => [s.status, s.note]), [
+    ['verified ✓', 'round 3 of 3'],
+    ['unverified · done', 'round 3 of 3, and it asked again — accepted as it stands at 2026-09-20T14:05:00.000Z, its findings open'],
+    ['waiting', undefined],
+  ]);
+  assert.deepEqual(l.waitingOnYou, [], 'and nobody waits on a person any more');
+
+  const d = decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked);
+  assert.equal(d.kind, 'running');
+  assert.deepEqual(roundLines(LOOP, r, d), [], '`wf decide` offers the round no more');
+
+  // What it is all for: a gated ending goes to its gate and is approved or not as ever, rather than never being filed at all.
+  const GATED = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2]!, gate: true }];
+  const filed: Run = { ...r, steps: { ...r.steps, ship: { taskId: 's1' } } };
+  const saidShip = (name: string) => (name === 'ship' ? signedDone() : said(name));
+  assert.deepEqual(assess(GATED, r, ALL_SUCCEEDED, said, asked).ready, ['ship']);
+  assert.equal(stepStatus(GATED[2]!, filed, ALL_SUCCEEDED, saidShip, asked, GATED), 'awaiting approval');
+  // And a gate on the looping step itself, which a round un-holds: a person's word ends the loop, so that gate holds now too.
+  const GATED_LOOP = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]!];
+  assert.equal(stepStatus(GATED_LOOP[1]!, r, ALL_SUCCEEDED, said, asked, GATED_LOOP), 'awaiting approval');
+  assert.equal(stepStatus(GATED_LOOP[1]!, inRound(3), ALL_SUCCEEDED, said, asked, GATED_LOOP), 'exhausted', 'and not while it is still asking');
+
+  // Their words are `wf decide`'s to print: free text from a person never reaches `wf ls`'s padded status column.
+  assert.deepEqual(acceptedLines(LOOP, r), { review: `accepted as it stands 14:05Z, its findings open — "${ENOUGH}"` });
+  assert.deepEqual(acceptedLines(LOOP, inRound(3)), {}, 'nothing for a loop nobody accepted');
+  // Spent by the try after it, as an approval is: a send-back files review again, and its findings are open again with it.
+  assert.deepEqual(acceptedLines(LOOP, inRound(4, acceptedTry(3))), {});
+  assert.deepEqual(spentAcceptances(inRound(4, acceptedTry(3))), acceptedTry(3).acceptances);
+  assert.deepEqual(spentAcceptances(r), []);
+});
+
+test("REFUSED: `wf accept` takes a loop out of rounds with `again` still true, and nothing else — each refusal naming the way on instead", () => {
+  const said = saidIn(3, true);
+  const why = (a: ReturnType<typeof acceptAsk>): string => {
+    if (!('refusal' in a)) assert.fail(`accepted, and should not have: ${JSON.stringify(a)}`);
+    return a.refusal;
+  };
+  const r = inRound(3);
+  // The one case it takes, and the try it is keyed by — at shipped defaults, `rounds: 3`.
+  assert.deepEqual(acceptAsk(LOOP, r, 'review', ENOUGH, ALL_SUCCEEDED, said, asked), { step: 'review', try: 3 });
+  assert.deepEqual(acceptAsk(LOOP, r, undefined, ENOUGH, ALL_SUCCEEDED, said, asked), { step: 'review', try: 3 }, "the run's one loop needs no naming");
+
+  // The words, asked for before anything about the run: an acceptance is nothing but its reason.
+  assert.match(why(acceptAsk(LOOP, r, 'review', undefined, ALL_SUCCEEDED, said, asked)), /^--message says why the work is good enough with its findings open.*Say it: wf accept r-1 review --message "<why>"\.$/);
+  assert.match(why(acceptAsk(LOOP, r, undefined, undefined, ALL_SUCCEEDED, said, asked)), /wf accept r-1 \[<step>\] --message "<why>"\.$/, 'named as they would type it');
+  assert.match(why(acceptAsk(LOOP, r, 'review', '   ', ALL_SUCCEEDED, said, asked)), /^--message is empty, and an acceptance's words are the whole reason/);
+
+  // A cancelled run files nothing, so nothing would ever honour it.
+  assert.match(why(acceptAsk(LOOP, inRound(3, CANCELLED), 'review', ENOUGH, ALL_SUCCEEDED, said, asked)), /^r-1 was cancelled at 2026-01-02T00:00:00Z, and a cancelled run files nothing/);
+
+  // A step that is not here, one that closes no loop, and a workflow with no loop or with several and none named.
+  assert.match(why(acceptAsk(LOOP, r, 'reviewer', ENOUGH, ALL_SUCCEEDED, said, asked)), /^r-1 has no step "reviewer" — its steps are implement, review, ship\.$/);
+  assert.match(why(acceptAsk(LOOP, r, 'ship', ENOUGH, ALL_SUCCEEDED, said, asked)), /^ship has no `loop:`.*this run's loops close at review.*wf approve r-1 ship\.$/);
+  assert.match(why(acceptAsk(STEPS, run({ implement: 't1', review: 't2' }), undefined, ENOUGH, ALL_SUCCEEDED, said, asked)), /^no step of r-1 has `loop:`, so there is no loop to end/);
+  const TWO = [...LOOP, { ...step('proofread', ['ship']), loop: 'ship', rounds: 2 }];
+  assert.match(why(acceptAsk(TWO, r, undefined, ENOUGH, ALL_SUCCEEDED, said, asked)), /^r-1 has 2 loops, closing at review, proofread: name the one to accept as it stands/);
+
+  // Already accepted, and a round already asked for: both are decided, and the next tick honours them once.
+  assert.match(why(acceptAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ENOUGH, ALL_SUCCEEDED, said, asked)), /^try 3 of review is already accepted, at 2026-09-20T14:05:00\.000Z/);
+  assert.match(why(acceptAsk(LOOP, r, 'review', ENOUGH, ALL_SUCCEEDED, said, asked, [roundAskFor(4)])), /^round 4 of review's loop is already asked for .*take that ask back first — round-review-4, in the run's \.asks directory/);
+
+  // Below the cap the run goes round itself, and a round held on a budget waits on a raise: neither is a person's to end early.
+  assert.match(why(acceptAsk(LOOP, inRound(1), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(1, true), asked)), /^review asked for another round, and `rounds: 3` has 2 left, so the next tick files round 2 itself/);
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const held: SpendOf = (id) => (id === 'i1' || id === 'i2' ? { usd: 2, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
+  assert.match(why(acceptAsk(BUDGETED_LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, true), asked, [], held)),
+    /^review asked for round 3, and its loop waits on a budget, not on you: `rounds: 3` has one round left\. Raise the cap and go round — wf round r-1 review --budget <amount> — and accept the work as it stands once its rounds are spent\.$/);
+
+  // A loop that ended `again: false` handed on by itself, and a round still running has asked for nothing yet.
+  assert.match(why(acceptAsk(LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, false), asked)), /^review signed off without asking for another round \(`again: false`\), so its loop is over on its own word/);
+  assert.match(why(acceptAsk(LOOP, reviewDue(3), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(3, true), asked)), /^round 3 of review's loop is still running \(review is .*\), so it has not asked for anything yet/);
+
+  // And `wf round` refuses an accepted loop, rather than telling a person it signed off without asking — the one thing it did not do.
+  assert.match(why(roundAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ALL_SUCCEEDED, said, asked)),
+    /^review asked for round 4, and a person accepted its work as it stands at 2026-09-20T14:05:00\.000Z, with its findings open \(wf accept\).*take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: wf round r-1 review\.$/);
+});
+
+test('the step after an accepted loop is handed the words and the findings the loop left open: `## Accepted`, then `## From review` without `again`', () => {
+  const said = saidIn(3, true);
+  const brief = composeBrief(LOOP[2]!, inRound(3, acceptedTry(3)), LOOP, said);
+  assert.match(brief, /\n## Accepted\n/);
+  assert.match(brief, /review judged this work and asked for another round after the 3 `rounds: 3` allows\./);
+  assert.match(brief, /\(`wf accept`, try 3, at 2026-09-20T14:05:00\.000Z\)/);
+  assert.ok(brief.includes(ENOUGH), 'the words they gave, as they wrote them');
+  assert.match(brief, /\n## From review\n/);
+  assert.ok(brief.includes('a producer with no findings reads as done'), 'and the findings that are still open');
+  assert.ok(!/^\s*again:/m.test(brief), '`again` is not a finding, and says nothing to a shipper');
+  assert.ok(!brief.includes('REVIEWER-SUMMARY'), 'a summary travels nowhere, here as anywhere');
+  // A run where no loop was accepted composes as it always did.
+  assert.doesNotMatch(composeBrief(LOOP[2]!, inRound(3), LOOP, said), /## Accepted/);
+});
+
 
 test("a round moves every step of the loop behind it: the target continued under its next try's id, the rest unfiled until what they wait on is verified", () => {
   const chain: Workflow[] = [IMPLEMENT, step('test', ['implement']), { ...LOOPING_REVIEW, after: ['test'] }];
@@ -2805,6 +2924,7 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
   assert.deepEqual(d.kind === 'awaiting' && [d.exhausted, d.overBudget], [['review'], []]);
   assert.deepEqual(roundLines(BUDGETED_LOOP, r, d, spent), [
     'review: it asked for round 4, and `rounds: 3` are spent, and implement has cost $3.50 of its $3 budget. Its findings are below. Once more, its cap raised above $3.50 — implement continued, then a new review:  wf round r-1 review --budget <amount>',
+    'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  wf accept r-1 review --message "<why>"',
   ]);
   assert.equal(listing(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, () => 0, [], [], [], [], () => 0, spent).steps[1]!.note, 'round 3 of 3, and it asked again — once more: wf round r-1 review --budget <amount>');
   assert.match((roundAsk(BUDGETED_LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent) as { refusal: string }).refusal, /^review asked for round 4, and implement has cost \$3\.50 of its \$3 budget: .*--budget <amount>\.$/);
@@ -2813,7 +2933,22 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
   assert.deepEqual(roundAsk(LOOP, r, 'review', ALL_SUCCEEDED, said, asked, [], spent), { step: 'review', round: 4 }, 'and without it, as before');
   assert.deepEqual(roundLines(LOOP, r, decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked, () => 0, [], [], () => false, spent), spent), [
     'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round r-1 review',
+    'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  wf accept r-1 review --message "<why>"',
   ]);
+});
+
+test('an accepted loop is over nobody\'s budget: no step of it is held, since no round will be filed — and a `--budget` ask left behind files nothing', () => {
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const said = saidIn(3, true);
+  const spent = spends({ i1: 1.5, i2: 1.5, i3: 1.5 });
+  const r = inRound(3, acceptedTry(3));
+  // The test above is this run without the acceptance: `exhausted`, and its loop held past $3. A loop nobody will file again is over no budget.
+  assert.deepEqual(BUDGETED_LOOP.map((s) => stepStatus(s, r, ALL_SUCCEEDED, said, asked, BUDGETED_LOOP, spent)), ['verified', 'unverified', 'waiting']);
+  const l = listing(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, () => 0, [], [], [], [], () => 0, spent);
+  assert.deepEqual([l.steps.map((s) => s.status), l.waitingOnYou], [['verified ✓', 'unverified · done', 'waiting'], []]);
+  assert.deepEqual(assess(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, () => undefined, [], [], () => false, spent).ready, ['ship']);
+  // And an ask for the round, raised above what was spent, is not honoured on a loop a person has ended: it is spent by the record, not by a tick.
+  assert.deepEqual(roundsDue(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, [{ ...roundAskFor(4), budget: 10 }], spent), []);
 });
 
 test('a step that signed off blocked past its budget reads blocked while its session runs, and once it has settled, over budget — its question answered with `--budget` beside `--message`', () => {

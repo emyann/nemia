@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { HARNESSES, advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, forget, forgetLine: forgetLineOf, list, listRuns, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
+const { HARNESSES, accept, advance, approve, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, forget, forgetLine: forgetLineOf, list, listRuns, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -865,6 +865,12 @@ const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
 const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/** What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something out of. */
+const refusal = async (p: Promise<unknown>): Promise<string> => {
+  const err = await p.then(() => undefined, (e: Error & { exitCode?: number }) => e);
+  assert.ok(err?.exitCode === 2, `expected a refusal, got ${err ? err.message : 'no error'}`);
+  return err!.message;
+};
 
 test('`retries: 1` re-files a step its check refused, once, continuing its session and told what the check said — and past it, files nothing', async () => {
   const { run, e, tasks, filings, settle, logs } = await throughCheck('check: npm test && npm run typecheck\nretries: 1', 'failed', 1);
@@ -1135,7 +1141,10 @@ test("REFUSED at the cap, at shipped defaults: `again: true` on round 3 files no
   assert.deepEqual([l.steps[1]!.status, l.steps[1]!.note, l.waitingOnYou], ['rounds exhausted', `round 3 of 3, and it asked again — once more: wf round ${run.id} review`, ['review']]);
   const { decision: d, offers, closeouts } = await decide(b.e, run.id);
   assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.failed], ['blocked', ['review'], []]);
-  assert.deepEqual(offers, [`review: it asked for round 4, and \`rounds: 3\` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round ${run.id} review`]);
+  assert.deepEqual(offers, [
+    `review: it asked for round 4, and \`rounds: 3\` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round ${run.id} review`,
+    `review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept ${run.id} review --message "<why>"`,
+  ]);
   assert.deepEqual((closeouts.review as { output?: object }).output, { findings: FOUND, again: true }, 'the last findings, for decide to print');
 
   // A person's once more: an ask, written whole, and no record.
@@ -1158,6 +1167,129 @@ test("REFUSED at the cap, at shipped defaults: `again: true` on round 3 files no
   const again = await advance(b.e, readRun(run.id));
   assert.deepEqual([again.looped, again.filed, roundAsksOf(run.id)], [[], [], []]);
   assert.equal(b.filings.filter((f) => f === `${run.id}-implement-try4`).length, 1);
+});
+
+/** implement ⇄ review as `looped()` builds it, and a gated ship after the loop: the ending an acceptance exists to reach. */
+const loopedThenShip = (reviewKeys = '') => {
+  const dir = looped(reviewKeys);
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: review\ngate: true\n---\nship it\n');
+  return dir;
+};
+const acceptAsksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('accept-')) : []);
+/** Why a person judged the loop's findings later work rather than this run's. */
+const ENOUGH = 'the finding is a case no shipped team has: follow-up work, not this run.';
+
+test("`wf accept` at the cap ends the loop on a person's word: the ask is written whole and no record, the next tick files the ending to its gate, and its brief carries the words and the findings", async () => {
+  const run = started(loopedThenShip());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) {
+    await toReview(b, run.id, n, true);
+    assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review'], `round ${n + 1}`);
+  }
+  await toReview(b, run.id, 3, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [], 'at the cap the ending is never filed, and that is what this is for');
+
+  // A person's word: an ask of its own, written whole, beside the retry and round asks — and no record.
+  const { acceptance, file } = await accept(b.e, run.id, undefined, ENOUGH);
+  assert.equal(file, path.join(asksDir(run.id), 'accept-review-3'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), acceptance);
+  assert.deepEqual([acceptance.step, acceptance.try, acceptance.message], ['review', 3, ENOUGH]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')).acceptances, undefined, 'the verb writes no record');
+  assert.deepEqual(readRun(run.id).acceptances, [acceptance], 'the tick composes it on read');
+  await assert.rejects(accept(b.e, run.id, undefined, ENOUGH), refusedWith(/^try 3 of review is already accepted, at /));
+  await assert.rejects(round(b.e, run.id), refusedWith(/^review asked for round 4, and a person accepted its work as it stands at .*take that acceptance back first/));
+
+  const l = await list(b.e, readRun(run.id));
+  assert.deepEqual([l.steps[1]!.status, l.steps[1]!.note], ['unverified · done', `round 3 of 3, and it asked again — accepted as it stands at ${acceptance.at}, its findings open`]);
+
+  // The next tick files what waits on the loop, as if review had said `again: false` — and hands it the words and what is still open.
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.filed, pass.looped, pass.tried, pass.status], [['ship'], [], [], 'running']);
+  assert.deepEqual(acceptAsksOf(run.id), ['accept-review-3'], 'and the acceptance stays where it was written, as an approval does');
+  const brief = b.tasks.get(`${run.id}-ship`)!.spec.brief;
+  assert.match(brief, /\n## Accepted\n/);
+  assert.match(brief, /\(`wf accept`, try 3, at /);
+  assert.ok(brief.includes(ENOUGH), 'the words they gave, for the shipper and whoever reads the merge');
+  assert.deepEqual(dataUnder(brief, '## From review'), { findings: FOUND }, 'and the findings the loop ended with open');
+  assert.doesNotMatch(brief, /REVIEWER-SUMMARY|"again"/);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [], 'filed once, however many passes');
+
+  // A gated ending goes to its gate and is approved or not as ever: the loop ended, the run did not.
+  b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const held = await list(b.e, readRun(run.id));
+  assert.deepEqual([held.steps[2]!.status, held.waitingOnYou], ['awaiting approval', ['ship']]);
+  const { decision: d, offers, accepted } = await decide(b.e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['blocked', [], ['ship']]);
+  assert.deepEqual(offers, [], 'no round is offered any more: the loop is over');
+  assert.deepEqual(accepted, { review: `accepted as it stands ${acceptance.at.slice(11, 16)}Z, its findings open — "${ENOUGH}"` });
+  await approve(b.e, run.id, 'ship', 'the findings are filed as follow-up');
+  assert.equal((await advance(b.e, readRun(run.id))).status, 'succeeded');
+});
+
+test('an acceptance file the run cannot read is not honoured, and not touched: the pass says so, and the loop is still out of rounds', async () => {
+  const run = started(loopedThenShip());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) { await toReview(b, run.id, n, true); await advance(b.e, readRun(run.id)); }
+  await toReview(b, run.id, 3, true);
+  await advance(b.e, readRun(run.id));
+
+  fs.mkdirSync(asksDir(run.id), { recursive: true });
+  const file = path.join(asksDir(run.id), 'accept-review-3');
+  const bad = [
+    ['{ not json', /unreadable \(/],
+    ['[]', /it is not an acceptance wf accept wrote/],
+    ['{"at":"now","message":"enough"}', /it says no time it was given/],
+    ['{"at":"2026-09-20T14:05:00.000Z"}', /it says nothing of why the work is good enough/],
+    ['{"at":"2026-09-20T14:05:00.000Z","message":"  "}', /its message is empty/],
+  ] as const;
+  for (const [written, why] of bad) {
+    fs.writeFileSync(file, written);
+    const pass = await advance(b.e, readRun(run.id));
+    assert.deepEqual([pass.filed, pass.status], [[], 'failed'], written);
+    assert.ok(pass.notes.some((n) => why.test(n)), `${written}: ${pass.notes.join(' | ')}`);
+    assert.equal(fs.readFileSync(file, 'utf8'), written, 'not touched');
+    assert.equal((await list(b.e, readRun(run.id))).steps[1]!.status, 'rounds exhausted');
+  }
+});
+
+/** The same loop, closed by a step with no gate: what waits on the loop runs the moment the loop is over, and nobody is asked. */
+const loopedThenDocs = () => {
+  const dir = looped();
+  fs.writeFileSync(path.join(dir, 'docs.md'), '---\nafter: review\n---\nwrite it up\n');
+  return dir;
+};
+
+test('an acceptance a tick has acted on is not a file to delete: the round refuses with what there is instead — and refuses again if it is deleted anyway', async () => {
+  const run = started(loopedThenDocs());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) { await toReview(b, run.id, n, true); await advance(b.e, readRun(run.id)); }
+  await toReview(b, run.id, 3, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [], 'at the cap, nothing after the loop');
+
+  // Before a tick has acted on it, taking the acceptance back is the way back into the loop: nothing has been done on its strength.
+  const { file } = await accept(b.e, run.id, undefined, ENOUGH);
+  const early = await refusal(round(b.e, run.id));
+  assert.match(early, /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: wf round /);
+
+  // Once one has, it is not: docs has run on the work, and taking the word back takes none of that back. So the refusal says what there is.
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['docs'], 'the tick files what waited, as if review had said `again: false`');
+  const late = await refusal(round(b.e, run.id));
+  assert.match(late, /^review asked for round 4, and a person accepted its work as it stands at .* \(wf accept\), so its loop is over on their word and there is nothing to go round again\. What waits on it has been filed: wf ls /);
+  assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
+
+  // Deleted anyway — an acceptance is level-triggered, unlike a round ask, so the loop reads out of rounds again and a round would be filed.
+  fs.rmSync(file);
+  assert.equal(readRun(run.id).acceptances, undefined);
+  assert.equal((await list(b.e, readRun(run.id))).steps[1]!.status, 'rounds exhausted', 'which is the standing a round is filed from');
+  const anyway = await refusal(round(b.e, run.id));
+  assert.match(anyway, /^docs waits on review and has already been filed \(running\), so a round would file implement again under a step that ran on its work, and take none of that back\./);
+  assert.match(anyway, /deleting that acceptance does not delete docs\. See where the run stands, and what there is to do: wf decide /);
+  assert.deepEqual(roundAsksOf(run.id), [], 'and no ask is written');
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, [], 'nor does a pass go round of its own accord');
 });
 
 test('`wf round` refuses a round still running, a round the run files itself and a cancelled run — exit 2, and no ask written', async () => {

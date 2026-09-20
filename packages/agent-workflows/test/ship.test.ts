@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
+const { accept, advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -729,6 +729,73 @@ test("a send-back composes with `wf round` in a loop out of rounds, as the incid
   const { approval } = await approve(e, id, 'ship', 'Merge it, now it takes main.');
   assert.deepEqual([approval.step, approval.try], ['ship', 2], 'a new approval, of the try ship is now on');
   assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
+});
+
+/** Why a person judged the loop's findings later work rather than this run's: what `wf accept` carries to the shipper. */
+const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
+
+/**
+ * The incident's other half: `implement ⇄ review → ship` at `rounds: 1`, implement committed on its branch, review done with `again: true`
+ * — out of rounds, and nothing after the loop is ever filed, so the ending never reaches its gate.
+ */
+async function atTheCap() {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: loopingFolder(1) });
+  const b = board();
+  const { e, settle } = b;
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement!;
+  fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, [], 'out of rounds, nothing after the loop is filed');
+  return { repo, id: run.id, ...b, base: git(repo, 'rev-parse', 'HEAD') };
+}
+
+test("the incident's other ending: at rounds exhausted a person accepts the work as it stands, and ship reaches its gate on their word — approved, filed, and told why the findings are still open", async () => {
+  const { repo, id, e, tasks } = await atTheCap();
+  const stuck = await list(e, readRun(id));
+  assert.deepEqual(['review', 'ship'].map((n) => stuck.steps.find((s) => s.name === n)!.status), ['rounds exhausted', 'waiting'],
+    'the ending never reaches its gate, which is how the work came to be merged by hand');
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^ship is not at its gate yet/.test(err.message));
+
+  // The person read the findings, judged them follow-up work, and said so. The loop ends; the run does not.
+  const { acceptance } = await accept(e, id, 'review', ENOUGH);
+  assert.deepEqual((await advance(e, readRun(id))).filed, [], 'the ending is approved before it is filed, so it goes to its gate, not to work');
+  const listed = await list(e, readRun(id));
+  assert.deepEqual([listed.steps.find((s) => s.name === 'ship')!.status, listed.toDecide?.kind], ['awaiting approval', 'approve']);
+  const { decision: d, offers, accepted } = await decide(e, id);
+  assert.deepEqual([d.kind === 'awaiting' && d.awaitingApproval, offers], [['ship'], []], 'the gate is what is left to decide, and no round is offered');
+  assert.deepEqual(accepted, { review: `accepted as it stands ${acceptance.at.slice(11, 16)}Z, its findings open — "${ENOUGH}"` });
+
+  // Approved, it is filed in the repository's own checkout as ever — and told why it is shipping work a reviewer had more to say about.
+  await approve(e, id, 'ship', 'Merge it; the findings are follow-up.');
+  assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
+  const brief = tasks.get(`${id}-ship`)!.spec.brief;
+  assert.match(brief, /\n## Accepted\n/);
+  assert.match(brief, /review judged this work and asked for another round after the 1 `rounds: 1` allows\./);
+  assert.ok(brief.includes(ENOUGH), brief);
+  assert.equal(tasks.get(`${id}-ship`)!.spec.cwd, repo);
+});
+
+test("a send-back at the ending's gate spends the acceptance: the loop is open again, its findings with it, and the work goes back to the reviewer", async () => {
+  const { id, e, tasks } = await atTheCap();
+  await accept(e, id, 'review', ENOUGH);
+  await advance(e, readRun(id));
+  assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
+
+  const { ask } = await retry(e, id, 'review', { mode: 'nudge', message: 'the second finding is this run\'s after all' });
+  assert.deepEqual([ask.step, ask.try], ['review', 2]);
+  const sent = await advance(e, readRun(id));
+  assert.deepEqual([sent.tried, sent.filed], [['review'], []]);
+  assert.equal(readRun(id).acceptances, undefined, 'spent by the try after it, as an approval is');
+  assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'accept-review-1')), 'and moved whole');
+  assert.doesNotMatch(tasks.get(`${id}-review-try2`)!.spec.brief as string, /## Accepted/, 'the reviewer is not told its own loop was ended');
+  // Out of rounds again on the new try, and the acceptance that ended the old one opens nothing.
+  await assert.rejects(accept(e, id, 'review', ENOUGH), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^round 1 of review's loop is still running/.test(err.message));
 });
 
 test("REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is", async () => {

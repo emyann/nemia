@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -70,6 +70,12 @@ const HELP = `wf — run a workflow of agent steps
                                once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer;
                                --budget raises the cap of a step of the loop over its budget
+  wf accept <runId> [<step>] --message "<why>"
+                               enough: a loop out of rounds ends on your word, with its findings
+                               open. What waits on the looping step is filed on the next tick as
+                               if it had said again: false — a gated ending goes to its gate —
+                               and every step after the loop is handed your words and those
+                               findings under ## Accepted. The other answer to wf round
   wf say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, wf ls notes the step
@@ -484,6 +490,28 @@ function roundHow(argv: string[]): { stepName?: string; budget?: number } {
   return { ...(stepName !== undefined ? { stepName } : {}), ...(budget !== undefined ? { budget } : {}) };
 }
 
+/**
+ * `wf accept`'s arguments after the run: the step that closes the loop, when there is more than one, and `--message "<why>"`, at most once
+ * each — the next argument is the words whatever it starts with, as `wf approve`'s is. Words that are missing or empty are refused where
+ * every other refusal of this verb is (`acceptAsk`), which knows the run and can name it.
+ */
+function acceptHow(argv: string[]): { stepName?: string; message?: string } {
+  let stepName: string | undefined;
+  let message: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--message' || arg.startsWith('--message=')) {
+      if (message !== undefined) usage('wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".');
+      const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
+      if (text === undefined) usage('--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".');
+      message = text;
+    } else if (arg.startsWith('--') || stepName !== undefined) {
+      usage('wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".');
+    } else stepName = arg;
+  }
+  return { ...(stepName !== undefined ? { stepName } : {}), ...(message !== undefined ? { message } : {}) };
+}
+
 /** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
 export async function main(argv: string[], e: ReturnType<typeof engine> = engine()): Promise<void> {
   const [verb, ...rest] = argv;
@@ -758,7 +786,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, waitingOn, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, waitingOn, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -863,6 +891,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
         // Its gate, under its name: approved, when and with what words — or awaiting approval, and the commands that answer it.
         if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
+        // And, under a looping step, the loop a person ended as it stands: when, and why they said the findings below can stay open.
+        if (accepted[name]) console.log(`    accepted  ${accepted[name].split('\n').join('\n              ')}`);
         // And what its session is waiting for, when its harness blocked it and said what for: the wait is the step's whole story.
         if (waitingOn[name]) console.log(`    harness  ${waitingOn[name]}`);
         if (check) {
@@ -997,6 +1027,21 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const { stepName, budget } = roundHow(more);
       const { ask, file } = await round(e, runId, stepName, budget);
       console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop${ask.budget !== undefined ? `, its cap raised to ${budgetWord(ask.budget)}` : ''} — the next tick files it, once`);
+      console.log(`   ${file}`);
+      return;
+    }
+
+    // A person's "enough" for a loop whose rounds are spent. Like `wf approve`, it writes the acceptance and nothing else: the tick reads
+    // it on every pass, and the looping step hands on with its findings still open.
+    case 'accept': {
+      const [runId, ...more] = rest;
+      if (!runId || runId.startsWith('--')) return console.log(HELP);
+      const { stepName, message } = acceptHow(more);
+      const { acceptance, file } = await accept(e, runId, stepName, message);
+      // What the acceptance lets happen: what waits on the looping step is filed on the next tick — or, with nothing waiting, the run is
+      // finished and there is something to decide.
+      const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(acceptance.step));
+      console.log(`${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
       console.log(`   ${file}`);
       return;
     }

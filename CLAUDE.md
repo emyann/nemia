@@ -77,6 +77,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   The same happened to a byte order mark: writing `\uFEFF` through the file tools put a raw BOM into `agent-judge`'s `card.ts` and
   `card.test.ts`, twice — and into this very line as it was written, caught only by looking for one — and that package's
   `test/source.test.ts` refuses one too (learned by the run that built the judge package).
+- **An e2e fixture written relative to now crosses midnight.** The quota seed resets the five-hour window 130 minutes out, and the
+  page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
+  e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
+  calendar day — rather than hardcoding which form it will take (learned by the second round of the run that gave an agent its skills).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

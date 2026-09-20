@@ -1433,12 +1433,38 @@ function queueTries(): Map<string, QueueTry> {
 export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
 
 /**
+ * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
+ * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
+ *
+ * Refused where the card is written, `wf inbox add` and the board's Inbox alike (`addToInbox` is the one writer), in the words `wf start
+ * --repo` is refused in: the same sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no
+ * way to edit one from the board, and refusing its start would strand it — so its `repo:` is ignored and said (`InboxStarted.ignoredRepo`).
+ *
+ * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
+ * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
+ */
+function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string }): string | null {
+  if (opts.repo === undefined || opts.workflow === undefined) return null;
+  let steps: readonly Workflow[];
+  try {
+    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo));
+  } catch {
+    return null;
+  }
+  if (!isFolderTeam(steps)) return null;
+  return `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
+    + `File the card without a repository, or name a workflow whose steps work on one.`;
+}
+
+/**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
  * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it; `dir` is the folder a path in the text's own
  * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
  * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
 export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
+  const refusedRepo = cardRepoRefusal(opts);
+  if (refusedRepo) throw new WorkflowError(refusedRepo);
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
   fs.mkdirSync(inboxDir(), { recursive: true });
   for (;;) {
@@ -1565,8 +1591,14 @@ export type InboxStart = {
   gates?: readonly string[];
 };
 
-/** What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why. */
-export type InboxStarted = { run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string };
+/**
+ * What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why.
+ *
+ * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card filed before
+ * `cardRepoRefusal` — or by hand — may still carry one. The run is started all the same, and the line says the path was not looked at,
+ * rather than leaving a person to wonder which repository the work went to.
+ */
+export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & { ignoredRepo?: string };
 
 /**
  * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }` on
@@ -1630,12 +1662,15 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
   });
+  // The card's `repo:` reached `start()` as the repository, and a folder run looks at none: said, not refused, since a card on disk cannot
+  // be edited from the board. A `--repo` given here was refused by `start()` before the run was written.
+  const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
   try {
     fs.rmSync(file, { force: true });
   } catch (err) {
-    return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}` };
+    return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}`, ...ignoredRepo };
   }
-  return { run, card, removed: true };
+  return { run, card, removed: true, ...ignoredRepo };
 }
 
 /**

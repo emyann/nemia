@@ -503,6 +503,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         printStarted(started.run, started.removed
           ? `${fromNote(started.run)} — removed from the inbox`
           : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`);
+        // A card filed with a repository, started as a team that works in folders: the path is on the card and nothing reads it.
+        if (started.ignoredRepo) console.log(`the card's repo: ${started.ignoredRepo} was not looked at — this workflow's steps work in folders, with no git repository`);
         return;
       }
       if (how.brief !== undefined) usage(`wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`);

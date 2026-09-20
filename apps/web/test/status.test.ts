@@ -75,7 +75,7 @@ test('a loop out of rounds waits on a person, in amber like a step that signed o
   assert.match(stateClass.exhausted, /\bbg-amber-100\b/);
   assert.equal(
     stateMeaning.exhausted,
-    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round',
+    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
   );
   // Final, so a run somebody called off does not make it read as a step that never started.
   assert.equal(stepState('rounds exhausted', true), 'exhausted');

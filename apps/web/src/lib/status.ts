@@ -80,7 +80,7 @@ export const stateMeaning: Record<StepState, string> = {
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
   'awaiting-approval': 'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
-  exhausted: 'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round',
+  exhausted: 'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
   'over-budget': 'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
   'budget-exhausted': 'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
   unsigned: 'unsigned: it ended without the closeout it was asked for',

@@ -25,6 +25,7 @@ process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
 const { app, diffFiles, DIFF_LINES } = await import('../src/app.ts');
+type DecideCommand = import('../src/app.ts').DecideCommand;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
@@ -217,6 +218,36 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   // The count counts: a decidable run's decision is read out of git.
   await decisionOf('r-d1');
   assert.ok(gitCount() > before, 'a decidable run runs git, through the same PATH');
+});
+
+test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {
+  // `implement ⇄ review`, rounds: 2, both rounds spent, and review asked for a third.
+  const looping = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    {
+      name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex', loop: 'implement', rounds: 2,
+      output: { file: 'review.json', schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false } },
+    },
+  ];
+  settledTask('t-d9-implement-2', done);
+  settledTask('t-d9-review-2', { ...done, again: true });
+  const tries = (name: string) => [{ taskId: `t-d9-${name}-1`, then: 'round' }];
+  writeRun({
+    id: 'r-d9', repo, baseRef: base, workflow: looping,
+    steps: { implement: { taskId: 't-d9-implement-2', branch, tries: tries('implement') }, review: { taskId: 't-d9-review-2', branch, tries: tries('review') } },
+  });
+
+  const { status, body } = await decisionOf('r-d9');
+  assert.equal(status, 200);
+  // Both offers are parsed to the command a person runs. An offer this route's ONCE_MORE does not know is handed over whole, and the
+  // board would give a person a paragraph of English to copy under a button that says `once more`.
+  assert.deepEqual(body.commands.filter((c: { label: string }) => c.label !== 'ship it' && c.label !== 'drop it').map(({ label, command }: DecideCommand) => ({ label, command })), [
+    { label: 'once more', command: 'wf round r-d9 review' },
+    { label: 'accept', command: 'wf accept r-d9 review --message "<why>"' },
+    { label: 'once more', command: 'wf retry r-d9 implement' },
+  ]);
+  const accept = body.commands.find((c: { label: string }) => c.label === 'accept');
+  assert.match(accept.said, /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept r-d9 review --message "<why>"$/);
 });
 
 test("a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers", async () => {

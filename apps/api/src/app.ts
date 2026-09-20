@@ -534,7 +534,7 @@ export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
  * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
  * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
  */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
@@ -1518,9 +1518,12 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 /**
  * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
  * past a cap — after the colon and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
- * `wf retry <run> <step> --message "<objection>"`.
+ * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer.
+ *
+ * A verb this does not know is not dropped: `commandsOf` falls back to the whole English sentence, which the board then offers as a
+ * command to copy and run. So an offer worded in the package goes in here in the same change (CLAUDE.md).
  */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>| --message "<objection>")?)/;
+const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --budget <amount>| --message "<(?:objection|why)>")?)/;
 
 /**
  * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as
@@ -1548,7 +1551,8 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: rea
   const once = [
     ...offers.map((said): DecideCommand => {
       const command = ONCE_MORE.exec(said)?.[1] ?? said;
-      return { label: command.endsWith('--message "<objection>"') ? 'send back' : 'once more', command, said };
+      const label = command.startsWith('wf accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
+      return { label, command, said };
     }),
     ...gates.flatMap(({ step, back }): DecideCommand[] => {
       const approve = `wf approve ${run.id} ${step}`;

@@ -1125,7 +1125,9 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
     got = await read();
   }
   if (!got) return null;
-  const last = got.events.filter((event) => (event.kind === 'text' || event.kind === 'system') && event.text?.trim()).at(-1);
+  // What the session said, not what it was told: a brief, a `wf say` and every tool result come back as `user` events
+  // (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
+  const last = got.events.filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim()).at(-1);
   const line = last?.text?.trim() ?? from?.line ?? null;
   lastSaid.set(key, { cursor: got.cursor, line });
   return line;

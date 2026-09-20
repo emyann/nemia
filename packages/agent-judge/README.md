@@ -276,7 +276,10 @@ questions and the answer compared with what the person did.
   needed to go past it whenever a request would be made. A second pass over the same store asks
   nothing, needs no `--yes`, and says so. With no key the judge is off and only the rival is scored.
 - The answers are the same keys `judge card` writes, in the same record: a brief asked by `judge
-  card` and by `judge runs` is asked once.
+  card` and by `judge runs` is asked once. Two runs dispatched with the same brief are one key too:
+  it is sent once, counted once in what a person consents to, and answered alike for both. Both are
+  still scored — each is a dispatch a person made — and the report says how many distinct briefs the
+  runs are, and names the runs that share one beside each disagreement.
 
 It prints, for the judge and for the rival, a confusion table per property against the label,
 agreement on the whole folder, and — for the judge alone — how many answers stayed `unsure`, kept
@@ -303,9 +306,9 @@ Two things were tuned, once, on the runs it is scored on, and nothing else was. 
 scored better on precision than the two paths together (0.74 against 0.71, both at recall 1.00) and
 was not taken, because the question the judge is asked names both. And the two halves of the plan
 rule were first joined by *or*, which fires on 69 briefs of the 75 and gets 18 folders of 75 whole,
-so they were joined by *and*, which fires on 39 and gets 35. Every number here and below comes from
+so they were joined by *and*, which fires on 39 and gets 35. Every number here comes from
 that one measurement, over the 75 in-scope runs on 2026-09-19; `src/rival.ts` repeats it and nothing
-else. The pivot plan's §2.3 reports a fair baseline at P 0.94 / R 0.91 on *web*, and that number is
+else. The `--since` table below is the same command over the same store on the same day. The pivot plan's §2.3 reports a fair baseline at P 0.94 / R 0.91 on *web*, and that number is
 **not** comparable to these: it was measured against whether the branch ended up touching
 `apps/web`, and the label here is the folder a person picked beforehand.
 
@@ -315,6 +318,8 @@ Against the 75 runs dispatched by hand up to 2026-09-19, with the judge off:
 $ judge runs
 judge runs: 75 runs in scope, 25 skipped, of 100 records in ~/.agent-workflows
   the judge is off: no TYPESAFE_API_KEY in the environment; nothing would be sent, and only the rival is scored.
+  …
+  74 distinct briefs: 1 of these runs repeat one another sent.
   …
 web · does the work change apps/web or the api it runs against · the label is a -build folder
   rival     label yes  label no
@@ -332,8 +337,38 @@ the whole folder
 
 So a plain reading of the text finds the web app well — it never misses one — and planning badly:
 it calls 39 briefs planning work where 17 were sent to a `dev-planned` folder, and misses 6 of
-those. Under half the folders come out whole. That is the bar the judge has to clear; whether it
-does is unmeasured until someone runs this with a key.
+those. Under half the folders come out whole.
+
+That *plan* table is confounded, and the *web* one is not. The four folders are not the same age,
+and a person cannot pick a folder that does not exist yet: `dev` and `dev-build` were added on
+2026-09-13 (`164742f`), `dev-planned` on 2026-09-14 (`bf4c1b1`) and `dev-planned-build` on
+2026-09-16 (`19fbecc`). Twenty-two of the 75 runs were started before that last date, and exactly
+one of them carries a `dev-planned` label — so early briefs the rival calls planning work are
+counted wrong whatever they said. `--since` is the flag that answers it. Over the window in which
+all four folders existed, the rival reads better at planning and the same at the web app:
+
+```
+$ judge runs --since 2026-09-16
+judge runs: 53 of 100 records were dispatched to dev, dev-build, dev-planned or dev-planned-build · since 2026-09-16 · jev-1.13.0
+  skipped  22  was started before --since
+  …
+web · does the work change apps/web or the api it runs against · the label is a -build folder
+  rival     label yes  label no
+    yes            22        10    P 0.69
+    no              0        21    R 1.00
+
+plan · should someone read the code and plan first · the label is a dev-planned folder
+  rival     label yes  label no
+    yes            11        17    P 0.39
+    no              5        20    R 0.69
+
+the whole folder
+  rival   25 of 53 agree · 28 differ
+```
+
+Planning goes from P 0.28 to P 0.39 and the web app stays where it was, which is what an age
+confound looks like. Neither reading is good. That is the bar the judge has to clear, on whichever
+window it is measured over; whether it clears it is unmeasured until someone runs this with a key.
 
 ## What is sent
 
@@ -345,7 +380,8 @@ frontmatter stripped, and that same fixed description — and nothing else off t
 id, not the folder it ran on, not its workflow. A brief is usually longer than a card (those on this
 machine run to about 7,000 characters), so it says how many characters would go, and from how many briefs,
 before it sends any, and asks for `--yes`. It counts only the briefs with a question still to ask:
-one already answered is never sent again, and is not in the number.
+one already answered is never sent again, and is not in the number, and a brief two runs were
+dispatched with is one brief in it.
 
 The service's base URL is fixed (`https://api.typesafe.ai`) and so is the SDK's log level (off). So
 `TYPESAFE_BASE_URL` and `TYPESAFE_LOG_LEVEL` in the environment cannot send the state elsewhere or

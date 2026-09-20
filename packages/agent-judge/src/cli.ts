@@ -44,22 +44,30 @@ export const defaultRecord = (env: Readonly<Record<string, string | undefined>>)
 /**
  * What a pass would send, counted without asking anything: the questions with nothing on record, and — with `--reask` —
  * those whose last asking failed, and the card texts that would travel with them. The key is computed by the code that
- * would ask, so this is the same arithmetic the ask does, and a second pass over the same store costs nothing and says
- * so. `sending` holds only the briefs with a question left: a brief every one of whose questions is answered is never
- * sent again, and must not be counted in what a person is asked to consent to.
+ * would ask, so this is the arithmetic the ask does, the pass included: two runs whose brief strips to the same card
+ * share a key, the first asking writes it and the second reads it back off the record, so a key counted once here is
+ * asked once there however many runs carry it. `sending` holds only the briefs with a question left: a brief every one
+ * of whose questions is answered — on record, or by an earlier brief in this same pass — is never sent again, and must
+ * not be counted in what a person is asked to consent to.
  */
 export type Asking = { readonly questions: number; readonly sending: readonly string[] };
 
 export const wouldAsk = (record: string, briefs: readonly string[], reask: boolean, now = Date.now()): Asking => {
   let questions = 0;
   const sending: string[] = [];
+  const counted = new Set<string>();
   for (const brief of briefs) {
     const state = cardState(brief);
     let n = 0;
     for (const question of Object.values(QUESTIONS)) {
       const key = keyOf(MODEL, question, state);
+      // Counted already, by an earlier brief in this pass: that asking writes the record this one would read.
+      if (counted.has(key)) continue;
       const r = reading(key, readFacts(record, key), question, MODEL, now);
-      if (r.status === 'none' || (reask && r.status === 'failed')) n++;
+      if (r.status === 'none' || (reask && r.status === 'failed')) {
+        counted.add(key);
+        n++;
+      }
     }
     questions += n;
     // What travels is the stripped card, not the brief: that is what `cardState` puts in the request.
@@ -68,9 +76,13 @@ export const wouldAsk = (record: string, briefs: readonly string[], reask: boole
   return { questions, sending };
 };
 
-/** A run's label, as a row carries it. The brief itself is not a row's: what is scored is the two properties. */
-const pick = (run: { id: string; first: string; folder: Row['folder']; web: boolean; plan: boolean }) =>
-  ({ id: run.id, first: run.first, folder: run.folder, web: run.web, plan: run.plan });
+/**
+ * A run's label, as a row carries it, beside the card that would travel: two runs whose brief strips to the same card
+ * are one question to the judge, and the report says so. The brief itself is not a row's: what is scored is the two
+ * properties.
+ */
+const pick = (run: { id: string; first: string; folder: Row['folder']; web: boolean; plan: boolean }, card: string) =>
+  ({ id: run.id, first: run.first, folder: run.folder, web: run.web, plan: run.plan, card });
 
 export async function main(argv: readonly string[], io: Io = {}): Promise<number> {
   const env = io.env ?? process.env;
@@ -150,15 +162,16 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       if (!off) {
         const j = judge({ model: MODEL, record: dir, env, ...(io.fetch ? { fetch: io.fetch } : {}), ...(io.retries !== undefined ? { retries: io.retries } : {}) });
         for (const run of runs) {
-          const asked = await j.ask(cardState(run.brief), QUESTIONS, reask ? { reask: 'failed' } : {});
+          const state = cardState(run.brief);
+          const asked = await j.ask(state, QUESTIONS, reask ? { reask: 'failed' } : {});
           cost.requests += asked.requests;
           cost.questions += asked.sent;
           cost.inputTokens += asked.usage?.input_tokens ?? 0;
           cost.ms += asked.ms ?? 0;
-          rows.push({ ...pick(run), rival: rival(run.brief), answers: asked.answers as CardAnswers });
+          rows.push({ ...pick(run, state.card as string), rival: rival(run.brief), answers: asked.answers as CardAnswers });
         }
       } else {
-        for (const run of runs) rows.push({ ...pick(run), rival: rival(run.brief) });
+        for (const run of runs) rows.push({ ...pick(run, cardState(run.brief).card as string), rival: rival(run.brief) });
       }
 
       const report: Report = {

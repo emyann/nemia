@@ -70,6 +70,20 @@ const fixture = () => {
   return store;
 };
 
+/** A store of just the records a test needs, where the six do not show the thing (a brief sent twice). */
+const storeOf = (records: { id: string; folder: string; brief: string; createdAt: string }[]) => {
+  const store = tmp('store');
+  const dir = path.join(store, 'runs');
+  fs.mkdirSync(dir);
+  for (const r of records) {
+    fs.writeFileSync(path.join(dir, `${r.id}.json`), JSON.stringify({
+      id: r.id, brief: r.brief, createdAt: r.createdAt,
+      workflowDir: `/home/someone/hkb-v2/workflows/${r.folder}`, workflow: WORKFLOW, steps: {},
+    }));
+  }
+  return store;
+};
+
 const run = async (argv: string[], replies: Parameters<typeof stub> = [forCard], env: Record<string, string> = ENV) => {
   const s = stub(...replies);
   const out: string[] = [];
@@ -219,6 +233,28 @@ test('with a record part filled, only the briefs that still have a question to a
   const chars = rest.reduce((n, r) => n + r.brief.length, 0);
   assert.match(text, new RegExp(`^ {2}about ${chars} characters would go to TypeSafe \u2014 5 of the 6 briefs, `, 'm'));
   assert.ok(!text.includes(String(chars + answered!.brief.length)), 'the brief already on record is not in the count');
+});
+
+test('a brief two runs were dispatched with is one question, counted once, sent once and scored twice', async () => {
+  // The same brief sent twice is one key: the first asking writes the record the second reads, so the pass makes one
+  // request. What a person consents to must say that, and the report must not read as two independent runs.
+  const brief = RUNS[1]!.brief;
+  const store = storeOf([
+    { id: 'first', folder: 'dev-build', brief, createdAt: '2026-09-10T00:00:00Z' },
+    { id: 'again', folder: 'dev', brief, createdAt: '2026-09-11T00:00:00Z' },
+  ]);
+  const record = tmp('runs');
+  assert.deepEqual(wouldAsk(record, [brief, brief], false), { questions: 4, sending: [brief] });
+
+  const { calls, text } = await run(['runs', '--store', store, '--record', record, '--yes']);
+  assert.equal(calls.length, 1, 'one request for the two runs');
+  assert.match(text, /^ {2}4 of 8 questions would be asked; the rest are on record in /m);
+  assert.match(text, new RegExp(`^ {2}about ${brief.length} characters would go to TypeSafe — 1 of the 2 briefs, `, 'm'));
+  // Both dispatches are scored all the same — each is a choice a person made — and the count says how many briefs.
+  assert.match(text, /^judge runs: 2 of 2 records were dispatched to /m);
+  assert.match(text, /^ {2}1 distinct brief: 1 of these runs repeat one another sent\.$/m);
+  assert.match(text, /^ {2}judge {3}1 of 2 agree · 1 differ · 0 stayed in the inbox, counted apart$/m);
+  assert.match(text, /^ {2}again · the same brief was dispatched as first$/m);
 });
 
 test('--json writes the same report whole, judgments and all', async () => {

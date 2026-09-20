@@ -23,8 +23,28 @@ export type Row = {
   readonly web: boolean;
   readonly plan: boolean;
   readonly rival: Guess;
+  /**
+   * The stripped card that would travel, which is the dispatch's identity: two runs whose brief strips to the same
+   * card are asked once and answered alike, so the report counts the distinct briefs and names the runs that share one.
+   */
+  readonly card: string;
   /** Absent when the judge is off. */
   readonly answers?: CardAnswers;
+};
+
+/** How many distinct briefs the rows are: fewer than the rows when one brief was dispatched more than once. */
+export const distinctBriefs = (rows: readonly Row[]): number => new Set(rows.map((r) => r.card)).size;
+
+/** For each run that shares its brief with another in scope, the other runs' ids, in the order they were read. */
+export const sharing = (rows: readonly Row[]): Map<string, string[]> => {
+  const by = new Map<string, string[]>();
+  for (const r of rows) by.set(r.card, [...(by.get(r.card) ?? []), r.id]);
+  const out = new Map<string, string[]>();
+  for (const r of rows) {
+    const ids = by.get(r.card)!.filter((id) => id !== r.id);
+    if (ids.length > 0) out.set(r.id, ids);
+  }
+  return out;
 };
 
 export type Property = 'web' | 'plan';
@@ -112,10 +132,13 @@ export type Disagreement = {
   readonly judge: string;
   readonly inbox: boolean;
   readonly probabilities: { readonly web: string; readonly plan: string; readonly clear: string };
+  /** Other runs in scope dispatched with this same brief: one disagreement, not two, whatever folder each chose. */
+  readonly also: readonly string[];
 };
 
 /** The runs where the judge and the person do not agree: the interesting ones, in the order the runs were read. */
 export const disagreements = (rows: readonly Row[]): Disagreement[] => {
+  const shared = sharing(rows);
   const out: Disagreement[] = [];
   for (const row of rows) {
     const d = dispatchOf(row);
@@ -126,6 +149,7 @@ export const disagreements = (rows: readonly Row[]): Disagreement[] => {
       probabilities: {
         web: shown(row.answers!.web), plan: shown(row.answers!.plan), clear: shown(row.answers!.clear),
       },
+      also: shared.get(row.id) ?? [],
     });
   }
   return out;
@@ -185,6 +209,11 @@ export const lines = (report: Report): string[] => {
   const out: string[] = [];
   const since = report.since ? ` · since ${report.since}` : '';
   out.push(`judge runs: ${rows.length} of ${report.read} records were dispatched to ${LABEL_LIST}${since} · ${report.model}`);
+  const distinct = distinctBriefs(rows);
+  if (distinct < rows.length) {
+    out.push(`  ${distinct} distinct brief${distinct === 1 ? '' : 's'}: ${rows.length - distinct} of these runs repeat one another sent.`);
+    out.push('    each is scored — a dispatch is a choice a person made — and the judge is asked once per brief.');
+  }
   out.push(`  store: ${report.store}`);
   for (const { why, count } of reasons(skipped)) out.push(`  skipped ${String(count).padStart(3)}  ${why}`);
   if (report.off) out.push(`  ${report.off}; only the rival is scored.`);
@@ -211,7 +240,7 @@ export const lines = (report: Report): string[] => {
     out.push('');
     out.push(`where the judge and the person differ · ${differ.length} of ${rows.length}; the person's choice is not always right (pivot §2.4)`);
     for (const d of differ) {
-      out.push(`  ${d.id}`);
+      out.push(`  ${d.id}${d.also.length > 0 ? ` · the same brief was dispatched as ${d.also.join(', ')}` : ''}`);
       out.push(`    ${d.folder} → ${d.judge}`);
       out.push(`    web ${d.probabilities.web} · plan ${d.probabilities.plan} · clear ${d.probabilities.clear}`);
       out.push(`    ${d.first}`);
@@ -244,6 +273,7 @@ export const document = (report: Report) => {
     ...(report.off ? { off: report.off } : {}),
     read: report.read,
     inScope: report.rows.length,
+    distinctBriefs: distinctBriefs(report.rows),
     labels: LABEL_LIST,
     skipped: report.skipped,
     asked: report.asked ?? null,

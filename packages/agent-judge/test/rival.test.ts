@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { folderOf, MODEL, type CardAnswers } from '../src/card.ts';
 import type { Judgment } from '../src/decide.ts';
 import { namesWeb, partsNamed, planningWord, PARTS, PARTS_FOR_PLAN, PLANNING_WORDS, rival, WEB_PATHS } from '../src/rival.ts';
-import { agreement, confusion, disagreements, judgeFolder, lines, shown, verdictOf, type Row } from '../src/score.ts';
+import { agreement, confusion, disagreements, distinctBriefs, judgeFolder, lines, sharing, shown, verdictOf, type Row } from '../src/score.ts';
 import { firstLine, labelOf } from '../src/runs.ts';
 
 const P = (noul: number): Judgment => ({ status: 'answered', answer: { type: 'noul', noul } as never, key: 'k', at: '2026-09-19T00:00:00Z', model: MODEL });
@@ -19,7 +19,7 @@ const answers = (web: Judgment, plan: Judgment, clear: Judgment = S(3)): CardAns
 const row = (id: string, folder: Row['folder'], over: Partial<Row> = {}): Row => ({
   id, first: `${id} does a thing`, folder,
   web: folder.endsWith('-build'), plan: folder.startsWith('dev-planned'),
-  rival: { web: false, plan: false, folder: 'dev' }, ...over,
+  rival: { web: false, plan: false, folder: 'dev' }, card: `${id}'s card`, ...over,
 });
 
 // ─── the rival ──────────────────────────────────────────────────────────────────────────────────
@@ -139,6 +139,7 @@ test('a disagreement carries the run, both folders and each probability; an inbo
   assert.deepEqual(d[0], {
     id: 'differ', first: 'differ does a thing', folder: 'dev-planned', judge: 'dev-build', inbox: false,
     probabilities: { web: 'P 0.95', plan: 'P 0.05', clear: 'score 3.00' },
+    also: [],
   });
   assert.equal(d[1]!.inbox, true);
   assert.match(d[1]!.judge, /^the inbox: says too little about what done looks like$/);
@@ -161,6 +162,28 @@ test('the printed report says what is scored, and with the judge off has no judg
   assert.ok(!/^ {2}judge/m.test(off), 'nothing is claimed for a judge that never answered');
   assert.ok(!off.includes('input tokens'));
   assert.match(off, /^ {2}rival {3}1 of 1 agree/m);
+});
+
+test('two runs sent with one brief are one brief in the count, and each disagreement names the other', () => {
+  // A brief dispatched twice is two choices a person made, so both are scored; it is one question to the judge, and one
+  // mistake if the judge differs. The count and the list say so rather than reading as two independent runs.
+  const rows = [
+    row('first', 'dev-build', { card: 'one card', answers: answers(P(0.95), P(0.05)) }),
+    row('again', 'dev', { card: 'one card', answers: answers(P(0.95), P(0.05)) }),
+    row('other', 'dev-build', { answers: answers(P(0.05), P(0.05)) }),
+  ];
+  assert.equal(distinctBriefs(rows), 2);
+  assert.deepEqual([...sharing(rows)], [['first', ['again']], ['again', ['first']]], 'a run that shares nothing is not in it');
+  assert.deepEqual(disagreements(rows).map((d) => [d.id, d.also]), [['again', ['first']], ['other', []]]);
+  // Both are still counted whole: two dispatches, one of them the judge would have sent elsewhere.
+  assert.deepEqual(agreement(rows, judgeFolder), { same: 1, differ: 2, inbox: 0, of: 3 });
+  const base = { store: '/s', record: '/r', model: MODEL, read: 3, skipped: [] };
+  const text = lines({ ...base, rows, asked: { requests: 1, questions: 4, inputTokens: 10, ms: 5 } }).join('\n');
+  assert.match(text, /^ {2}2 distinct briefs: 1 of these runs repeat one another sent\.$/m);
+  assert.match(text, /^ {2}again \u00b7 the same brief was dispatched as first$/m);
+  assert.match(text, /^ {2}other$/m, 'a run that shares no brief is named alone');
+  const alone = lines({ ...base, rows: [rows[2]!] }).join('\n');
+  assert.ok(!alone.includes('distinct brief'), 'with no repeat there is nothing to say');
 });
 
 test('a report with nothing in scope says so rather than dividing by nothing', () => {

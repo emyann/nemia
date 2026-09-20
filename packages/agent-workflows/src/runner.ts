@@ -24,7 +24,7 @@ export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutA
 import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, isFolderTeam, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
-export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
+export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
@@ -1675,7 +1675,8 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
 
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
- * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start.
+ * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card whose
+ * `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it.
  *
  * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
  * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
@@ -1698,7 +1699,12 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
   const where = next.repo ? {} : { on };
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
-    return started.removed ? { card: next.name, run: started.run.id, removed: true } : { card: next.name, run: started.run.id, removed: false, why: started.why };
+    // Carried, not dropped: a card whose `repo:` the run never looked at says so wherever it was started, and a tick's line is the only
+    // place a daemon's start is read (`queueLine`).
+    const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
+    return started.removed
+      ? { card: next.name, run: started.run.id, removed: true, ...ignored }
+      : { card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored };
   } catch (err) {
     const refused = (err as { exitCode?: number }).exitCode === 2;
     // On one line: git's words come with its command and its stderr, a line each.

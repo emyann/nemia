@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { repositoryQuery, runsQuery, startRun, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
+import { ignoredRepoNote } from '../lib/inbox';
 
 /**
  * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to
@@ -32,6 +33,9 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
   // A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one: there is no branch for
   // a run to wait on. No picker, and nothing about a repository under the button.
   const inFolders = workflow.folderTeam;
+  // A card filed before its team worked in folders still names a repository, and the start looks at none of it. The package starts it all
+  // the same and says so afterwards; said here, a person reads it while the choice is still theirs (`ignoredRepoNote`).
+  const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[] }) =>
       startRun({
@@ -93,6 +97,11 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           {card && ', and the card leaves the inbox'}.
         </span>
       </div>
+      {ignored && (
+        <p data-ignored-repo className="text-xs text-amber-700 dark:text-amber-400">
+          {ignored}
+        </p>
+      )}
 
       {start.isSuccess && (
         <p className="text-sm" data-started={start.data.id}>

@@ -79,6 +79,17 @@ export function presetOf(workflow: string | null, repo: string | null, here: str
   return readable.find((w) => w.from === 'repo' && w.name === workflow) ?? null;
 }
 
+/**
+ * What a card's `repo:` is worth on a team whose every step works in a folder: nothing. The package starts the card all the same —
+ * refusing it would strand a card filed before the team worked in folders — and says the repository was not looked at: `wf start`
+ * prints it, a tick's line carries it, and the api answers it on the start (`ignoredRepo`).
+ *
+ * The board says it before the start instead, on the form where a person picks the workflow: a start the api takes opens the run's
+ * page, so a sentence in its answer is shown to nobody. `repo` is the card's, and a card that names none has nothing to say.
+ */
+export const ignoredRepoNote = (workflow: Pick<WorkflowListing, 'folderTeam'>, repo: string | undefined | null): string | null =>
+  workflow.folderTeam && repo ? `The card's repo: ${repo} is not looked at — this workflow's steps work in folders, with no git repository.` : null;
+
 /** A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`. */
 export function ordinal(n: number): string {
   const tens = n % 100;

@@ -32,7 +32,7 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { addToInbox, advance, decide, forget, list, readRun, start } = await import('../src/runner.ts');
+const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, start, startQueued } = await import('../src/runner.ts');
 const { forgetLine } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
@@ -212,6 +212,41 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', 'a-note-on-tides-old', false]);
     assert.ok(out.some((line) => line === `the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository`), out.join('\n'));
     assert.ok(!fs.existsSync(file), 'started, the card leaves the inbox');
+  } finally {
+    process.chdir(cwd);
+  }
+  assert.deepEqual(gitAsked(), []);
+});
+
+test("a queued card of a folder team, started by a tick: its repo: is not looked at, and the tick's own line says so", async () => {
+  const cwd = process.cwd();
+  process.chdir(NOT_A_REPO);
+  try {
+    // The same card as the test above, queued instead of started by hand: `wf up` and `wf tick` start it, and a daemon's log is the only
+    // place that start is read. The line said it nowhere until `QueueStarted` carried the fact.
+    const card = (name: string, lines: string): string => {
+      const file = path.join(ROOT, 'inbox', `${name}.md`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `---\nworkflow: ${TEAM}\n${lines}---\na note on tides\n`);
+      queueInInbox(name);
+      return name;
+    };
+    const named = card('a-note-queued', `repo: ${NOT_A_REPO}\n`);
+    const started = startQueued(NOT_A_REPO)!;
+    assert.ok('run' in started, JSON.stringify(started));
+    const run = readRun(started.run);
+    assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', named, false], 'the run looked at no repository');
+    assert.equal(started.ignoredRepo, NOT_A_REPO, "the tick's start carries the card's repo, which the run looked at none of");
+    assert.equal(queueLine(started),
+      `started ${named} as ${started.run} (the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository)`,
+      'and the line a daemon prints says it, in the sentence wf start prints');
+
+    // The other way round, so the line is not one every start carries: a card of the same folder team that names no repository.
+    const plain = card('a-note-queued-plain', '');
+    const next = startQueued(NOT_A_REPO)!;
+    assert.ok('run' in next, JSON.stringify(next));
+    assert.equal(next.ignoredRepo, undefined, 'a card that names no repository has nothing to say');
+    assert.equal(queueLine(next), `started ${plain} as ${next.run}`);
   } finally {
     process.chdir(cwd);
   }

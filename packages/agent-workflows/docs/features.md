@@ -3671,9 +3671,13 @@ beside it changes these readers and no more.
 - **A card for a folder team names no repository.** `addToInbox` refuses `repo:` when the card's workflow has a step that says
   `workspace: folder`, in the words `wf start --repo` is refused in — one writer, so `wf inbox add` and the board's POST
   `/api/inbox` are refused alike (`cardRepoRefusal`). A card *already* on disk is not refused, which would strand it: its `repo:`
-  is ignored, as it always was, and `wf start` now says so (`InboxStarted.ignoredRepo`).
+  is ignored, as it always was, and it is said wherever the card is started (`InboxStarted.ignoredRepo`) — `wf start` prints it,
+  a tick's line carries it into a daemon's log (`queueLine`), and the api answers it on the start (`ignoredRepo` on the 201).
+  One sentence, written once (`ignoredRepoLine`), so the four paths cannot drift apart.
 - **The board files none.** `/api/workflows` says which teams work in folders (`folderTeam`), so the Inbox's File box replaces the
   Repository field with a line saying where the work goes, and sends no `repo:` — whatever was typed before the team was picked.
+  A card that named one all the same is said over before the start, on the form where the workflow is picked (`ignoredRepoNote`):
+  a start the api takes opens the run's page, so a sentence in its answer would be shown to nobody.
 - **Found with no repository in the picture.** `repoOf` resolves a path and never asks git, so the api pointed at a plain directory
   that is no repository lists the store's own folder teams and files for them (`apps/api/test/folder-run.test.ts`). An api with
   *no* repository to point at is the Factory-workspaces slice, and is not this one.

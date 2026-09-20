@@ -177,3 +177,37 @@ test("a folder step's file is served by name, and a name that is a path, or not 
     assert.match((await res.json() as { error: string }).error, /has no file '.*' in its folder/, name);
   }
 });
+
+test("a card started on a folder team carries the repository it named and the run looked at none of — and a card that names none, nothing", async () => {
+  const json = { 'content-type': 'application/json' };
+  const file = async (body: string, repo?: string): Promise<string> => {
+    const res = await app.request('/api/inbox', {
+      method: 'POST', headers: json,
+      // Filed for the team that works on a repository, which takes a `repo:`; started below on the one that works in folders, as the
+      // board's start form lets a person pick another. This is how a card comes to name a repository no run will look at.
+      body: JSON.stringify({ body, workflow: 'change', from: 'yours', ...(repo !== undefined ? { repo } : {}) }),
+    });
+    const filed = (await res.json()) as { name?: string; error?: string };
+    assert.equal(res.status, 201, filed.error);
+    return filed.name!;
+  };
+  const startOn = async (card: string) => app.request('/api/runs', {
+    method: 'POST', headers: json,
+    body: JSON.stringify({ workflow: 'notes', from: 'yours', brief: 'Write the note.', card }),
+  });
+
+  const named = await file('a note on the tides, from a card that names a repository', notARepo);
+  const res = await startOn(named);
+  const started = (await res.json()) as { id: string; card: string; removed: boolean; ignoredRepo?: string; error?: string };
+  assert.equal(res.status, 201, started.error);
+  assert.deepEqual([started.card, started.removed, started.ignoredRepo], [named, true, notARepo],
+    "the api says what `wf start` prints and a tick's line carries: the card's `repo:` was not looked at");
+  // And the run it started looked at none: no repository on its record, and its work is in a folder.
+  const run = (await (await app.request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
+  assert.deepEqual([run.repo, run.place], [null, 'folder']);
+
+  // The other way round, at the same shipped defaults: a card that names no repository has nothing to say, and the field is absent.
+  const plain = await file('a note on the moon, from a card that names none');
+  const next = (await (await startOn(plain)).json()) as Record<string, unknown>;
+  assert.equal('ignoredRepo' in next, false, `a card that names no repository has nothing to say: ${JSON.stringify(next)}`);
+});

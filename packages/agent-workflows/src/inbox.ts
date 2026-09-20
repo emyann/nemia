@@ -253,15 +253,26 @@ export const nextQueued = (listing: readonly InboxListing[], repo: string): Inbo
  * before, on the same repository. `on` is the repository it was tried on, for a card that names none.
  */
 export type QueueStarted =
-  | { card: string; run: string; removed: true }
-  | { card: string; run: string; removed: false; why: string }
+  | { card: string; run: string; removed: true; ignoredRepo?: string }
+  | { card: string; run: string; removed: false; why: string; ignoredRepo?: string }
   | { card: string; refused: string; on?: string }
   | { card: string; failed: string; again: boolean; on?: string };
 
 /**
+ * The card's own `repo:` when the run started from it looks at no repository — a folder team's does not, and a card filed before
+ * `cardRepoRefusal`, or by hand, may still carry one. Said and not refused, since a card on disk cannot be edited from the board.
+ *
+ * One writer, so a person reads the same sentence wherever the card was started: `wf start` prints it under the run, and a tick's
+ * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in runner.ts is what both are given.
+ */
+export const ignoredRepoLine = (repo: string): string =>
+  `the card's repo: ${repo} was not looked at — this workflow's steps work in folders, with no git repository`;
+
+/**
  * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. A
- * failure is said once by the daemon that says it — `wf up` keeps the last one it printed, rather than reading `again`, which is a fact about
- * the store and not about this terminal.
+ * card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon that
+ * says it — `wf up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
+ * terminal.
  */
 export function queueLine(q: QueueStarted): string {
   if ('refused' in q) {
@@ -271,9 +282,11 @@ export function queueLine(q: QueueStarted): string {
   if ('failed' in q) {
     return `${q.card} not started${q.on ? ` on ${q.on}` : ''}: ${q.failed} — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise`;
   }
-  return q.removed
+  const started = q.removed
     ? `started ${q.card} as ${q.run}`
     : `started ${q.card} as ${q.run} — still in the inbox: ${q.why}. wf inbox lists it as started as ${q.run}, and it is not started again: drop it with wf inbox rm ${q.card}`;
+  // A card the tick started whose `repo:` the run never looked at: said here too, or a daemon's log is the one start that says nothing.
+  return q.ignoredRepo ? `${started} (${ignoredRepoLine(q.ignoredRepo)})` : started;
 }
 
 /**

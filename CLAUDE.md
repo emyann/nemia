@@ -168,6 +168,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
+  TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
+  a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by
+  nothing else — no daemon log, no board. Grep for every place that spreads or rebuilds the type, and give the new fact one writer
+  (`ignoredRepoLine`) so the paths cannot word it differently either (learned by the run that started a folder team from a card).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
   there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy
@@ -206,6 +211,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own harness: `codex exec` is not interactive — one shell, fenced by the sandbox its `permissionMode` names — and a
   codex folder team passes in every mode codex has. A guard written from one harness's measurement, applied to
   another's words, sent a codex author from the tightest sandbox to the widest mode, by way of a fix codex refuses.
+  A refusal that names a mode must name one that harness takes: the test loops over `HARNESSES`, so the next harness
+  added fails until it has a list of its unasking modes and a default.
 - **A session started anywhere under `~/.claude/` cannot write there, in any mode.** Claude Code reads that directory
   as its own and refuses a write into it — *"sits under `~/.claude/`, which the harness treats as sensitive"* — whatever
   `--permission-mode` and `--allowedTools` say. `$CLAUDE_JOB_DIR/tmp` is under it, so a live `wf` store put there

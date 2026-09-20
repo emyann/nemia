@@ -438,7 +438,13 @@ export const workflows = new Hono()
         const started = startFromInbox({ name: asked.card, callerRepo: repo, workflow: asked.dir, ...(asked.brief !== undefined ? { brief: asked.brief } : {}), ...(asked.after ? { after: asked.after } : {}) });
         c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
         // Started all the same when the card could not be removed: the run is written, and the card lists as started until it is dropped.
-        return c.json({ id: started.run.id, card: started.card.name, removed: started.removed, ...(started.removed ? {} : { why: started.why }) }, 201);
+        // And a card whose `repo:` the run looked at none of — a folder team's — carries it, as `wf start` prints it and a tick's line
+        // says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
+        return c.json({
+          id: started.run.id, card: started.card.name, removed: started.removed,
+          ...(started.removed ? {} : { why: started.why }),
+          ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+        }, 201);
       } catch (err) {
         const status = (err as { exitCode?: unknown }).exitCode === 2 ? cardRefusalStatus(asked.card) : 422;
         return c.json({ error: messageOf(err) }, status);

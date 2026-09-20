@@ -1953,3 +1953,34 @@ test("REFUSED at shipped defaults: a save with no status — a fetch that never 
   assert.doesNotMatch(shapeless.head, /did not answer/, 'it answered: 200, without what it wrote');
   assert.equal(shapeless.reread, true);
 });
+
+/**
+ * A card's start form, rendered as a server renders it: the workflow it runs on, and the card's `repo:` when it names one. A folder
+ * team's start looks at no repository, and the form says so — before the start, since a start the api takes opens the run's page.
+ */
+async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> {
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const { StartRun } = await import('../src/components/StartRun.tsx');
+  const workflow = {
+    name: 'note', from: 'yours' as const, dir: '/home/me/.agent-workflows/workflows/note', description: null,
+    steps: [], graph: { roots: [], edges: [] }, schemas: [], folderTeam, version: '0', error: null,
+  };
+  return renderToStaticMarkup(createElement(
+    QueryClientProvider,
+    { client: new QueryClient() },
+    createElement(StartRun, { workflow, card: { name: 'a-note-on-the-tides', body: 'Why the tides come twice a day.' }, ...(repo ? { repo } : {}) }),
+  ));
+}
+
+test("a card that names a repository, started on a team that works in folders: the form says the repository is not looked at, and names it", async () => {
+  const html = await startMarkup(true, '/code/app');
+  const said = textsOf(html).find((text) => text.startsWith("The card's repo:"));
+  assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
+  assert.match(html, /data-ignored-repo/, 'in a note of its own, which the e2e and a person can find');
+});
+
+test('REFUSED at shipped defaults: no such note on a team that works on a repository, nor for a card that names none', async () => {
+  // The repository is looked at, and the form says where the run goes: a note would contradict it.
+  assert.doesNotMatch(await startMarkup(false, '/code/app'), /data-ignored-repo|is not looked at/);
+  assert.doesNotMatch(await startMarkup(true), /data-ignored-repo|is not looked at/, 'a card that names no repository has nothing to say');
+});

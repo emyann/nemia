@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -1207,6 +1207,61 @@ test('a step tried again is told what became of the last try: continued, that an
   assert.match(stopped, /was stopped before it signed off/);
   assert.match(stopped, /`wf retry --nudge`/);
   assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
+});
+
+// ─── what a blocked session's harness waits for ─────────────────────────────
+
+test("`waitingWords`: the harness's own word, with an article only where English wants one, and capped", () => {
+  assert.equal(waitingWords('permission prompt'), 'waiting for a permission prompt');
+  assert.equal(waitingWords('   permission prompt  '), 'waiting for a permission prompt', 'trimmed, as the harness spaced it');
+  assert.equal(waitingWords('input'), 'waiting for an input', 'a vowel takes `an`');
+  assert.equal(waitingWords('the workspace trust dialog'), 'waiting for the workspace trust dialog', 'a word that determines itself takes none');
+  assert.equal(waitingWords('an answer'), 'waiting for an answer');
+  assert.equal(waitingWords('tool approvals'), 'waiting for tool approvals', 'nor a plural');
+  // Whatever it says, a line of `wf ls` is a line: the word is cut at 60, on a character and not on a space.
+  assert.equal(waitingWords('x'.repeat(80)), `waiting for a ${'x'.repeat(59)}…`);
+  assert.equal(waitingWords(`${'x'.repeat(58)} and a great deal more`), `waiting for a ${'x'.repeat(58)}…`);
+  // And a line whatever the harness put in the word: `wf ls` pads its status column, so a newline in there would break the row in two.
+  assert.equal(waitingWords('permission prompt\nfor Bash(rm -rf /)'), 'waiting for a permission prompt for Bash(rm -rf /)');
+  assert.equal(waitingWords('permission\t prompt\r\n  for a tool'), 'waiting for a permission prompt for a tool', 'every run of whitespace, to one space');
+  // Collapsed before it is measured: the cut counts the characters a person sees, not the whitespace that never shows.
+  assert.equal(waitingWords(`${'x'.repeat(58)}\n\n\nyy`), `waiting for a ${'x'.repeat(58)}…`);
+});
+
+test('`answerIn` and `harnessWaitLine`: where a person answers it, alone and after the word', () => {
+  assert.equal(answerIn('ae/t1/1'), 'answer it in Claude Code: claude agents, session ae/t1/1');
+  assert.equal(answerIn(null), 'answer it in Claude Code: claude agents', 'no session on the record: the command still says where');
+  assert.equal(harnessWaitLine('permission prompt', 'ae/t1/1'),
+    'waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/t1/1', 'one line, for a screen with room for it');
+  assert.equal(harnessWaitLine('permission prompt', null), `waiting for a permission prompt — ${answerIn(null)}`);
+});
+
+test("`wf ls` says what a blocked step's harness waits for, beside the engine's word and not in it", () => {
+  const r = run({ implement: 't1', review: null });
+  const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
+  const lsWith = (phase: string, waitingOf: (id: string) => string | undefined) =>
+    listing(STEPS, r, shown({ t1: phase }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, [], undefined, waitingOf)
+      .steps[0]!.status;
+
+  assert.equal(lsWith('needs-human', waiting), 'needs-human: waiting for a permission prompt');
+  // One row per step: `cli.ts` pads this status to the width of the widest and prints the branch after it, so a newline the harness
+  // sent would split the row and mis-align every other row of the run.
+  const broken = lsWith('needs-human', () => 'permission prompt\nfor Bash(rm -rf /)');
+  assert.equal(broken, 'needs-human: waiting for a permission prompt for Bash(rm -rf /)');
+  assert.doesNotMatch(broken, /\s\s|[\n\r\t]/, 'nothing in the status that a padded column cannot hold');
+  assert.equal(lsWith('needs-human', () => undefined), 'needs-human', 'a harness that says nothing reads as it did before');
+  assert.equal(listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({})).steps[0]!.status, 'needs-human', 'and so does a caller that asks nothing');
+  assert.equal(lsWith('running (working)', waiting), 'running (working)', 'a phase that is not needs-human takes no word, whatever the caller answers');
+  assert.equal(lsWith('succeeded', waiting), 'unsigned', 'nor a task that settled');
+});
+
+test("the word beside the phase disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
+  const r = run({ implement: 't1', review: null });
+  const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
+  const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)], [], [], [], () => 0, () => undefined, undefined, [], undefined, waiting);
+  assert.deepEqual(l.steps[0], { name: 'implement', status: 'needs-human: waiting for a permission prompt', branch: null,
+    note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' },
+    "`needs-human` is still compared exactly: the note says the harness blocked it, though the status says more");
 });
 
 // ─── a step that asks, answered ─────────────────────────────────────────────

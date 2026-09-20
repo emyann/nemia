@@ -96,11 +96,13 @@ export type RunWaiting = {
 
 /**
  * Mirrors `StepNeeds` in apps/api/src/app.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
- * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. What that session said last is
- * on a run's detail alone (`lastLine`): the list reads no conversation. `approve`: what `wf ls` asks of you for a step waiting at its gate,
- * `approve plan`; null for any other step, and for one already sent back.
+ * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`: what that harness
+ * says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null where the harness said
+ * nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a run's detail alone
+ * (`lastLine`): the list reads no conversation. `approve`: what `wf ls` asks of you for a step waiting at its gate, `approve plan`; null for
+ * any other step, and for one already sent back.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: boolean; approve: string | null };
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean; waitingFor: { words: string; advice: string } | null; approve: string | null };
 
 /** Mirrors `StepApproval` in apps/api/src/app.ts: a person's approval of the try a gated step is on — when, and the words given with it. */
 export type StepApproval = { try: number; at: string; message: string | null };
@@ -297,6 +299,8 @@ export type RunDetail = {
     note: string | null;
     needs: string | null;
     blockedByHarness: boolean;
+    /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
+    waitingFor: StepNeeds['waitingFor'];
     approve: string | null;
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;

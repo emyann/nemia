@@ -59,13 +59,14 @@ const transcriptFile = (sessionId: string) => path.join(config, 'projects', '-co
 
 /**
  * A Claude Code task whose session the harness lists as blocked, its attempt never ended: the engine's `needs-human`. `lines` is its
- * conversation on disk, or none at all.
+ * conversation on disk, or none at all, and `waitingFor` what the harness says it waits for — as `claude agents --json` prints it beside
+ * a blocked state — or nothing, for a harness that says nothing.
  */
-const blockedSession = (taskId: string, lines?: (sessionId: string) => object[]) => {
+const blockedSession = (taskId: string, lines?: (sessionId: string) => object[], waitingFor?: string) => {
   const sessionId = randomUUID();
   journal(taskId, started('claude'));
   const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
-  rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'blocked', status: 'idle', startedAt: T0 });
+  rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'blocked', status: 'idle', startedAt: T0, ...(waitingFor ? { waitingFor } : {}) });
   fs.writeFileSync(registry, JSON.stringify(rows));
   if (lines) write(transcriptFile(sessionId), jsonl(lines(sessionId)));
   return sessionId;
@@ -120,7 +121,7 @@ const held = blockedSession('t-held', (id) => [
   said(id, 'assistant', 'a-2', 4, [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'npm test' } }]),
   said(id, 'user', 'u-2', 5, [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '# pass 12' }]),
   said(id, 'assistant', 'a-3', 6, [{ type: 'text', text: LOGIN }], { isApiErrorMessage: true, error: 'server_error' }),
-]);
+], 'permission prompt');
 blockedSession('t-idle', (id) => [
   said(id, 'user', 'u-1', 2, 'Idle on.'),
   { sessionId: id, isSidechain: false, type: 'system', uuid: 's-1', subtype: 'informational', content: '  Background session idle\n', timestamp: at(3) },
@@ -164,23 +165,26 @@ const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-type Needs = { name: string; needs: string | null; blockedByHarness: boolean; lastLine?: string | null };
+type Needs = { name: string; needs: string | null; blockedByHarness: boolean; waitingFor: { words: string; advice: string } | null; lastLine?: string | null };
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
 const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
 const lastLineOf = async (step: string): Promise<string | null> => (await detail()).steps.find((s: Needs) => s.name === step).lastLine;
 
 test("a step says what a person has to know to act — the question of one signed off blocked, and that the harness blocked a session — on both endpoints, and on the run's detail what the session said last", async () => {
+  // What the harness says it waits for, where it says anything: held's word, in the package's words, naming the session to answer it in.
+  // idle and silent are blocked by a harness that said nothing about what for, which is a word missing and not a step reading differently.
+  const waits = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
   const expected = [
-    { name: 'implement', needs: blocked.needs, blockedByHarness: false },
-    { name: 'theme', needs: null, blockedByHarness: false },
-    { name: 'tokens', needs: null, blockedByHarness: false },
-    { name: 'held', needs: null, blockedByHarness: true },
-    { name: 'idle', needs: null, blockedByHarness: true },
+    { name: 'implement', needs: blocked.needs, blockedByHarness: false, waitingFor: null },
+    { name: 'theme', needs: null, blockedByHarness: false, waitingFor: null },
+    { name: 'tokens', needs: null, blockedByHarness: false, waitingFor: null },
+    { name: 'held', needs: null, blockedByHarness: true, waitingFor: waits },
+    { name: 'idle', needs: null, blockedByHarness: true, waitingFor: null },
     // No conversation to read: blocked by the harness all the same.
-    { name: 'silent', needs: null, blockedByHarness: true },
+    { name: 'silent', needs: null, blockedByHarness: true, waitingFor: null },
     // Its session still at work: nothing needed.
-    { name: 'working', needs: null, blockedByHarness: false },
-    { name: 'review', needs: null, blockedByHarness: false },
+    { name: 'working', needs: null, blockedByHarness: false, waitingFor: null },
+    { name: 'review', needs: null, blockedByHarness: false, waitingFor: null },
   ];
   const lines: Record<string, string | null> = {
     // Its last `text` event, not the call before it nor the prompt: what the harness wrote into the conversation.
@@ -192,11 +196,12 @@ test("a step says what a person has to know to act — the question of one signe
   };
   const run = await detail();
   assert.deepEqual(
-    run.steps.map(({ name, needs, blockedByHarness, lastLine }: Needs) => ({ name, needs, blockedByHarness, lastLine })),
+    run.steps.map(({ name, needs, blockedByHarness, waitingFor, lastLine }: Needs) => ({ name, needs, blockedByHarness, waitingFor, lastLine })),
     expected.map((step) => ({ ...step, lastLine: lines[step.name] ?? null })),
   );
   const listed = (await summary()).steps;
-  assert.deepEqual(listed.map(({ name, needs, blockedByHarness }: Needs) => ({ name, needs, blockedByHarness })), expected);
+  assert.deepEqual(listed.map(({ name, needs, blockedByHarness, waitingFor }: Needs) => ({ name, needs, blockedByHarness, waitingFor })), expected,
+    'the list carries the word too: it is off the views the request already read, and costs no observation of its own');
   assert.equal(listed.some((step: object) => Object.hasOwn(step, 'lastLine')), false, 'the list carries no last line: it reads no conversation');
   // The engine's word, which is all the board had before: `needs-human`, and waiting on nobody the package names.
   assert.deepEqual(run.steps.filter((s: Needs) => s.blockedByHarness).map((s: { status: string }) => s.status), ['needs-human', 'needs-human', 'needs-human']);
@@ -213,6 +218,30 @@ test('REFUSED at shipped defaults: the list observes the harness once however ma
   // One for every task at once, and one for each blocked session's last line. Theme's refused check's output (`checksOf`) is
   // read on the check's own harness, which runs no `claude agents` (the engine's view observes a task's own harness alone).
   assert.equal(observations() - before, 1 + 3, 'GET /api/runs/:id');
+});
+
+test("what a blocked session's harness waits for is read afresh on every request: the word changes with the registry, and goes when the harness stops saying it", async () => {
+  const setWait = (word: string | undefined) => {
+    const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as Array<Record<string, unknown>>;
+    for (const row of rows) if (row.name === 'ae/t-held/1') { delete row.waitingFor; if (word) row.waitingFor = word; }
+    fs.writeFileSync(registry, JSON.stringify(rows));
+  };
+  const heldStep = async (): Promise<Needs & { status: string }> => (await summary()).steps.find((s: Needs) => s.name === 'held');
+
+  setWait('workspace trust dialog');
+  assert.deepEqual((await heldStep()).waitingFor, {
+    words: 'waiting for a workspace trust dialog',
+    advice: 'answer it in Claude Code: claude agents, session ae/t-held/1',
+  }, "the pass's own word, whatever the last pass carried");
+  assert.doesNotMatch(JSON.stringify(await heldStep()), /permission prompt/, 'nothing of the old word is left');
+
+  setWait(undefined);
+  const silent = await heldStep();
+  assert.deepEqual([silent.waitingFor, silent.blockedByHarness, silent.status], [null, true, 'needs-human'],
+    'a harness that stops saying: still blocked, and nothing said about what for');
+
+  setWait('permission prompt');
+  assert.equal((await heldStep()).waitingFor!.words, 'waiting for a permission prompt', 'and back, as the tests after this one have it');
 });
 
 test("a blocked session's last line follows its conversation: words written since are read from where the last read stopped, and a call alone moves nothing", async () => {

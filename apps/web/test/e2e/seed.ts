@@ -227,8 +227,8 @@ export const LOOPING = {
  * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — Q1's round-2
  * implement on 2026-09-14, stopped by the login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
  * run is running and moves, and in the package's words nobody is waiting on you: the step asked nothing. On the floor by default,
- * in the cell after NEIGHBOUR's. The board names the harness, and what the session said last (`line`), and continues the session as
- * `wf retry` does: the `held` page presses Continue, and takes its ask back.
+ * in the cell after NEIGHBOUR's. The board names the harness, what it says it waits for (`waitingFor`, on the registry row) and what
+ * the session said last (`line`), and continues the session as `wf retry` does: the `held` page presses Continue, and takes its ask back.
  */
 export const HELD = {
   id: 'blocked-by-the-harness-e2e3',
@@ -238,6 +238,10 @@ export const HELD = {
   sessionId: '9c3e1d2a-7b4f-4e8a-b6d5-1f0a2c3b4d5e',
   /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 wrote it that day. */
   line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
+  /** What `claude agents --json` says that session waits for (`waitingFor`), and the board's words for it and for answering it. */
+  waitingFor: 'permission prompt',
+  wait: 'waiting for a permission prompt',
+  advice: 'answer it in Claude Code: claude agents, session ae/blocked-by-the-harness-e2e3-implement/1',
 } as const;
 
 /**
@@ -1310,7 +1314,7 @@ export function seed(root: string, now = Date.now()): void {
     { kind: 'spawned', at: ago(2.9), attempt: 1 },
   ]));
   write(path.join(root, REGISTRY), JSON.stringify([
-    { name: `ae/${heldTask}/1`, sessionId: HELD.sessionId, kind: 'background', state: 'blocked', status: 'idle', startedAt: now - 2.9 * 60_000 },
+    { name: `ae/${heldTask}/1`, sessionId: HELD.sessionId, kind: 'background', state: 'blocked', status: 'idle', waitingFor: HELD.waitingFor, startedAt: now - 2.9 * 60_000 },
     { name: `ae/${SAYING.run}-${SAYING.step}/1`, sessionId: SAYING.sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: now - 2.5 * 60_000, pid: SAYING.pid },
   ]));
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));

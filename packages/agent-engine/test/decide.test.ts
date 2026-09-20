@@ -393,6 +393,25 @@ test('a `said` event changes no decision: running, blocked, ended done, failed w
   }
 });
 
+test('`waitingFor` changes no decision: it is the harness\'s word for a person to read, and `decide` does not read it', () => {
+  // A container's `state.waiting.reason`, carried and never judged. If this ever fails, something turned a word a
+  // future Claude Code may change into a condition the engine acts on.
+  const cases: Array<[string, Event[], Observed, ReturnType<typeof now>]> = [
+    ['blocked', [filed(), ...started()], 'blocked', now(5_000)],
+    ['blocked, no attempts left', [filed(), ...started()], 'blocked', now(5_000, 30_000, 3, 3)],
+    ['working', [filed(), ...started()], 'working', now(5_000)],
+    ['past the deadline', [withDeadline(10), ...started()], 'working', now(20_000)],
+  ];
+  for (const [label, events, state, when] of cases) {
+    const state0 = fold(TASK, events);
+    const bare = new Map<string, Sighting>([[N1, { sessionId: 's0', state }]]);
+    for (const word of ['permission prompt', 'workspace trust dialog']) {
+      const carried = new Map<string, Sighting>([[N1, { sessionId: 's0', state, waitingFor: word }]]);
+      assert.deepEqual(decide(state0, carried, when), decide(state0, bare, when), `${label}: ${word}`);
+    }
+  }
+});
+
 test('a journal with no `said` in it — every journal written before `say` — folds to `said: []` and otherwise the same state', () => {
   const { said: none, ...legacy } = fold(TASK, ran('failed', 2));
   assert.deepEqual(none, []);

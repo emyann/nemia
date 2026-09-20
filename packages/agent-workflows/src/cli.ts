@@ -758,7 +758,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, waitingOn, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -777,6 +777,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const heldOut = checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '';
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
+        // A step whose session the harness blocked reads as running and moves for nobody: what it waits for, and where to answer it.
+        // Said here because there is no other screen for it — a run held this way never reaches the one below.
+        for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is — unless the checkout holds
         // it, which the line below says instead: the next tick files nothing of it.
         for (const r of retrying.filter((r) => !(heldOut && r.step === ending?.name))) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
@@ -860,6 +863,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
         // Its gate, under its name: approved, when and with what words — or awaiting approval, and the commands that answer it.
         if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
+        // And what its session is waiting for, when its harness blocked it and said what for: the wait is the step's whole story.
+        if (waitingOn[name]) console.log(`    harness  ${waitingOn[name]}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
           // For a check that refused, the last of each stream, labelled: which pipe a line came from

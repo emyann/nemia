@@ -3451,6 +3451,16 @@ export function listing(
   standings: readonly BranchStanding[] = [],
   /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run's ending says where `waiting` would be. */
   checkout?: CheckoutHold,
+  /**
+   * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's `needs-human`
+   * on the step's line, and nowhere else.
+   *
+   * **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and by everything that reads a step's
+   * status — `harnessBlocked` in runner.ts, the api's `needsOf`, `stepState` on the board — so the phase a decision is made on stays
+   * the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in runner.ts passes this; the api does not, and
+   * its step's `status` reaches the board's chip unchanged.
+   */
+  waitingOf: (taskId: string) => string | undefined = () => undefined,
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
@@ -3562,7 +3572,10 @@ export function listing(
     const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
     // A step with no task of its own never reaches here but for its own word: the gate above is the one status a step reads unfiled.
     const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
-    return { name, status: `${word}${said}`, branch };
+    // And for a session the harness blocked, what it says it waits for: `needs-human: waiting for a permission prompt`. Only where the
+    // engine's word is exactly `needs-human` — the phase is the fact, this is the detail beside it.
+    const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
+    return { name, status: `${word}${waitsFor ? `: ${waitingWords(waitsFor)}` : ''}${said}`, branch };
   }
 
   /**
@@ -3589,6 +3602,54 @@ export function listing(
     ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}), ...(decide ? { toDecide: decide } : {}),
   };
 }
+
+/**
+ * The longest harness word a screen will print. Whatever `waitingFor` holds is the harness's, shown to a person verbatim, and on
+ * `wf ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
+ * never dropped — but `claude agents` is the only place the rest of it is: every screen here words it through `waitingWords`, the
+ * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
+ */
+const WAIT_CAP = 60;
+
+/** A word that already names its own thing. `permission prompt` does not, and reads as `a permission prompt`; `the login dialog` does. */
+const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
+
+/**
+ * What the harness says a blocked session is waiting for, in a sentence a person reads: `waiting for a permission prompt`.
+ *
+ * **One writer for these words**, because `wf ls`, `wf decide` and the board all say the same fact and must not word it three ways
+ * (the `ignoredRepoLine` lesson). The word itself is the harness's — no enum, here or in the engine — so all this does is put an
+ * article in front of it and clip it: `a`/`an` by the sound, none where the word brings its own determiner or is plural. That rule is
+ * a guess about English, not about the harness, and it is wrong for an odd noun phrase a future Claude Code emits; the only value
+ * measured is `permission prompt`, and the alternative — printing the word bare — reads wrong for that one.
+ *
+ * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
+ * would run, say — and `wf ls` pads each status to the width of the widest (`cli.ts`): a status with a newline in it breaks its row in
+ * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
+ * before the word is measured or clipped. A browser would have collapsed it and nothing would have shown there.
+ */
+export function waitingWords(waitingFor: string): string {
+  const word = waitingFor.trim().replace(/\s+/g, ' ');
+  const shown = word.length <= WAIT_CAP ? word : `${word.slice(0, WAIT_CAP - 1).trimEnd()}…`;
+  const article = DETERMINED.test(shown) || /s$/i.test(shown) ? '' : /^[aeiou]/i.test(shown) ? 'an ' : 'a ';
+  return `waiting for ${article}${shown}`;
+}
+
+/**
+ * What a person does about such a wait: `answer it in Claude Code: claude agents, session ae/<task>/1`, naming the session `claude agents`
+ * lists it under (`nameFor`), or without it where no attempt is on the record yet. Its own writer, because a screen with room for the
+ * whole sentence says it in one line (`harnessWaitLine`, `wf decide`) and one whose card says the wait already puts this under it (the
+ * board's banner): the same words either way, and never assembled twice.
+ *
+ * The advice assumes the wait is something a person can answer in the harness, which is true of the one value measured. A `waitingFor`
+ * naming something nobody can answer would carry advice that misleads: if that ever shows up, the fix is to word the advice off the word.
+ */
+export const answerIn = (session: string | null): string =>
+  `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
+
+/** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
+export const harnessWaitLine = (waitingFor: string, session: string | null): string =>
+  `${waitingWords(waitingFor)} — ${answerIn(session)}`;
 
 /**
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to

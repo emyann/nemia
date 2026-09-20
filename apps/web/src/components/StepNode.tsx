@@ -1,6 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
-import { needOf, needText, type Need } from '../lib/asks';
+import { needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { contextText } from '../lib/builder';
@@ -118,14 +118,15 @@ export function StepNode({
           )}
         </p>
       )}
-      {/* A session the harness blocked is no gate: the step asked nothing. It says so, with what the session said last. */}
+      {/* A session the harness blocked is no gate: the step asked nothing. The line says what its harness waits for, which is what this
+          page has nowhere else at a glance (`needNodeText`); the whole of it, with what the session said last, is on hover and in the banner. */}
       {!gate && need && (
         <p
           data-need={need.kind}
           title={needText(need)}
           className="truncate border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
         >
-          {needText(need)}
+          {needNodeText(need)}
         </p>
       )}
 

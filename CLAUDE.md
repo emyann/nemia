@@ -172,6 +172,23 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
+  `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/app.ts`, by `stepState` in
+  `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes
+  *beside* the phase, never into it: `listing` takes what the harness waits for as its own parameter (`waitingOf`) and decorates
+  the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
+  chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
+  undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A word from outside, printed into a column, is made one line before it is measured.** `wf ls` pads each status to the width of
+  the widest (`cli.ts`), so a harness's `waitingFor` — free text, which can carry a newline — breaks its row in two and mis-aligns
+  every other row of that run, and `wf decide` splits the same way. A browser would have collapsed it and nothing would have shown
+  there, so only the terminal says it. `waitingWords` (`run.ts`) turns every run of whitespace into one space before it measures or
+  clips, and its test asserts the printed status holds no double space and no control character (learned by the same run, round 2).
+- **A line that `truncate`s inside a node holds about thirty characters.** The step node's need line is `w-56`, so
+  `blocked by the harness: waiting for a permission prompt` showed as `blocked by the harness: waiting f…` — every new word cut off,
+  under a chip that already said `needs-human`. The node says the wait alone (`needNodeText` in `apps/web/src/lib/asks.ts`), the whole
+  sentence stays in its `title` and on the run's page, and the e2e proves it is read whole with `expectUncut` rather than assuming the
+  width fits: a screenshot of a cut line looks like a line (learned by the same run, round 2).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by

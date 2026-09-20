@@ -165,8 +165,8 @@ export type Waits = { said: string; step: string | null };
 export const decideLine = (branches: readonly string[]): string =>
   `decide its result: ${branches.length === 1 ? 'a branch' : `${branches.length} branches`} ahead of the base that nothing merges`;
 
-/** A step's need, for the inspector, in full: what it asks, or what the harness's session said last. */
+/** A step's need, for the inspector, in full: what it asks, or what the harness waits for, where to answer it, and what its session said last. */
 export const needWords = (need: Need): string =>
   (need.kind === 'asks' ? `${need.step} asks: ${need.needs}` : need.kind === 'harness'
-    ? `${need.step} is blocked by the harness${need.lastLine ? `; its session said last: ${need.lastLine}` : ''}`
+    ? `${need.step} is blocked by the harness${need.waitingFor ? `; ${need.waitingFor.words} — ${need.waitingFor.advice}` : ''}${need.lastLine ? `; its session said last: ${need.lastLine}` : ''}`
     : need.said);

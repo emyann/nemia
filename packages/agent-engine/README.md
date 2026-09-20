@@ -1035,12 +1035,19 @@ registration, `~/.claude/sessions/<pid>.json`, which a running session writes fo
 |---|---|---|
 | `tick` | every session's state | `observe`, once a pass |
 | `list()` | every task's phase | `observe`, once |
-| `view(id)`, attempt in flight | its session's state — working, idle, blocked | `observe` |
+| `view(id)`, attempt in flight | its session's state — working, idle, blocked — and, for a blocked one, what the harness says it waits for | `observe` |
 | `view(id)`, any other task | its phase, and its session's id once an attempt has ended: both on the record | nothing; `find` for a session whose id the record lacks |
 | `logs(id)` | the session's id | as `view(id)` |
 | `transcript(id)`, attempt in flight | which session it is | `find`; `observe` when no registration names it |
 | `transcript(id)`, attempt ended | the id on the record | nothing |
 | `say(id)` | its state, and its process | `observe`, then the registration by the pid listed |
+
+What a blocked session waits for is the harness's own word, carried and never judged: Claude Code prints
+`waitingFor: 'permission prompt'` beside `state: 'blocked'`, `observe` puts it on the sighting, and `view` puts it
+on the task as `waitingFor` where the phase is `needs-human`. It is a container's `state.waiting.reason`, not an
+enum of the engine's — `decide` never reads it, and a harness that says nothing leaves it unset. The detached
+harnesses say nothing and cannot: `ae-worker.ts` writes `working | stopped | done | failed` and never `blocked`,
+so a codex or `claude-detached` session never reaches `needs-human` at all.
 
 A view of a task with no attempt in flight carries no `usage`: an ended attempt's is on `state.attempts`. Measured on
 a loop of twenty reads each against that machine's board (236 tasks), before and after:

@@ -4,25 +4,28 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, gateOffered, needLine, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, gateOffered, needLine, needNodeText, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
+/** What the harness says such a session waits for, in the package's words, as the api gives them (`StepNeeds.waitingFor`). */
+const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
 
 type Step = RunDetail['steps'][number];
 
 /** A step as a run's detail gives it, cut to what these read. */
 const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
-  ({ name, status, note: null, needs: null, blockedByHarness: false, approve: null, lastLine: null, asked: null, check: null, ...over }) as Step;
+  ({ name, status, note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, lastLine: null, asked: null, check: null, ...over }) as Step;
 
 /** A run of these steps, waiting on `waitingOnYou`. */
 const run = (steps: Step[], waitingOnYou: string[], cancelledAt: string | null = null) => ({ steps, waitingOnYou, cancelledAt });
 
-test("a step's need is its question while it waits on you, or that the harness blocked its session, with what it said last where the api read it — none once asked, and none on a run called off", () => {
+test("a step's need is its question while it waits on you, or that the harness blocked its session, with what that harness waits for and what it said last where the api read it — none once asked, and none on a run called off", () => {
   const steps = [
     step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
     step('theme', 'failed ✗ check (exit 1)'),
-    step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN }),
+    step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN, waitingFor: WAIT }),
+    // Blocked by a harness that said nothing about what for, and said nothing since: the need is the harness's, with nothing under it.
     step('silent', 'needs-human', { blockedByHarness: true }),
     // Signed off blocked with a question, and a person has asked for its next try: the api leaves it out of `waitingOnYou`.
     step('plan', 'succeeded · BLOCKED', { needs: 'Which plan?', note: 'try 2 asked (--nudge, with your answer) — the next tick files it' }),
@@ -31,24 +34,29 @@ test("a step's need is its question while it waits on you, or that the harness b
   const needs = needsOf(run(steps, ['implement', 'theme']));
   assert.deepEqual(needs, [
     { step: 'implement', kind: 'asks', needs: 'Which database?' },
-    { step: 'held', kind: 'harness', lastLine: LOGIN },
-    { step: 'silent', kind: 'harness', lastLine: null },
+    { step: 'held', kind: 'harness', waitingFor: WAIT, lastLine: LOGIN },
+    { step: 'silent', kind: 'harness', waitingFor: null, lastLine: null },
   ]);
   assert.deepEqual(needsOf(run(steps, [], '2026-09-14T07:00:00.000Z')), []);
   assert.equal(needOf(steps[0]!, false, false), null, 'asked already: no question to show');
   assert.equal(needOf(steps[2]!, false, true), null, 'called off: nobody waits for the session');
 
+  // The wait before the last line: it is why the session has not moved. What a person does about it is not in either — the banner says it.
   assert.deepEqual(needs.map(needLine), [
     'implement asks: Which database?',
-    `held is blocked by the harness: ${LOGIN}`,
+    `held is blocked by the harness: ${WAIT.words} · ${LOGIN}`,
     'silent is blocked by the harness',
   ]);
-  assert.deepEqual(needs.map(needText), ['asks: Which database?', `blocked by the harness: ${LOGIN}`, 'blocked by the harness']);
+  assert.deepEqual(needs.map(needText), ['asks: Which database?', `blocked by the harness: ${WAIT.words} · ${LOGIN}`, 'blocked by the harness']);
+  for (const line of [...needs.map(needLine), ...needs.map(needText)]) assert.doesNotMatch(line, /answer it in Claude Code/);
 
-  // As the list gives a step the harness blocked, with no last line to give: the card names the harness and quotes nothing.
-  const listed = needOf({ name: 'held', needs: null, blockedByHarness: true }, false, false);
-  assert.deepEqual(listed, { step: 'held', kind: 'harness', lastLine: null });
-  assert.equal(needLine(listed!), 'held is blocked by the harness');
+  // A step's node has one narrow line: it says the wait alone, and every other need as it reads anywhere else.
+  assert.deepEqual(needs.map(needNodeText), ['asks: Which database?', WAIT.words, 'blocked by the harness']);
+
+  // As the list gives a step the harness blocked, with no last line to give: the card names the harness and what it waits for, and quotes nothing.
+  const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT }, false, false);
+  assert.deepEqual(listed, { step: 'held', kind: 'harness', waitingFor: WAIT, lastLine: null });
+  assert.equal(needLine(listed!), `held is blocked by the harness: ${WAIT.words}`);
 });
 
 test("a step at its gate needs its approval, in `wf ls`'s words, while it waits on you — none once approved or sent back, and none on a run called off; the Decide section offers it nothing, since Approve is in its section", () => {
@@ -132,7 +140,7 @@ test('a session the harness blocked is offered Continue, whether or not the api 
   assert.deepEqual(offersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }]);
   assert.deepEqual(answersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }], 'the Decide section is drawn for it, as for any try asked');
   // The need stays for as long as the harness keeps the session blocked: no tick has stopped it yet.
-  assert.deepEqual(needsOf(run([asked], [])), [{ step: 'held', kind: 'harness', lastLine: LOGIN }]);
+  assert.deepEqual(needsOf(run([asked], [])), [{ step: 'held', kind: 'harness', waitingFor: null, lastLine: LOGIN }]);
 });
 
 test('REFUSED: no Continue for a session still at work, which the harness did not block, nor for one it blocked on a run called off', () => {

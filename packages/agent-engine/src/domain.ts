@@ -90,6 +90,18 @@ export type Sighting = {
    */
   quietMs?: number;
   /**
+   * What the harness says this session is waiting for, in the harness's own words — `permission prompt`, as
+   * `claude agents --json` prints it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
+   * a session that is not waiting on anybody.
+   *
+   * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
+   * `state.waiting.reason`, a word a person reads, and Claude Code may add another next month. `decide` does not
+   * read it, and nothing here turns it into a state — `state` already says a session is `blocked`, and this says
+   * what it is blocked on. Level-triggered like every other field of a sighting: read afresh each pass, so a
+   * session that stops waiting simply stops carrying it.
+   */
+  waitingFor?: string;
+  /**
    * The harness ended the session because it spent the budget its task gave it — as the harness printed it (`claude -p`'s
    * result, `subtype: error_max_budget_usd`), never a cost compared with a budget, which nothing here does. `decide`
    * records it as the end's reason, and settles the task: no attempt follows one that spent its budget.

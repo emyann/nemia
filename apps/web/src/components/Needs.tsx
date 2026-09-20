@@ -33,8 +33,9 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
 
 /**
  * The banner at the top of a run's page: who the run waits on, in the package's words, and what each step needs — its question, or that
- * the harness blocked its session, with what the session said last. A session the harness blocked is continued from here, as `wf retry`
- * continues it (`Continue`); once that try is asked, the banner says what the tick does with it, in `wf ls`'s words: the step's note.
+ * the harness blocked its session, with what that harness says it waits for, what the session said last, and under them where a person
+ * answers the wait: in Claude Code, and never from here. A session the harness blocked is continued from here, as `wf retry` continues it
+ * (`Continue`); once that try is asked, the banner says what the tick does with it, in `wf ls`'s words: the step's note.
  *
  * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate, `approve plan`,
  * linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner says (`onYouOf`),
@@ -84,6 +85,13 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
                   <strong>{need.step}</strong> {need.kind === 'harness' ? 'is ' : ''}
                   {needText(need)}
                 </p>
+                {/* What a person does about the wait the line above says, in the package's words: the harness answers it, and this board
+                    does not — Continue below only asks the tick for another try (`answerIn`). */}
+                {need.kind === 'harness' && need.waitingFor && (
+                  <p data-advice className="break-words text-xs">
+                    {need.waitingFor.advice}
+                  </p>
+                )}
                 {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} />}
                 {offer?.kind === 'asked' && (
                   <p data-note className="font-mono text-xs">

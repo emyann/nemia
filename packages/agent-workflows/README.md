@@ -808,7 +808,7 @@ another repository and change that line.
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
-| the engine's word: `running (working)`, `needs-human` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
+| the engine's word: `running (working)`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine settled it `failed` (a journal from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
@@ -900,6 +900,16 @@ retries: 1
   The session can work again before a tick stops it, told something by a peer with no `wf up` running. The ask
   stands all the same: while the step's task has not settled, the tick stops its session, once, and files the try
   when it has, whatever the harness says by then. `wf retry` itself still refuses a step whose session works.
+- **And it says what the harness is waiting for.** `claude agents --json` reads a blocked session with a
+  `waitingFor` beside its state — `permission prompt` — and the engine carries that word onto the task's view
+  (`TaskView.waitingFor`), judging nothing by it. `wf ls` puts it beside the phase
+  (`needs-human: waiting for a permission prompt`), and `wf decide` says it with where a person answers it
+  (`waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/<task>/1`); so does
+  the board. It is the harness's own word, not a vocabulary of ours, and it is read afresh each pass: a session
+  that stops waiting stops carrying it, with nothing left over. **Beside the phase, never in it** — everything
+  that judges a blocked step compares the engine's `needs-human` exactly (`harnessBlocked`, the api's `needsOf`,
+  the board's chip), so only what `wf ls` prints gains the word. A harness that says nothing — codex,
+  `claude-detached`, neither of which reports a blocked session at all — leaves the line as it was.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived

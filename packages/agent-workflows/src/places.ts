@@ -39,8 +39,17 @@ export const inputsRoot = (runs: string, id: string): string => path.join(runs, 
  *
  * And the source's own `given/`: a parent was given its parents' folders the same way, and copying that on would square the run's work at
  * every fan-in down a chain. What this step waits on is what that step MADE.
+ *
+ * Replaced, not merged over. `make` runs on every filing of the step, and a step is filed more than once: a person's objection at a gate
+ * unfiles the step the work is sent back from, keeping its folder (`sentBack`), and a later pass files it again — with a try of the work
+ * between the two. A copy laid over the one from before would keep a file the parent has since deleted or renamed, while the brief calls
+ * the whole of it *a copy, taken as this step was filed*, and the step would raise findings about work that is not there any more. So the
+ * copy is emptied first: what is under `given/` is the run's to write, and the step is told to make what it makes outside it. (A round is
+ * not one of those filings: `validateLoops` holds a loop's steps to a chain, so each of them continues the one before in its folder, and
+ * the target the round files itself, in the folder its record keeps.)
  */
 function copyGiven(from: string, to: string): void {
+  fs.rmSync(to, { recursive: true, force: true });
   if (!fs.existsSync(from)) return;
   const skip = path.join(from, GIVEN);
   fs.cpSync(from, to, {

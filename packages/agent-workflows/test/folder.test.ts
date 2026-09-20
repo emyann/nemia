@@ -25,6 +25,9 @@ fs.mkdirSync(FAN, { recursive: true });
 fs.writeFileSync(path.join(FAN, 'a.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side a\n');
 fs.writeFileSync(path.join(FAN, 'b.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side b\n');
 fs.writeFileSync(path.join(FAN, 'c.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: a, b\n---\nput the two together\n');
+// And a fourth that continues the third's session, which is the shipped `note` chain's shape and the only one anybody runs today: it
+// works in `c`'s folder and is given nothing of its own, so its brief's `given/inputs` is true only because `c`'s copy is in there.
+fs.writeFileSync(path.join(FAN, 'd.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n');
 // Two files a person hands the run with `wf start --input`.
 const GIVEN_FILES = path.join(ROOT, 'given-files');
 fs.mkdirSync(GIVEN_FILES, { recursive: true });
@@ -46,7 +49,7 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, start, startQueued } = await import('../src/runner.ts');
-const { forgetLine } = await import('../src/run.ts');
+const { forgetLine, sentBack } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
 /** What `main` printed, line by line, while it ran. */
@@ -330,8 +333,16 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'out')), false, 'a symlink is not copied: a link in the folder is the fence undone by a file');
   assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'given')), false, 'nor a parent\'s own given/: what this step waits on is what that step made');
 
+  // The step that continues c's session works in c's folder, and is given nothing of its own: its brief says the run's files are
+  // `given/inputs` *in this folder*, which is true because c's copy is sitting in the folder it inherits. That is the shape the
+  // shipped `note` team has, and `givenPlan`'s reason for handing an inherit step the inputs at all — the loop below walks it.
+  settle(`${run.id}-c`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['d']);
+  assert.equal(tasks.get(`${run.id}-d`)!.spec.cwd, c, 'd continues c where it left off');
+  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'a')), true, 'and what c was given is still there, since nothing was made anew');
+
   // The two must not drift: every path any of these briefs names is inside the step's own folder, and there.
-  for (const name of ['a', 'b', 'c']) {
+  for (const name of ['a', 'b', 'c', 'd']) {
     const { brief, cwd } = tasks.get(`${run.id}-${name}`)!.spec;
     assert.ok(!brief.includes(ROOT), `${name}'s brief names no path under the store, which its fence denies it:\n${brief}`);
     const named = pathsNamed(brief);
@@ -343,6 +354,9 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   }
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.match(tasks.get(`${run.id}-a`)!.spec.brief, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  const d = tasks.get(`${run.id}-d`)!.spec.brief;
+  assert.match(d, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  assert.doesNotMatch(d, /given\/from/, 'a step standing in the folder it was given is given nothing more');
 
   await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
@@ -379,5 +393,41 @@ test('REFUSED: a card with a repository queued onto a folder team — `--workflo
   } finally {
     process.chdir(cwd);
   }
+  assert.deepEqual(gitAsked(), []);
+});
+
+
+test("a fan-in filed a second time is given its parent's folder as it stands then, not laid over the copy it had", async () => {
+  // `folderPlace.make` runs every time a step is filed, and a step is filed more than once: a person's objection at a gate unfiles the
+  // step the work is sent back from, keeping its folder (`sentBack`), and a later pass files it again — with a try of the work between
+  // the two. A copy laid over the one from before would keep a file its parent has since deleted or renamed, while the brief calls the
+  // whole of it a copy taken as this step was filed, and the step would raise findings about work that is not there any more.
+  const run = start({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN });
+  const { e, tasks, settle } = board();
+  const work = path.join(ROOT, 'runs', run.id, 'work');
+  const givenA = path.join(work, 'c', 'given', 'from', 'a');
+
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(work, 'a', 'keep.md'), '# kept\n');
+  fs.writeFileSync(path.join(work, 'a', 'gone.md'), '# only the first time\n');
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual(fs.readdirSync(givenA).sort(), ['gone.md', 'keep.md'], 'what a had made when c was first filed');
+  settle(`${run.id}-c`, 'succeeded', SIGNED);
+
+  // The send-back, on the record as the run writes it, and what a does about it: the file c would read again is gone, renamed into another.
+  const record = readRun(run.id);
+  record.steps.c = sentBack(record.steps.c!);
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  fs.rmSync(path.join(work, 'a', 'gone.md'));
+  fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
+
+  const again = await advance(e, readRun(run.id));
+  assert.deepEqual(again.filed, ['c'], again.notes.join('\n'));
+  assert.equal(tasks.get(`${run.id}-c-try2`)!.spec.cwd, path.join(work, 'c'), 'the folder it had, since a send-back keeps it');
+  assert.deepEqual(fs.readdirSync(givenA).sort(), ['keep.md', 'said.md'],
+    "a's folder as it stands now — the copy is replaced, not merged over, or the step reads work that is not there any more");
+
+  await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
 });

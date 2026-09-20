@@ -1295,18 +1295,19 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
   // What the agent named beside it before this write, read while its file still says so: a key whose line is taken off leaves no file behind.
   const named = SIDECARS.map(({ key }) => ({ key, was: frontmatterKey(held(`${old}.md`) ?? '', key), now: frontmatterKey(text, key) }));
-  for (const { sidecar, was } of before) {
-    if (was === sidecar.text) continue;
-    fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
-    written.push(sidecar.file);
-  }
   try {
+    for (const { sidecar, was } of before) {
+      if (was === sidecar.text) continue;
+      fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
+      written.push(sidecar.file);
+    }
     // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
     if (renamed && sameFile(file(name), file(old))) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
     fs.writeFileSync(file(name), text);
     written.push(`${name}.md`);
   } catch (err) {
-    // Each file beside it goes back to what it was, so an agent that was not written leaves nothing of itself behind.
+    // Each file beside it goes back to what it was, so an agent that was not written leaves nothing of itself behind — including a write
+    // that failed part-way through those files, which is why they are written in here too.
     for (const { sidecar, was } of before) {
       if (!written.includes(sidecar.file)) continue;
       was === undefined ? fs.rmSync(path.join(at, sidecar.file), { force: true }) : fs.writeFileSync(path.join(at, sidecar.file), was);

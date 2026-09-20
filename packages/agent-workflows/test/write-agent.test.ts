@@ -250,6 +250,13 @@ test('an agent writes both the files it names, and a write that fails leaves nei
   assert.throws(() => writeAgent(AGENTS, both, { version: null, skills, schema }));
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false, 'the skills it wrote are taken back');
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), false, 'and the schema');
+  // And a write that fails part-way through the files beside the agent: the second of them cannot be written, and the first is taken back
+  // all the same, so the folder holds nothing of an agent it does not hold.
+  fresh();
+  fs.mkdirSync(path.join(AGENTS, schema.file));
+  assert.throws(() => writeAgent(AGENTS, both, { version: null, skills, schema }));
+  assert.equal(fs.existsSync(path.join(AGENTS, skills.file)), false, 'the skills written before it failed are taken back');
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and no agent names them');
 });
 
 test('a skills file written through a link is refused by name, and what the link points at is left as it was', () => {

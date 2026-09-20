@@ -5,8 +5,9 @@ noul (how likely is yes), a score (where on a scale you describe) or a choice (o
 answer is a probability, and your code decides what to do with it: `decide` turns it into yes, no or
 unsure, and the caller's `switch` has to handle `unsure`.
 
-This is the first slice of P5 in `docs/pivot-2026-09-18.md`. It is a library and a command for
-trying the judge on a card by hand. Nothing calls it.
+This is the first slice of P5 in `docs/pivot-2026-09-18.md`. It is a library, and a command for
+trying the judge on a card by hand and for scoring the dispatches people have already made against
+it. Nothing calls it.
 
 ## Optional
 
@@ -122,6 +123,8 @@ ask hands the judge a stub `fetch`, and each failure kind is made to happen thro
 | `test/replay.test.ts` | Replay. |
 | `test/facade.test.ts` | The facade's refusals, `available()` and `judge status`. |
 | `test/card.test.ts` | The command. |
+| `test/runs.test.ts` | `judge runs`, over a fixture store and a stub fetch: what it reads, sends, prints and refuses. |
+| `test/rival.test.ts` | The rival's rules, each made to fire and not to fire, and the scoring. |
 | `test/key.test.ts` | The key, with the card questions' keys pinned: changing their wording fails it. |
 | `test/decide.test.ts` | `decide`. |
 | `test/boundary.test.ts` | The package is optional, and Effect stays inside it. |
@@ -137,8 +140,8 @@ Effect is in three files:
 - `src/facade.ts`: it runs one ask and turns the result into a Promise.
 
 Everything else is plain code and imports no Effect: `src/key.ts`, `src/decide.ts`,
-`src/record.ts`, `src/card.ts` and `src/cli.ts`. `test/boundary.test.ts` refuses a plain file that
-imports it.
+`src/record.ts`, `src/card.ts`, `src/runs.ts`, `src/rival.ts`, `src/score.ts` and `src/cli.ts`.
+`test/boundary.test.ts` refuses a plain file that imports it.
 
 What Effect buys:
 
@@ -207,6 +210,7 @@ The key never reaches a message: a key or bearer token echoed back in an error i
 ```
 judge status
 judge card <file> | --text "…" [--reask] [--record <dir>]
+judge runs [--store <dir>] [--record <dir>] [--since <date>] [--json <file>] [--yes] [--reask]
 ```
 
 `judge card` asks four questions of a card: web, plan, clear and size. It prints what came back, and
@@ -246,12 +250,138 @@ The thresholds are 0.8 and 0.2 for a noul, and 2.5 and 1.5 of 3 for clarity (`sr
 **have not been measured on held-out cards.** They were chosen by eye on the cards of the pivot plan's §2
 experiments, and nothing has checked them on a card outside that set.
 
+`judge runs` is how they get measured, and nobody has run it against the service yet: every number
+below was produced with the judge off, by the rival alone.
+
+### `judge runs`
+
+It scores the dispatches people have already made. Every run record in a store holds the brief a
+person wrote and the workflow folder they chose; the folder is the label, and the four `dev*` folders
+are the two properties `judge card` asks about, combined. So each brief can be asked the same four
+questions and the answer compared with what the person did.
+
+- **It gates nothing.** It files nothing, starts nothing, shows nothing to anyone, and changes no
+  threshold. It prints evidence; a person decides what to do with it.
+- It reads the store as files — `<store>/runs/*.json` — and imports nothing from the workspace. The
+  store defaults to `$WF_ROOT`, then `~/.agent-workflows`; `--store` names another.
+- Only `brief` and `workflowDir` are read off a record. The frozen `workflow` on it is never read:
+  those are the workflow's own words, not a person's, and searching them would read the steps as if
+  someone had written them about the work.
+- A run on any other folder (`ui`, `note`, a path, a folder that has since been renamed) is out of
+  scope, and a record written before a field existed is skipped. Each one is counted and named; a
+  file that is not JSON is named too, and is never fatal.
+- `--since <date>` keeps the runs started at or after it. `--json <file>` writes the whole report,
+  every run and every judgment in it.
+- What it would send, and what that costs, is printed **before** anything is sent, and `--yes` is
+  needed to go past it whenever a request would be made. A second pass over the same store asks
+  nothing, needs no `--yes`, and says so. With no key the judge is off and only the rival is scored.
+- The answers are the same keys `judge card` writes, in the same record: a brief asked by `judge
+  card` and by `judge runs` is asked once. Two runs dispatched with the same brief are one key too:
+  it is sent once, counted once in what a person consents to, and answered alike for both. Both are
+  still scored — each is a dispatch a person made — and the report says how many distinct briefs the
+  runs are, and names the runs that share one beside each disagreement.
+
+It prints, for the judge and for the rival, a confusion table per property against the label,
+agreement on the whole folder, and — for the judge alone — how many answers stayed `unsure`, kept
+out of both the right and the wrong and shown on their own line. Then the runs where the judge and
+the person differ, with the run's id, both folders, the probabilities and the brief's first line:
+the person's choice is not always right (pivot §2.4), and a disagreement is something to read, not a
+mistake by either.
+
+### The rival
+
+`src/rival.ts`: plain code, pure, no model. It guesses the same two properties from the brief's text
+alone, so the judge's numbers have something to beat.
+
+- **web** — the brief names `apps/web` or `apps/api`.
+- **plan** — the brief uses a planning word (plan, design, decide, propose, challenge, options,
+  trade-off, and their forms, as whole words, any case) **and** names at least three of the five
+  parts of the repository (`apps/web`, `apps/api`, `packages/agent-engine`,
+  `packages/agent-workflows`, `workflows/`), each counted once.
+
+A part counts where it is named as itself: `workflows/` is the repository's own folder, not the tail
+of `packages/agent-workflows/src/run.ts`, which briefs write constantly.
+
+Two things were tuned, once, on the runs it is scored on, and nothing else was. `apps/web` alone
+scored better on precision than the two paths together (0.74 against 0.71, both at recall 1.00) and
+was not taken, because the question the judge is asked names both. And the two halves of the plan
+rule were first joined by *or*, which fires on 69 briefs of the 75 and gets 18 folders of 75 whole,
+so they were joined by *and*, which fires on 39 and gets 35. Every number here comes from
+that one measurement, over the 75 in-scope runs on 2026-09-19; `src/rival.ts` repeats it and nothing
+else. The `--since` table below is the same command over the same store on the same day. The pivot plan's §2.3 reports a fair baseline at P 0.94 / R 0.91 on *web*, and that number is
+**not** comparable to these: it was measured against whether the branch ended up touching
+`apps/web`, and the label here is the folder a person picked beforehand.
+
+Against the 75 runs dispatched by hand up to 2026-09-19, with the judge off:
+
+```
+$ judge runs
+judge runs: 75 runs in scope, 25 skipped, of 100 records in ~/.agent-workflows
+  the judge is off: no TYPESAFE_API_KEY in the environment; nothing would be sent, and only the rival is scored.
+  …
+  74 distinct briefs: 1 of these runs repeat one another sent.
+  …
+web · does the work change apps/web or the api it runs against · the label is a -build folder
+  rival     label yes  label no
+    yes            29        12    P 0.71
+    no              0        34    R 1.00
+
+plan · should someone read the code and plan first · the label is a dev-planned folder
+  rival     label yes  label no
+    yes            11        28    P 0.28
+    no              6        30    R 0.65
+
+the whole folder
+  rival   35 of 75 agree · 40 differ
+```
+
+So a plain reading of the text finds the web app well — it never misses one — and planning badly:
+it calls 39 briefs planning work where 17 were sent to a `dev-planned` folder, and misses 6 of
+those. Under half the folders come out whole.
+
+That *plan* table is confounded, and the *web* one is not. The four folders are not the same age,
+and a person cannot pick a folder that does not exist yet: `dev` and `dev-build` were added on
+2026-09-13 (`164742f`), `dev-planned` on 2026-09-14 (`bf4c1b1`) and `dev-planned-build` on
+2026-09-16 (`19fbecc`). Twenty-two of the 75 runs were started before that last date, and exactly
+one of them carries a `dev-planned` label — so early briefs the rival calls planning work are
+counted wrong whatever they said. `--since` is the flag that answers it. Over the window in which
+all four folders existed, the rival reads better at planning and the same at the web app:
+
+```
+$ judge runs --since 2026-09-16
+judge runs: 53 of 100 records were dispatched to dev, dev-build, dev-planned or dev-planned-build · since 2026-09-16 · jev-1.13.0
+  skipped  22  was started before --since
+  …
+web · does the work change apps/web or the api it runs against · the label is a -build folder
+  rival     label yes  label no
+    yes            22        10    P 0.69
+    no              0        21    R 1.00
+
+plan · should someone read the code and plan first · the label is a dev-planned folder
+  rival     label yes  label no
+    yes            11        17    P 0.39
+    no              5        20    R 0.69
+
+the whole folder
+  rival   25 of 53 agree · 28 differ
+```
+
+Planning goes from P 0.28 to P 0.39 and the web app stays where it was, which is what an age
+confound looks like. Neither reading is good. That is the bar the judge has to clear, on whichever
+window it is measured over; whether it clears it is unmeasured until someone runs this with a key.
+
 ## What is sent
 
 To TypeSafe goes exactly what the caller put in `state`, plus the questions, and nothing else. The
 request body is `{ model, state, questions }`, and `test/live.test.ts` pins it field for field.
 `judge card` sends the card's text without its frontmatter, together with a fixed description of
-the repository.
+the repository. `judge runs` sends the same thing for each brief it scores — the brief with its
+frontmatter stripped, and that same fixed description — and nothing else off the run record: not its
+id, not the folder it ran on, not its workflow. A brief is usually longer than a card (those on this
+machine run to about 7,000 characters), so it says how many characters would go, and from how many briefs,
+before it sends any, and asks for `--yes`. It counts only the briefs with a question still to ask:
+one already answered is never sent again, and is not in the number, and a brief two runs were
+dispatched with is one brief in it.
 
 The service's base URL is fixed (`https://api.typesafe.ai`) and so is the SDK's log level (off). So
 `TYPESAFE_BASE_URL` and `TYPESAFE_LOG_LEVEL` in the environment cannot send the state elsewhere or
@@ -266,7 +396,8 @@ someone reads them, assume that what is sent may be kept.
 - `TYPESAFE_API_KEY` is read from the environment only. It is never written, logged or put in an
   error. For a run by hand, use `node --env-file=<checkout>/.env bin/judge.ts …`, and never print
   the file.
-- `WF_ROOT` is where `judge card` keeps its record unless `--record` says otherwise.
+- `WF_ROOT` is where `judge card` and `judge runs` keep their record unless `--record` says
+  otherwise, and where `judge runs` looks for a store unless `--store` does.
 
 ## Files
 
@@ -277,5 +408,8 @@ someone reads them, assume that what is sent may be kept.
 - `src/key.ts`: the key, the pinned model, and `Refusal`.
 - `src/decide.ts`: `decide`, `why` and the failure kinds.
 - `src/card.ts`: the card's questions, its thresholds, and `dispatch` to a folder.
-- `src/cli.ts`: `judge status` and `judge card`.
+- `src/runs.ts`: a store's run records, read as files: the label, and what is skipped and why.
+- `src/rival.ts`: the plain-code rival. Pure, no model.
+- `src/score.ts`: the tables, the disagreements and the report. Pure: no file, no network, no clock.
+- `src/cli.ts`: `judge status`, `judge card` and `judge runs`.
 - `bin/judge.ts`: the command's entry.

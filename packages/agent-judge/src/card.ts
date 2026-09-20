@@ -54,6 +54,13 @@ export const cardState = (text: string) => ({ card: cardText(text), repository: 
 
 export type Dispatch = { readonly folder: string } | { readonly inbox: string };
 
+/**
+ * The shipped folder a pair of properties names. The four `dev*` folders are these two independent properties combined
+ * (pivot §2.4, "ask for properties, not folders"), so one function names them, and `judge runs` reads a person's folder
+ * back through the same shape.
+ */
+export const folderOf = (plan: boolean, web: boolean): string => `dev${plan ? '-planned' : ''}${web ? '-build' : ''}`;
+
 const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 /** Pure: which shipped folder the properties map to, or why the card stays in the inbox. */
@@ -66,7 +73,7 @@ export const dispatch = (answers: CardAnswers): Dispatch => {
   if (v.clear === 'no') return { inbox: 'says too little about what done looks like' };
   const unsure = (Object.keys(v) as (keyof typeof v)[]).filter((k) => v[k] === 'unsure');
   if (unsure.length > 0) return { inbox: `unsure about ${list(unsure.map((k) => UNSURE[k]))}` };
-  return { folder: `dev${v.plan === 'yes' ? '-planned' : ''}${v.web === 'yes' ? '-build' : ''}` };
+  return { folder: folderOf(v.plan === 'yes', v.web === 'yes') };
 };
 
 const verdictOf = (id: keyof typeof QUESTIONS, j: Judgment): Verdict | '—' => (id === 'size' ? '—' : decide(j, THRESHOLDS[id]));

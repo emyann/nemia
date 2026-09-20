@@ -1232,6 +1232,10 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(asked.includes(`<p data-note="true" class="font-mono text-xs">${note}</p></li>`), asked);
   assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/);
+  // And no advice to answer the prompt in that session: the next tick stops it, so the line would send a person to a session about to go.
+  // The wait is still said, in the need's own line — only where to answer it is taken back.
+  assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /data-advice/);
+  assert.ok(textsOf(asked).includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`), asked);
 
   // A harness that says nothing about what for: the need alone, with no empty line under it.
   const mute = bannerMarkup({ ...run, steps: [asks, { ...base.steps[0]!, waitingFor: null }] });

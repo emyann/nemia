@@ -418,10 +418,11 @@ export type RunDetail = {
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
-    /** As on `RunSummary` (`StepNeeds`). */
-    needs: string | null;
-    blockedByHarness: boolean;
-    approve: string | null;
+    /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
+    needs: StepNeeds['needs'];
+    blockedByHarness: StepNeeds['blockedByHarness'];
+    waitingFor: StepNeeds['waitingFor'];
+    approve: StepNeeds['approve'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
     /**

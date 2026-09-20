@@ -108,6 +108,7 @@ export default {
     const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
     await expectVisible(need.locator('[data-note]', { hasText: note }), `the banner says the session is stopped, then the try filed, in wf ls's words (${note})`);
     await expectCount(need.getByRole('button', { name: 'Continue' }), 0, 'and offers Continue no more: the try is asked');
+    await expectCount(need.locator('[data-advice]'), 0, 'nor where to answer the prompt: the next tick stops that session, and the note says what was asked');
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(decide.locator(`[data-offer="asked"][data-step="${HELD.blocked}"] [data-note]`, { hasText: note }), 'the Decide section is drawn, as for any run with a try asked, and says it too');
     const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: HELD.blocked, exact: true }) });

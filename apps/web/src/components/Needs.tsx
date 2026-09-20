@@ -86,8 +86,9 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
                   {needText(need)}
                 </p>
                 {/* What a person does about the wait the line above says, in the package's words: the harness answers it, and this board
-                    does not — Continue below only asks the tick for another try (`answerIn`). */}
-                {need.kind === 'harness' && need.waitingFor && (
+                    does not — Continue below only asks the tick for another try (`answerIn`). Once that try is asked, the next tick stops
+                    this session, so the advice to answer a prompt in it goes, and the note below says what was asked instead. */}
+                {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
                   <p data-advice className="break-words text-xs">
                     {need.waitingFor.advice}
                   </p>

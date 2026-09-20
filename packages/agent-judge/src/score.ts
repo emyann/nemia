@@ -203,6 +203,13 @@ const table = (name: string, t: Table, unsure: boolean): string[] => {
   return lines;
 };
 
+/** The answers that did not come, by kind, most first: a failure of any kind reads `unsure` through `decide`. */
+export const failures = (rows: readonly Row[]): { kind: string; count: number }[] => {
+  const by = new Map<string, number>();
+  for (const r of rows) for (const j of Object.values(r.answers ?? {})) if (j.status === 'failed') by.set(j.kind, (by.get(j.kind) ?? 0) + 1);
+  return [...by].map(([kind, count]) => ({ kind, count })).sort((x, y) => y.count - x.count || x.kind.localeCompare(y.kind));
+};
+
 /** Everything `judge runs` prints after its preamble. */
 export const lines = (report: Report): string[] => {
   const { rows, skipped } = report;
@@ -217,6 +224,14 @@ export const lines = (report: Report): string[] => {
   out.push(`  store: ${report.store}`);
   for (const { why, count } of reasons(skipped)) out.push(`  skipped ${String(count).padStart(3)}  ${why}`);
   if (report.off) out.push(`  ${report.off}; only the rival is scored.`);
+  // A failed answer reads `unsure` in every table below, as a mid-range one does: say how many failed, and of what kind,
+  // so a pass the service refused or rate-limited is not read as a judge that could not make up its mind.
+  const failed = failures(rows);
+  if (failed.length > 0) {
+    const total = failed.reduce((n, f) => n + f.count, 0);
+    out.push(`  FAILED  ${total} of ${rows.length * 4} answers did not come — ${failed.map((f) => `${f.kind} ${f.count}`).join(', ')} — and read \`unsure\` below.`);
+    out.push('    fix the cause, then run again with --reask: only the failed questions are asked again.');
+  }
   if (rows.length === 0) {
     out.push('  nothing to score.');
     return out;

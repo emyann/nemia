@@ -294,8 +294,12 @@ mistake by either.
 alone, so the judge's numbers have something to beat.
 
 - **web** — the brief names `apps/web` or `apps/api`.
-- **plan** — the brief uses a planning word (plan, design, decide, propose, challenge, options,
-  trade-off, and their forms, as whole words, any case) **and** names at least three of the five
+- **plan** — the brief uses one of exactly these words, as a whole word, in any case: `plan`,
+  `plans`, `planned`, `planner`, `planning`, `design`, `designs`, `designed`, `decide`, `decides`,
+  `decision`, `decisions`, `propose`, `proposes`, `proposal`, `challenge`, `challenges`, `options`,
+  `trade-off`, `trade-offs`, `tradeoff`, `tradeoffs`. The list is fixed (`PLANNING_WORDS`): a form
+  it does not hold, such as `deciding` or `option`, does not fire the rule. **And** the brief names
+  at least three of the five
   parts of the repository (`apps/web`, `apps/api`, `packages/agent-engine`,
   `packages/agent-workflows`, `workflows/`), each counted once.
 

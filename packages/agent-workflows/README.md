@@ -167,7 +167,7 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallow`, `remote`,
-`output` — and a `description:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output` — and two of its own, `description:` and `skills:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -185,7 +185,59 @@ set itself, and its own note, never the agent's. `wf start` names each node's ag
 The repository's shipped folders are written this way (`workflows/agents/README.md` lists who does what), and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
 The board's Agents page edits the agent itself (`writeAgent`, `removeAgent`): yours only, against the version it was read at, its result
-schema with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
+schema and its skills with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
+
+#### What an agent says it can do: `skills:`, and a card in A2A's shape
+
+`description:` says what an agent is for in a line. `skills:` says what it can do, in the shape the
+[A2A protocol](https://a2a-protocol.org/latest/specification/) gives an agent's skills, and names a `.json` file beside
+the agent — `reviewer.skills.json` — holding a list of them:
+
+```json
+[
+  {
+    "id": "review-a-change",
+    "name": "Review a change",
+    "description": "Reads the diff read-only as a second engineer would and reports each finding by file and line.",
+    "tags": ["code", "review"],
+    "examples": ["Use this when a change is written and nobody has read it yet."]
+  }
+]
+```
+
+`id`, `name`, `description` and `tags` are A2A's required fields and each is required here; `examples`, `inputModes` and
+`outputModes` are its optional ones, each a list of strings. An `id` is lowercase words joined by dashes, unique in the
+file. Anything else is refused by name — an unknown key, a blank field, a duplicate id, an empty list, a file that is not
+`.json` beside the agent, one that is not there or does not parse — and `securityRequirements`, which A2A allows on a
+skill, is refused too: nothing here serves an agent over A2A, so its card declares no security schemes and a skill
+demanding one could never be satisfied.
+
+A skill is description, not machinery. Nothing reads one to decide anything: no step is routed by a tag, no tool is
+allowed or denied by a skill, and skills are *not* frozen on a run record — a run froze the keys that do the work, and
+what an agent says it can do can be corrected without touching a run in flight. `agentVersion` does digest the skills
+file with the agent, so the board refuses a save against a stale read of either.
+
+`wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
+in the shape of an A2A Agent Card, JSON on stdout and nothing else:
+
+```
+$ wf agents card reviewer
+{ "name": "reviewer", "description": "…", "version": "313e05637e6e9d71",
+  "capabilities": { "streaming": false, "pushNotifications": false, "extendedAgentCard": false },
+  "defaultInputModes": ["text/plain"], "defaultOutputModes": ["application/json"], "skills": [ … ] }
+reviewer (repo) — a card, not an address: nothing here serves this agent over A2A, so it declares no
+interfaces and no security schemes.
+```
+
+Three things it is honest about. It is **not a valid Agent Card**: A2A marks `supportedInterfaces` REQUIRED, an
+interface is a transport and a URL, and there is no URL — nothing here answers A2A, there is no `/.well-known/agent-card.json`,
+and a card is left where a reader would have to be told it is only a description. That is why the last line goes to
+stderr, where a pipe does not carry it. `capabilities` in A2A is protocol features — streaming, push notifications,
+extensions — not reach, so all three are `false` and mean it. And `version` is the content digest `agentVersion` computes,
+not a semantic version: it changes when the agent's file or a file beside it does, which is what the board needs it for.
+
+`output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
+`outputModes`, which names media types, not a schema; `output:` stays a key of its own.
 
 ### What a step may have: `tools:` and `effort:`
 

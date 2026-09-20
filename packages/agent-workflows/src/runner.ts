@@ -1345,6 +1345,41 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
   return { dir: at, removed };
 }
 
+/** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
+export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
+  { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
+  { from: 'yours', dir: path.join(HOME, 'workflows', AGENTS_FOLDER) },
+];
+
+export type AgentPlace = 'repo' | 'yours';
+
+/** Every agent of both places, in the order the places come, each read now. An agent that does not read carries its refusal. */
+export function listAgents(repo: string): Array<{ from: AgentPlace; dir: string; name: string; agent: Agent | WorkflowError }> {
+  return agentPlaces(repo).flatMap(({ from, dir }) =>
+    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })));
+}
+
+/**
+ * One agent by name, from `from` when it is given and otherwise the first place that has it. Refused, naming the fix, when no place has it,
+ * when both do and nothing says which, or when the file is there and does not read — that last in the parser's own words.
+ */
+export function findAgent(name: string, repo: string, from?: AgentPlace): { from: AgentPlace; dir: string; agent: Agent } {
+  const places = agentPlaces(repo).filter((place) => from === undefined || place.from === from);
+  const found = places.flatMap((place) => {
+    const agent = loadAgents(place.dir).get(name);
+    return agent === undefined ? [] : [{ ...place, agent }];
+  });
+  const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
+  if (!found.length) {
+    const has = agentPlaces(repo).filter((place) => fs.existsSync(place.dir)).map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
+    throw new WorkflowError(`no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${has.length ? has.join(' and ') : agentPlaces(repo).map((p) => p.dir).join(' and ')}. wf agents lists them.`);
+  }
+  if (found.length > 1) throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
+  const one = found[0]!;
+  if (one.agent instanceof Error) throw one.agent;
+  return { from: one.from, dir: one.dir, agent: one.agent };
+}
+
 /**
  * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it
  * by its name and a trailing `/`, a markdown file with its text.

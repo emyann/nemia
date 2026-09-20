@@ -1,0 +1,291 @@
+judge runs: 75 runs in scope, 26 skipped, of 101 records in /home/yrnd1/.agent-workflows
+  296 of 300 questions would be asked; 4 more are the same questions of a brief already counted, and 0 are on record in <record>
+  about 297765 characters would go to TypeSafe — 74 of the 75 briefs, stripped of their frontmatter, with the fixed description of the repository and nothing else
+  TypeSafe's retention terms have not been read by this project: assume that what is sent may be kept.
+
+judge runs: 75 of 101 records were dispatched to dev, dev-build, dev-planned or dev-planned-build · jev-1.13.0
+  74 distinct briefs: 1 of these runs repeat one another sent.
+    each is scored — a dispatch is a choice a person made — and the judge is asked once per brief.
+  store: /home/yrnd1/.agent-workflows
+  skipped   2  was run on note, not one of dev, dev-build, dev-planned, dev-planned-build
+  skipped   2  was run on workflows, not one of dev, dev-build, dev-planned, dev-planned-build
+  skipped   1  was run on ui, not one of dev, dev-build, dev-planned, dev-planned-build
+  skipped  11  was run on hold-the-bar-checked, not one of dev, dev-build, dev-planned, dev-planned-build
+  skipped  10  was run on hold-the-bar-checked-build, not one of dev, dev-build, dev-planned, dev-planned-build
+
+web · does the work change apps/web or the api it runs against · the label is a -build folder
+  judge     label yes  label no
+    yes            29         6    P 0.83
+    no              0        36    R 1.00
+    unsure          4                       kept out of both
+  rival     label yes  label no
+    yes            29        12    P 0.71
+    no              0        34    R 1.00
+
+plan · should someone read the code and plan first · the label is a dev-planned folder
+  judge     label yes  label no
+    yes            15        15    P 0.50
+    no              0         1    R 1.00
+    unsure         44                       kept out of both
+  rival     label yes  label no
+    yes            11        28    P 0.28
+    no              6        30    R 0.65
+
+the whole folder
+  judge   13 of 75 agree · 16 differ · 46 stayed in the inbox, counted apart
+  rival   35 of 75 agree · 40 differ
+
+where the judge and the person differ · 62 of 75; the person's choice is not always right (pivot §2.4)
+  make-the-inspector-say-what-qpx2
+    dev-build → the inbox: unsure about planning first
+    web P 0.98 · plan P 0.74 · clear score 3.00
+    Make the inspector say what each round did, what a step really runs wit…
+  make-looking-a-capability-no-o8rs
+    dev → the inbox: unsure about the web app and planning first
+    web P 0.37 · plan P 0.63 · clear score 3.00
+    Make looking a capability, not a step: a `look` skill any step may invo…
+  close-the-fence-by-machinery-ahlx
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.60 · clear score 3.00
+    Close the fence by machinery: a step may name the tools and commands it…
+  a-step-that-asks-gets-an-ans-v5qd
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.58 · clear score 3.00
+    A step that asks gets an answer, and a step that plans: `wf retry --mes…
+  the-board-says-what-a-step-n-e26v
+    dev-build → the inbox: unsure about planning first
+    web P 0.98 · plan P 0.74 · clear score 3.00
+    The board says what a step needs from a person, and takes the answer: `…
+  a-run-that-waits-on-a-run-wf-vaka
+    dev → the inbox: unsure about planning first
+    web P 0.13 · plan P 0.49 · clear score 3.00
+    A run that waits on a run: `wf start --after <runId>`, a pure `runReady…
+  the-factory-as-a-graph-of-ca-x2xs
+    dev-build → dev-planned-build
+    web P 0.98 · plan P 0.89 · clear score 3.00
+    The Factory as a graph of cards: a run that waits on a run is drawn wit…
+  three-small-correctness-item-lz3w
+    dev → dev-planned
+    web P 0.17 · plan P 0.80 · clear score 3.00
+    Three small correctness items in agent-workflows, each a guard that is …
+  a-plan-as-a-folder-of-cards-o4su
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.55 · clear score 3.00
+    A plan as a folder of cards: `wf plan <folder>` starts one run per card…
+  the-board-continues-a-sessio-xh9x
+    dev-build → the inbox: unsure about planning first
+    web P 0.98 · plan P 0.47 · clear score 3.00
+    The board continues a session the harness blocked, now that the package…
+  the-steering-channel-upper-h-d7es
+    dev-build → the inbox: unsure about planning first
+    web P 0.96 · plan P 0.61 · clear score 3.00
+    The steering channel, upper half: `wf say`, the words on the run's reco…
+  six-small-items-in-agent-wor-vrm2
+    dev → the inbox: unsure about planning first
+    web P 0.12 · plan P 0.48 · clear score 3.00
+    Six small items in agent-workflows, one commit each, every guard made t…
+  five-small-items-on-the-boar-zle1
+    dev-build → dev-planned-build
+    web P 0.97 · plan P 0.80 · clear score 3.00
+    Five small items on the board and its api, one commit each, every guard…
+  three-items-in-agent-engine-bt5p
+    dev → the inbox: unsure about planning first
+    web P 0.10 · plan P 0.70 · clear score 3.00
+    Three items in agent-engine, one commit each. Read CLAUDE.md, then docs…
+  cost-measured-and-a-budget-s-eou6
+    dev → dev-planned
+    web P 0.14 · plan P 0.88 · clear score 3.00
+    Cost measured and a budget set, engine half: what a session cost in dol…
+  cost-measured-and-a-budget-s-5rg0
+    dev → the inbox: unsure about planning first
+    web P 0.10 · plan P 0.68 · clear score 3.00
+    Cost measured and a budget set, agent-workflows half: a step's `budget:…
+  cost-measured-and-a-budget-s-ophw
+    dev → the inbox: unsure about planning first
+    web P 0.11 · plan P 0.64 · clear score 3.00
+    Cost measured and a budget set, agent-workflows half: a step's `budget:…
+  cost-measured-and-a-budget-s-tdan · the same brief was dispatched as cost-measured-and-a-budget-s-vbfh
+    dev → the inbox: unsure about planning first
+    web P 0.11 · plan P 0.56 · clear score 3.00
+    Cost measured and a budget set, agent-workflows half: a step's `budget:…
+  cost-measured-and-a-budget-s-vbfh · the same brief was dispatched as cost-measured-and-a-budget-s-tdan
+    dev → the inbox: unsure about planning first
+    web P 0.11 · plan P 0.56 · clear score 3.00
+    Cost measured and a budget set, agent-workflows half: a step's `budget:…
+  cost-on-the-board-what-a-ste-x662
+    dev-build → the inbox: unsure about planning first
+    web P 0.98 · plan P 0.68 · clear score 3.00
+    Cost on the board: what a step and a run cost, and a step held on its b…
+  forget-a-run-that-is-over-wf-auru
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.68 · clear score 3.00
+    Forget a run that is over: `wf rm <runId> [<runId>...]`, item 1 of docs…
+  an-inbox-cards-parked-before-ri7j
+    dev → the inbox: unsure about planning first
+    web P 0.12 · plan P 0.58 · clear score 3.00
+    An inbox: cards parked before they are started — `$WF_ROOT/inbox/`, `wf…
+  the-inbox-on-the-board-a-pag-ryny
+    dev-build → the inbox: unsure about planning first
+    web P 0.97 · plan P 0.72 · clear score 3.00
+    The inbox on the board: a page of its own where a person parks an idea …
+  three-small-items-in-agent-e-fiqe
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.72 · clear score 3.00
+    Three small items in agent-engine, one commit each, every guard made to…
+  four-items-in-agent-workflow-w4eb
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.59 · clear score 3.00
+    Four items in agent-workflows, one commit each: two small ones from the…
+  three-small-items-on-the-boa-bmq6
+    dev-build → dev-planned-build
+    web P 0.98 · plan P 0.87 · clear score 3.00
+    Three small items on the board, one commit each. Read CLAUDE.md (the ap…
+  make-the-inbox-be-the-first-7vms
+    dev → the inbox: unsure about planning first and what done looks like
+    web P 0.92 · plan P 0.40 · clear score 2.25
+    Make the inbox be the first item in the menu
+  the-runs-page-should-sort-th-zdoe
+    dev → the inbox: unsure about planning first and what done looks like
+    web P 0.89 · plan P 0.50 · clear score 2.49
+    The runs page should sort the run by date most recent / running ones sh…
+  two-findings-the-apps-lane-s-1qur
+    dev-build → the inbox: unsure about planning first
+    web P 0.96 · plan P 0.64 · clear score 3.00
+    Two findings the apps lane's review left, one commit each. Read CLAUDE.…
+  three-small-items-in-agent-e-0uqf
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.62 · clear score 3.00
+    Three small items in agent-engine, one commit each, every guard made to…
+  a-gate-a-step-s-handoff-that-18iy
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.66 · clear score 3.00
+    A gate: a step's handoff that waits for a person — packages/agent-workf…
+  the-queue-on-the-board-queue-ppu1
+    dev-build → dev-planned-build
+    web P 0.98 · plan P 0.84 · clear score 3.00
+    The queue on the board: queued inbox cards drawn on the Factory as ghos…
+  two-small-items-in-agent-wor-5l9e
+    dev → the inbox: unsure about planning first
+    web P 0.10 · plan P 0.30 · clear score 3.00
+    Two small items in agent-workflows, one commit each: the engine's new `…
+  the-gate-on-the-board-approv-4t7s
+    dev-build → the inbox: unsure about planning first
+    web P 0.96 · plan P 0.69 · clear score 3.00
+    The gate on the board: approve a held step from the run page, or send i…
+  the-workflow-builder-s-packa-x2ha
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.57 · clear score 3.00
+    The workflow builder's package half: a step rendered back to markdown, …
+  the-workflow-builder-on-the-4ifo
+    dev-build → the inbox: unsure about planning first
+    web P 0.97 · plan P 0.75 · clear score 3.00
+    The workflow builder on the board: steps and their edges drawn, written…
+  four-small-items-in-agent-en-ug4p
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.40 · clear score 3.00
+    Four small items in agent-engine, one commit each. Read CLAUDE.md, then…
+  the-end-of-a-run-is-a-step-o-y1wl
+    dev → the inbox: unsure about planning first
+    web P 0.12 · plan P 0.64 · clear score 3.00
+    The end of a run is a step of its workflow, and a finished run is a dec…
+  four-leftovers-on-the-board-fmk9
+    dev-build → dev-planned-build
+    web P 0.97 · plan P 0.81 · clear score 3.00
+    Four leftovers on the board from last night's reviews, one commit each.…
+  the-supervisor-packages-agen-n7c2
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.78 · clear score 2.99
+    The supervisor — packages/agent-workflows/docs/features.md §9, which is…
+  a-finished-run-is-a-decision-vjcj
+    dev-build → dev-planned-build
+    web P 0.96 · plan P 0.80 · clear score 3.00
+    A finished run is a decision on the board — the board half of packages/…
+  four-leftovers-in-agent-work-3uyy
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.41 · clear score 3.00
+    Four leftovers in agent-workflows from last night's reviews, one commit…
+  six-findings-the-last-review-6no7
+    dev → the inbox: unsure about planning first
+    web P 0.10 · plan P 0.42 · clear score 3.00
+    Six findings the last review left on the ending step (features.md's *Sh…
+  five-leftovers-from-the-revi-c0tl
+    dev → the inbox: unsure about planning first
+    web P 0.11 · plan P 0.58 · clear score 3.00
+    Five leftovers from the reviews of the supervisor and of the ending ste…
+  a-loop-s-target-keeps-one-cl-g2hh
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.31 · clear score 3.00
+    A loop's target keeps one closeout schema for the whole run, so continu…
+  a-step-can-cap-its-session-s-28sq
+    dev-build → dev-planned-build
+    web P 0.92 · plan P 0.91 · clear score 3.00
+    A step can cap its session's context: a `context:` key carried on the e…
+  what-a-session-read-by-price-i6q4
+    dev-build → dev-planned-build
+    web P 0.96 · plan P 0.88 · clear score 3.00
+    What a session read, by price: input tokens in three classes and the pe…
+  two-leftovers-of-the-agent-r-89jf
+    dev → the inbox: unsure about planning first
+    web P 0.09 · plan P 0.42 · clear score 3.00
+    Two leftovers of the agent refactor in the shipped folders: the shipper…
+  the-shipper-says-what-it-shi-ay13
+    dev → the inbox: unsure about planning first
+    web P 0.08 · plan P 0.36 · clear score 3.00
+    The shipper says what it shipped: a merge commit with a subject and a s…
+  a-gate-on-the-factory-says-w-fqxf
+    dev-build → dev-planned-build
+    web P 0.98 · plan P 0.83 · clear score 3.00
+    A gate on the Factory says what it asks and takes the answer: the brief…
+  every-run-of-an-agent-ends-i-mdgh
+    dev-planned → the inbox: unsure about planning first
+    web P 0.13 · plan P 0.76 · clear score 3.00
+    Every run of an agent ends in an outcome: a task that asked for a closi…
+  a-change-to-the-web-app-cann-i2h5
+    dev → the inbox: unsure about planning first
+    web P 0.12 · plan P 0.74 · clear score 3.00
+    A change to the web app cannot pass without the build and the e2e, whic…
+  the-subscription-s-quota-on-dy1k
+    dev-build → dev-planned-build
+    web P 0.97 · plan P 0.88 · clear score 3.00
+    The subscription's quota on the board: a statusline script writes what …
+  the-gate-s-card-on-the-facto-qtnr
+    dev-build → dev-planned-build
+    web P 0.95 · plan P 0.89 · clear score 3.00
+    The gate's card on the Factory fits its cell whatever the names: clamp …
+  a-workspace-is-a-choice-and-f86t
+    dev-planned → dev-planned-build
+    web P 0.86 · plan P 0.97 · clear score 2.99
+    A workspace is a choice, and a run does not need a repository: the seam…
+  a-node-s-outcome-is-drawn-no-f06r
+    dev-planned → dev-planned-build
+    web P 0.93 · plan P 0.82 · clear score 3.00
+    A node's outcome is drawn, not printed: the inspector's Output tab rend…
+  a-run-that-waits-on-a-person-yedh
+    dev → the inbox: unsure about planning first
+    web P 0.93 · plan P 0.44 · clear score 3.00
+    A run that waits on a person stays on the Factory's floor: a gate in th…
+  when-anthropic-s-usage-servi-y16i
+    dev → dev-planned-build
+    web P 0.94 · plan P 0.85 · clear score 3.00
+    When Anthropic's usage service does not answer, the board says so and b…
+  the-e2e-s-page-files-the-nor-b6wo
+    dev → the inbox: unsure about the web app
+    web P 0.42 · plan P 0.88 · clear score 3.00
+    The e2e's page files: the normal check guards them, and a page deleted …
+  a-run-whose-ending-step-bloc-58l0
+    dev-planned → the inbox: unsure about the web app
+    web P 0.66 · plan P 0.95 · clear score 2.97
+    A run whose ending step blocked can send the work back: today the only …
+  two-api-tests-that-fail-unde-a8b5
+    dev → the inbox: unsure about the web app and planning first
+    web P 0.65 · plan P 0.57 · clear score 3.00
+    Two api tests that fail under load, and one misplaced doc comment
+  the-judge-scores-the-dispatc-eenv
+    dev-planned → the inbox: unsure about planning first
+    web P 0.07 · plan P 0.48 · clear score 3.00
+    The judge scores the dispatches already made: `judge runs`, a shadow th…
+
+74 requests · 296 questions · 136503 input tokens · 17252 ms
+record: <record>
+nothing was filed, started or shown to anyone: this command gates nothing.
+wrote <json>

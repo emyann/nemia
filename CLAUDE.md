@@ -285,6 +285,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it
   cannot serve, by path (what was done), or the sentence says only what the list knows. Anywhere a page words an empty list, read
   what the list leaves out (learned by the run that started a folder team from a card, round 3).
+- **A directory the run writes into a step's workspace is listed by every surface that lists that workspace.** `folderFiles`
+  (`apps/api/src/artifacts.ts`) carries what it cannot serve by path, so *the folder is empty* is never said of a step whose work went
+  into `notes/` — and the run's own `given/` then stood in the folder of every step of every folder run started with `--input`, as an
+  absolute path with no name, and no step could be read as having made nothing. What the run itself put there is left out, under the
+  name the package exports (`GIVEN`), and the narrowing is tested too: a regular file a step wrote called `given` is its work and is
+  listed (learned by the run that gave a folder step its `given/`, round 2).
 - **A control hidden by a condition still holds what was put in it.** `StartRun` hides the After picker for a team that works in
   folders and kept its state, so picking runs under a git workflow and then picking a folder team sent them anyway — and the api's
   refusal named a control no longer on the page. Send what the current choice takes, not what the state holds (`afterFor`, same

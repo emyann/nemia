@@ -3738,13 +3738,26 @@ The fix is a copy, and the brief names the copy.
   — copied on, a chain would square the run's work at every fan-in.
 - **Nothing to copy, nothing made.** A chain with no inputs — the shipped `note` team — has no `given/` at all and is byte for byte
   what it was.
-- **What it does not do.** The copy is a snapshot taken as the step is filed, with no size cap: a parent re-run after its child was
-  filed leaves the child's copy stale until the child is filed again, and a folder team that writes something large hands every
-  fan-in child a whole copy of it. Neither has a case yet.
+- **A snapshot, taken as the step is filed, and taken again when it is filed again.** `make` runs on every filing, and `copyGiven`
+  empties `given/from/<step>` before it copies, so a step filed a second time — the send-back at a gate is the path that does it
+  (`sentBack`) — reads its parent's folder as it stands then, not that copy laid over the one from before. Merged, it would keep a
+  file the parent has since deleted or renamed, which is the brief's sentence made false and a step raising findings about work that
+  is gone. A round is not such a filing: `validateLoops` holds a loop's steps to a chain, so each continues the one before in its
+  folder, and the round files the target itself in the folder its record keeps.
+- **And the board leaves it out.** `folderFiles` (`apps/api/src/artifacts.ts`) lists everything a folder step's folder holds, by name
+  where the route serves it and by path where it cannot — a directory, a link — so that *the folder is empty* is never said of a step
+  whose work went into `notes/`. The run's own `given/` is not that step's work, and listed it would stand in the folder of every step
+  of every run started with `--input`: it is left out, under the name the package exports (`GIVEN`), and a regular file a step wrote
+  called `given` is still listed.
+- **What it does not do.** No size cap: a folder team that writes something large hands every fan-in child a whole copy of it. No
+  case yet.
 - **Tests.** `test/folder.test.ts` runs a real fan-in (`a`, `b` → `c`) started with `--input` on the fake board and asserts, for
   every brief, that no path under the store is named and that every path that *is* named resolves inside that step's own cwd and is
   on disk — the assertion that keeps the brief and the fence from drifting apart in words. Beside it: the symlink and the parent's
-  `given/` are not copied through, and `test/run.test.ts` holds the wording and the step with no `after`.
+  `given/` are not copied through; a fourth step continuing the fan-in's session (`d`, `after: c`) works in `c`'s folder and is given
+  nothing of its own, which is the shipped `note` chain's shape and `givenPlan`'s reason for handing an `inherit` step the inputs at
+  all; the send-back case above, which keeps a file `a` deleted out of the second copy; and `test/run.test.ts` holds the wording and
+  the step with no `after`.
 
 Two small things from the same review, in the same files: `wf inbox queue <card> --workflow <folder team>` writes `workflow:` over
 a card, which makes it a writer of the pair `cardRepoRefusal` judges, and it was not asking — a card with `repo:` ended queued on a

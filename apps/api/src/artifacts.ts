@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { artifactsDir } from 'agent-workflows';
-import { artifactPlace, type Run } from 'agent-workflows/run';
+import { artifactPlace, GIVEN, type Run } from 'agent-workflows/run';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
 export type ArtifactKind = 'image' | 'text' | 'other';
@@ -63,6 +63,15 @@ export function artifactOf(run: Pick<Run, 'id'>, step: string, file: string): St
   return { path: file, name, url, kind: typeOf(name).kind, size: stat.size };
 }
 
+/** Whether a path is a directory in its own right — a symlink to one is not, so a link the run did not make is listed as any link is. */
+const isDirectory = (at: string): boolean => {
+  try {
+    return fs.lstatSync(at).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Everything a folder step's own folder holds, for a person who never opens a terminal: each regular file directly in `dir`, by
  * name, as the files route serves it — its size and what the board does with it. Newest-looking first is not worth guessing at:
@@ -78,6 +87,12 @@ export function artifactOf(run: Pick<Run, 'id'>, step: string, file: string): St
  *
  * Beside the closeout's `artifacts`, which are the files a step *named* and the run collected: these are what is in the folder,
  * named or not, which is the only way to see what a step left behind that it forgot to name.
+ *
+ * One thing is left out: the run's own `given/` directory, which the run copied in before the step started — its inputs and a copy of
+ * each folder the step waits on (`givenPlan`). It is not what the step made, it is the same work drawn twice for a fan-in child, and
+ * listed it would stand in every folder of every run started with `--input`, so *the folder is empty* could never be said of a step
+ * that made nothing. The name comes from the package, not spelled a second time here. A `given` that is not a directory is a step's
+ * own file and is listed: what the run makes is a directory.
  */
 export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { files: StepArtifact[]; error: string | null } {
   let names: string[];
@@ -87,7 +102,7 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { 
     const code = (e as NodeJS.ErrnoException).code;
     return { files: [], error: code === 'ENOENT' ? null : `Its folder could not be read (${code ?? (e as Error).message}).` };
   }
-  const files = names.map((name) => {
+  const files = names.filter((name) => !(name === GIVEN && isDirectory(path.join(dir, name)))).map((name) => {
     const here = path.join(dir, name);
     const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
     if (!stat) return { path: here };

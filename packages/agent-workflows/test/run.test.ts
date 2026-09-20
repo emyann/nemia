@@ -4081,8 +4081,8 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
   for (const brief of briefs) assert.doesNotMatch(brief, /\bgit\b|branch|commit|worktree|repositor/i, brief);
   assert.match(briefs[0]!, /This step works in a folder the run made for it/);
   assert.match(briefs[1]!, /This folder has already been worked in by: write\. Their work is on disk here\./);
-  assert.match(briefs[2]!, /The steps before you worked in folders of their own, which this one is not:\n\n- write: `\/store\/runs\/n-1\/work\/write`/);
-  assert.match(briefs[3]!, /- a: `\/store\/runs\/n-1\/work\/a`\n- b: `\/store\/runs\/n-1\/work\/b`/);
+  assert.match(briefs[2]!, /The steps before you worked in folders of their own, which this one is not\. What each left has been copied into this folder:\n\n- write: `given\/from\/write`/);
+  assert.match(briefs[3]!, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.doesNotMatch(briefs[3]!, /merged/);
   assert.match(briefs[4]!, /An earlier one worked on this step in this folder, and what it left is still here\./);
   assert.match(briefs[5]!, /your last one could not be continued\. What it left is in this folder\./);
@@ -4094,6 +4094,10 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
     assert.match(brief, /Write nowhere else\./);
     assert.doesNotMatch(brief, /\/store\/runs\/n-1\/artifacts\//, 'that directory is outside the fence: it is not named');
     assert.doesNotMatch(brief, /by absolute path/);
+    // And the same of every other path the store holds — the parents' folders, the run's inputs. A folder step is denied each of them
+    // with no prompt, so a brief that names one tells a session to read what it cannot, and nothing says so to anyone. What it is told
+    // to read, the run copied into its folder: this is the assertion that keeps the two from drifting apart in words.
+    assert.doesNotMatch(brief, /\/store\//, 'no path under the store is named to a fenced session');
   }
 
   // As a run records them, a chain's step works in its parent's folder: review's is write's, and critic's is draft's. A root tried again
@@ -4108,12 +4112,26 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
   ];
   assert.match(again[0]!, /This folder has already been worked in by: review\. Their work is on disk here\./);
   assert.match(again[1]!, /This folder has already been worked in by: critic\. Their work is on disk here\./);
-  for (const brief of again) assert.doesNotMatch(brief, /which this one is not|change nothing in them/, brief);
+  for (const brief of again) assert.doesNotMatch(brief, /which this one is not|copied into this folder/, brief);
   // A fork's side tried again, beside a sibling in a folder of its own and the parent it did not continue: here is its own, the rest are not.
   const side = composeBrief(a, folder({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join], undefined, '/store/runs/n-1/artifacts/a', undefined,
     { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' });
-  assert.match(side, /The steps before you worked in folders of their own, which this one is not:\n\n- write: `\/store\/runs\/n-1\/work\/write`\n\n/);
+  assert.match(side, /The steps before you worked in folders of their own, which this one is not\. What each left has been copied into this folder:\n\n- write: `given\/from\/write`\n\n/);
   assert.doesNotMatch(side, /already been worked in/);
+
+  // A folder step that declares no `after` is given nothing, whatever else has run: `earlier`'s fallback — every step filed so far — is
+  // a fact about the run, and naming those folders would point a fenced session at directories no `make` ever copied. It is not told to
+  // judge work it cannot open either.
+  const solo = f('solo');
+  const alone = composeBrief(solo, folder({ write: 't1', solo: null }), [write, solo], undefined, '/store/runs/n-1/artifacts/solo');
+  assert.doesNotMatch(alone, /worked in|given\/from|Judge what is there/, alone);
+  assert.match(alone, /This step works in a folder the run made for it/);
+
+  // The inputs a person gave the run sit beside the folders, outside the fence too: the line names the copy in this folder.
+  const withInputs = composeBrief(review, { ...folder({ write: 't1', review: null }), inputs: ['mock.png'] }, [write, review], undefined,
+    '/store/runs/n-1/artifacts/review', undefined, undefined, undefined, undefined, '/store/runs/n-1/inputs');
+  assert.match(withInputs, /Files given with it \(`wf start --input`\), copied into `given\/inputs` in this folder: `mock\.png`\./);
+  assert.doesNotMatch(withInputs, /\/store\//, 'the run\'s own inputs directory is outside the fence: it is not named');
 
   // The same shapes on a git run still say git's words: the folder's are said only on a folder run.
   assert.match(composeBrief(join, run({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join].map((s) => ({ ...s, workspace: undefined }))), /has been merged into this branch/);

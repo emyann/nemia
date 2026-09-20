@@ -3708,6 +3708,44 @@ beside it changes these readers and no more.
 **Next, in order:** (3) a folder's lifetime — kept, cleaned, or none at all; (4) the Factory draws a run's workspace;
 (5) connections (P3), and a GitHub kind beside `folder`.
 
+## Shipped: a folder step can read what its brief tells it to read — `given/`
+
+Left open by the last review of the slice above. Once a folder team's steps had to run in `dontAsk`, two things the run itself
+writes into a brief pointed outside the fence: the folders of the steps a fan-in or a fork's child waits on, named by absolute
+path under *"Read what you need there"*, and `runs/<id>/inputs`, named by `inputsLine` on every brief of a run started with
+`wf start --input`. Both reads are denied with no prompt, the session carries on, and nothing says so to anyone — the shipped
+`note` chain never meets either, so no run had shown it.
+
+The fix is a copy, and the brief names the copy.
+
+- **`givenPlan` (`run.ts`) is the one writer** of what a folder step is given and what it is called: `given/inputs`, and
+  `given/from/<step>` for each folder this step waits on. `folderPlace.make` copies exactly what it names as it makes the folder,
+  and `composeBrief` words exactly what it names — one function, because the brief naming a path the fence denies is the defect
+  this closes.
+- **Keyed on the workspace plan**, so what is copied is what the step *declared* it waits on. `composeBrief`'s older fallback —
+  every step filed so far, for a step with no `after` — named folders no `make` ever copied; such a step is now given nothing and
+  told to judge nothing, which is the truth about what it can open.
+- **A copy, not a reach.** The engine's `SpawnRequest` carries no extra-directory field and the claude argv passes no `--add-dir`;
+  reach would mean new engine surface, a per-harness argument, a refusal for the harnesses that have none, and a fresh live
+  measurement — and Claude's `--add-dir` grants write as well as read, which is not what the brief promises. Copy needs no harness
+  feature and rests on a measurement already on the record: `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`,
+  no `allow:` rule) read `note.md` in its own cwd in the live run above. A read inside the session's own directory is allowed on
+  any harness. `artifactsContract`'s folder branch had already chosen the same way round, and this follows it.
+- **Refusing was rejected as the whole answer.** A fan-in is the shape `folderPlace`'s own doc promises, and refusing `--input` on
+  a folder run would take away the only way to hand a folder team a file.
+- **Two things the copy leaves behind**: a symlink, which `cpSync` would copy as a symlink and which is the fence undone by a file
+  (`writeWorkflow` refuses one by name for the same reason); and the source's own `given/`, which is its parents' work, not its own
+  — copied on, a chain would square the run's work at every fan-in.
+- **Nothing to copy, nothing made.** A chain with no inputs — the shipped `note` team — has no `given/` at all and is byte for byte
+  what it was.
+- **What it does not do.** The copy is a snapshot taken as the step is filed, with no size cap: a parent re-run after its child was
+  filed leaves the child's copy stale until the child is filed again, and a folder team that writes something large hands every
+  fan-in child a whole copy of it. Neither has a case yet.
+- **Tests.** `test/folder.test.ts` runs a real fan-in (`a`, `b` → `c`) started with `--input` on the fake board and asserts, for
+  every brief, that no path under the store is named and that every path that *is* named resolves inside that step's own cwd and is
+  on disk — the assertion that keeps the brief and the fence from drifting apart in words. Beside it: the symlink and the parent's
+  `given/` are not copied through, and `test/run.test.ts` holds the wording and the step with no `after`.
+
 ## Shipped: a node's outcome drawn, not printed — the Output tab
 
 The step inspector's Output tab printed a closeout: the summary, then each declared field as the JSON it came as. Now it opens on how

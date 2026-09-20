@@ -3224,11 +3224,17 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
 }
 
 /**
- * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: the directory the run copied them
- * into, and each by name. Undefined for a run given none, or with no directory to name.
+ * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: where they are, and each by name.
+ * Undefined for a run given none, or with no directory to name.
+ *
+ * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow.ts): the run's own `inputs/`
+ * sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say so. The
+ * run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
  */
-export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined): string | undefined =>
-  (dir && names?.length ? `Files given with it (\`wf start --input\`), in \`${dir}\`: ${names.map((n) => `\`${n}\``).join(', ')}.` : undefined);
+export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined, inFolder = false): string | undefined =>
+  (dir && names?.length
+    ? `Files given with it (\`wf start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${names.map((n) => `\`${n}\``).join(', ')}.`
+    : undefined);
 
 /** What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at `wf start`. */
 export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
@@ -3940,7 +3946,7 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
-  const inputs = inputsLine(inputsDir, run.inputs);
+  const inputs = inputsLine(inputsDir, run.inputs, inFolder);
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
   const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
 
@@ -3968,14 +3974,20 @@ export function composeBrief(
     const plan = workspacePlan(steps, step);
     const here = run.steps[step.name]?.workspace ?? (plan.kind === 'inherit' ? run.steps[plan.from]?.workspace : undefined);
     const inHere = earlier.filter((name) => here !== undefined && run.steps[name]?.workspace === here);
-    const elsewhere = earlier.filter((name) => !inHere.includes(name));
+    // The steps whose folders this one was GIVEN, which is not the same list as the steps before it: what the run copied in is what this
+    // step declared it waits on (`givenPlan`), and the brief names the copies, inside the fence. `earlier`'s fallback — every step filed
+    // so far, for a step that declares no `after` — is a fact about the run, not about this folder: named here it would point a fenced
+    // session at folders nobody copied and nobody can read.
+    const given = givenPlan(run, plan);
     if (inHere.length) parts.push('', `This folder has already been worked in by: ${inHere.join(', ')}. Their work is on disk here.`);
-    if (elsewhere.length) {
-      const where = elsewhere.map((name) => `- ${name}: \`${run.steps[name]?.workspace ?? 'no folder yet'}\``);
-      parts.push('', `${inHere.length ? 'Other steps' : 'The steps before you'} worked in folders of their own, which this one is not:`, '', ...where, '',
-        'Read what you need there, and change nothing in them: what you make goes in this folder.');
+    if (given.from.length) {
+      const where = given.from.map((g) => `- ${g.step}: \`${g.dir}\``);
+      parts.push('', `${inHere.length ? 'Other steps' : 'The steps before you'} worked in folders of their own, which this one is not. What each left has been copied into this folder:`, '', ...where, '',
+        'Read what you need there. Each is a copy, taken as this step was filed, so nothing you do to it reaches them: what you make goes in this folder, outside `given`.');
     }
-    if (earlier.length) {
+    // Said of work this step can actually open: what is in its own folder, or what was copied into it. A step that declares no `after`
+    // is given neither, however many steps have run beside it, and is told to judge nothing.
+    if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
   } else if (step.workspace === 'main') {
@@ -4539,6 +4551,47 @@ export type WorkspacePlan =
   | { kind: 'fork'; from: string | null }
   | { kind: 'merge'; from: string; also: string[] }
   | { kind: 'main' };
+
+/** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
+export const GIVEN = 'given';
+
+/** One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it came from. */
+export type GivenFrom = { step: string; dir: string; source: string };
+
+/** What a folder step is given: the run's inputs, and a copy of each folder it waits on. Both by their path from the step's own folder. */
+export type Given = { inputs: string | null; from: readonly GivenFrom[] };
+
+/**
+ * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
+ * both, because the brief naming a path the fence denies is the defect this exists to close.
+ *
+ * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow.ts): a call outside the step's own directory is denied with no
+ * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So two things the run has always written into a
+ * folder brief — the run's `inputs/`, and the folders of the steps this one waits on but did not continue — were paths no session could
+ * read. Copying is what makes them true: a read inside the session's own directory needs no permission of any harness, which is what the
+ * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allow:`) measured live when it read `note.md` in its
+ * cwd. Reaching out instead would mean a new field on the engine's task, a per-harness argument for it, and a fresh live measurement;
+ * `artifactsContract`'s folder branch already chose the same way round, and this follows it.
+ *
+ * Keyed on the workspace plan, so what is copied is what the step DECLARED it waits on — a fork's parent, a fan-in's parents — and never
+ * `composeBrief`'s "every step filed so far" fallback, which no `make` ever copied. A step that continues another's folder (`inherit`) is
+ * given nothing: it is standing in the folder that was given it. Pure.
+ */
+export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
+  if (placeOf(run) !== 'folder' || plan.kind === 'main') return { inputs: null, from: [] };
+  // Every folder of a folder run holds the run's inputs: a step that makes its own folder is given them here, and one that continues
+  // another's folder is standing in a folder that was — an `inherit` chain bottoms out at a step that made one.
+  const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
+  if (plan.kind === 'inherit') return { inputs, from: [] };
+  const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
+  return {
+    inputs,
+    from: parents.flatMap((name) => {
+      const source = run.steps[name]?.workspace;
+      return source ? [{ step: name, dir: `${GIVEN}/from/${name}`, source }] : [];
+    }),
+  };
+}
 
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
   // Said by the step, not by the shape: the repository's own checkout, where the base branch is (`workspace: main`).

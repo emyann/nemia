@@ -35,7 +35,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameR
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { folderPlace, workRoot } from './places.ts';
+import { folderPlace, inputsRoot, workRoot } from './places.ts';
 import { acceptanceOf, spentAcceptances, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
@@ -720,8 +720,12 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
 /**
  * The directory `wf start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
  * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
+ *
+ * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
+ * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is `places.ts`'s
+ * (`inputsRoot`), since that is where the copy is read from.
  */
-export const inputsDir = (run: Pick<Run, 'id'>): string => path.join(runsDir(), run.id, 'inputs');
+export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;

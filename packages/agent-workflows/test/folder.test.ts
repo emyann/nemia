@@ -18,6 +18,22 @@ fs.mkdirSync(NOT_A_REPO, { recursive: true });
 fs.mkdirSync(TEAM, { recursive: true });
 fs.writeFileSync(path.join(TEAM, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite the note\n');
 fs.writeFileSync(path.join(TEAM, 'review.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nafter: write\n---\nreview the note\n');
+// A fan-in: two roots working side by side in folders of their own, and a third that waits on both. The shape `folderPlace` promises
+// and the shipped `note` chain never meets — and the one whose brief used to name folders a `dontAsk` session cannot open.
+const FAN = path.join(ROOT, 'workflows', 'fan');
+fs.mkdirSync(FAN, { recursive: true });
+fs.writeFileSync(path.join(FAN, 'a.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side a\n');
+fs.writeFileSync(path.join(FAN, 'b.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side b\n');
+fs.writeFileSync(path.join(FAN, 'c.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: a, b\n---\nput the two together\n');
+// And a fourth that continues the third's session, which is the shipped `note` chain's shape and the only one anybody runs today: it
+// works in `c`'s folder and is given nothing of its own, so its brief's `given/inputs` is true only because `c`'s copy is in there.
+fs.writeFileSync(path.join(FAN, 'd.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n');
+// Two files a person hands the run with `wf start --input`.
+const GIVEN_FILES = path.join(ROOT, 'given-files');
+fs.mkdirSync(GIVEN_FILES, { recursive: true });
+fs.writeFileSync(path.join(GIVEN_FILES, 'mock.png'), 'PNG');
+fs.writeFileSync(path.join(GIVEN_FILES, 'brief notes.md'), '# what the tides do\n');
+
 // A team that works on a repository, to hold the refusals apart: a card for it keeps the repository it names.
 const GIT_TEAM = path.join(ROOT, 'workflows', 'change');
 fs.mkdirSync(GIT_TEAM, { recursive: true });
@@ -33,7 +49,7 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, start, startQueued } = await import('../src/runner.ts');
-const { forgetLine } = await import('../src/run.ts');
+const { forgetLine, sentBack } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
 /** What `main` printed, line by line, while it ran. */
@@ -124,6 +140,8 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
   assert.equal(write.cwd, writeFolder);
   assert.ok(fs.statSync(writeFolder).isDirectory(), 'made before the step is filed');
+  // A run given no inputs whose steps are a chain is given nothing, and its folders are what they always were.
+  assert.equal(fs.existsSync(path.join(writeFolder, 'given')), false, 'nothing to copy, nothing made');
   assert.doesNotMatch(write.brief, /\bgit\b|branch|commit/i);
   fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
 
@@ -267,6 +285,149 @@ test('the shipped note team is a folder team: it starts with no repository, and 
   assert.equal(review.cwd, write.cwd);
   assert.match(review.brief, /The moon pulls the sea\./);
   for (const brief of [write.brief, review.brief]) assert.doesNotMatch(brief, /\bgit\b|branch|commit|worktree/i);
+  await forget(e, run.id);
+  assert.deepEqual(gitAsked(), []);
+});
+
+/**
+ * The paths a brief names, of the kind a session would open: every backtick-quoted token that reads as a path rather than as a command or
+ * a key. A folder step is fenced to its own directory (`dontAsk`), so each of them has to be inside it and on disk.
+ */
+const pathsNamed = (brief: string): string[] =>
+  [...brief.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]!).filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'));
+
+test('a folder team with a fan-in, given files at its start: what each brief tells a step to read is inside its own folder, and on disk', async () => {
+  // Every path a folder brief used to name for these two — the run's `inputs/`, and the folders of the steps a fan-in waits on — sat
+  // beside the step's folder and outside its fence, where `dontAsk` denies the read with no prompt and the session carries on. The run
+  // copies them in as it makes the folder (`givenPlan`, `folderPlace.make`), and the brief names the copies. This is the test that keeps
+  // the two from drifting: what the brief says, the folder holds.
+  const run = start({
+    brief: 'two sides of a note',
+    repo: NOT_A_REPO,
+    workflowDir: FAN,
+    inputs: [path.join(GIVEN_FILES, 'mock.png'), path.join(GIVEN_FILES, 'brief notes.md')],
+  });
+  const { e, tasks, settle } = board();
+  const work = path.join(ROOT, 'runs', run.id, 'work');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['a', 'b']);
+  for (const name of ['a', 'b']) {
+    const folder = path.join(work, name);
+    assert.deepEqual(fs.readdirSync(path.join(folder, 'given', 'inputs')).sort(), ['brief notes.md', 'mock.png'], `${name} was given the run's inputs`);
+    assert.equal(fs.readFileSync(path.join(folder, 'given', 'inputs', 'mock.png'), 'utf8'), 'PNG');
+    assert.equal(fs.existsSync(path.join(folder, 'given', 'from')), false, 'a root waits on nobody, so it is given nobody\'s folder');
+  }
+  // What each side leaves, and two things the copy must not carry into the step after them: a link out of the folder, and the folder's
+  // own `given/`, which is its parents' work and not its own — copied on, a chain would square it at every fan-in.
+  fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
+  fs.writeFileSync(path.join(work, 'b', 'side-b.md'), '# b\n');
+  fs.symlinkSync(path.join(ROOT, 'somewhere'), path.join(work, 'b', 'out'));
+
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  const c = path.join(work, 'c');
+  assert.equal(tasks.get(`${run.id}-c`)!.spec.cwd, c, 'a fan-in gets a folder of its own');
+  assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'a', 'side-a.md'), 'utf8'), '# a\n');
+  assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'b', 'side-b.md'), 'utf8'), '# b\n');
+  assert.deepEqual(fs.readdirSync(path.join(c, 'given', 'inputs')).sort(), ['brief notes.md', 'mock.png'], 'and the run\'s inputs, as its parents were');
+  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'out')), false, 'a symlink is not copied: a link in the folder is the fence undone by a file');
+  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'given')), false, 'nor a parent\'s own given/: what this step waits on is what that step made');
+
+  // The step that continues c's session works in c's folder, and is given nothing of its own: its brief says the run's files are
+  // `given/inputs` *in this folder*, which is true because c's copy is sitting in the folder it inherits. That is the shape the
+  // shipped `note` team has, and `givenPlan`'s reason for handing an inherit step the inputs at all — the loop below walks it.
+  settle(`${run.id}-c`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['d']);
+  assert.equal(tasks.get(`${run.id}-d`)!.spec.cwd, c, 'd continues c where it left off');
+  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'a')), true, 'and what c was given is still there, since nothing was made anew');
+
+  // The two must not drift: every path any of these briefs names is inside the step's own folder, and there.
+  for (const name of ['a', 'b', 'c', 'd']) {
+    const { brief, cwd } = tasks.get(`${run.id}-${name}`)!.spec;
+    assert.ok(!brief.includes(ROOT), `${name}'s brief names no path under the store, which its fence denies it:\n${brief}`);
+    const named = pathsNamed(brief);
+    assert.ok(named.length, `${name}'s brief names a path`);
+    for (const at of named) {
+      assert.equal(path.isAbsolute(at), false, `${name}: ${at} is named by its path from the folder`);
+      assert.ok(fs.existsSync(path.join(cwd, at)), `${name}: ${at} is on disk in its folder`);
+    }
+  }
+  assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
+  assert.match(tasks.get(`${run.id}-a`)!.spec.brief, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  const d = tasks.get(`${run.id}-d`)!.spec.brief;
+  assert.match(d, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
+  assert.doesNotMatch(d, /given\/from/, 'a step standing in the folder it was given is given nothing more');
+
+  await forget(e, run.id);
+  assert.deepEqual(gitAsked(), []);
+});
+
+test('REFUSED: a card with a repository queued onto a folder team — `--workflow` writes that key, so it is judged as the card\'s own writer is', async () => {
+  const cwd = process.cwd();
+  process.chdir(NOT_A_REPO);
+  try {
+    // `wf inbox queue <card> --workflow <w>` writes `workflow:` over the card's own, which makes it a writer of the pair `cardRepoRefusal`
+    // judges — and it was not asking. A card filed for a git team was queued onto a folder team, to start on a repository no step of it
+    // will ever look at, with nothing said anywhere.
+    const file = path.join(ROOT, 'inbox', 'a-card-with-a-repo.md');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const text = `---\nworkflow: ${GIT_TEAM}\nrepo: ${NOT_A_REPO}\n---\na change to make\n`;
+    fs.writeFileSync(file, text);
+    const refused = refusal(() => queueInInbox('a-card-with-a-repo', { workflow: TEAM }));
+    assert.equal(refused.exitCode, 2);
+    assert.ok(refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), refused.message);
+    assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
+    assert.equal(fs.readFileSync(file, 'utf8'), text, 'refused before anything is written: the card is unqueued, and its workflow is its own');
+
+    // The two the guard must not take with it. A re-queue with no `--workflow` writes nobody's choice of team: the card is as a person
+    // left it, there is no editing one from the board, and refusing it would strand it.
+    assert.equal(queueInInbox('a-card-with-a-repo').was, 'queued');
+    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
+    // And a card queued onto a team that works on a repository keeps on as before.
+    assert.equal(queueInInbox('a-card-with-a-repo', { workflow: GIT_TEAM }).was, 'queued');
+    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
+    // A card with no repository is queued onto the folder team, which is the whole point of the key.
+    fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card-with-none.md'), 'a note on tides\n');
+    assert.equal(queueInInbox('a-card-with-none', { workflow: TEAM }).was, 'queued');
+    assert.equal(queueInInbox('a-card-with-none', { off: true }).was, 'taken back');
+  } finally {
+    process.chdir(cwd);
+  }
+  assert.deepEqual(gitAsked(), []);
+});
+
+
+test("a fan-in filed a second time is given its parent's folder as it stands then, not laid over the copy it had", async () => {
+  // `folderPlace.make` runs every time a step is filed, and a step is filed more than once: a person's objection at a gate unfiles the
+  // step the work is sent back from, keeping its folder (`sentBack`), and a later pass files it again — with a try of the work between
+  // the two. A copy laid over the one from before would keep a file its parent has since deleted or renamed, while the brief calls the
+  // whole of it a copy taken as this step was filed, and the step would raise findings about work that is not there any more.
+  const run = start({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN });
+  const { e, tasks, settle } = board();
+  const work = path.join(ROOT, 'runs', run.id, 'work');
+  const givenA = path.join(work, 'c', 'given', 'from', 'a');
+
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(work, 'a', 'keep.md'), '# kept\n');
+  fs.writeFileSync(path.join(work, 'a', 'gone.md'), '# only the first time\n');
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.deepEqual(fs.readdirSync(givenA).sort(), ['gone.md', 'keep.md'], 'what a had made when c was first filed');
+  settle(`${run.id}-c`, 'succeeded', SIGNED);
+
+  // The send-back, on the record as the run writes it, and what a does about it: the file c would read again is gone, renamed into another.
+  const record = readRun(run.id);
+  record.steps.c = sentBack(record.steps.c!);
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  fs.rmSync(path.join(work, 'a', 'gone.md'));
+  fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
+
+  const again = await advance(e, readRun(run.id));
+  assert.deepEqual(again.filed, ['c'], again.notes.join('\n'));
+  assert.equal(tasks.get(`${run.id}-c-try2`)!.spec.cwd, path.join(work, 'c'), 'the folder it had, since a send-back keeps it');
+  assert.deepEqual(fs.readdirSync(givenA).sort(), ['keep.md', 'said.md'],
+    "a's folder as it stands now — the copy is replaced, not merged over, or the step reads work that is not there any more");
+
   await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
 });

@@ -69,6 +69,12 @@ fs.writeFileSync(path.join(wrote, '..hidden.md'), 'not reachable by name');
 fs.mkdirSync(path.join(wrote, 'scratch'), { recursive: true });
 fs.writeFileSync(path.join(root, 'runs', 'f-notes', 'outside.md'), 'outside the folder');
 fs.symlinkSync(path.join(root, 'runs', 'f-notes', 'outside.md'), path.join(wrote, 'link.md'));
+// And what the run itself copied in before the step started, which is not what the step made: the files `wf start --input` gave it
+// and a copy of each folder it waits on (`givenPlan` in the package). Every folder run started with `--input` has one.
+fs.mkdirSync(path.join(wrote, 'given', 'inputs'), { recursive: true });
+fs.writeFileSync(path.join(wrote, 'given', 'inputs', 'mock.png'), PNG);
+fs.mkdirSync(path.join(wrote, 'given', 'from', 'sketch'), { recursive: true });
+fs.writeFileSync(path.join(wrote, 'given', 'from', 'sketch', 'side.md'), 'what the step before it made');
 
 /** A word about git, which a person reading a folder run must not meet: it has no repository, no branch and nothing to merge. */
 const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|repo|git)\b/i;
@@ -145,6 +151,8 @@ test("a folder step carries everything its folder holds: what a name reaches wit
   const [write] = run.steps;
   // In name order. A directory, a link out of the folder and a name the route refuses carry a path and nothing else — they are the
   // work too, and a board that turns an empty list into *the folder is empty* must not say that of a folder holding only `scratch/`.
+  // The run's own `given/` is the one thing left out: it is not the step's work, and listed it would stand in the folder of every
+  // step of every run started with `--input`, so no step could ever be read as having made nothing.
   assert.deepEqual(write!.files, [
     { path: path.join(wrote, '..hidden.md') },
     { path: path.join(wrote, 'bundle.zip'), name: 'bundle.zip', url: '/api/runs/f-notes/steps/write/files/bundle.zip', kind: 'other', size: 2 },
@@ -239,4 +247,23 @@ test("a card started on a folder team carries the repository it named and the ru
   const plain = await file('a note on the moon, from a card that names none');
   const next = (await (await startOn(plain)).json()) as Record<string, unknown>;
   assert.equal('ignoredRepo' in next, false, `a card that names no repository has nothing to say: ${JSON.stringify(next)}`);
+});
+
+test("a file a step wrote called `given` is its own work, and is listed — only the run's own `given/` directory is left out", async () => {
+  // The narrowing on the line above: what the run makes is a directory, so a regular file of that name is the step's, and hiding it
+  // would be work made invisible on the one surface a person who never opens a terminal has.
+  const folder = path.join(root, 'runs', 'f-given', 'work', 'write');
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, 'given'), 'what I was given, in my own words');
+  fs.writeFileSync(path.join(folder, 'note.md'), 'The tides.\n');
+  signedOff('t-given-write', folder);
+  fs.writeFileSync(path.join(root, 'runs', 'f-given.json'), JSON.stringify({
+    id: 'f-given', place: { kind: 'folder' }, workspace: path.join(root, 'runs', 'f-given', 'work'), brief: 'Write a note.', createdAt: at,
+    workflowDir: path.join(root, 'no-such-workflow'),
+    workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }],
+    steps: { write: { taskId: 't-given-write', workspace: folder, branch: null } },
+  }));
+
+  const run = (await (await app.request('/api/runs/f-given')).json()) as { steps: { files: { path: string; name?: string }[] }[] };
+  assert.deepEqual(run.steps[0]!.files.map((f) => f.name ?? f.path), ['given', 'note.md']);
 });

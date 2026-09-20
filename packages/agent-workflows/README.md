@@ -1103,6 +1103,9 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 
   A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
   another, a nudge, a round that continues its target. A run given none composes exactly as before.
+
+  On a folder run the directory is outside the step's fence, so the run copies the files into each folder it makes and
+  the line names the copy: ``Files given with it (`wf start --input`), copied into `given/inputs` in this folder: …``
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
@@ -1428,10 +1431,18 @@ agent: note-writer
 - **Refused at start**, exit 2, before anything is written: `--repo` named on the command line, on a brief or an inbox card
   (a card's own `repo:` is not looked at, as the directory typed in is not), `--no-worktree` (there is
   no branch to work on in place), and `--after`, on either side — a folder run ships nothing git could see merged.
-- **Each step works in a folder of its own**, `runs/<id>/work/<step>`, made empty as it is filed — except a step that
+- **Each step works in a folder of its own**, `runs/<id>/work/<step>`, made as it is filed — except a step that
   continues another's session (a chain, `inherit`), which works in that step's folder, since a harness session belongs to
-  its directory. A fork and a fan-in start empty: nothing is merged, and what came before reaches them as declared output
-  (`input:`), collected artifacts, and the folders' paths, which their brief names to read and leave as they are.
+  its directory. A fork and a fan-in start with nothing of their own: nothing is merged, and what came before reaches them
+  as declared output (`input:`), collected artifacts, and the copies below.
+- **What a step is told to read is in its own folder: `given/`.** A folder team's steps run in `dontAsk`
+  (`validateFolderMode`), fenced to their directory: a read outside it is denied with no prompt, and the session carries on
+  none the wiser. So the run copies in what its brief names, as it makes the folder — the files given with
+  `wf start --input` into `given/inputs`, and each folder this step waits on but did not continue into
+  `given/from/<step>` — and the brief names those, by their path from the folder, and nothing under the store. Each is a
+  copy taken as the step was filed: what a step does to one reaches nobody. A symlink is not copied through, nor a parent's
+  own `given/`, which is its parents' work and not its own. A run given no inputs whose steps are a chain is given
+  nothing, and has no `given/` at all.
 - **The briefs speak of folders** — where the step works, its files without "committed", its closeout without a hand-off
   commit — and never of git, a branch or a worktree.
 - **Handing off is collecting.** A finished step's artifacts are copied into `runs/<id>/artifacts/<step>/`, as for any
@@ -2017,6 +2028,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
 | `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry`, `wf round`, `wf approve`, `wf accept`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
+| `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
 | `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
@@ -2130,7 +2142,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | path | |
 |---|---|
 | `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds |
-| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/` |
+| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |

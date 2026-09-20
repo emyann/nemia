@@ -35,7 +35,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameR
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { folderPlace, workRoot } from './places.ts';
+import { folderPlace, inputsRoot, workRoot } from './places.ts';
 import { acceptanceOf, spentAcceptances, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
@@ -720,8 +720,12 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
 /**
  * The directory `wf start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
  * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
+ *
+ * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
+ * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is `places.ts`'s
+ * (`inputsRoot`), since that is where the copy is read from.
  */
-export const inputsDir = (run: Pick<Run, 'id'>): string => path.join(runsDir(), run.id, 'inputs');
+export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
@@ -1562,9 +1566,11 @@ export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRu
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
  * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
  *
- * Refused where the card is written, `wf inbox add` and the board's Inbox alike (`addToInbox` is the one writer), in the words `wf start
- * --repo` is refused in: the same sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no
- * way to edit one from the board, and refusing its start would strand it — so its `repo:` is ignored and said (`InboxStarted.ignoredRepo`).
+ * Refused wherever a card's `workflow:` is written — `addToInbox` (`wf inbox add`, and the board's Inbox) and `queueInInbox`
+ * (`wf inbox queue --workflow`, which writes that key over the card's own) — in the words `wf start --repo` is refused in: the same
+ * sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no way to edit one from the
+ * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
+ * (`InboxStarted.ignoredRepo`).
  *
  * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
  * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
@@ -1639,6 +1645,13 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     const listing = readInbox();
     const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
     if (why) throw new WorkflowError(why);
+    // `--workflow` writes that key over the card's own, which makes this a writer of the pair a card's `repo:` is judged against, and it
+    // was not refusing: a card filed with a repository was queued onto a folder team, to start on a repository no step of it looks at.
+    // A re-queue with no `--workflow` is not refused — the card is as it was, and a card on disk cannot be edited from the board.
+    if (how.workflow !== undefined) {
+      const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });
+      if (refusedRepo) throw new WorkflowError(refusedRepo);
+    }
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
   // When the card was last written, to set back over the rename below: the card's filing time, as a board reads it.

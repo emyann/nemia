@@ -267,11 +267,30 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
   and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A path a fenced step's brief names must be inside the step's own folder.** A folder team runs in `dontAsk`, so a read
+  outside its directory is denied with no prompt and the session carries on: the brief is the only thing that says the path
+  exists, and it was lying twice — the parents' folders a fan-in is told to read, and `runs/<id>/inputs` on every brief of a
+  run started with `--input`. Neither fails, and the shipped chain meets neither. The fix is to copy what the brief names
+  into the folder (`givenPlan` in `run.ts` words the brief and `folderPlace.make` does the copy, off the same plan), and the
+  test is the one that refuses drift: in a real run, no brief names a path under the store, and every path a brief does name
+  is on disk under that step's own cwd. A read inside cwd needs no `allow:` rule on any harness (measured by
+  `note-reviewer`); a write needs `Edit(**)`. Reaching out instead would be a new field on the engine's task and a fresh live
+  measurement (learned by the run that gave a folder step its `given/`).
+- **A key one function refuses is refused by every function that writes it, not by the one the comment names.**
+  `cardRepoRefusal`'s doc said `addToInbox` is the one writer of a card's `workflow:`, and `wf inbox queue --workflow` writes
+  it too: a card with `repo:` was queued onto a folder team, to start on a repository no step of it looks at. Before trusting
+  "one writer" in a comment, grep for the key (same run).
 - **A list a page turns into a sentence must carry everything the sentence is about.** The board says *the folder is empty* of an
   empty `files`, and `folderFiles` listed only what its route can serve by name: a step whose work went into `notes/` was reported
   to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it
   cannot serve, by path (what was done), or the sentence says only what the list knows. Anywhere a page words an empty list, read
   what the list leaves out (learned by the run that started a folder team from a card, round 3).
+- **A directory the run writes into a step's workspace is listed by every surface that lists that workspace.** `folderFiles`
+  (`apps/api/src/artifacts.ts`) carries what it cannot serve by path, so *the folder is empty* is never said of a step whose work went
+  into `notes/` — and the run's own `given/` then stood in the folder of every step of every folder run started with `--input`, as an
+  absolute path with no name, and no step could be read as having made nothing. What the run itself put there is left out, under the
+  name the package exports (`GIVEN`), and the narrowing is tested too: a regular file a step wrote called `given` is its work and is
+  listed (learned by the run that gave a folder step its `given/`, round 2).
 - **A control hidden by a condition still holds what was put in it.** `StartRun` hides the After picker for a team that works in
   folders and kept its state, so picking runs under a git workflow and then picking a folder team sent them anyway — and the api's
   refusal named a control no longer on the page. Send what the current choice takes, not what the state holds (`afterFor`, same

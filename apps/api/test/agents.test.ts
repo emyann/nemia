@@ -261,13 +261,14 @@ test('a new agent is written with its skills beside it, and a save that changes 
   assert.notEqual(again.agent.version, was, 'the skills file is digested with the agent');
   await refused(send('PUT', '/api/agents/yours/scribe', { ...scribe, version: was }), 409, /changed since it was read/);
 
-  // The line taken off takes the file with it: nothing names it now, and nothing in agents/ should be named by nothing.
+  // The line taken off — the board's Skills file field cleared, and saved — leaves the file: a save never deletes what a person wrote.
   const off = await send('PUT', '/api/agents/yours/scribe', { ...scribe, version: again.agent.version });
   const bare = (await off.json()) as AgentSaved;
   assert.equal(off.status, 200, JSON.stringify(bare));
   assert.equal(bare.agent.skills, null);
-  assert.deepEqual(bare.removed, ['scribe.skills.json']);
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);
+  assert.deepEqual(bare.removed, []);
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), true);
+  fs.rmSync(path.join(AGENTS, 'scribe.skills.json'));
   await send('DELETE', '/api/agents/yours/scribe', { version: bare.agent.version });
 });
 

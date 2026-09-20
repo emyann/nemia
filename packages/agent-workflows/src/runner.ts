@@ -1293,8 +1293,6 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   const removed: string[] = [];
   const held = (f: string): string | undefined => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
   const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
-  // What the agent named beside it before this write, read while its file still says so: a key whose line is taken off leaves no file behind.
-  const named = SIDECARS.map(({ key }) => ({ key, was: frontmatterKey(held(`${old}.md`) ?? '', key), now: frontmatterKey(text, key) }));
   try {
     for (const { sidecar, was } of before) {
       if (was === sidecar.text) continue;
@@ -1315,14 +1313,9 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     throw err;
   }
   if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
-  // A key's line taken off, or pointed at another file: the file it named goes too, unless another agent names it — that one is not this
-  // agent's to remove. As `removeAgent` does, and for the same reason: nothing in `agents/` should name a file that nothing names.
-  for (const { key, was, now } of named) {
-    if (was === undefined || was === now || !/^[^\\/]+\.json$/.test(was) || was.startsWith('.')) continue;
-    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(held(f) ?? '', key) === was);
-    const sidecarAt = path.join(at, was);
-    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(was); }
-  }
+  // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
+  // the board by mistake must not cost a person the schema or the skills they wrote: a file nothing names is harmless, and a person
+  // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
   return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
 }
 

@@ -270,27 +270,30 @@ test('a skills file written through a link is refused by name, and what the link
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
 });
 
-test("a key's line taken off takes the file it named: nothing in agents/ is named by nothing", () => {
+test("a key's line taken off leaves the file it named: a save never deletes what a person wrote", () => {
   fresh();
   const skills = { file: 'scribe.skills.json', text: '[{"id":"a","name":"A","description":"Does a.","tags":["t"]}]' };
   const schema = { file: 'scribe.schema.json', text: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }) };
   const both = { ...scribe, skills: skills.file, keys: { ...scribe.keys, output: schema.file } };
   const made = writeAgent(AGENTS, both, { version: null, skills, schema });
-  // Both lines taken off: neither file is named by anything now, so neither is left behind.
+  // Both lines taken off — a field cleared on the board and saved: the agent names neither file now, and both are still there, as written.
   const bare = writeAgent(AGENTS, scribe, { version: made.version });
-  assert.deepEqual(bare.removed.sort(), ['scribe.schema.json', 'scribe.skills.json']);
-  for (const f of ['scribe.skills.json', 'scribe.schema.json']) assert.equal(fs.existsSync(path.join(AGENTS, f)), false, f);
+  assert.deepEqual(bare.removed, []);
+  assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.skills.json'), 'utf8'), skills.text);
+  assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.schema.json'), 'utf8'), schema.text);
+  assert.equal(parseAgent('scribe', fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8')).skills, undefined, 'and the agent no longer names its skills');
 
-  // A file another agent names too is not this agent's to remove: it stays, and is not in `removed`.
+  // A line pointed at another file writes the new one and leaves the one it pointed at before.
   fresh();
   writeAgent(AGENTS, both, { version: null, skills, schema });
-  const sharing = writeAgent(AGENTS, { ...both, name: 'notary' }, { version: null });
-  assert.deepEqual(writeAgent(AGENTS, { ...scribe, name: 'notary' }, { version: sharing.version }).removed, []);
-  for (const f of ['scribe.skills.json', 'scribe.schema.json']) assert.ok(fs.existsSync(path.join(AGENTS, f)), f);
-  // And a line pointed at another file takes the one it pointed at before.
   const moved = writeAgent(AGENTS, { ...both, skills: 'scribe.can-do.json' }, { version: agentVersion(AGENTS, 'scribe')!, skills: { ...skills, file: 'scribe.can-do.json' } });
-  assert.deepEqual(moved.removed, ['scribe.skills.json']);
+  assert.deepEqual(moved.removed, []);
   assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.can-do.json')));
+  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), 'the file it named before is still there');
+  // Removing the agent is what takes its files: the one it names now goes with it, and the one it no longer names is not its to take.
+  const gone = removeAgent(AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
+  assert.deepEqual(gone, ['scribe.can-do.json', 'scribe.md', 'scribe.schema.json']);
+  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')));
 });
 
 test('the workflows beside the agents still load after every write', () => {

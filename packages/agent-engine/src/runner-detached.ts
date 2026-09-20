@@ -126,6 +126,15 @@ const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bi
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
 const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
+/**
+ * What the worker writes about one session, and the whole of what a detached harness knows of it.
+ *
+ * `state` is one of `working | stopped | done | failed` — the four `ae-worker.ts` ever writes. **Never `blocked`**:
+ * these harnesses run a process and watch it exit, and a process that is waiting on somebody is, from out here,
+ * a process that is running. So no detached session reaches the engine's `needs-human`, and none carries a
+ * `Sighting.waitingFor`: there is nothing to carry, not something dropped. Only a harness with a registry that
+ * says a session is waiting, and says what for — Claude Code's `claude agents --json` — can fill that field.
+ */
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string;
   nativeId?: string; logFile: string; exitCode?: number;

@@ -1157,7 +1157,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {
-        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown; pid?: unknown }>;
+        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; waitingFor?: unknown; startedAt?: unknown; pid?: unknown }>;
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
         listed.clear();
         pids.clear();
@@ -1170,12 +1170,17 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           const state = row.state as Observed | undefined;
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
+          // What the harness says the session waits for, as it says it: carried onto the sighting and judged by nothing
+          // here (`Sighting.waitingFor`). Trimmed, and only when it is a non-empty string — a harness that says nothing,
+          // or says it in some shape we have no reading of, leaves it unset rather than putting `undefined` in front of
+          // a person.
+          const waitingFor = typeof row.waitingFor === 'string' && row.waitingFor.trim() ? row.waitingFor.trim() : undefined;
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
             listed.set(row.sessionId, state);
             if (Number.isInteger(row.pid) && (row.pid as number) > 0) pids.set(row.sessionId, row.pid as number);
             if (typeof row.startedAt === 'number') starts.set(row.sessionId, row.startedAt);
             m.set(row.name, {
-              sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
+              sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId, ...(waitingFor ? { waitingFor } : {}) },
               // When THIS session started, as the harness recorded it: what usage is counted from.
               startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
             });

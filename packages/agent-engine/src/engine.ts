@@ -34,6 +34,15 @@ export type TaskView = {
   sessionId: string | null;
   /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
   usage?: Usage;
+  /**
+   * What the harness says the session is waiting for, in its own words, for a task whose phase is `needs-human`
+   * (`Sighting.waitingFor`) — `permission prompt`, as `claude agents --json` prints it. Absent for every other
+   * phase, and for a harness that says nothing: the detached harnesses (codex, claude-detached) never do.
+   *
+   * Off the same observation the phase was read from, so it costs no extra call, and read afresh every pass: a
+   * session that stops waiting loses it on the next.
+   */
+  waitingFor?: string;
 };
 
 /** File a task. The only write a person makes; everything after is the loop's. */
@@ -380,5 +389,8 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
     : last ? 'between attempts'
     : 'pending';
   // A released session is in no observation; the id its end was recorded with is what `logs` reads then.
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage };
+  // Only where the phase this pass computed is `needs-human`: the word answers "waiting for what?", and there is no
+  // question to answer about a session nobody is waiting on. Carried, not judged — `decide` never saw it.
+  const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
+  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage, ...(waitingFor ? { waitingFor } : {}) };
 });

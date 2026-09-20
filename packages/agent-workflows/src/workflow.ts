@@ -724,10 +724,8 @@ function rulesOf(step: string, key: 'disallow' | 'allow', written: string | unde
       : /\s/.test(odd) ? 'a space outside the parentheses separates two rules, to the harness'
       : 'a rule is a bare name, without quotes or brackets'}. ${shape}`);
   }
-  if (key === 'allow') {
-    const inert = rules.find((r) => FILE_TOOLS.some((tool) => r.startsWith(`${tool}(`)));
-    if (inert) refuse(fileRuleRefusal(named, inert));
-  }
+  const inert = rules.find((r) => FILE_TOOLS.some((tool) => r.startsWith(`${tool}(`)));
+  if (inert) refuse(fileRuleRefusal(named, inert, key));
   return rules;
 }
 
@@ -738,16 +736,22 @@ function rulesOf(step: string, key: 'disallow' | 'allow', written: string | unde
 const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
 
 /**
- * A path rule on a file-editing tool that is not `Edit`, which Claude Code accepts, warns about on stderr and never matches:
- * the session is denied the write and the run reads nothing about why.
+ * A path rule on a file-editing tool that is not `Edit`, which Claude Code accepts, warns about on stderr and never matches.
  *
- * Measured on Claude Code 2.1.278. The shipped note writer was given `allow: Write(**)` and could not write its own `note.md`
- * — `Permission to use Write has been denied because Claude Code is running in don't ask mode` — while the harness said, on a
- * stderr nobody reads, `Write(**) is not matched by file permission checks — only Edit(path) rules are`. With `Edit(**)` it
- * wrote inside its folder and was denied outside it, which is the fence.
+ * Measured on Claude Code 2.1.278, on the allow list. The shipped note writer was given `allow: Write(**)` and could not write its
+ * own `note.md` — `Permission to use Write has been denied because Claude Code is running in don't ask mode` — while the harness
+ * said, on a stderr nobody reads, `Write(**) is not matched by file permission checks — only Edit(path) rules are`. With `Edit(**)`
+ * it wrote inside its folder and was denied outside it, which is the fence.
+ *
+ * Refused on the deny list too, on the harness's own sentence: what it does not match is the *file permission check*, which is the one
+ * check a deny rule on a write is read in. An inert allow denies a step its own work, which a person finds by the work not happening; an
+ * inert deny is worse, since the step is fenced by nothing while its file reads as fenced. The fix is the same rule on `Edit`, which
+ * covers the file-editing tools whichever list it is in.
  */
-const fileRuleRefusal = (named: string, rule: string): string =>
-  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
+const fileRuleRefusal = (named: string, rule: string, key: 'disallow' | 'allow'): string =>
+  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${key === 'allow'
+    ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
+    : 'allows the write anyway — so the step would be fenced by nothing while its file reads as fenced'}. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
 
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it

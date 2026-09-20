@@ -554,7 +554,7 @@ test('REFUSED: an allow: that names no rule, or an entry that is not one rule �
   assert.throws(() => fm('write', 'allow: Write(**'), refusedWith(/has `Write\(\*\*`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
 });
 
-test('REFUSED: an allow: rule on a file-editing tool that is not Edit, which Claude Code takes and never matches', () => {
+test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, which Claude Code takes and never matches', () => {
   // Measured on Claude Code 2.1.278: with `allow: Write(**)` the shipped note writer could not write its own `note.md`
   // — "Permission to use Write has been denied" — while the harness said, on a stderr nobody reads, that the rule "is not
   // matched by file permission checks". With `Edit(**)` it wrote inside its folder and was denied outside it.
@@ -565,10 +565,15 @@ test('REFUSED: an allow: rule on a file-editing tool that is not Edit, which Cla
   for (const h of ['claude', 'claude-detached']) {
     assert.throws(() => fm('write', `harness: ${h}\nallow: Write(src/**)`), refusedWith(/Claude Code matches a file write against `Edit` rules alone/), h);
   }
-  // Allowed: the rule that works, the bare name (unscoped, and matched), and a deny list, which is matched as written.
+  // The deny list is read in the same check, so a rule it can never match is refused there too: taken, the step reads as fenced and is not.
+  assert.throws(() => fm('write', 'disallow: Write(**)'),
+    refusedWith(/^write: `disallow: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and allows the write anyway — so the step would be fenced by nothing while its file reads as fenced\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./));
+  assert.throws(() => fm('write', 'disallow: SendMessage, NotebookEdit(notes/**)'), refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/), 'wherever in the deny list it sits');
+  // Allowed: the rule that works, in either list, and the bare name, which has no path to miss.
   assert.deepEqual(fm('write', 'allow: Edit(**)').allow, ['Edit(**)']);
+  assert.deepEqual(fm('write', 'disallow: Edit(../**)').disallow, ['Edit(../**)']);
   assert.deepEqual(fm('write', 'allow: Write').allow, ['Write'], 'no path, so no file permission check to miss');
-  assert.deepEqual(fm('write', 'disallow: Write(**)').disallow, ['Write(**)'], 'a deny list is not an allow list; this refusal is the allow list\'s');
+  assert.deepEqual(fm('write', 'disallow: Write').disallow, ['Write'], 'the bare name denies the tool itself');
 });
 
 test('REFUSED: allow: on a codex step, naming the sandbox permissionMode sets instead', () => {

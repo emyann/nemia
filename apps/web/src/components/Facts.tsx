@@ -9,7 +9,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
   return (
     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
       {rows.map(([label, value]) => (
-        <div key={label} className="contents">
+        <div key={label} data-fact={label} className="contents">
           <dt className="text-neutral-500">{label}</dt>
           <dd className="min-w-0 break-words">{value ?? '—'}</dd>
         </div>

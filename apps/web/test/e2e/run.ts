@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { arrivalLine, DRAFT_TRANSCRIPT, INBOX, QUOTA, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedQuota, seedWorkflows } from './seed.ts';
+import { arrivalLine, DRAFT_TRANSCRIPT, INBOX, QUOTA, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedFolder, seedInbox, seedQueue, seedQuota, seedWorkflows } from './seed.ts';
 import { loadPages } from './pages.ts';
 import { exitOn, launch, visitAll } from './visit.ts';
 import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
@@ -152,6 +152,8 @@ async function main(): Promise<void> {
   seedQuota(store);
   // After the checkout's files, which its base commits.
   seedDiamond(checkout, store);
+  // A run with no repository anywhere in it, newest of them all.
+  seedFolder(store);
   // Over every journal the seed wrote: where the api reads when each task was filed.
   seedFeed(store);
   // A `claude` that lists the store's sessions (REGISTRY) — HELD's, blocked — first on the api's PATH. The engine observes `claude

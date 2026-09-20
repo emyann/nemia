@@ -151,7 +151,7 @@ export default {
     // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. To decide: ENDING and UNMERGED. Waiting on you: FAKE,
     // LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off.
     await expectVisible(
-      page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
+      page.getByText('4 in flight · 12 finished · 2 to decide · 6 waiting on you'),
       'the Factory counts the runs in flight, the finished, those nobody has decided, and those waiting on you',
     );
     // A run at a gate in its middle: nothing of it moves until a person approves its step, and the api reads it failed, with nothing to

@@ -82,10 +82,13 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
     if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
     try { return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') }; } catch { return null; }
   };
-  // The skills as the form edits them — the file's text — with what the parser read out of it, or null when it did not read.
+  // The skills as the form edits them — the file's text — with what the parser read out of it, or null when it did not read. A file the
+  // agent names that is not there is still named: it is kept as `keys.output` is kept below, with nothing in it, or the next save would
+  // write the agent back with no `skills:` line and the only word that the file is missing — the package's refusal — would be gone.
   const skillsOf = (named: string | undefined, list: AgentSkill[] | null): ListedSkills | null => {
+    if (named === undefined) return null;
     const sidecar = sidecarOf(named);
-    return sidecar === null ? null : { ...sidecar, list };
+    return sidecar === null ? { file: named, text: '', list } : { ...sidecar, list };
   };
   if (agent === undefined || agent instanceof Error) {
     // Not read: its lines as written, so what is wrong can be put right in the form.

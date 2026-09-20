@@ -1221,6 +1221,11 @@ test("`waitingWords`: the harness's own word, with an article only where English
   // Whatever it says, a line of `wf ls` is a line: the word is cut at 60, on a character and not on a space.
   assert.equal(waitingWords('x'.repeat(80)), `waiting for a ${'x'.repeat(59)}…`);
   assert.equal(waitingWords(`${'x'.repeat(58)} and a great deal more`), `waiting for a ${'x'.repeat(58)}…`);
+  // And a line whatever the harness put in the word: `wf ls` pads its status column, so a newline in there would break the row in two.
+  assert.equal(waitingWords('permission prompt\nfor Bash(rm -rf /)'), 'waiting for a permission prompt for Bash(rm -rf /)');
+  assert.equal(waitingWords('permission\t prompt\r\n  for a tool'), 'waiting for a permission prompt for a tool', 'every run of whitespace, to one space');
+  // Collapsed before it is measured: the cut counts the characters a person sees, not the whitespace that never shows.
+  assert.equal(waitingWords(`${'x'.repeat(58)}\n\n\nyy`), `waiting for a ${'x'.repeat(58)}…`);
 });
 
 test('`answerIn` and `harnessWaitLine`: where a person answers it, alone and after the word', () => {
@@ -1239,6 +1244,11 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
       .steps[0]!.status;
 
   assert.equal(lsWith('needs-human', waiting), 'needs-human: waiting for a permission prompt');
+  // One row per step: `cli.ts` pads this status to the width of the widest and prints the branch after it, so a newline the harness
+  // sent would split the row and mis-align every other row of the run.
+  const broken = lsWith('needs-human', () => 'permission prompt\nfor Bash(rm -rf /)');
+  assert.equal(broken, 'needs-human: waiting for a permission prompt for Bash(rm -rf /)');
+  assert.doesNotMatch(broken, /\s\s|[\n\r\t]/, 'nothing in the status that a padded column cannot hold');
   assert.equal(lsWith('needs-human', () => undefined), 'needs-human', 'a harness that says nothing reads as it did before');
   assert.equal(listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({})).steps[0]!.status, 'needs-human', 'and so does a caller that asks nothing');
   assert.equal(lsWith('running (working)', waiting), 'running (working)', 'a phase that is not needs-human takes no word, whatever the caller answers');

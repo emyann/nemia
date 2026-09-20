@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, gateOffered, needLine, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, gateOffered, needLine, needNodeText, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -49,6 +49,9 @@ test("a step's need is its question while it waits on you, or that the harness b
   ]);
   assert.deepEqual(needs.map(needText), ['asks: Which database?', `blocked by the harness: ${WAIT.words} · ${LOGIN}`, 'blocked by the harness']);
   for (const line of [...needs.map(needLine), ...needs.map(needText)]) assert.doesNotMatch(line, /answer it in Claude Code/);
+
+  // A step's node has one narrow line: it says the wait alone, and every other need as it reads anywhere else.
+  assert.deepEqual(needs.map(needNodeText), ['asks: Which database?', WAIT.words, 'blocked by the harness']);
 
   // As the list gives a step the harness blocked, with no last line to give: the card names the harness and what it waits for, and quotes nothing.
   const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT }, false, false);

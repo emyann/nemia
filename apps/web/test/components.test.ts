@@ -1105,12 +1105,14 @@ test("a step's node says what it needs: a gate's question after `waiting on you`
 
   const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
-  // What the harness waits for before what the session happened to say last, and on one line: the node has one, and the advice is the banner's.
+  // The line is the wait alone — thirty-odd characters is all the node has, and `blocked by the harness: ` would leave `waiting f…`.
+  // The whole of it, with what the session said last, is on hover; where a person answers it is the banner's.
   assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${WAIT.words} · ${LOGIN}" class="truncate `), held);
-  assert.ok(held.includes(`>blocked by the harness: ${WAIT.words} · ${LOGIN}</p>`), held);
+  assert.ok(held.includes(`>${WAIT.words}</p>`), held);
   assert.doesNotMatch(held, /answer it in Claude Code/);
-  // A harness that says nothing about what for reads as it did before there was a word for it.
-  assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] })).includes(`>blocked by the harness: ${LOGIN}</p>`));
+  // A harness that says nothing about what for reads as it did before there was a word for it, on the line as on hover.
+  const mute = nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] }));
+  assert.ok(mute.includes(`title="blocked by the harness: ${LOGIN}"`) && mute.includes(`>blocked by the harness: ${LOGIN}</p>`), mute);
   assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
 });

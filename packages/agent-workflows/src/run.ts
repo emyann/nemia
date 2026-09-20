@@ -3606,7 +3606,8 @@ export function listing(
 /**
  * The longest harness word a screen will print. Whatever `waitingFor` holds is the harness's, shown to a person verbatim, and on
  * `wf ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
- * never dropped — the whole word is still on the run's page and in `claude agents`.
+ * never dropped — but `claude agents` is the only place the rest of it is: every screen here words it through `waitingWords`, the
+ * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
  */
 const WAIT_CAP = 60;
 
@@ -3621,9 +3622,14 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
  * article in front of it and clip it: `a`/`an` by the sound, none where the word brings its own determiner or is plural. That rule is
  * a guess about English, not about the harness, and it is wrong for an odd noun phrase a future Claude Code emits; the only value
  * measured is `permission prompt`, and the alternative — printing the word bare — reads wrong for that one.
+ *
+ * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
+ * would run, say — and `wf ls` pads each status to the width of the widest (`cli.ts`): a status with a newline in it breaks its row in
+ * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
+ * before the word is measured or clipped. A browser would have collapsed it and nothing would have shown there.
  */
 export function waitingWords(waitingFor: string): string {
-  const word = waitingFor.trim();
+  const word = waitingFor.trim().replace(/\s+/g, ' ');
   const shown = word.length <= WAIT_CAP ? word : `${word.slice(0, WAIT_CAP - 1).trimEnd()}…`;
   const article = DETERMINED.test(shown) || /s$/i.test(shown) ? '' : /^[aeiou]/i.test(shown) ? 'an ' : 'a ';
   return `waiting for ${article}${shown}`;

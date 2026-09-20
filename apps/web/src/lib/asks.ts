@@ -9,17 +9,22 @@ import type { RunDetail, RunSummary, RunToDecide } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
-type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'approve'> & { lastLine?: string | null };
+type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'waitingFor' | 'approve'> & { lastLine?: string | null };
 
 /**
- * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what the
- * session said last where the api read it (a run's detail), and null where it did not (the list) or the session said nothing; or, at its
- * gate, its approval — `said` in `wf ls`'s words, `approve plan`.
+ * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
+ * says it waits for where it says anything (`waitingFor`, the package's words, on the list as on the detail), and what the session said last
+ * where the api read it (a run's detail), null where it did not (the list) or the session said nothing; or, at its gate, its approval —
+ * `said` in `wf ls`'s words, `approve plan`.
  */
 export type Need =
   | { step: string; kind: 'asks'; needs: string }
-  | { step: string; kind: 'harness'; lastLine: string | null }
+  | { step: string; kind: 'harness'; waitingFor: NeedsStep['waitingFor']; lastLine: string | null }
   | { step: string; kind: 'approve'; said: string };
+
+/** The harness's own half of such a need, in the order a person reads it: what it waits for, then what the session said last. */
+export const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
+  [need.waitingFor?.words, need.lastLine].filter(Boolean).join(' · ');
 
 /**
  * A step's need, or null. The question of a step that signed off blocked, while it waits on you — not once a person has asked for its
@@ -29,7 +34,7 @@ export type Need =
  */
 export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean): Need | null {
   if (runCancelled) return null;
-  if (step.blockedByHarness) return { step: step.name, kind: 'harness', lastLine: step.lastLine ?? null };
+  if (step.blockedByHarness) return { step: step.name, kind: 'harness', waitingFor: step.waitingFor, lastLine: step.lastLine ?? null };
   if (step.approve && waitingOnYou) return { step: step.name, kind: 'approve', said: step.approve };
   if (step.needs && waitingOnYou) return { step: step.name, kind: 'asks', needs: step.needs };
   return null;
@@ -50,11 +55,18 @@ export const needsOf = (run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & 
 };
 
 /**
- * A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it said last>` — and at a gate,
- * `wf ls`'s own words, which name the step: `approve plan`.
+ * A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it waits for> · <what it said
+ * last>` — and at a gate, `wf ls`'s own words, which name the step: `approve plan`. The wait before the last line: it is why the session
+ * has not moved, and the line is only the last thing it happened to say.
+ *
+ * What a person does about the wait is not here — a card has one line and a node has one line, and `advice` needs its own (`NeedsBanner`).
  */
-export const needText = (need: Need): string =>
-  need.kind === 'asks' ? `asks: ${need.needs}` : need.kind === 'approve' ? need.said : `blocked by the harness${need.lastLine ? `: ${need.lastLine}` : ''}`;
+export const needText = (need: Need): string => {
+  if (need.kind === 'asks') return `asks: ${need.needs}`;
+  if (need.kind === 'approve') return need.said;
+  const said = harnessSaid(need);
+  return `blocked by the harness${said ? `: ${said}` : ''}`;
+};
 
 /**
  * A need with the step it is of, as the card and the banner say it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,

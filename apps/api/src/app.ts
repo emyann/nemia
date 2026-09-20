@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, harnessWaitLine, HARNESSES, nameFor, waitingWords, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
+import { answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
 import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -165,10 +165,11 @@ export type RunWaiting = {
  * harness again, and the list is read on every poll of the Factory for one observation.
  *
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
- * views — no observation of its own, unlike `lastLine`). Both its forms are the package's words, never worded here: `words`
- * for a card with a line to spare (`waiting for a permission prompt`) and `advice` for a person about to act on it, naming
- * the session to answer in Claude Code. Null where the harness said nothing, and for a step nothing blocked — read afresh
- * on every request, so a session that stops waiting stops carrying it.
+ * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
+ * the wait a card or a node says (`waiting for a permission prompt`), `advice` what a person does about it, naming the
+ * session `claude agents` lists it under (`answerIn`). Said under the wait, never with it — one sentence between them, and
+ * a surface with room for both. Null where the harness said nothing, and for a step nothing blocked — read afresh on every
+ * request, so a session that stops waiting stops carrying it.
  *
  * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for: `approve
  * plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
@@ -1079,7 +1080,7 @@ function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'wor
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
-    waitingFor: word ? { words: waitingWords(word), advice: harnessWaitLine(word, attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt)) } : null,
+    waitingFor: word ? { words: waitingWords(word), advice: answerIn(attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt)) } : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
   };
 }

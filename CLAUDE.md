@@ -172,6 +172,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
+  `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/app.ts`, by `stepState` in
+  `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes
+  *beside* the phase, never into it: `listing` takes what the harness waits for as its own parameter (`waitingOf`) and decorates
+  the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
+  chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
+  undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by

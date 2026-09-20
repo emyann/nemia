@@ -14,16 +14,18 @@ export default {
   route: `/runs/${HELD.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const said = `blocked by the harness: ${HELD.line}`;
+    const said = `blocked by the harness: ${HELD.wait} · ${HELD.line}`;
     const banner = page.locator('section[aria-label="Waiting on you"]');
     const need = banner.locator(`[data-need="harness"][data-step="${HELD.blocked}"]`);
-    await expectVisible(need.getByText(`${HELD.blocked} is ${said}`), 'the banner names the harness, and what the session said last');
+    await expectVisible(need.getByText(`${HELD.blocked} is ${said}`), 'the banner names the harness, what it waits for, and what the session said last');
+    await expectVisible(need.locator('[data-advice]', { hasText: HELD.advice }), 'and under them where a person answers the wait: in Claude Code, naming the session');
     await expectCount(banner.getByText(/^Waiting on you:/), 0, "nobody is waiting on you in the package's words: the step asked nothing");
 
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const node = graph.locator(`.react-flow__node[data-id="${HELD.blocked}"]`);
     await expectVisible(node.locator('[data-state="needs-human"]', { hasText: 'needs-human' }), "the step's chip is the engine's word, needs-human");
-    await expectVisible(node.locator('[data-need="harness"]', { hasText: said }), 'its node says the harness blocked it, and what the session said last');
+    await expectVisible(node.locator('[data-need="harness"]', { hasText: said }), 'its node says the harness blocked it, what it waits for, and what the session said last');
+    await expectCount(node.locator('[data-advice]'), 0, 'and not where to answer it: a node has one line, and the banner says that');
     await expectCount(node.getByText('waiting on you'), 0, 'and is no human gate: nothing was asked of a person');
 
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>

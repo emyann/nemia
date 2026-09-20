@@ -70,11 +70,11 @@ export default {
     // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
     await expectVisible(beside, `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`);
     await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
-    // A run whose session the harness blocked is in flight too: its card names the harness. What the session said last is on the
-    // run's page, which reads it: the list reads no conversation.
+    // A run whose session the harness blocked is in flight too: its card names the harness and what it waits for, which the list carries.
+    // What the session said last is on the run's page, which reads it: the list reads no conversation.
     await expectVisible(
-      page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, { hasText: new RegExp(`^${HELD.blocked} is blocked by the harness$`) }),
-      `the card of a run whose session the harness blocked says so — not needs-human alone (${HELD.id})`,
+      page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, { hasText: new RegExp(`^${HELD.blocked} is blocked by the harness: ${HELD.wait}$`) }),
+      `the card of a run whose session the harness blocked says so, and what the harness waits for — not needs-human alone (${HELD.id})`,
     );
     await settled(page);
     // As a person first finds it: every card on the fitted floor can be read and pressed, none under the legend or the buttons.

@@ -1082,13 +1082,16 @@ type Offer = import('../src/lib/asks.ts').Offer;
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
 
+/** What the harness says a blocked session waits for, as the api gives it: the words a card or a node says, and what a person does about it. */
+const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-1/1' };
+
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
-function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'lastLine'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
   const run = runOf(status, over);
-  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, lastLine: null, asked: null, ...needs }] };
+  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, ...needs }] };
 }
 
-test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what it said last — whole on hover", () => {
+test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
   // One line, as the node's others: a second would make it taller than the layering's row.
@@ -1100,10 +1103,14 @@ test("a step's node says what it needs: a gate's question after `waiting on you`
   assert.doesNotMatch(nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [] })), /data-need/);
   assert.doesNotMatch(nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [], cancelledAt: at })), /data-need/);
 
-  const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
-  assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${LOGIN}" class="truncate `), held);
-  assert.ok(held.includes(`>blocked by the harness: ${LOGIN}</p>`), held);
+  // What the harness waits for before what the session happened to say last, and on one line: the node has one, and the advice is the banner's.
+  assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${WAIT.words} · ${LOGIN}" class="truncate `), held);
+  assert.ok(held.includes(`>blocked by the harness: ${WAIT.words} · ${LOGIN}</p>`), held);
+  assert.doesNotMatch(held, /answer it in Claude Code/);
+  // A harness that says nothing about what for reads as it did before there was a word for it.
+  assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] })).includes(`>blocked by the harness: ${LOGIN}</p>`));
   assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
 });
@@ -1194,8 +1201,8 @@ const bannerMarkup = (run: RunDetail) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
-  const base = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
-  const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, lastLine: null };
+  const base = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
+  const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, waitingFor: null, lastLine: null };
   const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]!] };
   const html = bannerMarkup(run);
 
@@ -1203,12 +1210,13 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   const texts = textsOf(html);
   assert.ok(texts.includes('asks: Which database?'), html);
   // After the step's name, which is a tag of its own.
-  assert.ok(texts.includes(`is blocked by the harness: ${LOGIN}`), html);
+  assert.ok(texts.includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`), html);
   const items = new Map([...html.matchAll(/<li data-need="(\w+)" data-step="(\w+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
   assert.doesNotMatch(items.get('implement')!, /<form|<button|<textarea/, 'a question is answered from the Decide section, not the banner');
   // For the session the harness blocked, after what it said last: a form that asks, its box optional, and one button, enabled with nothing written.
   const review = items.get('review')!;
-  assert.match(review, /^<p [^>]*>[\s\S]*?<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/);
+  // Under the wait, where a person answers it — and this board does not: Continue below asks the tick for another try, and nothing else.
+  assert.match(review, /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-xs">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/);
   assert.deepEqual([...review.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]), [['submit', false, 'Continue']]);
   assert.match(review, /<label for="[^"]+" class="sr-only">What to tell review, if anything<\/label>/);
   assert.match(review, /<textarea [^>]*placeholder="Anything to tell it \(optional\): the next try is told it\."/);
@@ -1222,11 +1230,16 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(asked.includes(`<p data-note="true" class="font-mono text-xs">${note}</p></li>`), asked);
   assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/);
+
+  // A harness that says nothing about what for: the need alone, with no empty line under it.
+  const mute = bannerMarkup({ ...run, steps: [asks, { ...base.steps[0]!, waitingFor: null }] });
+  assert.ok(textsOf(mute).includes(`is blocked by the harness: ${LOGIN}`), mute);
+  assert.doesNotMatch(mute, /data-advice/);
 });
 
 test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
   assert.equal(bannerMarkup(needing('running (working)', {}, { waitingOnYou: [] })), '', 'nothing needed: no banner');
-  const held = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
+  const held = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
   assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
 });

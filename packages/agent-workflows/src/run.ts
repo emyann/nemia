@@ -3630,15 +3630,20 @@ export function waitingWords(waitingFor: string): string {
 }
 
 /**
- * The same, with what a person does about it: `waiting for a permission prompt — answer it in Claude Code: claude agents, session
- * ae/<task>/1`. Where there is room to read it — `wf decide`, a run's page — and not on a card, where a second line would grow the card
- * past its cell.
+ * What a person does about such a wait: `answer it in Claude Code: claude agents, session ae/<task>/1`, naming the session `claude agents`
+ * lists it under (`nameFor`), or without it where no attempt is on the record yet. Its own writer, because a screen with room for the
+ * whole sentence says it in one line (`harnessWaitLine`, `wf decide`) and one whose card says the wait already puts this under it (the
+ * board's banner): the same words either way, and never assembled twice.
  *
  * The advice assumes the wait is something a person can answer in the harness, which is true of the one value measured. A `waitingFor`
  * naming something nobody can answer would carry advice that misleads: if that ever shows up, the fix is to word the advice off the word.
  */
+export const answerIn = (session: string | null): string =>
+  `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
+
+/** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
 export const harnessWaitLine = (waitingFor: string, session: string | null): string =>
-  `${waitingWords(waitingFor)} — answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
+  `${waitingWords(waitingFor)} — ${answerIn(session)}`;
 
 /**
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to

@@ -121,8 +121,12 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
 
 test('what else a run waits on a person for, in full words for the inspector and a line that fits for the card', () => {
   assert.equal(needWords({ step: 'implement', kind: 'asks', needs: 'Which database?' }), 'implement asks: Which database?');
-  assert.equal(needWords({ step: 'held', kind: 'harness', lastLine: 'Try again in a minute' }), 'held is blocked by the harness; its session said last: Try again in a minute');
-  assert.equal(needWords({ step: 'held', kind: 'harness', lastLine: null }), 'held is blocked by the harness');
+  const wait = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
+  assert.equal(needWords({ step: 'held', kind: 'harness', waitingFor: wait, lastLine: 'Try again in a minute' }),
+    `held is blocked by the harness; ${wait.words} — ${wait.advice}; its session said last: Try again in a minute`);
+  assert.equal(needWords({ step: 'held', kind: 'harness', waitingFor: null, lastLine: 'Try again in a minute' }),
+    'held is blocked by the harness; its session said last: Try again in a minute', 'a harness that said nothing about what for');
+  assert.equal(needWords({ step: 'held', kind: 'harness', waitingFor: null, lastLine: null }), 'held is blocked by the harness');
   assert.equal(decideLine(['wf/r/implement']), 'decide its result: a branch ahead of the base that nothing merges');
   assert.equal(decideLine(['a', 'b']), 'decide its result: 2 branches ahead of the base that nothing merges');
 });

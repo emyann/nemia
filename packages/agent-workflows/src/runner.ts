@@ -18,7 +18,7 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LARGE_CONTEXT, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, peakMark, readWords, rebuiltCache, sumUsage, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Consumed, type Radius, type Touched } from './radius.ts';
 export { isGitRun, placeOf } from './run.ts';
-export { harnessWaitLine, waitingWords } from './run.ts';
+export { answerIn, harnessWaitLine, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
  * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-engine — it is not a

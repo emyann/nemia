@@ -173,7 +173,7 @@ const lastLineOf = async (step: string): Promise<string | null> => (await detail
 test("a step says what a person has to know to act — the question of one signed off blocked, and that the harness blocked a session — on both endpoints, and on the run's detail what the session said last", async () => {
   // What the harness says it waits for, where it says anything: held's word, in the package's words, naming the session to answer it in.
   // idle and silent are blocked by a harness that said nothing about what for, which is a word missing and not a step reading differently.
-  const waits = { words: 'waiting for a permission prompt', advice: 'waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/t-held/1' };
+  const waits = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
   const expected = [
     { name: 'implement', needs: blocked.needs, blockedByHarness: false, waitingFor: null },
     { name: 'theme', needs: null, blockedByHarness: false, waitingFor: null },
@@ -231,7 +231,7 @@ test("what a blocked session's harness waits for is read afresh on every request
   setWait('workspace trust dialog');
   assert.deepEqual((await heldStep()).waitingFor, {
     words: 'waiting for a workspace trust dialog',
-    advice: 'waiting for a workspace trust dialog — answer it in Claude Code: claude agents, session ae/t-held/1',
+    advice: 'answer it in Claude Code: claude agents, session ae/t-held/1',
   }, "the pass's own word, whatever the last pass carried");
   assert.doesNotMatch(JSON.stringify(await heldStep()), /permission prompt/, 'nothing of the old word is left');
 

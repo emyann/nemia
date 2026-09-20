@@ -101,7 +101,7 @@ test('REFUSED: a plain file that imports Effect, or a value from an Effect file,
 test('the plain files import no Effect; the facade exports none of it', () => {
   const src = path.join(PACKAGE, 'src');
   const plain = fs.readdirSync(src).filter((f) => f.endsWith('.ts') && !EFFECT.includes(f));
-  assert.deepEqual(plain.sort(), ['card.ts', 'cli.ts', 'decide.ts', 'key.ts', 'record.ts'], 'a new file is sorted into plain or Effect here');
+  assert.deepEqual(plain.sort(), ['card.ts', 'cli.ts', 'decide.ts', 'key.ts', 'record.ts', 'rival.ts', 'runs.ts', 'score.ts'], 'a new file is sorted into plain or Effect here');
   const found = plain.flatMap((f) => effectIn(fs.readFileSync(path.join(src, f), 'utf8')).map((from) => `${f}: ${from}`));
   assert.deepEqual(found, []);
   const reexports = [...fs.readFileSync(path.join(src, 'facade.ts'), 'utf8').matchAll(/^\s*export\s+(type\s+)?\{[^}]*\}\s+from\s+['"]([^'"]+)['"]/gm)];

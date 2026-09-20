@@ -1716,7 +1716,7 @@ test("what sessions read, by price: beside the cost, the peak marked at a cap or
     total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'), cost: 'run $6.80', overBudget: null, commands: [],
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
-  assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/);
+  assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/);
 });
 
 test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {

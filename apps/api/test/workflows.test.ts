@@ -139,6 +139,8 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   assert.deepEqual({ ...review, keys: undefined }, {
     workflow: 'good', from: 'repo', dir: good, step: 'review', body: 'Review it.',
     source: fs.readFileSync(path.join(good, 'review.md'), 'utf8'), keys: undefined,
+    // This step names no agent, so there is nothing it says it can do. A step whose agent has skills is further down.
+    agentSkills: null,
   });
   assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
   assert.deepEqual(review.keys.map((k) => k.key), [...STEP_KEYS], "in the package's order, set or not");

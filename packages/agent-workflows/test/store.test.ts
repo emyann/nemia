@@ -226,6 +226,8 @@ const board = () => {
   const said = new Map<string, Array<{ at: string; attempt: number; text: string }>>();
   /** Tasks whose session is not given the words: `say` rejects, with no exit code, and journals nothing. */
   const deaf = new Set<string>();
+  /** What the harness says each task's session waits for, as `claude agents` says it: the engine carries it onto the view (`TaskView.waitingFor`). */
+  const waiting = new Map<string, string>();
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
@@ -234,6 +236,7 @@ const board = () => {
       const reasons = Array.isArray(t?.reason) ? t.reason : [t?.reason];
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        ...(waiting.get(id) ? { waitingFor: waiting.get(id) } : {}),
         state: {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
           // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
@@ -267,7 +270,7 @@ const board = () => {
     },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, said, deaf };
+  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -2197,7 +2200,8 @@ test("REFUSED before, now accepted at shipped defaults: `wf retry` on a step who
   await main(['retry', run.id, 'implement'], e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
   assert.equal(printed[0], `${run.id}  asked: try 2 of implement (--nudge) — its harness blocked its session: the next tick stops it, and files the try once it has stopped`);
-  assert.deepEqual((await list(e, readRun(run.id))).steps[0], { name: 'implement', status: 'needs-human', branch: run.branch, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' });
+  assert.deepEqual((await list(e, readRun(run.id))).steps[0], { name: 'implement', status: 'needs-human', branch: run.branch, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' },
+    'this harness says nothing about what it waits for: the phase alone, as before');
 
   const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
   const first = await advance(e, readRun(run.id));
@@ -2224,6 +2228,34 @@ test("REFUSED before, now accepted at shipped defaults: `wf retry` on a step who
   assert.deepEqual(asksOf(run.id), [], 'consumed');
   const after = await advance(e, readRun(run.id));
   assert.deepEqual([after.tried, b.stopped, b.filings.filter((f) => f === try2).length], [[], [taskId], 1], 'once');
+});
+
+test("a step whose harness blocked its session says what the harness waits for — on `wf ls` and on `wf decide`, read afresh each pass", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.settle(taskId, 'needs-human' as TaskPhase);
+  b.waiting.set(taskId, 'permission prompt');
+  const status = async () => (await list(b.e, readRun(run.id))).steps[0]!.status;
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const decided = async () => { printed.length = 0; await main(['decide', run.id], b.e); return printed.join('\n'); };
+
+  assert.equal(await status(), 'needs-human: waiting for a permission prompt', '`wf ls`: beside the phase');
+  assert.match(await decided(), new RegExp(`\n {2}implement: waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/${taskId}/1$`, 'm'),
+    '`wf decide`: the word, and where a person answers it');
+
+  // Level-triggered: the word is read on the pass that prints it, and nothing of the last one is kept.
+  b.waiting.set(taskId, 'workspace trust dialog');
+  assert.equal(await status(), 'needs-human: waiting for a workspace trust dialog');
+  assert.doesNotMatch(await decided(), /permission prompt/, 'the old word is nowhere');
+
+  // And a harness that stops saying leaves the step reading as it did before any of this.
+  b.waiting.delete(taskId);
+  assert.equal(await status(), 'needs-human');
+  assert.doesNotMatch(await decided(), /answer it in Claude Code/, 'no word, no line');
 });
 
 test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {

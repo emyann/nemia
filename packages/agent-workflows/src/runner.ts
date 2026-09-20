@@ -10,7 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
 import { isDeepStrictEqual, promisify } from 'node:util';
-import { claudeDetached, codex, createEngine, type Engine, type TaskView, type Usage } from 'agent-engine';
+import { claudeDetached, codex, createEngine, type Engine, nameFor, type TaskView, type Usage } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
@@ -18,6 +18,13 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LARGE_CONTEXT, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, peakMark, readWords, rebuiltCache, sumUsage, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Consumed, type Radius, type Touched } from './radius.ts';
 export { isGitRun, placeOf } from './run.ts';
+export { harnessWaitLine, waitingWords } from './run.ts';
+/**
+ * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
+ * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-engine — it is not a
+ * dependency of it — and this file is the only one in the workspace that knows the engine exists.
+ */
+export { nameFor } from 'agent-engine';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, signoffsSpent, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
@@ -30,7 +37,7 @@ import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCa
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { folderPlace, workRoot } from './places.ts';
 import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -610,6 +617,16 @@ export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: 
  * Exported, log-free, for a consumer that asks `retry` for such a step as `wf retry` does.
  */
 export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'needs-human';
+
+/**
+ * What the harness says a task's blocked session waits for, in its own words (`TaskView.waitingFor`), off views already read — `permission
+ * prompt`, as `claude agents --json` prints it. `undefined` for a task nobody is waiting on, and for a harness that says nothing: the
+ * detached ones never do. Costs no observation of its own: the engine read it on the same pass it read the phase.
+ *
+ * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
+ * run.ts, which is the only place this repository turns the harness's word into a sentence.
+ */
+export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string | undefined => views.get(taskId)?.waitingFor;
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
@@ -2574,7 +2591,7 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
   const standings = standingsOf(run);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout);
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views));
 }
 
 /**
@@ -3266,6 +3283,12 @@ export async function decide(e: Engine, id: string): Promise<{
   answering: Record<string, string>;
   /** For each gated step with something to say, what its gate says (`gateLines`): approved, when and with what words, or awaiting approval and the commands. */
   gates: Record<string, string>;
+  /**
+   * For each step whose session the harness blocked and that says what it waits for, the sentence a person acts on (`harnessWaitLine`):
+   * `waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/<task>/1`. Off the views already read, so it
+   * costs no observation; empty for a harness that says nothing, which is every harness but Claude Code's.
+   */
+  waitingOn: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
   waiting: Wait[];
   /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
@@ -3339,6 +3362,16 @@ export async function decide(e: Engine, id: string): Promise<{
   const used = consumption(views, run);
   const costs = Object.fromEntries(Object.entries(run.steps).filter(([, record]) => record.taskId || record.tries?.length)
     .map(([name]) => [name, costLine(steps.find((s) => s.name === name), run, name, used[name], spendOf)]));
+  // What each blocked session's harness says it waits for, and the session a person answers it in: the engine's name for the task's
+  // current attempt, which is the name `claude agents` lists it under. Level-triggered like the phase beside it — read this pass, kept
+  // nowhere — so a step that stops waiting says nothing here on the next.
+  const waitingOn: Record<string, string> = {};
+  for (const [name, record] of Object.entries(run.steps)) {
+    const word = record.taskId ? waitingOf(views)(record.taskId) : undefined;
+    if (!record.taskId || !word) continue;
+    const attempt = views.get(record.taskId)?.state.attempts.at(-1)?.n;
+    waitingOn[name] = harnessWaitLine(word, attempt === undefined ? null : nameFor(record.taskId, attempt));
+  }
   // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
   return {
@@ -3353,6 +3386,7 @@ export async function decide(e: Engine, id: string): Promise<{
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
+    waitingOn,
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),

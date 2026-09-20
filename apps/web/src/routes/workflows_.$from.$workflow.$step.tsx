@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { AgentLink } from '../components/AgentParts';
+import { AgentLink, Skills } from '../components/AgentParts';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
 import { stepQuery } from '../lib/api';
@@ -18,8 +18,9 @@ export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
 });
 
 /**
- * One step of a workflow, to read: what it is told, rendered, and the agent attached to it, if one is, linked, then every key a step may set with its value and what it means — or,
- * with Source, its file as written. It starts nothing: the Workflows page does.
+ * One step of a workflow, to read: what it is told, rendered, the agent attached to it, if one is, linked, with what that agent says it can
+ * do, then every key a step may set with its value and what it means — or, with Source, its file as written. It starts nothing: the
+ * Workflows page does.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
@@ -49,9 +50,13 @@ function StepPage() {
           </span>
         </div>
         {agent && (
-          <p data-step-agent className="text-xs text-neutral-500">
-            Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions it is told first.
-          </p>
+          <div className="space-y-1">
+            <p data-step-agent className="text-xs text-neutral-500">
+              Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions it is told first.
+            </p>
+            {/* What that agent says it can do (`skills:`), read beside this workflow: a description of the work, which fences nothing. */}
+            <Skills skills={page.agentSkills} className="pl-3" />
+          </div>
         )}
       </header>
 

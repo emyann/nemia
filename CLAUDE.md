@@ -172,6 +172,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
+  `apps/api/src/app.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
+  English sentence — for a verb it does not know. Nothing fails: the board draws a `once more` button that copies
+  *"review: enough — go on with what is there; its findings stay on the record, and …:  wf accept r-1 review --message …"*. So an offer
+  the package gains adds its verb and its placeholder to that regex, a label to `DecideCommand` and to `apps/web/src/lib/api.ts`'s
+  mirror, in the same change — with a test that asserts the *bare* command, since one asserting the offer is listed passes either way
+  (learned by the run that let a person accept a loop out of rounds).
 - **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
   `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/app.ts`, by `stepState` in
   `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes

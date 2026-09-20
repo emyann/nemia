@@ -161,6 +161,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A key added to `AGENT_KEYS` that is not a role key has three exclusion sites.** `description` and `skills` describe the agent and are no
+  step's, so each place that turns `AGENT_KEYS` into the keys a step inherits excludes them by name: `ROLE_KEYS` in `apps/api/src/builder.ts`
+  and in `apps/api/src/agents.ts`, and the hand-written mirror in `apps/web/src/lib/agents.ts`. Miss one and the board offers the key as a
+  role key on every step form. And a key that names a file beside the agent is digested twice — `agentVersion` in the package, `versionOf` in
+  `apps/api/src/workflows.ts` — or an edit of that file moves the agent's version and not the folder's (learned by the run that added
+  `skills:`).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
   there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy

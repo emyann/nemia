@@ -217,6 +217,11 @@ allowed or denied by a skill, and skills are *not* frozen on a run record — a 
 what an agent says it can do can be corrected without touching a run in flight. `agentVersion` does digest the skills
 file with the agent, so the board refuses a save against a stale read of either.
 
+A skill here is also not a Claude Code skill. `.claude/skills/` holds folders of instructions a session loads through the
+`Skill` tool, which `tools:` allows or denies — machinery a session uses. An A2A skill is a sentence about the agent that
+nothing loads and nothing reads. Two words, two meanings; where both could be meant, this README says *an A2A skill* or
+names the file.
+
 `wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
 in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 

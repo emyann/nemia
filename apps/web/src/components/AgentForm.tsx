@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
 import { choicesOf, draftOf, edited, formOf, KEY_LABELS, meaningOf, schemaFileFor, skillsFileFor, type AgentForm as Form } from '../lib/agents';
-import { Skills } from './AgentParts';
 
 /** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
 const UNSET = '(unset)';
@@ -124,8 +123,6 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
             placeholder={listing ? undefined : '[{ "id": "write-a-note", "name": "Write a note", "description": "Writes the notes of a change.", "tags": ["note"] }]'}
           />
         </div>
-        {/* As the package read the file, when it did: what the Agents page and a step's page show of this agent. */}
-        <Skills skills={listing?.skills?.list} className="sm:col-span-3" />
       </fieldset>
 
       <fieldset className="space-y-3">

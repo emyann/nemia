@@ -64,13 +64,15 @@ export function artifactOf(run: Pick<Run, 'id'>, step: string, file: string): St
 }
 
 /**
- * Every file a folder step's own folder holds, for a person who never opens a terminal: each regular file directly in `dir`, by
+ * Everything a folder step's own folder holds, for a person who never opens a terminal: each regular file directly in `dir`, by
  * name, as the files route serves it — its size and what the board does with it. Newest-looking first is not worth guessing at:
  * they are listed in name order, as a directory listing reads.
  *
- * A link is not a file in the folder (`fileIn` does not follow one), nor is a directory, nor anything under one: the route serves
- * a name and never a path, and what it cannot serve it does not list. An unreadable folder is an empty list — a step not filed
- * yet has no folder at all, and that is not an error.
+ * What the route cannot serve is listed all the same, by its path alone, drawn as any path a closeout named that the api does not
+ * serve: a directory, a link (`fileIn` follows none), a name with a separator or `..` in it. The route serves a name and never a
+ * path, and none of those becomes reachable by being listed — but a folder holding only `notes/` is not an empty folder, and the
+ * board, which turns an empty list into *the folder is empty*, would tell a person their step made nothing. An unreadable folder
+ * is an empty list — a step not filed yet has no folder at all, and that is not an error.
  *
  * Beside the closeout's `artifacts`, which are the files a step *named* and the run collected: these are what is in the folder,
  * named or not, which is the only way to see what a step left behind that it forgot to name.
@@ -82,12 +84,12 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): St
   } catch {
     return [];
   }
-  return names.flatMap((name) => {
-    if (refusedName(name) !== null) return [];
-    const stat = fileIn(dir, name);
-    if (!stat) return [];
+  return names.map((name) => {
+    const here = path.join(dir, name);
+    const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
+    if (!stat) return { path: here };
     const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/files/${encodeURIComponent(name)}`;
-    return [{ path: path.join(dir, name), name, url, kind: typeOf(name).kind, size: stat.size }];
+    return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
   });
 }
 

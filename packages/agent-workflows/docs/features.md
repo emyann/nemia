@@ -3682,13 +3682,17 @@ beside it changes these readers and no more.
   that is no repository lists the store's own folder teams and files for them (`apps/api/test/folder-run.test.ts`). An api with
   *no* repository to point at is the Factory-workspaces slice, and is not this one.
 - **Where the work is.** A run carries `work` — the directory under the store it makes its folders in — where a git run has a
-  repository, a base and a branch; each step of it carries `files`, every file its folder holds now, with its size and a url. Not
-  only what a closeout named: what is in the folder, named or not, which is the only way to see what a step left behind that it
-  forgot to name (`folderFiles`).
+  repository, a base and a branch; each step of it carries `files`, everything its folder holds now: each file a name reaches with
+  its size and a url, and what the route serves by no name — a directory, a link, a name it refuses — by its path alone, as any
+  path a closeout named that the api does not serve. Not only what a closeout named: what is in the folder, named or not, which is
+  the only way to see what a step left behind that it forgot to name. And nothing the list leaves out, since the board turns an
+  empty list into *the folder is empty*: a step whose work went into `notes/` is not a step that made nothing (`folderFiles`).
 - **Read on the board.** `GET /api/runs/<run>/steps/<step>/files/<name>` mirrors the artifacts route guard for guard: a name and
   never a path, opened without following a link, served uncached, unsniffed and sandboxed. A text file opens in a tab; the run's
-  page and the Factory's card say `folders`, both paths copyable; the Decide section offers `wf rm` and nothing to merge; the Start
-  form drops the `--after` picker. **No git word** reaches a person reading a folder run — the api's test and the e2e's `folder`
+  page says where its work is and each step's folder, copyable, where a git run's says repo, base and branch, and the Factory's
+  card says `folders` with the work root on hover — no row of its own, since a card drawn taller than its cell reaches over the
+  card beneath it; the Decide section offers `wf rm` and nothing to merge; the Start form drops the `--after` picker and sends
+  none, whatever was picked before the team was (`afterFor`). **No git word** reaches a person reading a folder run — the api's test and the e2e's `folder`
   page each sweep every sentence the board draws for one and refuse any.
 - **What the harness said last** is the session's own words: a brief, a `wf say` and every tool result come back as `user` events,
   and the board read them back at the person as the reason the session stopped.

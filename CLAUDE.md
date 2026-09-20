@@ -226,6 +226,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
   and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A list a page turns into a sentence must carry everything the sentence is about.** The board says *the folder is empty* of an
+  empty `files`, and `folderFiles` listed only what its route can serve by name: a step whose work went into `notes/` was reported
+  to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it
+  cannot serve, by path (what was done), or the sentence says only what the list knows. Anywhere a page words an empty list, read
+  what the list leaves out (learned by the run that started a folder team from a card, round 3).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

@@ -59,7 +59,7 @@ fs.writeFileSync(path.join(root, 'runs', 'f-notes.json'), JSON.stringify({
 
 // What the step left in its folder: the note it named in its closeout and the sketch it did not, a file of bytes, a directory,
 // a link that leads out of the folder, and a name the files route refuses. All but the first three are things the folder holds
-// that no name can reach, and the listing leaves them out.
+// that no name can reach: the listing carries them by their path, since they are the work too, and serves none of them.
 const wrote = path.join(work, 'write');
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 fs.writeFileSync(path.join(wrote, 'note.md'), 'The tides.\n');
@@ -140,13 +140,17 @@ test('REFUSED: POST /api/inbox files a card for a folder team with a repository 
   assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
 });
 
-test("a folder step carries every file its folder holds, by name, with its size and where the api serves it", async () => {
+test("a folder step carries everything its folder holds: what a name reaches with its size and url, the rest by its path", async () => {
   const run = (await (await app.request('/api/runs/f-notes')).json()) as { steps: { files: { path: string; name?: string; url?: string; kind?: string; size?: number }[] }[] };
   const [write] = run.steps;
-  // In name order, and only what a name reaches: not the directory, not the link out of the folder, not the name the route refuses.
+  // In name order. A directory, a link out of the folder and a name the route refuses carry a path and nothing else — they are the
+  // work too, and a board that turns an empty list into *the folder is empty* must not say that of a folder holding only `scratch/`.
   assert.deepEqual(write!.files, [
+    { path: path.join(wrote, '..hidden.md') },
     { path: path.join(wrote, 'bundle.zip'), name: 'bundle.zip', url: '/api/runs/f-notes/steps/write/files/bundle.zip', kind: 'other', size: 2 },
+    { path: path.join(wrote, 'link.md') },
     { path: path.join(wrote, 'note.md'), name: 'note.md', url: '/api/runs/f-notes/steps/write/files/note.md', kind: 'text', size: 11 },
+    { path: path.join(wrote, 'scratch') },
     { path: path.join(wrote, 'sketch.png'), name: 'sketch.png', url: '/api/runs/f-notes/steps/write/files/sketch.png', kind: 'image', size: PNG.length },
   ]);
 });

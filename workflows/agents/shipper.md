@@ -1,5 +1,6 @@
 ---
 description: Ends a run in the repository's own checkout: trial merges its result branch, runs the check, and commits — or aborts and says why.
+skills: shipper.skills.json
 harness: claude
 model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,

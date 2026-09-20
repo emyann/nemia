@@ -1,0 +1,14 @@
+[
+  {
+    "id": "review-a-note",
+    "name": "Review a note",
+    "description": "Reads a note read-only and says whether it answers what was asked and whether what it says is right, each finding quoting the sentence it is about.",
+    "tags": [
+      "note",
+      "review"
+    ],
+    "examples": [
+      "Use this when a note is written and nobody has checked it."
+    ]
+  }
+]

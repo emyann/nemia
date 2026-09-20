@@ -196,6 +196,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   session reads the refusal and carries on, so a folder team may run in no other mode (`validateFolderMode`). It is
   not the workspace-trust dialog: a folder run does start unattended on `claude --bg` (measured on Claude Code
   2.1.278, by the first live `note` run).
+- **A session started anywhere under `~/.claude/` cannot write there, in any mode.** Claude Code reads that directory
+  as its own and refuses a write into it — *"sits under `~/.claude/`, which the harness treats as sensitive"* — whatever
+  `--permission-mode` and `--allowedTools` say. `$CLAUDE_JOB_DIR/tmp` is under it, so a live `wf` store put there
+  fails every write a step makes and every measurement taken in it is about that, not about the fence being measured.
+  Put a probe store somewhere else (`mktemp -d /tmp/…`). This cost a live run and a wrong conclusion about the
+  allow rule.
 - **A `Write(path)` allow rule is taken and never matched.** Claude Code matches a file write against `Edit` rules
   alone, whatever tool made it, and an `Edit` rule covers Write and NotebookEdit with it. Given
   `--allowedTools 'Write(**)'` it warns on a stderr nobody reads — *"is not matched by file permission checks — only

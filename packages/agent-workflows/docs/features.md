@@ -3702,6 +3702,37 @@ What it leaves:
 These take up the board's part of *Shipped: declared outputs and inputs* ("The board's Output tab can render the declared output") and
 the tab's side of P0.5's "the schema it answered carried with it": the api carries it, off the frozen workflow, not the outcome record.
 
+## Shipped: an agent says what it can do — `skills:`, and a card in A2A's shape
+
+The owner set the P3 reach plan aside ("too much … just keep it simple") and asked for the
+[A2A protocol](https://a2a-protocol.org/latest/specification/)'s shape for an agent's configuration instead. Read at the source
+(`specification/a2a.proto`, not a summary), A2A's `capabilities` are protocol features — streaming, push notifications, extensions —
+**not** reach; what an agent can do is its `skills`, each `{ id, name, description, tags }` with optional `examples`, `inputModes`,
+`outputModes`. So one key, `skills:`, and a card that prints what the file says.
+
+- **`skills:` names a `.json` list beside the agent**, as `output:` names a schema: a sidecar, digested into `agentVersion` with the
+  agent, written and removed with it. A2A's four required fields are required here and each is checked by name; `securityRequirements`,
+  which A2A allows on a skill, is refused: nothing here serves an agent over A2A, so a skill demanding a scheme could never be satisfied.
+  An `id` is lowercase words joined by dashes and unique in its file. Every refusal has a test that makes it refuse.
+- **A skill fences nothing.** Nothing reads one to decide anything — no routing by tag, no tool allowed or denied — and the skills are
+  *not* frozen on a run record: a run froze the keys that do the work, and what an agent says it can do can be corrected under a run in
+  flight. It is also not a Claude Code skill (`.claude/skills/`, which `tools:` allows through the `Skill` tool); the README says which.
+- **`wf agents`** lists both places, each agent by its description with its skills under it, and **`wf agents card <name>`** prints an
+  A2A `AgentCard`: JSON on stdout, and on stderr the line that makes it honest. It is **not a valid Agent Card** — A2A marks
+  `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and nothing here answers A2A — so the card declares no
+  interfaces and no security schemes, and says so where a pipe does not carry it. `version` is the content digest, not a semantic one.
+- **The api** carries an agent's `skills` on its listing (the file, its text, the parsed list), a step's page carries the skills of the
+  agent it names (`agentSkills`), and `GET /api/agents/:from/:name/card` answers the same card the CLI prints, refusing with A2A's own
+  words an agent missing a field the protocol marks REQUIRED. `versionOf` digests the skills file, so a stale save is refused.
+- **The board** shows the list wherever the agent shows: the Agents page, the agent's page, a step's page, and the agent form, whose
+  *What it can do* fieldset writes the file (paste with no file named and it is `<name>.skills.json`). Remove names each file beside the
+  agent that will go with it. The e2e's `agents` page photographs all of it in both themes.
+- **The shipped agents say what they can do**: all eight in `workflows/agents/`, and the package's two `ui` copies, byte for byte.
+
+**What it leaves.** No registry, no connections, no enforcement, no remote call, no new package, no `/.well-known/agent-card.json` —
+deliberately, all of it. `output:` maps to no A2A field and stays a key of its own (A2A's nearest, a skill's `outputModes`, names media
+types). When P3's reach keys are built they want a name that is not `capabilities`, or the two vocabularies collide.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

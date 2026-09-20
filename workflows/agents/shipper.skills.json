@@ -1,0 +1,27 @@
+[
+  {
+    "id": "trial-merge-a-branch",
+    "name": "Trial merge a run's branch",
+    "description": "In the repository's own checkout, merges a run's result branch onto the base branch, runs the folder's check on the merged tree, and commits — or aborts and leaves the checkout as it found it.",
+    "tags": [
+      "merge",
+      "git",
+      "tests"
+    ],
+    "examples": [
+      "Use this when a run is finished and a person has approved what it made."
+    ]
+  },
+  {
+    "id": "say-why-it-aborted",
+    "name": "Say why it aborted",
+    "description": "When the merge conflicts or the check fails, undoes the merge and reports what stopped it, so the work can be sent back rather than half-shipped.",
+    "tags": [
+      "merge",
+      "review"
+    ],
+    "examples": [
+      "Use this when an ending must be safe to run unattended."
+    ]
+  }
+]

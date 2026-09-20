@@ -3,8 +3,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
-import { dollarsOf, workflowFolder } from './workflow.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -77,6 +77,13 @@ const HELP = `wf — run a workflow of agent steps
                                the session is handed them again, as ## Said to your session
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
+  wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
+                               for, and what it says it can do (its skills:)
+  wf agents card <name> [--repo .] [--from repo|yours]
+                               that agent in the shape of an A2A Agent Card, JSON on stdout and
+                               nothing else — every field the protocol marks REQUIRED but
+                               supportedInterfaces, which is left out because nothing here serves an
+                               agent over A2A. The card describes; it is not an address
 
 A workflow is a folder of markdown files. One file is one step:
 
@@ -323,6 +330,23 @@ function planHow(argv: string[]): { repo?: string } {
     twice: () => 'wf plan takes --repo once: a plan works on one repository.',
   });
   return { repo: values['--repo']?.[0] };
+}
+
+/** `wf agents`' flags: `--repo <r>` once, and for a card `--from repo|yours` once, when both places have an agent of that name. */
+function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } {
+  const { values } = readFlags(argv, {
+    takes: {
+      '--repo': 'the repository whose workflows/agents to read: wf agents --repo <r>',
+      '--from': 'which place the agent is in: wf agents card <name> --from repo|yours',
+    },
+    unknown: (arg) => (arg.startsWith('-')
+      ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
+      : `wf agents takes no argument but card <name>: wf agents, or wf agents card ${arg}.`),
+    twice: (flag) => `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
+  });
+  const from = values['--from']?.[0];
+  if (from !== undefined && from !== 'repo' && from !== 'yours') usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
+  return { repo: values['--repo']?.[0], ...(from === 'repo' || from === 'yours' ? { from } : {}) };
 }
 
 /** `wf inbox queue`'s flags, after the card's name: `--workflow <w>` once, and `--off` — not both. */
@@ -997,6 +1021,34 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const taskId = readRun(runId).steps[stepName]?.taskId;
       if (!taskId) return console.log(`${stepName} has not run yet`);
       return console.log(await e.logs(taskId));
+    }
+
+    // The agents a step may name, and one of them in A2A's shape. Reads the two places and prints; writes nothing.
+    case 'agents': {
+      const [sub, ...args] = rest;
+      if (sub === 'card') {
+        const [name, ...flags] = args;
+        if (!name || name.startsWith('--')) return console.log(HELP);
+        const how = agentsHow(flags);
+        const { from, dir, agent } = findAgent(name, how.repo ?? '.', how.from);
+        const version = agentVersion(dir, name)!;
+        // The card alone on stdout, so `wf agents card <name> | jq` reads it; what it is not goes to stderr.
+        console.log(JSON.stringify(agentCard(agent, version), null, 2));
+        console.error(`${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`);
+        return;
+      }
+      if (sub !== undefined && sub !== '--repo' && sub !== '--from') return console.log(HELP);
+      const how = agentsHow(rest);
+      const agents = listAgents(how.repo ?? '.');
+      if (!agents.length) return console.log(`no agents — an agent is a file in <workflows>/agents: ${agentPlaces(path.resolve(how.repo ?? '.')).map((p) => p.dir).join(' or ')}`);
+      for (const { from, name, agent } of agents) {
+        if (agent instanceof Error) { console.log(`${name}  ${from}  does not read: ${agent.message.split('\n')[0]}`); continue; }
+        console.log(`${name}  ${from}  ${agent.description ?? 'no description:'}`);
+        for (const skill of agent.skills?.list ?? []) console.log(`   ${skill.id}  ${skill.name} — ${skill.description}`);
+        if (!agent.skills) console.log(`   says nothing it can do — give it a skills: file beside it`);
+      }
+      console.log(`\none in A2A's shape: wf agents card <name>`);
+      return;
     }
 
     default:

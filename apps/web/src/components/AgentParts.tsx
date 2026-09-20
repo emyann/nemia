@@ -1,5 +1,5 @@
 import { Link as AriaLink } from 'react-aria-components';
-import type { AgentListing, AgentUser } from '../lib/api';
+import type { AgentListing, AgentSkill, AgentUser } from '../lib/api';
 import { cn } from '../lib/utils';
 import { routeLink } from './routeLink';
 
@@ -57,6 +57,34 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
         <span>No node names it yet.</span>
       )}
     </p>
+  );
+}
+
+/**
+ * What an agent says it can do: each skill its `skills:` file holds, in the file's order — the name a caller would read, what it is for, and
+ * the tags it carries. `none` is what stands there when the agent names no skills file, or when the file does not read and the refusal is
+ * shown elsewhere; nothing is drawn at all where `none` is left out.
+ */
+export function Skills({ skills, none, className }: { skills: readonly AgentSkill[] | null | undefined; none?: React.ReactNode; className?: string }) {
+  if (!skills?.length) return none ? <p className="text-xs text-neutral-500">{none}</p> : null;
+  return (
+    <ul data-skills className={cn('space-y-1.5', className)}>
+      {skills.map((skill) => (
+        <li key={skill.id} data-agent-skill={skill.id} className="text-xs leading-snug">
+          <span className="font-medium text-neutral-800 dark:text-neutral-200">{skill.name}</span>{' '}
+          <span className="text-neutral-600 dark:text-neutral-400">{skill.description}</span>
+          {skill.tags.length > 0 && (
+            <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+              {skill.tags.map((tag) => (
+                <span key={tag} className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                  {tag}
+                </span>
+              ))}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

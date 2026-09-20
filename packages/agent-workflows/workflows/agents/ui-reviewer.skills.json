@@ -1,0 +1,28 @@
+[
+  {
+    "id": "review-a-web-change",
+    "name": "Review a web change",
+    "description": "Reads the diff read-only as a second engineer would and reports each finding by file and line.",
+    "tags": [
+      "web",
+      "review",
+      "code"
+    ],
+    "examples": [
+      "Use this when a web change is written and nobody has read it yet."
+    ]
+  },
+  {
+    "id": "read-a-screenshot",
+    "name": "Read a screenshot",
+    "description": "Reads the screenshots of every page the change touched, in both themes, and names what is cut off, overlapping or unreadable — by page and by theme.",
+    "tags": [
+      "web",
+      "review",
+      "screenshots"
+    ],
+    "examples": [
+      "Use this when a change is only as good as the page it draws."
+    ]
+  }
+]

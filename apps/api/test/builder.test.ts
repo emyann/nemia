@@ -118,7 +118,10 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => k !== 'description'));
+  // The role keys are the agent keys a step has too: what the builder may set on the node. `description` and `skills` say what the agent is
+  // and what it can do, and belong to no step, so neither is on the step form and neither is ever written into a step file.
+  assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => k !== 'description' && k !== 'skills'));
+  for (const own of ['description', 'skills']) assert.equal(form.roleKeys.includes(own as never), false, own);
 
   // The kinds held to the parser. A count is what the parser refuses as "not a count", and nothing else is: in a folder where every key can be
   // read — `b` waits on `a`, loops to it, and declares `again` — each key set to a word that is not a number.

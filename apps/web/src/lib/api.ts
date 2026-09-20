@@ -709,7 +709,17 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  * Mirrors `WorkflowStepPage` in apps/api/src/workflows.ts: one step of a workflow — its body, its file as written, and every key a step may set,
  * in the package's order, with its value as the loader read it.
  */
-export type WorkflowStepPage = { workflow: string; from: WorkflowListing['from']; dir: string; step: string; body: string; source: string; keys: KeyRow[] };
+export type WorkflowStepPage = {
+  workflow: string;
+  from: WorkflowListing['from'];
+  dir: string;
+  step: string;
+  body: string;
+  source: string;
+  keys: KeyRow[];
+  /** What the agent this step names says it can do, read beside the workflow — null for a step with no agent, or one whose skills do not read. */
+  agentSkills: AgentSkill[] | null;
+};
 
 /** A step of a workflow, for its page. Read again on each visit, as the Workflows page is: a person edits the folder. */
 export const stepQuery = (from: string, workflow: string, step: string) =>
@@ -794,6 +804,26 @@ export const saveWorkflow = (name: string, save: { version: string; steps: reado
 export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step }, isSaved);
 
+/**
+ * Mirrors `AgentSkill` in the package: one thing an agent says it can do, in the A2A protocol's words — `id`, `name`, `description` and
+ * `tags` are REQUIRED there and here, and the rest are written only where they say something the card does not already say.
+ */
+export type AgentSkill = {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  examples?: string[];
+  inputModes?: string[];
+  outputModes?: string[];
+};
+
+/**
+ * Mirrors `ListedSkills` in apps/api/src/agents.ts: the file an agent's `skills:` names, its text as the form edits it, and the skills the
+ * package read out of it — null where the file does not read, and the listing's `error` says why.
+ */
+export type SkillsFile = { file: string; text: string; list: AgentSkill[] | null };
+
 /** The keys an agent sets on the steps that name it: every agent key but its description. Mirrors `RoleKey` in the package. */
 export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallow' | 'remote' | 'output';
 
@@ -802,7 +832,8 @@ export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string
 
 /**
  * Mirrors `AgentListing` in apps/api/src/agents.ts: one agent — its keys as its file writes them, its instructions, the result schema its
- * `output:` names, its file as written, the version a write carries, the nodes that name it, and the parser's refusal of a file that does not read.
+ * `output:` names and the skills its `skills:` names, its file as written, the version a write carries, the nodes that name it, and the
+ * parser's refusal of a file that does not read.
  */
 export type AgentListing = {
   name: string;
@@ -813,6 +844,7 @@ export type AgentListing = {
   keys: Partial<Record<AgentRoleKey, string>>;
   body: string;
   schema: SchemaFile | null;
+  skills: SkillsFile | null;
   source: string;
   version: string;
   usedBy: AgentUser[];
@@ -832,8 +864,20 @@ export const agentQuery = (from: string, name: string) =>
     queryFn: () => get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
   });
 
-/** An agent as a write sends it: its name, description, the role keys it sets — one unset as null — its instructions, and a result schema pasted for it. */
-export type AgentDraft = { name: string; description: string | null; keys: Partial<Record<AgentRoleKey, string | null>>; body: string; schema?: SchemaFile };
+/**
+ * An agent as a write sends it: its name, description, the skills file it names — null for none — the role keys it sets, one unset as null,
+ * its instructions, and a result schema or a skills file pasted for it. `skills` is the agent's own line, as `description` is; `skillsText`
+ * is what that file holds, and travels only when it changed.
+ */
+export type AgentDraft = {
+  name: string;
+  description: string | null;
+  skills: string | null;
+  keys: Partial<Record<AgentRoleKey, string | null>>;
+  body: string;
+  schema?: SchemaFile;
+  skillsText?: string;
+};
 
 /** Mirrors `AgentSaved` in apps/api/src/agents.ts: the agent as it now reads, and its files by name. */
 export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };

@@ -46,8 +46,13 @@ test('an agent is its role keys as written, its description, and its body as its
   assert.equal(agent('quiet', '---\nmodel: opus\n---\n').body, '', 'an agent may set only how its steps run');
 });
 
-test('the role keys are the keys a step has, but for wiring, and the description', () => {
-  for (const key of AGENT_KEYS) if (key !== 'description') assert.ok((STEP_KEYS as readonly string[]).includes(key), key);
+// `description` and `skills` describe the agent itself — who it is, and what it says it can do — and a step has neither: a step's work is
+// the workflow's, not the agent's. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
+const AGENT_OWN = ['description', 'skills'];
+
+test('the role keys are the keys a step has, but for wiring, the description and the skills', () => {
+  for (const key of AGENT_KEYS) if (!AGENT_OWN.includes(key)) assert.ok((STEP_KEYS as readonly string[]).includes(key), key);
+  for (const key of AGENT_OWN) assert.ok(!(STEP_KEYS as readonly string[]).includes(key), `${key} describes the agent, and is no step's key`);
 });
 
 test('REFUSED at shipped defaults: every wiring key in an agent file, by name, saying it belongs on the step', () => {
@@ -281,4 +286,116 @@ test("`wf start` names each node's agent beside it — by the agent's name, not 
   const [id, said] = printed[0]!.split('  ');
   assert.ok(id, printed.join('\n'));
   assert.equal(said, '3 step(s): build (coder) → judge (critic) → wrap');
+});
+
+/** An agent whose `skills:` names a file the reader is handed: what `loadAgents` hands `parseAgent` for a file beside it. */
+const withSkills = (name: string, json: string, line = `${name}.skills.json`): Agent =>
+  agent(name, `---\ndescription: Does the work\nskills: ${line}\n---\nDo it.\n`, (file) => (file === `${name}.skills.json` ? json : undefined));
+
+const ONE_SKILL = '[{"id":"review-a-change","name":"Review a change","description":"Read a branch against its brief.","tags":["code","review"],"examples":["Use this when a change needs a second pair of eyes."]}]';
+
+test('an agent says what it can do in the A2A protocol\'s words: the skills its `skills:` names, beside it', () => {
+  const a = withSkills('reviewer', ONE_SKILL);
+  assert.equal(a.skills?.file, 'reviewer.skills.json');
+  assert.deepEqual(a.skills?.list, [{
+    id: 'review-a-change',
+    name: 'Review a change',
+    description: 'Read a branch against its brief.',
+    tags: ['code', 'review'],
+    examples: ['Use this when a change needs a second pair of eyes.'],
+  }]);
+  assert.equal(agent('quiet', '---\ndescription: Does the work\n---\nDo it.\n').skills, undefined, 'an agent may say nothing of what it can do');
+  // `skills` is the agent's own line, as `description` is: no step takes it, so it never reaches a step's keys.
+  assert.equal((a.keys as Record<string, unknown>).skills, undefined);
+});
+
+test("an agent's skills are read with the optional A2A fields it writes, and without the ones it does not", () => {
+  const a = withSkills('coder', '[{"id":"a","name":"A","description":"d","tags":["t"],"inputModes":["text/plain"],"outputModes":["application/json"]}]');
+  assert.deepEqual(a.skills?.list[0], { id: 'a', name: 'A', description: 'd', tags: ['t'], inputModes: ['text/plain'], outputModes: ['application/json'] });
+  assert.ok(!('examples' in a.skills!.list[0]!), 'a field the file does not write is not on the skill');
+});
+
+test('REFUSED at shipped defaults: a `skills:` that is not a .json file beside the agent', () => {
+  for (const line of ['../elsewhere.skills.json', 'sub/skills.json', '/etc/skills.json', 'skills.yaml', '.hidden.json']) {
+    const said = refusal(() => withSkills('reviewer', ONE_SKILL, line));
+    assert.ok(said.startsWith(`agents/reviewer.md: \`skills: ${line}\` is not a skills file's name.`), said);
+    assert.ok(said.includes('`skills: reviewer.skills.json`'), said);
+  }
+});
+
+test('REFUSED at shipped defaults: a skills file that is not there, not JSON, not a list, or empty', () => {
+  const missing = refusal(() => agent('reviewer', '---\nskills: reviewer.skills.json\n---\nDo it.\n', () => undefined));
+  assert.ok(missing.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not there.'), missing);
+  assert.ok(missing.includes('write it beside agents/reviewer.md'), missing);
+
+  const unread = refusal(() => agent('reviewer', '---\nskills: reviewer.skills.json\n---\nDo it.\n'));
+  assert.ok(unread.includes('this agent was read without its folder'), unread);
+
+  const notJson = refusal(() => withSkills('reviewer', '[{'));
+  assert.ok(notJson.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not JSON ('), notJson);
+
+  const notList = refusal(() => withSkills('reviewer', '{"id":"a"}'));
+  assert.ok(notList.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not a list.'), notList);
+
+  const none = refusal(() => withSkills('reviewer', '[]'));
+  assert.ok(none.includes('is an empty list, and an agent with no skills says nothing it can do'), none);
+});
+
+test('REFUSED at shipped defaults: a skill missing a field the protocol marks REQUIRED, or with an id no caller could name', () => {
+  for (const key of ['id', 'name', 'description']) {
+    const entry: Record<string, unknown> = { id: 'a-skill', name: 'A skill', description: 'What it does.', tags: ['t'] };
+    delete entry[key];
+    const said = refusal(() => withSkills('reviewer', JSON.stringify([entry])));
+    assert.ok(said.startsWith(`agents/reviewer.md: \`skills: reviewer.skills.json\`, skill 1 has no \`${key}\`, and the A2A protocol marks it REQUIRED.`), said);
+    const blank = refusal(() => withSkills('reviewer', JSON.stringify([{ ...entry, [key]: '  ' }])));
+    assert.ok(blank.includes(`has no \`${key}\``), blank);
+  }
+  const notObject = refusal(() => withSkills('reviewer', '["review"]'));
+  assert.ok(notObject.includes('skill 1 is "review", not a skill.'), notObject);
+
+  for (const id of ['Review A Change', 'review_a_change', 'review a change', '-review', 'review-']) {
+    const said = refusal(() => withSkills('reviewer', JSON.stringify([{ id, name: 'A', description: 'd', tags: ['t'] }])));
+    assert.ok(said.includes(`skill \`${id}\` is not an id`), said);
+    assert.ok(said.includes('lowercase words joined by dashes'), said);
+  }
+});
+
+test('REFUSED at shipped defaults: tags missing or empty, a list that is not one, a key A2A has not, and a duplicate id', () => {
+  const noTags = refusal(() => withSkills('reviewer', '[{"id":"a","name":"A","description":"d"}]'));
+  assert.ok(noTags.includes('skill `a` has no `tags`, and the A2A protocol marks them REQUIRED'), noTags);
+
+  const empty = refusal(() => withSkills('reviewer', '[{"id":"a","name":"A","description":"d","tags":[]}]'));
+  assert.ok(empty.includes('has an empty `tags`, which says as little as none'), empty);
+
+  for (const key of ['tags', 'examples', 'inputModes', 'outputModes']) {
+    const said = refusal(() => withSkills('reviewer', JSON.stringify([{ id: 'a', name: 'A', description: 'd', tags: ['t'], [key]: 'one' }])));
+    assert.ok(said.includes(`skill \`a\`: \`${key}\` is a JSON array of words`), said);
+    const blank = refusal(() => withSkills('reviewer', JSON.stringify([{ id: 'a', name: 'A', description: 'd', tags: ['t'], [key]: [''] }])));
+    assert.ok(blank.includes(`\`${key}\` is a JSON array of words`), blank);
+  }
+
+  const unknown = refusal(() => withSkills('reviewer', '[{"id":"a","name":"A","description":"d","tags":["t"],"inputSchema":{}}]'));
+  assert.ok(unknown.includes('skill 1 sets `inputSchema`, which an A2A skill does not have.'), unknown);
+  assert.ok(unknown.includes('id, name, description, tags, examples, inputModes, outputModes'), unknown);
+
+  // A real A2A field all the same, and refused on its own words: it names a security scheme a card with no interfaces never declares.
+  const secured = refusal(() => withSkills('reviewer', '[{"id":"a","name":"A","description":"d","tags":["t"],"securityRequirements":[]}]'));
+  assert.ok(secured.includes('sets `securityRequirements`'), secured);
+  assert.ok(secured.includes('nothing here serves this agent over A2A'), secured);
+
+  const twice = refusal(() => withSkills('reviewer', '[{"id":"a","name":"A","description":"d","tags":["t"]},{"id":"a","name":"B","description":"e","tags":["u"]}]'));
+  assert.ok(twice.includes('gives `a` twice, as skill 1 and skill 2'), twice);
+});
+
+test("a broken skills file is the agent's refusal, thrown only at a step that names it", () => {
+  const dir = workflows({
+    'agents/reviewer.md': '---\ndescription: Reviews\nskills: reviewer.skills.json\n---\nReview it.\n',
+    'agents/reviewer.skills.json': '[]',
+    'agents/implementer.md': IMPLEMENTER,
+    'dev/implement.md': '---\nagent: implementer\n---\n',
+  });
+  const agents = loadAgents(agentsDir(path.join(dir, 'dev')));
+  assert.ok(agents.get('reviewer') instanceof WorkflowError, 'the broken one is kept as its refusal');
+  assert.ok(!(agents.get('implementer') instanceof WorkflowError), 'and stops no agent beside it');
+  assert.equal(loadWorkflows(path.join(dir, 'dev')).length, 1, 'nor a workflow that does not name it');
 });

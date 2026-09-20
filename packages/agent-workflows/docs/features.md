@@ -3688,9 +3688,14 @@ beside it changes these readers and no more.
   page each sweep every sentence the board draws for one and refuse any.
 - **What the harness said last** is the session's own words: a brief, a `wf say` and every tool result come back as `user` events,
   and the board read them back at the person as the reason the session stopped.
-- **Live** — see *Verified live*, above. What it cost to find: the fence, not the folder. Every step of a folder team must run in
-  `dontAsk`, refused at load otherwise (`validateFolderMode`); `allow:` gives a fenced step its own folder back, and must be an
-  `Edit` rule, since Claude Code matches no `Write(<path>)` against a file permission check.
+- **Live** — see *Verified live*, above. What it cost to find: the fence, not the folder. Every step of a Claude Code folder team
+  must run in `dontAsk`, refused at load otherwise (`validateFolderMode`); `allow:` gives a fenced step its own folder back, and
+  must be an `Edit` rule, since Claude Code matches no `Write(<path>)` against a file permission check. The guard is judged
+  against the step's own harness: `codex exec` is not interactive — one shell, fenced by the sandbox `permissionMode` names, a
+  call outside it denied there and then — so a codex folder team passes in every mode codex has, `workspace-write`, its default,
+  with them. Judged on Claude's words it was refused and told to write `permissionMode: dontAsk`, which codex does not take,
+  beside `allow: Edit(**)`, which `rulesOf` refuses on codex: two refusals pointing at each other, whose only way through was
+  `bypassPermissions`, the widest mode of all.
 
 **Next, in order:** (3) a folder's lifetime — kept, cleaned, or none at all; (4) the Factory draws a run's workspace;
 (5) connections (P3), and a GitHub kind beside `folder`.

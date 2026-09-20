@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, loadAgents, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -941,7 +942,7 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
     (e: WorkflowError) => e.exitCode === 2 && /^write says `workspace: folder`, and review does not/.test(e.message));
 });
 
-test('REFUSED at load: a step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`', () => {
+test('REFUSED at load: a step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`; judged per harness, so codex, fenced by its sandbox, passes in every one of its own', () => {
   const team = (...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
     ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
   const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
@@ -959,6 +960,36 @@ test('REFUSED at load: a step of a folder team in a permission mode that can sto
   refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);
   // And the fix is named, both halves of it.
   refused(team(undefined), /Write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step that must write its own work needs `allow: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/);
+
+  // A step of another harness is judged on that harness's modes, because what was measured is Claude Code's prompt. `codex exec` is not
+  // interactive: it has one shell, fenced by the sandbox its mode names, and a call outside the fence is denied there and then. Judged on
+  // Claude's words, a codex folder team in `workspace-write` — the tightest sandbox that writes, and codex's default — was refused at load
+  // and told to write `permissionMode: dontAsk`, which codex does not take, and `allow: Edit(**)`, which `rulesOf` refuses on codex: two
+  // refusals pointing at each other, whose only way through was `bypassPermissions`, the widest mode of all.
+  const on = (harness: string, ...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', harness, ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
+  for (const mode of PERMISSION_MODES.codex!) assert.doesNotThrow(() => validate(on('codex', 'workspace-write', mode)), `codex ${mode}`);
+  assert.doesNotThrow(() => validate(on('codex', undefined)), 'and a codex step that names no sandbox runs in `workspace-write`, which writes in its folder and asks nobody');
+  assert.doesNotThrow(() => parseFolder([['write', '---\nworkspace: folder\nharness: codex\npermissionMode: workspace-write\n---\nWrite.\n']]), 'as a person writes one');
+  // `claude-detached` is Claude Code by another road, and is judged as `claude` is.
+  refused(on('claude-detached', 'dontAsk', 'acceptEdits'), /^s1: `workspace: folder` works in a folder nobody has opened, and `permissionMode: acceptEdits` can stop and ask/);
+
+  // And for every harness there is: one a folder team can run in, and, where there is a refusal, a fix written in that harness's own
+  // vocabulary. A harness added to `PERMISSION_MODES` and forgotten in `UNASKING` would have every folder team of its own refused here,
+  // in another harness's words — which is what the codex refusal above was.
+  for (const harness of HARNESSES) {
+    const modes = PERMISSION_MODES[harness]!;
+    const says = (permissionMode: string): string | undefined => {
+      try { validate(on(harness, permissionMode)); return undefined; } catch (e) { return (e as WorkflowError).message; }
+    };
+    const refusals = modes.map((mode) => [mode, says(mode)] as const);
+    assert.ok(refusals.some(([, why]) => why === undefined), `${harness}: no permission mode it takes can run a folder team`);
+    for (const [mode, why] of refusals) {
+      if (why === undefined) continue;
+      const named = /Write `permissionMode: ([^`]+)`/.exec(why)?.[1];
+      assert.ok(named && modes.includes(named), `${harness} ${mode}: the refusal names \`permissionMode: ${named}\`, which ${harness} does not take — ${why}`);
+    }
+  }
 
   // A team that is not a folder team is not judged on this at all: a git run's steps work in a checkout a person opened, with settings of
   // its own, and every mode has always been theirs to choose.

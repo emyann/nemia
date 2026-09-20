@@ -1494,11 +1494,32 @@ function validateFolder(steps: readonly Workflow[]): void {
 }
 
 /**
- * The permission modes that never stop to ask a person: `dontAsk`, which denies what it is not given and lets the session read the
- * refusal and carry on, and `bypassPermissions`, which allows everything. Every other Claude Code mode asks, including `auto`, the
- * engine's default.
+ * The permission modes that never stop to ask a person, per harness — because a mode is the harness's word, and what it does with a
+ * call it was not given is the harness's too.
+ *
+ * On Claude Code (`claude`, `claude-detached`): `dontAsk`, which denies what it is not given and lets the session read the refusal and
+ * carry on, and `bypassPermissions`, which allows everything. Every other mode asks, `auto` — the engine's default — among them.
+ *
+ * On codex: every mode it has. `codex exec` is not interactive; it has one shell, fenced by the sandbox `permissionMode` names, and a
+ * call outside the fence is denied there and then. `read-only` reads and writes nothing, `workspace-write` writes in the workspace and
+ * asks nobody — this file's own `allow:` refusal says exactly that to anyone who writes a rule list on codex — and the two widest allow
+ * more, not less. So a codex folder team is not judged on this at all, and is not pushed off its sandbox to reach the widest mode.
+ *
+ * Every harness has a list here and a default below, held by `test/vocabulary.test.ts`: a harness added with neither would have every
+ * folder team of its own refused, in another harness's words.
  */
-const UNASKING = ['dontAsk', 'bypassPermissions'];
+const UNASKING: Readonly<Record<string, readonly string[]>> = {
+  claude: ['dontAsk', 'bypassPermissions'],
+  'claude-detached': ['dontAsk', 'bypassPermissions'],
+  codex: PERMISSION_MODES.codex!,
+};
+
+/**
+ * The mode a step runs in when it names none, which is what the guard below judges such a step on: the engine's `auto` on Claude Code
+ * (`runner.ts`'s default), codex's `workspace-write` (`sandboxOf` in the engine's `runner-detached.ts`, which falls to it for a task
+ * that named no sandbox).
+ */
+const DEFAULT_MODE: Readonly<Record<string, string>> = { claude: 'auto', 'claude-detached': 'auto', codex: 'workspace-write' };
 
 /**
  * The way a step of a folder team cannot be run: in a permission mode that can stop and ask.
@@ -1514,20 +1535,30 @@ const UNASKING = ['dontAsk', 'bypassPermissions'];
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
  * api — passes.
  *
+ * Judged against the step's own harness (`UNASKING`), since what was measured is Claude Code's prompt. A codex step is fenced by a
+ * sandbox and asks nobody in any of its modes, so a codex folder team passes here — judged on Claude's words, the tightest sandbox it
+ * has would be refused and told to write a mode codex does not take.
+ *
  * It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allow:` gives back, scoped to the step's own
  * folder (`Edit(**)`).
  */
 function validateFolderMode(steps: readonly Workflow[]): void {
   if (!isFolderTeam(steps)) return;
-  const asking = steps.find((s) => !UNASKING.includes(s.permissionMode ?? ''));
+  const asks = (s: Workflow): boolean => {
+    const harness = s.harness ?? DEFAULT_HARNESS;
+    return !(UNASKING[harness] ?? []).includes(s.permissionMode ?? DEFAULT_MODE[harness] ?? '');
+  };
+  const asking = steps.find(asks);
   if (!asking) return;
+  const on = asking.harness ?? DEFAULT_HARNESS;
+  const unasking = UNASKING[on] ?? [];
   const mode = asking.permissionMode
     ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
-    : "it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something";
+    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE[on]}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
     `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, and ${mode}`
     + ' — a read or a write outside the folder can, and an unattended session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
-    + ' Write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on.'
+    + ` Write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.`
     + " A step that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }

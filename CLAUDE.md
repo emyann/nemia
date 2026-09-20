@@ -202,7 +202,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `acceptEdits`, and `auto`, the engine's default, does the same). `dontAsk` denies the call with no prompt and the
   session reads the refusal and carries on, so a folder team may run in no other mode (`validateFolderMode`). It is
   not the workspace-trust dialog: a folder run does start unattended on `claude --bg` (measured on Claude Code
-  2.1.278, by the first live `note` run).
+  2.1.278, by the first live `note` run). What was measured is Claude Code's prompt, so the guard reads the step's
+  own harness: `codex exec` is not interactive — one shell, fenced by the sandbox its `permissionMode` names — and a
+  codex folder team passes in every mode codex has. A guard written from one harness's measurement, applied to
+  another's words, sent a codex author from the tightest sandbox to the widest mode, by way of a fix codex refuses.
 - **A session started anywhere under `~/.claude/` cannot write there, in any mode.** Claude Code reads that directory
   as its own and refuses a write into it — *"sits under `~/.claude/`, which the harness treats as sensitive"* — whatever
   `--permission-mode` and `--allowedTools` say. `$CLAUDE_JOB_DIR/tmp` is under it, so a live `wf` store put there

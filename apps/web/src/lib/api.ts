@@ -649,6 +649,8 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** What the session may do without being asked (`allow:`): empty where the step allows nothing beyond its mode. */
+  allow: string[];
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -795,7 +797,7 @@ export const createWorkflow = (name: string, step: ListedStep): Promise<Workflow
   build('POST', '/api/workflows/yours', { name, step }, isSaved);
 
 /** The keys an agent sets on the steps that name it: every agent key but its description. Mirrors `RoleKey` in the package. */
-export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallow' | 'remote' | 'output';
+export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallow' | 'allow' | 'remote' | 'output';
 
 /** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };

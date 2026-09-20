@@ -332,7 +332,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Write(**), Edit(**)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -352,7 +352,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
   assert.equal(w.gate, true);
   assert.equal(w.remote, true);
-  assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
+  assert.deepEqual([w.effort, w.tools, w.disallow, w.allow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage'], ['Write(**)', 'Edit(**)']]);
   assert.equal(w.context, 150000);
 });
 
@@ -383,7 +383,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -532,6 +532,31 @@ test('REFUSED: disallow: on a codex step, naming the sandbox permissionMode sets
   assert.throws(() => fm('review', 'harness: codex\ndisallow: Bash(npm run build)'),
     refusedWith(/^review: `disallow: Bash\(npm run build\)` is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: read-only` for a step that must not write\./));
   assert.throws(() => fm('review', 'disallow: SendMessage\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has no tool list to deny from/), 'wherever the harness line is, and beside the sandbox too');
+});
+
+test('allow: is the rules the harness is given to allow without asking, one rule per entry, trimmed — and absent, the step may do only what its permissionMode allows', () => {
+  const w = fm('write', 'permissionMode: dontAsk\nallow: Write(**) ,  Edit(**), Bash(npm test),');
+  assert.deepEqual(w.allow, ['Write(**)', 'Edit(**)', 'Bash(npm test)'], 'a space inside a rule stays in it; a trailing comma adds none');
+  assert.equal(fm('review', 'harness: claude').allow, undefined, 'absent: only what the permission mode allows by itself');
+  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('write', `harness: ${h}\nallow: Write(**)`).allow, ['Write(**)'], h);
+  // The deny list beside it, on the same step: neither is the other's opposite, and a deny still beats an allow.
+  assert.deepEqual(fm('write', 'allow: Write(**)\ndisallow: SendMessage').allow, ['Write(**)']);
+});
+
+test('REFUSED: an allow: that names no rule, or an entry that is not one rule — the deny list\'s refusals in the allow list\'s words', () => {
+  assert.throws(() => fm('write', 'allow:'), refusedWith(/^write: `allow` has no value, which allows nothing and reads as a permission\. Name what the session may do without being asked — `allow: Write\(\*\*\), Edit\(\*\*\)` — or delete the line/));
+  assert.throws(() => fm('write', 'allow: ,'), refusedWith(/^write: `allow: ,` names no rule\. .*Without the line, the step may do only what its `permissionMode` allows by itself\./));
+  assert.throws(() => fm('write', 'allow: Bash(npm test, npm run build)'),
+    refusedWith(/^write: `allow: Bash\(npm test, npm run build\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(npm test`, `npm run build\)` as rules\. .*Two tools are two rules: `Write\(\*\*\), Edit\(\*\*\)`\./));
+  assert.throws(() => fm('write', 'allow: [Write, Edit]'), refusedWith(/has `\[Write`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('write', 'allow: Write Edit'), refusedWith(/has `Write Edit`, which is not one rule: a space outside the parentheses separates two rules, to the harness/));
+  assert.throws(() => fm('write', 'allow: Write(**'), refusedWith(/has `Write\(\*\*`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
+});
+
+test('REFUSED: allow: on a codex step, naming the sandbox permissionMode sets instead', () => {
+  assert.throws(() => fm('write', 'harness: codex\nallow: Write(**)'),
+    refusedWith(/^write: `allow: Write\(\*\*\)` is an allow list, and codex has no tool list to allow from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: workspace-write` for a step that writes in its workspace and asks nobody\./));
+  assert.throws(() => fm('write', 'allow: Write(**)\nharness: codex\npermissionMode: workspace-write'), refusedWith(/codex has no tool list to allow from/), 'wherever the harness line is, and beside the sandbox too');
 });
 
 test("REFUSED: an effort the step's harness does not take, by name, with the efforts it does", () => {
@@ -885,7 +910,7 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
   for (const word of ['Folder', 'folders', 'dir']) refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\. `));
 
   const team = (...words: Array<'folder' | 'main' | undefined>): Workflow[] => words.map((workspace, i) =>
-    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', ...(workspace ? { workspace } : {}) }) as Workflow);
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', permissionMode: 'dontAsk', ...(workspace ? { workspace } : {}) }) as Workflow);
   assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
   assert.doesNotThrow(() => validate(team(undefined, undefined, 'main')), 'or none does');
   const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
@@ -895,8 +920,36 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
   refused(team('folder', 'main'), /^s0 says `workspace: folder`, and s1 does not/);
 
   // And at load, from a folder of files, as a person writes them.
-  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\n---\nWrite.\n'], ['review', '---\nafter: write\n---\nReview.\n']]),
+  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite.\n'], ['review', '---\nafter: write\n---\nReview.\n']]),
     (e: WorkflowError) => e.exitCode === 2 && /^write says `workspace: folder`, and review does not/.test(e.message));
+});
+
+test('REFUSED at load: a step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`', () => {
+  const team = (...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
+  const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
+
+  // The two modes that never ask: `dontAsk`, which denies instead, and `bypassPermissions`, which allows instead. A folder team may run in
+  // those and no other — measured on Claude Code 2.1.278, where a `--bg` session in `acceptEdits` and one in `auto` each sat on the first
+  // call outside their folder with `waitingFor: 'permission prompt'` and nobody to answer.
+  assert.doesNotThrow(() => validate(team('dontAsk', 'bypassPermissions')));
+  // Every other mode the parser takes is refused, and the step that is in one is named — the second here, so a rule that only ever looked
+  // at the first would fail.
+  for (const mode of ['default', 'acceptEdits', 'plan', 'manual', 'auto']) {
+    refused(team('dontAsk', mode), new RegExp(`^s1: \`workspace: folder\` works in a folder nobody has opened, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — the first read or write outside the folder does`));
+  }
+  // The line left off is the same defect: the engine files such a task in `auto`.
+  refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);
+  // And the fix is named, both halves of it.
+  refused(team(undefined), /Write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step that must write its own work needs `allow: Write\(\*\*\), Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder\.$/);
+
+  // A team that is not a folder team is not judged on this at all: a git run's steps work in a checkout a person opened, with settings of
+  // its own, and every mode has always been theirs to choose.
+  assert.doesNotThrow(() => validate([{ name: 'implement', after: [], body: 'x', permissionMode: 'acceptEdits' } as Workflow]));
+
+  // At load, from files: the same refusal reaches a person writing a folder of markdown.
+  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\npermissionMode: acceptEdits\n---\nWrite.\n']]),
+    (e: WorkflowError) => e.exitCode === 2 && /^write: `workspace: folder` works in a folder nobody has opened, and `permissionMode: acceptEdits` can/.test(e.message));
 });
 
 test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {
@@ -1078,7 +1131,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   // `agent:` renders in test/agents.test.ts, which has agents to resolve it with.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
+    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Write(**),Edit(**)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
@@ -1096,6 +1149,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'permissionMode: dontAsk',
     'tools: Read, Grep, Glob, Bash',
     'disallow: Bash(npm run build), SendMessage',
+    'allow: Write(**), Edit(**)',
     'remote: true',
     'deadlineSeconds: 900',
     'maxAttempts: 2',
@@ -1129,10 +1183,10 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
 });
 
-test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input` or `disallow` are no line — and a step that sets nothing is its body', () => {
+test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input`, `disallow` or `allow` are no line — and a step that sets nothing is its body', () => {
   const bare: StepDraft = { name: 'implement', after: [], body: 'Implement it.' };
   assert.equal(renderStep(bare), 'Implement it.\n');
-  assert.equal(renderStep({ ...bare, harness: undefined, input: [], disallow: [], model: null } as unknown as StepDraft), 'Implement it.\n', 'as the board lists a step: null and [] for what it does not set');
+  assert.equal(renderStep({ ...bare, harness: undefined, input: [], disallow: [], allow: [], model: null } as unknown as StepDraft), 'Implement it.\n', 'as the board lists a step: null and [] for what it does not set');
   assert.deepEqual(parseWorkflow('implement', renderStep(bare)), { ...parseWorkflow('implement', 'Implement it.') }, 'and reads back as the step');
 
   // A draft names its `output:` by file, and the schema is read from the folder; a loop's rounds are the default when it sets none.

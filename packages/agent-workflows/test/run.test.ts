@@ -3896,7 +3896,15 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
   assert.doesNotMatch(briefs[3]!, /merged/);
   assert.match(briefs[4]!, /An earlier one worked on this step in this folder, and what it left is still here\./);
   assert.match(briefs[5]!, /your last one could not be continued\. What it left is in this folder\./);
-  for (const brief of briefs) assert.match(brief, /the run copies each such file into that directory/);
+  // One way to hand a file over, and it is inside the fence. The directory the run keeps sits beside the folder, and a step of a folder
+  // team runs in `dontAsk` (`validateFolderMode`): named it, the session would be denied writing there and would have handed nothing over.
+  for (const brief of briefs) {
+    assert.match(brief, /leave it in this\nfolder, and name it in `artifacts` by its path from the folder/);
+    assert.match(brief, /the run\ncopies each such file out and keeps it, before it checks your work\./);
+    assert.match(brief, /Write nowhere else\./);
+    assert.doesNotMatch(brief, /\/store\/runs\/n-1\/artifacts\//, 'that directory is outside the fence: it is not named');
+    assert.doesNotMatch(brief, /by absolute path/);
+  }
 
   // As a run records them, a chain's step works in its parent's folder: review's is write's, and critic's is draft's. A root tried again
   // after review ran, and a loop's target in its next round, work in that folder too, and are told the later step worked here — never

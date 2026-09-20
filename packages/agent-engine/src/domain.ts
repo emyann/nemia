@@ -247,6 +247,11 @@ export type Event =
        * `tools` is: a runner hands it to its harness, and `decide` never learns what a rule is.
        */
       disallowedTools?: string[];
+      /**
+       * What the session may do without being asked, in its harness's permission rules. Carried, never read here, as
+       * `disallowedTools` is.
+       */
+      allowedTools?: string[];
       /** How hard the harness should think, in its own words. Carried, never read here. */
       effort?: string;
       /**
@@ -369,6 +374,7 @@ export type State = {
   /** The session's tools, what it may not have, effort and MCP servers. See the `filed` event. `decide` never reads any of them. */
   tools?: string[];
   disallowedTools?: string[];
+  allowedTools?: string[];
   effort?: string;
   mcp?: Record<string, McpServer>;
   /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
@@ -401,7 +407,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
+        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.allowedTools = e.allowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
         s.contextTokens = e.contextTokens;
         s.remoteControl = e.remoteControl; s.priority = e.priority;
         break;

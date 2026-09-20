@@ -54,6 +54,11 @@ export type SpawnRequest = {
   tools?: string[];
   /** What the session may not have, in this harness's permission rules, one per entry. Absent or empty: nothing denied. */
   disallowedTools?: string[];
+  /**
+   * What the session may do without being asked, in this harness's permission rules, one per entry. Absent or empty:
+   * only what its permission mode allows by itself. A deny beats it.
+   */
+  allowedTools?: string[];
   /** How hard the harness should think, in its own words. */
   effort?: string;
   /** MCP servers the session may have, by name, beside its checkout's `.mcp.json`. Absent: only those. */
@@ -1099,6 +1104,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
       // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
       ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
+      // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
+      // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
+      // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
+      // so a fenced session that must write its own work is given `Write(**)`, a glob resolved against its `cwd`.
+      // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
+      // lists above are, and a deny still beats it.
+      ...(r.allowedTools?.length ? ['--allowedTools', r.allowedTools.join(',')] : []),
       // Remote Control, only when the task asks: the session bridged to claude.ai and listed in its agents view, where it
       // can be driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this
       // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt

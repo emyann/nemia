@@ -17,4 +17,9 @@ changing nothing. Neither step has a `check:`: a note has no suite, so each is u
 `wf decide` says so.
 
 Nothing here reads or sends anything outside the machine: neither agent has a web tool, and the writer writes
-only in its folder. When the note has been read, `wf rm <run>` forgets the run with its folders and files.
+only in its folder. Both run in `permissionMode: dontAsk`, which every step of a folder team must
+(`validateFolderMode`): a folder is nobody's checkout, nobody is there to answer a prompt, and in a mode that can
+ask the first call outside the folder stops the session for ever. `dontAsk` denies it with no prompt instead, and
+the session reads the refusal and carries on — so the writer, which that mode would deny its own `note.md`, is
+given `allow: Write(**), Edit(**)`, a glob against the folder it is in. When the note has been read, `wf rm <run>`
+forgets the run with its folders and files.

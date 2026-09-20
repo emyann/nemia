@@ -1979,6 +1979,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
         disallowedTools: step.disallow,
+        allowedTools: step.allow,
         // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
         remoteControl: step.remote,
         deadlineSeconds: step.deadlineSeconds,
@@ -2033,6 +2034,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
+        allowedTools: target.allow,
         remoteControl: target.remote,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
@@ -2136,6 +2138,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       tools: step.tools,
       // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
       disallowedTools: step.disallow,
+      allowedTools: step.allow,
       // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
       remoteControl: step.remote,
       deadlineSeconds: step.deadlineSeconds,

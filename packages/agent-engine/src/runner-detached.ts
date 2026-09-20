@@ -625,6 +625,10 @@ export const codex: HarnessSpec = {
     if (task.disallowedTools?.length) {
       return `\`disallowedTools: ${JSON.stringify(task.disallowedTools)}\` is a deny list, and Codex has no tool list to take from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` runs commands and writes nothing. Leave \`disallowedTools\` off a Codex task, and name the sandbox.`;
     }
+    // An allow list would be dropped the same way, and for the same reason.
+    if (task.allowedTools?.length) {
+      return `\`allowedTools: ${JSON.stringify(task.allowedTools)}\` is an allow list, and Codex has no tool list to allow from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`workspace-write\` writes in the workspace and asks nobody. Leave \`allowedTools\` off a Codex task, and name the sandbox.`;
+    }
     // A cap would be dropped without a word: `codex exec --help` (0.154.0) has no spend cap, and its stream counts tokens,
     // not dollars — its config's budgets are token budgets.
     if (task.budgetUsd !== undefined) {
@@ -737,6 +741,13 @@ export const claudeDetached: HarnessSpec = {
       // Variadic, and ended by the flag after it, as for `claude --bg`.
       ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
+      // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
+      // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
+      // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
+      // so a fenced session that must write its own work is given `Write(**)`, a glob resolved against its `cwd`.
+      // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
+      // lists above are, and a deny still beats it.
+      ...(r.allowedTools?.length ? ['--allowedTools', r.allowedTools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
       // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
       ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),

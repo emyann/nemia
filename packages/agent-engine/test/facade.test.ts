@@ -370,6 +370,24 @@ test('file() refuses a disallowedTools that is not a list of permission rules, a
   assert.deepEqual((filed as { disallowedTools?: string[] }).disallowedTools, rules, 'on the record, for the runner');
 });
 
+test('file() refuses an allowedTools that is not a list of permission rules, and an allow list on codex, and journals one that is', async () => {
+  const { journal, engine } = shipped();
+  const notRules: unknown[] = [
+    'Write(**)', [''], [' Write(**)'], [42], ['Write(**),Edit(**)'], ['Bash npm test'],
+    ['Write(**'], ['Write()'], ['(**)'], ['-p'],
+  ];
+  for (const allowedTools of notRules) {
+    await refused(engine, { brief: 'b', cwd: '/r', allowedTools: allowedTools as string[] }, /is not a list of permission rules\. Give one rule per entry/);
+  }
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', allowedTools: ['Write(**)'] }, /is an allow list, and Codex has no tool list/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  const rules = ['Write(**)', 'Edit(**)', 'Bash(npm test)', 'mcp__playwright__browser_navigate', `Bash(git commit -m 'wip')`];
+  const id = await engine.file({ brief: 'b', cwd: '/r', allowedTools: rules });
+  const [filed] = await journal.read(id);
+  assert.deepEqual((filed as { allowedTools?: string[] }).allowedTools, rules, 'on the record, for the runner');
+});
+
 test('file() refuses an mcp map whose entries are not .mcp.json servers, and journals one that is', async () => {
   const { journal, engine } = shipped();
   const bad: Array<[unknown, RegExp]> = [

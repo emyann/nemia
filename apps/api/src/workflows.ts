@@ -50,6 +50,8 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** What the session may do without being asked, in the same rules (`allow:`): empty where the step allows nothing beyond its mode. */
+  allow: string[];
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -237,6 +239,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],
+  allow: step.allow ?? [],
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,

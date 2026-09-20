@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
-import { Check, code, Facts, Read, readRows, specRows, spentRows, Told, when } from '../components/Facts';
+import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, Told, when } from '../components/Facts';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
@@ -104,9 +104,11 @@ function Run({ run }: { run: RunDetail }) {
         )}
         <Facts
           rows={[
-            ['repo', code(run.repo)],
-            ['base', code(run.baseRef)],
-            ['branch', code(run.branch)],
+            // A folder run has no repository, no base and no branch, and a row of dashes where they belong says nothing. Where its
+            // work is instead — the one thing a person needs to find what it made.
+            ...(run.place === 'folder'
+              ? ([['work', pathRow(run.work)]] satisfies Array<[string, ReactNode]>)
+              : ([['repo', code(run.repo)], ['base', code(run.baseRef)], ['branch', code(run.branch)]] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
             ['cancelled', run.cancelledAt && when(run.cancelledAt)],
             ['workflow', code(run.workflowDir)],
@@ -168,7 +170,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       <Facts
         rows={[
-          ['branch', code(step.branch)],
+          // A folder step's folder, where a git step's branch goes: the directory it worked in, copyable.
+          run.place === 'folder' ? ['folder', pathRow(step.workspace)] : ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
           // Its gate, where it has one: a person's word files what follows it — or, for the step that ends the run, the step itself.
           ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
@@ -181,6 +184,15 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           ...spentRows(step),
         ]}
       />
+
+      {/* What a folder step left in its folder, which is the whole of what it made: the files its closeout named and the ones it
+          forgot to, each with its size, and a text file readable in a tab. A git step's work is its branch, and has no such list. */}
+      {run.place === 'folder' && step.taskId !== null && (
+        <div aria-label="Files" data-files className="text-xs text-neutral-500">
+          Files in its folder:
+          <Artifacts artifacts={step.files} size none="the folder is empty" />
+        </div>
+      )}
 
       {/* At its gate, what it handed on — which is what a person approves — with Approve and Send back beside it. At an ending step's
           gate, what it would act on instead: it has handed nothing on, and approving is what runs it. */}

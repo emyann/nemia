@@ -95,7 +95,7 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
             {run.id}
           </span>
           {/* A folder run has no repository: its steps work in folders the run made (`workspace: folder`). */}
-          <span className="shrink-0" title={run.repo ?? 'Its steps work in folders the run made, with no git repository'}>
+          <span className="shrink-0" title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}, with no git repository` : 'Its steps work in folders the run made, with no git repository')}>
             {run.repo ? repoName(run.repo) : 'folders'}
           </span>
         </p>

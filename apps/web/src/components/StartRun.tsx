@@ -29,6 +29,9 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
+  // A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one: there is no branch for
+  // a run to wait on. No picker, and nothing about a repository under the button.
+  const inFolders = workflow.folderTeam;
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[] }) =>
       startRun({
@@ -75,7 +78,7 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
         placeholder="What to do: the brief each step is told, under “What was asked for”."
         className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
       />
-      <AfterPicker selected={after} onChange={setAfter} repo={repo} />
+      {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
@@ -85,7 +88,8 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
         <span className="min-w-0 text-xs text-neutral-500">
-          Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}, from <code className="font-mono break-all">{workflow.dir}</code>
+          {inFolders ? 'Works in folders it makes for each step, with no git repository' : <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>}, from{' '}
+          <code className="font-mono break-all">{workflow.dir}</code>
           {card && ', and the card leaves the inbox'}.
         </span>
       </div>

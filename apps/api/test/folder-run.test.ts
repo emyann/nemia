@@ -57,6 +57,22 @@ fs.writeFileSync(path.join(root, 'runs', 'f-notes.json'), JSON.stringify({
   steps: { write: { taskId: 't-write', workspace: path.join(work, 'write'), branch: null } },
 }));
 
+// What the step left in its folder: the note it named in its closeout and the sketch it did not, a file of bytes, a directory,
+// a link that leads out of the folder, and a name the files route refuses. All but the first three are things the folder holds
+// that no name can reach, and the listing leaves them out.
+const wrote = path.join(work, 'write');
+const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
+fs.writeFileSync(path.join(wrote, 'note.md'), 'The tides.\n');
+fs.writeFileSync(path.join(wrote, 'sketch.png'), PNG);
+fs.writeFileSync(path.join(wrote, 'bundle.zip'), 'PK');
+fs.writeFileSync(path.join(wrote, '..hidden.md'), 'not reachable by name');
+fs.mkdirSync(path.join(wrote, 'scratch'), { recursive: true });
+fs.writeFileSync(path.join(root, 'runs', 'f-notes', 'outside.md'), 'outside the folder');
+fs.symlinkSync(path.join(root, 'runs', 'f-notes', 'outside.md'), path.join(wrote, 'link.md'));
+
+/** A word about git, which a person reading a folder run must not meet: it has no repository, no branch and nothing to merge. */
+const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|repo|git)\b/i;
+
 test('the runs list shows a folder run with no repository, and says its kind', async () => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
@@ -66,21 +82,38 @@ test('the runs list shows a folder run with no repository, and says its kind', a
   assert.equal(run.place, 'folder');
 });
 
-test("a folder run's detail has no repository, base, branch or isolation, and its step's folder", async () => {
+test("a folder run's detail has no repository, base, branch or isolation — where its work is instead, and its step's folder", async () => {
   const res = await app.request('/api/runs/f-notes');
   assert.equal(res.status, 200);
-  const run = (await res.json()) as Record<string, unknown> & { steps: { name: string; workspace: string | null; branch: string | null; status: string }[] };
+  const run = (await res.json()) as Record<string, unknown> & { steps: { name: string; workspace: string | null; branch: string | null; note: string | null; status: string }[] };
   assert.deepEqual([run.repo, run.baseRef, run.branch, run.isolate, run.place], [null, null, null, null, 'folder']);
+  // The one thing a person needs to find what it made, where a git run has a repository and a branch.
+  assert.equal(run.work, work);
   const [write] = run.steps;
   assert.deepEqual([write!.name, write!.workspace, write!.branch], ['write', path.join(work, 'write'), null]);
+  // And the sentences it carries — what the board reads out loud — name no git.
+  for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {
+    if (typeof said === 'string') assert.doesNotMatch(said, GIT_WORD, said);
+  }
 });
 
-test("a folder run's decision reads, with nothing to merge", async () => {
+test("a folder run's decision reads, with nothing to merge and nothing about git", async () => {
   const res = await app.request('/api/runs/f-notes/decision');
   assert.equal(res.status, 200);
-  const decision = (await res.json()) as { standings: unknown[]; touched: unknown[]; commands: unknown[] };
-  // No branch to stand against the base, none touched to diff, and no command to merge one.
-  assert.deepEqual([decision.standings, decision.touched, decision.commands], [[], [], []]);
+  const decision = (await res.json()) as {
+    standings: unknown[]; touched: unknown[]; sensitive: unknown[];
+    commands: { label: string; command: string; said: string | null }[];
+    lesson: { said: string }; overBudget: string | null;
+  };
+  // No branch to stand against a base, none touched to diff, and none read in full.
+  assert.deepEqual([decision.standings, decision.touched, decision.sensitive], [[], [], []]);
+  // What `wf decide` offers instead: the one command, and nothing to merge or delete (cli.ts, `!git`).
+  assert.deepEqual(decision.commands, [{ label: 'forget it', command: 'wf rm f-notes', said: 'forgets the run with its folders and files' }]);
+  // Every sentence the board shows out of this answer, read for a git word. The lesson line is about a branch's diff, so the board
+  // does not draw it for a folder run; it is checked here so a change that starts drawing it fails.
+  for (const said of [...decision.commands.flatMap((c) => [c.command, c.said ?? '']), decision.overBudget ?? '']) {
+    assert.doesNotMatch(said, GIT_WORD, said);
+  }
 });
 
 test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
@@ -105,4 +138,42 @@ test('REFUSED: POST /api/inbox files a card for a folder team with a repository 
   assert.match(error, /^--repo .*: this card's workflow has steps that say `workspace: folder`/);
   assert.match(error, /File the card without a repository, or name a workflow whose steps work on one\.$/);
   assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
+});
+
+test("a folder step carries every file its folder holds, by name, with its size and where the api serves it", async () => {
+  const run = (await (await app.request('/api/runs/f-notes')).json()) as { steps: { files: { path: string; name?: string; url?: string; kind?: string; size?: number }[] }[] };
+  const [write] = run.steps;
+  // In name order, and only what a name reaches: not the directory, not the link out of the folder, not the name the route refuses.
+  assert.deepEqual(write!.files, [
+    { path: path.join(wrote, 'bundle.zip'), name: 'bundle.zip', url: '/api/runs/f-notes/steps/write/files/bundle.zip', kind: 'other', size: 2 },
+    { path: path.join(wrote, 'note.md'), name: 'note.md', url: '/api/runs/f-notes/steps/write/files/note.md', kind: 'text', size: 11 },
+    { path: path.join(wrote, 'sketch.png'), name: 'sketch.png', url: '/api/runs/f-notes/steps/write/files/sketch.png', kind: 'image', size: PNG.length },
+  ]);
+});
+
+test("a folder step's file is served by name, and a name that is a path, or not in the folder, is refused", async () => {
+  const base = '/api/runs/f-notes/steps/write/files';
+
+  const note = await app.request(`${base}/note.md`);
+  assert.deepEqual(
+    [note.status, note.headers.get('content-type'), note.headers.get('cache-control'), note.headers.get('x-content-type-options'), await note.text()],
+    [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
+  );
+  // An agent's text on the board's origin runs no script of its, as a step's named file does not.
+  assert.ok((note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'));
+  assert.deepEqual(Buffer.from(await (await app.request(`${base}/sketch.png`)).arrayBuffer()), PNG);
+
+  // Every one of these names a file on disk: only the refusal stands between it and the response. An encoded `..` alone never
+  // reaches the route — a URL resolves it — so the path is spelled with the separator encoded instead.
+  for (const name of ['..%2Foutside.md', 'scratch%2Fnothing.md', 'a%5Cb.md', '..hidden.md']) {
+    const res = await app.request(`${base}/${name}`);
+    assert.equal(res.status, 400, name);
+    assert.match((await res.json() as { error: string }).error, /is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/, name);
+  }
+  // Not a regular file in the folder: absent, a directory, and a link that leads out of it.
+  for (const name of ['gone.md', 'scratch', 'link.md']) {
+    const res = await app.request(`${base}/${name}`);
+    assert.equal(res.status, 404, name);
+    assert.match((await res.json() as { error: string }).error, /has no file '.*' in its folder/, name);
+  }
 });

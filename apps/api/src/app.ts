@@ -4,7 +4,7 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
 import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
-import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
+import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
@@ -26,6 +26,8 @@ export type RunSummary = {
   repo: string | null;
   /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `workspace: folder`. */
   place: PlaceKind;
+  /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
+  work: string | null;
   brief: string;
   /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
   workflowDir: string;
@@ -343,6 +345,12 @@ export type RunDetail = {
   /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run, which has none of them. */
   repo: string | null;
   place: PlaceKind;
+  /**
+   * Where a folder run's work is: the directory its steps' folders are made under (`workRoot`), which is what a person is given in
+   * place of a repository and a branch — there is nothing to check out, and nothing to merge. Null on a git run, whose work is on
+   * its branch.
+   */
+  work: string | null;
   workflowDir: string;
   baseRef: string | null;
   branch: string | null;
@@ -392,6 +400,11 @@ export type RunDetail = {
     told: string | null;
     taskId: string | null;
     workspace: string | null;
+    /**
+     * For a step of a folder run, every file its folder holds now, each as `folderFiles` reads it: the whole of what it made, not
+     * only what its closeout named. Empty for a step of a git run, whose work is a branch to read, and for one not filed yet.
+     */
+    files: StepArtifact[];
     branch: string | null;
     status: string;
     /** As on `RunSummary`. */
@@ -512,7 +525,7 @@ export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
  * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
  * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
  */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
@@ -1016,6 +1029,7 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
     id: run.id,
     repo: run.repo ?? null,
     place: placeOf(run),
+    work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
     createdAt: run.createdAt,
@@ -1117,6 +1131,18 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
   return line;
 }
 
+/**
+ * The folder a step of a folder run works in, off the run's record (`folderPlace` made it): null for a step of a git run, which
+ * works on a branch, and for one the run has not filed yet, which has no folder.
+ */
+const workFolderOf = (run: Run, step: string): string | null => (isGitRun(run) ? null : (run.steps[step]?.workspace ?? null));
+
+/** Every file that folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. */
+function filesOf(run: Run, step: string): StepArtifact[] {
+  const dir = workFolderOf(run, step);
+  return dir ? folderFiles(run, step, dir) : [];
+}
+
 /** A try asked for, as the page says it (`StepAsked`). */
 const askedOf = (r: Retry | undefined): StepAsked | null =>
   r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null, stopFirst: r.stopFirst === true } : null;
@@ -1167,6 +1193,7 @@ async function detail(run: Run): Promise<RunDetail> {
     brief: run.brief,
     repo: run.repo ?? null,
     place: placeOf(run),
+    work: isGitRun(run) ? null : run.workspace,
     workflowDir: run.workflowDir,
     baseRef: run.baseRef ?? null,
     branch: run.branch ?? null,
@@ -1208,6 +1235,7 @@ async function detail(run: Run): Promise<RunDetail> {
         told: toldOf(run, name, source, views),
         taskId,
         workspace: run.steps[name]?.workspace ?? null,
+        files: filesOf(run, name),
         branch: run.steps[name]?.branch ?? null,
         note: judged.notes.get(name) ?? null,
         ...needs,
@@ -1482,7 +1510,7 @@ type AtGate = { step: string; back: string[] };
 /**
  * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each
  * step waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch —
- * which has nothing to merge, nor a branch to delete.
+ * which has nothing to merge, nor a branch to delete. A folder run has none of those: forget it, and nothing about git.
  *
  * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
  * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
@@ -1508,6 +1536,9 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: rea
       ];
     }),
   ];
+  // A folder run has no branch to ship or drop: its work stays where it is until a person is done with it, and forgetting it is the one
+  // command `wf decide` prints (cli.ts, `!git`).
+  if (!isGitRun(run)) return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
@@ -1707,6 +1738,15 @@ function taskOfStep(id: string, step: string): { run: Run; taskId: string | null
   }
   return { run, taskId: run.steps[step]?.taskId ?? null };
 }
+
+/** How a file a step wrote is served: never cached, never sniffed, and — an agent's text on the board's origin — never run. */
+const served = (type: string) => ({
+  'Content-Type': type,
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  // An SVG or an HTML file opened in a tab runs no script of its.
+  'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+});
 
 /** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-engine). */
 export type TranscriptEvent = Awaited<ReturnType<typeof e.transcript>>['events'][number];
@@ -2130,13 +2170,31 @@ export const app = new Hono()
         error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
       }, 404);
     }
-    return c.body(new Uint8Array(file.body), 200, {
-      'Content-Type': file.type,
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      // A step's file is an agent's text, served on the board's origin: an SVG opened in a tab runs no script of its.
-      'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
-    });
+    return c.body(new Uint8Array(file.body), 200, served(file.type));
+  })
+  // One file of a folder step's own folder, by name and never by path, as `files` on the step links it: what the step made,
+  // named in its closeout or not. Read on each request and never kept — the folder is the step's, and it may write in it again.
+  .get('/api/runs/:id/steps/:step/files/:name', (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const name = c.req.param('name');
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    const refused = refusedName(name);
+    if (refused) return c.json({ error: refused }, 400);
+    const dir = workFolderOf(found.run, step);
+    if (!dir) {
+      return c.json({
+        error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
+      }, 404);
+    }
+    const file = readFolderFile(dir, name);
+    if (!file) {
+      return c.json({
+        error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
+      }, 404);
+    }
+    return c.body(new Uint8Array(file.body), 200, served(file.type));
   })
   // A step's conversation, read once from a cursor: the engine's events for the step's current task, and whether it is live.
   .get('/api/runs/:id/steps/:step/transcript', async (c) => {

@@ -12,6 +12,8 @@ export type RunSummary = {
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
   place: PlaceKind;
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run. */
+  work: string | null;
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
@@ -242,6 +244,8 @@ export type RunDetail = {
   /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has none. */
   repo: string | null;
   place: PlaceKind;
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run, whose work is on its branch. */
+  work: string | null;
   workflowDir: string;
   baseRef: string | null;
   branch: string | null;
@@ -280,6 +284,11 @@ export type RunDetail = {
     told: string | null;
     taskId: string | null;
     workspace: string | null;
+    /**
+     * For a step of a folder run, every file its folder holds now — the whole of what it made, not only what its closeout named.
+     * Empty for a step of a git run, whose work is a branch, and for one not filed yet.
+     */
+    files: StepArtifact[];
     branch: string | null;
     status: string;
     /** As on `RunSummary`. */
@@ -405,7 +414,7 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
  * Mirrors `Standing` in apps/api/src/app.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it

@@ -27,7 +27,7 @@ its package half) — and the workflow builder's package half: a step rendered b
 (`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
 half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
 workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
-with no repository (`workspace: folder`, P2's first slice) — have shipped.
+with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — have shipped.
 
 ## Shipped: the check
 
@@ -3651,11 +3651,50 @@ the git words are not renamed. No change to `packages/agent-engine`: a task's `c
   a `git` first on PATH that fails and logs each call, and reads that none was made; one git team shows the stub records. The
   shipped folders' runs are pinned unchanged (`git-before-after.test.ts`).
 
-Not verified live: a `claude --bg` session filed in a folder that is not a git repository. The engine takes any `cwd`; no real
-session has run in one.
+**Verified live** in the second slice, on 2026-09-19 against Claude Code 2.1.278, in a scratch store under `/tmp` with no git
+repository anywhere: `workflows/note` ran unattended on `claude --bg`, `write` wrote `note.md` (2,394 bytes) in
+`runs/<id>/work/write` and the run collected it into the step's files, `review` continued the same folder and answered
+`verdict: holds`. Two steps, 59 seconds, $0.06, no prompt, and no git. `wf decide` offered `wf rm` and nothing to merge.
 
-**Next, in order:** (2) the inbox and the board start a folder team — a card needs no `repo:`; (3) a folder's lifetime — kept,
-cleaned, or none at all; (4) the Factory draws a run's workspace; (5) connections (P3), and a GitHub kind beside `folder`.
+There is no workspace-trust dialog, and no folder team needs `claude-detached`. What stopped the first attempt was the fence,
+not the folder: a fenced agent in a mode that *can* ask blocks for ever on the first call outside its fence, with nobody there
+to answer. `dontAsk` denies such a call with no prompt, and the session reads the refusal and carries on — so every step of a
+folder team must run in it, and a step that means to write in its own folder says `allow: Edit(**)`, which is what the shipped
+note agents were given (see the second slice, below).
+
+## Shipped: a folder team started and read from the board (P2, its second slice)
+
+The second slice of the same item: a person who never opens a terminal files an idea for a folder team, starts it, and finds what
+it made. Nothing here knows more than one kind of workspace — the record still says `place: { kind: 'folder' }`, and a GitHub kind
+beside it changes these readers and no more.
+
+- **A card for a folder team names no repository.** `addToInbox` refuses `repo:` when the card's workflow has a step that says
+  `workspace: folder`, in the words `wf start --repo` is refused in — one writer, so `wf inbox add` and the board's POST
+  `/api/inbox` are refused alike (`cardRepoRefusal`). A card *already* on disk is not refused, which would strand it: its `repo:`
+  is ignored, as it always was, and `wf start` now says so (`InboxStarted.ignoredRepo`).
+- **The board files none.** `/api/workflows` says which teams work in folders (`folderTeam`), so the Inbox's File box replaces the
+  Repository field with a line saying where the work goes, and sends no `repo:` — whatever was typed before the team was picked.
+- **Found with no repository in the picture.** `repoOf` resolves a path and never asks git, so the api pointed at a plain directory
+  that is no repository lists the store's own folder teams and files for them (`apps/api/test/folder-run.test.ts`). An api with
+  *no* repository to point at is the Factory-workspaces slice, and is not this one.
+- **Where the work is.** A run carries `work` — the directory under the store it makes its folders in — where a git run has a
+  repository, a base and a branch; each step of it carries `files`, every file its folder holds now, with its size and a url. Not
+  only what a closeout named: what is in the folder, named or not, which is the only way to see what a step left behind that it
+  forgot to name (`folderFiles`).
+- **Read on the board.** `GET /api/runs/<run>/steps/<step>/files/<name>` mirrors the artifacts route guard for guard: a name and
+  never a path, opened without following a link, served uncached, unsniffed and sandboxed. A text file opens in a tab; the run's
+  page and the Factory's card say `folders`, both paths copyable; the Decide section offers `wf rm` and nothing to merge; the Start
+  form drops the `--after` picker. **No git word** reaches a person reading a folder run — the api's test and the e2e's `folder`
+  page each sweep every sentence the board draws for one and refuse any.
+- **What the harness said last** is the session's own words: a brief, a `wf say` and every tool result come back as `user` events,
+  and the board read them back at the person as the reason the session stopped.
+- **Live** — see *Verified live*, above. What it cost to find: the fence, not the folder. Every step of a folder team must run in
+  `dontAsk`, refused at load otherwise (`validateFolderMode`); `allow:` gives a fenced step its own folder back, and must be an
+  `Edit` rule, since Claude Code matches no `Write(<path>)` against a file permission check.
+
+**Next, in order:** (3) a folder's lifetime — kept, cleaned, or none at all; (4) the Factory draws a run's workspace;
+(5) connections (P3), and a GitHub kind beside `folder`.
+
 ## Shipped: a node's outcome drawn, not printed — the Output tab
 
 The step inspector's Output tab printed a closeout: the summary, then each declared field as the JSON it came as. Now it opens on how

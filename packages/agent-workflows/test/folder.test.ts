@@ -378,6 +378,16 @@ test('REFUSED: a card with a repository queued onto a folder team — `--workflo
     assert.ok(refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), refused.message);
     assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
     assert.equal(fs.readFileSync(file, 'utf8'), text, 'refused before anything is written: the card is unqueued, and its workflow is its own');
+    // Taken OFF the queue with `--workflow` writes the key just the same (`queuedText`), so it is refused just the same. The card has to
+    // be queued for that write to happen — an unqueued card taken off the queue is left alone, whatever was passed — so it is queued
+    // first, on the team it names, which works on a repository.
+    assert.equal(queueInInbox('a-card-with-a-repo').was, 'queued');
+    const queued = fs.readFileSync(file, 'utf8');
+    const off = refusal(() => queueInInbox('a-card-with-a-repo', { off: true, workflow: TEAM }));
+    assert.equal(off.exitCode, 2);
+    assert.ok(off.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), off.message);
+    assert.equal(fs.readFileSync(file, 'utf8'), queued, 'and again nothing is written: the card is still queued, on its own team');
+    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
 
     // The two the guard must not take with it. A re-queue with no `--workflow` writes nobody's choice of team: the card is as a person
     // left it, there is no editing one from the board, and refusing it would strand it.
@@ -430,4 +440,56 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
 
   await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
+});
+
+test("a parent's regular file called `given` is its work, and reaches the step after it: only the run's own given/ directory stays behind", async () => {
+  // `b` has no parent, and this run is given no inputs, so the run makes no `given/` in b's folder: the name is free, and a step that
+  // wrote a FILE called that made work like any other — the board's listing already reads it so (`folderFiles`). Skipped by name alone,
+  // it was dropped from the copy the fan-in receives.
+  const run = start({ brief: 'two sides, one of them fond of a name', repo: NOT_A_REPO, workflowDir: FAN });
+  const { e, settle } = board();
+  const work = path.join(ROOT, 'runs', run.id, 'work');
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(work, 'b', 'given'), 'what b was given to understand\n');
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  assert.equal(fs.readFileSync(path.join(work, 'c', 'given', 'from', 'b', 'given'), 'utf8'), 'what b was given to understand\n');
+  await forget(e, run.id);
+});
+
+test("REFUSED: a step's given/ that is a link is never followed — filed again, nothing outside the folder is removed or written, and the pass says why", async () => {
+  // `<folder>/given` is the run's to empty and write each time the step is filed, and a step is filed twice after a send-back. A step
+  // that replaced it with a link out of its folder would have that filing remove and write wherever the link points.
+  const run = start({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN });
+  const { e, settle } = board();
+  const work = path.join(ROOT, 'runs', run.id, 'work');
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
+  for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['c']);
+  settle(`${run.id}-c`, 'succeeded', SIGNED);
+
+  // Somebody's directory outside the run, shaped as the copy is — `from/a/` inside it — so a followed link would empty it.
+  const outside = path.join(ROOT, 'outside-the-run');
+  fs.mkdirSync(path.join(outside, 'from', 'a'), { recursive: true });
+  fs.writeFileSync(path.join(outside, 'from', 'a', 'theirs.md'), 'not the run\'s to touch\n');
+  fs.rmSync(path.join(work, 'c', 'given'), { recursive: true });
+  fs.symlinkSync(outside, path.join(work, 'c', 'given'));
+
+  const record = readRun(run.id);
+  record.steps.c = sentBack(record.steps.c!);
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  let said = '';
+  let filed: string[] = [];
+  try {
+    const pass = await advance(e, readRun(run.id));
+    filed = pass.filed;
+    said = pass.notes.join('\n');
+  } catch (err) { said = (err as Error).message; }
+  assert.deepEqual(filed, [], 'c is not filed through a link');
+  assert.match(said, /given is a link, and `given\/` in a step's folder is the run's own/);
+  assert.match(said, /Remove or rename it/);
+  assert.equal(fs.readFileSync(path.join(outside, 'from', 'a', 'theirs.md'), 'utf8'), 'not the run\'s to touch\n', 'what the link points at is as it was');
+  assert.deepEqual(fs.readdirSync(path.join(outside, 'from', 'a')), ['theirs.md'], 'and nothing of the run was written there');
+  await forget(e, run.id);
 });

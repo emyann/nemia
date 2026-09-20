@@ -55,8 +55,29 @@ function copyGiven(from: string, to: string): void {
   fs.cpSync(from, to, {
     recursive: true,
     force: true,
-    filter: (src) => src !== skip && !fs.lstatSync(src).isSymbolicLink(),
+    // The source's own `given/` is a DIRECTORY the run made. A regular file a step wrote and called `given` is its work, as the board's
+    // listing already reads it (`folderFiles`), and is copied like any other.
+    filter: (src) => {
+      const at = fs.lstatSync(src);
+      return !at.isSymbolicLink() && !(src === skip && at.isDirectory());
+    },
   });
+}
+
+/**
+ * `<workspace>/given` is the run's own to empty and write, and every path `copyGiven` removes and copies to goes through it. A step that
+ * left a link there — or anything but a directory — would have the next filing of it remove and write wherever the link points, outside
+ * the folder: refused by name, as `writeWorkflow` refuses a link, and never followed. Nothing is removed, and the step is not filed.
+ */
+function ownGiven(workspace: string): void {
+  const at = path.join(workspace, GIVEN);
+  const found = fs.lstatSync(at, { throwIfNoEntry: false });
+  if (!found || (found.isDirectory() && !found.isSymbolicLink())) return;
+  const what = found.isSymbolicLink() ? 'a link' : 'not a directory';
+  throw Object.assign(new Error(
+    `${at} is ${what}, and \`${GIVEN}/\` in a step's folder is the run's own: it is emptied and written each time the step is filed, so it is never followed. ` +
+    `Remove or rename it — the step's own work belongs outside \`${GIVEN}/\` — and the next tick files the step.`,
+  ), { exitCode: 2 });
 }
 
 /**
@@ -79,6 +100,7 @@ export const folderPlace = (runs: string): Place => ({
     // (`givenPlan` in run.ts, which words the brief off the same plan). Nothing to copy, nothing made: a chain's folder is as it was.
     const given = givenPlan(run, plan);
     const notes: string[] = [];
+    if (given.inputs || given.from.length > 0) ownGiven(workspace);
     if (given.inputs) {
       copyGiven(inputsRoot(runs, run.id), path.join(workspace, given.inputs));
       notes.push(`${given.inputs}: the files wf start --input gave the run, copied in`);

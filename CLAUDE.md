@@ -276,6 +276,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   is on disk under that step's own cwd. A read inside cwd needs no `allow:` rule on any harness (measured by
   `note-reviewer`); a write needs `Edit(**)`. Reaching out instead would be a new field on the engine's task and a fresh live
   measurement (learned by the run that gave a folder step its `given/`).
+- **A key one function refuses is refused by every function that writes it, not by the one the comment names.**
+  `cardRepoRefusal`'s doc said `addToInbox` is the one writer of a card's `workflow:`, and `wf inbox queue --workflow` writes
+  it too: a card with `repo:` was queued onto a folder team, to start on a repository no step of it looks at. Before trusting
+  "one writer" in a comment, grep for the key (same run).
 - **A list a page turns into a sentence must carry everything the sentence is about.** The board says *the folder is empty* of an
   empty `files`, and `folderFiles` listed only what its route can serve by name: a step whose work went into `notes/` was reported
   to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it

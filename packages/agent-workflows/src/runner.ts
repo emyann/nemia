@@ -1566,9 +1566,11 @@ export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRu
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
  * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
  *
- * Refused where the card is written, `wf inbox add` and the board's Inbox alike (`addToInbox` is the one writer), in the words `wf start
- * --repo` is refused in: the same sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no
- * way to edit one from the board, and refusing its start would strand it — so its `repo:` is ignored and said (`InboxStarted.ignoredRepo`).
+ * Refused wherever a card's `workflow:` is written — `addToInbox` (`wf inbox add`, and the board's Inbox) and `queueInInbox`
+ * (`wf inbox queue --workflow`, which writes that key over the card's own) — in the words `wf start --repo` is refused in: the same
+ * sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no way to edit one from the
+ * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
+ * (`InboxStarted.ignoredRepo`).
  *
  * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
  * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
@@ -1643,6 +1645,13 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     const listing = readInbox();
     const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
     if (why) throw new WorkflowError(why);
+    // `--workflow` writes that key over the card's own, which makes this a writer of the pair a card's `repo:` is judged against, and it
+    // was not refusing: a card filed with a repository was queued onto a folder team, to start on a repository no step of it looks at.
+    // A re-queue with no `--workflow` is not refused — the card is as it was, and a card on disk cannot be edited from the board.
+    if (how.workflow !== undefined) {
+      const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });
+      if (refusedRepo) throw new WorkflowError(refusedRepo);
+    }
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
   // When the card was last written, to set back over the rename below: the card's filing time, as a board reads it.

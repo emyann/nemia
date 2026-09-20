@@ -1685,8 +1685,9 @@ function validateFolder(steps: readonly Workflow[]): void {
  * asks nobody — this file's own `allow:` refusal says exactly that to anyone who writes a rule list on codex — and the two widest allow
  * more, not less. So a codex folder team is not judged on this at all, and is not pushed off its sandbox to reach the widest mode.
  *
- * Every harness has a list here and a default below, held by `test/vocabulary.test.ts`: a harness added with neither would have every
- * folder team of its own refused, in another harness's words.
+ * Every harness has a list here and a default below, held by the loop over `HARNESSES` in `test/workflow.test.ts`: a harness added with
+ * neither would have every folder team of its own refused, in another harness's words. (`test/vocabulary.test.ts` holds the engine's own
+ * lists against this file's; the pair of lists below is the workflow test's.)
  */
 const UNASKING: Readonly<Record<string, readonly string[]>> = {
   claude: ['dontAsk', 'bypassPermissions'],

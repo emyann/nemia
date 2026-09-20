@@ -347,3 +347,37 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
 });
+
+test('REFUSED: a card with a repository queued onto a folder team — `--workflow` writes that key, so it is judged as the card\'s own writer is', async () => {
+  const cwd = process.cwd();
+  process.chdir(NOT_A_REPO);
+  try {
+    // `wf inbox queue <card> --workflow <w>` writes `workflow:` over the card's own, which makes it a writer of the pair `cardRepoRefusal`
+    // judges — and it was not asking. A card filed for a git team was queued onto a folder team, to start on a repository no step of it
+    // will ever look at, with nothing said anywhere.
+    const file = path.join(ROOT, 'inbox', 'a-card-with-a-repo.md');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const text = `---\nworkflow: ${GIT_TEAM}\nrepo: ${NOT_A_REPO}\n---\na change to make\n`;
+    fs.writeFileSync(file, text);
+    const refused = refusal(() => queueInInbox('a-card-with-a-repo', { workflow: TEAM }));
+    assert.equal(refused.exitCode, 2);
+    assert.ok(refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), refused.message);
+    assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
+    assert.equal(fs.readFileSync(file, 'utf8'), text, 'refused before anything is written: the card is unqueued, and its workflow is its own');
+
+    // The two the guard must not take with it. A re-queue with no `--workflow` writes nobody's choice of team: the card is as a person
+    // left it, there is no editing one from the board, and refusing it would strand it.
+    assert.equal(queueInInbox('a-card-with-a-repo').was, 'queued');
+    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
+    // And a card queued onto a team that works on a repository keeps on as before.
+    assert.equal(queueInInbox('a-card-with-a-repo', { workflow: GIT_TEAM }).was, 'queued');
+    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
+    // A card with no repository is queued onto the folder team, which is the whole point of the key.
+    fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card-with-none.md'), 'a note on tides\n');
+    assert.equal(queueInInbox('a-card-with-none', { workflow: TEAM }).was, 'queued');
+    assert.equal(queueInInbox('a-card-with-none', { off: true }).was, 'taken back');
+  } finally {
+    process.chdir(cwd);
+  }
+  assert.deepEqual(gitAsked(), []);
+});

@@ -3746,6 +3746,12 @@ The fix is a copy, and the brief names the copy.
   on disk — the assertion that keeps the brief and the fence from drifting apart in words. Beside it: the symlink and the parent's
   `given/` are not copied through, and `test/run.test.ts` holds the wording and the step with no `after`.
 
+Two small things from the same review, in the same files: `wf inbox queue <card> --workflow <folder team>` writes `workflow:` over
+a card, which makes it a writer of the pair `cardRepoRefusal` judges, and it was not asking — a card with `repo:` ended queued on a
+folder team. It refuses now, as `addToInbox` does, and a re-queue with no `--workflow` still goes through, since a card on disk
+cannot be edited from the board. And the comment above `UNASKING`/`DEFAULT_MODE` now names the test that actually holds them
+(`test/workflow.test.ts`'s loop over `HARNESSES`).
+
 ## Shipped: a node's outcome drawn, not printed — the Output tab
 
 The step inspector's Output tab printed a closeout: the summary, then each declared field as the JSON it came as. Now it opens on how

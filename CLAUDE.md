@@ -188,6 +188,21 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A fake engine's closeout is flat, as a harness writes it.** `parseCloseout` moves the fields beside `outcome` — a schema's
   `title`, `gist` — under `output`; a test that hands the fake an `output` already nested reads the step as `unsigned`, and the next
   step is never filed. Give the fake `{ ...SIGNED, title, gist }` (learned by the run that added `workspace: folder`).
+- **A session in a folder nobody has opened blocks for ever in any mode that can ask.** A `workspace: folder` step
+  works in a directory the run just made: no settings file, nothing trusted. The first call outside it — reading the
+  artifacts directory beside it, say — raises an ordinary permission prompt, `claude agents` reads the session
+  `blocked` with `waitingFor: 'permission prompt'`, and nobody is there to answer (thirty-one minutes in
+  `acceptEdits`, and `auto`, the engine's default, does the same). `dontAsk` denies the call with no prompt and the
+  session reads the refusal and carries on, so a folder team may run in no other mode (`validateFolderMode`). It is
+  not the workspace-trust dialog: a folder run does start unattended on `claude --bg` (measured on Claude Code
+  2.1.278, by the first live `note` run).
+- **A `Write(path)` allow rule is taken and never matched.** Claude Code matches a file write against `Edit` rules
+  alone, whatever tool made it, and an `Edit` rule covers Write and NotebookEdit with it. Given
+  `--allowedTools 'Write(**)'` it warns on a stderr nobody reads — *"is not matched by file permission checks — only
+  Edit(path) rules are"* — and denies the write: the shipped note writer, fenced by `dontAsk`, could not write its
+  own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
+  and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
+  (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

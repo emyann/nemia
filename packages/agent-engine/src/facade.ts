@@ -146,7 +146,7 @@ export type TaskSpec = {
    */
   disallowedTools?: string[];
   /**
-   * What the session may do without being asked, in Claude Code's permission rules — `['Write(**)', 'Edit(src/**)']`,
+   * What the session may do without being asked, in Claude Code's permission rules — `['Edit(src/**)', 'Bash(npm test)']`,
    * one rule per entry, a path glob resolved against the session's `cwd`. Claude Code is given the list as
    * `--allowedTools`, and a deny beats it. Absent or empty: only what the permission mode allows by itself, which in
    * `dontAsk` is reads inside the cwd and nothing that writes — measured on 2.1.278, and why a fenced session in a
@@ -413,7 +413,7 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
     return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
   }
   if (spec.allowedTools !== undefined && !(Array.isArray(spec.allowedTools) && spec.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
-    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Write(**)", "Bash(npm test)"].`;
+    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
   }
   const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
   if (mcp) return mcp;

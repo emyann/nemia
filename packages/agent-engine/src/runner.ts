@@ -1107,7 +1107,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
       // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
       // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
-      // so a fenced session that must write its own work is given `Write(**)`, a glob resolved against its `cwd`.
+      // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
       // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
       // lists above are, and a deny still beats it.
       ...(r.allowedTools?.length ? ['--allowedTools', r.allowedTools.join(',')] : []),

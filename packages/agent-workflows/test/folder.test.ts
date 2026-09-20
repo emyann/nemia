@@ -16,7 +16,7 @@ const GIT_ASKED = path.join(ROOT, 'git-asked');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 fs.mkdirSync(NOT_A_REPO, { recursive: true });
 fs.mkdirSync(TEAM, { recursive: true });
-fs.writeFileSync(path.join(TEAM, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Write(**)\n---\nwrite the note\n');
+fs.writeFileSync(path.join(TEAM, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite the note\n');
 fs.writeFileSync(path.join(TEAM, 'review.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nafter: write\n---\nreview the note\n');
 
 // A `git` that refuses and says so, first on PATH: anything that reaches for git during a folder run is written down.

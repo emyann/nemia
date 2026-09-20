@@ -12,11 +12,15 @@
  *   plan   the brief holds a planning word AND names three or more parts of the repository — the plan question's two
  *          halves, "leaves real design decisions open" and "changes several parts of the system together".
  *
- * **Tuned once, on the runs it is scored on, and that is the whole of it.** Over the owner's 74 dispatched runs on
- * 2026-09-19: `apps/web` alone scored P 0.71 R 1.00 on web and `apps/web` or `apps/api` P 0.68 R 1.00, and the wording's
- * two paths were kept over the better-scoring single one. On plan, the two halves joined by *or* fired on 69 of the 74
- * briefs (P 0.23 R 1.00, 15 of 74 whole folders right), so they were joined by *and* instead (P 0.23 R 0.75, 22 of 74).
- * Nothing else was changed, and no word was added or removed after a score. The README says the same.
+ * **Tuned once, on the runs it is scored on, and that is the whole of it.** One measurement, over the owner's 75
+ * dispatched runs on 2026-09-19, which the README reports the same numbers from:
+ *
+ *   web    `apps/web` alone P 0.74 R 1.00; `apps/web` or `apps/api` P 0.71 R 1.00. The wording's two paths were kept
+ *          over the better-scoring single one, because the question the judge is asked names both.
+ *   plan   the two halves joined by *or* fire on 69 of the 75 briefs (P 0.25 R 1.00, 18 of 75 whole folders right), so
+ *          they were joined by *and* instead: fires on 39 (P 0.28 R 0.65, 35 of 75).
+ *
+ * Nothing else was changed, and no word was added or removed after a score.
  */
 import { folderOf } from './card.ts';
 
@@ -38,11 +42,20 @@ export const PARTS_FOR_PLAN = 3;
 
 const WORD = new RegExp(`\\b(?:${PLANNING_WORDS.join('|')})\\b`, 'i');
 
-export const namesWeb = (brief: string): boolean => WEB_PATHS.some((p) => brief.includes(p));
+/**
+ * A path named as itself, not as the tail of a longer one. `workflows/` is the end of
+ * `packages/agent-workflows/src/run.ts`, which briefs write constantly, so a plain `includes` counted one path as two
+ * parts and the plan rule fired on briefs that name two. A part counts where nothing word-like runs into it.
+ */
+const pathIn = (path: string) => new RegExp(`(?<![\\w-])${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+
+const AT = Object.fromEntries([...WEB_PATHS, ...PARTS].map((p) => [p, pathIn(p)]));
+
+export const namesWeb = (brief: string): boolean => WEB_PATHS.some((p) => AT[p]!.test(brief));
 
 export const planningWord = (brief: string): boolean => WORD.test(brief);
 
-export const partsNamed = (brief: string): number => PARTS.filter((p) => brief.includes(p)).length;
+export const partsNamed = (brief: string): number => PARTS.filter((p) => AT[p]!.test(brief)).length;
 
 export type Guess = {
   readonly web: boolean;

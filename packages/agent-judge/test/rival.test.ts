@@ -44,6 +44,20 @@ test('the plan rule needs a planning word AND three parts; each half alone does 
   assert.equal(rival(`Decide it across ${PARTS[0]} and ${PARTS[1]}.`).plan, false, 'two parts is not three');
 });
 
+test('a part written as a brief writes it — a path — is one part, and `workflows/` is not its tail', () => {
+  // `workflows/` is the end of `packages/agent-workflows/src/run.ts`, which briefs write constantly. Counted by
+  // substring it made one path two parts, and the plan rule fired on briefs naming two.
+  assert.equal(partsNamed('Fix `packages/agent-workflows/src/run.ts`.'), 1);
+  assert.equal(partsNamed('Fix `packages/agent-workflows/src/run.ts` and `apps/web/src/Board.tsx`.'), 2);
+  assert.equal(rival('Decide how `packages/agent-workflows/src/run.ts` and `apps/web/src/Board.tsx` agree.').plan, false);
+  // The repository's own folder still counts, written any of the ways a brief writes it.
+  for (const said of ['the workflows/ folder', 'a step under workflows/dev', 'copy workflows/ui'])
+    assert.equal(partsNamed(said), 1, said);
+  assert.equal(partsNamed('Read workflows/dev, apps/web/src and packages/agent-engine/src/domain.ts.'), 3);
+  // And a path is still a path where a word runs up to it the other way round.
+  assert.equal(partsNamed('agent-workflows/src alone'), 0, 'a part named without its `packages/` is not that part');
+});
+
 test('every planning word is a word, not a fragment, and case does not matter', () => {
   for (const w of PLANNING_WORDS) assert.equal(planningWord(`We should ${w} it.`), true, w);
   assert.equal(planningWord('PLAN it'), true);

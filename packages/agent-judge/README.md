@@ -294,15 +294,20 @@ alone, so the judge's numbers have something to beat.
 - **plan** — the brief uses a planning word (plan, design, decide, propose, challenge, options,
   trade-off, and their forms, as whole words, any case) **and** names at least three of the five
   parts of the repository (`apps/web`, `apps/api`, `packages/agent-engine`,
-  `packages/agent-workflows`, `workflows/`).
+  `packages/agent-workflows`, `workflows/`), each counted once.
 
-Two things were tuned, once, on the runs it is scored on, and nothing else was: `apps/web` alone
-scored better on precision than the two paths together (0.71 against 0.68, both at recall 1.00) and
-was not taken, because the question the judge is asked names both; and the two halves of the plan
-rule were first joined by *or*, which fired on 69 briefs of 74 and got 15 folders of 74 right, so
-they were joined by *and*. The pivot plan's §2.3 reports a fair baseline at P 0.94 / R 0.91 on
-*web*, and that number is **not** comparable to these: it was measured against whether the branch
-ended up touching `apps/web`, and the label here is the folder a person picked beforehand.
+A part counts where it is named as itself: `workflows/` is the repository's own folder, not the tail
+of `packages/agent-workflows/src/run.ts`, which briefs write constantly.
+
+Two things were tuned, once, on the runs it is scored on, and nothing else was. `apps/web` alone
+scored better on precision than the two paths together (0.74 against 0.71, both at recall 1.00) and
+was not taken, because the question the judge is asked names both. And the two halves of the plan
+rule were first joined by *or*, which fires on 69 briefs of the 75 and gets 18 folders of 75 whole,
+so they were joined by *and*, which fires on 39 and gets 35. Every number here and below comes from
+that one measurement, over the 75 in-scope runs on 2026-09-19; `src/rival.ts` repeats it and nothing
+else. The pivot plan's §2.3 reports a fair baseline at P 0.94 / R 0.91 on *web*, and that number is
+**not** comparable to these: it was measured against whether the branch ended up touching
+`apps/web`, and the label here is the folder a person picked beforehand.
 
 Against the 75 runs dispatched by hand up to 2026-09-19, with the judge off:
 
@@ -318,16 +323,17 @@ web · does the work change apps/web or the api it runs against · the label is 
 
 plan · should someone read the code and plan first · the label is a dev-planned folder
   rival     label yes  label no
-    yes            13        41    P 0.24
-    no              4        17    R 0.76
+    yes            11        28    P 0.28
+    no              6        30    R 0.65
 
 the whole folder
-  rival   24 of 75 agree · 51 differ
+  rival   35 of 75 agree · 40 differ
 ```
 
-So a plain reading of the text finds the web app well and planning badly, and gets under a third of
-the folders whole. That is the bar the judge has to clear; whether it does is unmeasured until
-someone runs this with a key.
+So a plain reading of the text finds the web app well — it never misses one — and planning badly:
+it calls 39 briefs planning work where 17 were sent to a `dev-planned` folder, and misses 6 of
+those. Under half the folders come out whole. That is the bar the judge has to clear; whether it
+does is unmeasured until someone runs this with a key.
 
 ## What is sent
 
@@ -337,8 +343,9 @@ request body is `{ model, state, questions }`, and `test/live.test.ts` pins it f
 the repository. `judge runs` sends the same thing for each brief it scores — the brief with its
 frontmatter stripped, and that same fixed description — and nothing else off the run record: not its
 id, not the folder it ran on, not its workflow. A brief is usually longer than a card (those on this
-machine run to about 7,000 characters), so it says how many characters would go before it sends any,
-and asks for `--yes`.
+machine run to about 7,000 characters), so it says how many characters would go, and from how many briefs,
+before it sends any, and asks for `--yes`. It counts only the briefs with a question still to ask:
+one already answered is never sent again, and is not in the number.
 
 The service's base URL is fixed (`https://api.typesafe.ai`) and so is the SDK's log level (off). So
 `TYPESAFE_BASE_URL` and `TYPESAFE_LOG_LEVEL` in the environment cannot send the state elsewhere or

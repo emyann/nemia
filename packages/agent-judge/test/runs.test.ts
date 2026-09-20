@@ -147,7 +147,9 @@ test('one request per run in scope, carrying the brief and the fixed repository 
   assert.deepEqual(Object.keys(calls[0]!.body.questions), ['web', 'plan', 'clear', 'size']);
   assert.match(text, /^judge runs: 6 runs in scope, 6 skipped, of 12 records in /m);
   assert.match(text, /^ {2}24 of 24 questions would be asked; the rest are on record in /m);
-  assert.match(text, /^ {2}about \d+ characters of briefs would go to TypeSafe, with the fixed description of the repository and nothing else$/m);
+  const chars = RUNS.reduce((n, r) => n + r.brief.length, 0);
+  assert.match(text, new RegExp(`^ {2}about ${chars} characters would go to TypeSafe \u2014 6 of the 6 briefs, stripped of their frontmatter, ` +
+    'with the fixed description of the repository and nothing else$', 'm'));
   assert.match(text, /^ {2}TypeSafe's retention terms have not been read by this project: assume that what is sent may be kept\.$/m);
   assert.match(text, /^6 requests · 24 questions · 6000 input tokens · \d+ ms$/m);
 });
@@ -201,6 +203,24 @@ test('a second pass makes no request and reads the same tables off the record', 
   assert.match(again.text, /^0 requests · 0 questions · 0 input tokens · 0 ms$/m, 'and it cost nothing, as it said it would');
 });
 
+test('with a record part filled, only the briefs that still have a question to ask are counted as sent', async () => {
+  // The common case after the first pass: some briefs answered, some new. A person reads this number to decide whether
+  // to send, so it must not count a brief that is never sent again.
+  const store = fixture();
+  const record = tmp('runs');
+  const [answered, ...rest] = RUNS;
+  const s = stub(forCard);
+  await main(['card', '--text', answered!.brief, '--record', record], { env: ENV, out: () => {}, fetch: s.fetch, retries: 0 });
+  assert.equal(s.calls.length, 1, 'one brief is on record, asked through `judge card`: the two verbs share the record');
+
+  const { calls, text } = await run(['runs', '--store', store, '--record', record, '--yes']);
+  assert.equal(calls.length, 5, 'and `judge runs` asks nothing about it');
+  assert.match(text, /^ {2}20 of 24 questions would be asked; the rest are on record in /m);
+  const chars = rest.reduce((n, r) => n + r.brief.length, 0);
+  assert.match(text, new RegExp(`^ {2}about ${chars} characters would go to TypeSafe \u2014 5 of the 6 briefs, `, 'm'));
+  assert.ok(!text.includes(String(chars + answered!.brief.length)), 'the brief already on record is not in the count');
+});
+
 test('--json writes the same report whole, judgments and all', async () => {
   const store = fixture();
   const file = path.join(tmp('runs'), 'report.json');
@@ -237,11 +257,11 @@ test('what it would ask is counted without asking, and a failure on record is as
   const store = fixture();
   const record = tmp('runs');
   const briefs = readRuns(store).runs.map((r) => r.brief);
-  assert.equal(wouldAsk(record, briefs, false), 24);
+  assert.equal(wouldAsk(record, briefs, false).questions, 24);
   const failed = await run(['runs', '--store', store, '--record', record, '--yes'], [{ status: 500 }]);
   assert.match(failed.text, /^ {2}rival {3}5 of 6 agree/m, 'a pass that answered nothing still scores the rival');
-  assert.equal(wouldAsk(record, briefs, false), 0, 'a failure is a fact: nothing is asked again by itself');
-  assert.equal(wouldAsk(record, briefs, true), 24, 'and --reask would ask each of them again');
+  assert.equal(wouldAsk(record, briefs, false).questions, 0, 'a failure is a fact: nothing is asked again by itself');
+  assert.equal(wouldAsk(record, briefs, true).questions, 24, 'and --reask would ask each of them again');
   const kept = await run(['runs', '--store', store, '--record', record]);
   assert.equal(kept.calls.length, 0);
   const again = await run(['runs', '--store', store, '--record', record, '--reask', '--yes']);

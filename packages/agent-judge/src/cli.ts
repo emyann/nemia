@@ -43,20 +43,29 @@ export const defaultRecord = (env: Readonly<Record<string, string | undefined>>)
 
 /**
  * What a pass would send, counted without asking anything: the questions with nothing on record, and — with `--reask` —
- * those whose last asking failed. The key is computed by the code that would ask, so this is the same arithmetic the
- * ask does, and a second pass over the same store costs nothing and says so.
+ * those whose last asking failed, and the card texts that would travel with them. The key is computed by the code that
+ * would ask, so this is the same arithmetic the ask does, and a second pass over the same store costs nothing and says
+ * so. `sending` holds only the briefs with a question left: a brief every one of whose questions is answered is never
+ * sent again, and must not be counted in what a person is asked to consent to.
  */
-export const wouldAsk = (record: string, briefs: readonly string[], reask: boolean, now = Date.now()): number => {
-  let n = 0;
+export type Asking = { readonly questions: number; readonly sending: readonly string[] };
+
+export const wouldAsk = (record: string, briefs: readonly string[], reask: boolean, now = Date.now()): Asking => {
+  let questions = 0;
+  const sending: string[] = [];
   for (const brief of briefs) {
     const state = cardState(brief);
+    let n = 0;
     for (const question of Object.values(QUESTIONS)) {
       const key = keyOf(MODEL, question, state);
       const r = reading(key, readFacts(record, key), question, MODEL, now);
       if (r.status === 'none' || (reask && r.status === 'failed')) n++;
     }
+    questions += n;
+    // What travels is the stripped card, not the brief: that is what `cardState` puts in the request.
+    if (n > 0) sending.push(state.card as string);
   }
-  return n;
+  return { questions, sending };
 };
 
 /** A run's label, as a row carries it. The brief itself is not a row's: what is scored is the two properties. */
@@ -121,16 +130,17 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       const off = available(env) ? undefined : 'the judge is off: no TYPESAFE_API_KEY in the environment';
 
       // What it costs and what it sends, before anything is sent. `--yes` is needed only when a request would be made.
-      const asking = off ? 0 : wouldAsk(dir, runs.map((r) => r.brief), reask);
-      const characters = runs.reduce((n, r) => n + r.brief.length, 0);
+      const asking = off ? { questions: 0, sending: [] } : wouldAsk(dir, runs.map((r) => r.brief), reask);
+      const characters = asking.sending.reduce((n, card) => n + card.length, 0);
       out(`judge runs: ${runs.length} runs in scope, ${skipped.length} skipped, of ${read} records in ${root}`);
       if (off) out(`  ${off}; nothing would be sent, and only the rival is scored.`);
-      else out(`  ${asking} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
-      if (asking > 0) {
-        out(`  about ${characters} characters of briefs would go to TypeSafe, with the fixed description of the repository and nothing else`);
+      else out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
+      if (asking.questions > 0) {
+        out(`  about ${characters} characters would go to TypeSafe — ${asking.sending.length} of the ${runs.length} briefs, ` +
+          'stripped of their frontmatter, with the fixed description of the repository and nothing else');
       } else if (!off) out('  nothing would be sent: every answer is already on record.');
       out("  TypeSafe's retention terms have not been read by this project: assume that what is sent may be kept.");
-      if (asking > 0 && !yes) {
+      if (asking.questions > 0 && !yes) {
         return refuse('judge runs: nothing was sent. Read what it costs above, then run it again with --yes.');
       }
       out('');

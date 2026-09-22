@@ -279,7 +279,7 @@ session working again fills the slot another's end freed, and blocking again giv
 
 **What changed** (2026-09-16). The ceiling is counted per pool, not per harness. A harness declares the pool it is counted
 in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and is a pool of its own, under the name it is configured under, when
-it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-engine/src/runner.ts`), and so is the
+it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-engine/src/runner-claude-vocabulary.ts`), and so is the
 engine's `claudeDetached`, which names that pool, so no caller has to: agent-workflows passes the engine's harnesses and a
 `check`, and names none. Before, both ran Claude Code on one subscription and were counted apart, so a ceiling of 2 let
 four Claude Code sessions run. `test/pool.test.ts`, with fake `claude` and `codex`, at `createEngine()`'s own harnesses and
@@ -509,7 +509,7 @@ does anything to a background session, since workers run on the model's whole wi
   The control, a session that never compacted, agreed to the token (34,869 and 365). Its `costUsd` was right throughout: it
   is the `cost-state`'s own. **Fixed**: an attempt whose lines hold a `compact_boundary` takes its tokens from the
   `cost-state` the way it takes its cost — its own share of the total — and has none while no `cost-state` is written,
-  rather than a count missing its compactions (`transcriptUsage` in `src/runner.ts`). The `claude -p` session's transcript
+  rather than a count missing its compactions (`transcriptUsage` in `src/runner-claude-transcript.ts`). The `claude -p` session's transcript
   then read 1,327,896 input tokens, what its result's `modelUsage` said.
 
 **What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on

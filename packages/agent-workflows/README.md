@@ -18,6 +18,7 @@ wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
+wf prune            # the worktrees of runs that are over, with the space each frees; --yes removes them
 wf rm r-xyz          # it is over: its worktrees, record and files go; its branches stay
 wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
@@ -2030,6 +2031,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 |---|---|---|---|
 | `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
+| `runs/<id>.pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
 | `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry`, `wf round`, `wf approve`, `wf accept`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
@@ -2038,6 +2040,49 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | not touched |
 | `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
+
+## Freeing the space: `wf prune`
+
+A worktree is most of what a run leaves on disk — its `node_modules` alone was 1.1 GB — and it is the one
+thing of a finished run nobody reads again. `wf prune [<runId> ...]` removes the worktrees of runs that are
+over, and nothing else of them: the record, its asks, closeouts and cost, its branches, its files under
+`runs/<id>/` (artifacts and inputs), its check logs and the engine's tasks are all kept. The run stays on
+`wf ls` and the board as it ended.
+
+**It lists before it removes.** Without `--yes` it prints each run it would prune, each worktree with the
+space it holds (`du`, which does not follow the links a worktree's `node_modules` has into the main
+checkout), and the total, then `nothing removed`. At a terminal it asks, and removes on a `y`; anywhere
+else it removes only with `--yes`. With no run named it reads every run in the store: the runs not over
+are summed up on one line, a run with nothing to prune is not said, and the rest are listed. The tick never
+prunes: space is a person's call.
+
+**What it removes, and how:** each worktree git lists inside `worktrees/<id>/`, by `git worktree remove`,
+never `--force`, then `git worktree prune`. What git ignores (`node_modules`, `.e2e/`) goes with it, and
+nothing a link inside it points at. Unlike `wf rm`, it commits nothing: a worktree with changes no commit
+has is refused, not handed off.
+
+**What it refuses**, naming each reason and its fix, with exit 2:
+
+- **a run not over** — running, or with anything a pass would file. Pruning is not cancelling: `wf cancel`
+  first, then `wf prune` once what was in flight has settled.
+- **a hand-off still owed**: a step settled and no pass since, whose uncommitted work and files the hand-off
+  takes out of the worktree. Let a tick run first.
+- **a finished run not merged into its base**, unless `--unmerged`. Pruned, none of its steps can be tried
+  again, sent round, approved or accepted, and its branch is the one place its work is left. A cancelled
+  run needs no `--unmerged`: it could not be tried again anyway.
+- **a worktree that is dirty** (its files named), **locked** (with the `git worktree unlock`), or
+  **detached on a commit no branch holds** (with the `git switch -c` that keeps it).
+- **a folder run** (`workspace: folder`): its steps' folders are its work, kept until `wf rm`.
+- whatever `wf rm` refuses, and for the same reasons: a step waiting at its gate, an ask no pass has spent.
+
+**A pruned run is marked, and read as over.** `wf prune` writes `runs/<id>.pruned` — when, and each worktree
+with its size — before it removes anything, so a pass that reads the run mid-prune files nothing into a
+worktree about to go. The mark is a person's fact beside the record, composed on read as a cancellation is.
+`wf ls` prints `(pruned)` beside the run, `wf decide` says when and what it kept, and the board's run page
+has a `pruned` row. `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run, `wf decide`
+offers none of them, the run waits on nobody, and the tick files nothing for it, whatever ask is written
+by hand. `wf rm` still forgets it, the mark with it. A run pruned again — a worktree git refused the
+first time — is marked with the later time, and every worktree either prune removed.
 
 ## Choosing the model per step
 

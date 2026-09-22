@@ -18,7 +18,7 @@ prompt box: the steering channel's upper half), and six small items — `radius`
 in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
 file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
 settling it `failed` — and a step's `budget:`, with what a step and a run cost on `wf ls` and `wf decide` (plan §6 item 29, its
-workflow half), forgetting a run that is over (`wf rm`) — and an inbox of cards parked before they are started (`wf inbox`,
+workflow half), forgetting a run that is over (`wf rm`), and freeing a finished run's worktrees (`wf prune`) — and an inbox of cards parked before they are started (`wf inbox`,
 and its page on the board) — two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
 cards that start themselves (`wf inbox queue`) — and markdown rendered on the board, with a page for a card and for a step that
 explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — and
@@ -1864,6 +1864,45 @@ What it leaves:
 - **The board.** `apps/api` has no route to forget a run. A run forgotten from the terminal leaves the Factory's list, since it reads
   `listRuns`.
 - **A directory of worktrees with no record** is named, not removed: nothing says which repository holds them.
+
+## Shipped: freeing the space — `wf prune`
+
+`wf rm` frees a run's space only by forgetting it, and a finished run is still read: its closeouts, its cost, what it decided. A
+worktree is most of what a run leaves on disk and the one thing of it nobody reads again. Approved at the plan's gate as revised:
+worktrees only, `--unmerged` opt-in, no `--artifacts` (a run's files go only with `wf rm`), and a pruned run said on `wf decide`, `wf ls`
+and the run's page.
+
+What was built:
+
+- **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with each worktree's size (`du -sk`, which counts a link as a link)
+  and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
+  one line, and a run with nothing to prune is not said. The tick never prunes.
+- **The pure part, in run.ts.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished
+  run not merged, unless `--unmerged`; a hand-off owed (`handOffDue`); a worktree locked, detached on a commit no branch holds, or holding
+  changes no commit has. It also refuses whatever `forgetRefusal` refuses, with `wf prune` in its fixes. `prunedRefusal` is the one wording of why
+  `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run.
+- **`prune` in runner.ts** reads the run as `forget` does, finds the worktrees with `runWorktrees`, and removes them with
+  `git worktree remove`, never `--force`, then `git worktree prune`. It commits nothing, since a dirty worktree is refused.
+- **The mark, `runs/<id>.pruned`**, is a person's fact beside the record, composed on read as `.cancelled` is (`readRun`), stripped by
+  `rewriteRun`, and removed by `wf rm`. `mayFile` reads it before each filing, and `advance` skips the hand-off of a pruned run. `assess` drops
+  the asks of a pruned run, so a retry written by hand is neither due in `wf ls` nor `asked` on the board, and `listing` waits on nobody.
+- **The board.** The api carries `pruned` on a run's detail and offers no command in its Decide section; the run page has a `pruned`
+  row with when, what was removed and freed, and what was kept.
+
+Where it departs from the plan:
+
+- **A run other runs wait on is not held.** They read its record and branches, which stay; `forgetRefusal` is asked with no other runs.
+- **The mark is written before the removal**, so a pass that reads the run mid-prune files nothing into a worktree about to go. A prune
+  that removed nothing takes a new mark back.
+- **A running run gets one reason, `not over`**, rather than every reason `forgetRefusal` would name for it.
+
+Left for later:
+
+- **`--artifacts`**: a run's files under `runs/<id>/` (screenshots, the e2e's PNGs) are the other large thing a finished run keeps. A card
+  of its own; today they go only with `wf rm`.
+- **The board has no prune button**, and the Runs list and the Factory say nothing of a pruned run; only its page does.
+- **A cancelled run whose branch is not merged prunes without `--unmerged`**: nothing of it could be tried again anyway, but its branch is
+  still the one place its work is.
 
 ## Shipped: two small items from the plan's queue
 

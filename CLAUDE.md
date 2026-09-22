@@ -303,6 +303,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   folders and kept its state, so picking runs under a git workflow and then picking a folder team sent them anyway — and the api's
   refusal named a control no longer on the page. Send what the current choice takes, not what the state holds (`afterFor`, same
   round). The same for a field a form stops showing.
+- **A person's fact that stops a run's asks is read by `assess`, not only by the verbs and the tick.** The verbs refused a retry on a pruned
+  run and `mayFile` kept the tick from filing one, and `wf ls` still printed a retry written by hand as `try 2 asked — the next tick files
+  it`, and the board drew the run as moving: `listing` and the api read what is due off `assess`, not off the tick. A new marker beside
+  `.cancelled` goes into `assess` (and `listing`'s `waitingOnYou`), and its test asserts `wf ls` and the api say nothing is coming (learned
+  by the run that added `wf prune`).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { filesIn, sidebar, themeOf } from '../board.ts';
 import { drawEdge } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -63,7 +63,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const mine = card(refused, yours.name);
       await mine.getByRole('button', { name: 'Build', exact: true }).click();
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
@@ -108,7 +109,7 @@ export default {
       if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== '' || (await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '') {
         throw new Refused("and build's loop and rounds with it");
       }
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 422: PUT ${answered.url()}`;
       const seen = problems();
@@ -128,7 +129,8 @@ export default {
     const stale = await page.context().newPage();
     try {
       const { problems } = watch(stale);
-      await stale.goto(page.url(), { waitUntil: 'networkidle' });
+      await stale.goto(page.url(), { waitUntil: 'load' });
+      await idle(stale);
       const mine = card(stale, yours.name);
       await mine.getByRole('button', { name: 'Build', exact: true }).click();
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
@@ -157,7 +159,7 @@ export default {
       await expectVisible(builder.locator('.react-flow__node[data-id="plan"] dd', { hasText: /^test -f PLAN\.md$/ }), "plan's block shows the check written by hand");
       const body = await builder.locator('[data-step-form="plan"]').getByRole('textbox', { name: 'What it is told' }).inputValue();
       if (body !== 'Write PLAN.md.') throw new Refused(`plan's form reads the body on disk, and the change drawn is let go — it shows ${JSON.stringify(body)}`);
-      await stale.waitForLoadState('networkidle');
+      await idle(stale);
       const expected = `request answered 409: PUT ${answered.url()}`;
       const seen = problems();
       const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
@@ -183,7 +185,8 @@ export default {
       fs.mkdirSync(crewDir, { recursive: true });
       fs.writeFileSync(path.join(crewDir, 'build.md'), `---\nagent: ${agent}\ncheck: npm test\n---\nMind the cache.\n`);
       const { problems } = watch(crewed);
-      await crewed.goto(page.url(), { waitUntil: 'networkidle' });
+      await crewed.goto(page.url(), { waitUntil: 'load' });
+      await idle(crewed);
       await card(crewed, crew).getByRole('button', { name: 'Build', exact: true }).click();
       const builder = card(crewed, crew).locator(`section[data-builder="${crew}"]`);
       const keys = builder.locator('[data-step-form="build"]');
@@ -215,7 +218,7 @@ export default {
       await picker.selectOption('');
       await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
       await expectVisible(keys.getByRole('textbox', { name: 'What it is told' }), 'and its body is all it is told');
-      await crewed.waitForLoadState('networkidle');
+      await idle(crewed);
       if (problems().length) throw new Refused(`the agent's page saw nothing refused — it saw:\n    ${problems().join('\n    ')}`);
     } finally {
       await crewed.close();

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { themeOf } from '../board.ts';
 import { cardOf, cardsDrawn, expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -87,7 +87,8 @@ export default {
     const written = seedLongNames(store!, new Date(oldest - 60_000).toISOString());
     const card = cardOf(page, id);
     try {
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
       await expectVisible(card, `the run with the long names is on the floor (${id})`);
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
@@ -110,7 +111,8 @@ export default {
     } finally {
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
     }
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
     await expectCount(card, 0, 'with the run taken back, its card is gone');
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);

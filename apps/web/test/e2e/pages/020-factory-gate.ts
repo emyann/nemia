@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page, Response } from 'playwright';
 import { themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
-import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -37,7 +37,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       await expectVisible(answerOf(refused, 'Approve'), 'Approve on the card, on a page of its own');
       const listed = await (await refused.request.get(new URL('/api/runs', refused.url()).href)).text();
       await refused.route((url) => url.pathname === '/api/runs', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }));

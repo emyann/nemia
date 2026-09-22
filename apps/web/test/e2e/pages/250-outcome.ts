@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { sidebar, themeOf } from '../board.ts';
-import { expectCount, expectDrawn, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, REPO, store } from '../world.ts';
@@ -154,7 +154,8 @@ export default {
     await sidebar(page);
     const written = writeRun(store!);
     try {
-      await page.goto(new URL(`/runs/${OUTCOME.id}`, page.url()).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL(`/runs/${OUTCOME.id}`, page.url()).href, { waitUntil: 'load' });
+      await idle(page);
 
       const review = await outputOf(page, 'review');
       await expectVisible(review.locator('[data-outcome="done"][data-by="agent"]'), 'review opens on its outcome, done, said by the agent');
@@ -214,7 +215,8 @@ export default {
       await photograph(page, garbled, 'garbled');
     } finally {
       // Off the run first, so no poll of it asks for a run that is gone.
-      await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+      await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
     }
     await expectCount(page.locator(`a[href="/runs/${OUTCOME.id}"]`), 0, 'taken back: the run is gone from the list');

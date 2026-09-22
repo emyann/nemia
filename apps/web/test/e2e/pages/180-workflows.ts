@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator } from 'playwright';
 import { cancelledAt, nextVisit, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectInside, expectTexts, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DIAMOND, DIAMOND_RUNS, FAKE, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -71,7 +71,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const form = refused.locator(`section[aria-label="Workflow ${good.name}"]`);
       await form.getByRole('textbox', { name: 'Start a run' }).fill('Wait on a run that was called off');
       const pick = form.locator(`input[type="checkbox"][value="${DIAMOND.cancelled.id}"]`);
@@ -93,7 +94,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `start-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 422: POST ${answered.url()}`;
       const seen = problems();
@@ -124,7 +125,8 @@ export default {
       await links(again.locator(`section[aria-label="Workflow ${good.name}"]`), good.name).filter({ hasText: 'review' }).click();
       await again.waitForURL(`**/workflows/repo/${good.name}/review`, { timeout: WAIT_MS });
       await expectVisible(again.locator('h1', { hasText: /^review$/ }), "a step's link opens the step's page");
-      await again.goBack({ waitUntil: 'networkidle' });
+      await again.goBack({ waitUntil: 'load' });
+      await idle(again);
       const block = again.locator(`section[aria-label="Workflow ${good.name}"] .react-flow__node[data-id="implement"]`);
       await expectVisible(block, 'back on the Workflows page, the graph');
       await block.click();

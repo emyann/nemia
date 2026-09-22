@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectCount, expectTexts, expectVisible, Refused, watch } from './checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
 import { API, store } from './world.ts';
 
@@ -25,9 +25,10 @@ export async function nextVisit(page: Page, check: (again: Page) => Promise<void
   const again = await page.context().newPage();
   try {
     const { problems } = watch(again);
-    await again.goto(page.url(), { waitUntil: 'networkidle' });
+    await again.goto(page.url(), { waitUntil: 'load' });
+    await idle(again);
     await check(again);
-    await again.waitForLoadState('networkidle');
+    await idle(again);
     const seen = problems();
     if (seen.length) throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
   } finally {

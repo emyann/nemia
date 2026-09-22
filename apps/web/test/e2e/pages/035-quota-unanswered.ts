@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -20,7 +20,8 @@ export default {
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows a good reading first: the last one, to keep in sight');
     try {
       fs.writeFileSync(file, recordedUsage('unanswered'));
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
       const line = page.locator('[data-quota="unanswered"]');
       await expectVisible(
         line.filter({ hasText: /^Claude Code is signed in to a subscription \(max\), but Anthropic's usage service gave it nothing this time\. The service may be limiting how often it is asked/ }),
@@ -45,7 +46,8 @@ export default {
     } finally {
       fs.writeFileSync(file, written);
     }
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again, and no last reading');
     await expectCount(page.locator('[data-quota-last]'), 0, 'no last reading beside a fresh one');
   },

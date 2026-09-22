@@ -2391,7 +2391,7 @@ export function roundAsk(
 }
 
 /** Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing or empty. */
-const acceptWordsRefusal = (message: string | undefined, command: string): string | null => (
+export const acceptWordsRefusal = (message: string | undefined, command: string): string | null => (
   message === undefined
     ? `--message says why the work is good enough with its findings open, and is what the steps after the loop are handed — the shipper, and whoever reads the merge, have nothing else. Say it: ${command} --message "<why>".`
     : !message.trim()

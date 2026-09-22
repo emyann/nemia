@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, runStartedAt, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
-import { acceptanceOf, addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
+import { accept, answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, runStartedAt, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
+import { acceptanceOf, acceptWordsRefusal, addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -1546,7 +1546,9 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 /**
  * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
  * past a cap — after the colon and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
- * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer.
+ * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer — which
+ * the board also presses itself, through `POST /api/runs/:id/steps/:step/accept`, reading the step off this command (`acceptStepOf` in
+ * apps/web/src/lib/decide.ts).
  *
  * A verb this does not know is not dropped: `commandsOf` falls back to the whole English sentence, which the board then offers as a
  * command to copy and run. So an offer worded in the package goes in here in the same change (CLAUDE.md).
@@ -1922,6 +1924,20 @@ const approveGuard = (id: string, step: string): Guarded => ({
   shape: APPROVE_SHAPE,
 });
 
+/** The body `POST …/accept` takes: `wf accept`'s `--message`, as JSON — required, as the command line requires it. */
+const ACCEPT_SHAPE = '`{ "message": "<why>" }`';
+
+/** An acceptance of a loop out of rounds, as the guard's refusals word it (guard.ts). */
+const acceptGuard = (id: string, step: string): Guarded => ({
+  route: `POST /api/runs/${id}/steps/${step}/accept`,
+  does: 'accepts the work of a loop out of rounds as it stands',
+  forAnother: 'accept one',
+  why: 'the next tick files what waits on a loop a person accepts, and the words given with it go into the brief of every step after the loop, which an agent acts on in this repository',
+  reach: "accept it from the run's page on the board",
+  instead: `Accept it from the run's page on the board, or with \`wf accept ${id} ${step} --message "<why>"\``,
+  shape: ACCEPT_SHAPE,
+});
+
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The body `POST …/say` takes: the words, as `wf say` takes them. */
@@ -2192,6 +2208,43 @@ export const app = new Hono()
       const said = err instanceof Error ? err.message : String(err);
       if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json({ error: `Could not approve step '${step}': ${said}. \`wf approve ${id} ${step}\` approves the same way from the command line.` }, 502);
+    }
+  })
+  // The board's fifth write: a person's acceptance of a loop out of rounds, as it stands, through the package's `accept()` — `wf accept`'s own —
+  // which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again: false`.
+  // Guarded as an approval is (guard.ts). Refused in the package's words, verbatim: words that are missing or empty (`acceptWordsRefusal`,
+  // 422) before the run is read, and a loop that may not be accepted (`acceptAsk`, 409) after — a step with no `loop:`, a round the run files
+  // itself or one already asked for, a loop that ended `again: false`, a try already accepted, a run called off. The api judges none of it.
+  .post('/api/runs/:id/steps/:step/accept', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const refused = refusedBeforeReading(acceptGuard(id, step), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/accept takes a JSON body: ${ACCEPT_SHAPE}.` }, 400);
+    }
+    if (!isObject(body)) return c.json({ error: `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.` }, 400);
+    const { message } = body;
+    if (message !== undefined && typeof message !== 'string') {
+      return c.json({
+        error: `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`wf accept ${id} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(message)}: ${ACCEPT_SHAPE}.`,
+      }, 400);
+    }
+    const words = acceptWordsRefusal(message, `wf accept ${id} ${step}`);
+    if (words) return c.json({ error: words }, 422);
+    try {
+      const { acceptance, file } = await accept(e, id, step, message);
+      // Accepted, and not yet done: what waits on the loop is filed by the next tick, as it is for an acceptance given at the command line.
+      return c.json({ step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file }, 202);
+    } catch (err) {
+      const said = err instanceof Error ? err.message : String(err);
+      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
+      return c.json({ error: `Could not accept ${step}'s loop as it stands: ${said}. \`wf accept ${id} ${step} --message "<why>"\` accepts the same way from the command line.` }, 502);
     }
   })
   // A step's session output as text, for `wf logs` parity. The board reads the conversation from the transcript routes below.

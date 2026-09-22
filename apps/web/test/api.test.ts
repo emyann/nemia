@@ -299,6 +299,28 @@ test("a raise is posted as JSON beside the try's mode, or with the round's step,
   ]);
 });
 
+const { acceptLoop } = await import('../src/lib/api.ts');
+
+test("an acceptance is posted as JSON to the looping step's route with the words as typed, and resolves with what the package wrote; a refusal rejects with the package's words, verbatim, and an answer without the acceptance says so", async (t) => {
+  const at = '2026-09-22T10:00:00.000Z';
+  let answer = () => answered(202, { step: 'review', try: 3, at, message: 'Good enough.', file: '/store/runs/r 1.asks/accept-review-3' });
+  const sent = starting(t, () => answer());
+  assert.deepEqual(await acceptLoop('r 1', 'review', { message: 'Good enough.' }), { step: 'review', try: 3, at, message: 'Good enough.', file: '/store/runs/r 1.asks/accept-review-3' });
+
+  const words = "review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself.";
+  answer = () => answered(409, { error: words });
+  await assert.rejects(acceptLoop('r-1', 'review', { message: 'Good enough.' }), (err: Error) => err.message === words);
+  answer = () => answered(202, { ok: true });
+  await assert.rejects(acceptLoop('r-1', 'review', { message: 'Good enough.' }), (err: Error) =>
+    /^POST \/api\/runs\/r-1\/steps\/review\/accept answered 202 .*without the acceptance it wrote/.test(err.message) && /before accepting again/.test(err.message));
+
+  assert.deepEqual(sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]), [
+    ['/api/runs/r%201/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+    ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+    ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+  ]);
+});
+
 test("REFUSED: a run's detail without its gate — who it waits on in wf ls's words, or a step's need and gate — naming what is missing and the fix; an api started before the board approved a step", async (t) => {
   const gated = { name: 'plan', tries: [], said: [], timeline: [], approve: 'approve plan', gate: { awaiting: true, approval: null } };
   const refuses = (what: string) => (err: Error) =>

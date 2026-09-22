@@ -1,9 +1,9 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
-import { askRound, askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
+import { acceptLoop, askRound, askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
-import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
+import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { CopyButton } from './CopyButton';
 import { Facts, pathRow, readRows } from './Facts';
@@ -41,8 +41,9 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
-          What <code>wf decide {runId}</code> shows. The board runs none of its commands: copy one to run it yourself. An answer given
-          here asks for a try as <code>wf retry</code> does, or a round as <code>wf round</code> does; each row says what the tick does with it.
+          What <code>wf decide {runId}</code> shows. Copy a command to run it yourself; the board runs one of them, accepting a loop's work
+          as it stands with your reason, as <code>wf accept</code> does. An answer given here asks for a try as <code>wf retry</code> does, or a
+          round as <code>wf round</code> does; each row says what the tick does with it.
         </p>
       </div>
       {children}
@@ -53,7 +54,7 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
 /**
  * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and the
  * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
- * here. `offers` go first.
+ * here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first.
  */
 export function DecideSection({ runId, decision, offers = null, run = null }: { runId: string; decision: Decidable; offers?: ReactNode; run?: Pick<RunDetail, 'place' | 'work'> | null }) {
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
@@ -91,7 +92,7 @@ export function DecideSection({ runId, decision, offers = null, run = null }: { 
         <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
-      <Commands commands={commands} />
+      <Commands runId={runId} commands={commands} />
     </DecideFrame>
   );
 }
@@ -458,6 +459,21 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
   });
 }
 
+/**
+ * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the list the
+ * Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a key of its own.
+ */
+function useAccept(runId: string, step: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (how: { message: string }) => acceptLoop(runId, step, how),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+    },
+  });
+}
+
 /** An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it. */
 function useRound(runId: string) {
   const queryClient = useQueryClient();
@@ -669,29 +685,97 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
   );
 }
 
-/** Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one. */
-export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
+/**
+ * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but `wf accept`, which a
+ * person who never opens a terminal has no other way to give: its row also takes their reason and presses it (`AcceptCommand`).
+ */
+export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">Commands — copy one to run it; the board runs none</h3>
+      <h3 className="text-xs font-medium text-neutral-500">Commands — copy one to run it; the board runs only accept, with your reason</h3>
       {commands.length ? (
         <ul className="space-y-2">
-          {commands.map((c) => (
-            <li key={`${c.label} ${c.command}`} data-command={c.label} className="space-y-0.5">
-              {c.said && <p className="text-xs text-neutral-500">{c.said.replace(`:  ${c.command}`, '')}</p>}
-              <div className="flex items-center gap-2">
-                <span className="w-16 shrink-0 text-xs text-neutral-500">{c.label}</span>
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-neutral-100 px-2 py-1 font-mono text-xs dark:bg-neutral-950">
-                  {c.command}
-                </code>
-                <CopyButton text={c.command} />
-              </div>
-            </li>
-          ))}
+          {commands.map((c) => {
+            const accepts = acceptStepOf(c, runId);
+            return accepts ? (
+              <AcceptCommand key={`${c.label} ${c.command}`} runId={runId} step={accepts} command={c} />
+            ) : (
+              <li key={`${c.label} ${c.command}`} data-command={c.label} className="space-y-0.5">
+                <CommandLine command={c} />
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-sm text-neutral-500">None yet: the run is still moving.</p>
       )}
     </section>
+  );
+}
+
+/** A command's words, then its label, the command and the button that copies it. */
+function CommandLine({ command: c }: { command: DecideCommand }) {
+  return (
+    <>
+      {c.said && <p className="text-xs text-neutral-500">{c.said.replace(`:  ${c.command}`, '')}</p>}
+      <div className="flex items-center gap-2">
+        <span className="w-16 shrink-0 text-xs text-neutral-500">{c.label}</span>
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-neutral-100 px-2 py-1 font-mono text-xs dark:bg-neutral-950">
+          {c.command}
+        </code>
+        <CopyButton text={c.command} />
+      </div>
+    </>
+  );
+}
+
+/**
+ * `wf accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the button
+ * waits for it — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls the package's `accept()`.
+ * What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api has it, what the tick does with it,
+ * until the run is read again and the loop is offered no more.
+ */
+export function AcceptCommand({ runId, step, command }: { runId: string; step: string; command: DecideCommand }) {
+  const [message, setMessage] = useState('');
+  const field = useId();
+  const accept = useAccept(runId, step);
+  return (
+    <li data-command={command.label} data-step={step} className="space-y-2">
+      <div className="space-y-0.5">
+        <CommandLine command={command} />
+      </div>
+      {accept.isSuccess ? (
+        <p data-accepted className="pl-18 font-mono text-xs">
+          try {accept.data.try} of {step} accepted as it stands — what waits on it is filed on the next tick
+        </p>
+      ) : (
+        <form
+          aria-label={`Accept ${step} as it stands`}
+          // Under the command, past its label (w-16 and the row's gap-2).
+          className="space-y-2 pl-18"
+          onSubmit={(event) => {
+            event.preventDefault();
+            // As typed, as `--message` takes it: words that are only whitespace are the package's to refuse, in its words.
+            accept.mutate({ message });
+          }}
+        >
+          <label htmlFor={field} className="sr-only">
+            {`Why ${step}'s work is good enough as it stands`}
+          </label>
+          <textarea
+            id={field}
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            rows={3}
+            placeholder="Why the work is good enough with its findings open (required): every step after the loop is handed it."
+            className={TEXTAREA}
+          />
+          <button type="submit" disabled={accept.isPending || !message.trim()} className={BUTTON}>
+            {accept.isPending ? 'Accepting…' : 'Accept as it stands'}
+          </button>
+          {accept.isError && <Refusal error={accept.error} not="Not accepted" />}
+        </form>
+      )}
+    </li>
   );
 }

@@ -431,7 +431,7 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 /** Mirrors `Lesson` in apps/api/src/app.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
-/** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
+/** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints. The board runs one of them itself, `accept` (`acceptLoop`). */
 export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
@@ -1214,6 +1214,32 @@ export async function approveStep(runId: string, step: string, how: { message?: 
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the approval it wrote, so the api and this board disagree about what approving answers. ` +
         `The approval may be written: look at the step (\`wf decide ${runId}\`) before approving again, and restart the api (\`npm run dev\`).`,
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Accept the work of a loop out of rounds as it stands, as `wf accept` does — with `message`, `--message`, why the work is good enough with its
+ * findings open, which every step after the loop is handed, and which the package requires: the api calls the package's `accept()`, which
+ * writes the acceptance and nothing else, and the next tick files what waits on the looping step. Resolves with the step, the try accepted,
+ * when, the words and the acceptance's file; rejects with the api's refusal in full — the package's words for words missing or empty, or for a
+ * loop that may not be accepted — or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of it, as of an approval. Going round once more is `askRound`.
+ */
+export async function acceptLoop(runId: string, step: string, how: { message: string }): Promise<{ step: string; try: number; at: string; message: string; file: string }> {
+  const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/accept`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
+  const body = (await res.json().catch(() => undefined)) as { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.step === 'string' && typeof body.try === 'number' && typeof body.at === 'string') {
+    return { step: body.step, try: body.try, at: body.at, message: String(body.message), file: String(body.file) };
+  }
+  if (res.ok) {
+    // Written, it may well be: look before accepting again.
+    throw new Error(
+      `POST ${route} answered ${res.status} ${res.statusText} without the acceptance it wrote, so the api and this board disagree about what accepting answers. ` +
+        `The acceptance may be written: look at the looping step (\`wf ls ${runId}\`) before accepting again, and restart the api (\`npm run dev\`).`,
     );
   }
   throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);

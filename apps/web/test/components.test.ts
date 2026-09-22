@@ -1183,6 +1183,29 @@ test('the Decide section puts the answers first, before what there is to decide,
   assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
+test("the Decide section's accept row takes a reason and presses it; every other row still only copies", () => {
+  const decision = {
+    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    total: { usage: null, used: 'not measured', cost: 'not measured' },
+    commands: [
+      { label: 'once more' as const, command: 'wf round r-1 review', said: null },
+      { label: 'accept' as const, command: 'wf accept r-1 review --message "<why>"', said: 'review: enough — go on with what is there:  wf accept r-1 review --message "<why>"' },
+    ],
+  };
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision })));
+  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
+  const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
+  assert.match(row, /data-step="review"/);
+  assert.match(row, /<code[^>]*>wf accept r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
+  assert.match(row, /<form aria-label="Accept review as it stands"/);
+  const label = /<label for="([^"]+)"[^>]*>Why review&#x27;s work is good enough as it stands<\/label>/.exec(row);
+  assert.ok(label, row);
+  assert.match(row, new RegExp(`<textarea id="${label[1]}"`));
+  // Blank, the button waits for a reason, as `wf accept` waits for `--message`.
+  assert.match(row, /<button type="submit" disabled=""[^>]*>Accept as it stands<\/button>/);
+  assert.deepEqual([.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
+});
+
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
   const answer = 'Postgres, the one in docker-compose.yml.';
   const answered = threeTries.map((t) => ({ ...t, answer: t.try === 2 ? answer : null }));

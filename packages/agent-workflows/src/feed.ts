@@ -201,6 +201,21 @@ export function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>
 }
 
 /**
+ * Whether the feed was cut under a reader at `cursor`, in words — or undefined, when the cursor is still one of this file's: it was deleted, a
+ * file was put in its place (`ino`, the inode the cursor was read in), or it is shorter than the cursor or has no line boundary there
+ * (`feedCursorRefusal`): truncated, and perhaps written again. A feed truncated and written past the cursor again, a line ending just there,
+ * is not seen: nothing on disk tells it from the same feed grown.
+ */
+function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs.Stats | undefined): string | undefined {
+  if (cursor === 0) return undefined;
+  const from = `reading the feed there is now from its start — a line said before may be said again`;
+  if (!stat) return `the feed was deleted under this watch at cursor ${cursor} (${file}): ${from}`;
+  if (ino !== undefined && stat.ino !== ino) return `the feed was replaced under this watch at cursor ${cursor} (${file}): ${from}`;
+  if (feedCursorRefusal(file, cursor) !== undefined) return `the feed was truncated under this watch at cursor ${cursor}, and is ${stat.size} bytes now (${file}): ${from}`;
+  return undefined;
+}
+
+/**
  * Follow the feed from `from`: every line already there, then each as it is written, in order and at least once, until `stop()`.
  *
  * As the engine's `watch` follows its own: pushed by `fs.watch` on the directory the feed is in, and backed by a timer, so an event the OS
@@ -210,21 +225,33 @@ export function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>
  * Each line comes with its cursor: the byte just after it, where a reader that has taken that line and no other resumes — so a follower
  * that hands each line on (the api's stream, an event's id) can be picked up after the last line it handed on, not after the last read.
  *
- * A cursor that cannot be read from is refused before anything is watched (`feedCursorRefusal`, exit 2); an error after that — a feed
- * truncated under the watcher, a file that could not be opened this beat — goes to `onError`, and the watch goes on. `onRead` hears of
- * each read that works, before the lines it found are handed on, and whether it found any: so a follower that said a read failed can
- * say it works again on the next beat that reads, not only when the next line is written.
+ * A cursor that cannot be read from is refused before anything is watched (`feedCursorRefusal`, exit 2); an error after that — a file that
+ * could not be opened this beat — goes to `onError`, and the watch goes on. `onRead` hears of each read that works, before the lines it
+ * found are handed on, and whether it found any: so a follower that said a read failed can say it works again on the next beat that reads,
+ * not only when the next line is written.
+ *
+ * **A feed cut under the watch** — deleted, truncated, or replaced by another file — leaves the cursor pointing into a file that is not the
+ * one it was handed out by (`feedCut`). Given `onCut`, the watch says so there once, in words, and reads on from the start of the feed there
+ * is now. From the start and not from its end: a cut feed is one the tick has no fold of, so its next pass writes every run's words again
+ * (`recordFeedFile`) — the lines a watcher that lost its place needs, and they would be skipped from the end, as would every transition
+ * written between the cut and the watch noticing it. The cost is a line the watcher had before may be said again, which at least once
+ * already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's stream
+ * does, and a reader opens it again from the feed it has now.
  */
-export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError, onRead }: {
+export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError, onRead, onCut }: {
   from?: number;
   onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
   intervalMs?: number;
   onError?: (e: unknown) => void;
   onRead?: () => void | Promise<void>;
+  /** The feed was cut under the watch, in words (`feedCut`): the watch reads on from 0, the start of the feed there is now. */
+  onCut?: (said: string) => void | Promise<void>;
 }): { stop(): void } {
   const refusal = feedCursorRefusal(file, from);
   if (refusal) throw refused(refusal);
   let cursor = from;
+  // The file the cursor was read in, by inode: one put in its place is another feed, whatever its size.
+  let ino = statOf(file)?.ino;
   let stopped = false;
   let draining = false;
   let again = false;
@@ -240,6 +267,16 @@ export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_0
       do {
         again = false;
         for (;;) {
+          if (onCut) {
+            const stat = statOf(file);
+            const cut = feedCut(file, cursor, ino, stat);
+            ino = stat?.ino;
+            if (cut) {
+              cursor = 0;
+              await onCut(cut);
+              if (stopped) return;
+            }
+          }
           const got = readEnds(file, cursor);
           if (stopped) return;
           await onRead?.();

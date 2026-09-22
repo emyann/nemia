@@ -810,7 +810,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       console.log(`watching from ${from}, ^C to stop`);
       // For ever: the watch holds the process open until ^C, as \`wf up\` does.
       return new Promise<void>(() => {
-        watchFeed({ from, onLine: (line) => console.log(feedLineWords(line)), onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`) });
+        // A feed cut under the watch is said once, and followed from the start of the feed there is now (`watchFeedFile`).
+        watchFeed({
+          from, onLine: (line) => console.log(feedLineWords(line)),
+          onCut: (said) => console.error(`wf watch: ${said}`),
+          onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`),
+        });
       });
     }
 

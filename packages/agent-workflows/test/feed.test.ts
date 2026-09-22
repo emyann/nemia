@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { feedPhase, feedWords, listing } from '../src/run.ts';
@@ -348,6 +348,87 @@ test("a watch hands each line on with its own cursor: the byte after it, in byte
   }
   assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
   assert.equal(got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1, true, "the torn line's bytes are counted into the next line's cursor");
+});
+
+test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
+  emptyStore();
+  const b = board();
+  const run = started('the cut');
+  await tick(b.e);
+  // A real `wf watch`, since it never returns: its process is killed at the end. Its engine is never asked anything.
+  const cli = new URL('../src/cli.ts', import.meta.url).href;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`], {
+    env: { ...process.env, WF_ROOT: ROOT }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  let err = '';
+  child.stdout.on('data', (d) => { out += d; });
+  child.stderr.on('data', (d) => { err += d; });
+  /** Wait until `ok` holds of what the watch printed, under a bound of seconds: for what it counts, never a length of time. */
+  const printed = async (ok: () => boolean, what: string) => {
+    const bound = Date.now() + 10_000;
+    while (!ok()) {
+      if (Date.now() > bound) throw new Error(`${what} — stdout:\n${out}\nstderr:\n${err}`);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  };
+  const cuts = () => err.split('\n').filter((l) => l.includes('under this watch'));
+  try {
+    await printed(() => out.includes('watching from'), 'the watch starts');
+
+    // Truncated to nothing: said once, and the watch reads the feed the tick writes again from its start — the transition among it.
+    fs.truncateSync(FEED, 0);
+    await printed(() => cuts().length === 1, 'the truncation is said');
+    assert.match(cuts()[0]!, /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+    await tick(b.e);
+    await tick(b.e);
+    await printed(() => /\splan\s+awaiting approval/.test(out), 'the gate reached after the cut is delivered');
+
+    // Deleted: the same.
+    const before = out.length;
+    fs.rmSync(FEED);
+    await printed(() => cuts().length === 2, 'the deletion is said');
+    assert.match(cuts()[1]!, /the feed was deleted under this watch/);
+    await approve(b.e, run.id, 'plan');
+    for (let i = 0; i < 2; i++) await tick(b.e);
+    await printed(() => /\splan\s+(?!awaiting)/.test(out.slice(before)), 'the approval after the deletion is delivered');
+
+    // Replaced by another file of the same bytes and more: nothing about its size tells, its inode does.
+    const at = out.length;
+    const next = `${FEED}.next`;
+    fs.writeFileSync(next, `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`);
+    fs.renameSync(next, FEED);
+    await printed(() => out.slice(at).includes('r-new'), 'the replacement is read');
+    assert.equal(cuts().length, 3);
+    assert.match(cuts()[2]!, /the feed was replaced under this watch/);
+
+    // Once each: every beat after reads on, and says nothing more — no `past the end`, ever.
+    const quiet = err;
+    fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
+    await printed(() => out.includes('r-last'), 'the line after is delivered');
+    assert.equal(err, quiet, 'nothing more said');
+    assert.doesNotMatch(err, /past the end|falls inside a line/);
+  } finally {
+    child.kill();
+  }
+});
+
+test('REFUSED: a watch not told what to do about a cut feed refuses to read it, on every beat — the api ends its stream on that', async () => {
+  emptyStore();
+  const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
+  fs.writeFileSync(FEED, `${line}\n${line}\n`);
+  const errors: Error[] = [];
+  const watch = watchFeed({ from: size(), intervalMs: 20, onLine: () => {}, onError: (e) => { errors.push(e as Error); } });
+  try {
+    fs.truncateSync(FEED, 0);
+    const bound = Date.now() + 5_000;
+    while (errors.length < 2) {
+      assert.ok(Date.now() < bound, `refused ${errors.length} times in 5s`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assert.ok(errors.every(refusedWith(/is past the end of the feed/)), errors.map((e) => e.message).join('\n'));
+  } finally { watch.stop(); }
 });
 
 test('a watch says each read that works, before the lines it found and whether or not it found any, and no read that fails', async (t) => {

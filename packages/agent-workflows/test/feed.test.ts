@@ -22,7 +22,7 @@ const FEED = path.join(ROOT, 'feed.jsonl');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_RUNS;
-const { approve, cancel, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } = await import('../src/runner.ts');
+const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -323,6 +323,31 @@ test('`wf feed` prints each line and the cursor to read on from; `wf watch` foll
   fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-after', word: 'running' })}\n`);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
+});
+
+test("a watch hands each line on with its own cursor: the byte after it, in bytes not characters, where a reader resumes with the lines after it and no other", async () => {
+  emptyStore();
+  const line = (run: string, word: string, note?: string) => JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word, ...(note ? { note } : {}) });
+  // A note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody.
+  fs.writeFileSync(FEED, [line('r-a', 'running'), line('r-a', 'awaiting approval', 'round 2 — asked — approve it'), '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo', line('r-b', 'running'), line('r-a', 'done')].map((l) => `${l}\n`).join(''));
+  const whole = readFeed(0);
+  assert.equal(whole.lines.length, 4);
+
+  const got: { line: FeedLine; cursor: number }[] = [];
+  let arrived: () => void = () => {};
+  const all = new Promise<void>((resolve) => { arrived = resolve; });
+  const watch = watchFeed({ intervalMs: 20, onLine: (l, cursor) => { got.push({ line: l, cursor }); if (got.length >= whole.lines.length) arrived(); } });
+  try {
+    await Promise.race([all, new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000))]);
+  } finally { watch.stop(); }
+
+  assert.deepEqual(got.map((g) => g.line), whole.lines, 'every line, once, in order');
+  for (const [i, { cursor }] of got.entries()) {
+    assert.equal(feedCursorRefusal(cursor), undefined, `line ${i}'s cursor is one the feed takes`);
+    assert.deepEqual(readFeed(cursor).lines, whole.lines.slice(i + 1), `from line ${i}'s cursor, the lines after it and no other`);
+  }
+  assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
+  assert.equal(got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1, true, "the torn line's bytes are counted into the next line's cursor");
 });
 
 test('`wf --help` names wf feed and wf watch, and says which feed is whose', async (t) => {

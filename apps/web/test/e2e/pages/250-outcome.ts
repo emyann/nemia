@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -218,6 +218,8 @@ export default {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      // Said on the feed, as the tick says a run gone from the store: the list follows the feed, and polls once a minute beside it.
+      fed(OUTCOME.id, 'removed');
     }
     await expectCount(page.locator(`a[href="/runs/${OUTCOME.id}"]`), 0, 'taken back: the run is gone from the list');
   },

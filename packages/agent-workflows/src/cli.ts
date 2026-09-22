@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -39,6 +39,10 @@ const HELP = `wf — run a workflow of agent steps
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured
+  wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
+                               step's word as wf ls says it, and what a person's word changed — then
+                               cursor: <n>, to read on from with wf feed <n>; from the start with none
+  wf watch [cursor]            the same, followed as the tick writes it, until ^C
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
                                forget runs that are over, a line each: a run's worktrees removed
@@ -139,8 +143,9 @@ what, who may drive it, for how long and for how much. Everything else the agent
                      slot, oldest first; a run waiting on --after counts once it is filed; a run of a
                      one-step workflow that says slot: none is not counted and never waits for one
 
-To follow what the engine is doing, use the engine — a run's task ids carry the run and the step,
-so its output already names the work. Point it at this board:
+wf watch follows what the workflow decides: a step at its gate, one blocked, a run waiting on another,
+done. To follow what the engine does under it — each attempt started, ended, settled — use the engine:
+a run's task ids carry the run and the step, so its output already names the work. Point it at this board:
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
@@ -547,6 +552,17 @@ function acceptHow(argv: string[]): { stepName?: string; message?: string } {
   return { ...(stepName !== undefined ? { stepName } : {}), ...(message !== undefined ? { message } : {}) };
 }
 
+/**
+ * The cursor `wf feed` and `wf watch` read from: 0 when none is given, a whole number of bytes otherwise, and nothing more. Whether the feed
+ * has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
+ */
+function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
+  if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) {
+    usage(`wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`);
+  }
+  return argv[0] === undefined ? 0 : Number(argv[0]);
+}
+
 /** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
 export async function main(argv: string[], e: ReturnType<typeof engine> = engine()): Promise<void> {
   const [verb, ...rest] = argv;
@@ -689,7 +705,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
     case 'tick': {
       // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
-      const { runs: results, queue } = await tick(e, { repo: path.resolve('.') });
+      const { runs: results, queue, feedError } = await tick(e, { repo: path.resolve('.') });
+      if (feedError) console.error(feedError);
       if (queue) console.log(queueLine(queue));
       if (!results.length && !queue) return console.log('no runs');
       for (const r of results) {
@@ -716,9 +733,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // told. So the daemon goes by what it has said itself, not by what the store has written: `again` is not read here. Nothing is
       // decided on it — a pass decides what it decides, and this is only what has been printed.
       let said: string | undefined;
+      // And the feed's failure, said once until it changes, the same way: a feed that cannot be written fails every pass alike.
+      let feedSaid: string | undefined;
       for (;;) {
         // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
-        const { runs: passed, queue } = await tick(e, { repo: path.resolve('.') });
+        const { runs: passed, queue, feedError } = await tick(e, { repo: path.resolve('.') });
+        if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
+        feedSaid = feedError;
         if (queue) {
           // A pass at a full cap reads no queue at all (`tick`), so the first pass that does is the first that can say anything.
           const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
@@ -734,6 +755,24 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
         await new Promise((r) => setTimeout(r, every));
       }
+    }
+
+    case 'feed': {
+      const { lines, cursor } = readFeed(feedCursor('feed', rest));
+      for (const line of lines) console.log(feedLineWords(line));
+      // Last, and always: where to read on from, as `ae feed` ends.
+      return console.log(`cursor: ${cursor}`);
+    }
+
+    case 'watch': {
+      const from = feedCursor('watch', rest);
+      const refusal = feedCursorRefusal(from);
+      if (refusal) usage(refusal);
+      console.log(`watching from ${from}, ^C to stop`);
+      // For ever: the watch holds the process open until ^C, as \`wf up\` does.
+      return new Promise<void>(() => {
+        watchFeed({ from, onLine: (line) => console.log(feedLineWords(line)), onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`) });
+      });
     }
 
     case 'ls': {

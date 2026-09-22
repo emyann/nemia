@@ -921,8 +921,11 @@ export function heldRuns(runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { i
   return held;
 }
 
+/** A run the cap holds, in the words the feed keeps of it (`feedWords`): the count in flight is left to `wf ls`. */
+const SLOT_WAIT = 'waiting for a run slot';
+
 /** A run the cap holds, as `wf ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`. */
-export const slotWord = (slot: RunSlot): string => `waiting for a run slot (${slot.inFlight} of ${slot.cap} in flight)`;
+export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**
  * The daemon's two ceilings, as `wf up` says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude` with `claude-detached`,
@@ -3969,6 +3972,47 @@ const gateNote = (run: Pick<Run, 'id'>, step: string, back: readonly string[]): 
  */
 export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));
+
+// ─── what the feed says ─────────────────────────────────────────────────────
+
+/** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
+export type FeedSaid = { word: string; note?: string };
+
+/** What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run. */
+export type FeedWords = { run: FeedSaid; steps: Array<FeedSaid & { name: string }> };
+
+/**
+ * The engine's word for a task, as the feed keeps it: every word of a session at work — `running (working)`, `running (idle)`,
+ * `working (quiescent)`, `starting`, `between attempts` — is `running`, and every other word is itself. Pure.
+ *
+ * A session's live state moves between those words on its own, many times a step, and nothing of the run's judgement moves with it: a
+ * feed that wrote each would write a line every few passes for every step at work, and a watcher waiting for a gate would read through
+ * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human` and the settled
+ * words are kept: each is something the run decides on.
+ */
+export const feedPhase = (word: string): string =>
+  word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
+
+/**
+ * What the feed says of a run as a pass judged it: the listing `wf ls` prints (`listing`, handed the engine's words through `feedPhase`),
+ * in the feed's words. Pure.
+ *
+ * Each step's word is its status on `wf ls`, and its note the note beside it there — the try due or on, the gate and what answers it, how
+ * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. The run's word
+ * is `assess`'s status, `(pruned)` beside it as `wf ls` says it, and its note who it waits on you for (`onYouWords`).
+ *
+ * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
+ * moves with every other run's start and end while nothing of this one does.
+ */
+export function feedWords(l: Listing, run: Pick<Run, 'pruned'>, status: Assessment['status']): FeedWords {
+  const onYou = onYouWords(l);
+  return {
+    run: { word: `${status}${run.pruned ? ' (pruned)' : ''}`, ...(onYou.length ? { note: `waiting on you: ${onYou.join(', ')}` } : {}) },
+    steps: l.steps.map((s) => ({
+      name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(s.note ? { note: s.note } : {}),
+    })),
+  };
+}
 
 /**
  * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read, by

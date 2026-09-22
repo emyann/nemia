@@ -39,6 +39,11 @@ import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCa
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { folderPlace, inputsRoot, workRoot } from './places.ts';
 import { acceptanceOf, spentAcceptances, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { feedPhase, feedWords, type FeedWords } from './run.ts';
+import { feedCursorRefusal as cursorRefusalIn, freshMemo, readFeedFile, recordFeedFile, watchFeedFile, type FeedLine, type FeedMemo } from './feed.ts';
+export { feedLineWords, REMOVED } from './feed.ts';
+export type { FeedLine } from './feed.ts';
+export type { FeedSaid, FeedWords } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Pruned, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1928,6 +1933,8 @@ function failedWords(err: unknown, lines = 4): string {
 export type Advanced = {
   run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[];
   inFlight: boolean; held?: RunSlot;
+  /** What the pass judged of the run and of each step, in the words the feed keeps (`feedWords`): what `tick` writes where they changed. */
+  feed: FeedWords;
 };
 
 /**
@@ -2097,6 +2104,13 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
+  // What the pass judged, as `wf ls` words it, for the feed (`recordFeed`) — worded here, off what this pass read before it filed anything: a
+  // step filed below has no view on this pass, and would read `unknown`. So a step's filing reaches the feed a pass late, as the engine's
+  // `pending`. Off the same reads as the judgement, and nothing read again: the feed only reports what the pass decided on.
+  const feed = feedWords(listing(
+    steps, run, (taskId) => feedPhase(engineWord(views)(taskId)), (name) => closeoutOf(views, run, name), asked, verdictOf, asks, roundAsks,
+    readAnswers(run.id), waiting, saidCount(views, run), spendOf, held, [], checkout, waitingOf(views),
+  ), run, status);
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
   // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
@@ -2390,6 +2404,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
     inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
+    feed,
   };
 }
 
@@ -2712,7 +2727,11 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
 }
 
 /** One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything (`startQueued`). */
-export type Pass = { runs: Advanced[]; queue?: QueueStarted };
+export type Pass = {
+  runs: Advanced[]; queue?: QueueStarted;
+  /** Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed to decide. */
+  feedError?: string;
+};
 
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon.
@@ -2740,8 +2759,43 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
     if (advanced.inFlight) counted++;
   }
   const queue = slotFree({ inFlight: counted, cap }) ? startQueued(repo, runs) : undefined;
-  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}) };
+  // Last, and apart: what the pass judged, written where it changed. A feed that cannot be written costs the report, never the pass.
+  let feedError: string | undefined;
+  try {
+    recordFeed(new Map(runs.map((run) => [run.id, done.get(run.id)!.feed])));
+  } catch (err) {
+    feedError = `the feed (${feedFile()}) was not written on this pass: ${(err as Error).message}`;
+  }
+  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}) };
 }
+
+// ─── the feed ───────────────────────────────────────────────────────────────
+
+/** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the tick alone. */
+export const feedFile = (): string => path.join(HOME, 'feed.jsonl');
+
+/** This process's fold of the feed, as far as it has read it: a restarted daemon starts from none, and reads the feed once. */
+const feedMemo: FeedMemo = freshMemo();
+
+/**
+ * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`), and the lines
+ * written. `now` is every run the pass read: one the feed still names that is not in it is gone, and gets its `removed`. `memo` is for a
+ * test, which starts one afresh to be a restarted daemon.
+ */
+export const recordFeed = (now: ReadonlyMap<string, FeedWords>, { at = new Date().toISOString(), memo = feedMemo }: { at?: string; memo?: FeedMemo } = {}): FeedLine[] =>
+  recordFeedFile(feedFile(), now, at, memo);
+
+/** A fold of nothing, for a test that plays a restarted daemon. */
+export const freshFeedMemo = freshMemo;
+
+/** The feed's lines after `after`, and the cursor to read on from (`readFeedFile`): a cursor inside a line, or past the end, is refused by name. */
+export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => readFeedFile(feedFile(), after);
+
+/** Why `after` cannot be read from — or undefined when it can (`feedCursorRefusal` in feed.ts). */
+export const feedCursorRefusal = (after: number): string | undefined => cursorRefusalIn(feedFile(), after);
+
+/** Follow the feed from `from` until `stop()` (`watchFeedFile`): refused before anything is watched when the cursor cannot be read from. */
+export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
@@ -2768,6 +2822,16 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
 }
 
 /**
+ * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:
+ * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `wf ls`
+ * prints beside a step, and what the feed words it from (`feedPhase`).
+ */
+const engineWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string => {
+  const v = views.get(taskId);
+  return v?.state.brief ? v.phase : 'unknown';
+};
+
+/**
  * What `wf ls` shows for one run — the pure call, over one read of each task.
  *
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the
@@ -2779,17 +2843,11 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
   // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
   const { asks, rounds } = readAsks(run.id);
-  // The engine's own word, but `unknown` for a task it has no record of, as `phaseOfView` has it: the engine folds
-  // that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight.
-  const wordOf = (taskId: string): string => {
-    const v = views.get(taskId);
-    return v?.state.brief ? v.phase : 'unknown';
-  };
   // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
   const standings = standingsOf(run);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views));
+  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views));
 }
 
 /**

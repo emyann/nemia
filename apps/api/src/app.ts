@@ -378,6 +378,12 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   startedAt: string | null;
   cancelledAt: string | null;
+  /**
+   * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record and
+   * files are kept, so the rest of the page reads as before; what it no longer offers is anything that would work in a worktree. Null for a
+   * run never pruned.
+   */
+  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }> } | null;
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
@@ -1249,6 +1255,7 @@ async function detail(run: Run): Promise<RunDetail> {
     createdAt: run.createdAt,
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
+    pruned: run.pruned ? { at: run.pruned.at, worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })) } : null,
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
@@ -1665,7 +1672,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
+  // None for a pruned run: each would work in a worktree `wf prune` removed, and the verb refuses it (`prunedRefusal`), as `wf decide` offers none.
+  const offers = run.pruned ? [] : [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
   // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — with the steps its send-back
   // names (`sendBackTo`), which is what `wf decide` prints under the step. The word is `listing`'s, as `needsOf` reads it for the verb.
   const gates: AtGate[] = steps

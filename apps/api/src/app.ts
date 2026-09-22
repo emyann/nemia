@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
+import { answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, runStartedAt, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
 import { acceptanceOf, addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -32,6 +32,11 @@ export type RunSummary = {
   /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
   workflowDir: string;
   createdAt: string;
+  /**
+   * When the run started (`runStartedAt`): its first task's filing, off the engine's feed — for a run started `--after` runs, or held for a
+   * run slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is filed.
+   */
+  startedAt: string | null;
   cancelledAt: string | null;
   /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
   after: string[];
@@ -370,6 +375,8 @@ export type RunDetail = {
   branch: string | null;
   isolate: boolean | null;
   createdAt: string;
+  /** As on `RunSummary`. */
+  startedAt: string | null;
   cancelledAt: string | null;
   /** As on `RunSummary`. */
   after: string[];
@@ -1040,7 +1047,7 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
   return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
-async function summarize(run: Run, views: Views): Promise<RunSummary> {
+async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, string>): Promise<RunSummary> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
@@ -1052,6 +1059,7 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
     brief: run.brief,
     workflowDir: run.workflowDir,
     createdAt: run.createdAt,
+    startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
     waiting: judged.waiting,
@@ -1116,8 +1124,9 @@ function acceptedOf(run: Run, step: string): StepAcceptance | null {
 
 /**
  * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
- * time, and the wait for a slot is filing → first attempt. Read on from the cursor on each detail — a filing is written once and never
- * changes — so a page polled every five seconds reads what was appended since. A read's cache: a fresh process reads the feed from the start.
+ * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor on
+ * each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
+ * since. A read's cache: a fresh process reads the feed from the start.
  */
 const filings = { filed: new Map<string, string>(), cursor: 0 };
 
@@ -1225,7 +1234,8 @@ async function detail(run: Run): Promise<RunDetail> {
   const used = consumption(views, run);
   // Off the same views — every task in the store, so every try's — and the feed's filing times: no observation either.
   // And the steps the run is judged by, whose loops its rounds are of.
-  const clock = timeline(run, views, await filedTimes(), steps);
+  const filed = await filedTimes();
+  const clock = timeline(run, views, filed, steps);
   return {
     id: run.id,
     brief: run.brief,
@@ -1237,6 +1247,7 @@ async function detail(run: Run): Promise<RunDetail> {
     branch: run.branch ?? null,
     isolate: run.isolate ?? null,
     createdAt: run.createdAt,
+    startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
@@ -2012,10 +2023,13 @@ export const app = new Hono()
     // the two reads would show as `unknown` until the next poll.
     //
     // A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed.
+    //
+    // And the feed's filing times, once, read on from where the last read stopped (`filedTimes`): when each run started.
     const runs = listRuns();
     const views = await everyView();
+    const filed = await filedTimes();
     const summaries: RunSummary[] = [];
-    for (const run of runs) summaries.push(await summarize(run, views));
+    for (const run of runs) summaries.push(await summarize(run, views, filed));
     return c.json(summaries);
   })
   // The cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory says over its floor.

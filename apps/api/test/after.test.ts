@@ -95,8 +95,14 @@ writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i');
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
 
+// The feed, as the engine appends to it: b-running and i-started were filed an hour and more after they were created, as a run started
+// `--after` runs is, once they ship. a-shipped's and x-gone's filings are not on it, as in a store from before the feed.
+const filedB = '2026-09-14T01:10:00.000Z';
+const filedI = '2026-09-14T01:40:30.000Z';
+fs.writeFileSync(path.join(root, 'engine', 'feed.jsonl'), [['t-b', filedB], ['t-i', filedI]].map(([taskId, at]) => `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`).join(''));
+
 type Listed = {
-  id: string; after: string[]; status: string; moving: boolean; waitingOnYou: string[];
+  id: string; after: string[]; status: string; moving: boolean; waitingOnYou: string[]; createdAt: string; startedAt: string | null;
   waiting: { runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>; word: string; advice: string; onYou: boolean } | null;
   steps: Array<{ name: string; status: string }>;
 };
@@ -178,6 +184,21 @@ test("a run's detail carries the same `after`, `waiting` and `moving`", async ()
     const listed = runs.get(id)!;
     assert.deepEqual({ after: detail.after, waiting: detail.waiting, moving: detail.moving }, { after: listed.after, waiting: listed.waiting, moving: listed.moving }, id);
     assert.deepEqual(detail.steps.map((s: { status: string }) => s.status), listed.steps.map((s) => s.status), id);
+  }
+});
+
+test("a run started when its first task was filed, off the engine's feed, not when it was created — on the list and the detail alike; nothing filed, not started", async () => {
+  const runs = await listedRuns();
+  const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
+  assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-shipped for an hour: that hour is not time at work');
+  assert.deepEqual(started('i-started'), [at, filedI]);
+  // Started, and its filing not on the feed: when it was created, the only time there is.
+  assert.deepEqual(started('a-shipped'), [at, at]);
+  // Waiting on runs, whether they may still ship or never will, or with its parents shipped and the tick yet to file it: not started.
+  for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled']) assert.equal(runs.get(id)!.startedAt, null, id);
+  for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
+    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
   }
 });
 

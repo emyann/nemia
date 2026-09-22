@@ -13,7 +13,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskView } from 'agent-engine';
-import type { RetryHow, Run, TaskPhase } from '../src/run.ts';
+import type { Run, TaskPhase } from '../src/run.ts';
+import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));

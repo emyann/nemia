@@ -226,6 +226,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   package's root, so a grep for `from '…/runner.ts'` misses it and only the other package's suite fails, reading `undefined`. Before
   moving an export between the engine's files, grep the workspace for the file's bare name (learned by the run that split the
   engine's `runner.ts`).
+- **A name moved out of `run.ts` leaves the `agent-workflows/run` subpath, and the api's tests read that subpath by `await import`.**
+  `const { messageRefusal } = await import('agent-workflows/run')` in `apps/api/test/asks.test.ts` is no `import … from` line, so a
+  scan of static imports misses it, and no typecheck sees it: neither agent-workflows' nor the api's `tsconfig.json` includes `test/`.
+  Only the api's suite fails. Before moving a name out of `run.ts`, grep the workspace for `agent-workflows/run'`, and re-export from
+  `run.ts` what the api reads there, from a module beneath it, so no cycle (learned by the run that moved *trying again* into `retry.ts`).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by
@@ -328,7 +333,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   on you` with a `wf retry --budget` that `prunedRefusal` refused, while `wf ls` said nothing waited on you. And `wf ls`'s step notes
   (`gateNote`, `exhaustedNote`, `heldNote`) offered `wf approve` and `wf round` with no caller guarding them at all. Each producer in `run.ts`
   now reads `run.pruned`, so every surface that calls it agrees. A new marker that refuses verbs is checked against every string with `wf <verb>`
-  in it (`grep -n "wf round \|wf retry \|wf approve \|wf accept " src/run.ts`), not against the callers you remember (learned by the run
+  in it (`grep -n "wf round \|wf retry \|wf approve \|wf accept " src/*.ts`), not against the callers you remember (learned by the run
   that made a pruned run say it was pruned).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;

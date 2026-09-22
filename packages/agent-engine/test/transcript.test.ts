@@ -26,7 +26,8 @@ process.env.CLAUDE_CONFIG_DIR = config;
 // Where Codex keeps rollouts is read when one is looked for; set here, once, for the whole file.
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
-const { claudeOps, claudeTranscriptEvents } = await import('../src/runner.ts');
+const { claudeOps } = await import('../src/runner.ts');
+const { claudeTranscriptEvents } = await import('../src/runner-claude-transcript.ts');
 const { claudeDetached, codex, codexRolloutEvents, detachedOps } = await import('../src/runner-detached.ts');
 
 /** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns were. */

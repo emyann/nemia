@@ -27,7 +27,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
 const { createEngine } = await import('../src/facade.ts');
-const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner.ts');
+const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner-claude-inbox.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
 

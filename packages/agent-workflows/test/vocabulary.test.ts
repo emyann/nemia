@@ -14,7 +14,7 @@ import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/wo
 // The lists are exports of the engine's modules, and not of its root (`agent-engine` exports `.` and `./effect`),
 // so they are read from beside the root this package resolves: the modules `runner.ts` runs, not a second copy.
 const root = import.meta.resolve('agent-engine');
-const runner = await import(new URL('./runner.ts', root).href) as {
+const runner = await import(new URL('./runner-claude-vocabulary.ts', root).href) as {
   CLAUDE_PERMISSION_MODES: readonly string[]; CLAUDE_EFFORTS: readonly string[]; CLAUDE_CONTEXT_TOKENS: { least: number; most: number };
 };
 const detached = await import(new URL('./runner-detached.ts', root).href) as {

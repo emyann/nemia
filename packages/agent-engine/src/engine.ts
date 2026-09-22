@@ -10,7 +10,8 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { mcpRefuses, Runner, type McpServer } from './runner.ts';
+import { Runner, type McpServer } from './runner.ts';
+import { mcpRefuses } from './runner-mcp.ts';
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;

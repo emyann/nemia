@@ -22,10 +22,11 @@ import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting, Usage } from './domain.ts';
-import {
-  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, checkoutMcpConfig, claudeMcpArgs, claudeRefuses, claudeTranscriptEvents, claudeTranscriptFile, isoTime, readTranscript, RunnerError,
-  worktreeName, writeMcpConfig, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent,
-} from './runner.ts';
+import { RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
+import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
+import { isoTime, readTranscript } from './runner-transcript.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {

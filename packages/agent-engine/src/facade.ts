@@ -16,9 +16,11 @@ import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, noTranscript, Runner, RunnerError,
-  type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
+  claudeOps, Runner, RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
+import { claudeSayRefuses } from './runner-claude-inbox.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses } from './runner-claude-vocabulary.ts';
+import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';

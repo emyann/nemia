@@ -1955,6 +1955,38 @@ up — every 4000ms, ^C to stop
   `workflow:` and no `--workflow` — `--workflow <w>` writes both; a card already queued, with its place, and `--off` to take it
   back first; a card a run was started from; and `--off` beside `--workflow`. `--off` on a card not queued says so, exit 0.
 
+## One `wf up` per store: `daemon.json`
+
+The tick keeps one writer per file, and two ticks are two writers. So `wf up` takes the store for itself, through a file of its own,
+`$WF_ROOT/daemon.json`, which it alone writes:
+
+```json
+{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z" }
+```
+
+`pid` is the node process that ticks, `every` its interval, and `passedAt` when its last pass completed (`null` before the first). It is
+written as the store is taken, after every pass, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always
+through a hidden file renamed over it, so a reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in
+`src/daemon.ts`): no file, a file that does not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)`), one alive that
+has not passed for a long while (`stalled`), or one `ticking`.
+
+- **A second `wf up` is refused by name, exit 2, while the store is ticked** — naming the pid, where and since when it ticks, its last pass,
+  and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
+  leave the child ticking, reparented to init). Anything else is taken over, and `wf up` says from whom when it was not a clean stop:
+  `took ~/.agent-workflows over from pid 51234, whose process is gone`.
+- **Stale is ten of the holder's own intervals, never under fifteen minutes** (`staleAfterMs`): the heartbeat is written only when a pass
+  completes, and one pass may run an `npm ci` for up to ten minutes. At the shipped 4000 ms the floor decides. A daemon taken over while it
+  lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops rather than be a second writer.
+- **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,
+  and every case a hand tick helps in — the daemon stopped, gone or stalled — already passes. A hand tick never writes the file.
+- **Two starts on an empty store cannot both win**: the file is claimed with a link, which fails when it appeared in between, and the
+  loser judges again. Two takeovers of one stale file both rename; the loser finds out at its first pass.
+- **`wf ls` ends on a line saying whether a daemon ticks and when it last passed**: `wf up: ticking, pid 51234, every 4000ms — last pass
+  3s ago (…)`, or `stalled`, `none ticking — pid 51234 is gone`, `stopped`, and `none has held this store` — so a run `waiting` is told
+  apart from a store nothing ticks.
+- **Liveness is this host's.** A store on a shared disk ticked from another machine reads as gone here. A pid reused after a daemon was
+  killed with `-9`, within the stale window, reads as ticking; a clean stop writes `stoppedAt` and never does.
+
 ## Calling a run off
 
 A run could be started and watched but never stopped: the only recourse was killing the session by
@@ -2226,6 +2258,7 @@ holding a concurrency slot forever.
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, and what a step is told, `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` included |
+| `src/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against a clock and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
 | `src/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
@@ -2242,6 +2275,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
+| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |

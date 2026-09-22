@@ -58,19 +58,37 @@ too, and the engine prices nothing — and the parent's total is on the parent's
 Low priority: this harness exists for comparison — and, since only `claude -p` keeps a spend cap (issue 17), for a task
 that must not spend past one.
 
-### 6. The Effect door's `file` refuses nothing
+### 6. The Effect door's `file` refuses no harness's words
 
-**Where.** `file` in `agent-engine/src/engine.ts` journals what it is given. The refusals live in
-`createEngine().file()` (`refusalOf` in `agent-engine/src/facade.ts`), because that is where the
+**Where.** `file` in `agent-engine/src/engine.ts` refuses what the task says of itself; the refusals in a harness's
+words live in `createEngine().file()` (`harnessRefusalOf` in `agent-engine/src/facade.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
-**Effect.** A consumer of `agent-engine/effect` can still journal `deadlineSeconds: NaN`, which stops
-the task on its first pass, or a permission mode its harness rejects, which now waits out the grace
-window and ends the attempt `lost` rather than stalling the tick.
+**What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
+same sentences word for word — an empty brief, cwd, model, resumeFrom or effort; a cwd that is not absolute; attempts,
+deadline, retry policy, tool lists and permission rules, `mcp`, `budgetUsd`, `priority`, `remoteControl` and
+`contextTokens` that are not values of their kind. The Effect door fails with `FileRefused` (exported beside `file`, a
+tagged error as `JournalError` is) before anything is journalled; the facade asks the same function first and then the
+harness, and throws `file: <the sentence>` as before. So `deadlineSeconds: NaN` is refused at both doors in one set of
+words. `test/refusal.test.ts`: every one of those refusals made to refuse at the Effect door, nothing journalled, and the
+Promise door's message the Effect door's behind `file: `; checked by deleting the call in `file` (every case fails)
+and one line of `refusalOf` (its cases fail).
 
-**Fix.** The harness-agnostic half of `refusalOf` can move under the Effect `file` as it is. The
-vocabulary half needs the runner to answer, and `RunnerOps` has no verb for that — the four it
-requires are the line that type holds — so it would be a value passed to `file`, not another verb.
+**What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
+runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
+window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;
+`remoteControl: true` on a `HarnessSpec`; `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
+that an unknown harness and a bad mode are still journalled there, so the day this moves, that test says so.
+
+The issue used to say `RunnerOps` has no verb for this, and so it would be a value passed to `file`. The first half is
+wrong: `RunnerOps` already has optional verbs (`find`, `release`, `transcript`, `say`), and an optional `refuses`
+would not move the line its four required ones hold. What it costs is elsewhere: `file` would need `Runner` beside
+`Journal`, a change to every Effect consumer's `file`; `composite` would need to refuse an unknown harness where it
+falls back today; and the refusals that name another harness — *file the task on `claude-detached`*, the windowed and
+the bridged harnesses listed by name — need the whole map of harness configs, which only `createEngine` holds, where
+the composite sees opaque ops. A value passed to `file` instead would be opt-in: it repeats what the consumer's runner
+layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
+workspace files through the Effect door (agent-workflows and the api use `createEngine`).
 
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
@@ -332,8 +350,9 @@ priority, then filing, a negative one last; `test/facade.test.ts`: every refusal
 - **agent-workflows files none yet.** The run's momentum — every filing after a run's first step above a new run's
   first — is the upper layer's, and a run of its own (agent-workflows `docs/features.md`, Engine-side work).
 - **Not a brief key.** `ae start` cannot file one; a task filed through the API shows it in `ae ls` all the same.
-- **The Effect door** journals any value (issue 6). One that is not a finite number — a file journal writes `NaN` back as
-  `null` — is read as 0 when the board is ordered, never as above or below every other.
+- **A journal from before the refusal.** Both doors refuse a `priority` that is not a finite number (issue 6). One a
+  journal already holds — written before, or by hand; a file journal writes `NaN` back as `null` — is read as 0 when the
+  board is ordered, never as above or below every other.
 
 ### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
 
@@ -358,8 +377,8 @@ retry, and never for a task without it; `test/engine.test.ts`: carried to every 
   told.
 - **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
   drops a released session at once was not looked at.
-- **The Effect door refuses nothing** (issue 6): a `remoteControl: true` that reaches `codex` or `claude-detached` through it
-  is dropped without a word.
+- **The Effect door refuses no harness's words** (issue 6): it refuses a `remoteControl` that is not true or false, and a
+  `remoteControl: true` that reaches `codex` or `claude-detached` through it is dropped without a word.
 - **Not a brief key**, and agent-workflows files none yet: a step key (`remote:`, features.md §2) is a run of its own.
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`

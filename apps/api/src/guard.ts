@@ -1,10 +1,11 @@
 /**
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
- * Fourteen writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
+ * Fifteen writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
  * for another try (`POST /api/runs/:id/steps/:step/retry`, app.ts) or another round (`POST /api/runs/:id/round`, app.ts), each of which writes a
  * person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, app.ts), which writes a person's
- * approval file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, app.ts), which the engine hands the session and
+ * approval file, or an acceptance of a loop out of rounds as it stands (`POST /api/runs/:id/steps/:step/accept`, app.ts), which writes a
+ * person's acceptance file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, app.ts), which the engine hands the session and
  * journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE /api/inbox/:name`, inbox.ts); a card queued
  * to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE /api/inbox/:name/queue`), each of which writes
  * the store's inbox; and a workflow of yours built on the board — made (`POST /api/workflows/yours`), or put back from its steps and

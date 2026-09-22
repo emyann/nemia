@@ -409,7 +409,7 @@ What it leaves:
   path, so a step's own photographs reach its files directory by a copy, which a `dontAsk` step cannot make.
   They stay in `/tmp/playwright-mcp`, one directory for every step on the machine (plan §4b); the skill names a
   folder per run and step inside it.
-- **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/run.ts`) heads a finding with
+- **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/closeout.ts`) heads a finding with
   `file:line` only when `file` is at its top level, so a `where` finding prints
   `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.
   Reading `where.file`/`where.line` and `where.page`/`where.theme` there is a few lines and a case in

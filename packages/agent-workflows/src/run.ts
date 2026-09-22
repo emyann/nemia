@@ -288,8 +288,11 @@ export function assess(
   // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
   // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
   if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], held: [], status: 'cancelled' };
+  // A pruned run is read as it ended, and a person's ask of it is honoured by nobody: its worktrees are gone, so the verbs refuse one and
+  // the tick files none (`mayFile`). One written by hand is not a try due, here or anywhere that reads this.
+  if (run.pruned) [asks, roundAsks] = [[], []];
 
-  const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const stood =new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
   // An ending step works in the repository's own checkout, and while another run's is in that one directory nothing of it is filed

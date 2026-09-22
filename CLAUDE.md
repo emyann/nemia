@@ -165,6 +165,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   allowance for a stream the page left is proven on events emitted by hand (`checks.test.ts`), since this Playwright reports no such abort.
   A page that edits the store by hand where the board must see it says so on the feed too, `fed(run, step?, word)` in `board.ts` (learned
   by the run that taught the e2e to wait past the feed stream).
+- **While the board follows the feed it polls once a minute, and react-query re-reads a changed `refetchInterval` only when the query
+  changes.** `runsQuery`, `runQuery` and `ceilingsQuery` poll at `pace(5_000)` (`lib/feed.ts`): 60 s while `/api/feed/stream` is open, 5 s
+  while it is not. An e2e page that edits the store by hand and waits on the board to see it calls `fed()`, or waits out the minute and fails
+  at `WAIT_MS`; never raise the wait (the `outcome` page took its run back unsaid and relied on the 5 s poll; it says `removed` now). And a function interval is read again on the query's next update, not when the flag it reads flips:
+  `useFeed` marks the polled queries stale when the stream opens (`refetchType: 'none'`, which reads nothing) and reads them when it goes
+  down, or a run the feed has no line for keeps its 5 s timer (learned by the run that made the board follow the feed).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the

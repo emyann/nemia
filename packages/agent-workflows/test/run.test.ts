@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, tryOf, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, tryOf, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, firstFiledAt, runStartedAt, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -2595,6 +2595,31 @@ test("a run the cap on runs in flight held counts its wait as queued — `create
   const never = timeline(r, views, filed);
   assert.equal(never.slot, null);
   assert.deepEqual([never.run.queued, timelineTotalLines(never)], ['16s', ['timeline  run  queued 16s  ran 27m12s  wall 27m37s']], 'as before');
+});
+
+test("a run's start is its first filing — of any try, check or step, whatever order the record and the steps name them in — and not its `createdAt`; `createdAt` only for a run started with its filings off the feed", () => {
+  // review, named first on the record, was filed last; implement's try 1 before its try 2, and try 1's check before try 2's session.
+  const r = run({}, {
+    createdAt: clock(0),
+    steps: {
+      review: { taskId: 'rv' },
+      implement: { taskId: 't2', check: { taskId: 'c2' }, tries: [{ taskId: 't1', check: { taskId: 'c1' }, then: 'retries' }] },
+    },
+  });
+  const filed = new Map([['rv', clock(40)], ['t2', clock(21)], ['c2', clock(26)], ['c1', clock(19, 56)], ['t1', clock(4, 30)]]);
+  assert.equal(firstFiledAt(r, filed), clock(4, 30));
+  assert.equal(runStartedAt(r, filed), clock(4, 30), 'four and a half minutes after it was created: the wait before it is not time at work');
+  // A check filed before any session — a recheck, say — is still the run's first filing.
+  assert.equal(firstFiledAt(r, new Map([...filed, ['c1', clock(2)]])), clock(2));
+
+  // Started, and none of its tasks on the feed: no filing, and the start is the only time the record has.
+  assert.equal(firstFiledAt(r, new Map([['other', clock(1)]])), null);
+  assert.equal(runStartedAt(r, new Map()), clock(0));
+  // Nothing filed — waiting on runs, or held for a slot: no start, whatever the feed holds for other runs.
+  const waiting = run({ implement: null }, { createdAt: clock(0) });
+  assert.deepEqual([firstFiledAt(waiting, filed), runStartedAt(waiting, filed)], [null, null]);
+  // A try whose retry is asked and not filed yet has started all the same.
+  assert.equal(runStartedAt({ ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', then: 'retries' }] } } }, filed), clock(4, 30));
 });
 
 test('a recheck ran no session: the try it reached names the session it checked again, counted once in the totals; each round of a loop totals apart', () => {

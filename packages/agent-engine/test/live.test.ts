@@ -395,7 +395,7 @@ test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends 
   skip,
   timeout: 12 * 60_000,
 }, async (t) => {
-  // Through the Effect door, which refuses nothing: `createEngine().file()` refuses this task.
+  // Through the Effect door, which refuses no harness's words (open issue 6): `createEngine().file()` refuses this task.
   const root = tmp('bg-budget-board');
   const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));

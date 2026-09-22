@@ -162,6 +162,11 @@ channels, the lot. Keep your `effect` version aligned with this package's if you
 tags are identity-based, and two copies in one tree do not see each other's services. A consumer
 who never imports Effect can never have that problem.
 
+Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — one function,
+`refusalOf` in `src/engine.ts`, and `test/refusal.test.ts` holds both doors to it — and fails with `FileRefused`,
+a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
+ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6).
+
 ## Several harnesses, one board
 
 A task picks its harness in the brief. Verified live, concurrently, on one board:
@@ -395,7 +400,7 @@ by up to one response. `claude --bg` took the same flag without a word, read the
 `done`; neither the registry nor its transcript said anything of a budget, and the flag's help says it "only works with
 --print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget on `claude`, naming
 `claude-detached`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API, which refuses
-nothing (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
+no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
 **A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
@@ -478,8 +483,8 @@ stopped for a higher priority, which waits for a slot like any task.
 ended, so in filing order any task filed in that gap goes first, and the run waits behind work that arrived after it
 started. A workflow layer that files every step after a run's first above a new run's first keeps that slot with the run.
 
-`file()` refuses a `priority` that is not a finite number — `NaN`, `Infinity`, `"high"` — naming the fix. The Effect door
-refuses nothing (open issue 6), and a value it journalled that is not a finite number is read as 0. `ae ls` shows
+`file()` refuses a `priority` that is not a finite number — `NaN`, `Infinity`, `"high"` — naming the fix, at both doors, and
+a journal written before it did that holds one is read as 0. `ae ls` shows
 `priority 2` beside a task filed with one. It is not a key a brief has, so `ae start` files at 0.
 
 ## What "done" means, and who decides it

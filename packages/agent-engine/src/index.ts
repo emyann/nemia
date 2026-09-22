@@ -26,8 +26,8 @@
  */
 
 // ─── file work, ask about it, stop it ───────────────────────────────────────
-export { file, requestStop, view, tick, step, settleTask, GRACE_MS, DEFAULT_MAX_CONCURRENT } from './engine.ts';
-export type { TaskView } from './engine.ts';
+export { file, FileRefused, requestStop, view, tick, step, settleTask, GRACE_MS, DEFAULT_MAX_CONCURRENT } from './engine.ts';
+export type { Filing, TaskView } from './engine.ts';
 
 // ─── the feed: how an upper layer reacts without polling a task ─────────────
 export { Journal, JournalError } from './journal.ts';

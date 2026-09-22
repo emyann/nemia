@@ -475,7 +475,8 @@ test('priority first, higher before lower, then filing order within one — no p
   await fileAt(b, 'c', '2026-09-16T10:00:03.000Z', { priority: 5 });
   await fileAt(b, 'd', '2026-09-16T10:00:01.000Z', { priority: 5 });
   await fileAt(b, 'e', '2026-09-16T09:00:00.000Z', { priority: -1 });
-  // What the Effect door, which refuses nothing, can journal: read as no priority, never as above or below every other.
+  // What a journal written before `file` refused it, or by hand, can hold: read as no priority, never as above or below
+  // every other. `fileAt` appends the event itself, as such a journal did.
   await fileAt(b, 'f', '2026-09-16T10:00:04.000Z', { priority: Number.NaN });
   assert.deepEqual(await admitted(b, 6), ['d', 'c', 'b', 'a', 'f', 'e']);
 });

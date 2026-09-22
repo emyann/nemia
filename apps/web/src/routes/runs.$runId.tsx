@@ -16,6 +16,8 @@ import { runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
+import { duration } from '../lib/canvas';
+import { waitedMs } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/$runId')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
@@ -110,6 +112,8 @@ function Run({ run }: { run: RunDetail }) {
               ? ([['work', pathRow(run.work)]] satisfies Array<[string, ReactNode]>)
               : ([['repo', code(run.repo)], ['base', code(run.baseRef)], ['branch', code(run.branch)]] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
+            // When it started — its first step filed — and the wait before it, which a run started `--after` runs spends doing nothing.
+            ['started', startedRow(run)],
             ['cancelled', run.cancelledAt && when(run.cancelledAt)],
             ['workflow', code(run.workflowDir)],
           ]}
@@ -218,6 +222,21 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           what its own approval filed and the terms it acts on. */}
       {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
+  );
+}
+
+/**
+ * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count as
+ * time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
+ */
+function startedRow(run: RunDetail): ReactNode {
+  if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
+  const waited = waitedMs(run)!;
+  return (
+    <span data-started>
+      {when(run.startedAt)}
+      {waited >= 1000 && `, after waiting ${duration(waited)}`}
+    </span>
   );
 }
 

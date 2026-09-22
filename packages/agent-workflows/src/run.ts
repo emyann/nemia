@@ -4745,14 +4745,32 @@ function slotWaitOf(run: Run, filed: ReadonlyMap<string, string>): SlotWait | nu
   if (!run.slotHeldAt) return null;
   const from = run.after?.length ? run.slotHeldAt : run.createdAt;
   if (!hasStarted(run)) return { from, filedAt: null, ms: null, queued: 'still waiting' };
+  const filedAt = firstFiledAt(run, filed);
+  const ms = between(from, filedAt);
+  return { from, filedAt, ms, queued: ms === null ? 'not known' : durationWord(ms) };
+}
+
+/**
+ * When the run could first be at work: the earliest filing of any task of any try of any step — a session's or a check's — off the
+ * engine's feed (`readFilings`). Null while nothing of the run is filed, and for a run whose tasks are not on the feed. Pure.
+ *
+ * Not the record's `createdAt`: a run started `--after` runs, or held for a run slot, is created long before anything of it is filed. And
+ * not when its parents shipped, which nothing writes down: the tick files the roots on the pass that reads them shipped.
+ */
+export function firstFiledAt(run: Run, filed: ReadonlyMap<string, string>): string | null {
   const tasks = Object.values(run.steps).flatMap((record) => [
     ...(record.tries ?? []).flatMap((t) => [t.taskId, t.check?.taskId]),
     record.taskId, record.check?.taskId,
   ]);
-  const filedAt = tasks.flatMap((id) => (id && filed.has(id) ? [filed.get(id)!] : [])).sort()[0] ?? null;
-  const ms = between(from, filedAt);
-  return { from, filedAt, ms, queued: ms === null ? 'not known' : durationWord(ms) };
+  return tasks.flatMap((id) => (id && filed.has(id) ? [filed.get(id)!] : [])).sort()[0] ?? null;
 }
+
+/**
+ * When a run started, as a person is told it: its first filing (`firstFiledAt`); for a run that has started and whose filings the feed does
+ * not have — a store from before the feed — its `createdAt`, the best there is; null while nothing of it is filed. Pure.
+ */
+export const runStartedAt = (run: Run, filed: ReadonlyMap<string, string>): string | null =>
+  firstFiledAt(run, filed) ?? (hasStarted(run) ? run.createdAt : null);
 
 const between = (from: string | null, to: string | null): number | null => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
 

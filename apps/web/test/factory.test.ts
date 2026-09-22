@@ -4,6 +4,7 @@ import type { RunSummary } from '../src/lib/api.ts';
 import {
   arranged,
   byAge,
+  clockCounts,
   CARD_WIDTH,
   CELL_HEIGHT,
   CELL_WIDTH,
@@ -24,6 +25,7 @@ import {
   placeRuns,
   repoName,
   runEdges,
+  runClock,
   runOfNode,
   spanOf,
   standingOf,
@@ -31,6 +33,7 @@ import {
   titleOf,
   toDecideOf,
   toggleOpen,
+  waitedMs,
   waitsOnYou,
   type Span,
 } from '../src/lib/factory.ts';
@@ -42,6 +45,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   repo: '/code/app',
   brief: 'Do the thing',
   createdAt: '2026-09-13T00:00:00.000Z',
+  startedAt: null,
   cancelledAt: null,
   status: 'running',
   moving: false,
@@ -819,4 +823,46 @@ test("who a run waits on, on the Runs row, is `wf ls`'s words where the api give
   const { onYou: _onYou, ...before } = gated;
   assert.deepEqual(onYouOf(before), ['step-0']);
   assert.deepEqual(onYouOf({ ...before, waitingOnYou: [] }), []);
+});
+
+test("a card's clock counts from when the run started — its first filing — not from when it was created: the wait before is waiting, and said on hover", () => {
+  // 7fev, 2026-09-20: created, waited 4h 29m on its parent, then worked 1h 45m. Its card said about 6h.
+  const createdAt = '2026-09-20T08:00:00.000Z';
+  const startedAt = '2026-09-20T12:29:00.000Z';
+  const now = Date.parse('2026-09-20T14:14:00.000Z');
+  const going = { createdAt, startedAt, cancelledAt: null, waiting: null };
+  const clock = runClock(going, now, false);
+  assert.deepEqual([clock.words, clock.at], ['1h 45m since it started', startedAt]);
+  assert.ok(clock.title.startsWith(`Started ${new Date(startedAt).toLocaleString()}.`), clock.title);
+  assert.ok(clock.title.endsWith(`Created ${new Date(createdAt).toLocaleString()}, and waited 4h 29m before its first step was filed.`), clock.title);
+  assert.equal(waitedMs(going), (4 * 60 + 29) * 60_000);
+  // Finished: when it started, not a clock still counting — from the start too.
+  assert.equal(runClock(going, now, true).words, 'started 1h 45m ago');
+  assert.deepEqual([clockCounts(going, false), clockCounts(going, true)], [true, false]);
+
+  // Started at once — or started with its filings off the feed, when the api gives createdAt: no wait to speak of.
+  const atOnce = runClock({ ...going, startedAt: createdAt }, now, false);
+  assert.deepEqual([atOnce.words, atOnce.title], ['6h 14m since it started', `Started ${new Date(createdAt).toLocaleString()}.`]);
+});
+
+test("REFUSED: a run nothing of which is filed has no time at work — it is waiting, and for how long, whether it waits on runs, for a slot, or on you; called off first, it never started", () => {
+  const createdAt = '2026-09-20T08:00:00.000Z';
+  const now = Date.parse('2026-09-20T12:29:00.000Z');
+  const waiting = { runs: [], word: 'waiting on 7a87', advice: 'nothing of 7fev is filed until wf decide says 7a87 has shipped onto main', onYou: false };
+  const onRuns = runClock({ createdAt, startedAt: null, cancelledAt: null, waiting }, now, false);
+  assert.deepEqual([onRuns.words, onRuns.at], ['waiting for 4h 29m', createdAt]);
+  assert.equal(onRuns.title, `Created ${new Date(createdAt).toLocaleString()}. Nothing of it is filed yet: waiting on 7a87.`);
+  assert.doesNotMatch(onRuns.words, /since it started|started .* ago/);
+  // Held for a slot, or its parents shipped and the next pass yet to file it: nothing to name, and waiting all the same.
+  assert.equal(runClock({ createdAt, startedAt: null, cancelledAt: null, waiting: null }, now, false).words, 'waiting for 4h 29m');
+  // On a run that never ships without a person: off the moving floor, `finished`, and still waiting — its clock still counts.
+  const onYou = { createdAt, startedAt: null, cancelledAt: null, waiting: { ...waiting, onYou: true } };
+  assert.equal(runClock(onYou, now, true).words, 'waiting for 4h 29m');
+  assert.equal(clockCounts(onYou, true), true);
+  assert.equal(waitedMs(onYou), null);
+  // Called off before anything of it was filed: it never started, and waits for nothing.
+  const called = { createdAt, startedAt: null, cancelledAt: '2026-09-20T09:00:00.000Z', waiting: null };
+  assert.deepEqual([runClock(called, now, true).words, runClock(called, now, true).title],
+    ['created 4h 29m ago', `Created ${new Date(createdAt).toLocaleString()}. Called off before anything of it was filed.`]);
+  assert.equal(clockCounts(called, true), false);
 });

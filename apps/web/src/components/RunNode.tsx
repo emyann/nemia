@@ -7,10 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunSummary } from '@/lib/api';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
-import { duration } from '@/lib/canvas';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { repoName, titleOf, toDecideOf, waitsOnYou } from '@/lib/factory';
+import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnYou } from '@/lib/factory';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { RouteLink } from './AgentParts';
@@ -40,8 +39,8 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * which leaves the gap between cards.
  */
 export function RunNode({ data: { run, finished, open, reading, trouble, onToggle } }: NodeProps<RunFlowNode>) {
-  // Every second while the run is in flight; a finished run's "started … ago" moves slowly.
-  const now = useNow(finished ? 30_000 : 1_000);
+  // Every second while its clock counts (`clockCounts`); a finished run's "started … ago" moves slowly.
+  const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
   const decide = toDecideOf(run);
@@ -57,7 +56,8 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
     setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   }, [stamp, taken]);
   const said = taken && (stamp === (taken.next ?? taken.stamp)) ? taken.said : null;
-  const since = duration(now - Date.parse(run.createdAt));
+  // How long it has been at work, from its first filing — or, before that, how long it has waited (`runClock`).
+  const clock = runClock(run, now, finished);
 
   return (
     // Marked while nobody has decided its result, and not dimmed as a finished card is: nothing of it moves, so it is finished, and it is
@@ -184,8 +184,8 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
 
       <div className="flex min-h-6 items-center justify-between gap-2 border-t px-3 pt-2">
         <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
-          <time dateTime={run.createdAt} title={new Date(run.createdAt).toLocaleString()} className="truncate">
-            {finished ? `started ${since} ago` : run.waiting ? `waiting for ${since}` : `${since} since it started`}
+          <time dateTime={clock.at} title={clock.title} className="truncate">
+            {clock.words}
           </time>
           {/* What it has cost, beside its age, once a cost was measured: `≥` where an ended attempt has none on it. */}
           {run.cost && (

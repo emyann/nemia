@@ -111,6 +111,21 @@ export default {
     await expectUncut(cardOf(page, bottom.id).locator('ul[aria-label="Steps"] li > span:first-child'), "the bottom card's step name is whole beside its root's waiting on chip");
     await expectInside(cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-state="waiting"]'), cardOf(page, bottom.id), "and the chip stays inside the card");
     for (const run of [top, shipped, running]) await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
+    // How long each has been at work, counted from when it started: the running side waited a minute on the top, created and nothing of
+    // it filed, and that minute is on hover, not in its time at work. The bottom and the orphan have not started: they say they wait.
+    await expectVisible(
+      cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s since it started$/ }),
+      `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
+    );
+    // Counted from the instant the api says it started, its first filing, and not from its creation a minute before.
+    const times = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as { createdAt: string; startedAt: string | null };
+    if (!times.startedAt || Date.parse(times.startedAt) - Date.parse(times.createdAt) !== 60_000) {
+      throw new Refused(`${running.id} was seeded filed a minute after it was created; the api says created ${times.createdAt}, started ${times.startedAt}`);
+    }
+    await expectCount(cardOf(page, running.id).locator(`time[datetime="${times.startedAt}"]`), 1, `${running.id}'s card counts from ${times.startedAt}, when it started, not ${times.createdAt}`);
+    for (const run of [bottom, orphan]) {
+      await expectVisible(cardOf(page, run.id).locator('time[title*="Nothing of it is filed yet"]', { hasText: /^waiting for / }), `${run.id}'s card says it is waiting, and for how long, not a time at work`);
+    }
     await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] [data-sample="cards"]'), 1, "the Factory's legend draws the edge between two cards");
     // Photographed as a person first finds it: the page's own photograph is taken at the end, after a graph unfolded over the diamond.
     await settled(page);

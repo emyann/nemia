@@ -3,7 +3,7 @@
  * says, where a card goes, and where an open run's graph goes beside it. Pure.
  */
 import type { RunSummary, RunToDecide } from './api';
-import type { EdgeState } from './canvas.ts';
+import { duration, type EdgeState } from './canvas.ts';
 import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point, type StepEdges } from './layout.ts';
 
 /**
@@ -59,6 +59,41 @@ export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readon
  */
 export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
   run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
+
+type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> & { waiting?: RunSummary['waiting'] };
+
+/** How long a run waited before it started — created to its first filing — or null while nothing of it is filed. */
+export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): number | null =>
+  run.startedAt === null ? null : Math.max(0, Date.parse(run.startedAt) - Date.parse(run.createdAt));
+
+/**
+ * Whether a run's clock still counts, second by second: the time at work of a run in flight, and the wait of a run nothing of which is
+ * filed yet and nobody called off — `finished` on the floor for one that waits on a run that never ships, and waiting all the same.
+ */
+export const clockCounts = (run: Clocked, finished: boolean): boolean => (run.startedAt === null ? run.cancelledAt === null : !finished);
+
+/**
+ * What a run's clock says, wherever the board says how long a run has been going: `words` on the Factory's card, `at` the instant they count
+ * from, and `title` the times in full. `finished` is the card's: not in flight.
+ *
+ * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
+ * then waits, doing nothing, until they ship, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
+ * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
+ */
+export function runClock(run: Clocked, now: number, finished: boolean): { words: string; at: string; title: string } {
+  const local = (iso: string) => new Date(iso).toLocaleString();
+  if (run.startedAt === null) {
+    const created = `Created ${local(run.createdAt)}.`;
+    const since = duration(now - Date.parse(run.createdAt));
+    return run.cancelledAt !== null
+      ? { words: `created ${since} ago`, at: run.createdAt, title: `${created} Called off before anything of it was filed.` }
+      : { words: `waiting for ${since}`, at: run.createdAt, title: `${created} Nothing of it is filed yet${run.waiting ? `: ${run.waiting.word}` : ''}.` };
+  }
+  const since = duration(now - Date.parse(run.startedAt));
+  const waited = waitedMs(run)!;
+  const title = `Started ${local(run.startedAt)}.${waited >= 1000 ? ` Created ${local(run.createdAt)}, and waited ${duration(waited)} before its first step was filed.` : ''}`;
+  return { words: finished ? `started ${since} ago` : `${since} since it started`, at: run.startedAt, title };
+}
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
   toDecide?: RunToDecide | null;

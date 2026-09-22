@@ -4,7 +4,7 @@ import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
-import { inFlight, inFlightFirst, onYouOf, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
+import { inFlight, inFlightFirst, onYouOf, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -80,7 +80,7 @@ function RunRow({ run }: { run: RunSummary }) {
   const decide = toDecideOf(run);
 
   return (
-    // The run's link, and beside it when it started and the workflow's link: side by side, since a link inside a link is not HTML.
+    // The run's link, and beside it when it was created and the workflow's link: side by side, since a link inside a link is not HTML.
     <li data-in-flight={inFlight(run)} className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900">
       <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
         <p className="truncate font-medium">{title}</p>
@@ -113,7 +113,8 @@ function RunRow({ run }: { run: RunSummary }) {
         </ul>
       </Link>
       <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
-        <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
+        {/* When it was created, which orders the list; when it started, and how long it waited before, on hover, in the card's words. */}
+        <time className="text-xs text-neutral-500" dateTime={run.createdAt} title={runClock(run, Date.now(), !inFlight(run)).title}>
           {new Date(run.createdAt).toLocaleString()}
         </time>
         {/* What it has cost, as `wf ls` puts it on the run's line, once a cost was measured. */}

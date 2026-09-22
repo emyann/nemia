@@ -241,6 +241,37 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
   assert.ok(!under('runs', `${run.id}.pruned`));
 });
 
+test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async () => {
+  // A gated step that signed off: the run is not running, and not merged, so --unmerged is given, and the gate alone holds it.
+  const b = board();
+  const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
+  fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
+  fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  const run = start({ brief: 'at its gate', repo: aRepo(), workflowDir: gated });
+  await advance(b.e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  assert.equal((await decide(b.e, run.id)).decision.kind, 'awaiting', 'over, as `decide` reads it: not refused as running');
+  const atGate = await prune(b.e, run.id, { yes: true, unmerged: true });
+  assert.equal(atGate.kind, 'refused');
+  assert.equal(atGate.refusal, `implement waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${run.id} implement. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id}.`);
+  assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
+
+  // A retry asked of a step that shipped, which no pass files: the run is over and merged, and the ask alone holds it — until it is taken back.
+  const shipped = await aFinished(b, { merged: true });
+  const asks = path.join(ROOT, 'runs', `${shipped.run.id}.asks`);
+  fs.mkdirSync(asks, { recursive: true });
+  fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+  assert.equal((await decide(b.e, shipped.run.id)).decision.kind, 'shipped');
+  const asked = await prune(b.e, shipped.run.id, { yes: true });
+  assert.equal(asked.kind, 'refused');
+  assert.equal(asked.refusal, `try 2 of implement is asked for, and no pass files it as the run stands. Take that ask back, then wf prune ${shipped.run.id}: rm ${path.join(asks, 'retry-implement-2')}.`);
+  assert.ok(fs.existsSync(shipped.wt) && !under('runs', `${shipped.run.id}.pruned`));
+  fs.rmSync(path.join(asks, 'retry-implement-2'));
+  assert.equal((await prune(b.e, shipped.run.id, { yes: true })).kind, 'pruned');
+});
+
 test('REFUSED after a prune: a retry, a round, an approval and an acceptance — each would file work into a worktree that is gone — and a pass files nothing on an ask a person wrote by hand', async (t) => {
   const b = board();
   const { run } = await aFinished(b);

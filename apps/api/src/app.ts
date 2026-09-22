@@ -469,7 +469,7 @@ export type RunDetail = {
     spent: Spent | null;
     /** Its cap in force, and what its tries have cost of it (`StepBudget`); null for a step with no `budget:`. */
     budget: StepBudget | null;
-    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off. */
+    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off or pruned. */
     raise: StepRaise | null;
     /**
      * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
@@ -1004,7 +1004,7 @@ function costOf(run: Run, name: string, steps: readonly Workflow[], views: Views
   const budget = step && cap !== undefined
     ? { usd: cap, said: budgetWord(cap), of: spent && `${spent.said} of ${budgetWord(cap)}`, over: Boolean(overBudget(step, run, spendOf)) }
     : null;
-  return { spent, budget, raise: step && !run.cancelledAt ? raiseOf(run, step, steps, views, spendOf) : null };
+  return { spent, budget, raise: step && !run.cancelledAt && !run.pruned ? raiseOf(run, step, steps, views, spendOf) : null };
 }
 
 /**
@@ -1672,8 +1672,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  // None for a pruned run: each would work in a worktree `wf prune` removed, and the verb refuses it (`prunedRefusal`), as `wf decide` offers none.
-  const offers = run.pruned ? [] : [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
+  // None for a pruned run, whose verbs each refuse it (`prunedRefusal`): the package's lines say so themselves, for `wf decide` and for this.
+  const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
   // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — with the steps its send-back
   // names (`sendBackTo`), which is what `wf decide` prints under the step. The word is `listing`'s, as `needsOf` reads it for the verb.
   const gates: AtGate[] = steps

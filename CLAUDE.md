@@ -313,6 +313,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   it`, and the board drew the run as moving: `listing` and the api read what is due off `assess`, not off the tick. A new marker beside
   `.cancelled` goes into `assess` (and `listing`'s `waitingOnYou`), and its test asserts `wf ls` and the api say nothing is coming (learned
   by the run that added `wf prune`).
+- **A line that offers a verb says that verb's refusal itself; its callers do not.** `decide` and the api's `decisionOf` each wrapped
+  `retryLines` in `run.pruned ? [] : …`, and neither wrapped `overBudgetLine`: a pruned run over its budget was told `OVER BUDGET, waiting
+  on you` with a `wf retry --budget` that `prunedRefusal` refused, while `wf ls` said nothing waited on you. And `wf ls`'s step notes
+  (`gateNote`, `exhaustedNote`, `heldNote`) offered `wf approve` and `wf round` with no caller guarding them at all. Each producer in `run.ts`
+  now reads `run.pruned`, so every surface that calls it agrees. A new marker that refuses verbs is checked against every string with `wf <verb>`
+  in it (`grep -n "wf round \|wf retry \|wf approve \|wf accept " src/run.ts`), not against the callers you remember (learned by the run
+  that made a pruned run say it was pruned).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

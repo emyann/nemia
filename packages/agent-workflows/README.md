@@ -2167,9 +2167,11 @@ has is refused, not handed off.
 with its size — before it removes anything, so a pass that reads the run mid-prune files nothing into a
 worktree about to go. The mark is a person's fact beside the record, composed on read as a cancellation is.
 `wf ls` prints `(pruned)` beside the run, `wf decide` says when and what it kept, and the board's run page
-has a `pruned` row. `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run, `wf decide`
-offers none of them, the run waits on nobody, and the tick files nothing for it, whatever ask is written
-by hand. `wf rm` still forgets it, the mark with it. A run pruned again — a worktree git refused the
+has a `pruned` row. `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run, and neither
+`wf decide`, `wf ls`'s step notes nor the board offer any of them: a step over its budget reads
+`OVER BUDGET: … since the run was pruned at …` with no raise, a loop out of rounds `no round more`, a gate
+`not approved, and never can be`. The run waits on nobody, and the tick files nothing for it, whatever ask
+is written by hand. `wf rm` still forgets it, the mark with it. A run pruned again — a worktree git refused the
 first time — is marked with the later time, and every worktree either prune removed.
 
 ## Choosing the model per step

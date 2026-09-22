@@ -1,0 +1,1442 @@
+[
+ {
+  "file": "apps/api/test/builder.test.ts",
+  "lines": 662,
+  "decls": 48,
+  "ms": 464,
+  "inputTokens": 3050,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.68
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.8,
+    "confidence": 0.66,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.14,
+     "2": 0.73,
+     "3": 0.07
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.49,
+    "confidence": 0.48,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.51,
+     "2": 0.45,
+     "3": 0.03
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/api/test/capabilities.test.ts",
+  "lines": 776,
+  "decls": 53,
+  "ms": 474,
+  "inputTokens": 3538,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.69
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.97,
+    "confidence": 0.68,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.1,
+     "2": 0.72,
+     "3": 0.14
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.7,
+    "confidence": 0.58,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.35,
+     "2": 0.58,
+     "3": 0.06
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/api/test/app.test.ts",
+  "lines": 1409,
+  "decls": 88,
+  "ms": 480,
+  "inputTokens": 4813,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.74
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.89,
+    "confidence": 0.58,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.16,
+     "2": 0.63,
+     "3": 0.16
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.79,
+    "confidence": 0.6,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.3,
+     "2": 0.6,
+     "3": 0.1
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/api/src/app.ts",
+  "lines": 2376,
+  "decls": 133,
+  "ms": 576,
+  "inputTokens": 9773,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.17,
+    "confidence": 0.36,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.09,
+     "2": 0.44,
+     "3": 0.4
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.22,
+    "confidence": 0.49,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.14,
+     "2": 0.49,
+     "3": 0.37
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/src/components/FactoryCanvas.tsx",
+  "lines": 718,
+  "decls": 16,
+  "ms": 197,
+  "inputTokens": 1682,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.82
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.41,
+    "confidence": 0.48,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.03,
+     "2": 0.49,
+     "3": 0.47
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.03,
+    "confidence": 0.52,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.22,
+     "1": 0.55,
+     "2": 0.2,
+     "3": 0.03
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/src/components/ui/sidebar.tsx",
+  "lines": 712,
+  "decls": 34,
+  "ms": 192,
+  "inputTokens": 1734,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.81
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.39,
+    "confidence": 0.35,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.2,
+     "1": 0.23,
+     "2": 0.55,
+     "3": 0.02
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.07,
+    "confidence": 0.88,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.88,
+     "2": 0.08,
+     "3": 0.01
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/src/lib/api.ts",
+  "lines": 1318,
+  "decls": 119,
+  "ms": 345,
+  "inputTokens": 9564,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.68,
+    "confidence": 0.34,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.15,
+     "1": 0.2,
+     "2": 0.48,
+     "3": 0.17
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.89,
+    "confidence": 0.57,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.26,
+     "2": 0.58,
+     "3": 0.16
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/src/components/Decide.tsx",
+  "lines": 782,
+  "decls": 30,
+  "ms": 457,
+  "inputTokens": 2748,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.06,
+    "confidence": 0.45,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.1,
+     "2": 0.52,
+     "3": 0.31
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.32,
+    "confidence": 0.66,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.67,
+     "2": 0.32,
+     "3": 0
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/test/components.test.ts",
+  "lines": 2029,
+  "decls": 168,
+  "ms": 319,
+  "inputTokens": 8700,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.84
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.34,
+    "confidence": 0.34,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.08,
+     "2": 0.35,
+     "3": 0.52
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.04,
+    "confidence": 0.57,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.18,
+     "2": 0.59,
+     "3": 0.23
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/test/e2e/seed.ts",
+  "lines": 1448,
+  "decls": 48,
+  "ms": 253,
+  "inputTokens": 4181,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.25,
+    "confidence": 0.25,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.09,
+     "1": 0.09,
+     "2": 0.31,
+     "3": 0.51
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.65,
+    "confidence": 0.6,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.37,
+     "2": 0.6,
+     "3": 0.03
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/test/factory.test.ts",
+  "lines": 869,
+  "decls": 70,
+  "ms": 252,
+  "inputTokens": 4106,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.73
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.67,
+    "confidence": 0.39,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.09,
+     "1": 0.29,
+     "2": 0.48,
+     "3": 0.14
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.8,
+    "confidence": 0.65,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.26,
+     "2": 0.65,
+     "3": 0.08
+    }
+   }
+  }
+ },
+ {
+  "file": "apps/web/test/e2e/pages/200-inbox.ts",
+  "lines": 614,
+  "decls": 4,
+  "ms": 529,
+  "inputTokens": 1033,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.51
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.85,
+    "confidence": 0.84,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.85,
+     "3": 0.01
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 0.05,
+    "confidence": 0.95,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.98,
+     "1": 0,
+     "2": 0.01,
+     "3": 0.01
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/src/domain.ts",
+  "lines": 618,
+  "decls": 22,
+  "ms": 221,
+  "inputTokens": 1800,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.62
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.78,
+    "confidence": 0.51,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.11,
+     "1": 0.14,
+     "2": 0.62,
+     "3": 0.13
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 0.94,
+    "confidence": 0.75,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.16,
+     "1": 0.75,
+     "2": 0.09,
+     "3": 0
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/src/facade.ts",
+  "lines": 636,
+  "decls": 14,
+  "ms": 201,
+  "inputTokens": 1552,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.72
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.87,
+    "confidence": 0.62,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.12,
+     "2": 0.69,
+     "3": 0.12
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.16,
+    "confidence": 0.68,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.69,
+     "2": 0.23,
+     "3": 0
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/src/runner.ts",
+  "lines": 1429,
+  "decls": 63,
+  "ms": 222,
+  "inputTokens": 4465,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.59,
+    "confidence": 0.59,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.02,
+     "2": 0.33,
+     "3": 0.64
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.01,
+    "confidence": 0.71,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.13,
+     "2": 0.72,
+     "3": 0.15
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/src/runner-detached.ts",
+  "lines": 793,
+  "decls": 30,
+  "ms": 253,
+  "inputTokens": 2386,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.79
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.44,
+    "confidence": 0.44,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.03,
+     "2": 0.46,
+     "3": 0.5
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.68,
+    "confidence": 0.65,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.32,
+     "2": 0.66,
+     "3": 0.01
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/test/detached.test.ts",
+  "lines": 750,
+  "decls": 60,
+  "ms": 217,
+  "inputTokens": 3285,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.75
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.91,
+    "confidence": 0.62,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.13,
+     "2": 0.67,
+     "3": 0.15
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.63,
+    "confidence": 0.58,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.38,
+     "2": 0.58,
+     "3": 0.03
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/test/engine.test.ts",
+  "lines": 875,
+  "decls": 62,
+  "ms": 224,
+  "inputTokens": 3383,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.63
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.64,
+    "confidence": 0.52,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.29,
+     "2": 0.58,
+     "3": 0.06
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.64,
+    "confidence": 0.57,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.39,
+     "2": 0.5599999999999999,
+     "3": 0.04
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/cli.ts",
+  "lines": 1110,
+  "decls": 23,
+  "ms": 225,
+  "inputTokens": 2190,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.78
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.72,
+    "confidence": 0.64,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.22,
+     "2": 0.69,
+     "3": 0.04
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.11,
+    "confidence": 0.84,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.85,
+     "2": 0.12,
+     "3": 0
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-engine/test/facade.test.ts",
+  "lines": 657,
+  "decls": 39,
+  "ms": 276,
+  "inputTokens": 2538,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.65
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.75,
+    "confidence": 0.5,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.25,
+     "2": 0.56,
+     "3": 0.13
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.59,
+    "confidence": 0.57,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.4,
+     "2": 0.58,
+     "3": 0.01
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/workflow.ts",
+  "lines": 1892,
+  "decls": 123,
+  "ms": 225,
+  "inputTokens": 8159,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.83
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.44,
+    "confidence": 0.44,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.03,
+     "2": 0.36,
+     "3": 0.5700000000000001
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.08,
+    "confidence": 0.51,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.2,
+     "2": 0.51,
+     "3": 0.29
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/test/queue-store.test.ts",
+  "lines": 690,
+  "decls": 37,
+  "ms": 197,
+  "inputTokens": 2727,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.66
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.85,
+    "confidence": 0.67,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.16,
+     "2": 0.71,
+     "3": 0.09
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.6,
+    "confidence": 0.56,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.4,
+     "2": 0.57,
+     "3": 0.02
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/run.ts",
+  "lines": 4884,
+  "decls": 273,
+  "ms": 472,
+  "inputTokens": 20376,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.82
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.35,
+    "confidence": 0.35,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.08,
+     "2": 0.29,
+     "3": 0.56
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.55,
+    "confidence": 0.55,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.09,
+     "2": 0.25,
+     "3": 0.66
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/runner.ts",
+  "lines": 3506,
+  "decls": 168,
+  "ms": 339,
+  "inputTokens": 12228,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.81
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.77,
+    "confidence": 0.77,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.01,
+     "2": 0.17,
+     "3": 0.81
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.24,
+    "confidence": 0.24,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.18,
+     "2": 0.39,
+     "3": 0.43
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/test/ship.test.ts",
+  "lines": 846,
+  "decls": 47,
+  "ms": 245,
+  "inputTokens": 3340,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.61
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.83,
+    "confidence": 0.66,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.16,
+     "2": 0.71,
+     "3": 0.08
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.67,
+    "confidence": 0.6,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.36,
+     "2": 0.6,
+     "3": 0.03
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/test/store.test.ts",
+  "lines": 3747,
+  "decls": 185,
+  "ms": 273,
+  "inputTokens": 10917,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.78
+   },
+   "purposes": {
+    "type": "score",
+    "score": 2.13,
+    "confidence": 0.52,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.08,
+     "2": 0.57,
+     "3": 0.3
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.22,
+    "confidence": 0.43,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.17,
+     "2": 0.44,
+     "3": 0.39
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/test/workflow.test.ts",
+  "lines": 1340,
+  "decls": 103,
+  "ms": 326,
+  "inputTokens": 5960,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.75
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.86,
+    "confidence": 0.54,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.09,
+     "1": 0.11,
+     "2": 0.64,
+     "3": 0.16
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.87,
+    "confidence": 0.42,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.34,
+     "2": 0.43,
+     "3": 0.22
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/deps.ts",
+  "lines": 228,
+  "decls": 16,
+  "ms": 180,
+  "inputTokens": 1825,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.75
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.81,
+    "confidence": 0.58,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.09,
+     "1": 0.13,
+     "2": 0.66,
+     "3": 0.12
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.05,
+    "confidence": 0.78,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.78,
+     "2": 0.14,
+     "3": 0
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/test/run.test.ts",
+  "lines": 4164,
+  "decls": 292,
+  "ms": 495,
+  "inputTokens": 15591,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.72
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.98,
+    "confidence": 0.46,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.11,
+     "2": 0.55,
+     "3": 0.26
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 2.39,
+    "confidence": 0.39,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.13,
+     "2": 0.33,
+     "3": 0.53
+    }
+   }
+  }
+ },
+ {
+  "file": "packages/agent-workflows/src/check.ts",
+  "lines": 208,
+  "decls": 17,
+  "ms": 243,
+  "inputTokens": 1754,
+  "model": "jev-1.13.0",
+  "answers": {
+   "split": {
+    "type": "noul",
+    "noul": 0.62
+   },
+   "purposes": {
+    "type": "score",
+    "score": 1.79,
+    "confidence": 0.66,
+    "legend": {
+     "0": "One purpose: every declaration serves the same job",
+     "1": "Two closely related purposes that belong together",
+     "2": "Three or four purposes that could each stand alone",
+     "3": "Many unrelated purposes mixed together in one file"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.14,
+     "2": 0.73,
+     "3": 0.06
+    }
+   },
+   "navigate": {
+    "type": "score",
+    "score": 1.02,
+    "confidence": 0.83,
+    "legend": {
+     "0": "Easy: few declarations, each clearly named for what it does",
+     "1": "Manageable: many declarations, but named and grouped so the right one is found quickly",
+     "2": "Hard: many declarations of mixed purposes, where finding the right ones means reading around",
+     "3": "Very hard: hundreds of declarations or a few enormous ones, where a change needs much of the file read first"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.82,
+     "2": 0.1,
+     "3": 0
+    }
+   }
+  }
+ }
+]

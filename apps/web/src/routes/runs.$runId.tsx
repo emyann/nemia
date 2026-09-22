@@ -1,7 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Artifacts, ClosedNeeds } from '../components/Closeout';
+import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
@@ -115,6 +115,8 @@ function Run({ run }: { run: RunDetail }) {
             // When it started — its first step filed — and the wait before it, which a run started `--after` runs spends doing nothing.
             ['started', startedRow(run)],
             ['cancelled', run.cancelledAt && when(run.cancelledAt)],
+            // Only once `wf prune` removed its worktrees: the run is read as it ended, and nothing of it can be tried again.
+            ...(run.pruned ? ([['pruned', <Pruned pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
             ['workflow', code(run.workflowDir)],
           ]}
         />
@@ -126,6 +128,17 @@ function Run({ run }: { run: RunDetail }) {
         <StepSection key={step.name} run={run} step={step} runCancelled={runCancelled} />
       ))}
     </article>
+  );
+}
+
+/** When `wf prune` removed a run's worktrees, how many and what they held, and what it kept — in `wf prune`'s words. */
+function Pruned({ pruned: { at, worktrees } }: { pruned: NonNullable<RunDetail['pruned']> }) {
+  const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
+  const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
+  return (
+    <span data-pruned title={worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`).join('\n')}>
+      {when(at)} — removed {count}, {bytesWord(bytes)} freed; its branches, record and files are kept
+    </span>
   );
 }
 

@@ -348,6 +348,8 @@ export const SHIPPED = {
   branch: 'wf/it-shipped-itself-e2e13/implement',
   /** What ship said it did, which is the account a person reads under the step. */
   merged: 'Merged it onto main with --no-ff, and the check passed.',
+  /** What `wf prune` freed once it shipped: the one worktree its implement and review worked in, as a `node_modules` makes one. */
+  prunedBytes: 1.5 * 1024 ** 3,
 } as const;
 
 /**
@@ -1067,6 +1069,8 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   signedOff(`${SHIPPED.id}-review`, shippedLane, 'Review the change.', 0.59, 0.4, done('One reading of it, and nothing to change.'));
   signedOff(`${SHIPPED.id}-ship`, repo, shipBody, 0.3, 0.2, done(SHIPPED.merged));
   write(path.join(root, 'runs', `${SHIPPED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
+  // And pruned after it shipped, as `wf prune` marks a run: its record and branch kept, the worktree gone.
+  write(path.join(root, 'runs', `${SHIPPED.id}.pruned`), JSON.stringify({ at: ago(0.1), worktrees: [{ path: shippedLane, bytes: SHIPPED.prunedBytes }] }, null, 2));
   shipRun(SHIPPED.id, SHIPPED.title, 'its ending step was approved, ran in the checkout and merged the branch: nothing left to decide.', SHIPPED.branch, 0.8, {
     implement: { taskId: `${SHIPPED.id}-implement`, workspace: shippedLane, branch: SHIPPED.branch },
     review: { taskId: `${SHIPPED.id}-review`, workspace: shippedLane, branch: SHIPPED.branch },

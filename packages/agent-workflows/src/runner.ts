@@ -25,6 +25,8 @@ export { answerIn, harnessWaitLine, waitingWords } from './run.ts';
  * dependency of it — and this file is the only one in the workspace that knows the engine exists.
  */
 export { nameFor } from 'agent-engine';
+export { pruneLines, prunedBytes, prunedRefusal, pruneRefusal, sizeOf } from './run.ts';
+export type { Pruned, PruneFacts, Pruning } from './run.ts';
 export { acceptAsk, acceptanceOf, acceptedLines, approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, firstFiledAt, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, runStartedAt, saidLines, signoffsSpent, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Acceptance, Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
@@ -37,7 +39,7 @@ import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCa
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { folderPlace, inputsRoot, workRoot } from './places.ts';
 import { acceptanceOf, spentAcceptances, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Pruned, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -67,20 +69,43 @@ export const inboxDir = (): string => path.join(HOME, 'inbox');
 const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
 
 /**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), each approval at a gate
- * (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is ever written into the record
- * (`rewriteRun`).
+ * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk — a person's fact, in a file of its own
+ * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
+ * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `wf rm` removes it with the run.
+ */
+const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
+
+/** The prune marker, read: undefined for a run never pruned, and for a marker that no longer reads as one, whose run is taken as pruned all the same. */
+function readPruned(id: string): Pruned | undefined {
+  let text: string;
+  try { text = fs.readFileSync(pruneFile(id), 'utf8'); } catch { return undefined; }
+  try {
+    const { at, worktrees } = JSON.parse(text) as Partial<Pruned>;
+    return { at: typeof at === 'string' ? at : '', worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [] };
+  } catch {
+    return { at: '', worktrees: [] };
+  }
+}
+
+/**
+ * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), each
+ * approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is ever written into
+ * the record (`rewriteRun`).
  */
 export const readRun = (id: string): Run => {
   // A mistyped run id is the commonest way to reach this, and `ENOENT: no such file or directory,
   // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
-  const { approvals: _, acceptances: __, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  const { approvals: _, acceptances: __, pruned: ___, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
   const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
+  const pruned = readPruned(id);
   const { approvals } = readApprovals(id);
   const { acceptances } = readAcceptances(id);
-  return { ...run, ...(at ? { cancelledAt: at } : {}), ...(approvals.length ? { approvals } : {}), ...(acceptances.length ? { acceptances } : {}) };
+  return {
+    ...run, ...(at ? { cancelledAt: at } : {}), ...(pruned ? { pruned } : {}),
+    ...(approvals.length ? { approvals } : {}), ...(acceptances.length ? { acceptances } : {}),
+  };
 };
 
 /**
@@ -354,10 +379,10 @@ const writeRun = (run: Run) => {
  * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
  * after it is opened takes the write with it.
  *
- * Without the approvals and acceptances `readRun` composed onto it: they are a person's files, and a copy in the record would outlive the
- * file it was read from.
+ * Without the approvals, acceptances and pruning `readRun` composed onto it: they are a person's files, and a copy in the record would
+ * outlive the file it was read from.
  */
-const rewriteRun = ({ approvals: _, acceptances: __, ...run }: Run): boolean => {
+const rewriteRun = ({ approvals: _, acceptances: __, pruned: ___, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');
@@ -2040,7 +2065,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
   // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
   let markedHandedOff = false;
-  const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
+  // A pruned run owed no hand-off when its worktrees went (`pruneRefusal`), and has nowhere to hand one off from since.
+  const collected = (run.pruned ? [] : handOffDue(steps, run, phaseOf)).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
     const record = run.steps[name]!;
     let handed: ReturnType<typeof handOff>;
@@ -2081,9 +2107,11 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
   // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
   // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
-  // filed on this pass.
+  // filed on this pass. A pruned run is called off the same way: whatever a person's ask says, what it would file works in a worktree
+  // `wf prune` removed, or inherits one — and the marker is written before the first removal, so a pass that read the run a moment
+  // before stops here too.
   let calledOff = false;
-  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)));
+  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)) || fs.existsSync(pruneFile(run.id)));
   const endingSaid = (ending: Workflow): EndingStopped => {
     const said = signedOff(ending.name);
     return {
@@ -2527,6 +2555,117 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
 }
 
 /**
+ * Remove the worktrees of a run that is over, and nothing else — `wf prune`. Its record, asks, closeouts and costs, its branches, its files
+ * directory, its check logs and inputs, and the engine's record of its sessions are kept, so `wf decide`, `wf ls` and the board still read
+ * it, and a run waiting on it still reads whether it shipped.
+ *
+ * Read as `wf rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run, a
+ * run not over, anything that holds `wf rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on
+ * no branch, or holds a change no commit has. A run with no worktree left answers `nothing`, and says why.
+ *
+ * Without `yes`, nothing is touched: each worktree and what it holds on disk (`du`, which counts a link and not what it points at — a
+ * worktree's `node_modules` of links to the main checkout's costs nothing to keep). With it, the run is marked pruned first (`pruneFile`),
+ * so that a pass reading it while its worktrees go files nothing (`advance`); then git removes each worktree — never `--force`, so a file
+ * that turned up since it was read is git's refusal and not a loss — and the marker is written again with what was removed. A run left with
+ * nothing removed and never pruned before is not marked. The tick never calls this.
+ */
+export async function prune(e: Engine, id: string, { unmerged = false, yes = false }: { unmerged?: boolean; yes?: boolean } = {}): Promise<Pruning> {
+  const refusedId = idRefusal(id, 'prune');
+  if (refusedId) throw Object.assign(new Error(refusedId), { exitCode: 2 });
+  const run = readRun(id);
+  const none = { worktrees: [], left: [] };
+  const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
+  if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none };
+
+  // The run's worktrees, as git lists them — a directory already gone is git's to forget (`git worktree prune`), not a removal.
+  const within = resolved(path.join(HOME, 'worktrees', id));
+  let steps: Workflow[] | undefined;
+  try { steps = stepsOf(run); } catch { /* a record from before runs froze their workflow, whose folder is gone: `pruneRefusal` says so */ }
+  const recorded = { ...run, steps: Object.fromEntries(Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st])) };
+  const listed = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? '')).worktrees
+    .filter((w) => !(w.prunable && w.locked === undefined));
+  if (!listed.length) {
+    const nothing = run.pruned ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (wf prune)`
+      : !run.isolate ? `it cut no worktree — it worked in ${run.repo} itself`
+      : 'no worktree of it is left';
+    if (yes && run.pruned) gitSays(run.repo, 'worktree', 'prune');
+    return { id, kind: 'nothing', nothing, ...none };
+  }
+
+  // Read as `wf rm` reads it: what the engine holds, and a person has asked, adopted first, so a filing no pass has written down still holds.
+  const { views, phaseOf } = await taskPhases(e, run);
+  const { asks, rounds } = readAsks(id);
+  const reader = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  const verdictOf = exitVerdicts(views, run);
+  const spendOf = spendReader(views);
+  let decided: Decision['kind'] | undefined;
+  let held: string | null = null;
+  let owed: string[] = [];
+  if (steps) {
+    await adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
+    await adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
+    await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
+    for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
+      run.steps[name] = { ...run.steps[name]!, taskId };
+    }
+    decided = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind;
+    const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
+    const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
+    // No other run is asked: one waiting on this run reads its record, which stays.
+    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune');
+    owed = handOffDue(steps, run, phaseOf);
+  }
+  // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.
+  const facts = listed.map((w) => {
+    const status = w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
+    const changes = (status ?? '').split('\n').filter(Boolean).map((line) => line.slice(3));
+    const onBranch = w.detached && w.head && w.locked === undefined ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim()) : false;
+    const hold = heldWorktree(w, { clean: status !== undefined && !changes.length, onBranch });
+    // git could not read its status: taken as holding what nobody can see, and refused.
+    const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
+    return { path: w.path, ...(hold ?? {}), ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
+  });
+  // A run once pruned was agreed to be pruned unmerged, or was merged: its merge is not asked again.
+  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || Boolean(run.pruned) });
+  if (refusal) return { id, kind: 'refused', refusal, ...none };
+
+  const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path) }));
+  if (!yes) return { id, kind: 'prunable', worktrees, left: [] };
+
+  const at = new Date().toISOString();
+  const before = run.pruned?.worktrees ?? [];
+  fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: before }, null, 2));
+  const removed: Array<{ path: string; bytes: number }> = [];
+  const left: Pruning['left'] = [];
+  for (const w of worktrees) {
+    try {
+      execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      removed.push(w);
+    } catch (err) {
+      left.push({ path: w.path, git: gitWords(err) });
+    }
+  }
+  gitSays(run.repo, 'worktree', 'prune');
+  try { fs.rmdirSync(within); } catch { /* not empty: what git would not remove is still there */ }
+  if (!removed.length && !run.pruned) fs.rmSync(pruneFile(id), { force: true });
+  else fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: [...before, ...removed] }, null, 2));
+  return { id, kind: 'pruned', worktrees: removed, left, at };
+}
+
+/** What a directory holds on disk, in bytes, as `du` counts it: a link as a link. Zero when `du` cannot say. */
+function diskBytes(dir: string): number {
+  try {
+    const out = execFileSync('du', ['-sk', dir], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return (Number.parseInt(out, 10) || 0) * 1024;
+  } catch (err) {
+    // `du` says what it could not read on stderr, and still totals the rest.
+    const out = (err as { stdout?: string }).stdout ?? '';
+    return (Number.parseInt(out, 10) || 0) * 1024;
+  }
+}
+
+/**
  * A path as git names a worktree: every link on the way followed, as far as the path exists, and the rest as written. A store under a
  * link — a home directory on another disk, or macOS's `/var` in `/private/var` — would otherwise hold no worktree git lists.
  */
@@ -2547,7 +2686,7 @@ const gitWords = (err: unknown): string => {
 
 /**
  * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: its record first, then its
- * cancellation, its asks, its own directory (inputs, artifacts), its check logs (`checkLogsOf`, by the steps `names`, or without them any
+ * cancellation, its pruning, its asks, its own directory (inputs, artifacts), its check logs (`checkLogsOf`, by the steps `names`, or without them any
  * under its id that is no other stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the engine's.
  */
 function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
@@ -2558,7 +2697,7 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
     fs.rmSync(at, { recursive: true, force: true });
     removed.push(`${path.relative(HOME, at)}${st.isDirectory() ? '/' : ''}`);
   };
-  for (const at of [runFile(id), cancelFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
+  for (const at of [runFile(id), cancelFile(id), pruneFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
   const checks = path.join(HOME, 'checks');
   let logs: string[] = [];
   try { logs = fs.readdirSync(checks); } catch { /* no check ever ran */ }
@@ -3473,17 +3612,19 @@ export async function decide(e: Engine, id: string): Promise<{
   }
   // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
+  // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is offered.
+  const over = Boolean(run.cancelledAt || run.pruned);
   return {
     run, decision: d, closeouts, checks,
-    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
-    rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
-    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
+    retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
+    rounding: over ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
+    offers: run.pruned ? [] : [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),
     used,
     costs,
     runCost: runCostLines(run, spendOf),
     answers,
-    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
+    answering: run.pruned ? {} : answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     accepted: acceptedLines(steps, run),
     waitingOn,

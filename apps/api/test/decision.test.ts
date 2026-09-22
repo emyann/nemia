@@ -290,6 +290,32 @@ test("a branch git cannot read is an `error` on its entry — the lesson not kno
   assert.equal(nowhere.body.lesson.state, 'unknown');
 });
 
+test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
+  // As r-d3: implement signed off blocked, and may be tried again — until the run is pruned.
+  writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
+  assert.deepEqual((await decisionOf('r-d10')).body.commands.map((c: DecideCommand) => c.command), ['wf retry r-d10 implement']);
+  assert.deepEqual((await (await app.request('/api/runs/r-d10')).json()).waitingOnYou, ['implement']);
+  const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
+  fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
+
+  const { status, body } = await decisionOf('r-d10');
+  assert.equal(status, 200);
+  assert.deepEqual(body.commands, []);
+  const page = await (await app.request('/api/runs/r-d10')).json();
+  assert.deepEqual(page.pruned, pruned);
+  assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
+  // A try asked by hand, beside the verb that refuses it, is no try coming: the board says nothing is on its way.
+  const asks = path.join(root, 'runs', 'r-d10.asks');
+  fs.mkdirSync(asks, { recursive: true });
+  fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+  const asked = await (await app.request('/api/runs/r-d10')).json();
+  assert.equal(asked.steps.find((s: { name: string }) => s.name === 'implement').asked, null);
+  assert.equal(asked.moving, false);
+  fs.rmSync(asks, { recursive: true });
+  // And a run never pruned says so with a null, not a missing field.
+  assert.equal((await (await app.request('/api/runs/r-d1')).json()).pruned, null);
+});
+
 test('a run called off, or whose branch is already on its base, has nothing to decide, in `wf decide`\'s words', async () => {
   writeRun({ id: 'r-d4', repo, baseRef: base, steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } } });
   fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');

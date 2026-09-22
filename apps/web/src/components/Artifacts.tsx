@@ -1,8 +1,11 @@
 import type { StepArtifact } from '../lib/api';
 
-/** Bytes as a person reads them, as `wf decide` prints a file's size. */
+/** Bytes as a person reads them, as `wf decide` prints a file's size and `wf prune` a worktree's (`sizeOf`). */
 export const bytesWord = (bytes: number): string =>
-  bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  bytes < 1024 ? `${bytes} B`
+  : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB`
+  : bytes < 1024 ** 3 ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
 /**
  * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;

@@ -241,7 +241,7 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
   assert.ok(!under('runs', `${run.id}.pruned`));
 });
 
-test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async () => {
+test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
   // A gated step that signed off: the run is not running, and not merged, so --unmerged is given, and the gate alone holds it.
   const b = board();
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
@@ -253,9 +253,14 @@ test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at 
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
   assert.equal((await decide(b.e, run.id)).decision.kind, 'awaiting', 'over, as `decide` reads it: not refused as running');
+  const gateWords = `implement waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${run.id} implement. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id}.`;
   const atGate = await prune(b.e, run.id, { yes: true, unmerged: true });
   assert.equal(atGate.kind, 'refused');
-  assert.equal(atGate.refusal, `implement waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${run.id} implement. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id}.`);
+  assert.equal(atGate.refusal, gateWords);
+  // Without --unmerged, the gate alone is said: --unmerged gets past no gate, so offering it would name a command that is refused in turn.
+  const bare = await prune(b.e, run.id, { yes: true });
+  assert.equal(bare.refusal, gateWords);
+  assert.doesNotMatch(bare.refusal!, /--unmerged/);
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 
   // A retry asked of a step that shipped, which no pass files: the run is over and merged, and the ask alone holds it — until it is taken back.
@@ -270,6 +275,11 @@ test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at 
   assert.ok(fs.existsSync(shipped.wt) && !under('runs', `${shipped.run.id}.pruned`));
   fs.rmSync(path.join(asks, 'retry-implement-2'));
   assert.equal((await prune(b.e, shipped.run.id, { yes: true })).kind, 'pruned');
+
+  // Once what held it is cleared, the next prune says what is left: called off at its gate, the run that is not merged prunes with no word
+  // more, since a cancelled run is never tried again (features.md, left for later); the gate no longer holds either way.
+  assert.equal((await typed(t, b.e, 'cancel', run.id)).error, undefined);
+  assert.equal((await prune(b.e, run.id, { yes: true })).kind, 'pruned');
 });
 
 test('REFUSED after a prune: a retry, a round, an approval and an acceptance — each would file work into a worktree that is gone — and a pass files nothing on an ask a person wrote by hand', async (t) => {

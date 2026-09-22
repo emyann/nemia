@@ -2998,7 +2998,7 @@ export type PruneFacts = {
  * - **a run that is not over** (`decision` says running), or whose workflow no longer reads, so that nobody can say.
  * - **whatever holds `wf rm`** (`held`): a task in flight, anything due, an ask no pass has spent, a step at its gate. A run waiting on
  *   this one is no reason here, since the record it reads stays.
- * - **a run finished and not merged**, unless `unmerged`: pruned, none of its steps can be tried again, sent round or approved
+ * - **a run finished and not merged**, unless `unmerged`, and said only once nothing above holds it, since `--unmerged` clears none of that: pruned, none of its steps can be tried again, sent round or approved
  *   (`prunedRefusal`), and its branch is the one place its work is left.
  * - **a hand-off still owed** (`owed`): what a pass would commit, and the files it would collect, are only in the worktree.
  * - **a worktree git would not remove, or that holds what no branch has**: locked; on no branch; or with changes no commit holds — where
@@ -3017,7 +3017,9 @@ export function pruneRefusal(run: Run, facts: PruneFacts, { unmerged = false }: 
   } else if (facts.held) {
     said.push(facts.held.replace(/\.$/, ''));
   }
-  if (facts.decided === 'awaiting' && !unmerged) {
+  // Not beside what holds `wf rm`: `--unmerged` gets past none of it, and a person told to run it would be refused again. Once that is
+  // cleared — a gate approved or the run called off, an ask taken back — the next `wf prune` says this, if it still holds.
+  if (facts.decided === 'awaiting' && !unmerged && !facts.held) {
     said.push(`it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: wf prune ${id} --unmerged`);
   }
   if (facts.owed.length) {

@@ -2069,7 +2069,8 @@ has is refused, not handed off.
   takes out of the worktree. Let a tick run first.
 - **a finished run not merged into its base**, unless `--unmerged`. Pruned, none of its steps can be tried
   again, sent round, approved or accepted, and its branch is the one place its work is left. A cancelled
-  run needs no `--unmerged`: it could not be tried again anyway.
+  run needs no `--unmerged`: it could not be tried again anyway. It is not said beside what `wf rm` refuses
+  (below), since `--unmerged` gets past none of that; once that is cleared, the next `wf prune` says it.
 - **a worktree that is dirty** (its files named), **locked** (with the `git worktree unlock`), or
   **detached on a commit no branch holds** (with the `git switch -c` that keeps it).
 - **a folder run** (`workspace: folder`): its steps' folders are its work, kept until `wf rm`.

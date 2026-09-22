@@ -350,7 +350,7 @@ export type RunDetail = {
 };
 
 /**
- * Mirrors `TaskSpan` in agent-workflows' run.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the engine's
+ * Mirrors `TaskSpan` in agent-workflows' timeline.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the engine's
  * feed, and null where the feed has none; `spawnedAt` its first attempt's spawn; `endedAt` its last attempt's end once it settled. `at` is
  * where it stands, and `queued` (filed → spawned, the wait for a slot) and `ran` (spawned → ended) the package's words for its two times.
  */
@@ -374,7 +374,7 @@ export type TaskSpan = {
 export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
 
 /**
- * Mirrors `StepTimelineTotal` in apps/api/src/app.ts — `TimelineTotal` in agent-workflows' run.ts, with its cost: a round of a loop — `loop` its
+ * Mirrors `StepTimelineTotal` in apps/api/src/app.ts — `TimelineTotal` in agent-workflows' timeline.ts, with its cost: a round of a loop — `loop` its
  * looping step, counting the steps that round files again — or the run's, every step's (`loop` and `round` null); sums over its tasks, and its
  * wall, in words; and what the sessions in it cost, null where none was measured.
  */

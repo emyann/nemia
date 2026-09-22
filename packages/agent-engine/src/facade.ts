@@ -16,12 +16,12 @@ import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, noTranscript, Runner, RunnerError,
   type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
-import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
+import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
 
@@ -363,71 +363,17 @@ const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
 
 // ─── what the door refuses ──────────────────────────────────────────────────
 
-/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
-const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
-
 /**
- * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses —
- * `SendMessage`, `Bash(npm run build)`. A space or a comma outside the parentheses separates two rules on
- * the harness's side, so an entry that has one is not one rule.
- */
-const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
-
-/**
- * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`.
+ * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, the
+ * half every door refuses (`engine.ts`), whose type checks the ranges here rest on.
  *
- * Checked at the API, so the CLI is not the only door that checks. A journalled task is a promise
- * the loop keeps trying to honour, so a value it cannot use is cheapest refused before it is
- * written: `deadlineSeconds: NaN` was journalled as `null` and stopped its task on the first pass,
- * and a permission mode the harness rejects failed the spawn, which failed the whole tick. Which
- * words a harness takes is asked of the harness; the engine never learns them.
+ * Checked at the API, so the CLI is not the only door that checks: a permission mode the harness rejects failed the
+ * spawn, which failed the whole tick. Which words a harness takes is asked of the harness; the engine never learns
+ * them, and the Effect door, which has no harnesses to ask, refuses none of them (open issue 6).
  */
-const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
-  if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
-  // Resolved against whichever process ticks the task, which need not be the one filing it — and a
-  // detached worker resolved it twice, from inside itself (`spawn sh ENOENT`, open issue 10).
-  if (!path.isAbsolute(spec.cwd)) {
-    return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
-  }
+const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
-  }
-  if (spec.maxAttempts !== undefined && !(Number.isInteger(spec.maxAttempts) && spec.maxAttempts >= 1)) {
-    return `\`maxAttempts: ${spec.maxAttempts}\` is not a number of attempts. Give a whole number from 1.`;
-  }
-  if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
-    return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
-  }
-  if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
-    return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
-  }
-  if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
-  if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
-  if (spec.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
-  // One name per entry: a comma inside one would split into two names on the way to the harness.
-  if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
-    return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
-  }
-  if (spec.disallowedTools !== undefined && !(Array.isArray(spec.disallowedTools) && spec.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
-    return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
-  }
-  if (spec.allowedTools !== undefined && !(Array.isArray(spec.allowedTools) && spec.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
-    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
-  }
-  const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
-  if (mcp) return mcp;
-  if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
-    return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
-  }
-  if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
-    return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
-  }
-  if (spec.remoteControl !== undefined && typeof spec.remoteControl !== 'boolean') {
-    return `\`remoteControl: ${JSON.stringify(spec.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
-  }
-  if (spec.contextTokens !== undefined && !(typeof spec.contextTokens === 'number' && Number.isSafeInteger(spec.contextTokens) && spec.contextTokens > 0)) {
-    return `\`contextTokens: ${typeof spec.contextTokens === 'number' ? spec.contextTokens : JSON.stringify(spec.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
   }
   const h = harnesses[spec.harness]!;
   // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
@@ -514,7 +460,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // in another — two ceilings for one subscription, each the full size.
     file: async (spec) => {
       const task = { ...spec, harness: spec.harness ?? fallback };
-      const refused = refusalOf(task, harnesses);
+      const refused = refusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
       return go(file(task));
     },

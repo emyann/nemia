@@ -229,7 +229,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         try: () => {
           // Resolved here, from the process that launches, as `claude --bg`'s cwd is. Relative, the
           // worker started in it and then launched the harness in the same path again, from inside
-          // it: `spawn sh ENOENT` for `cwd: 'repo'`. `file()` refuses one; this is the Effect door.
+          // it: `spawn sh ENOENT` for `cwd: 'repo'`. `file` refuses one at both doors; this is a journal written
+          // before it did, or by hand, and a caller of the runner itself.
           const r = { ...asked, cwd: path.resolve(asked.cwd) };
           // Checked here because `spawn` does not throw for it: the child emits the error later, and
           // unheard, that event kills the process that launched the worker — the engine.

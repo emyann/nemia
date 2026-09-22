@@ -5,11 +5,12 @@
  * this file is the I/O that carries it out. If you find yourself adding an `if` here, it probably
  * belongs in `decide` — that is the line that keeps this engine small.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, type McpServer } from './runner.ts';
+import { mcpRefuses, Runner, type McpServer } from './runner.ts';
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
@@ -45,14 +46,90 @@ export type TaskView = {
   waitingFor?: string;
 };
 
-/** File a task. The only write a person makes; everything after is the loop's. */
-export const file = Effect.fn('file')(function* (spec: {
+/** What `file` journals: a task as a person files it. */
+export type Filing = {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
   worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[]; allowedTools?: string[];
   effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; contextTokens?: number;
   remoteControl?: boolean; priority?: number; id?: string;
-}) {
+};
+
+/** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
+export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused', {
+  message: Schema.String,
+}) {}
+
+/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
+const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+
+/**
+ * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses —
+ * `SendMessage`, `Bash(npm run build)`. A space or a comma outside the parentheses separates two rules on
+ * the harness's side, so an entry that has one is not one rule.
+ */
+const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
+
+/**
+ * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it no harness
+ * is asked about.
+ *
+ * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
+ * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN` was
+ * journalled as `null` and stopped its task on the first pass. `createEngine().file()` asks this first and then each
+ * harness for its own words (`harnessRefusalOf` in `facade.ts`), which this door never learns (open issue 6).
+ */
+export const refusalOf = (spec: Filing): string | undefined => {
+  if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
+  if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
+  // Resolved against whichever process ticks the task, which need not be the one filing it — and a
+  // detached worker resolved it twice, from inside itself (`spawn sh ENOENT`, open issue 10).
+  if (!path.isAbsolute(spec.cwd)) {
+    return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
+  }
+  if (spec.maxAttempts !== undefined && !(Number.isInteger(spec.maxAttempts) && spec.maxAttempts >= 1)) {
+    return `\`maxAttempts: ${spec.maxAttempts}\` is not a number of attempts. Give a whole number from 1.`;
+  }
+  if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
+    return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
+  }
+  if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
+    return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
+  }
+  if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
+  if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
+  if (spec.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
+  // One name per entry: a comma inside one would split into two names on the way to the harness.
+  if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
+    return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
+  }
+  if (spec.disallowedTools !== undefined && !(Array.isArray(spec.disallowedTools) && spec.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+    return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
+  }
+  if (spec.allowedTools !== undefined && !(Array.isArray(spec.allowedTools) && spec.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
+  }
+  const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
+  if (mcp) return mcp;
+  if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
+    return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
+  }
+  if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
+    return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
+  }
+  if (spec.remoteControl !== undefined && typeof spec.remoteControl !== 'boolean') {
+    return `\`remoteControl: ${JSON.stringify(spec.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
+  }
+  if (spec.contextTokens !== undefined && !(typeof spec.contextTokens === 'number' && Number.isSafeInteger(spec.contextTokens) && spec.contextTokens > 0)) {
+    return `\`contextTokens: ${typeof spec.contextTokens === 'number' ? spec.contextTokens : JSON.stringify(spec.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
+  }
+  return undefined;
+};
+
+/** File a task. The only write a person makes; everything after is the loop's. */
+export const file = Effect.fn('file')(function* (spec: Filing) {
+  const refused = refusalOf(spec);
+  if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
@@ -279,8 +356,9 @@ const filedMs = (state: State) => {
 };
 
 /**
- * A task's priority, 0 when it has none. One that is not a finite number — which only the Effect door, refusing nothing,
- * can journal, and a file journal writes back as `null` — is read as none, never as above or below every other.
+ * A task's priority, 0 when it has none. One that is not a finite number — which `file` refuses, so only a journal written
+ * before it did, or by hand, holds one, and a file journal writes back as `null` — is read as none, never as above or
+ * below every other.
  */
 const priorityOf = (state: State) => (Number.isFinite(state.priority) ? state.priority! : 0);
 

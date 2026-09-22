@@ -6,7 +6,7 @@
  * the same flag read a file 42 times, spent $0.19 and ended `done`. So `claude-detached` hands a task's budget to the
  * harness on every attempt and records the end it prints, and `createEngine().file()` refuses a budget on `claude`, which
  * would keep none. The `claude --bg` runner is still given the flag when a task reaches it with one — through the Effect
- * door, which refuses nothing (open issue 6).
+ * door, which refuses no harness's words (open issue 6).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

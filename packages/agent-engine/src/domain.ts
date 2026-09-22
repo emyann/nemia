@@ -596,7 +596,10 @@ function resumeTarget(state: State, last: Attempt | undefined): string | undefin
   // Attempt 1 continues whatever the task was filed against — a previous step's session, usually.
   // That is a fact about the work, not a retry policy, so `resume: 'never'` does not override it:
   // "do not resume a failure" and "this task IS a continuation" are different statements.
-  if (!last) return state.resumeFrom;
+  // The same holds while every attempt so far was refused: an `unstartable` spawn ran nothing, and the
+  // next attempt is still the first to run, the continuation the task was filed as. Not `spawnedAt`:
+  // an attempt adopted after a crash never journalled its spawn, and its session did run.
+  if (!last || state.attempts.every((a) => a.reason === 'unstartable')) return state.resumeFrom;
   if (!last.nativeId || state.resume === 'never') return undefined;
   if (state.resume === 'always') return last.nativeId;
   return last.reason === 'lost' || last.reason === 'unsigned' ? last.nativeId : undefined;

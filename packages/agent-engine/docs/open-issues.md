@@ -58,19 +58,6 @@ too, and the engine prices nothing — and the parent's total is on the parent's
 Low priority: this harness exists for comparison — and, since only `claude -p` keeps a spend cap (issue 17), for a task
 that must not spend past one.
 
-### 5. An unstartable first attempt of a continuation retries cold
-
-**Where.** `resumeTarget` in `agent-engine/src/domain.ts` continues a task's `resumeFrom` only when
-there is no previous attempt.
-
-**Effect.** A task filed against a session, with `maxAttempts` above 1, whose first spawn the harness
-refuses (`reason: 'unstartable'`) starts its second attempt cold, without the session it was meant to
-continue. With `maxAttempts: 1` — the default, and what agent-workflows files unless a step says
-otherwise — it cannot happen.
-
-**Fix.** `resumeTarget` continues `state.resumeFrom` while no attempt has spawned. That is a change to
-`decide`, so it was left when the unstartable ending went in (engine `8a52173`).
-
 ### 6. The Effect door's `file` refuses nothing
 
 **Where.** `file` in `agent-engine/src/engine.ts` journals what it is given. The refusals live in
@@ -719,6 +706,7 @@ under the engine.
 | two `claude` and two `claude-detached` sessions ran at a ceiling of 2 — four Claude Code sessions on one subscription, counted as two pools | a harness declares the pool it is counted in, its own name by default; `'claude-bg'` and the engine's `claudeDetached` are both counted in `claude`, with no caller saying so (issue 20) | engine, 2026-09-16 |
 | the nudge sent to a session that ended in prose asked for "your closing statement" and named no tool: twice it got no sign-off, and a person's sentence naming `StructuredOutput` got one in thirty seconds | the nudge names the tool and says the work stands, with its words pinned by a test (issue 25) | engine, 2026-09-17 |
 | a session held busy by a background shell it left running was never read: its closeout sat unread for seventy-seven minutes, and only a person killing the shell let the run go on | a busy session whose own closeout is the last word in its conversation, and whose transcript has been cold for the quiescence floor, is read as quiet: the attempt ends on that statement (issue 24) | engine, 2026-09-17 |
+| a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

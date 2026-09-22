@@ -3,7 +3,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import readline from 'node:readline/promises';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -47,6 +48,15 @@ const HELP = `wf — run a workflow of agent steps
                                for, or a run waiting on it has not started. Its branches are kept:
                                --delete-branches deletes those merged into the run's base branch,
                                and --force-unmerged beside it the others, with their work
+  wf prune [<runId> ...] [--unmerged] [--yes]
+                               free the space runs that are over hold: their worktrees, removed
+                               through git, and nothing else — each run's record, branches and
+                               files are kept, and it stays on wf ls, wf decide and the board,
+                               marked pruned. Lists what it would remove, with its size, and
+                               removes it on --yes, or on y at the prompt. With no run, every run.
+                               Refused while a run is not over, owes a hand-off, is a folder run,
+                               or has a worktree locked, on no branch, or with changes no commit
+                               has; and a finished run not merged unless --unmerged
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
   wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
@@ -405,6 +415,31 @@ function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
   return { ids, how };
 }
 
+/** `wf prune`'s arguments: the runs to prune, each once — none is every run — and its two switches. Refused before any run is read: a flag it does not take. */
+function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: boolean } {
+  const ids: string[] = [];
+  let unmerged = false;
+  let yes = false;
+  for (const arg of argv) {
+    if (arg === '--unmerged') unmerged = true;
+    else if (arg === '--yes') yes = true;
+    else if (arg.startsWith('-')) usage(`wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged and --yes: wf prune [<runId> ...] [--unmerged] [--yes].`);
+    else if (!ids.includes(arg)) ids.push(arg);
+  }
+  return { ids, unmerged, yes };
+}
+
+/** A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes. */
+async function confirmed(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(question)).trim());
+  } finally {
+    rl.close();
+  }
+}
+
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
 const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message', '--budget'];
 
@@ -707,7 +742,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
       const held = await runSlots(e);
       for (const run of runs) {
-        const calledOff = run.cancelledAt ? '  (cancelled)' : '';
+        // A pruned run is still a run: said beside its line, as a cancelled one is, since what is left of it is its branches.
+        const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
         const { steps, waitingOnYou, waiting, cost, toDecide } = await list(e, run, held.get(run.id));
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
@@ -775,6 +811,62 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
+    // Freeing what runs that are over hold on disk: their worktrees, and nothing else. A dry run unless a person says yes — on the flag, or at
+    // the prompt — and never on a tick. Named runs each get their line, a refusal included, and a refusal makes the verb fail once every run
+    // has had its say; with none named, every run is read, and one still running or with nothing to prune is not a line of its own.
+    case 'prune': {
+      const { ids, unmerged, yes } = pruneHow(rest);
+      const named = ids.length > 0;
+      const found: Pruning[] = [];
+      const notPruned: string[] = [];
+      let failed = false;
+      for (const id of named ? ids : listRuns().map((r) => r.id)) {
+        try {
+          found.push(await prune(e, id, { unmerged }));
+        } catch (err) {
+          console.log(`${id}  not pruned: ${(err as Error).message}`);
+          notPruned.push(id);
+          if ((err as { exitCode?: number }).exitCode !== 2) failed = true;
+        }
+      }
+      const running = found.filter((p) => !named && p.kind === 'refused' && /\bit is not over\b/.test(p.refusal ?? ''));
+      for (const p of found) {
+        if (!named && (p.kind === 'nothing' || running.includes(p))) continue;
+        for (const line of pruneLines(p)) console.log(line);
+        if (named && p.kind === 'refused') notPruned.push(p.id);
+      }
+      if (running.length) console.log(`${running.length} run${running.length > 1 ? 's' : ''} not over, not pruned: ${running.map((p) => p.id).join(', ')}`);
+      const prunable = found.filter((p) => p.kind === 'prunable');
+      const refusedNamed = () => {
+        if (notPruned.length) {
+          throw Object.assign(new Error(`wf prune: ${notPruned.join(', ')} not pruned — ${notPruned.length > 1 ? 'each' : 'its'} line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
+        }
+      };
+      if (!prunable.length) {
+        if (!found.some((p) => p.kind === 'refused')) console.log(named ? 'nothing to prune' : 'nothing to prune: no run that is over has a worktree left');
+        return refusedNamed();
+      }
+      const total = sizeOf(prunedBytes(prunable.flatMap((p) => p.worktrees)));
+      console.log(`${prunable.length} run${prunable.length > 1 ? 's' : ''} to prune, ${total} in all`);
+      if (!yes && !(await confirmed('remove them? [y/N] '))) {
+        console.log(`nothing removed: wf prune ${[...(named ? prunable.map((p) => p.id) : []), ...(unmerged ? ['--unmerged'] : []), '--yes'].join(' ')} removes them`);
+        return refusedNamed();
+      }
+      for (const p of prunable) {
+        // Read again, not trusted from the listing: a run may have been handed a word, or a change made in a worktree, since.
+        try {
+          const done = await prune(e, p.id, { unmerged, yes: true });
+          for (const line of pruneLines(done)) console.log(line);
+          if (done.kind === 'refused' || done.left.length) notPruned.push(p.id);
+        } catch (err) {
+          console.log(`${p.id}  not pruned: ${(err as Error).message}`);
+          notPruned.push(p.id);
+          if ((err as { exitCode?: number }).exitCode !== 2) failed = true;
+        }
+      }
+      return refusedNamed();
+    }
+
     // The run does not end by going quiet. A review and a reply are two opinions and something
     // has to say what ships — which is a person's job, so the run's last act is to put the
     // material in front of one. Read-only on purpose: it shows the choice and the exact commands,
@@ -791,7 +883,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
       const from = fromNote(run);
-      const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}`;
+      // And that its worktrees were removed: what is left of it is its branches, its record and its files.
+      const pruned = run.pruned ? `pruned at ${run.pruned.at || 'a time its marker no longer says'} — its worktrees were removed (wf prune); its branches, record and files are kept` : '';
+      const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}${pruned ? `\n  ${pruned}` : ''}`;
       const steps = stepsOf(run);
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
@@ -926,7 +1020,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (answering[name]) console.log(`    ${answering[name]}`);
         // What it declared that is not where it says, then what is in the directory the run made for its
         // files: the screenshots a UI step's check took, say, which are on no branch.
-        const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name));
+        const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name), run.pruned);
         for (const line of files) console.log(`    ${line}`);
       }
       console.log();

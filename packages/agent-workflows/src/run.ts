@@ -2979,11 +2979,6 @@ function leftWords(f: Forgot): string {
 // ─── pruning a run ──────────────────────────────────────────────────────────
 
 /**
- * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
- * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
- * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record.
- */
-/**
  * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it was
  * pruned — or that its marker no longer says — and what was removed. Pure.
  */
@@ -2993,6 +2988,11 @@ export const prunedWords = (pruned: Pruned): string =>
 /** A step at its gate on a pruned run, as `wf ls` and `wf decide` both say it: no approval is left to give (`prunedRefusal`). */
 const neverApproved = (pruned: Pruned): string => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
 
+/**
+ * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
+ * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
+ * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record.
+ */
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
   return `${run.id} was pruned at ${run.pruned.at}: its worktrees were removed (wf prune), and ${what} would file work into one of them. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;

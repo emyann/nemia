@@ -381,6 +381,25 @@ test('...under any policy, and after as many refusals as there are attempts to s
   }
 });
 
+test('an ADOPTED attempt ran, though its spawn was never journalled: it is judged by the policy, as one that spawned', () => {
+  // The crash between the spawn call and its `spawned` entry: the session is found under our name and ended
+  // from its sighting, so the attempt has a session id and an ending, and no `spawnedAt`.
+  const ended = (reason: 'unsigned' | 'harness'): Event =>
+    ({ kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason, nativeId: 'n1' });
+  // A task filed against no session: an unsigned attempt is continued, with the nudge, as it always was.
+  const plain = fold(TASK, [filed(2), { kind: 'starting', at: at(1), attempt: 1 }, ended('unsigned')]);
+  assert.equal(plain.attempts[0]?.spawnedAt, null, 'the fixture is an adoption: no spawn on the record');
+  const a = decide(plain, seen(), now(9));
+  assert.equal(a.do === 'start' && a.resumeFrom, 'n1');
+  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
+  // A continuation of `sess-1`: the nudge goes to the session that did this attempt's work, not to `sess-1`.
+  const b = decide(fold(TASK, continuation([ended('unsigned')])), seen(), now(9));
+  assert.equal(b.do === 'start' && b.resumeFrom, 'n1');
+  // And `resume: never` still starts a harness failure clean.
+  assert.deepEqual(decide(fold(TASK, continuation([ended('harness')], { resume: 'never' })), seen(), now(9)),
+    { do: 'start', attempt: 2, resumeFrom: undefined });
+});
+
 test('a continuation whose first attempt DID spawn is judged by the policy, as any retry: its own session or none, never the one it was filed against', () => {
   const spawnedThen = (reason: 'harness' | 'lost', nativeId?: string, error?: string): Event[] => [
     { kind: 'spawned', at: at(2), attempt: 1, ...(error ? { error } : {}) },

@@ -2739,6 +2739,8 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent, () => 1), 'over budget');
   const a = assess(BUDGETED, r, p, signedDone, asked, () => 1, [], [], () => false, spent);
   assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], '`retries: 2` has one left, and spends nothing past the cap');
+  // Held on its budget, its check still refused it: the run is failed in every word, and the feed says so — not `blocked`.
+  assert.equal(a.stoppedOn, undefined, 'a step over budget whose own check refused it broke');
   assert.deepEqual(cancelPlan(BUDGETED, r, p, signedDone, asked, () => 1, [], [], spent), { kind: 'finished', status: 'failed' }, 'no tick would file anything');
 
   const l = listing(BUDGETED, r, shown(REFUSED_TWICE), signedOff({ implement: said('done') }), asked, () => 1, [], [], [], [], () => 0, spent);

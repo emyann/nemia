@@ -18,6 +18,11 @@ export type RunSummary = {
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
   createdAt: string;
+  /**
+   * When the run started: the first filing of any of its tasks, off the engine's feed — for a run started `--after` runs, or held for a run
+   * slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is filed.
+   */
+  startedAt: string | null;
   cancelledAt: string | null;
   /** The runs this one waits on (`wf start --after`), as its record froze them: the edges from their cards to its card on the Factory. */
   after: string[];
@@ -256,6 +261,8 @@ export type RunDetail = {
   branch: string | null;
   isolate: boolean | null;
   createdAt: string;
+  /** As on `RunSummary`. */
+  startedAt: string | null;
   cancelledAt: string | null;
   /** As on `RunSummary`. */
   after: string[];

@@ -383,6 +383,8 @@ export const DIAMOND = {
   words: {
     bottom: 'waiting on the-other-side-runs-e2e6',
     orphan: 'waiting on called-off-e2e8 (cancelled)',
+    /** What `running`'s card says on hover of the minute it waited, created and nothing filed, before its step was: not time at work. */
+    running: 'waited 1m 00s before its first step was filed',
   },
 } as const;
 
@@ -524,12 +526,13 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   work(shipped.id, true);
   signedOff(shipped, 2.4, 2.3);
   record(shipped, 2.4, { taskId: task(shipped), workspace: repo, branch: branchOf(shipped.id) });
-  // Its session started and has not ended, as NEIGHBOUR's draft: the engine reads it running.
+  // Its session started and has not ended, as NEIGHBOUR's draft: the engine reads it running. Created a minute before its step was filed,
+  // as a run started `--after` one is filed on the pass after its parent ships: that minute is its wait, and its card does not count it.
   work(running.id, false);
   write(path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`), lines([
-    filed(running, 2.2),
-    { kind: 'starting', at: ago(2.1), attempt: 1 },
-    { kind: 'spawned', at: ago(2.1), attempt: 1 },
+    filed(running, 1.2),
+    { kind: 'starting', at: ago(1.1), attempt: 1 },
+    { kind: 'spawned', at: ago(1.1), attempt: 1 },
   ]));
   record(running, 2.2, { taskId: task(running), workspace: repo, branch: branchOf(running.id) });
   record(bottom, 2.0, { taskId: null });

@@ -15,6 +15,8 @@ export default {
     const advice = `${cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${orphan.id}, or start the work again without --after ${cancelled.id}`;
     await expectVisible(banner.locator('[data-advice]', { hasText: advice }), 'and what wf decide leaves you to do, word for word');
     await expectVisible(banner.locator(`a[href="/runs/${cancelled.id}"]`), `${cancelled.id} is linked to its page`);
+    // Created, and nothing of it filed: it has not started, whatever time has passed since.
+    await expectVisible(page.locator('[data-fact="started"] dd', { hasText: /^not yet$/ }), `${orphan.id} has not started: nothing of it is filed`);
     await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'no Decide section: nothing of the run is filed, and wf decide offers nothing else');
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     await expectVisible(

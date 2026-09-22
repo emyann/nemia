@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, touchedSummary } from '../src/lib/decide.ts';
+import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, touchedSummary } from '../src/lib/decide.ts';
 import type { Decidable, Radius, Touched } from '../src/lib/api.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
@@ -129,4 +129,16 @@ test("a diff's file is found among the branch's changes by its name, a rename by
   assert.equal(changeOf(read, 'README.md'), undefined);
   assert.equal(changeOf(unread('wf/r/gone'), 'CLAUDE.md'), undefined);
   assert.equal(changeOf(undefined, 'CLAUDE.md'), undefined);
+});
+
+test("the board presses `accept` on the step its command names, and on no other row, nor a command it cannot read the step off", () => {
+  const accept = (command: string) => ({ label: 'accept' as const, command });
+  assert.equal(acceptStepOf(accept('wf accept r-1 review --message "<why>"'), 'r-1'), 'review');
+  assert.equal(acceptStepOf(accept('wf accept r 1 review --message "<why>"'), 'r 1'), 'review');
+  // Every other row only copies, and a command that is not `wf accept` for this run — or names no one step — is not pressed.
+  assert.equal(acceptStepOf({ label: 'once more', command: 'wf round r-1 review' }, 'r-1'), null);
+  assert.equal(acceptStepOf(accept('wf accept r-2 review --message "<why>"'), 'r-1'), null);
+  assert.equal(acceptStepOf(accept('wf accept r-1 --message "<why>"'), 'r-1'), null);
+  assert.equal(acceptStepOf(accept('wf accept r-1 review extra --message "<why>"'), 'r-1'), null);
+  assert.equal(acceptStepOf(accept('wf accept r-1 review'), 'r-1'), null);
 });

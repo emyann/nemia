@@ -2,7 +2,7 @@
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are `wf decide`'s.
  */
-import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
+import type { Decidable, DecideCommand, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
 
 /**
@@ -98,4 +98,17 @@ export function diffLine(line: string): DiffLine {
 export function changeOf(touched: Touched | undefined, file: string): { added: number | null; removed: number | null } | undefined {
   if (!touched || 'error' in touched.radius) return undefined;
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));
+}
+
+/**
+ * The looping step an `accept` command of this run accepts — `wf accept <run> <step> --message "<why>"`, as the api reads it out of `wf decide`'s
+ * offer (`ONCE_MORE` in apps/api/src/app.ts) — or null for any other command, or one of another run. The board presses that one itself.
+ */
+export function acceptStepOf(command: Pick<DecideCommand, 'label' | 'command'>, runId: string): string | null {
+  if (command.label !== 'accept') return null;
+  const prefix = `wf accept ${runId} `;
+  const suffix = ' --message "<why>"';
+  if (!command.command.startsWith(prefix) || !command.command.endsWith(suffix)) return null;
+  const step = command.command.slice(prefix.length, -suffix.length);
+  return /^\S+$/.test(step) ? step : null;
 }

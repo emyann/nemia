@@ -29,6 +29,11 @@ export default {
     await expectVisible(approval.locator('[data-words="none"]'), 'and that it was given with no words');
     await expectCount(page.getByText('every step after the gate'), 0, 'nothing on the page says a step follows the gate: none does');
     await expectCount(section.locator(`section[aria-label="The gate of ${ending}"]`), 0, 'and there is no gate to act at: it is approved');
+
+    // And pruned since: the run's facts say when, what it freed and what it kept, and its steps are still read as they ended.
+    const said = /— removed 1 worktree, 1\.50 GB freed; its branches, record and files are kept$/;
+    await expectVisible(page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }), 'the run says it was pruned: when, what it removed and freed, and what it kept');
+    await expectVisible(section.getByText(SHIPPED.merged), 'and a pruned run still reads its steps as they ended');
     await settled(page);
   },
 } satisfies PageSpec;

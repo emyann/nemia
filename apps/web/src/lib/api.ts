@@ -264,6 +264,11 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   startedAt: string | null;
   cancelledAt: string | null;
+  /**
+   * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk. Its branches, record and files are
+   * kept, and none of its steps can be tried again. Null on a run never pruned.
+   */
+  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }> } | null;
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */

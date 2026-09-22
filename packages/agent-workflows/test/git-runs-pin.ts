@@ -6,7 +6,8 @@
  * of the commit before folder workspaces.
  */
 import path from 'node:path';
-import { composeBrief, decision, forgetLine, listing, toDecide, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
+import { composeBrief, decision, forgetLine, listing, toDecide, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import type { Closeout } from '../src/closeout.ts';
 import { loadWorkflows, outputFields, type Workflow } from '../src/workflow.ts';
 
 export const REPO = path.join(import.meta.dirname, '..', '..', '..');

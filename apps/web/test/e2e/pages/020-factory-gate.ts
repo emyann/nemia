@@ -37,11 +37,12 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
+      // Held before the page loads, so every read of the list it makes is the held one — the reads the feed's replay asks for as it opens too.
+      const listed = await (await refused.request.get(new URL('/api/runs', page.url()).href)).text();
+      await refused.route((url) => url.pathname === '/api/runs', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }));
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
       await expectVisible(answerOf(refused, 'Approve'), 'Approve on the card, on a page of its own');
-      const listed = await (await refused.request.get(new URL('/api/runs', refused.url()).href)).text();
-      await refused.route((url) => url.pathname === '/api/runs', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }));
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, `approve-${ending}-1`), JSON.stringify({ step: ending, try: 1, at: new Date().toISOString() }));
       await answerOf(refused, 'Approve').click();

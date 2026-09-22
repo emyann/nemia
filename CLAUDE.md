@@ -171,6 +171,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   at `WAIT_MS`; never raise the wait (the `outcome` page took its run back unsaid and relied on the 5 s poll; it says `removed` now). And a function interval is read again on the query's next update, not when the flag it reads flips:
   `useFeed` marks the polled queries stale when the stream opens (`refetchType: 'none'`, which reads nothing) and reads them when it goes
   down, or a run the feed has no line for keeps its 5 s timer (learned by the run that made the board follow the feed).
+- **A page opened on the board reads what it shows twice, once from its loader and once from the feed's replay.** The feed's stream opens with
+  no cursor and replays the whole feed, and each line invalidates what it can change, so a run's record is read again moments after the load. An
+  e2e page that holds a read with `route` to fake a moment before a change routes before its `goto`: the say page's second page routed after
+  the load, the replay's read went out first and came back after the journal said the session ended, and its box was closed for good in the
+  dark theme only (learned by the run that made the board follow the feed, round 2).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the

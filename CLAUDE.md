@@ -211,6 +211,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   under a chip that already said `needs-human`. The node says the wait alone (`needNodeText` in `apps/web/src/lib/asks.ts`), the whole
   sentence stays in its `title` and on the run's page, and the e2e proves it is read whole with `expectUncut` rather than assuming the
   width fits: a screenshot of a cut line looks like a line (learned by the same run, round 2).
+- **A name moved out of an engine file is imported from it by URL, too.** `agent-workflows/test/vocabulary.test.ts` reads the
+  engine's lists with `await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-engine')))`, beside the
+  package's root, so a grep for `from '…/runner.ts'` misses it and only the other package's suite fails, reading `undefined`. Before
+  moving an export between the engine's files, grep the workspace for the file's bare name (learned by the run that split the
+  engine's `runner.ts`).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by

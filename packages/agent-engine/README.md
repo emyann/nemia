@@ -1190,7 +1190,12 @@ selector, and it is why no attempt can ever run twice.
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — Claude Code's runner, words and usage, its registrations and inbox, and the one transcript reader |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — and Claude Code's `--bg` runner, which stays beside it: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so apart the two files would import each other |
+| `src/runner-transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
+| `src/runner-claude-transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
+| `src/runner-claude-vocabulary.ts` | Claude Code's modes, efforts, context windows and pool, and what it refuses to be asked for |
+| `src/runner-claude-inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
+| `src/runner-mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them |
 | `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |

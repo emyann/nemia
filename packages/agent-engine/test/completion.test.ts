@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { claudeOps, lastStructuredOutput, QUIESCENT_AFTER_MS } from '../src/runner.ts';
+import { claudeOps, QUIESCENT_AFTER_MS } from '../src/runner.ts';
+import { lastStructuredOutput } from '../src/runner-claude-transcript.ts';
 import { createEngine } from '../src/facade.ts';
 
 /**

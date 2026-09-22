@@ -28,7 +28,8 @@
 import { Effect, Layer } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting, Usage } from './domain.ts';
-import { renderTranscript, Runner, RunnerError } from './runner.ts';
+import { Runner, RunnerError } from './runner.ts';
+import { renderTranscript } from './runner-claude-transcript.ts';
 
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: Observed; abort: AbortController; toolCalls: number; usage?: Usage };

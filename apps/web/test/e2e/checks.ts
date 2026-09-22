@@ -18,8 +18,8 @@ export class Refused extends Error {}
 export const FEED_STREAM = '/api/feed/stream';
 const isFeedStream = (request: Request): boolean => new URL(request.url()).pathname === FEED_STREAM;
 
-/** A page's requests in flight, the feed's stream left out, each with its place in the order they were asked for; and when one last started or ended. */
-type Flights = { open: Map<Request, number>; last: number };
+/** A page's requests in flight, the feed's stream left out; and when one last started or ended. */
+type Flights = { open: Set<Request>; last: number };
 const flights = new WeakMap<Page, Flights>();
 
 /**
@@ -27,19 +27,19 @@ const flights = new WeakMap<Page, Flights>();
  * visit.ts opens, so a request begun before `idle` is called is counted. A page `idle` is the first to track counts from then.
  *
  * A page that navigates or reloads leaves its requests in flight behind, and Playwright (1.62) says nothing more of them: no
- * `requestfinished`, no `requestfailed`. So once the page's own navigation has committed, every request asked for before it is let go.
+ * `requestfinished`, no `requestfailed`. So once the page's own navigation has committed, every request in flight but that navigation's is
+ * let go — those the old document asked for while the navigation was on its way too, as its polls may — which is what Playwright's own
+ * `networkidle` does at a commit (`_onClearLifecycle`). The new document asks for nothing before its commit.
  */
 export function track(page: Page): void {
   if (flights.has(page)) return;
-  const f: Flights = { open: new Map(), last: Date.now() };
-  let order = 0;
-  // The page's own navigation, asked for and not yet committed: where the requests of the document it leaves end.
-  let leaving: number | undefined;
+  const f: Flights = { open: new Set(), last: Date.now() };
+  // The page's own navigation, asked for and not yet committed.
+  let leaving: Request | undefined;
   page.on('request', (request) => {
-    order += 1;
-    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = order;
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = request;
     if (isFeedStream(request)) return;
-    f.open.set(request, order);
+    f.open.add(request);
     f.last = Date.now();
   });
   const done = (request: Request) => {
@@ -50,7 +50,7 @@ export function track(page: Page): void {
   // Also said of a same-document navigation (`history.pushState`), which asks for nothing and leaves nothing behind.
   page.on('framenavigated', (frame) => {
     if (frame !== page.mainFrame() || leaving === undefined) return;
-    for (const [request, asked] of f.open) if (asked < leaving) f.open.delete(request);
+    for (const request of f.open) if (request !== leaving) f.open.delete(request);
     leaving = undefined;
     f.last = Date.now();
   });
@@ -73,7 +73,7 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
   const end = from + timeout;
   while (f.open.size || Date.now() - Math.max(f.last, from) < QUIET_MS) {
     if (Date.now() >= end) {
-      const open = [...f.open.keys()].map((r) => `${r.method()} ${r.url()}`);
+      const open = [...f.open].map((r) => `${r.method()} ${r.url()}`);
       throw new Refused(`the network idles — ${open.length ? `still in flight after ${timeout} ms: ${open.join(', ')}` : `never quiet for ${QUIET_MS} ms in ${timeout} ms`}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -84,20 +84,27 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
  * Everything a page does that it must not: a console error, an uncaught exception, a request that failed
  * or was answered 400 or worse. Listened for from before the page loads, and read with `problems()`.
  *
- * One failure passes: the feed's stream aborted (`net::ERR_ABORTED`) by the page itself navigating or reloading after that stream opened,
- * which is how a browser ends every request of a page it leaves — though Playwright 1.62 reports none of them, and a later one may. The
- * board closing its own stream while it stays on the page is counted, as any other failure is.
+ * One failure passes: the feed's stream aborted (`net::ERR_ABORTED`) by the page itself navigating or reloading after that stream opened —
+ * the navigation committed after it, as `track` reads a page left — which is how a browser ends every request of a page it leaves, though
+ * Playwright 1.62 reports none of them, and a later one may. The board closing its own stream while it stays on the page is counted, as any
+ * other failure is.
  */
 export function watch(page: Page): { problems: () => string[] } {
   track(page);
   const seen: string[] = [];
-  // In the order the browser asked for them: each feed stream when it opened, and the page's own last navigation.
+  // In the order the browser said them: each feed stream when it opened, and the commit of the page's own last navigation.
   let order = 0;
   let navigated = 0;
+  let leaving = false;
   const opened = new WeakMap<Request, number>();
   page.on('request', (request) => {
-    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigated = ++order;
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = true;
     else if (isFeedStream(request)) opened.set(request, ++order);
+  });
+  page.on('framenavigated', (frame) => {
+    if (frame !== page.mainFrame() || !leaving) return;
+    navigated = ++order;
+    leaving = false;
   });
   page.on('console', (message) => {
     if (message.type() === 'error') seen.push(`console error: ${message.text()}`);

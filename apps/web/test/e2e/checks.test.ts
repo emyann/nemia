@@ -31,6 +31,7 @@ before(async () => {
     }
     // Unref'd: an answer nobody waits for any more does not hold the tests open.
     if (url.pathname === '/api/slow') return void setTimeout(() => res.writeHead(200, { 'content-type': 'application/json' }).end('[]'), Number(url.searchParams.get('ms'))).unref();
+    if (url.pathname === '/api/slow-page') return void setTimeout(() => res.writeHead(200, { 'content-type': 'text/html' }).end('<p>there</p>'), Number(url.searchParams.get('ms'))).unref();
     const html = served.get(url.pathname);
     if (html === undefined) return void res.writeHead(404).end();
     res.writeHead(200, { 'content-type': 'text/html' }).end(html);
@@ -319,7 +320,7 @@ test("the feed's stream left by the page's own reload is not counted — and one
   assert.deepEqual(problems(), [want]);
 });
 
-test('the watch lets the feed\'s stream be aborted by a navigation of the page after it opened, and counts every other failure', () => {
+test('the watch lets the feed\'s stream be aborted by a navigation of the page committed after it opened, and counts every other failure', () => {
   // A page as far as `watch` listens to one, its events emitted in the order a browser would report them.
   const main = {};
   const emitter = new EventEmitter();
@@ -328,14 +329,27 @@ test('the watch lets the feed\'s stream be aborted by a navigation of the page a
     url: () => `http://e2e.test${pathname}`, method: () => 'GET', isNavigationRequest: () => navigation, frame: () => main, failure: () => ({ errorText: error }),
   });
   const failed = (pathname: string, error = 'net::ERR_ABORTED') => `request failed: GET http://e2e.test${pathname} — ${error}`;
+  // The page's own navigation: asked for, then committed.
+  const navigate = (frame: object = main) => {
+    emitter.emit('request', { ...request('/', { navigation: true }), frame: () => frame });
+    emitter.emit('framenavigated', frame);
+  };
   const { problems } = watch(page);
   const seen = () => problems().length;
 
   // Opened, then the page reloads: its abort passes.
   const left = request(FEED_STREAM);
   emitter.emit('request', left);
-  emitter.emit('request', request('/', { navigation: true }));
+  navigate();
   emitter.emit('requestfailed', left);
+  assert.deepEqual(problems(), []);
+
+  // Opened by the page it leaves while the navigation is on its way, before the commit: its abort passes too.
+  const late = request(FEED_STREAM);
+  emitter.emit('request', request('/', { navigation: true }));
+  emitter.emit('request', late);
+  emitter.emit('framenavigated', main);
+  emitter.emit('requestfailed', late);
   assert.deepEqual(problems(), []);
 
   // Opened after that navigation, and aborted with no other: the board closed it.
@@ -349,7 +363,7 @@ test('the watch lets the feed\'s stream be aborted by a navigation of the page a
   const other = request('/api/runs/r-1/stream');
   emitter.emit('request', broken);
   emitter.emit('request', other);
-  emitter.emit('request', request('/', { navigation: true }));
+  navigate();
   emitter.emit('requestfailed', broken);
   emitter.emit('requestfailed', other);
   assert.equal(seen(), 3);
@@ -358,15 +372,42 @@ test('the watch lets the feed\'s stream be aborted by a navigation of the page a
   // A navigation of a frame inside the page is not the page's own.
   const framed = request(FEED_STREAM);
   emitter.emit('request', framed);
-  emitter.emit('request', { ...request('/frame', { navigation: true }), frame: () => ({}) });
+  navigate({});
   emitter.emit('requestfailed', framed);
   assert.equal(seen(), 4);
+  // Nor is a frame's commit while the page's own navigation is on its way: only the page's commit leaves the page.
+  const pending = request(FEED_STREAM);
+  emitter.emit('request', pending);
+  emitter.emit('request', request('/', { navigation: true }));
+  emitter.emit('framenavigated', {});
+  emitter.emit('requestfailed', pending);
+  emitter.emit('framenavigated', main);
+  assert.equal(seen(), 5);
+
+  // Nor is a same-document navigation (`history.pushState`), which asks for nothing.
+  const pushed = request(FEED_STREAM);
+  emitter.emit('request', pushed);
+  emitter.emit('framenavigated', main);
+  emitter.emit('requestfailed', pushed);
+  assert.equal(seen(), 6);
 });
 
 test('idle lets go of the requests a page left behind when it reloaded, of which Playwright says nothing more — and of none on a pushState', async () => {
   const { page } = await servedPage('<p>ok</p>');
   await page.evaluate(() => void fetch('/api/slow?ms=60000'));
   await page.reload({ waitUntil: 'load' });
+  await idle(page, 3_000);
+
+  // And of those the old document asks for while the navigation is on its way: a poll every 50 ms, and a page that answers after 800.
+  const asked: string[] = [];
+  let navigating = false;
+  page.on('request', (r) => {
+    if (r.isNavigationRequest()) navigating = true;
+    else if (navigating) asked.push(r.url());
+  });
+  await page.evaluate(() => void setInterval(() => void fetch('/api/slow?ms=60000'), 50));
+  await page.goto(`${origin}/api/slow-page?ms=800`, { waitUntil: 'load' });
+  assert.ok(asked.length > 0, 'the old document asked for something between the navigation and its commit — or this proves nothing');
   await idle(page, 3_000);
 
   const from = Date.now();

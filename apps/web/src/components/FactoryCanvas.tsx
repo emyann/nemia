@@ -146,8 +146,8 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
  * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`). The
- * first two are read again every 5 s, as the runs are: the daemon starts a card
- * when a run slot frees, and nothing on the board asks it to.
+ * cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed carries no card's
+ * events yet: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   return (
@@ -184,7 +184,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // The step whose inspector is open.
   const [selected, setSelected] = useState<{ runId: string; step: string } | null>(null);
 
-  // Only a run open on the floor reads its detail, again every 5 s (`runQuery`); a closed card reads the list.
+  // Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`); a closed card reads the list.
   const reading = useMemo(() => open.filter((id) => ids.includes(id)), [open, idsKey]);
   const reads = useQueries({ queries: reading.map((id) => runQuery(id)) });
 
@@ -520,6 +520,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // And the runs nobody has decided, which are finished too and stay on the floor: counted as `wf ls` says them, before who else
   // the run waits on. A run at its ending's gate is in both counts — the decision is what it waits on you for.
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
+  // Polled every 5 s whether or not the feed is followed: a card queued, dropped or edited is on no event of it.
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queue.data) : [];
   // The lane beside the floor comes or goes with the first card queued or the last one started: the floor is fitted again to its new width.

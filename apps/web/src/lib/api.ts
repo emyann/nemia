@@ -1,4 +1,5 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
+import { pace } from './feed.ts';
 
 /** Mirrors `RunStatus` in apps/api/src/app.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -538,10 +539,11 @@ async function get<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while it is. */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
   queryFn: () => get<RunSummary[]>('/api/runs'),
-  refetchInterval: 5_000,
+  refetchInterval: () => pace(5_000),
 });
 
 /** Mirrors `Described` in apps/api/src/capabilities.ts: a skill or an agent, and the file it was read from. */
@@ -1021,7 +1023,10 @@ export type InboxEntry = {
   tried?: { at: string; repo: string; why: string; refused: boolean };
 };
 
-/** The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit. */
+/**
+ * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and on
+ * a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards yet.
+ */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
   queryFn: () => get<InboxEntry[]>('/api/inbox'),
@@ -1110,11 +1115,11 @@ export type Ceilings = {
   held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
 };
 
-/** The cap on runs in flight, read again every 5 s beside the runs: what the Factory says over its floor. */
+/** The cap on runs in flight, read again as the runs are, on a run's event: what the Factory says over its floor. */
 export const ceilingsQuery = queryOptions({
   queryKey: ['ceilings'],
   queryFn: () => get<Ceilings>('/api/ceilings'),
-  refetchInterval: 5_000,
+  refetchInterval: () => pace(5_000),
 });
 
 /**
@@ -1278,7 +1283,7 @@ export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
     queryFn: () => get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
-    refetchInterval: 5_000,
+    refetchInterval: () => pace(5_000),
   });
 
 /**

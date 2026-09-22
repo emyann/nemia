@@ -51,7 +51,8 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
         setBrief('');
         setAfter([]);
       }
-      void queryClient.invalidateQueries({ queryKey: ['runs'] });
+      // The list alone: a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
       onStarted?.(started);
     },
     onError: (error) => onRefused?.(error.message),

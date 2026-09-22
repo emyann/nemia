@@ -162,6 +162,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's
   admission gate, worktree base and lease each were).
+- **A test of a timer waits for the ticks it counts, never for a length of time.** "start() ticks on a timer" slept 200 ms
+  and wanted two ticks at 20 ms; a process the scheduler parks for those 200 ms wakes with the interval and the sleep both
+  due, sees one tick, and fails — two full checks in four at a load of 20, and on demand by freezing the test with `SIGSTOP`
+  as its loop starts. Wait for the Nth tick under a bound of seconds (`ticksUntil` in `agent-engine/test/facade.test.ts`); a
+  wait *after* `stop()` is safe at any length over the interval, since an interval that survived comes due first. And a tick
+  faster than its interval proves no overlap guard: the old test passed with `start()`'s guard deleted. Run a mutant of a
+  loop under `timeout`: one whose `stop()` no longer clears its interval holds `node --test` open for ever (learned by the
+  run that made the timer test pass under load).
 - **A rule about order or names is not proven by a fixture that already has it.** The equal-times admission test read
   a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping

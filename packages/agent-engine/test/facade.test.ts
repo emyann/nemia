@@ -109,20 +109,96 @@ test('the file-backed default needs no configuration at all', async () => {
   assert.equal((await reopened.view(id)).state.brief, 'b');
 });
 
+/**
+ * A harness whose every observation takes `ms`: one pass of `tick()` observes once, so this is a tick slower than
+ * the timer. It counts the passes begun and the most ever in flight at once.
+ */
+const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
+  const fast = fakeHarness(sessions);
+  const seen = { passes: 0, inFlight: 0, most: 0 };
+  const harness: PromiseRunner = {
+    ...fast,
+    async observe() {
+      seen.passes += 1;
+      seen.inFlight += 1;
+      seen.most = Math.max(seen.most, seen.inFlight);
+      try { await new Promise((r) => setTimeout(r, ms)); return await fast.observe(); } finally { seen.inFlight -= 1; }
+    },
+  };
+  return { harness, seen };
+};
+
+/** Resolves when `onTick` has been called `n` times, or rejects after `boundMs` of wall clock. */
+const ticksUntil = (n: number, boundMs: number) => {
+  let ticks = 0;
+  let reached!: () => void;
+  const done = new Promise<void>((r) => { reached = r; });
+  return {
+    onTick: () => { ticks += 1; if (ticks === n) reached(); },
+    count: () => ticks,
+    wait: async (errors: unknown[]) => {
+      let timer: NodeJS.Timeout | undefined;
+      const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`saw ${ticks} tick(s) of ${n} in ${boundMs}ms; errors: ${errors.map(String).join('; ') || 'none'}`)), boundMs);
+      });
+      try { await Promise.race([done, late]); } finally { clearTimeout(timer); }
+    },
+  };
+};
+
 test('start() ticks on a timer and never overlaps', async () => {
+  // Nothing here waits for a length of time and then counts: under load a fixed wait saw one tick where it expected
+  // two (2026-09-20). It waits for the third tick instead, as long as a starved machine needs.
+  //
+  // Each pass takes three intervals, and the timer comes due before the pass's own wait does — timers fire in the
+  // order they come due, however late — so the timer fires during every pass, and only the guard in `start()` keeps a
+  // second pass out. Delete the guard and `most` reads 2.
   const sessions = new Map<string, Sighting>();
-  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  const { harness, seen } = slowHarness(sessions, 60);
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' });
   await engine.file({ brief: 'b', cwd: '/repo' });
 
-  let ticks = 0;
-  const loop = engine.start({ intervalMs: 20, onTick: () => { ticks += 1; } });
-  await new Promise((r) => setTimeout(r, 200));
-  loop.stop();
-  const seen = ticks;
-  assert.ok(seen >= 2, `expected several ticks, saw ${seen}`);
+  const errors: unknown[] = [];
+  const ticks = ticksUntil(3, 30_000);
+  const loop = engine.start({ intervalMs: 20, onTick: ticks.onTick, onError: (e) => { errors.push(e); } });
+  try { await ticks.wait(errors); } finally { loop.stop(); }
 
+  // `stop()` ran in the same turn as the third tick's report, before any timer could fire: no pass is under way.
+  assert.equal(ticks.count(), 3, 'three ticks, and nobody called tick()');
+  assert.equal(seen.most, 1, 'two ticks ran at once');
+  assert.equal(seen.passes, 3, 'every pass that began, reported');
+  assert.equal(seen.inFlight, 0);
+
+  // Any wait longer than the interval proves it: the interval, had it survived, comes due first and fires first.
   await new Promise((r) => setTimeout(r, 100));
-  assert.equal(ticks, seen, 'stop() means stopped');
+  assert.equal(seen.passes, 3, 'stop() means stopped: no pass began after it');
+  assert.equal(ticks.count(), 3, 'and none was reported');
+  assert.deepEqual(errors, []);
+});
+
+test('a tick under way when stop() is called finishes, and reports, and is the last', async () => {
+  // What the fixed-wait version of the test above could meet, and never pinned: `stop()` cannot take back a pass
+  // that has begun — its sessions are spawned, its events journalled — so the pass ends and says what it did.
+  const sessions = new Map<string, Sighting>();
+  const { harness, seen } = slowHarness(sessions, 60);
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' });
+  await engine.file({ brief: 'b', cwd: '/repo' });
+
+  const errors: unknown[] = [];
+  const ticks = ticksUntil(1, 30_000);
+  const loop = engine.start({ intervalMs: 20, onTick: ticks.onTick, onError: (e) => { errors.push(e); } });
+  // The first pass begins on the first firing; stop while its observation is still waiting.
+  const bound = Date.now() + 30_000;
+  while (seen.inFlight === 0 && Date.now() < bound) await new Promise((r) => setTimeout(r, 1));
+  loop.stop();
+  assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
+  assert.equal(ticks.count(), 0);
+
+  await ticks.wait(errors);
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(ticks.count(), 1, 'the pass under way reported once');
+  assert.equal(seen.passes, 1, 'and no other began');
+  assert.deepEqual(errors, []);
 });
 
 test('a free slot goes to the task filed first, by the time file() wrote — not to the id first in the alphabet', async () => {

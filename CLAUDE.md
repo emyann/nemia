@@ -158,6 +158,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the registry reads the session as `shell`, the engine reads the step as working, and nothing settles it (seventy-seven
   minutes, learned by the run that drew the queue on the Factory; engine open issue 24). Give every background loop
   a bound — `timeout 120 bash -c '…'` — and end your own servers and watchers before you sign off.
+- **A handle closed is still counted until the event loop turns.** `process.getActiveResourcesInfo()` lists an `fs.watch` as
+  `FSEventWrap` until libuv's close phase has run, and a stream read through `app.request` is all promises: four tests ran start to
+  end without one turn, so a baseline taken at the fifth counted seven watchers already stopped, and the count then fell below it. Wait
+  for an absolute count (`until(() => watchers() === 0)` in `apps/api/test/feed.test.ts`), never read one once after a close (learned
+  by the run that streamed the workflow feed).
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

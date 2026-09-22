@@ -128,9 +128,14 @@ function parseLine(text: string): FeedLine[] {
   }
 }
 
-/** Every complete line from `after` to `size`, and the byte after the last of them: never past a line with no newline yet. */
-function linesFrom(file: string, after: number, size: number): { lines: FeedLine[]; cursor: number } {
-  if (after >= size) return { lines: [], cursor: after };
+/**
+ * Every complete line from `after` to `size`, each with the byte just after its newline (`ends`, one for each of `lines`), and the byte
+ * after the last complete line: never past a line with no newline yet. The ends are counted in bytes, on the buffer, not in characters
+ * of the text — a note with a dash in it is three bytes of one character. A line nobody can read keeps no end, and moves the cursor all
+ * the same.
+ */
+function linesFrom(file: string, after: number, size: number): { lines: FeedLine[]; ends: number[]; cursor: number } {
+  if (after >= size) return { lines: [], ends: [], cursor: after };
   const buf = Buffer.alloc(size - after);
   const fd = fs.openSync(file, 'r');
   try {
@@ -138,10 +143,16 @@ function linesFrom(file: string, after: number, size: number): { lines: FeedLine
   } finally {
     fs.closeSync(fd);
   }
-  const end = buf.lastIndexOf(0x0a);
-  if (end < 0) return { lines: [], cursor: after };
-  const lines = buf.subarray(0, end).toString('utf8').split('\n').flatMap(parseLine);
-  return { lines, cursor: after + end + 1 };
+  const lines: FeedLine[] = [];
+  const ends: number[] = [];
+  let start = 0;
+  for (let nl = buf.indexOf(0x0a); nl >= 0; start = nl + 1, nl = buf.indexOf(0x0a, start)) {
+    for (const line of parseLine(buf.subarray(start, nl).toString('utf8'))) {
+      lines.push(line);
+      ends.push(after + nl + 1);
+    }
+  }
+  return { lines, ends, cursor: after + start };
 }
 
 const refused = (message: string): Error => Object.assign(new Error(message), { exitCode: 2 });
@@ -151,6 +162,12 @@ const refused = (message: string): Error => Object.assign(new Error(message), { 
  * none, at 0. A cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
  */
 export function readFeedFile(file: string, after = 0): { lines: FeedLine[]; cursor: number } {
+  const { lines, cursor } = readEnds(file, after);
+  return { lines, cursor };
+}
+
+/** `readFeedFile`, with the byte after each line (`linesFrom`'s `ends`): what a watch hands on with each line. */
+function readEnds(file: string, after: number): { lines: FeedLine[]; ends: number[]; cursor: number } {
   const refusal = feedCursorRefusal(file, after);
   if (refusal) throw refused(refusal);
   return linesFrom(file, after, statOf(file)?.size ?? 0);
@@ -190,14 +207,20 @@ export function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>
  * drops costs latency and not a line. One read at a time: a push and a tick landing together must not deliver a line twice — and a push
  * that lands during a read has the read go round once more rather than be lost to it.
  *
+ * Each line comes with its cursor: the byte just after it, where a reader that has taken that line and no other resumes — so a follower
+ * that hands each line on (the api's stream, an event's id) can be picked up after the last line it handed on, not after the last read.
+ *
  * A cursor that cannot be read from is refused before anything is watched (`feedCursorRefusal`, exit 2); an error after that — a feed
- * truncated under the watcher — goes to `onError`, and the watch goes on.
+ * truncated under the watcher, a file that could not be opened this beat — goes to `onError`, and the watch goes on. `onRead` hears of
+ * each read that works, before the lines it found are handed on, and whether it found any: so a follower that said a read failed can
+ * say it works again on the next beat that reads, not only when the next line is written.
  */
-export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError }: {
+export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError, onRead }: {
   from?: number;
-  onLine: (line: FeedLine) => void | Promise<void>;
+  onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
   intervalMs?: number;
   onError?: (e: unknown) => void;
+  onRead?: () => void | Promise<void>;
 }): { stop(): void } {
   const refusal = feedCursorRefusal(file, from);
   if (refusal) throw refused(refusal);
@@ -217,12 +240,14 @@ export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_0
       do {
         again = false;
         for (;;) {
-          const got = readFeedFile(file, cursor);
+          const got = readEnds(file, cursor);
+          if (stopped) return;
+          await onRead?.();
           if (got.cursor === cursor) break;
           cursor = got.cursor;
-          for (const line of got.lines) {
+          for (const [i, line] of got.lines.entries()) {
             if (stopped) return;
-            await onLine(line);
+            await onLine(line, got.ends[i]!);
           }
         }
       } while (again && !stopped);

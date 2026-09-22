@@ -2934,7 +2934,7 @@ export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => re
 /** Why `after` cannot be read from — or undefined when it can (`feedCursorRefusal` in feed.ts). */
 export const feedCursorRefusal = (after: number): string | undefined => cursorRefusalIn(feedFile(), after);
 
-/** Follow the feed from `from` until `stop()` (`watchFeedFile`): refused before anything is watched when the cursor cannot be read from. */
+/** Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched when the cursor cannot be read from. */
 export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
 
 /**

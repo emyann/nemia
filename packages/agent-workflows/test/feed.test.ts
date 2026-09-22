@@ -22,7 +22,7 @@ const FEED = path.join(ROOT, 'feed.jsonl');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_RUNS;
-const { approve, cancel, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } = await import('../src/runner.ts');
+const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -323,6 +323,66 @@ test('`wf feed` prints each line and the cursor to read on from; `wf watch` foll
   fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-after', word: 'running' })}\n`);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
+});
+
+test("a watch hands each line on with its own cursor: the byte after it, in bytes not characters, where a reader resumes with the lines after it and no other", async () => {
+  emptyStore();
+  const line = (run: string, word: string, note?: string) => JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word, ...(note ? { note } : {}) });
+  // A note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody.
+  fs.writeFileSync(FEED, [line('r-a', 'running'), line('r-a', 'awaiting approval', 'round 2 — asked — approve it'), '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo', line('r-b', 'running'), line('r-a', 'done')].map((l) => `${l}\n`).join(''));
+  const whole = readFeed(0);
+  assert.equal(whole.lines.length, 4);
+
+  const got: { line: FeedLine; cursor: number }[] = [];
+  let arrived: () => void = () => {};
+  const all = new Promise<void>((resolve) => { arrived = resolve; });
+  const watch = watchFeed({ intervalMs: 20, onLine: (l, cursor) => { got.push({ line: l, cursor }); if (got.length >= whole.lines.length) arrived(); } });
+  try {
+    await Promise.race([all, new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000))]);
+  } finally { watch.stop(); }
+
+  assert.deepEqual(got.map((g) => g.line), whole.lines, 'every line, once, in order');
+  for (const [i, { cursor }] of got.entries()) {
+    assert.equal(feedCursorRefusal(cursor), undefined, `line ${i}'s cursor is one the feed takes`);
+    assert.deepEqual(readFeed(cursor).lines, whole.lines.slice(i + 1), `from line ${i}'s cursor, the lines after it and no other`);
+  }
+  assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
+  assert.equal(got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1, true, "the torn line's bytes are counted into the next line's cursor");
+});
+
+test('a watch says each read that works, before the lines it found and whether or not it found any, and no read that fails', async (t) => {
+  if (process.getuid?.() === 0) return t.skip('a mode of 000 does not keep root from reading');
+  emptyStore();
+  fs.writeFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' })}\n`);
+  const said: string[] = [];
+  /** Wait until `ok` holds of what the watch said, under a bound of seconds: for the beats counted, never a length of time. */
+  const heard = async (ok: () => boolean, what: string) => {
+    const bound = Date.now() + 5_000;
+    while (!ok()) {
+      if (Date.now() > bound) throw new Error(`${what}: the watch said ${said.join(', ')}`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+  const count = (word: string) => said.filter((w) => w === word).length;
+  const watch = watchFeed({ intervalMs: 20, onLine: () => { said.push('line'); }, onRead: () => { said.push('read'); }, onError: () => { said.push('error'); } });
+  try {
+    await heard(() => count('read') >= 4, 'reads that find nothing are said too');
+    assert.deepEqual(said.slice(0, 2), ['read', 'line'], 'the read, then the line it found');
+    assert.equal(count('line'), 1);
+
+    fs.chmodSync(FEED, 0o000);
+    try {
+      await heard(() => count('error') >= 1, 'a read that fails goes to onError');
+      const at = said.lastIndexOf('error');
+      await heard(() => said.slice(at + 1).includes('error'), 'and so does the next');
+      assert.deepEqual(said.slice(at).filter((w) => w !== 'error'), [], 'no read is said while reads fail');
+    } finally {
+      fs.chmodSync(FEED, 0o644);
+    }
+    const back = said.length;
+    await heard(() => said.slice(back).includes('read'), 'the first read that works is said, with nothing new written');
+    assert.equal(count('line'), 1);
+  } finally { watch.stop(); }
 });
 
 test('`wf --help` names wf feed and wf watch, and says which feed is whose', async (t) => {

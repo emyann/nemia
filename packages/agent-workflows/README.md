@@ -82,6 +82,10 @@ it goes on from that line's start. A cursor inside a line, or past the end, is r
 (exit 2) rather than read from, since every line after it would be misread. A line a writer died in
 is ended by the next append and read by nobody.
 
+The api streams the same feed at `GET /api/feed/stream`, one server-sent event a line — `run`,
+`step` or `removed`, by what the line is about — its id the cursor just after that line, so an
+EventSource that reconnects resumes after the last line it was sent.
+
 `wf` once had a `watch` verb that followed the engine, and gave it back: observing the engine is
 the engine's job. This one follows what only this package knows.
 

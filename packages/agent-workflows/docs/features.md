@@ -28,7 +28,8 @@ its package half) — and the workflow builder's package half: a step rendered b
 half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
 workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
 with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — and a feed of what the
-tick judged, followed with `wf watch` (its package half; the board's half is a card of its own) — have shipped.
+tick judged, followed with `wf watch` (its package half), and streamed by the api (`GET /api/feed/stream`; the board reading it is a
+card of its own) — have shipped.
 
 ## Shipped: the check
 
@@ -1918,19 +1919,52 @@ under a bound, and nothing after `stop()`; `wf --help`; and no engine read added
 comparison, the fold from the feed, the last-newline stop, the mid-line refusal, the torn-tail newline, the `removed`, `feedPhase`); a `stop()`
 that leaves its timer holds `node --test` open, so run that mutant under `timeout`.
 
-### Still to build: the board reads the feed (a card of its own)
+### Shipped: the api streams the feed
 
-The api and the Factory still poll. The next card, in `apps/`:
+The api's half of what was sketched here. What was built, in `apps/api/src/app.ts` beside the transcript stream:
 
-- **`GET /api/feed/stream?after=<cursor>`** in `apps/api/src/app.ts`, with `streamSSE` as the transcript stream beside it does, over
-  `watchFeed` from `agent-workflows`' runner: each line an event carrying its cursor
-  as the SSE `id`, a refused cursor a 400 in `feedCursorRefusal`'s words, and `stop()` on the stream's abort. A new api test file imports
-  `test/harness.ts` first (CLAUDE.md), and one test sends a cursor inside a line and sees the refusal.
-- **The board**: `runsQuery` in `apps/web/src/lib/api.ts` drops its 5 s `refetchInterval` (or lengthens it to a backstop), and one
-  EventSource invalidates `['runs']` on each line and the named run's record with `exact: true` — never `['runs', <id>]` by prefix, which
-  refetches a decision under the wrong state (CLAUDE.md). It closes on the `error` that ends a response, not on the last event.
+- **`GET /api/feed/stream`**, server-sent events over `watchFeed` from the package root: pushed by its `fs.watch` and backed by its 1 s
+  timer, so the api keeps no poll of its own. One event a line: its name what the line is about (`feedEventOf`) — `step` for a line with
+  a `step`, `removed` for a run's line that says `REMOVED`, `run` for any other — its data the line as written, and its id **the cursor
+  just after that line**, not the last read's. For that the package's `watchFeedFile` hands `onLine` a second argument, counted in bytes
+  on the buffer (a note with a dash in it is three bytes of one character). So a reconnect resumes after the last event it was sent.
+- **The transcript stream's conventions**: `Last-Event-ID`, over `?after=`, over none; an empty value is none, and none is 0, the whole
+  feed — where `wf watch` and `ae watch` start. The cursor is checked before the stream opens: anything not a whole number is refused in
+  the api's words, and a number the feed has no line boundary at in `feedCursorRefusal`'s, inside a 400 that quotes what was sent.
+- **`unreadable` / `readable`**, as the transcript stream says them. A watch refused mid-stream (exit 2: the feed truncated or replaced
+  under the cursor) sends `unreadable {error, retrying: false}` once and ends the stream, rather than fail every second as `wf watch`
+  still does; a reader opens it again with no cursor. Any other failed read is said once with `retrying: true`, and cleared with
+  `readable` by the next line it hands on.
+- **Stopped when the reader goes**: the route awaits the stream's abort and then `stop()`s the watch, so a board tab closed leaves no
+  fs watcher and no timer. Tested by counting the process's `FSEventWrap` handles, through `app.request` and through a real socket
+  served by `@hono/node-server`, as `main.ts` serves it.
+- **The engine's feed is not in it.** A step's filing (`pending`), its start (`running`) and its settling (`succeeded`, `failed`,
+  `needs-human`, …) already reach the workflow feed as the step's word, a pass late at most. The engine's is keyed by task, so relaying
+  it by run would be joining, not relaying; its `watch` hands out no cursor per entry, so one stream of both would need a two-part cursor.
+  Neither feed carries a session's live words, its cost, a harness's `waitingFor` or a git standing, so the board keeps a slow poll
+  either way.
+
+Tested in `apps/api/test/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
+`removed` with the feed's end as each id; a reconnect by `Last-Event-ID` over `?after`; a cursor inside a line, past the end, and not a
+number refused by address and by header, each a 400; a truncated feed ending the stream; three streams holding three watchers and none
+once their readers go, and a closed socket giving its watcher back. And in the package's `test/feed.test.ts`: each line's cursor is one
+the feed takes, from which a read gives exactly the lines after it, with a non-ASCII note and a torn line before a good one.
+
+### Still to build: the board follows the feed (a card of its own)
+
+- **One EventSource on `/api/feed/stream`** for the app, opened with no cursor (the whole feed replays, so batch what it does into one
+  invalidation per animation frame), and closed on the `error` that ends a response, not on the last event (CLAUDE.md).
+- **Per event**: `step` and `run` invalidate `['runs']` and the named run's record with `exact: true` — never `['runs', <id>]` by prefix,
+  which refetches a decision under the wrong state (CLAUDE.md) — and `run` the ceilings and the inbox too, since a run's word moving can
+  free a slot or start a queued card. `removed` invalidates `['runs']` and removes the named run's record, `exact: true`. `unreadable`
+  with `retrying: false` closes the stream and opens it again with no cursor, then refetches; with `retrying: true` it is said on the
+  page until `readable` clears it.
+- **`runsQuery`'s 5 s poll becomes a backstop** of 30–60 s, not nothing: a session's live words (`running (idle)`), cost, a harness's
+  `waitingFor` and a finished run's git standing (`to decide`) are in no feed.
 - **An e2e page of its own** that writes a run's change into the seed's store and sees the Factory move without waiting out a poll; it
   shifts no count (CLAUDE.md), since it writes no run.
+- **If a first connection's replay measures large** (about 150 bytes a line, and the feed only grows), list-then-watch: `/api/runs` hands
+  back the feed's cursor read before its listing, and the board opens the stream from it.
 
 ## Shipped: freeing the space — `wf prune`
 

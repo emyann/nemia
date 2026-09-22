@@ -53,7 +53,7 @@ wf watch             # the same from the start, then each line as the tick write
 20:58:40  the-gate-yd1g  —  running
 20:58:40  the-gate-yd1g  plan  waiting
 20:58:40  the-gate-yd1g  plan  pending
-20:58:48  the-gate-yd1g  —  failed  · waiting on you: approve plan
+20:58:48  the-gate-yd1g  —  awaiting approval  · waiting on you: approve plan
 20:58:48  the-gate-yd1g  plan  awaiting approval  · approve it: wf approve the-gate-yd1g plan — or send it back: …
 20:59:02  the-gate-yd1g  —  running
 20:59:02  the-gate-yd1g  plan  unverified · done
@@ -61,7 +61,14 @@ wf watch             # the same from the start, then each line as the tick write
 
 It is `$WF_ROOT/feed.jsonl`, a line of JSON per change — `{at, run, step?, word, note?}` — for the
 run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pruned run, and what
-waits on you as its note) and for each step's word and note as `wf ls` prints them. **The tick is its
+waits on you as its note) and for each step's word and note as `wf ls` prints them. A run stopped on
+a person's word and not on anything that broke says what `wf decide` says of it rather than `failed`:
+`awaiting approval` when every step that stops it waits at its gate — a plan's, or the ending's
+before it runs — and `blocked` otherwise (a step signed off blocked or unsigned, a loop out of
+rounds, a cap reached). `failed` is kept for a run in which a step's task failed or was stopped, or
+its check refused it or did not finish. A step that signed off blocked has what it needs — its
+closeout's `needs`, made one line and clipped at 200 characters — as the first part of its note,
+`needs: …`, so the question is on the watcher's screen and `wf decide` has it whole. **The tick is its
 one writer**, and appends a line only where what it judged is not what the feed said last; a run
 whose record is gone (`wf rm`) gets one `removed`. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
@@ -81,6 +88,14 @@ expires. A read stops at the last newline, so it never passes a line half writte
 it goes on from that line's start. A cursor inside a line, or past the end, is refused by name
 (exit 2) rather than read from, since every line after it would be misread. A line a writer died in
 is ended by the next append and read by nobody.
+
+A feed deleted, truncated or replaced **while `wf watch` follows it** is said once, on stderr —
+`wf watch: the feed was truncated under this watch at cursor 1834, and is 0 bytes now …` — and the
+watch reads on from the start of the feed there is now. From the start, not its end: the tick has
+no fold of a cut feed, so its next pass writes every run's words again, and those are the lines a
+watcher that lost its place needs; a line it had before may be said again. A feed truncated and
+written past the cursor again, a line ending just there, is not seen: nothing on disk tells it from
+the same feed grown.
 
 The api streams the same feed at `GET /api/feed/stream`, one server-sent event a line — `run`,
 `step` or `removed`, by what the line is about — its id the cursor just after that line, so an

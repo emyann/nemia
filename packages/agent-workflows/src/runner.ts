@@ -2250,7 +2250,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const feed = feedWords(listing(
     steps, run, (taskId) => feedPhase(engineWord(views)(taskId)), (name) => closeoutOf(views, run, name), asked, verdictOf, asks, roundAsks,
     readAnswers(run.id), waiting, saidCount(views, run), spendOf, held, [], checkout, waitingOf(views),
-  ), run, status);
+  ), run, assessed, (name) => closeoutOf(views, run, name));
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
   // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind

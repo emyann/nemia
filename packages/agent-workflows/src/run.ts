@@ -238,6 +238,17 @@ export type Assessment = {
    */
   held: string[];
   status: 'running' | 'succeeded' | 'failed' | 'cancelled';
+  /**
+   * A run `failed` that nothing failed in: what stopped it instead, as `wf decide` tells the two apart (`Decision`'s `outcome`). `awaiting
+   * approval` when every step that stops what follows it waits at its gate, and `blocked` when a person's word is what stops it otherwise —
+   * a step that signed off blocked, or unsigned, a loop out of rounds, a cap reached. Absent where a step broke: its task failed or was
+   * stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not `failed`.
+   *
+   * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `wf cancel`, `toDecide`) reads a run
+   * that stopped. This is for what a person reads of it: the feed's run line said `failed` of a run waiting at its ship gate while `wf ls`
+   * and `wf decide` said it was awaiting approval and nothing had failed.
+   */
+  stoppedOn?: 'awaiting approval' | 'blocked';
   /** What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing. */
   toDecide?: ToDecide;
 };
@@ -343,7 +354,19 @@ export function assess(
     : 'running';
 
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
-  return { ready, check, retry, round, blocked, held, status: overall, ...(decide ? { toDecide: decide } : {}) };
+  const stoppedOn = overall === 'failed' ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own }))) : undefined;
+  return { ready, check, retry, round, blocked, held, status: overall, ...(stoppedOn ? { stoppedOn } : {}), ...(decide ? { toDecide: decide } : {}) };
+}
+
+/**
+ * What stopped a `failed` run in which no step broke (`Assessment['stoppedOn']`) — or undefined where one did. Pure. Off each step's status
+ * as the run reads it, and its own ending under that (`standing`), as `decision` reads it: a step whose task failed and that is over its
+ * budget reads `over budget`, and it still broke. A step about to be tried again reads `running`, and stops nothing.
+ */
+function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['stoppedOn'] {
+  const stops = each.filter((s) => stopsFollowers(s.status));
+  if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return undefined;
+  return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
 }
 
 // ─── a gate: a handoff that waits for a person ─────────────────────────────
@@ -3960,10 +3983,19 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
  * before the word is measured or clipped. A browser would have collapsed it and nothing would have shown there.
  */
 export function waitingWords(waitingFor: string): string {
-  const word = waitingFor.trim().replace(/\s+/g, ' ');
-  const shown = word.length <= WAIT_CAP ? word : `${word.slice(0, WAIT_CAP - 1).trimEnd()}…`;
+  const shown = oneLine(waitingFor, WAIT_CAP);
   const article = DETERMINED.test(shown) || /s$/i.test(shown) ? '' : /^[aeiou]/i.test(shown) ? 'an ' : 'a ';
   return `waiting for ${article}${shown}`;
+}
+
+/**
+ * Free text from outside — a harness's word, a closeout's `needs` — made one line of at most `cap` characters: every run of whitespace, a
+ * newline included, becomes one space, and what is over the cap is clipped with `…`. Pure. What `waitingWords` does to a harness's word, for
+ * every screen that prints such text into a line of its own.
+ */
+export function oneLine(text: string, cap: number): string {
+  const line = text.trim().replace(/\s+/g, ' ');
+  return line.length <= cap ? line : `${line.slice(0, cap - 1).trimEnd()}…`;
 }
 
 /**
@@ -4023,21 +4055,46 @@ export const feedPhase = (word: string): string =>
  * in the feed's words. Pure.
  *
  * Each step's word is its status on `wf ls`, and its note the note beside it there — the try due or on, the gate and what answers it, how
- * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. The run's word
- * is `assess`'s status, `(pruned)` beside it as `wf ls` says it, and its note who it waits on you for (`onYouWords`).
+ * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. A step that signed
+ * off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for a run `failed` that nothing
+ * failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)` beside it as `wf ls` says
+ * it, and its note who it waits on you for (`onYouWords`).
  *
  * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
  * moves with every other run's start and end while nothing of this one does.
  */
-export function feedWords(l: Listing, run: Pick<Run, 'pruned'>, status: Assessment['status']): FeedWords {
+export function feedWords(
+  l: Listing,
+  run: Pick<Run, 'pruned'>,
+  { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
+  /** How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its word. */
+  closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
+): FeedWords {
   const onYou = onYouWords(l);
   return {
-    run: { word: `${status}${run.pruned ? ' (pruned)' : ''}`, ...(onYou.length ? { note: `waiting on you: ${onYou.join(', ')}` } : {}) },
-    steps: l.steps.map((s) => ({
-      name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(s.note ? { note: s.note } : {}),
-    })),
+    run: { word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`, ...(onYou.length ? { note: `waiting on you: ${onYou.join(', ')}` } : {}) },
+    steps: l.steps.map((s) => {
+      const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
+      return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(note ? { note } : {}) };
+    }),
   };
 }
+
+/**
+ * The longest `needs` the feed carries. A feed line is one line of `wf watch`, and a step's `needs` is the agent's, of any length: past this
+ * it is clipped, and `wf decide` has it whole.
+ */
+const NEEDS_CAP = 200;
+
+/**
+ * What a step that signed off blocked needs, for its line in the feed: `needs: <its closeout's needs>`, one line (`oneLine`) — or nothing, for
+ * a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so a
+ * watcher does not have to run `wf decide` to read it. Pure.
+ */
+const needsNote = (c: Closeout | { error: string } | undefined): string => {
+  const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
+  return needs ? `needs: ${needs}` : '';
+};
 
 /**
  * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read, by

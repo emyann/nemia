@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { feedPhase, feedWords, listing } from '../src/run.ts';
@@ -123,6 +123,7 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
   assert.deepEqual(words(run.id, 'plan').filter((w) => w === 'awaiting approval'), ['awaiting approval'], 'the gate reached is one line over four passes');
   const onYou = lines().filter((l) => l.run === run.id && l.step === undefined && l.note);
   assert.deepEqual(onYou.map((l) => l.note), ['waiting on you: approve plan'], 'and the run says, once, that it waits on a person');
+  assert.deepEqual(onYou.map((l) => l.word), ['awaiting approval'], 'at its gate, in the word wf decide says it in: nothing failed');
 
   // A person's word: the approval is a file of its own, and the next pass's line is what it changed.
   await approve(b.e, run.id, 'plan');
@@ -140,6 +141,72 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
 
   // And every line carries its time, its run, and its word: the shape a reader parses.
   for (const l of lines()) assert.ok(typeof l.at === 'string' && l.run && l.word, JSON.stringify(l));
+});
+
+/** A workflow of `implement → ship`, whose ending waits at its gate for a person before it is filed: as the shipped `dev` ends. */
+const ending = (() => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n');
+  return dir;
+})();
+
+test("a run waiting at its ending's gate reads `awaiting approval` in the feed, as wf decide says it — never `failed`, since nothing failed", async (t) => {
+  emptyStore();
+  const b = board();
+  const repo = aRepo();
+  const run = start({ brief: 'the ship gate', repo, workflowDir: ending });
+  await tick(b.e);
+  // Work on the step's branch, as a session leaves it: a branch that never moved is read by git as merged already.
+  const branch = readRun(run.id).steps.implement!.branch!;
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' }).trim();
+  git('update-ref', `refs/heads/${branch}`, git('commit-tree', `${branch}^{tree}`, '-p', branch, '-m', 'the work'));
+  b.set(`${run.id}-implement`, 'succeeded', SIGNED);
+  for (let i = 0; i < 3; i++) await tick(b.e);
+
+  assert.equal(words(run.id, 'ship').at(-1), 'awaiting approval', 'the ship step waits at its gate');
+  const last = lines().filter((l) => l.run === run.id && l.step === undefined).at(-1)!;
+  assert.deepEqual({ word: last.word, note: last.note }, { word: 'awaiting approval', note: 'waiting on you: approve ship' });
+  assert.equal(words(run.id).includes('failed'), false, `no line of the run says failed: ${words(run.id).join(' → ')}`);
+  // What wf decide says of the same run: awaiting approval, and nothing failed.
+  const decided = (await printedBy(t, b.e, 'decide', run.id)).join('\n');
+  assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/);
+  assert.doesNotMatch(decided, /FAILED/);
+
+  // And a run in which a step did break says so: a word that fits a gate is not a word that hides a failure.
+  const broke = start({ brief: 'the break', repo: aRepo(), workflowDir: ending });
+  await tick(b.e);
+  b.set(`${broke.id}-implement`, 'failed');
+  for (let i = 0; i < 2; i++) await tick(b.e);
+  assert.equal(words(broke.id).at(-1), 'failed');
+});
+
+test('a step that signed off blocked says what it needs on its line in the feed, made one line, beside BLOCKED — and the run says blocked, not failed', async () => {
+  emptyStore();
+  const b = board();
+  const run = started('the question');
+  await tick(b.e);
+  const needs = 'Which colour —\n  red, or\tblue?\n\nThe brief says both.';
+  b.set(`${run.id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs });
+  for (let i = 0; i < 3; i++) await tick(b.e);
+
+  const plan = lines().filter((l) => l.run === run.id && l.step === 'plan').at(-1)!;
+  assert.match(plan.word, /BLOCKED/);
+  assert.equal(plan.note, 'needs: Which colour — red, or blue? The brief says both.');
+  assert.equal(lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('needs:')).length, 1, 'said once, over three passes');
+  const said = lines().filter((l) => l.run === run.id && l.step === undefined).at(-1)!;
+  assert.deepEqual({ word: said.word, note: said.note }, { word: 'blocked', note: 'waiting on you: plan' });
+
+  // Long, it is clipped, and wf decide has it whole; a step that signed off done says nothing it needs, whatever its closeout holds.
+  const long = started('the long question');
+  const other = started('the done');
+  await tick(b.e);
+  b.set(`${long.id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'why '.repeat(100) });
+  b.set(`${other.id}-plan`, 'succeeded', { ...SIGNED, needs: 'nothing, really' });
+  for (let i = 0; i < 2; i++) await tick(b.e);
+  const clipped = lines().filter((l) => l.run === long.id && l.step === 'plan').at(-1)!.note!;
+  assert.ok(clipped.startsWith('needs: why why') && clipped.endsWith('…') && clipped.length <= 'needs: '.length + 200, clipped);
+  assert.equal(lines().some((l) => l.run === other.id && l.note?.includes('needs:')), false);
 });
 
 test('nothing is written when nothing changed, across a restart: a daemon with no fold of its own reads the feed, and says nothing again', async () => {
@@ -350,6 +417,87 @@ test("a watch hands each line on with its own cursor: the byte after it, in byte
   assert.equal(got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1, true, "the torn line's bytes are counted into the next line's cursor");
 });
 
+test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
+  emptyStore();
+  const b = board();
+  const run = started('the cut');
+  await tick(b.e);
+  // A real `wf watch`, since it never returns: its process is killed at the end. Its engine is never asked anything.
+  const cli = new URL('../src/cli.ts', import.meta.url).href;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`], {
+    env: { ...process.env, WF_ROOT: ROOT }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  let err = '';
+  child.stdout.on('data', (d) => { out += d; });
+  child.stderr.on('data', (d) => { err += d; });
+  /** Wait until `ok` holds of what the watch printed, under a bound of seconds: for what it counts, never a length of time. */
+  const printed = async (ok: () => boolean, what: string) => {
+    const bound = Date.now() + 10_000;
+    while (!ok()) {
+      if (Date.now() > bound) throw new Error(`${what} — stdout:\n${out}\nstderr:\n${err}`);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  };
+  const cuts = () => err.split('\n').filter((l) => l.includes('under this watch'));
+  try {
+    await printed(() => out.includes('watching from'), 'the watch starts');
+
+    // Truncated to nothing: said once, and the watch reads the feed the tick writes again from its start — the transition among it.
+    fs.truncateSync(FEED, 0);
+    await printed(() => cuts().length === 1, 'the truncation is said');
+    assert.match(cuts()[0]!, /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+    await tick(b.e);
+    await tick(b.e);
+    await printed(() => /\splan\s+awaiting approval/.test(out), 'the gate reached after the cut is delivered');
+
+    // Deleted: the same.
+    const before = out.length;
+    fs.rmSync(FEED);
+    await printed(() => cuts().length === 2, 'the deletion is said');
+    assert.match(cuts()[1]!, /the feed was deleted under this watch/);
+    await approve(b.e, run.id, 'plan');
+    for (let i = 0; i < 2; i++) await tick(b.e);
+    await printed(() => /\splan\s+(?!awaiting)/.test(out.slice(before)), 'the approval after the deletion is delivered');
+
+    // Replaced by another file of the same bytes and more: nothing about its size tells, its inode does.
+    const at = out.length;
+    const next = `${FEED}.next`;
+    fs.writeFileSync(next, `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`);
+    fs.renameSync(next, FEED);
+    await printed(() => out.slice(at).includes('r-new'), 'the replacement is read');
+    assert.equal(cuts().length, 3);
+    assert.match(cuts()[2]!, /the feed was replaced under this watch/);
+
+    // Once each: every beat after reads on, and says nothing more — no `past the end`, ever.
+    const quiet = err;
+    fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
+    await printed(() => out.includes('r-last'), 'the line after is delivered');
+    assert.equal(err, quiet, 'nothing more said');
+    assert.doesNotMatch(err, /past the end|falls inside a line/);
+  } finally {
+    child.kill();
+  }
+});
+
+test('REFUSED: a watch not told what to do about a cut feed refuses to read it, on every beat — the api ends its stream on that', async () => {
+  emptyStore();
+  const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
+  fs.writeFileSync(FEED, `${line}\n${line}\n`);
+  const errors: Error[] = [];
+  const watch = watchFeed({ from: size(), intervalMs: 20, onLine: () => {}, onError: (e) => { errors.push(e as Error); } });
+  try {
+    fs.truncateSync(FEED, 0);
+    const bound = Date.now() + 5_000;
+    while (errors.length < 2) {
+      assert.ok(Date.now() < bound, `refused ${errors.length} times in 5s`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assert.ok(errors.every(refusedWith(/is past the end of the feed/)), errors.map((e) => e.message).join('\n'));
+  } finally { watch.stop(); }
+});
+
 test('a watch says each read that works, before the lines it found and whether or not it found any, and no read that fails', async (t) => {
   if (process.getuid?.() === 0) return t.skip('a mode of 000 does not keep root from reading');
   emptyStore();
@@ -418,12 +566,16 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0];
   const run = { id: 'r-1', brief: 'b', createdAt: '2026-09-22T10:00:00.000Z', steps: {}, repo: '/r', branch: 'wf/r-1', base: 'main' } as unknown as Run;
   const held = listing(steps, run, () => 'unknown', () => undefined, undefined, undefined, [], [], [], [], undefined, undefined, { inFlight: 2, cap: 2 });
-  const a = feedWords(held, run, 'running');
+  const a = feedWords(held, run, { status: 'running' });
   assert.deepEqual(a.run, { word: 'running' });
   assert.deepEqual(a.steps.map((s) => s.word), ['waiting for a run slot']);
   const other = listing(steps, run, () => 'unknown', () => undefined, undefined, undefined, [], [], [], [], undefined, undefined, { inFlight: 3, cap: 3 });
-  assert.deepEqual(feedWords(other, run, 'running'), a, 'the count in flight moving is not a change');
-  assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, 'succeeded').run, { word: 'succeeded (pruned)' });
+  assert.deepEqual(feedWords(other, run, { status: 'running' }), a, 'the count in flight moving is not a change');
+  assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'succeeded' }).run, { word: 'succeeded (pruned)' });
+  // A run stopped on a person's word, and not on anything that broke, says what it stopped on — pruned too — and one that broke says failed.
+  assert.deepEqual(feedWords(held, run, { status: 'failed', stoppedOn: 'awaiting approval' }).run, { word: 'awaiting approval' });
+  assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'failed', stoppedOn: 'blocked' }).run, { word: 'blocked (pruned)' });
+  assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' });
 });
 
 test('the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved', () => {

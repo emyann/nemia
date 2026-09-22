@@ -77,6 +77,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   until a drag is under way, so `dragTo`'s check of what the pointer would hit finds the node over the handle. Drag with `page.mouse`
   (down, move in steps, up), and keep both ends in the frame: a drag that starts off a handle pans the pane (`drawEdge` in
   `apps/web/test/e2e/canvas.ts`, learned by the run that built the workflow builder).
+- **A sed address built from `grep -n` output can write a file.** `sed -n "$(grep -n pat f | cut -d: -f1)p"` is safe; one that keeps
+  the matched text (`2427:  watch = watchFeed({`) hands sed a `w` command, and sed writes the input to a file named after the rest of the
+  line, at the root, with nothing said. `git add -A` then committed a second `apps/api/src/app.ts` named `atch = watchFeed({p`. Read
+  `git status --short` before `git add -A`, and read a line of `git diff --name-only` that looks like noise (learned by the run that let
+  `wf watch` survive a cut feed).
 - **A file written through a script can turn an escape into the character it names.** A Python heredoc, or a tool that decodes
   escapes, wrote a raw NUL and DEL into a regular expression's class in `apps/api/src/builder.ts`: ripgrep then took the whole file for
   binary, and a search of `apps/api/src` did not find it. Each app's `test/source.test.ts` refuses a raw control character in its `src` and

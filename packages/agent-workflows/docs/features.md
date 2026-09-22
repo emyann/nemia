@@ -1934,7 +1934,8 @@ The api's half of what was sketched here. What was built, in `apps/api/src/app.t
 - **`unreadable` / `readable`**, as the transcript stream says them. A watch refused mid-stream (exit 2: the feed truncated or replaced
   under the cursor) sends `unreadable {error, retrying: false}` once and ends the stream, rather than fail every second as `wf watch`
   still does; a reader opens it again with no cursor. Any other failed read is said once with `retrying: true`, and cleared with
-  `readable` by the next line it hands on.
+  `readable` by the first read that works, whether it finds a line or not — the watch's `onRead`, called before the lines a read found
+  are handed on. Tested with the feed made unreadable (mode 000) for more than a beat, then readable again with nothing new written.
 - **Stopped when the reader goes**: the route awaits the stream's abort and then `stop()`s the watch, so a board tab closed leaves no
   fs watcher and no timer. Tested by counting the process's `FSEventWrap` handles, through `app.request` and through a real socket
   served by `@hono/node-server`, as `main.ts` serves it.

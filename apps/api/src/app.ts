@@ -2415,7 +2415,8 @@ export const app = new Hono()
       let end: () => void = () => {};
       const ended = new Promise<void>((resolve) => { end = resolve; });
       stream.onAbort(end);
-      // Whether the last read failed. A failure is said once, and cleared with `readable` by the next line the watch hands on.
+      // Whether the last read failed. A failure is said once, and cleared with `readable` by the first read that works, as the
+      // transcript's is — whether or not it finds a line.
       let failing = false;
       // Whether the stream is ending: said once, however many beats the watch fails on before it is stopped.
       let over = false;
@@ -2425,10 +2426,10 @@ export const app = new Hono()
       try {
         watch = watchFeed({
           from,
-          onLine: async (line, cursor) => {
+          onLine: (line, cursor) => stream.writeSSE({ event: feedEventOf(line), data: JSON.stringify(line), id: String(cursor) }),
+          onRead: async () => {
             if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
             failing = false;
-            await stream.writeSSE({ event: feedEventOf(line), data: JSON.stringify(line), id: String(cursor) });
           },
           onError: (err) => {
             // Refused (exit 2): the feed was truncated or replaced under the cursor, and no read from it will work again. The

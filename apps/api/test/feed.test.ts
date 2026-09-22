@@ -189,6 +189,41 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
   assert.equal(said.filter((b) => b.event === 'unreadable').length, 1, 'said once');
 });
 
+test('a read that fails for a beat is said once, `retrying`, and cleared by the first read that works — before any line is written', async (t) => {
+  const pass = emptyFeed();
+  pass({ 'r-1': planAt('running') });
+  const { reader, text } = await open(`?after=${end()}`);
+  try {
+    fs.chmodSync(feedFile(), 0o000);
+    try {
+      if (process.getuid?.() === 0) {
+        t.skip('a mode of 000 does not keep root from reading');
+        return;
+      }
+      const failed = await readUntil(reader, text, (s) => s.length >= 1);
+      assert.equal(failed[0]!.event, 'unreadable');
+      const { error, retrying } = JSON.parse(failed[0]!.data!);
+      assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
+      assert.match(error, /EACCES/);
+      // More than two of the watch's beats (1 s): each fails again, and none is said again. An absence, so a bound of time is all
+      // there is; a slow machine makes it prove less, never fail.
+      await new Promise((r) => setTimeout(r, 2_500));
+    } finally {
+      fs.chmodSync(feedFile(), 0o644);
+    }
+    // Nothing written: the next read that works clears it all the same.
+    const cleared = await readUntil(reader, text, (s) => s.length >= 2);
+    assert.deepEqual(cleared.map((b) => b.event), ['unreadable', 'readable'], 'said once, then cleared — with no line between');
+
+    const [line] = pass({ 'r-1': planAt('succeeded') });
+    const more = await readUntil(reader, text, (s) => s.length >= 3);
+    assert.deepEqual(more[2], { event: 'step', data: JSON.stringify(line), id: String(end()) });
+    assert.equal(more.length, 3, 'and the line that comes next, with nothing more said of the failure');
+  } finally {
+    await reader.cancel();
+  }
+});
+
 test('a stream whose reader goes leaves no watcher behind: each open stream holds one, and a cancelled one gives it back', async () => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });

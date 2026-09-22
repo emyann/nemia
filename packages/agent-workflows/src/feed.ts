@@ -211,13 +211,16 @@ export function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>
  * that hands each line on (the api's stream, an event's id) can be picked up after the last line it handed on, not after the last read.
  *
  * A cursor that cannot be read from is refused before anything is watched (`feedCursorRefusal`, exit 2); an error after that — a feed
- * truncated under the watcher — goes to `onError`, and the watch goes on.
+ * truncated under the watcher, a file that could not be opened this beat — goes to `onError`, and the watch goes on. `onRead` hears of
+ * each read that works, before the lines it found are handed on, and whether it found any: so a follower that said a read failed can
+ * say it works again on the next beat that reads, not only when the next line is written.
  */
-export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError }: {
+export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError, onRead }: {
   from?: number;
   onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
   intervalMs?: number;
   onError?: (e: unknown) => void;
+  onRead?: () => void | Promise<void>;
 }): { stop(): void } {
   const refusal = feedCursorRefusal(file, from);
   if (refusal) throw refused(refusal);
@@ -238,6 +241,8 @@ export function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_0
         again = false;
         for (;;) {
           const got = readEnds(file, cursor);
+          if (stopped) return;
+          await onRead?.();
           if (got.cursor === cursor) break;
           cursor = got.cursor;
           for (const [i, line] of got.lines.entries()) {

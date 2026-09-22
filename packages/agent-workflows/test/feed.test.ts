@@ -350,6 +350,41 @@ test("a watch hands each line on with its own cursor: the byte after it, in byte
   assert.equal(got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1, true, "the torn line's bytes are counted into the next line's cursor");
 });
 
+test('a watch says each read that works, before the lines it found and whether or not it found any, and no read that fails', async (t) => {
+  if (process.getuid?.() === 0) return t.skip('a mode of 000 does not keep root from reading');
+  emptyStore();
+  fs.writeFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' })}\n`);
+  const said: string[] = [];
+  /** Wait until `ok` holds of what the watch said, under a bound of seconds: for the beats counted, never a length of time. */
+  const heard = async (ok: () => boolean, what: string) => {
+    const bound = Date.now() + 5_000;
+    while (!ok()) {
+      if (Date.now() > bound) throw new Error(`${what}: the watch said ${said.join(', ')}`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+  const count = (word: string) => said.filter((w) => w === word).length;
+  const watch = watchFeed({ intervalMs: 20, onLine: () => { said.push('line'); }, onRead: () => { said.push('read'); }, onError: () => { said.push('error'); } });
+  try {
+    await heard(() => count('read') >= 4, 'reads that find nothing are said too');
+    assert.deepEqual(said.slice(0, 2), ['read', 'line'], 'the read, then the line it found');
+    assert.equal(count('line'), 1);
+
+    fs.chmodSync(FEED, 0o000);
+    try {
+      await heard(() => count('error') >= 1, 'a read that fails goes to onError');
+      const at = said.lastIndexOf('error');
+      await heard(() => said.slice(at + 1).includes('error'), 'and so does the next');
+      assert.deepEqual(said.slice(at).filter((w) => w !== 'error'), [], 'no read is said while reads fail');
+    } finally {
+      fs.chmodSync(FEED, 0o644);
+    }
+    const back = said.length;
+    await heard(() => said.slice(back).includes('read'), 'the first read that works is said, with nothing new written');
+    assert.equal(count('line'), 1);
+  } finally { watch.stop(); }
+});
+
 test('`wf --help` names wf feed and wf watch, and says which feed is whose', async (t) => {
   const printed = (await printedBy(t, board().e, '--help')).join('\n');
   assert.match(printed, /^ {2}wf feed \[cursor\] /m);

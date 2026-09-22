@@ -291,13 +291,17 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
     if (concurrent === undefined) delete process.env.WF_MAX_CONCURRENT;
     else process.env.WF_MAX_CONCURRENT = concurrent;
   }
+  // The store taken, said once per start (daemon-store.test.ts has the rest of it).
+  const holds = `   holds ${ROOT} as pid ${process.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`;
   assert.deepEqual(printed, [
     'up — every 4000ms, ^C to stop',
     '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
     '   runs in flight: no cap (WF_MAX_RUNS)',
+    holds,
     'up — every 1000ms, ^C to stop',
     '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
     '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
+    holds,
   ]);
 
   emptyStore('two');

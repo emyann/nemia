@@ -48,6 +48,9 @@ export type { FeedLine } from './feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Pruned, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { taskUsage, timeline, type Timeline } from './timeline.ts';
+import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding, type Identity } from './daemon.ts';
+export { DAEMON_FILE, DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, STALE_PASSES, daemonLine, everyOf, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
+export type { DaemonFile, DaemonStanding, Identity } from './daemon.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -480,6 +483,140 @@ function recordCeilings(c: { sessions: number; runs: number }): void {
     fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
     fs.renameSync(hidden, tickFile());
   } catch { /* read from the reader's own environment instead */ }
+}
+
+// ─── who ticks the store ────────────────────────────────────────────────────
+
+/** `$WF_ROOT/daemon.json`: the store taken by one `wf up`, written by it alone (`daemon.ts`). */
+export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
+
+/** The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged free. */
+function readDaemon(): string | undefined {
+  try { return fs.readFileSync(daemonFile(), 'utf8'); } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
+  }
+}
+
+/** Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there. */
+export function alive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+/**
+ * When process `pid` started, in clock ticks since boot: field 22 of `/proc/<pid>/stat`, read after the last `)`, since the command name
+ * before it may hold spaces and parentheses. Undefined where there is no `/proc`, or the process is gone.
+ */
+export function procStartOf(pid: number): number | undefined {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const start = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
+    return Number.isInteger(start) ? start : undefined;
+  } catch { return undefined; }
+}
+
+/** What the process table says of the file's pid (`Identity` in daemon.ts): alive, and whether it is the process that wrote the file. */
+export function identify(file: DaemonFile): Identity {
+  if (!alive(file.pid)) return 'gone';
+  const start = file.procStart === undefined ? undefined : procStartOf(file.pid);
+  if (start === undefined) return alive(file.pid) ? 'unknown' : 'gone';
+  return start === file.procStart ? 'same' : 'other';
+}
+
+/** Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table). */
+export const daemonStanding = (now = Date.now()): DaemonStanding => standingOf(readDaemon(), { now, identify });
+
+/** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
+function writeDaemon(file: DaemonFile): void {
+  const hidden = path.join(HOME, `.${DAEMON_FILE}.${process.pid}`);
+  fs.writeFileSync(hidden, daemonText(file));
+  fs.renameSync(hidden, daemonFile());
+}
+
+/** What `takeStore` took: the file this daemon now holds the store by, and where the store stood before it. */
+export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
+
+/**
+ * `wf up` takes the store: refused by name, exit 2, while another daemon ticks it (`holdRefusal`); otherwise the file names this process. An
+ * empty store is claimed with a link, which fails when the file appeared in between, so two starts on an empty store cannot both win — the
+ * loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns it at
+ * its first pass (`stillHeld`).
+ */
+export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd: string; now?: number }): TakenStore {
+  fs.mkdirSync(HOME, { recursive: true });
+  const procStart = procStartOf(process.pid);
+  const held: DaemonFile = { pid: process.pid, startedAt: new Date(now).toISOString(), cwd, every, passedAt: null, ...(procStart !== undefined ? { procStart } : {}) };
+  for (let tries = 0; ; tries++) {
+    const replaced = daemonStanding(now);
+    const holder = holderAgainst(replaced, process.pid);
+    if (holder) throw Object.assign(new Error(holdRefusal(holder, 'up', HOME, now)), { exitCode: 2 });
+    if (replaced.kind !== 'none') {
+      writeDaemon(held);
+      return { held, replaced };
+    }
+    const hidden = path.join(HOME, `.${DAEMON_FILE}.${process.pid}`);
+    fs.writeFileSync(hidden, daemonText(held));
+    try {
+      fs.linkSync(hidden, daemonFile());
+      return { held, replaced };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || tries >= 2) throw err;
+    } finally {
+      fs.rmSync(hidden, { force: true });
+    }
+  }
+}
+
+/**
+ * Whether the store is still this daemon's, read at the start of each pass: undefined when it is — the file names this process, or there is no
+ * file or none that reads, which the next write puts right — or the file of whoever took it over.
+ */
+export function stillHeld(held: DaemonFile): DaemonFile | undefined {
+  const text = readDaemon();
+  const file = text === undefined ? undefined : parseDaemonFile(text);
+  return file && file.pid !== held.pid ? file : undefined;
+}
+
+/**
+ * Write down a pass this daemon completed — only while the store is still its own: a file that names another holder is that holder's to
+ * write. Answers the file as it now stands.
+ */
+export function passed(held: DaemonFile, at = new Date().toISOString()): DaemonFile {
+  const now = { ...held, passedAt: at };
+  if (!stillHeld(held)) writeDaemon(now);
+  return now;
+}
+
+/**
+ * The daemon's beat, on a timer of its interval: `beatAt` written into its own file, whatever the pass is doing — only while the file names
+ * this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the next pass's to write. Never thrown: it runs
+ * on a timer, where a throw would end the process mid-pass.
+ */
+export function beat(held: DaemonFile, at = new Date().toISOString()): void {
+  try {
+    const text = readDaemon();
+    const file = text === undefined ? undefined : parseDaemonFile(text);
+    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
+  } catch { /* the next pass writes the file, or fails saying why */ }
+}
+
+/**
+ * Let the store go: `stoppedAt` written, so the store reads free at once and a reused pid never holds it — only while the file still names
+ * this daemon. Never thrown: it runs as the process stops, on a signal or a failure, and a store that cannot be written is read free anyway
+ * once the process is gone.
+ */
+export function releaseStore(held: DaemonFile, at = new Date().toISOString()): void {
+  try {
+    const text = readDaemon();
+    const file = text === undefined ? undefined : parseDaemonFile(text);
+    if (file?.pid === held.pid && !file.stoppedAt) writeDaemon({ ...file, stoppedAt: at });
+  } catch { /* read as gone once the process is */ }
+}
+
+/** Why a pass by hand may not run now — a daemon ticks the store — or undefined when it may. A `wf tick` never writes the file. */
+export function storeRefusal(verb: 'tick', now = Date.now()): string | undefined {
+  const holder = holderAgainst(daemonStanding(now), process.pid);
+  return holder ? holdRefusal(holder, verb, HOME, now) : undefined;
 }
 
 export const engine = (): Engine => createEngine({

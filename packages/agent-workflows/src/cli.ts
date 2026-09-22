@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -34,11 +34,17 @@ const HELP = `wf — run a workflow of agent steps
                                mark a card to start on its own: the tick starts the oldest queued
                                card once a run slot is free; --off takes the mark back
   wf inbox rm <name>           drop a card without starting it
-  wf tick                      one pass: tick the engine, file what became ready
-  wf up [ms]                   the same, on a timer
+  wf tick                      one pass: tick the engine, file what became ready — refused while a
+                               wf up ticks the store, since it runs the same pass (daemon.json)
+  wf up [ms]                   the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),
+                               holding the store: a second wf up is refused while this one ticks,
+                               and takes the store over once its process is gone or it has been
+                               silent for 10 intervals, at least 15 minutes; it writes
+                               WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
-                               flight); what each step's tries and the run have cost, where measured
+                               flight); what each step's tries and the run have cost, where measured;
+                               last, whether a wf up ticks the store and when its last pass was
   wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
                                step's word as wf ls says it, and what a person's word changed — then
                                cursor: <n>, to read on from with wf feed <n>; from the start with none
@@ -704,6 +710,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     }
 
     case 'tick': {
+      // A second writer beside a daemon that ticks the store: refused, with no force — the daemon runs this same pass within its interval.
+      const held = storeRefusal('tick');
+      if (held) throw Object.assign(new Error(held), { exitCode: 2 });
       // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
       const { runs: results, queue, feedError } = await tick(e, { repo: path.resolve('.') });
       if (feedError) console.error(feedError);
@@ -723,37 +732,67 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     }
 
     case 'up': {
-      const every = Number(rest[0]) || 4_000;
+      // An interval the file cannot hold is refused before anything: a daemon whose file does not read holds nothing.
+      const asked = everyOf(rest[0]);
+      const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
+      // The ceilings first, so a WF_MAX_RUNS refused is refused before the store is taken; then the store, or a refusal naming who holds it.
+      const ceiling = ceilings();
+      const { held, replaced } = takeStore({ every, cwd: path.resolve('.') });
+      const store = HOME;
       console.log(`up — every ${every}ms, ^C to stop`);
       // Both ceilings, in words, before the first pass: what the daemon holds work to.
-      for (const line of ceilingLines(ceilings())) console.log(`   ${line}`);
-      // The failure this daemon last said, so that it says it once and no more. A card whose start fails without a refusal is tried on
-      // every pass, and the pass writes down what it said (`QueueTry`, `again`) — but that pass may have been another `wf up` or a
-      // `wf tick`, whose line is on a terminal that is gone, and a person restarting the daemon to see why cards stopped starting must be
-      // told. So the daemon goes by what it has said itself, not by what the store has written: `again` is not read here. Nothing is
-      // decided on it — a pass decides what it decides, and this is only what has been printed.
-      let said: string | undefined;
-      // And the feed's failure, said once until it changes, the same way: a feed that cannot be written fails every pass alike.
-      let feedSaid: string | undefined;
-      for (;;) {
-        // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
-        const { runs: passed, queue, feedError } = await tick(e, { repo: path.resolve('.') });
-        if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
-        feedSaid = feedError;
-        if (queue) {
-          // A pass at a full cap reads no queue at all (`tick`), so the first pass that does is the first that can say anything.
-          const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
-          if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
-          said = failure;
+      for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
+      console.log(`   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`);
+      const took = takeoverLine(replaced, store, Date.now());
+      if (took) console.log(`   ${took}`);
+      // Stopped by a signal, the store is let go on the way out, so it reads free at once. A crash leaves the file, read as gone.
+      const stops = ([['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]] as const).map(([signal, code]) => {
+        const stop = () => { releaseStore(held); process.exit(code); };
+        process.once(signal, stop);
+        return [signal, stop] as const;
+      });
+      // The beat, on its own timer: a pass that runs long — an install in each of several worktrees — is still heard from, and is not taken
+      // for stalled and taken over mid-pass. Unref'd: the loop holds the process, not the beat.
+      const beating = setInterval(() => beat(held), every);
+      beating.unref();
+      try {
+        // The failure this daemon last said, so that it says it once and no more. A card whose start fails without a refusal is tried on
+        // every pass, and the pass writes down what it said (`QueueTry`, `again`) — but that pass may have been another `wf up` or a
+        // `wf tick`, whose line is on a terminal that is gone, and a person restarting the daemon to see why cards stopped starting must be
+        // told. So the daemon goes by what it has said itself, not by what the store has written: `again` is not read here. Nothing is
+        // decided on it — a pass decides what it decides, and this is only what has been printed.
+        let said: string | undefined;
+        // And the feed's failure, said once until it changes, the same way: a feed that cannot be written fails every pass alike.
+        let feedSaid: string | undefined;
+        for (;;) {
+          // Still this daemon's store, or it stops: taken over, it would be a second writer.
+          const by = stillHeld(held);
+          if (by) throw new Error(takenFromLine(by, store));
+          // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
+          const { runs: advanced, queue, feedError } = await tick(e, { repo: path.resolve('.') });
+          // The heartbeat: a pass completed, written down for `wf ls` and for the next `wf up`.
+          passed(held);
+          if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
+          feedSaid = feedError;
+          if (queue) {
+            // A pass at a full cap reads no queue at all (`tick`), so the first pass that does is the first that can say anything.
+            const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
+            if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+            said = failure;
+          }
+          for (const r of advanced) {
+            for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
+            if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
+            if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
+            if (r.looped.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
+            if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
+          }
+          await new Promise((r) => setTimeout(r, every));
         }
-        for (const r of passed) {
-          for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
-          if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
-          if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
-          if (r.looped.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
-          if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
-        }
-        await new Promise((r) => setTimeout(r, every));
+      } finally {
+        clearInterval(beating);
+        for (const [signal, stop] of stops) process.off(signal, stop);
+        releaseStore(held);
       }
     }
 
@@ -777,7 +816,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
     case 'ls': {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
-      if (!runs.length) return console.log('no runs');
+      // Last, on every path: whether a daemon ticks the store, and when its last pass was — or `waiting` could mean nothing ticks at all.
+      const ticking = () => console.log(daemonLine(daemonStanding(), Date.now()));
+      if (!runs.length) { console.log('no runs'); return ticking(); }
       // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
       const held = await runSlots(e);
       for (const run of runs) {
@@ -808,7 +849,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
       }
-      return;
+      return ticking();
     }
 
     case 'cancel': {

@@ -19,7 +19,7 @@ const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-daemon-'));
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_RUNS;
-const { NPM_CI_TIMEOUT_MS, STALE_FLOOR_MS, daemonFile } = await import('../src/runner.ts');
+const { beat, daemonFile, daemonStanding } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const FILE = path.join(ROOT, 'daemon.json');
@@ -44,7 +44,7 @@ const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
   return text;
 };
 
-const read = () => JSON.parse(fs.readFileSync(FILE, 'utf8')) as { pid: number; startedAt: string; cwd: string; every: number; passedAt: string | null; stoppedAt?: string };
+const read = () => JSON.parse(fs.readFileSync(FILE, 'utf8')) as { pid: number; startedAt: string; cwd: string; every: number; passedAt: string | null; beatAt?: string; stoppedAt?: string };
 
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
 
@@ -65,9 +65,64 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
 
 const clear = () => fs.rmSync(FILE, { force: true });
 
-test('the stale floor is longer than the longest pass the tick can make, an npm ci — or a working daemon would be taken over', () => {
-  assert.ok(STALE_FLOOR_MS > NPM_CI_TIMEOUT_MS, `${STALE_FLOOR_MS} > ${NPM_CI_TIMEOUT_MS}`);
+test('a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout', async (t) => {
   assert.equal(daemonFile(), FILE);
+  clear();
+  // One pass that awaits — as an npm ci in each of several worktrees does — until it has seen two beats of its own daemon, under a bound of
+  // seconds: counted, not timed. Without the beat's timer no beat comes and the bound fails it.
+  const beats: string[] = [];
+  const kinds = new Set<string>();
+  const e = engineOf(() => { throw STOP; });
+  e.tick = async () => {
+    e.passes++;
+    const until = Date.now() + 10_000;
+    while (beats.length < 2) {
+      assert.ok(Date.now() < until, 'two beats within 10s of a pass in flight');
+      const f = read();
+      assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
+      if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
+      kinds.add(daemonStanding().kind);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    throw STOP;
+  };
+  const { threw } = await typed(t, ['up', '10'], e);
+  assert.equal(threw, STOP);
+  assert.equal(e.passes, 1);
+  assert.ok(Date.parse(beats[1]!) > Date.parse(beats[0]!), beats.join(' '));
+  assert.deepEqual([...kinds], ['ticking']);
+  assert.ok(read().stoppedAt, 'let go as it stopped');
+});
+
+test('the beat writes only its own daemon\'s file: not over another holder, not after a stop, not a file it did not take', () => {
+  clear();
+  const self = { pid: process.pid, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
+  fs.writeFileSync(FILE, JSON.stringify(self));
+  beat(self, '2026-09-22T12:00:00.000Z');
+  assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z' }, 'its own file beats, its last pass kept');
+  for (const [name, over] of [['another holder', { pid: LIVE }], ['stopped', { stoppedAt: minutesAgo(0.1) }], ['an earlier start of this pid', { startedAt: minutesAgo(5) }]] as const) {
+    const text = holdBy(process.pid, { ...self, ...over });
+    beat(self);
+    assert.equal(fs.readFileSync(FILE, 'utf8'), text, name);
+  }
+  clear();
+  beat(self);
+  assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
+});
+
+test('REFUSED at shipped defaults: `wf up` with an interval daemon.json cannot hold — before the store is taken, and no pass run', async () => {
+  for (const arg of ['-5', '1e400', '0', 'soon']) {
+    clear();
+    const e = engineOf();
+    await assert.rejects(main(['up', arg], e), refusedWith(new RegExp(`^wf up takes its pass interval in whole milliseconds, from 1 to 2147483647, and ${JSON.stringify(arg)} is not one: `)), arg);
+    assert.equal(e.passes, 0, arg);
+    assert.equal(fs.existsSync(FILE), false, `${arg}: the store not taken`);
+  }
+  // And a store held by a live daemon is not freed by one: the refusal is the interval's, the file untouched.
+  const text = holdBy(LIVE);
+  await assert.rejects(main(['up', '-5'], engineOf()), refusedWith(/^wf up takes its pass interval/));
+  assert.equal(fs.readFileSync(FILE, 'utf8'), text);
+  clear();
 });
 
 test('`wf up` takes the store: its pid, where and how often it ticks, then each pass completed — and lets it go as it stops', async (t) => {
@@ -115,7 +170,7 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
 
 test('a holder stale, gone or stopped is taken over by `wf up` — and not refused to a `wf tick`, which writes nothing', async (t) => {
   const cases = [
-    { name: 'stale', pid: LIVE, over: { passedAt: minutesAgo(16) }, took: new RegExp(`^ {3}took ${ROOT} over from pid ${LIVE}, alive but with no pass for 16m0\\ds, over the 15m00s that is stale at every 4000ms`) },
+    { name: 'stale', pid: LIVE, over: { passedAt: minutesAgo(16) }, took: new RegExp(`^ {3}took ${ROOT} over from pid ${LIVE}, alive but silent for 16m0\\ds, over the 15m00s that is stale at every 4000ms`) },
     { name: 'gone', pid: GONE, over: {}, took: new RegExp(`^ {3}took ${ROOT} over from pid ${GONE}, whose process is gone`) },
     { name: 'stopped', pid: LIVE, over: { stoppedAt: minutesAgo(0.01) }, took: undefined },
     { name: 'unreadable', pid: LIVE, over: { pid: 'nobody' }, took: new RegExp(`^ {3}took ${ROOT} over from a daemon.json that did not read as a holder$`) },
@@ -160,7 +215,7 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
   const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
   assert.equal(await lastLine(), 'wf up: none has held this store — nothing ticks it; start one with wf up');
   holdBy(LIVE, { passedAt: minutesAgo(20) });
-  assert.match((await lastLine())!, new RegExp(`^wf up: stalled, pid ${LIVE}, every 4000ms — alive, but last pass 20m00s ago \\(`));
+  assert.match((await lastLine())!, new RegExp(`^wf up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for 20m0\\ds: last pass 20m0\\ds ago \\(`));
   holdBy(GONE);
   assert.match((await lastLine())!, new RegExp(`^wf up: none ticking — pid ${GONE} is gone, its last pass `));
   clear();

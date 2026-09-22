@@ -49,7 +49,7 @@ export type { FeedSaid, FeedWords } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Pruned, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { taskUsage, timeline, type Timeline } from './timeline.ts';
 import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding } from './daemon.ts';
-export { DAEMON_FILE, STALE_FLOOR_MS, STALE_PASSES, daemonLine, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
+export { DAEMON_FILE, DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, STALE_PASSES, daemonLine, everyOf, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
 export type { DaemonFile, DaemonStanding } from './daemon.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -567,6 +567,19 @@ export function passed(held: DaemonFile, at = new Date().toISOString()): DaemonF
 }
 
 /**
+ * The daemon's beat, on a timer of its interval: `beatAt` written into its own file, whatever the pass is doing — only while the file names
+ * this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the next pass's to write. Never thrown: it runs
+ * on a timer, where a throw would end the process mid-pass.
+ */
+export function beat(held: DaemonFile, at = new Date().toISOString()): void {
+  try {
+    const text = readDaemon();
+    const file = text === undefined ? undefined : parseDaemonFile(text);
+    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
+  } catch { /* the next pass writes the file, or fails saying why */ }
+}
+
+/**
  * Let the store go: `stoppedAt` written, so the store reads free at once and a reused pid never holds it — only while the file still names
  * this daemon. Never thrown: it runs as the process stops, on a signal or a failure, and a store that cannot be written is read free anyway
  * once the process is gone.
@@ -864,7 +877,7 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
 export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
-export const NPM_CI_TIMEOUT_MS = 10 * 60_000;
+const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 
 const execFileAsync = promisify(execFile);
 const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });

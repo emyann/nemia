@@ -4,9 +4,10 @@
  * nothing here reads a disk or signals a process.
  *
  * One `wf up` per store, since the tick keeps one writer per file and two ticks are two writers. The file is the daemon's alone: it writes it
- * as it takes the store, after every pass it completes, and as it stops. A second `wf up`, and a `wf tick` by hand, read it and are refused
- * while it names a live process whose last pass is recent (`ticking`); anything else — no file, a file that does not read, a holder that
- * stopped, is gone or has not passed for a long while — is free, and `wf up` takes it over.
+ * as it takes the store, after every pass it completes, on a beat of its interval while it lives — a pass in flight included — and as it
+ * stops. A second `wf up`, and a `wf tick` by hand, read it and are refused while it names a live process heard from recently (`ticking`);
+ * anything else — no file, a file that does not read, a holder that stopped, is gone or has been silent for a long while — is free, and
+ * `wf up` takes it over.
  */
 import { durationWord } from './radius.ts';
 
@@ -18,6 +19,11 @@ export type DaemonFile = {
   /** Its pass interval, in milliseconds (`wf up [ms]`): how stale is stale is measured from it (`staleAfterMs`). */
   every: number;
   passedAt: string | null;
+  /**
+   * The daemon's beat: written on a timer of its interval whatever the pass is doing, so a pass that runs long — installs in several worktrees
+   * one after another — still shows its process at work. Absent before the first beat.
+   */
+  beatAt?: string;
   /** Written as it stops on a signal or a failure: a clean stop frees the store even when the pid is later reused. */
   stoppedAt?: string;
 };
@@ -29,16 +35,38 @@ export const DAEMON_FILE = 'daemon.json';
 export const STALE_PASSES = 10;
 
 /**
- * The least a holder must go without a pass to be taken over: fifteen minutes. The heartbeat is written only when a pass completes, and one
- * pass may run an `npm ci` in a worktree for up to ten minutes (`NPM_CI_TIMEOUT_MS` in runner.ts, held below this by a test): a threshold
- * under the longest pass would take the store from a daemon that is working. At the shipped interval of 4000 ms the floor decides.
+ * The least a holder must be silent to be taken over: fifteen minutes. A pass has no bound — it files every ready step of every run, each
+ * perhaps behind an `npm ci` of up to ten minutes — so silence is not measured from the last pass but from the beat, which a timer writes
+ * while the pass awaits. What keeps a timer from firing is the event loop held by synchronous work (a `git`, a `du`), or the process
+ * stopped (`^Z`, `SIGSTOP`); the floor leaves those room. At the shipped interval of 4000 ms the floor decides.
  */
 export const STALE_FLOOR_MS = 15 * 60_000;
 
-/** How long a holder of interval `every` may go without a pass before it reads as stalled: ten of its intervals, never under fifteen minutes. */
+/** How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes. */
 export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
 const isTime = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+
+/** The longest interval a timer keeps: Node fires a longer one after 1 ms, so `wf up 1e10` would pass without pause and never go stale. */
+export const MAX_EVERY_MS = 2 ** 31 - 1;
+
+/** The interval `wf up` ticks at when it is given none. */
+export const DEFAULT_EVERY_MS = 4_000;
+
+/**
+ * `wf up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into the
+ * file, and one that does not read there — `-5`, or `1e400`, which JSON writes as `null` — would make the daemon no holder while it ticks.
+ */
+export function everyOf(arg: string | undefined): { every: number } | { refusal: string } {
+  if (arg === undefined) return { every: DEFAULT_EVERY_MS };
+  const every = Number(arg);
+  if (arg.trim() !== '' && Number.isInteger(every) && every >= 1 && every <= MAX_EVERY_MS) return { every };
+  return {
+    refusal: `wf up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
+      `wf up [ms], ${DEFAULT_EVERY_MS} when none is given. The interval is written into ${DAEMON_FILE}, and a holder whose interval does not ` +
+      `read there holds nothing: a second wf up would take the store from it while it ticks.`,
+  };
+}
 
 /**
  * The file as `wf up` writes it, or undefined when the text does not read as one. A pid that is not a positive whole number is not read as
@@ -51,19 +79,20 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
     v = parsed as Record<string, unknown>;
   } catch { return undefined; }
-  const { pid, startedAt, cwd, every, passedAt, stoppedAt } = v;
+  const { pid, startedAt, cwd, every, passedAt, beatAt, stoppedAt } = v;
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return undefined;
   if (!isTime(startedAt) || typeof cwd !== 'string') return undefined;
   if (typeof every !== 'number' || !Number.isFinite(every) || every <= 0) return undefined;
   if (passedAt !== null && passedAt !== undefined && !isTime(passedAt)) return undefined;
+  if (beatAt !== undefined && !isTime(beatAt)) return undefined;
   if (stoppedAt !== undefined && !isTime(stoppedAt)) return undefined;
-  return { pid, startedAt, cwd, every, passedAt: passedAt ?? null, ...(stoppedAt !== undefined ? { stoppedAt } : {}) };
+  return { pid, startedAt, cwd, every, passedAt: passedAt ?? null, ...(beatAt !== undefined ? { beatAt } : {}), ...(stoppedAt !== undefined ? { stoppedAt } : {}) };
 }
 
 /**
  * Where the store stands: nobody has held it (`none`); a file that does not read as a holder (`unreadable`); a holder that stopped and said so
- * (`stopped`); one whose process is gone (`gone`); one alive that has not passed within `staleAfterMs` of its interval (`stalled`); or one
- * ticking. `last` is when it last showed life — its last pass, or its start before any — and `quiet` how long ago that was.
+ * (`stopped`); one whose process is gone (`gone`); one alive that has been silent for longer than `staleAfterMs` of its interval (`stalled`); or
+ * one ticking. `last` is when it last showed life — the latest of its start, its last pass and its beat — and `quiet` how long ago that was.
  */
 export type DaemonStanding =
   | { kind: 'none' }
@@ -79,7 +108,7 @@ export function daemonStanding(text: string | undefined, { now, alive }: { now: 
   if (text === undefined) return { kind: 'none' };
   const file = parseDaemonFile(text);
   if (!file) return { kind: 'unreadable', text };
-  const last = Math.max(Date.parse(file.startedAt), file.passedAt ? Date.parse(file.passedAt) : -Infinity);
+  const last = Math.max(...[file.startedAt, file.passedAt, file.beatAt].filter((t): t is string => !!t).map(Date.parse));
   const quiet = now - last;
   const kind = file.stoppedAt ? 'stopped' : !alive(file.pid) ? 'gone' : quiet > staleAfterMs(file.every) ? 'stalled' : 'ticking';
   return { kind, file, last, quiet };
@@ -89,10 +118,16 @@ export function daemonStanding(text: string | undefined, { now, alive }: { now: 
 export const holderAgainst = (standing: DaemonStanding, self: number): DaemonFile | undefined =>
   standing.kind === 'ticking' && standing.file.pid !== self ? standing.file : undefined;
 
-/** When a holder last showed life, in words: `last pass 3s ago (2026-09-22T10:00:04.000Z)`, or `no pass yet, started 3s ago (…)`. */
+/**
+ * When a holder last passed, in words: `last pass 3s ago (2026-09-22T10:00:04.000Z)`, or `no pass completed yet, started 3s ago (…)` — and,
+ * when its beat is more than two intervals past that, that a pass is under way and when the process was last heard from, so a pass that
+ * runs long, or never ends, is read as that and not as a daemon at rest.
+ */
 export function lastPassWords(file: DaemonFile, now: number): string {
   const ago = (t: string) => `${durationWord(now - Date.parse(t))} ago (${t})`;
-  return file.passedAt ? `last pass ${ago(file.passedAt)}` : `no pass completed yet, started ${ago(file.startedAt)}`;
+  const passed = file.passedAt ? `last pass ${ago(file.passedAt)}` : `no pass completed yet, started ${ago(file.startedAt)}`;
+  const since = Date.parse(file.passedAt ?? file.startedAt);
+  return file.beatAt && Date.parse(file.beatAt) - since > 2 * file.every ? `${passed}, a pass under way since — alive ${ago(file.beatAt)}` : passed;
 }
 
 /** How to stop a daemon, said wherever one is named: its own pid, since an `npm exec` wrapper killed leaves the node child ticking. */
@@ -108,7 +143,7 @@ export function holdRefusal(holder: DaemonFile, verb: 'up' | 'tick', store: stri
   const stale = durationWord(staleAfterMs(holder.every));
   return verb === 'up'
     ? `wf up: ${store} is held by ${who}. One store takes one wf up: a second would be a second writer of every file the tick writes. ` +
-      `Leave it ticking, or stop it with ${stopWords(holder.pid)}; a holder that has not passed for ${stale} is taken over by the next wf up.`
+      `Leave it ticking, or stop it with ${stopWords(holder.pid)}; a holder silent for ${stale} is taken over by the next wf up.`
     : `wf tick: ${store} is held by ${who}, which runs this same pass within its interval: a pass by hand beside it would be a second writer. ` +
       `Wait for its next pass — wf ls says when it was — or stop it with ${stopWords(holder.pid)}, and tick by hand then.`;
 }
@@ -118,7 +153,7 @@ export function takeoverLine(replaced: DaemonStanding, store: string, now: numbe
   if (replaced.kind === 'unreadable') return `took ${store} over from a ${DAEMON_FILE} that did not read as a holder`;
   if (replaced.kind === 'gone') return `took ${store} over from pid ${replaced.file.pid}, whose process is gone — its ${lastPassWords(replaced.file, now)}`;
   if (replaced.kind === 'stalled') {
-    return `took ${store} over from pid ${replaced.file.pid}, alive but with no pass for ${durationWord(replaced.quiet)}, over the ${durationWord(staleAfterMs(replaced.file.every))} that is stale at every ${replaced.file.every}ms — ` +
+    return `took ${store} over from pid ${replaced.file.pid}, alive but silent for ${durationWord(replaced.quiet)}, over the ${durationWord(staleAfterMs(replaced.file.every))} that is stale at every ${replaced.file.every}ms — ` +
       `it stops at its next pass, on reading the store is no longer its; ${stopWords(replaced.file.pid)}`;
   }
   return undefined;
@@ -137,7 +172,7 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
     case 'unreadable': return `wf up: none known — ${DAEMON_FILE} does not read as a holder, so nothing is known to tick this store; wf up takes it over`;
     case 'ticking': return `wf up: ticking, pid ${standing.file.pid}, every ${standing.file.every}ms — ${lastPassWords(standing.file, now)}`;
     case 'stalled':
-      return `wf up: stalled, pid ${standing.file.pid}, every ${standing.file.every}ms — alive, but ${lastPassWords(standing.file, now)}; ` +
+      return `wf up: stalled, pid ${standing.file.pid}, every ${standing.file.every}ms — alive, but silent for ${durationWord(standing.quiet)}: ${lastPassWords(standing.file, now)}; ` +
         `the next wf up takes the store over, and kill ${standing.file.pid} stops it`;
     case 'gone': return `wf up: none ticking — pid ${standing.file.pid} is gone, its ${lastPassWords(standing.file, now)}; start one with wf up`;
     case 'stopped':

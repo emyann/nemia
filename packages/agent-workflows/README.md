@@ -1961,22 +1961,28 @@ The tick keeps one writer per file, and two ticks are two writers. So `wf up` ta
 `$WF_ROOT/daemon.json`, which it alone writes:
 
 ```json
-{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z" }
+{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "beatAt": "2026-09-22T10:41:09.002Z" }
 ```
 
-`pid` is the node process that ticks, `every` its interval, and `passedAt` when its last pass completed (`null` before the first). It is
-written as the store is taken, after every pass, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always
-through a hidden file renamed over it, so a reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in
-`src/daemon.ts`): no file, a file that does not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)`), one alive that
-has not passed for a long while (`stalled`), or one `ticking`.
+`pid` is the node process that ticks, `every` its interval, `passedAt` when its last pass completed (`null` before the first), and `beatAt`
+when its timer last wrote the file. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
+doing, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always through a hidden file renamed over it, so a
+reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon.ts`): no file, a file that does
+not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)`), one alive that has been silent for a long while
+(`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
+before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
 - **A second `wf up` is refused by name, exit 2, while the store is ticked** — naming the pid, where and since when it ticks, its last pass,
   and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
   leave the child ticking, reparented to init). Anything else is taken over, and `wf up` says from whom when it was not a clean stop:
   `took ~/.agent-workflows over from pid 51234, whose process is gone`.
-- **Stale is ten of the holder's own intervals, never under fifteen minutes** (`staleAfterMs`): the heartbeat is written only when a pass
-  completes, and one pass may run an `npm ci` for up to ten minutes. At the shipped 4000 ms the floor decides. A daemon taken over while it
-  lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops rather than be a second writer.
+- **Stale is ten of the holder's own intervals of silence, never under fifteen minutes** (`staleAfterMs`), measured from the latest of its
+  start, its last pass and its beat. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
+  ten minutes — so the pass alone cannot say the daemon is alive; the beat, on a timer, is written while the pass awaits. What silences it
+  is the event loop held by synchronous work, or the process stopped (`^Z`); the floor leaves those room, and at the shipped 4000 ms it
+  decides. A daemon taken over while it lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops
+  rather than be a second writer. A pass that awaits for ever keeps beating, and holds the store until it is killed: `wf ls` says so —
+  `last pass 40m00s ago (…), a pass under way since — alive 3s ago (…)` — rather than letting a second daemon in beside it.
 - **`wf tick` by hand is refused the same way while a daemon ticks**, with no force: the daemon runs the same pass within its interval,
   and every case a hand tick helps in — the daemon stopped, gone or stalled — already passes. A hand tick never writes the file.
 - **Two starts on an empty store cannot both win**: the file is claimed with a link, which fails when it appeared in between, and the
@@ -1985,7 +1991,8 @@ has not passed for a long while (`stalled`), or one `ticking`.
   3s ago (…)`, or `stalled`, `none ticking — pid 51234 is gone`, `stopped`, and `none has held this store` — so a run `waiting` is told
   apart from a store nothing ticks.
 - **Liveness is this host's.** A store on a shared disk ticked from another machine reads as gone here. A pid reused after a daemon was
-  killed with `-9`, within the stale window, reads as ticking; a clean stop writes `stoppedAt` and never does.
+  killed with `-9`, within the stale window, reads as ticking; a clean stop writes `stoppedAt` and never does. A daemon resumed from `^Z`
+  after it was taken over finishes the pass it was in before it reads the file again.
 
 ## Calling a run off
 

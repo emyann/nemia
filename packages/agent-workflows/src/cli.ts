@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, daemonLine, daemonStanding, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -36,10 +36,11 @@ const HELP = `wf — run a workflow of agent steps
   wf inbox rm <name>           drop a card without starting it
   wf tick                      one pass: tick the engine, file what became ready — refused while a
                                wf up ticks the store, since it runs the same pass (daemon.json)
-  wf up [ms]                   the same, on a timer (4000 unless given), holding the store: a second
-                               wf up is refused while this one ticks, and takes the store over once
-                               its process is gone or it has not passed for 10 intervals, at least
-                               15 minutes; it writes WF_ROOT/daemon.json — pid, start, last pass
+  wf up [ms]                   the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),
+                               holding the store: a second wf up is refused while this one ticks,
+                               and takes the store over once its process is gone or it has been
+                               silent for 10 intervals, at least 15 minutes; it writes
+                               WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
@@ -731,7 +732,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     }
 
     case 'up': {
-      const every = Number(rest[0]) || 4_000;
+      // An interval the file cannot hold is refused before anything: a daemon whose file does not read holds nothing.
+      const asked = everyOf(rest[0]);
+      const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
       // The ceilings first, so a WF_MAX_RUNS refused is refused before the store is taken; then the store, or a refusal naming who holds it.
       const ceiling = ceilings();
       const { held, replaced } = takeStore({ every, cwd: path.resolve('.') });
@@ -748,6 +751,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         process.once(signal, stop);
         return [signal, stop] as const;
       });
+      // The beat, on its own timer: a pass that runs long — an install in each of several worktrees — is still heard from, and is not taken
+      // for stalled and taken over mid-pass. Unref'd: the loop holds the process, not the beat.
+      const beating = setInterval(() => beat(held), every);
+      beating.unref();
       try {
         // The failure this daemon last said, so that it says it once and no more. A card whose start fails without a refusal is tried on
         // every pass, and the pass writes down what it said (`QueueTry`, `again`) — but that pass may have been another `wf up` or a
@@ -783,6 +790,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           await new Promise((r) => setTimeout(r, every));
         }
       } finally {
+        clearInterval(beating);
         for (const [signal, stop] of stops) process.off(signal, stop);
         releaseStore(held);
       }

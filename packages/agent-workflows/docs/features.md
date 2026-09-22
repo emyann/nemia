@@ -1940,19 +1940,24 @@ On 2026-09-16 four daemons ticked `~/.agent-workflows` at once; on 2026-09-22 st
 node child ticking, reparented to init, while a check on the wrapper's name counted none. And `tick.json` is written only when the caps
 change, so nothing said whether a daemon was ticking at all: a run `waiting` and a store nothing ticks read the same.
 
-- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, stoppedAt? }` — its node pid, its start,
-  where and how often it ticks, its last completed pass (`null` before the first), and `stoppedAt` once it stopped on a signal or a
-  failure. Judged purely by `daemonStanding` (`src/daemon.ts`): `none`, `unreadable`, `stopped`, `gone`, `stalled` or `ticking`.
-- **A second `wf up`, and a `wf tick` by hand, are refused by name, exit 2, while the store is `ticking`** — a live pid whose last pass,
-  or start, is within `staleAfterMs(every)` = max(10 × its interval, 15 minutes): fifteen at the shipped 4000 ms, since one pass may run an
-  `npm ci` for ten. The refusal names the pid and says `kill <pid>`, the node process, not the wrapper. No force for `wf tick`.
+- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, beatAt?, stoppedAt? }` — its node pid, its
+  start, where and how often it ticks, its last completed pass (`null` before the first), its beat — written on a timer of its interval,
+  while a pass awaits too — and `stoppedAt` once it stopped on a signal or a failure. `wf up [ms]` refuses, exit 2, an interval that is not
+  a whole number from 1 to 2147483647, before the store is taken: `-5` and `1e400` (JSON's `null`) would not read back, and a daemon whose
+  file does not read holds nothing. Judged purely by `daemonStanding` (`src/daemon.ts`): `none`, `unreadable`, `stopped`, `gone`, `stalled` or `ticking`.
+- **A second `wf up`, and a `wf tick` by hand, are refused by name, exit 2, while the store is `ticking`** — a live pid whose start, last
+  pass or beat is within `staleAfterMs(every)` = max(10 × its interval, 15 minutes). Not the last pass alone: a pass files every ready step
+  of every run, each perhaps behind a ten-minute `npm ci`, so it has no bound, and a daemon read as stalled mid-pass would be taken over while
+  it still files (round 2's finding). The beat is silenced only by a blocked event loop or a stopped process; a pass that awaits for ever
+  keeps beating and holds the store until killed, and `wf ls` says `a pass under way since — alive 3s ago`. The refusal names the pid and says `kill <pid>`, the node process, not the wrapper. No force for `wf tick`.
 - **Anything else is taken over** — claimed with a link on an empty store, renamed over the rest — and a daemon that finds another pid in
   the file at the start of a pass stops. `wf ls` ends on a line saying whether a daemon ticks and when its last pass was.
 
 Tested in `test/daemon.test.ts` (each standing, both sides of the threshold at 4000 ms and at 600 000 ms, alive-but-stale and
-dead-but-fresh, the words) and `test/daemon-store.test.ts` (the file written pass by pass and let go; both refusals at shipped
+dead-but-fresh, a long pass heard from by its beat, the intervals refused, the words) and `test/daemon-store.test.ts` (the file written pass by pass and let go; both refusals at shipped
 defaults, the file untouched and no pass run; a stale, gone, stopped and unreadable holder taken over; a daemon taken over mid-run
-stopping without writing over its successor; a hand tick writing nothing; SIGTERM writing `stoppedAt`, exit 143). Each guard was
+stopping without writing over its successor; a hand tick writing nothing; SIGTERM writing `stoppedAt`, exit 143; a pass in flight beating
+and read as ticking throughout; the beat writing nothing but its own file; `wf up -5` refused with the store untouched). Each guard was
 deleted in turn and failed a test; the link claim's retry on `EEXIST` is not covered, as nothing races two starts.
 
 ### Still to build: the board reads `daemon.json` (a card of its own)
@@ -1961,7 +1966,7 @@ The api and the board still cannot tell `waiting` from nothing ticking. The card
 
 - **Judge it as `wf ls` does**: `daemonStanding()` from the package's root (runner.ts), one file read and one `kill(pid, 0)` per poll,
   never per run, and `daemonLine` for the words — the api does not re-derive staleness. The kinds (`none`, `unreadable`, `stopped`, `gone`,
-  `stalled`, `ticking`), `staleAfterMs` and the file's shape — `pid, startedAt, cwd, every, passedAt | null, stoppedAt?`, at
+  `stalled`, `ticking`), `staleAfterMs` and the file's shape — `pid, startedAt, cwd, every, passedAt | null, beatAt?, stoppedAt?`, at
   `daemonFile()` — are held stable for it.
 - **The api must run on the daemon's host**: liveness is a signal 0, which means nothing across machines.
 - **The board** says it once, beside the runs, where a run reads `waiting`: nothing ticks this store, and how to start `wf up`.

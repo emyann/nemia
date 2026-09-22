@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Ajv } from 'ajv';
-import { closeoutSchemaOf, composeBrief, workspacePlan, type Closeout, type Run } from '../src/run.ts';
+import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
+import { closeoutSchemaOf, type Closeout } from '../src/closeout.ts';
 import { loadWorkflows, loopSpan, terminalSteps, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');

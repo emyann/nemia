@@ -13,7 +13,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Ajv } from 'ajv';
-import { closeoutSchemaOf, composeBrief, outputLines, workspacePlan, type Closeout, type Run } from '../src/run.ts';
+import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
+import { closeoutSchemaOf, outputLines, type Closeout } from '../src/closeout.ts';
 import { loadWorkflows, loopSpan, terminalSteps } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');

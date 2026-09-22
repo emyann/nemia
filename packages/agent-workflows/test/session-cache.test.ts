@@ -21,7 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
-import { CLOSEOUT_SCHEMA, closeoutSchemaOf, type TaskPhase } from '../src/run.ts';
+import type { TaskPhase } from '../src/run.ts';
+import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-cache-'));

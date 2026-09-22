@@ -297,7 +297,7 @@ and each round, as `tools:` does.
 - Every shipped `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which an
   unattended session had (measured, plan §4b) and no step needs.
 - `wf decide` prints a finding's `where` as a place (`file:line`, `page · theme`, a string as it is, another object as
-  its keys and values), where it printed a ui review's nested `where` as JSON. `placeText` in run.ts.
+  its keys and values), where it printed a ui review's nested `where` as JSON. `placeText` in closeout.ts.
 
 What it leaves:
 

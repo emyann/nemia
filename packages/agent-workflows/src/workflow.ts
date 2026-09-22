@@ -209,7 +209,7 @@ export const DEFAULT_ROUNDS = 3;
 /**
  * The field the run adds to a loop's target's closeout, and owes from its second round: its answer to each finding
  * it was handed, which the next round's looping step is given as data. The run's, like the four every closeout
- * has, so a target's `output:` may not declare it. The schema itself is `REPLIES_SCHEMA` in run.ts.
+ * has, so a target's `output:` may not declare it. The schema itself is `REPLIES_SCHEMA` in closeout.ts.
  */
 export const LOOP_REPLIES = 'replies';
 
@@ -274,7 +274,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
 /**
  * The four fields every closeout has. They are the run's: `summary` goes to the person who decides and
  * nowhere else, so an `output:` may not declare one of them and have it travel to a step. The schema
- * itself is `CLOSEOUT_SCHEMA` in run.ts, and a test holds the two to each other.
+ * itself is `CLOSEOUT_SCHEMA` in closeout.ts, and a test holds the two to each other.
  */
 export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
 

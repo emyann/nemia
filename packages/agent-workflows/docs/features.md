@@ -3705,8 +3705,8 @@ beside it changes these readers and no more.
   beside `allow: Edit(**)`, which `rulesOf` refuses on codex: two refusals pointing at each other, whose only way through was
   `bypassPermissions`, the widest mode of all.
 
-**Next, in order:** (3) a folder's lifetime — kept, cleaned, or none at all; (4) the Factory draws a run's workspace;
-(5) connections (P3), and a GitHub kind beside `folder`.
+**Next, in order:** (3) the Factory draws a run's workspace; (4) connections (P3), and a GitHub kind beside `folder`. A folder's
+lifetime, once (3) here, was decided rather than built: *Decided: a folder lives as long as its run*, below.
 
 ## Shipped: a folder step can read what its brief tells it to read — `given/`
 
@@ -3764,6 +3764,35 @@ a card, which makes it a writer of the pair `cardRepoRefusal` judges, and it was
 folder team. It refuses now, as `addToInbox` does, and a re-queue with no `--workflow` still goes through, since a card on disk
 cannot be edited from the board. And the comment above `UNASKING`/`DEFAULT_MODE` now names the test that actually holds them
 (`test/workflow.test.ts`'s loop over `HARNESSES`).
+
+## Decided: a folder lives as long as its run
+
+The slice named "a folder's lifetime — kept, cleaned, or none at all" was laid out at a plan gate on 22 September, and the owner
+chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exactly as long as its record, until `wf rm`
+(`removeKeyed` in `runner.ts`, `workRoot` in `places.ts`). Nothing was built but a test.
+
+- **Measured** (home store, 2026-09-22): two folder runs, both of the shipped `note` team. The finished one has one folder, not
+  two, since review continues write's session and so its folder (`workspacePlan`'s `inherit`): `note.md`, 2,741 bytes, the same
+  bytes as `artifacts/write/note.md`. The other's write step left its folder empty, and review was never filed. The second copy the
+  card worried about is one small file.
+- **Why kept.** `collectArtifacts` copies only what a closeout *names*, so a folder holds the only copy of what a step left unnamed,
+  and the board lists folders for exactly that (`folderFiles`). A run that ended on anything but success is written again in its
+  folders: `wf retry` (a nudge continues a session tied to that directory, and `--fresh` files there too), `wf round`, `wf accept`
+  (the steps after a loop continue its folders), and a gate's send-back (`sentBack`); only a run whose every step succeeded is
+  never written again (`retryRefusal`). Removing a folder would also make the board lie: `folderFiles` reads a missing folder as an
+  empty one, and the run's page says *the folder is empty*. People are told where the folders are, by `wf start` and `wf decide`,
+  and `wf decide` offers `wf rm` as *forgets the run with its folders and files*. A git run keeps its far larger worktrees until
+  `wf rm` on the same rule.
+- **Not built, and what each would have cost.** *Cleaned* at a run's end: breaks every path above, and needs a new word on the
+  board for a folder that is gone. A verb to drop `work/` and keep the record: a second forget with its own refusals, for 3 KB. A
+  step key (`kept` | `cleaned`), or *none at all* for a step that needs no files: a key with three obligations outside the package
+  (CLAUDE.md), and a step with no folder has no cwd a harness can start in.
+- **When it comes back.** A fan-in copies each parent's whole folder into `given/from/<step>` (`copyGiven`), so a team that fans
+  in stores its work more than once, and a large one more than a little. No shipped team fans in yet; the first one that does is
+  the time to measure again.
+- **Pinned.** `test/folder.test.ts`, *a folder run's folder outlives its end*: a run whose write step signed off `blocked` is nudged
+  with `wf retry`, and the try is filed in `runs/<id>/work/write`, which still holds the `note.md` the first try wrote. A mutant that
+  removes `work/` before the retry fails it on that read.
 
 ## Shipped: a node's outcome drawn, not printed — the Output tab
 

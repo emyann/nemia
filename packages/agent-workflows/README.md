@@ -1450,9 +1450,11 @@ agent: note-writer
 - **Deciding.** A finished folder run is awaiting with no branches: `wf decide` names its folders and offers `wf rm`,
   never a git command, and the board reads its repository, base and branch as null. `wf rm` removes `runs/<id>/` with
   the record, and runs no git.
+- **The folders live until `wf rm`**, as a git run's worktrees do, and not until the run ends. A run that ended on anything
+  but success is written again in them — a try, a round, an acceptance, a send-back from a gate — and a folder holds the only
+  copy of what a step did not name in its closeout. (`docs/features.md`, *Decided: a folder lives as long as its run*.)
 
-What is not there yet: an inbox card or the board starting a folder team (a card still names a repository), folders kept
-or cleaned on a lifetime of their own, the Factory drawing a run's workspace, and connections to anything off the machine.
+What is not there yet: the Factory drawing a run's workspace, and connections to anything off the machine.
 
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 

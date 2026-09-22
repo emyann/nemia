@@ -27,7 +27,8 @@ its package half) — and the workflow builder's package half: a step rendered b
 (`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
 half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
 workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
-with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — have shipped.
+with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — and a feed of what the
+tick judged, followed with `wf watch` (its package half; the board's half is a card of its own) — have shipped.
 
 ## Shipped: the check
 
@@ -1864,6 +1865,72 @@ What it leaves:
 - **The board.** `apps/api` has no route to forget a run. A run forgotten from the terminal leaves the Factory's list, since it reads
   `listRuns`.
 - **A directory of worktrees with no record** is named, not removed: nothing says which repository holds them.
+
+## Shipped: `wf watch` — a feed of what the tick judged
+
+The engine has a feed (`engine/feed.jsonl`) of what happened to its tasks, with a byte cursor, and `ae watch` follows it. What this
+package decides on top — a step at its gate, one signed off blocked, a loop out of rounds, a run waiting on another or for a slot, a run
+done — was a pass's judgement and nothing more: learned by asking again (`wf ls` every few seconds, the board's 5 s poll). Now the tick
+writes it down as it changes. The README's *Following it: `wf watch` and `ae watch`* is the account.
+
+What was built:
+
+- **`$WF_ROOT/feed.jsonl`**, a line `{at, run, step?, word, note?}` per change: the run's status (`assess`'s, as `wf tick` prints it,
+  `(pruned)` beside it, and what waits on you as its note) and each step's word and note as `wf ls` says them (`feedWords` in run.ts,
+  off the `listing` the pass builds from the reads its judgement already made — the engine is asked nothing more). A run whose record
+  is gone gets one `removed`. The tick is the one writer: last in the pass, after the queue, in one append, and a failure to write is the
+  pass's `feedError`, which `wf tick` and `wf up` print and nothing else reads.
+- **Compared against the feed, not memory** (`src/feed.ts`): a process folds the feed as far as it has read it (`foldFeed`), reads on
+  from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
+  for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
+- **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
+  count; no cost is said. Without these the feed would be written on every pass a session went idle, and every pass a dollar was spent.
+- **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
+  a cursor inside a line or past the end is refused with exit 2 and what to type (`wf feed 0`). A line a writer died in is ended by the
+  next append and parsed by nobody.
+- **`wf feed [cursor]`** prints the lines and `cursor: <n>`; **`wf watch [cursor]`** follows from 0 by default, pushed by `fs.watch` on
+  the store and backed by a 1 s timer, one read at a time, as the engine's `watch` is. `wf --help` names both, and says which feed is whose.
+
+Where it departs from the card, and why:
+
+- **The fold is kept in memory and checked against the feed each pass, not in a file of its own.** A second file would be a second thing
+  to keep in step with the first, and one more writer's file; the feed read from 0 is the fold, so a restart costs one read of it.
+- **The words are read before the pass files anything**, so a step filed on a pass reaches the feed a pass later, as `pending`: a step
+  filed this pass has no engine view yet, and would read `unknown`.
+- **No git standing is read** (`standings` is `[]`): `wf ls`'s `→ to decide` for a finished run with no ending step, and an ending
+  whose work is already on the base, are not in the feed. Reading them costs git calls per finished run on every pass; the feed says the
+  run `succeeded`, and `wf decide` says the rest.
+- **A step's check verdict is the tick's** (`exitVerdicts`, off the engine's attempt), where `wf ls` reads the check's log: the same
+  number, read without a log.
+- **The run's word at a gate is `assess`'s `failed`**, as `wf tick` and the api's run status already say it, with `waiting on you:
+  approve plan` as its note. Renaming it is a change to the tick's vocabulary, not the feed's.
+- **Two writers are possible** — `wf tick` typed beside `wf up` — and each reads the other's lines before it writes, so a line is said
+  twice only when both passes land between the same two reads. At least once, never lost.
+- **`wf watch` with no cursor starts from 0**, where the plan said the end: `ae watch`, which the card asks it to follow as, starts
+  from 0, and `wf feed`'s last line is the cursor that starts at the end. A note is printed after `·`, as `wf ls` prints a step's.
+- **`wf rm` writes nothing to the feed itself**; the next pass sees the record gone and writes `removed`. `wf prune` the same: the run's
+  word gains `(pruned)` on the next pass.
+
+Tested in `test/feed.test.ts`: a transition written once over four passes; nothing written across a restart (a fresh fold); a live word
+moving writes nothing; a cancel and a removal each one line; a cursor inside a line refused by the read, `wf feed` and `wf watch` (before it
+says it is watching); a partial line neither read nor passed, and read once it ends; a torn line ended; `wf watch` delivering lines by count
+under a bound, and nothing after `stop()`; `wf --help`; and no engine read added. Each was checked to fail with its rule deleted (the
+comparison, the fold from the feed, the last-newline stop, the mid-line refusal, the torn-tail newline, the `removed`, `feedPhase`); a `stop()`
+that leaves its timer holds `node --test` open, so run that mutant under `timeout`.
+
+### Still to build: the board reads the feed (a card of its own)
+
+The api and the Factory still poll. The next card, in `apps/`:
+
+- **`GET /api/feed/stream?after=<cursor>`** in `apps/api/src/app.ts`, with `streamSSE` as the transcript stream beside it does, over
+  `watchFeed` from `agent-workflows`' runner: each line an event carrying its cursor
+  as the SSE `id`, a refused cursor a 400 in `feedCursorRefusal`'s words, and `stop()` on the stream's abort. A new api test file imports
+  `test/harness.ts` first (CLAUDE.md), and one test sends a cursor inside a line and sees the refusal.
+- **The board**: `runsQuery` in `apps/web/src/lib/api.ts` drops its 5 s `refetchInterval` (or lengthens it to a backstop), and one
+  EventSource invalidates `['runs']` on each line and the named run's record with `exact: true` — never `['runs', <id>]` by prefix, which
+  refetches a decision under the wrong state (CLAUDE.md). It closes on the `error` that ends a response, not on the last event.
+- **An e2e page of its own** that writes a run's change into the seed's store and sees the Factory move without waiting out a poll; it
+  shifts no count (CLAUDE.md), since it writes no run.
 
 ## Shipped: freeing the space — `wf prune`
 

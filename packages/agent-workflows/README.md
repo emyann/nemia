@@ -17,6 +17,7 @@ wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflo
 wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up
 wf ls
+wf watch             # what the tick judges, a line each time it changes: a gate reached, a run done
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 wf prune            # the worktrees of runs that are over, with the space each frees; --yes removes them
 wf rm r-xyz          # it is over: its worktrees, record and files go; its branches stay
@@ -29,17 +30,60 @@ wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go o
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 ```
 
-To follow it live, use the engine rather than this package — a run's task ids carry the run and the
-step, so the engine's own output already names the work:
+## Following it: `wf watch` and `ae watch`
+
+Two feeds, one a layer. The engine's says what happened to its tasks — filed, started, ended,
+settled — and a run's task ids carry the run and the step, so its output already names the work:
 
 ```bash
 AE_ROOT="$HOME/.agent-workflows/engine" ae watch
 ```
 
-`wf` had a `watch` verb once. It was the better implementation of the two, which was the problem:
-observing the engine is the engine's job, and a workflow layer that owns it is a workflow layer
-that has to be installed before you can see anything. Moving it down made the sentence above —
-*`file`, `tick`, `view`, `logs` and nothing else* — true again.
+What this package decides on top of that — a step at its gate, one signed off blocked, a loop out
+of rounds, a run waiting on another or for a run slot, a run done — the engine cannot say. That is
+`wf watch`, and `wf feed` beside it for a read that ends:
+
+```bash
+wf feed              # every line so far, then  cursor: <n>
+wf feed 1834         # the lines after that cursor, then the next one
+wf watch             # the same from the start, then each line as the tick writes it, until ^C
+```
+
+```
+20:58:40  the-gate-yd1g  —  running
+20:58:40  the-gate-yd1g  plan  waiting
+20:58:40  the-gate-yd1g  plan  pending
+20:58:48  the-gate-yd1g  —  failed  · waiting on you: approve plan
+20:58:48  the-gate-yd1g  plan  awaiting approval  · approve it: wf approve the-gate-yd1g plan — or send it back: …
+20:59:02  the-gate-yd1g  —  running
+20:59:02  the-gate-yd1g  plan  unverified · done
+```
+
+It is `$WF_ROOT/feed.jsonl`, a line of JSON per change — `{at, run, step?, word, note?}` — for the
+run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pruned run, and what
+waits on you as its note) and for each step's word and note as `wf ls` prints them. **The tick is its
+one writer**, and appends a line only where what it judged is not what the feed said last; a run
+whose record is gone (`wf rm`) gets one `removed`. **Nothing reads it to decide**: every pass still
+judges from the world, and a feed deleted by hand costs its history, never a decision.
+
+What a pass compares against is the feed itself, folded, not something it remembers: a daemon keeps
+its fold with the byte it read to, and reads on from there each pass — its own lines and any a
+`wf tick` beside it wrote — and a restarted one reads the feed once from the start. So a restart
+writes nothing for what did not change. Four things are left out of a word so that it moves only
+when the judgement does: the engine's live words (`running (working)`, `running (idle)`,
+`working (quiescent)`, `starting`, `between attempts`) read `running`, a slot wait says no count, no
+cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finished run with no
+ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
+are read before the pass files anything.
+
+**The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
+expires. A read stops at the last newline, so it never passes a line half written, and one after
+it goes on from that line's start. A cursor inside a line, or past the end, is refused by name
+(exit 2) rather than read from, since every line after it would be misread. A line a writer died in
+is ended by the next append and read by nobody.
+
+`wf` once had a `watch` verb that followed the engine, and gave it back: observing the engine is
+the engine's job. This one follows what only this package knows.
 
 ## Where this stops
 
@@ -2038,6 +2082,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
 | `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
+| `feed.jsonl` | what the tick judged of each run and step, a line each time it changed (`wf feed`, `wf watch`) | the tick | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | not touched |
 | `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
 
@@ -2185,6 +2230,7 @@ holding a concurrency slot forever.
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
 | `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`), a workflow folder written from its steps (`writeWorkflow`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/feed.ts` | the feed of what the tick judged: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges` — pure), the cursor and its refusal, and the file read, appended to and followed (`readFeedFile`, `recordFeedFile`, `watchFeedFile`); no engine |
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
@@ -2196,6 +2242,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
+| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |

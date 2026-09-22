@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { sidebar, themeOf } from '../board.ts';
-import { expectCount, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
+import { expectCount, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -48,7 +48,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const refusedNeed = refused.locator(`section[aria-label="Waiting on you"] [data-need="harness"][data-step="${HELD.blocked}"]`);
       const refusedButton = refusedNeed.getByRole('button', { name: 'Continue' });
       await expectVisible(refusedButton, `Continue for ${HELD.blocked}, with a file that is no ask at its try's name`);
@@ -69,7 +70,7 @@ export default {
       if (fs.readFileSync(journal, 'utf8') !== seeded) throw new Refused(`nothing is stopped on a refusal — ${journal} changed`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `held-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
@@ -117,6 +118,7 @@ export default {
     await page.screenshot({ path: path.join(OUT, `held-asked-${await themeOf(page)}.png`), fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(HELD.id, HELD.blocked, 'needs-human');
     await expectVisible(need.getByRole('button', { name: 'Continue' }), 'with the ask taken back, Continue is back once the run is read again');
     await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the Decide section goes with the try');
     await settled(page);

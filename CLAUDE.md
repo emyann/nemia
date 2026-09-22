@@ -69,7 +69,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **The e2e's watch counts every 4xx a page sees against it.** A refusal the e2e makes on purpose goes
   in a page of its own, with a watch that must see that one refusal and nothing else (the `answer` page,
   learned by the run that added the answer box). And the e2e visits every page in light, then every page
-  in dark, so a page that writes to the store takes its write back before it ends.
+  in dark, so a page that writes to the store takes its write back before it ends. It lets one failure pass: a
+  `net::ERR_ABORTED` on `/api/feed/stream` opened before the page itself navigated or reloaded (`watch` in `checks.ts`);
+  the board closing that stream mid-page still counts.
 - **The engine's `transcript` of an attempt still in flight observes its harness** — one `claude agents`
   call per read, since the session's id is on no record yet. Read it on a run's detail, never on the list
   the Factory polls (learned by the run that put a blocked session's last line on the board).
@@ -149,11 +151,20 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   answer for the state *after* the write, and a run whose state went back to one already read showed a blank Decide section until a reload.
   A write invalidates the run's record alone (`exact: true`); the next state is a key of its own (learned by the run that put a finished
   run's decision on the board).
-- **A page that changes what it shows at the end of its e2e is photographed mid-read.** `visit.ts` waits for the network to idle before the
+- **A page that changes what it shows at the end of its e2e is photographed mid-read.** `visit.ts` waits for the network to idle (`idle`) before the
   picture, but a page whose state changes after that wait re-issues the queries its state keys — the run page reads its decision again when
   a step moves — and the shot showed `Reading the branch…` where the branch's diff stat belongs. End such a page by waiting for what it
   reads again, with an assertion of its own (the `decide` page's last line, learned by the run that put a finished run's decision on the
   board).
+- **The e2e waits for `idle(page)`, never `networkidle`.** Playwright's `networkidle` waits for no request in flight, so a stream that never
+  ends — the workflow feed the board may hold open from its root — holds it for ever. `idle` (`checks.ts`) waits for 500 ms with nothing in
+  flight but `/api/feed/stream`, measured from the call, and a `goto` or `reload` waits for `load` and then `idle`. Under Playwright 1.62 a
+  page that navigates or reloads drops its old document's requests with no `requestfinished` and no `requestfailed`, so `idle` lets go of
+  every request but the navigation's at the main frame's commit, as Playwright's own `networkidle` does (`_onClearLifecycle`), or waits
+  for a fetch that will never be answered — a poll the old document started while the navigation was on its way included. The watch's
+  allowance for a stream the page left is proven on events emitted by hand (`checks.test.ts`), since this Playwright reports no such abort.
+  A page that edits the store by hand where the board must see it says so on the feed too, `fed(run, step?, word)` in `board.ts` (learned
+  by the run that taught the e2e to wait past the feed stream).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the

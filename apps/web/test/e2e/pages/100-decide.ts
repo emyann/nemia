@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { expectRendered, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -95,6 +95,7 @@ export default {
     // Taken back, and the page ends as it began — the branch read again for the state it is back in, so its photograph is of the whole
     // panel and not of a panel still reading.
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, ending, 'awaiting approval');
     await expectVisible(banner.locator('[data-approve]', { hasText: said }), 'with the send-back taken back, the gate holds again once the run is read again');
     await expectVisible(gate, `and ${ending} waits at it`);
     await expectVisible(acts.locator('[data-standing="ahead"]', { hasText: ENDING.standing }), 'and the panel says where the branch stands again');

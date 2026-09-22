@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { themeOf } from '../board.ts';
+import { fed, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -53,6 +53,7 @@ export default {
       await page.screenshot({ path: path.join(OUT, `factory-mid-gate-approved-${await themeOf(page)}.png`), fullPage: true });
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
+      fed(id, gated, 'awaiting approval');
     }
     await expectVisible(card.locator('[data-answer="Approve"]'), 'with the approval taken back, the card offers the gate again, and the page ends as it began');
   },

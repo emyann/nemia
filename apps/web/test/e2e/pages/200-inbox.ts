@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { PLACES_SAID, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, DIAMOND_RUNS, QUEUE, QUEUED, queuedCardText, refusedWhy, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -154,7 +154,7 @@ export default {
         ]);
         if (queued.status() !== 200) throw new Refused(`the api queues ${planned.name} — it answered ${queued.status()}: ${await queued.text()}`);
         await expectTexts(item.locator('[data-queued]'), [`queued · ${PLACES_SAID[QUEUED.length]}`], `${planned.name} says its place once queued (queued · ${PLACES_SAID[QUEUED.length]})`);
-        await page.waitForLoadState('networkidle');
+        await idle(page);
         await unmoved('queued');
         await settled(page);
         await page.screenshot({ path: path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), fullPage: true });
@@ -164,7 +164,7 @@ export default {
         ]);
         if (unqueued.status() !== 200) throw new Refused(`the api takes ${planned.name} off the queue — it answered ${unqueued.status()}: ${await unqueued.text()}`);
         await expectCount(item.locator('[data-queued]'), 0, `Unqueue takes ${planned.name} off the queue`);
-        await page.waitForLoadState('networkidle');
+        await idle(page);
         await unmoved('taken off the queue');
         if (fs.readFileSync(file, 'utf8') !== text) throw new Refused(`${planned.name} is written back as it was — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`);
       } finally {
@@ -199,7 +199,8 @@ export default {
     const starting = await page.context().newPage();
     try {
       const { problems } = watch(starting);
-      await starting.goto(page.url(), { waitUntil: 'networkidle' });
+      await starting.goto(page.url(), { waitUntil: 'load' });
+      await idle(starting);
       const item = cardIn(starting, planned.name);
       await item.getByRole('button', { name: 'Start' }).click();
       const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
@@ -222,7 +223,7 @@ export default {
       const got = { from: record.from, brief: record.brief, workflowDir: record.workflowDir, repo: record.repo };
       if (JSON.stringify(got) !== JSON.stringify(expected)) throw new Refused(`the record is the card's start — it holds ${JSON.stringify(got)}, and should hold ${JSON.stringify(expected)}`);
       if (fs.existsSync(cardFile)) throw new Refused(`the card leaves the inbox once its run is written — ${cardFile} is still there`);
-      await starting.waitForLoadState('networkidle');
+      await idle(starting);
       const seen = problems();
       if (seen.length) throw new Refused(`no console error and no failed request while starting a card — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
@@ -244,7 +245,8 @@ export default {
       const kept = await page.context().newPage();
       try {
         const { problems } = watch(kept);
-        await kept.goto(page.url(), { waitUntil: 'networkidle' });
+        await kept.goto(page.url(), { waitUntil: 'load' });
+        await idle(kept);
         const item = cardIn(kept, planned.name);
         await item.getByRole('button', { name: 'Start' }).click();
         const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
@@ -265,7 +267,7 @@ export default {
         if (JSON.stringify(listing.find((e) => e.name === planned.name)?.startedAs) !== JSON.stringify([answer.id])) {
           throw new Refused(`the inbox read again names the run the card was started as — it listed ${JSON.stringify(listing)}`);
         }
-        await kept.waitForLoadState('networkidle');
+        await idle(kept);
         await expectVisible(item.locator(`[data-started-as] a[href="/runs/${answer.id}"]`), `the card says it was started as ${answer.id}, linked to the run`);
         const why = await item.locator('[data-started-as] [data-kept]').textContent();
         if (why !== answer.why) throw new Refused(`the card says why it was not removed, in the api's words — it shows ${JSON.stringify(why)}, and the api said ${JSON.stringify(answer.why)}`);
@@ -275,7 +277,7 @@ export default {
         if (!fs.existsSync(cardFile)) throw new Refused(`the card is still in the inbox — ${cardFile} is gone`);
         await settled(kept);
         await kept.screenshot({ path: path.join(OUT, `inbox-kept-${await themeOf(kept)}.png`), fullPage: true });
-        await kept.waitForLoadState('networkidle');
+        await idle(kept);
         const seen = problems();
         if (seen.length) throw new Refused(`no console error and no failed request on a start whose card stayed — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
       } finally {
@@ -294,14 +296,15 @@ export default {
         workflowDir: path.join(checkout, 'workflows', WORKFLOWS.good.name), workflow: [], steps: {}, createdAt: new Date().toISOString(), from: { inbox: bare.name },
       }, null, 2));
       const { problems } = watch(already);
-      await already.goto(page.url(), { waitUntil: 'networkidle' });
+      await already.goto(page.url(), { waitUntil: 'load' });
+      await idle(already);
       const item = cardIn(already, bare.name);
       await expectVisible(item.locator(`[data-started-as] a[href="/runs/${STARTED_AS}"]`), `a card a record names says it was started as ${STARTED_AS}, linked to the run`);
       await expectCount(item.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
       await expectVisible(item.getByRole('button', { name: 'Remove' }), 'and offers Remove');
       await settled(already);
       await already.screenshot({ path: path.join(OUT, `inbox-started-as-${await themeOf(already)}.png`), fullPage: true });
-      await already.waitForLoadState('networkidle');
+      await idle(already);
       const seen = problems();
       if (seen.length) throw new Refused(`no console error and no failed request on a card started already — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
@@ -319,7 +322,8 @@ export default {
     try {
       fs.writeFileSync(elsewhereFile, `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${elsewhere}\n---\nA card about another repository\n`);
       const { problems } = watch(other);
-      await other.goto(page.url(), { waitUntil: 'networkidle' });
+      await other.goto(page.url(), { waitUntil: 'load' });
+      await idle(other);
       const item = cardIn(other, elsewhereName);
       await item.getByRole('button', { name: 'Start' }).click();
       const pick = item.getByRole('combobox', { name: 'Workflow' });
@@ -334,7 +338,7 @@ export default {
       await expectCount(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 0, 'with no Start until one is picked');
       await settled(other);
       await other.screenshot({ path: path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), fullPage: true });
-      await other.waitForLoadState('networkidle');
+      await idle(other);
       const seen = problems();
       if (seen.length) throw new Refused(`no console error and no failed request on a card about another repository — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
@@ -358,7 +362,8 @@ export default {
       fs.writeFileSync(namedFile, 'Not a card: notes beside the card of that name.\n');
       fs.writeFileSync(namedCard, 'Notes, as a card\n');
       const { problems } = watch(strays);
-      await strays.goto(page.url(), { waitUntil: 'networkidle' });
+      await strays.goto(page.url(), { waitUntil: 'load' });
+      await idle(strays);
       const sub = cardIn(strays, 'sub/');
       await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
       await expectCount(sub.getByRole('link'), 0, "and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed");
@@ -381,7 +386,7 @@ export default {
       if (shown !== strayText) throw new Refused(`the stray file's Source is the file as written — it shows ${JSON.stringify(shown)}`);
       await settled(strays);
       await strays.screenshot({ path: path.join(OUT, `inbox-strays-${await themeOf(strays)}.png`), fullPage: true });
-      await strays.waitForLoadState('networkidle');
+      await idle(strays);
       const seen = problems();
       if (seen.length) throw new Refused(`no console error and no failed request with a stray file and a folder in the inbox — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
@@ -398,7 +403,8 @@ export default {
     try {
       fs.renameSync(inbox, aside);
       const { problems } = watch(empty);
-      await empty.goto(page.url(), { waitUntil: 'networkidle' });
+      await empty.goto(page.url(), { waitUntil: 'load' });
+      await idle(empty);
       await expectVisible(
         empty.locator('[data-empty]', { hasText: 'The inbox is empty. File an idea in the box above, or from the command line: wf inbox add "<idea>".' }),
         'an empty inbox says how to file a card, here and with wf inbox add',
@@ -406,7 +412,7 @@ export default {
       await expectVisible(empty.locator('form[aria-label="File a card"]'), 'and still has the box');
       await settled(empty);
       await empty.screenshot({ path: path.join(OUT, `inbox-empty-${await themeOf(empty)}.png`), fullPage: true });
-      await empty.waitForLoadState('networkidle');
+      await idle(empty);
       const seen = problems();
       if (seen.length) throw new Refused(`no console error and no failed request on an empty inbox — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     } finally {
@@ -435,7 +441,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const item = cardIn(refused, bare.name);
       await item.getByRole('button', { name: 'Start' }).click();
       const pick = item.getByRole('combobox', { name: 'Workflow' });
@@ -461,7 +468,7 @@ export default {
       }
       const listing = (await (await reread).json()) as Array<{ name: string }>;
       if (listing.some((e) => e.name === bare.name)) throw new Refused(`the inbox read again after the refusal no longer lists ${bare.name} — it listed ${JSON.stringify(listing.map((e) => e.name))}`);
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       await expectCount(item, 0, 'the card leaves the list once the inbox is read again after the refusal');
       await expectCount(listed(refused), 2 + QUEUED.length, `and only ${rich.name}, ${planned.name} and the queued cards are listed`);
       const gone = refused.locator(`section[aria-label="Cards"] li[data-gone="${bare.name}"]`);
@@ -473,7 +480,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       onlyRefusal(refused, problems(), answered);
     } finally {
       await refused.close();
@@ -486,7 +493,8 @@ export default {
     const unremoved = await page.context().newPage();
     try {
       const { problems } = watch(unremoved);
-      await unremoved.goto(page.url(), { waitUntil: 'networkidle' });
+      await unremoved.goto(page.url(), { waitUntil: 'load' });
+      await idle(unremoved);
       const item = cardIn(unremoved, planned.name);
       await expectVisible(item.getByRole('button', { name: 'Remove' }), `${planned.name} offers Remove`);
       fs.renameSync(cardFile, plannedAside);
@@ -500,7 +508,7 @@ export default {
         throw new Refused(`the api refuses to drop a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
       }
       await reread;
-      await unremoved.waitForLoadState('networkidle');
+      await idle(unremoved);
       await expectCount(item, 0, 'the card leaves the list once the inbox is read again after the refusal');
       const gone = unremoved.locator(`section[aria-label="Cards"] li[data-gone="${planned.name}"]`);
       await expectVisible(gone.locator('[data-refused="remove"]', { hasText: 'Not removed. The api refused it:' }), 'the refusal stays, where the card was listed');
@@ -511,7 +519,7 @@ export default {
       await unremoved.screenshot({ path: path.join(OUT, `inbox-remove-refused-${await themeOf(unremoved)}.png`), fullPage: true });
       await gone.getByRole('button', { name: 'Dismiss' }).click();
       await expectCount(gone, 0, 'Dismiss takes the refusal of a card that is gone away');
-      await unremoved.waitForLoadState('networkidle');
+      await idle(unremoved);
       onlyRefusal(unremoved, problems(), answered);
     } finally {
       await unremoved.close();
@@ -523,7 +531,8 @@ export default {
     const conflicted = await page.context().newPage();
     try {
       const { problems } = watch(conflicted);
-      await conflicted.goto(page.url(), { waitUntil: 'networkidle' });
+      await conflicted.goto(page.url(), { waitUntil: 'load' });
+      await idle(conflicted);
       const item = cardIn(conflicted, planned.name);
       await item.getByRole('button', { name: 'Start' }).click();
       const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
@@ -543,7 +552,7 @@ export default {
         throw new Refused(`the api refuses to start a card a run was started from, naming the run — it answered ${answered.status()}: ${JSON.stringify(error)}`);
       }
       await reread;
-      await conflicted.waitForLoadState('networkidle');
+      await idle(conflicted);
       await expectVisible(item.locator(`[data-started-as] a[href="/runs/${STARTED_AS}"]`), `the card, read again, says it was started as ${STARTED_AS}`);
       await expectCount(item.locator('[data-start-card]'), 0, 'its start form is gone: it may not start again');
       await expectVisible(item.locator('[data-refused="start"]', { hasText: 'Not started. The api refused it:' }), 'and the refusal stays, on the card');
@@ -553,7 +562,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(conflicted);
       await conflicted.screenshot({ path: path.join(OUT, `inbox-conflict-${await themeOf(conflicted)}.png`), fullPage: true });
-      await conflicted.waitForLoadState('networkidle');
+      await idle(conflicted);
       onlyRefusal(conflicted, problems(), answered);
     } finally {
       await conflicted.close();
@@ -569,7 +578,8 @@ export default {
     const requeued = await page.context().newPage();
     try {
       const { problems } = watch(requeued);
-      await requeued.goto(page.url(), { waitUntil: 'networkidle' });
+      await requeued.goto(page.url(), { waitUntil: 'load' });
+      await idle(requeued);
       const item = cardIn(requeued, planned.name);
       const queueIt = item.getByRole('button', { name: 'Queue', exact: true });
       await expectVisible(queueIt, `${planned.name} offers Queue`);
@@ -590,7 +600,7 @@ export default {
         throw new Refused(`the api refuses to queue a card queued already, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
       }
       await reread;
-      await requeued.waitForLoadState('networkidle');
+      await idle(requeued);
       await expectTexts(item.locator('[data-queued]'), [`queued · ${PLACES_SAID[place - 1]}`], `the card, read again, says it is queued, in its place (queued · ${PLACES_SAID[place - 1]})`);
       await expectVisible(item.getByRole('button', { name: 'Unqueue' }), 'and offers Unqueue in place of Queue');
       if (JSON.stringify(await order(requeued)) !== JSON.stringify(listedBefore)) {
@@ -601,7 +611,7 @@ export default {
       if (shown !== error) throw new Refused(`the refusal on the card is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
       await settled(requeued);
       await requeued.screenshot({ path: path.join(OUT, `inbox-queue-refused-${await themeOf(requeued)}.png`), fullPage: true });
-      await requeued.waitForLoadState('networkidle');
+      await idle(requeued);
       onlyRefusal(requeued, problems(), answered);
     } finally {
       await requeued.close();

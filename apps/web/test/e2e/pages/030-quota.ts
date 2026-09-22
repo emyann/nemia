@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -23,7 +23,8 @@ export default {
       await page.screenshot({ path: path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), fullPage: true });
     };
     const said = async (state: string, text: RegExp, why: string) => {
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
       await expectVisible(page.locator(`[data-quota="${state}"]`, { hasText: text }), why);
       await expectCount(page.locator('[data-quota-window]'), 0, 'and no number reads as now');
       await shoot(state);
@@ -63,7 +64,8 @@ export default {
     } finally {
       fs.writeFileSync(file, written);
     }
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again');
 
     // The header, taller with the quota, leaves every card clear of the one beneath it.

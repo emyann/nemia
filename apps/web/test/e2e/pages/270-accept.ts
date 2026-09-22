@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { sidebar, themeOf } from '../board.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -67,6 +67,7 @@ export default {
       await page.screenshot({ path: path.join(OUT, `accept-accepted-${await themeOf(page)}.png`), fullPage: true });
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
+      fed(id, step, 'rounds exhausted');
     }
 
     // Taken back: the loop is out of rounds again once the run is read again, and the page ends as it began.

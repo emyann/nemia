@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { expectTheme, Refused, settled, watch } from './checks.ts';
+import { expectTheme, idle, Refused, settled, track, watch } from './checks.ts';
 
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
@@ -15,7 +15,8 @@ export type Theme = (typeof THEMES)[number];
 /**
  * A page the e2e visits: its name, for the screenshots and the failure; where it is; and what it must have. `follows` for a page that follows a
  * live session over server-sent events: its stream never finishes, so the network never idles, and the page is visited once it has loaded and
- * photographed once its canvases have settled, without waiting on the network.
+ * photographed once its canvases have settled, without waiting on the network. Every other page is visited once it has loaded and its network
+ * is idle (`idle`: the feed's stream, which the board may hold open, left out), and photographed once it is idle again.
  */
 export type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void>; follows?: true };
 
@@ -33,11 +34,12 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
   try {
-    await page.goto(base + spec.route, { waitUntil: spec.follows ? 'load' : 'networkidle' });
+    await page.goto(base + spec.route, { waitUntil: 'load' });
+    if (!spec.follows) await idle(page);
     await expectTheme(page, theme);
     await spec.expect(page);
     // What a person would see, once whatever the last assertion started has settled.
-    if (!spec.follows) await page.waitForLoadState('networkidle');
+    if (!spec.follows) await idle(page);
     await settled(page);
     await page.screenshot({ path: shot, fullPage: true });
     const seen = problems();
@@ -67,6 +69,8 @@ export async function visitAll(browser: Browser, base: string, pages: readonly P
   const shots: string[] = [];
   for (const theme of THEMES) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
+    // Every page opened in it, a page's second page too, has its requests counted from its first, for `idle`.
+    context.on('page', track);
     try {
       for (const spec of pages) {
         shots.push(await visit(context, base, spec, theme, out));

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { sidebar, themeOf } from '../board.ts';
-import { expectCount, expectInside, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -108,7 +108,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const row = raiseRow(refused, over.step);
       const box = amountOf(row, over.step);
       await expectVisible(box, `the box for ${over.step}'s cap, on a page of its own`);
@@ -133,7 +134,7 @@ export default {
       if (fs.existsSync(asks)) throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();

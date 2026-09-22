@@ -5,16 +5,65 @@
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectTheme, expectUncut, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectTheme, expectUncut, expectVisible, FEED_STREAM, idle, QUIET_MS, Refused, watch } from './checks.ts';
 
 let browser: Browser;
+/**
+ * A server on this machine, for what a route cannot fake: a stream held open — the feed's, and a run's — and a request answered late. Its
+ * pages are `served`'s.
+ */
+let server: http.Server;
+let origin: string;
+const served = new Map<string, string>();
 before(async () => {
   browser = await chromium.launch();
+  server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://here');
+    if (url.pathname === FEED_STREAM || url.pathname === '/api/runs/r-1/stream') {
+      // Headers and a comment, and never an end: an EventSource open for as long as the page is.
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+      res.write(': open\n\n');
+      return;
+    }
+    // Unref'd: an answer nobody waits for any more does not hold the tests open.
+    if (url.pathname === '/api/slow') return void setTimeout(() => res.writeHead(200, { 'content-type': 'application/json' }).end('[]'), Number(url.searchParams.get('ms'))).unref();
+    if (url.pathname === '/api/slow-page') return void setTimeout(() => res.writeHead(200, { 'content-type': 'text/html' }).end('<p>there</p>'), Number(url.searchParams.get('ms'))).unref();
+    const html = served.get(url.pathname);
+    if (html === undefined) return void res.writeHead(404).end();
+    res.writeHead(200, { 'content-type': 'text/html' }).end(html);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 after(async () => {
   await browser?.close();
+  server?.closeAllConnections();
+  server?.close();
 });
+
+/** `html` served from this machine, loaded in a page of its own and watched from before it loads. */
+async function servedPage(html: string) {
+  const route = `/page-${served.size + 1}`;
+  served.set(route, html);
+  const page = await (await browser.newContext()).newPage();
+  const { problems } = watch(page);
+  await page.goto(origin + route, { waitUntil: 'load' });
+  return { page, problems };
+}
+
+/** A stream opened by the page, in `window.es` for the page to close, answered with its headers before this resolves. */
+async function opened(page: Page, pathname: string): Promise<void> {
+  await Promise.all([
+    page.waitForResponse((r) => new URL(r.url()).pathname === pathname),
+    page.evaluate((p) => {
+      (window as unknown as { es: EventSource }).es = new EventSource(p);
+    }, pathname),
+  ]);
+}
 
 /** `html` at a made-up origin, with `/api/runs` answering `api` — no server, no port. */
 async function pageWith(html: string, { theme = 'light', api = 200 }: { theme?: 'light' | 'dark'; api?: number } = {}) {
@@ -61,7 +110,7 @@ test('an image whose request failed is refused as not drawn, though its box is v
 
 test('a page that does none of those has no problems — or every page would fail, and the watch prove nothing', async () => {
   const { page, problems } = await pageWith('<p>ok</p><script>fetch("/api/runs")</script>');
-  await page.waitForLoadState('networkidle');
+  await idle(page);
   assert.deepEqual(problems(), []);
 });
 
@@ -221,4 +270,151 @@ test('a name cut short by the room beside it is refused, naming it — and so is
     (err: Error) => err instanceof Refused && err.message === 'the name is whole — implement is cut short');
   await assert.rejects(expectUncut(page.locator('.gone'), 'the name is whole', 300),
     (err: Error) => err instanceof Refused && err.message === 'the name is whole — nothing to look at: 0 found');
+});
+
+test("idle resolves with the feed's stream open, which never ends — and only once nothing else has been in flight for its half a second", async () => {
+  const { page } = await servedPage('<p>ok</p>');
+  await opened(page, FEED_STREAM);
+  const from = Date.now();
+  await idle(page, 3_000);
+  assert.ok(Date.now() - from >= QUIET_MS, `quiet for ${QUIET_MS} ms counted from the call, not from the last request — it took ${Date.now() - from} ms`);
+});
+
+test('idle waits for any other request: one answered late, and a stream that is not the feed\'s, which it refuses at its timeout, naming it', async () => {
+  const { page } = await servedPage('<p>ok</p>');
+  await opened(page, FEED_STREAM);
+  const from = Date.now();
+  await page.evaluate(() => void fetch('/api/slow?ms=1200'));
+  await idle(page, 5_000);
+  assert.ok(Date.now() - from >= 1_200 + QUIET_MS, `idle waited for the late answer, then for quiet — it took ${Date.now() - from} ms`);
+
+  await opened(page, '/api/runs/r-1/stream');
+  await assert.rejects(idle(page, 1_000),
+    (err: Error) => err instanceof Refused && err.message === `the network idles — still in flight after 1000 ms: GET ${origin}/api/runs/r-1/stream`);
+});
+
+test("the board closing the feed's stream while it stays on the page is a failed request the watch counts", async () => {
+  const { page, problems } = await servedPage('<p>ok</p>');
+  await opened(page, FEED_STREAM);
+  await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
+  const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
+  await eventually(() => problems().includes(want));
+  assert.deepEqual(problems(), [want]);
+});
+
+test("the feed's stream left by the page's own reload is not counted — and one opened after that reload, then closed by the page, is", async () => {
+  const opens = `<p>ok</p><script>window.es = new EventSource('${FEED_STREAM}')</script>`;
+  const { page, problems } = await servedPage(opens);
+  const isStream = (r: { url: () => string }) => new URL(r.url()).pathname === FEED_STREAM;
+  await page.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
+  // Playwright 1.62 reports nothing of a request its page left, so this much holds with the watch's rule or without it: the page below,
+  // whose events are emitted by hand, is where the rule is made to allow and to refuse.
+  const [reopened] = await Promise.all([page.waitForResponse(isStream, { timeout: 5_000 }), page.reload({ waitUntil: 'load' })]);
+  assert.ok(reopened.ok());
+  await idle(page, 3_000);
+  assert.deepEqual(problems(), []);
+
+  await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
+  const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
+  await eventually(() => problems().length > 0);
+  assert.deepEqual(problems(), [want]);
+});
+
+test('the watch lets the feed\'s stream be aborted by a navigation of the page committed after it opened, and counts every other failure', () => {
+  // A page as far as `watch` listens to one, its events emitted in the order a browser would report them.
+  const main = {};
+  const emitter = new EventEmitter();
+  const page = Object.assign(emitter, { mainFrame: () => main }) as unknown as Page;
+  const request = (pathname: string, { navigation = false, error = 'net::ERR_ABORTED' } = {}) => ({
+    url: () => `http://e2e.test${pathname}`, method: () => 'GET', isNavigationRequest: () => navigation, frame: () => main, failure: () => ({ errorText: error }),
+  });
+  const failed = (pathname: string, error = 'net::ERR_ABORTED') => `request failed: GET http://e2e.test${pathname} — ${error}`;
+  // The page's own navigation: asked for, then committed.
+  const navigate = (frame: object = main) => {
+    emitter.emit('request', { ...request('/', { navigation: true }), frame: () => frame });
+    emitter.emit('framenavigated', frame);
+  };
+  const { problems } = watch(page);
+  const seen = () => problems().length;
+
+  // Opened, then the page reloads: its abort passes.
+  const left = request(FEED_STREAM);
+  emitter.emit('request', left);
+  navigate();
+  emitter.emit('requestfailed', left);
+  assert.deepEqual(problems(), []);
+
+  // Opened by the page it leaves while the navigation is on its way, before the commit: its abort passes too.
+  const late = request(FEED_STREAM);
+  emitter.emit('request', request('/', { navigation: true }));
+  emitter.emit('request', late);
+  emitter.emit('framenavigated', main);
+  emitter.emit('requestfailed', late);
+  assert.deepEqual(problems(), []);
+
+  // Opened after that navigation, and aborted with no other: the board closed it.
+  const closed = request(FEED_STREAM);
+  emitter.emit('request', closed);
+  emitter.emit('requestfailed', closed);
+  assert.deepEqual(problems(), [failed(FEED_STREAM)]);
+
+  // Opened, then a navigation, and failed some other way than an abort; and another stream, aborted the same way.
+  const broken = request(FEED_STREAM, { error: 'net::ERR_INCOMPLETE_CHUNKED_ENCODING' });
+  const other = request('/api/runs/r-1/stream');
+  emitter.emit('request', broken);
+  emitter.emit('request', other);
+  navigate();
+  emitter.emit('requestfailed', broken);
+  emitter.emit('requestfailed', other);
+  assert.equal(seen(), 3);
+  assert.deepEqual(problems().slice(1), [failed(FEED_STREAM, 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'), failed('/api/runs/r-1/stream')]);
+
+  // A navigation of a frame inside the page is not the page's own.
+  const framed = request(FEED_STREAM);
+  emitter.emit('request', framed);
+  navigate({});
+  emitter.emit('requestfailed', framed);
+  assert.equal(seen(), 4);
+  // Nor is a frame's commit while the page's own navigation is on its way: only the page's commit leaves the page.
+  const pending = request(FEED_STREAM);
+  emitter.emit('request', pending);
+  emitter.emit('request', request('/', { navigation: true }));
+  emitter.emit('framenavigated', {});
+  emitter.emit('requestfailed', pending);
+  emitter.emit('framenavigated', main);
+  assert.equal(seen(), 5);
+
+  // Nor is a same-document navigation (`history.pushState`), which asks for nothing.
+  const pushed = request(FEED_STREAM);
+  emitter.emit('request', pushed);
+  emitter.emit('framenavigated', main);
+  emitter.emit('requestfailed', pushed);
+  assert.equal(seen(), 6);
+});
+
+test('idle lets go of the requests a page left behind when it reloaded, of which Playwright says nothing more — and of none on a pushState', async () => {
+  const { page } = await servedPage('<p>ok</p>');
+  await page.evaluate(() => void fetch('/api/slow?ms=60000'));
+  await page.reload({ waitUntil: 'load' });
+  await idle(page, 3_000);
+
+  // And of those the old document asks for while the navigation is on its way: a poll every 50 ms, and a page that answers after 800.
+  const asked: string[] = [];
+  let navigating = false;
+  page.on('request', (r) => {
+    if (r.isNavigationRequest()) navigating = true;
+    else if (navigating) asked.push(r.url());
+  });
+  await page.evaluate(() => void setInterval(() => void fetch('/api/slow?ms=60000'), 50));
+  await page.goto(`${origin}/api/slow-page?ms=800`, { waitUntil: 'load' });
+  assert.ok(asked.length > 0, 'the old document asked for something between the navigation and its commit — or this proves nothing');
+  await idle(page, 3_000);
+
+  const from = Date.now();
+  await page.evaluate(() => {
+    void fetch('/api/slow?ms=1200');
+    history.pushState({}, '', '/elsewhere');
+  });
+  await idle(page, 5_000);
+  assert.ok(Date.now() - from >= 1_200, `idle waited for the request asked for before the pushState — it took ${Date.now() - from} ms`);
 });

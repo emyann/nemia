@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { filesIn, sidebar, themeOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -77,7 +77,8 @@ export default {
     await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
 
     // Yours: scribe's form, its result schema read from the file its output: names.
-    await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'networkidle' });
+    await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
+    await idle(page);
     const scribeForm = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(scribeForm, `${seeded.name}'s form`);
     if ((await scribeForm.getByRole('textbox', { name: 'Schema file' }).inputValue()) !== seeded.keys.output) throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}`);
@@ -95,7 +96,8 @@ export default {
     const madeSkills = path.join(agentsDir, `${made.name}.skills.json`);
     const pasted = JSON.stringify([made.skill], null, 2);
     try {
-      await page.goto(new URL('/agents', page.url()).href, { waitUntil: 'networkidle' });
+      await page.goto(new URL('/agents', page.url()).href, { waitUntil: 'load' });
+      await idle(page);
       await page.getByRole('link', { name: 'New agent' }).click();
       await page.waitForURL((url) => url.pathname === '/agents/new', { timeout: WAIT_MS });
       const form = page.getByRole('form', { name: 'New agent' });
@@ -156,7 +158,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'networkidle' });
+      await refused.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
+      await idle(refused);
       await expectVisible(refused.locator(`[data-used-by] a[data-node="${naming}/write"]`), `${seeded.name} is attached to ${naming} › write`);
       await refused.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
@@ -175,7 +178,7 @@ export default {
       if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before)) throw new Refused(`nothing is removed on a refusal — ${agentsDir} changed`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `agents-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       const expected = `request answered 409: DELETE ${answered.url()}`;
       const seen = problems();
       const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
@@ -185,7 +188,8 @@ export default {
       fs.rmSync(namingDir, { recursive: true, force: true });
       await refused.close();
     }
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
     await expectTexts(card(page, 'yours', seeded.name).locator('[data-used-by]'), ['No node names it yet.'], `back on the list, no node names ${seeded.name} again`);
     if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before)) throw new Refused(`the page puts the store back — ${agentsDir} holds ${filesIn(agentsDir).map(([n]) => n).join(', ')}`);
   },

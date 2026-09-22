@@ -2,7 +2,7 @@
  * What `npm run e2e` holds a page to, as functions over a Playwright page — so each can be made to
  * refuse on its own (checks.test.ts), and not only be seen to pass.
  */
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Request } from 'playwright';
 
 /** How long an element has to appear. The pages read an api on this machine; slower than this is a finding. */
 export const WAIT_MS = 10_000;
@@ -11,17 +11,110 @@ export const WAIT_MS = 10_000;
 export class Refused extends Error {}
 
 /**
+ * The workflow feed's stream, which the board may hold open from its root for as long as a page is open: never answered in full, so a
+ * network that waits for it never idles (`idle` does not), and aborted by the browser whenever the page itself goes (`watch` lets that
+ * one abort pass).
+ */
+export const FEED_STREAM = '/api/feed/stream';
+const isFeedStream = (request: Request): boolean => new URL(request.url()).pathname === FEED_STREAM;
+
+/** A page's requests in flight, the feed's stream left out; and when one last started or ended. */
+type Flights = { open: Set<Request>; last: number };
+const flights = new WeakMap<Page, Flights>();
+
+/**
+ * Counts `page`'s requests in flight from now on, once however often it is called: from before a page loads, by `watch` and for every page
+ * visit.ts opens, so a request begun before `idle` is called is counted. A page `idle` is the first to track counts from then.
+ *
+ * A page that navigates or reloads leaves its requests in flight behind, and Playwright (1.62) says nothing more of them: no
+ * `requestfinished`, no `requestfailed`. So once the page's own navigation has committed, every request in flight but that navigation's is
+ * let go — those the old document asked for while the navigation was on its way too, as its polls may — which is what Playwright's own
+ * `networkidle` does at a commit (`_onClearLifecycle`). The new document asks for nothing before its commit.
+ */
+export function track(page: Page): void {
+  if (flights.has(page)) return;
+  const f: Flights = { open: new Set(), last: Date.now() };
+  // The page's own navigation, asked for and not yet committed.
+  let leaving: Request | undefined;
+  page.on('request', (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = request;
+    if (isFeedStream(request)) return;
+    f.open.add(request);
+    f.last = Date.now();
+  });
+  const done = (request: Request) => {
+    if (f.open.delete(request)) f.last = Date.now();
+  };
+  page.on('requestfinished', done);
+  page.on('requestfailed', done);
+  // Also said of a same-document navigation (`history.pushState`), which asks for nothing and leaves nothing behind.
+  page.on('framenavigated', (frame) => {
+    if (frame !== page.mainFrame() || leaving === undefined) return;
+    for (const request of f.open) if (request !== leaving) f.open.delete(request);
+    leaving = undefined;
+    f.last = Date.now();
+  });
+  flights.set(page, f);
+}
+
+/** How long no request may be in flight for the network to be idle: Playwright's `networkidle`'s half a second. */
+export const QUIET_MS = 500;
+
+/**
+ * Once no request but the feed's stream has been in flight on `page` for `QUIET_MS`, counted from no earlier than the call: what a person
+ * would see once whatever the last action started has been answered. Playwright's `networkidle` in its place waits on every request, the
+ * stream too, and never fires; and a `waitForLoadState('networkidle')` after a click answers at once, however much the click set going. A
+ * network still busy after `timeout` is refused, naming what is in flight.
+ */
+export async function idle(page: Page, timeout = 30_000): Promise<void> {
+  track(page);
+  const f = flights.get(page)!;
+  const from = Date.now();
+  const end = from + timeout;
+  while (f.open.size || Date.now() - Math.max(f.last, from) < QUIET_MS) {
+    if (Date.now() >= end) {
+      const open = [...f.open].map((r) => `${r.method()} ${r.url()}`);
+      throw new Refused(`the network idles — ${open.length ? `still in flight after ${timeout} ms: ${open.join(', ')}` : `never quiet for ${QUIET_MS} ms in ${timeout} ms`}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/**
  * Everything a page does that it must not: a console error, an uncaught exception, a request that failed
  * or was answered 400 or worse. Listened for from before the page loads, and read with `problems()`.
+ *
+ * One failure passes: the feed's stream aborted (`net::ERR_ABORTED`) by the page itself navigating or reloading after that stream opened —
+ * the navigation committed after it, as `track` reads a page left — which is how a browser ends every request of a page it leaves, though
+ * Playwright 1.62 reports none of them, and a later one may. The board closing its own stream while it stays on the page is counted, as any
+ * other failure is.
  */
 export function watch(page: Page): { problems: () => string[] } {
+  track(page);
   const seen: string[] = [];
+  // In the order the browser said them: each feed stream when it opened, and the commit of the page's own last navigation.
+  let order = 0;
+  let navigated = 0;
+  let leaving = false;
+  const opened = new WeakMap<Request, number>();
+  page.on('request', (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = true;
+    else if (isFeedStream(request)) opened.set(request, ++order);
+  });
+  page.on('framenavigated', (frame) => {
+    if (frame !== page.mainFrame() || !leaving) return;
+    navigated = ++order;
+    leaving = false;
+  });
   page.on('console', (message) => {
     if (message.type() === 'error') seen.push(`console error: ${message.text()}`);
   });
   page.on('pageerror', (error) => seen.push(`uncaught: ${error.message}`));
-  page.on('requestfailed', (request) =>
-    seen.push(`request failed: ${request.method()} ${request.url()} — ${request.failure()?.errorText ?? 'no reason given'}`));
+  page.on('requestfailed', (request) => {
+    const reason = request.failure()?.errorText;
+    if (reason === 'net::ERR_ABORTED' && isFeedStream(request) && navigated > (opened.get(request) ?? Infinity)) return;
+    seen.push(`request failed: ${request.method()} ${request.url()} — ${reason ?? 'no reason given'}`);
+  });
   page.on('response', (response) => {
     if (response.status() >= 400) seen.push(`request answered ${response.status()}: ${response.request().method()} ${response.url()}`);
   });

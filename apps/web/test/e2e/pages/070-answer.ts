@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { sidebar, themeOf } from '../board.ts';
-import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -30,7 +30,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       const refusedRow = refused.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
       const refusedBox = refusedRow.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
       await expectVisible(refusedBox, `the answer box for ${FAKE.blocked}, with a file that is no ask at its try's name`);
@@ -51,7 +52,7 @@ export default {
       if (there.length !== 1 || fs.readFileSync(file, 'utf8') !== '{}\n') throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), fullPage: true });
-      await refused.waitForLoadState('networkidle');
+      await idle(refused);
       // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
@@ -89,6 +90,7 @@ export default {
     await page.screenshot({ path: path.join(OUT, `answer-asked-${await themeOf(page)}.png`), fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(FAKE.id, FAKE.blocked, 'blocked');
     await expectVisible(box, `with the ask taken back, ${FAKE.blocked} waits on you again, and its box is back once the run is read again`);
   },
 } satisfies PageSpec;

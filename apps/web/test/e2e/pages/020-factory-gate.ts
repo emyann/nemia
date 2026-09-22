@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { themeOf } from '../board.ts';
+import { fed, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
-import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -37,7 +37,8 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      await refused.goto(page.url(), { waitUntil: 'load' });
+      await idle(refused);
       await expectVisible(answerOf(refused, 'Approve'), 'Approve on the card, on a page of its own');
       const listed = await (await refused.request.get(new URL('/api/runs', refused.url()).href)).text();
       await refused.route((url) => url.pathname === '/api/runs', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }));
@@ -64,6 +65,7 @@ export default {
       if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
       // Taken back before the close: the first page, focused again, reads the list again.
       fs.rmSync(asks, { recursive: true, force: true });
+      fed(id, ending, 'awaiting approval');
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
       await refused.close();
@@ -114,6 +116,7 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, ending, 'awaiting approval');
     await expectVisible(answerOf(page, 'Approve'), 'with the approval taken back, the card offers the gate again');
     await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
 
@@ -135,6 +138,7 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, ending, 'awaiting approval');
     await expectVisible(answerOf(page, 'Approve'), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
 
     // Every card still clear of the one beneath it, the gate's line and its buttons on the ending's card.

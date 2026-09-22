@@ -739,7 +739,8 @@ export function toDecide(
 ): ToDecide | undefined {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
-  if (waiting) {
+  // A pruned run's approval is refused (`prunedRefusal`), so it is not what is left to decide: what its branches hold is.
+  if (waiting && !run.pruned) {
     // Unless git has already taken the result (`resultOnBase`): an ending that has not run would merge a branch the base branch already
     // has, so there is nothing to decide and nothing for an approval to file. Read off git each pass, like the `git` kind below — a person
     // who merges by hand tells the run nothing, and this is how it finds out. Its listing says where the branch stands, and `wf approve` is
@@ -1990,7 +1991,8 @@ export function retryLines(
   /** What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`, one that did not finish the recheck. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): string[] {
-  if (d.kind !== 'awaiting') return [];
+  // None on a pruned run: every try works in a worktree `wf prune` removed, and `wf retry` refuses it (`prunedRefusal`).
+  if (d.kind !== 'awaiting' || run.pruned) return [];
   const lines: string[] = [];
   for (const step of steps) {
     const { status, modes, sendsBack, back, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
@@ -2026,7 +2028,8 @@ export function retryLines(
  * `wf decide`'s OVER BUDGET line, saying for each step why it is held. A step whose own tries cost its budget or more gives the amounts:
  * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `wf ls` does:
  * `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Pure. Undefined with no step over budget.
- * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`).
+ * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`). On a pruned run it waits on nobody, and
+ * says the run was pruned where it would say so: the raise it waits for is refused (`prunedRefusal`), as `listing` waits on nobody for it.
  */
 export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
   if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
@@ -2039,6 +2042,8 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
     return `${name} (held: its round would file ${others.map((o) => `${o.name} again, which has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ')})`;
   });
   const them = d.overBudget.length > 1 ? 'them' : 'it';
+  // A pruned run waits on nobody for its budget: the raise it would wait for is a try or a round, and each is refused (`prunedRefusal`).
+  if (run.pruned) return `OVER BUDGET: ${why.join(', ')}  — nothing more is filed for ${them}, raised or not, since the run was ${prunedWords(run.pruned)}; nothing after ${them} ran`;
   return `OVER BUDGET, waiting on you: ${why.join(', ')}  — the run files nothing more for ${them} on its own; nothing after ${them} ran`;
 }
 
@@ -2057,7 +2062,8 @@ export function answerLines(
   /** What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too. */
   spendOf: SpendOf = () => undefined,
 ): Record<string, string> {
-  if (d.kind !== 'awaiting') return {};
+  // None on a pruned run, whose try `wf retry` refuses (`prunedRefusal`): its question stays, with nothing to answer it with.
+  if (d.kind !== 'awaiting' || run.pruned) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
@@ -2510,13 +2516,18 @@ export function roundDueNote(steps: readonly Workflow[], r: Round): string {
     : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;
 }
 
-/** A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a step's. */
+/**
+ * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a step's.
+ * On a pruned run, where it stands and why there is no more: `wf round` is refused there (`prunedRefusal`), and a note never offers a refused verb.
+ */
 const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : `once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
 
-/** A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the round. */
+/** A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the round — or, pruned, why there is none. */
 const heldNote = (step: Workflow, run: Run): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — once more: wf round ${run.id} ${step.name} --budget <amount>`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : `once more: wf round ${run.id} ${step.name} --budget <amount>`}`;
+
+const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
 
 /** The steps of a loop over their budget, in words: `implement has cost $4.20 of its $3 budget`. */
 const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>): string =>
@@ -2527,7 +2538,8 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  * with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
  */
 export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): string[] {
-  if (d.kind !== 'awaiting') return [];
+  // None on a pruned run: `wf round` and `wf accept` each file work into a worktree `wf prune` removed, and refuse it (`prunedRefusal`).
+  if (d.kind !== 'awaiting' || run.pruned) return [];
   return steps.filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name))).flatMap((looping) => {
     const name = looping.name;
     const over = loopOver(steps, looping, run, spendOf);
@@ -2971,6 +2983,16 @@ function leftWords(f: Forgot): string {
  * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
  * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record.
  */
+/**
+ * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it was
+ * pruned — or that its marker no longer says — and what was removed. Pure.
+ */
+export const prunedWords = (pruned: Pruned): string =>
+  `pruned at ${pruned.at || 'a time its marker no longer says'} — its worktrees were removed (wf prune)`;
+
+/** A step at its gate on a pruned run, as `wf ls` and `wf decide` both say it: no approval is left to give (`prunedRefusal`). */
+const neverApproved = (pruned: Pruned): string => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
+
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
   return `${run.id} was pruned at ${run.pruned.at}: its worktrees were removed (wf prune), and ${what} would file work into one of them. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
@@ -3964,7 +3986,9 @@ export const harnessWaitLine = (waitingFor: string, session: string | null): str
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
  */
-const gateNote = (run: Pick<Run, 'id'>, step: string, back: readonly string[]): string =>
+const gateNote = (run: Pick<Run, 'id' | 'pruned'>, step: string, back: readonly string[]): string =>
+  // Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`).
+  run.pruned ? neverApproved(run.pruned) :
   `approve it: wf approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
 
 /**
@@ -4639,6 +4663,11 @@ export function gateLines(
     if (given) {
       lines[step.name] = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
     } else if (standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval') {
+      // Never approved, and now never can be: `wf approve` and the send-back each file work into a worktree `wf prune` removed.
+      if (run.pruned) {
+        lines[step.name] = neverApproved(run.pruned);
+        continue;
+      }
       const back = sendBackTo(step, run).map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ');
       lines[step.name] = `awaiting approval:  wf approve ${run.id} ${step.name} [--message "<words>"]${back ? `  — or send it back:  ${back}` : ''}`;
     }

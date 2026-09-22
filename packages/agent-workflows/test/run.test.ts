@@ -2850,6 +2850,36 @@ test("`budgetUsdFor`: what is left of the cap in force, once the step's tries ar
   assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude-detached' }, undefined, cost(1)), undefined);
 });
 
+test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered no round and no acceptance — `wf ls` and `wf decide` say the run was pruned instead', () => {
+  const pruned = { at: '2026-09-17T01:00:00.000Z', worktrees: [] };
+  const since = 'since the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (wf prune)';
+  const offered = /wf (approve|retry|round|accept) /;
+
+  // Out of rounds: `wf round` and `wf accept` are each refused on a pruned run (`prunedRefusal`).
+  const r = inRound(3, { pruned });
+  const said = saidIn(3, true);
+  const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
+  assert.deepEqual([l.steps[1]!.status, l.steps[1]!.note, l.waitingOnYou], ['rounds exhausted', `round 3 of 3, and it asked again — no round more, ${since}`, []]);
+  const d = decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked);
+  assert.ok(d.kind === 'awaiting', d.kind);
+  assert.deepEqual([roundLines(LOOP, r, d), retryLines(LOOP, r, d, ALL_SUCCEEDED, said, asked), answerLines(LOOP, r, d, ALL_SUCCEEDED, said, asked)], [[], [], {}]);
+  assert.match(retryRefusal(LOOP, r, 'review', { mode: 'fresh' }, ALL_SUCCEEDED, said, asked)!, /was pruned at/);
+
+  // Held on a budget: the round would raise a cap, and nothing is filed on a pruned run, raised or not.
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const held = inRound(1, { pruned });
+  const heldSaid = saidIn(1, true);
+  const spent = spends({ i1: 4.25, r1: 0.5 });
+  const hl = listing(BUDGETED_LOOP, held, ALL_SUCCEEDED, heldSaid, asked, () => 0, [], [], [], [], () => 0, spent);
+  assert.deepEqual([hl.steps[1]!.note, hl.waitingOnYou], [`round 1 of 3, and it asked again, past a budget — no round more, ${since}`, []]);
+  assert.doesNotMatch(JSON.stringify(hl), offered);
+  const hd = decision(BUDGETED_LOOP, held, ALL_SUCCEEDED, nothingShipped, heldSaid, asked, () => 0, [], [], () => false, spent);
+  assert.ok(hd.kind === 'awaiting', hd.kind);
+  assert.equal(overBudgetLine(BUDGETED_LOOP, held, hd, spent),
+    `OVER BUDGET: implement ($4.25 of $3), review (held: its round would file implement again, which has cost $4.25 of its $3 budget)  — nothing more is filed for them, raised or not, ${since}; nothing after them ran`);
+  assert.deepEqual([roundLines(BUDGETED_LOOP, held, hd, spent), retryLines(BUDGETED_LOOP, held, hd, ALL_SUCCEEDED, heldSaid, asked, spent)], [[], []]);
+});
+
 test('REFUSED past a budget in a loop: `again: true` files no round while a step of the loop is over its budget — both read over budget — and `wf round` goes once more only with `--budget` above what that step spent, which the round keeps', () => {
   const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
   const r = inRound(1);
@@ -3898,6 +3928,21 @@ test("an ending step is handed its own approval and the words given with it — 
     ship: 'awaiting approval:  wf approve r-1 ship [--message "<words>"]  — or send it back:  wf retry r-1 review --message "<objection>"',
   });
   assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), { ship: 'approved 23:10Z — "Merge it, and do not touch the changelog."' });
+});
+
+test('REFUSED once pruned: a step at its gate is offered no approval and no send-back — `gateLines`, `to decide` and `wf ls` say nothing a pruned run refuses', () => {
+  // `wf prune` refuses a run at its gate; a marker is written by hand all the same, and one that no longer reads is taken as pruned.
+  const pruned = { at: '2026-09-17T01:00:00.000Z', worktrees: [] };
+  const r = atEnd({ pruned });
+  assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), {
+    ship: 'not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (wf prune)',
+  });
+  assert.equal(assess(ENDS, r, DONE, signedDone, asked).toDecide, undefined, 'its approval is refused, so it is not what is left to decide');
+  const l = listing(ENDS, r, (id) => ({ t1: 'succeeded', t2: 'succeeded' } as Record<string, TaskPhase>)[id] ?? 'unknown', signedDone, asked);
+  assert.deepEqual([l.steps[2]!.note, l.waitingOnYou, l.toDecide], ['not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (wf prune)', [], undefined]);
+  assert.doesNotMatch(JSON.stringify(l), /wf (approve|retry|round|accept) /, JSON.stringify(l));
+  // The approval given before the prune is still said: it is a fact about the run, not an offer.
+  assert.deepEqual(gateLines(ENDS, atEnd({ pruned, approvals: [approval('ship', 1)] }), DONE, signedDone, asked), { ship: 'approved 23:10Z' });
 });
 
 test('REFUSED at an ending gate: `wf rm` holds the run and `wf cancel` calls it off — an approval would file the step that acts', () => {

@@ -259,6 +259,32 @@ test("the decision says what `wf decide` says of steps held on their budget — 
   assert.deepEqual(once.map((c: { command: string }) => c.command), [`wf round ${R} review --budget <amount>`, `wf retry ${R} tokens --budget <amount>`]);
 });
 
+test("REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `wf decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise", async () => {
+  // `wf prune --unmerged` writes this beside the record, and removes it from nothing: taken back at the end, so the tests after this one read R as it was.
+  const marker = path.join(root, 'runs', `${R}.pruned`);
+  const pruned = { at: '2026-09-15T07:00:00.000Z', worktrees: [] };
+  write(marker, JSON.stringify(pruned));
+  try {
+    const said = await decide(engine(), R);
+    const body = await (await app.request(`/api/runs/${R}/decision`)).json();
+    assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `wf decide` and for the board');
+    assert.equal(body.overBudget, 'OVER BUDGET: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)'
+      + '  — nothing more is filed for them, raised or not, since the run was pruned at 2026-09-15T07:00:00.000Z — its worktrees were removed (wf prune); nothing after them ran');
+    assert.deepEqual(said.offers, []);
+    assert.deepEqual(body.commands.filter((c: { command: string }) => /^wf (retry|round|accept|approve) /.test(c.command)), [], JSON.stringify(body.commands));
+    // What each raise would be refused in: the verb's own words, which the decision no longer contradicts.
+    assert.match(await retryRefuses('tokens', { mode: 'nudge', budget: 10 }), /^r-cost was pruned at 2026-09-15T07:00:00\.000Z: /);
+
+    const run = await detail();
+    assert.deepEqual(run.pruned, pruned);
+    assert.deepEqual([run.waitingOnYou, run.steps.map((s: Step) => s.raise)], [[], [null, null, null]]);
+    assert.doesNotMatch(JSON.stringify(run.steps.map((s: Step) => s.note)), /wf (retry|round|accept|approve) /);
+  } finally {
+    fs.rmSync(marker);
+  }
+  nothingWritten('reading a pruned run asks for nothing');
+});
+
 test('REFUSED at shipped defaults: a raise another site could make — a page on another site, a name that is not this machine, a body not sent as JSON — on both routes, and nothing is written', async () => {
   const cases: Array<[string, (body: unknown, headers: Record<string, string>) => Promise<Response>]> = [
     [`POST /api/runs/${R}/steps/tokens/retry`, (body, headers) => askTry('tokens', body, headers)],

@@ -30,16 +30,16 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A workflow of one step, `implement`, whose closeout names a file it leaves in its workspace. */
-const oneStep = () => {
+/** A workflow of one step, `implement`, whose closeout names a file it leaves in its workspace — with a `budget:`, when given one. */
+const oneStep = (budget?: number) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), `${budget === undefined ? '' : `---\nbudget: ${budget}\n---\n`}implement it\n`);
   return dir;
 };
 
-/** Just enough engine: each task's phase, and its closeout on its one attempt once it has one. */
+/** Just enough engine: each task's phase, and its closeout on its one attempt once it has one, with what that attempt cost when it says. */
 const board = () => {
-  const tasks = new Map<string, { phase: TaskPhase; closeout?: unknown }>();
+  const tasks = new Map<string, { phase: TaskPhase; closeout?: unknown; usage?: object }>();
   const filings: string[] = [];
   const e = {
     view: async (id: string) => {
@@ -49,14 +49,14 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t ? 'filed' : '', settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: t.usage ?? null }],
         },
       };
     },
     file: async (spec: { id: string }) => { filings.push(spec.id); tasks.set(spec.id, { phase: 'pending' }); return spec.id; },
     stop: async () => {},
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object) => tasks.set(id, { phase, closeout, usage });
   return { e, filings, settle };
 };
 
@@ -66,9 +66,9 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  * A run that is over: started for real, its one step filed in a worktree of its own, `work` committed on its branch, signed off, and handed
  * off by a pass — with a `node_modules` in the worktree that git ignores, holding a link out of it. Merged into `main` with `merged`.
  */
-const aFinished = async (b: ReturnType<typeof board>, { merged = false, work = 'fix.ts' }: { merged?: boolean; work?: string } = {}) => {
+const aFinished = async (b: ReturnType<typeof board>, { merged = false, work = 'fix.ts', budget, costUsd, closeout = SIGNED }: { merged?: boolean; work?: string; budget?: number; costUsd?: number; closeout?: object } = {}) => {
   const repo = aRepo();
-  const run = start({ brief: 'add a flag', repo, workflowDir: oneStep() });
+  const run = start({ brief: 'add a flag', repo, workflowDir: oneStep(budget) });
   await advance(b.e, readRun(run.id));
   const wt = readRun(run.id).steps.implement!.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
@@ -79,7 +79,7 @@ const aFinished = async (b: ReturnType<typeof board>, { merged = false, work = '
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
   fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me\n');
   fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
-  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  b.settle(`${run.id}-implement`, 'succeeded', closeout, costUsd === undefined ? undefined : { costUsd });
   await advance(b.e, readRun(run.id));   // the hand-off: nothing left uncommitted
   const branch = `wf/${run.id}/implement`;
   if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', branch);
@@ -309,6 +309,31 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   await advance(b.e, readRun(run.id));
   assert.deepEqual(b.filings, filings, 'nothing filed');
   assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /asked|due|files it/, '`wf ls` says no try is coming of the ask written by hand');
+});
+
+test('REFUSED after a prune: a step over its budget is offered no raise — `decide`, `wf decide` and the api say the run was pruned where they said it waits on you, as `wf ls` does', async (t) => {
+  const b = board();
+  // Signed off blocked past its budget, and nothing about a budget holds `wf prune`: finished and not merged, it is pruned under --unmerged.
+  const { run } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
+  const before = await decide(b.e, run.id);
+  assert.equal(before.overBudgetLine, 'OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran');
+  assert.match(before.offers.join('\n'), new RegExp(`:  wf retry ${run.id} implement --budget <amount>`), 'its raise is offered before');
+  assert.equal(before.answering.implement, `to answer it, its cap raised above $3.40:  wf retry ${run.id} implement --budget <amount> --message "<answer>"`);
+  assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/);
+  assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
+  const at = readRun(run.id).pruned!.at;
+
+  const d = await decide(b.e, run.id);
+  assert.equal(d.decision.kind, 'awaiting', 'still a run to decide: its branch holds its work');
+  assert.equal(d.overBudgetLine, `OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at ${at} — its worktrees were removed (wf prune); nothing after it ran`);
+  assert.deepEqual([d.offers, d.answering, d.gates], [[], {}, {}]);
+  await assert.rejects(retry(b.e, run.id, 'implement', { mode: 'nudge', budget: 5 }), /was pruned at/, 'the raise the line used to point to is refused');
+
+  const screen = (await typed(t, b.e, 'decide', run.id)).printed.join('\n');
+  assert.ok(screen.includes(`\n  ${d.overBudgetLine}\n`), screen);
+  assert.doesNotMatch(screen, /waiting on you/, screen);
+  assert.doesNotMatch(screen, /wf (retry|round|accept|approve) /, 'no verb a pruned run refuses');
+  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `wf ls` agrees');
 });
 
 test('`wf prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, and the rest are listed with the total', async (t) => {

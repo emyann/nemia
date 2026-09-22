@@ -25,7 +25,7 @@ export { answerIn, harnessWaitLine, waitingWords } from './run.ts';
  * dependency of it — and this file is the only one in the workspace that knows the engine exists.
  */
 export { nameFor } from 'agent-engine';
-export { pruneLines, prunedBytes, prunedRefusal, pruneRefusal, sizeOf } from './run.ts';
+export { pruneLines, prunedBytes, prunedRefusal, prunedWords, pruneRefusal, sizeOf } from './run.ts';
 export type { Pruned, PruneFacts, Pruning } from './run.ts';
 export { acceptAsk, acceptanceOf, acceptedLines, approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, signoffsSpent, spentWord, stepSpend, taskSpend, tryNote, waitAdvice, waitWord } from './run.ts';
 export { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines } from './timeline.ts';
@@ -3810,19 +3810,21 @@ export async function decide(e: Engine, id: string): Promise<{
   }
   // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
-  // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is offered.
+  // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is
+  // offered — each line below that would offer a verb says so itself (`retryLines`, `roundLines`, `answerLines`, `overBudgetLine`, `gateLines`),
+  // so the api's decision, which calls the same functions, says the same.
   const over = Boolean(run.cancelledAt || run.pruned);
   return {
     run, decision: d, closeouts, checks,
     retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
     rounding: over ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
-    offers: run.pruned ? [] : [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
+    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),
     used,
     costs,
     runCost: runCostLines(run, spendOf),
     answers,
-    answering: run.pruned ? {} : answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
+    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     accepted: acceptedLines(steps, run),
     waitingOn,

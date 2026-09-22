@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { agentCard, agentVersion, dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -964,7 +964,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // And the inbox card it was started from, when it was.
       const from = fromNote(run);
       // And that its worktrees were removed: what is left of it is its branches, its record and its files.
-      const pruned = run.pruned ? `pruned at ${run.pruned.at || 'a time its marker no longer says'} — its worktrees were removed (wf prune); its branches, record and files are kept` : '';
+      const pruned = run.pruned ? `${prunedWords(run.pruned)}; its branches, record and files are kept` : '';
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}${pruned ? `\n  ${pruned}` : ''}`;
       const steps = stepsOf(run);
 
@@ -999,6 +999,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       }
 
       console.log(`${head}\n`);
+      // A pruned run waits on nobody, as `wf ls` says: whatever a person would do about a step files work into a worktree that is gone
+      // (`prunedRefusal`). How each step ended is still said; that it waits on you is not.
+      const onYou = run.pruned ? '' : ', waiting on you';
       // The run's own verdicts first: they decide how much of the rest is worth reading.
       if (decision.failedCheck.length) console.log(`  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`);
       if (decision.unfinishedCheck.length) console.log(`  CHECK DID NOT FINISH: ${decision.unfinishedCheck.join(', ')}  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran`);
@@ -1008,19 +1011,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
       // A step that stopped itself and said why is a different thing from one that broke, and the
       // difference decides whether you read a summary or a log.
-      if (decision.stuck.length) console.log(`  BLOCKED, waiting on you: ${decision.stuck.join(', ')}`);
+      if (decision.stuck.length) console.log(`  BLOCKED${onYou}: ${decision.stuck.join(', ')}`);
       // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
-      if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED, waiting on you: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
+      if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
       // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
-      if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
       // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
       // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
       const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);
       const unrun = decision.awaitingApproval.filter((name) => !run.steps[name]?.taskId);
-      if (handedOn.length) console.log(`  AWAITING APPROVAL, waiting on you: ${handedOn.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
-      if (unrun.length) console.log(`  AWAITING APPROVAL, waiting on you: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it`);
+      if (handedOn.length) console.log(`  AWAITING APPROVAL${onYou}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`);
+      if (unrun.length) console.log(`  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // And the checkout, where a try of the ending waits for it: the ask stands, and the tick files it once that step settles.
       if (heldOut) console.log(heldOut);

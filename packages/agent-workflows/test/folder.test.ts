@@ -48,8 +48,8 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, start, startQueued } = await import('../src/runner.ts');
-const { forgetLine, sentBack } = await import('../src/run.ts');
+const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, retry, start, startQueued } = await import('../src/runner.ts');
+const { forgetLine, sentBack, stepTaskId } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
 /** What `main` printed, line by line, while it ran. */
@@ -175,6 +175,30 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
   assert.match(forgetLine(forgot), new RegExp(`^${run.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`));
   assert.deepEqual(gitAsked(), [], 'and nothing asked git');
+});
+
+// Why a folder run's folders live until `wf rm` and not until its end (features.md, *Decided: a folder lives as long as its run*): a run
+// that ended on anything but success is written again in the folder it worked in. A try is filed there, a nudge continues a session tied
+// to that directory, and what the first try left in it is what the second one works on. Removing the folders at a run's end breaks this.
+test("a folder run's folder outlives its end: a run that ended blocked is tried again in the folder its step left, with the step's work still in it", async () => {
+  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+  const { e, tasks, settle } = board();
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['write']);
+  const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
+  fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
+
+  settle(`${run.id}-write`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which tides?' });
+  await advance(e, readRun(run.id));
+  const ended = (await decide(e, run.id)).decision;
+  assert.deepEqual(ended.kind === 'awaiting' && ended.outcome, 'blocked', JSON.stringify(ended));
+
+  await retry(e, run.id, 'write', { mode: 'nudge', message: 'the ocean ones' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['write']);
+  const again = tasks.get(stepTaskId(readRun(run.id), 'write', 2));
+  assert.ok(again, 'the try is filed');
+  assert.equal(again.spec.cwd, writeFolder, 'in the folder the first try worked in');
+  assert.equal(fs.readFileSync(path.join(writeFolder, 'note.md'), 'utf8'), '# Tides\n', 'which still holds what it wrote');
+  assert.deepEqual(gitAsked(), []);
 });
 
 test('wf start from a directory that is no repository: a folder team starts, and --repo named is refused in its words', async () => {

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { themeOf } from '../board.ts';
+import { fed, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING } from '../seed.ts';
@@ -65,6 +65,7 @@ export default {
       if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
       // Taken back before the close: the first page, focused again, reads the list again.
       fs.rmSync(asks, { recursive: true, force: true });
+      fed(id, ending, 'awaiting approval');
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
       await refused.close();
@@ -115,6 +116,7 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, ending, 'awaiting approval');
     await expectVisible(answerOf(page, 'Approve'), 'with the approval taken back, the card offers the gate again');
     await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
 
@@ -136,6 +138,7 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, ending, 'awaiting approval');
     await expectVisible(answerOf(page, 'Approve'), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
 
     // Every card still clear of the one beneath it, the gate's line and its buttons on the ending's card.

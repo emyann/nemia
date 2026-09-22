@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -126,6 +126,7 @@ export default {
       // Taken back: draft's task and its conversation as seeded — at work, told nothing, and nothing arrived.
       fs.writeFileSync(journal, seeded);
       fs.writeFileSync(conversation, seededConversation);
+      fed(SAYING.run, SAYING.step, 'running');
     }
     // Read again, the run has draft at work once more, and the box is open.
     await expectVisible(boxOf(page, 'open'), 'with the writes taken back, the box is open again once the run is read again');

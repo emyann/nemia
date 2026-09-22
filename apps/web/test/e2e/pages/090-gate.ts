@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectRendered, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -103,6 +103,7 @@ export default {
     } finally {
       await refused.close();
       fs.writeFileSync(recordFile, seededRecord);
+      fed(id, gated, 'awaiting approval');
     }
 
     // Approved, with words: the api takes it through the board's proxy, and writes the approval as `wf approve` does, and nothing else.
@@ -135,6 +136,7 @@ export default {
 
     // Taken back: the gate holds again, and plan is sent back from its page, as `wf retry --message` sends it — then that is taken back too.
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, gated, 'awaiting approval');
     await expectVisible(approveOf(page), `with the approval taken back, ${gated} waits at its gate again once the run is read again`);
     await expectCount(approval, 0, 'and its approval is gone from under it');
     await objection.fill(GATED.objection);
@@ -152,6 +154,7 @@ export default {
     await page.screenshot({ path: path.join(OUT, `gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(id, gated, 'awaiting approval');
     await expectVisible(approveOf(page), `with the send-back taken back, ${gated} waits at its gate again, and the page ends as it began`);
     await settled(page);
   },

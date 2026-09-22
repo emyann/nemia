@@ -36,6 +36,20 @@ export async function nextVisit(page: Page, check: (again: Page) => Promise<void
   }
 }
 
+/**
+ * One line appended to the workflow feed, `$store/feed.jsonl`, in the shape the package's tick writes it (`FeedLine`: `{ at, run, step?, word }`):
+ * for a page that edits the store by hand, where no tick runs to say so, and a board that reads the feed must see the edit. `word` is what
+ * `wf ls` says of the step after the edit — or of the run, given no step. A report and never an input, as the package's own lines are: the
+ * api reads the feed only to stream it, so a line left behind changes no page after this one.
+ */
+export function fed(run: string, word: string): void;
+export function fed(run: string, step: string, word: string): void;
+export function fed(run: string, ...said: [string] | [string, string]): void {
+  const [step, word] = said.length === 2 ? said : [undefined, said[0]];
+  const line = { at: new Date().toISOString(), run, ...(step !== undefined ? { step } : {}), word };
+  fs.appendFileSync(path.join(store!, 'feed.jsonl'), `${JSON.stringify(line)}\n`);
+}
+
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { sidebar, themeOf } from '../board.ts';
+import { fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -90,6 +90,7 @@ export default {
     await page.screenshot({ path: path.join(OUT, `answer-asked-${await themeOf(page)}.png`), fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
+    fed(FAKE.id, FAKE.blocked, 'blocked');
     await expectVisible(box, `with the ask taken back, ${FAKE.blocked} waits on you again, and its box is back once the run is read again`);
   },
 } satisfies PageSpec;

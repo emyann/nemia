@@ -3685,7 +3685,7 @@ export type Listing = {
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
    */
   steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
-  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off. */
+  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off or pruned. */
   waitingOnYou: string[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
@@ -3773,8 +3773,8 @@ export function listing(
   };
   // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did. So is a loop going round again.
   // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
-  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
-  const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
+  const due = run.cancelledAt || run.pruned ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
+  const rounds = run.cancelledAt || run.pruned ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
   // And no step a round due files again reads held on its budget: a person raised the cap for the round (`roundSpans`).
   const refiled = roundSpans(steps, rounds);
   // Nor does an ending step hold its gate while the work it would act on is filed again (`unheld`): it reads as the waiting step it is.
@@ -3898,7 +3898,7 @@ export function listing(
   // a run waits on, and the board reads it there.
   const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings, checkout);
   return {
-    steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting,
+    steps: rows, waitingOnYou: run.cancelledAt || run.pruned ? [] : waitingOnYou, waiting,
     ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}), ...(decide ? { toDecide: decide } : {}),
   };
 }

@@ -247,6 +247,7 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   // A step that signed off blocked: a person may try it again, until the run is pruned.
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
   assert.equal((await decide(b.e, run.id)).answering.implement !== undefined, true, 'an answer is offered before');
+  assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/, 'and `wf ls` says it waits on you');
   assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
   const at = readRun(run.id).pruned!.at;
   const said = `${run.id} was pruned at ${at}: its worktrees were removed (wf prune), and`;
@@ -257,6 +258,7 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   await assert.rejects(accept(b.e, run.id, 'implement', 'as it stands'), (err: Error) => err.message.startsWith(`${said} an acceptance would file work into one of them.`));
   const d = await decide(b.e, run.id);
   assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}], 'and nothing is offered');
+  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `wf ls` waits on nobody');
 
   // The verbs are one writer of the asks; a person with a text editor is another. The pass is the guard that holds.
   const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
@@ -265,6 +267,7 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   const filings = [...b.filings];
   await advance(b.e, readRun(run.id));
   assert.deepEqual(b.filings, filings, 'nothing filed');
+  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /asked|due|files it/, '`wf ls` says no try is coming of the ask written by hand');
 });
 
 test('`wf prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, and the rest are listed with the total', async (t) => {

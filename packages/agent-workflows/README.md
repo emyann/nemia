@@ -1961,14 +1961,15 @@ The tick keeps one writer per file, and two ticks are two writers. So `wf up` ta
 `$WF_ROOT/daemon.json`, which it alone writes:
 
 ```json
-{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "beatAt": "2026-09-22T10:41:09.002Z" }
+{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "beatAt": "2026-09-22T10:41:09.002Z", "procStart": 1627402 }
 ```
 
-`pid` is the node process that ticks, `every` its interval, `passedAt` when its last pass completed (`null` before the first), and `beatAt`
-when its timer last wrote the file. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
+`pid` is the node process that ticks, `every` its interval, `passedAt` when its last pass completed (`null` before the first), `beatAt`
+when its timer last wrote the file, and `procStart` when its process started (clock ticks since boot, `/proc/<pid>/stat`), which with the
+pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
 doing, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always through a hidden file renamed over it, so a
 reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon.ts`): no file, a file that does
-not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)`), one alive that has been silent for a long while
+not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` fails, or the pid's start is not `procStart`), one alive that has been silent for a long while
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
@@ -1991,7 +1992,9 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   3s ago (…)`, or `stalled`, `none ticking — pid 51234 is gone`, `stopped`, and `none has held this store` — so a run `waiting` is told
   apart from a store nothing ticks.
 - **Liveness is this host's.** A store on a shared disk ticked from another machine reads as gone here. A pid reused after a daemon was
-  killed with `-9`, within the stale window, reads as ticking; a clean stop writes `stoppedAt` and never does. A daemon resumed from `^Z`
+  killed with `-9` is another process's, told by its start, and the store is taken over at once. Where the start cannot be compared — no
+  `/proc`, or a file with no `procStart` — a live pid still holds, since two writers are the worse mistake, but no line hands it over as a
+  pid to kill as it stands: it is said unconfirmed, with `ps -p <pid> -o lstart=,args=` to check it first. A daemon resumed from `^Z`
   after it was taken over finishes the pass it was in before it reads the file again.
 
 ## Calling a run off

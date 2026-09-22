@@ -48,9 +48,9 @@ export type { FeedLine } from './feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 import { acceptAsk, acceptedLines, answerLines, answerOf, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Pruned, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { taskUsage, timeline, type Timeline } from './timeline.ts';
-import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding } from './daemon.ts';
+import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding, type Identity } from './daemon.ts';
 export { DAEMON_FILE, DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, STALE_PASSES, daemonLine, everyOf, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
-export type { DaemonFile, DaemonStanding } from './daemon.ts';
+export type { DaemonFile, DaemonStanding, Identity } from './daemon.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -503,8 +503,28 @@ export function alive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
 }
 
+/**
+ * When process `pid` started, in clock ticks since boot: field 22 of `/proc/<pid>/stat`, read after the last `)`, since the command name
+ * before it may hold spaces and parentheses. Undefined where there is no `/proc`, or the process is gone.
+ */
+export function procStartOf(pid: number): number | undefined {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const start = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
+    return Number.isInteger(start) ? start : undefined;
+  } catch { return undefined; }
+}
+
+/** What the process table says of the file's pid (`Identity` in daemon.ts): alive, and whether it is the process that wrote the file. */
+export function identify(file: DaemonFile): Identity {
+  if (!alive(file.pid)) return 'gone';
+  const start = file.procStart === undefined ? undefined : procStartOf(file.pid);
+  if (start === undefined) return alive(file.pid) ? 'unknown' : 'gone';
+  return start === file.procStart ? 'same' : 'other';
+}
+
 /** Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table). */
-export const daemonStanding = (now = Date.now()): DaemonStanding => standingOf(readDaemon(), { now, alive });
+export const daemonStanding = (now = Date.now()): DaemonStanding => standingOf(readDaemon(), { now, identify });
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
 function writeDaemon(file: DaemonFile): void {
@@ -524,7 +544,8 @@ export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
  */
 export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd: string; now?: number }): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
-  const held: DaemonFile = { pid: process.pid, startedAt: new Date(now).toISOString(), cwd, every, passedAt: null };
+  const procStart = procStartOf(process.pid);
+  const held: DaemonFile = { pid: process.pid, startedAt: new Date(now).toISOString(), cwd, every, passedAt: null, ...(procStart !== undefined ? { procStart } : {}) };
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);

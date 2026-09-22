@@ -4,14 +4,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, daemonLine, everyOf, daemonStanding, holdRefusal, holderAgainst, parseDaemonFile, staleAfterMs, takeoverLine, type DaemonFile } from '../src/daemon.ts';
+import { DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, daemonLine, everyOf, daemonStanding, holdRefusal, holderAgainst, parseDaemonFile, staleAfterMs, takeoverLine, type DaemonFile, type Identity } from '../src/daemon.ts';
 
 const NOW = Date.parse('2026-09-22T12:00:00.000Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
 const holder = (over: Partial<DaemonFile> = {}): DaemonFile => ({ pid: 4242, startedAt: ago(60), cwd: '/home/me/repo', every: 4000, passedAt: ago(0.05), ...over });
 const text = (file: DaemonFile | Record<string, unknown>) => JSON.stringify(file);
-const live = { now: NOW, alive: () => true };
-const dead = { now: NOW, alive: () => false };
+const as = (identity: Identity) => ({ now: NOW, identify: () => identity });
+const live = as('same');
+const dead = as('gone');
 const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => daemonStanding(text(file), how).kind;
 
 test('stale is ten of the holder\'s own intervals, never under fifteen minutes — the floor decides at the shipped 4000 ms', () => {
@@ -40,34 +41,51 @@ test('each standing, from the file and the clock: none, unreadable, ticking, sta
   assert.equal(kindOf(holder({ passedAt: ago(0) }), dead), 'gone');
   // A stop said frees the store even while its pid answers: reused by another process, it holds nothing.
   assert.equal(kindOf(holder({ stoppedAt: ago(0.01) })), 'stopped');
+  // A pid alive but another process's — reused after a kill -9 — is gone, however fresh the file: deleting the identity check fails this.
+  assert.equal(kindOf(holder({ passedAt: ago(0) }), as('other')), 'gone');
+  // A live pid that cannot be compared holds, as a live pid did before: two writers are the worse mistake.
+  assert.equal(kindOf(holder(), as('unknown')), 'ticking');
+  assert.equal(kindOf(holder({ passedAt: ago(16) }), as('unknown')), 'stalled');
 });
 
 test('a file that does not read as a holder is unreadable, and holds nothing — a pid that would signal a process group included', () => {
   for (const bad of ['', '{', 'null', '[]', '"x"']) assert.equal(daemonStanding(bad, live).kind, 'unreadable', JSON.stringify(bad));
   const { pid: _pid, ...noPid } = holder();
-  for (const file of [noPid, holder({ pid: 0 }), holder({ pid: -1 }), holder({ pid: 1.5 }), holder({ every: 0 }), { ...holder(), startedAt: 'yesterday' }, { ...holder(), passedAt: 'soon' }, { ...holder(), cwd: 7 }, { ...holder(), stoppedAt: 3 }, { ...holder(), beatAt: 'now' }, { ...holder(), every: -5 }, { ...holder(), every: null }]) {
+  for (const file of [noPid, holder({ pid: 0 }), holder({ pid: -1 }), holder({ pid: 1.5 }), holder({ every: 0 }), { ...holder(), startedAt: 'yesterday' }, { ...holder(), passedAt: 'soon' }, { ...holder(), cwd: 7 }, { ...holder(), stoppedAt: 3 }, { ...holder(), beatAt: 'now' }, { ...holder(), every: -5 }, { ...holder(), every: null }, holder({ procStart: -1 }), holder({ procStart: 1.5 }), { ...holder(), procStart: '12' }]) {
     assert.equal(parseDaemonFile(text(file)), undefined, text(file));
     assert.equal(holderAgainst(daemonStanding(text(file), live), 1), undefined);
   }
   assert.deepEqual(parseDaemonFile(text({ ...holder(), passedAt: undefined })), { ...holder(), passedAt: null });
+  assert.deepEqual(parseDaemonFile(text(holder({ procStart: 1627402 }))), holder({ procStart: 1627402 }));
 });
 
 test('only a daemon ticking that is not the reader holds the store against it', () => {
   const ticking = daemonStanding(text(holder()), live);
-  assert.deepEqual(holderAgainst(ticking, 1), holder());
+  assert.deepEqual(holderAgainst(ticking, 1)?.file, holder());
   assert.equal(holderAgainst(ticking, 4242), undefined, 'its own file holds nothing against itself');
   for (const file of [holder({ passedAt: ago(16) }), holder({ stoppedAt: ago(1) })]) assert.equal(holderAgainst(daemonStanding(text(file), live), 1), undefined);
   assert.equal(holderAgainst(daemonStanding(text(holder()), dead), 1), undefined);
+  assert.equal(holderAgainst(daemonStanding(text(holder()), as('other')), 1), undefined, 'a reused pid holds nothing');
+  assert.equal(holderAgainst(daemonStanding(text(holder()), as('unknown')), 1)?.file.pid, 4242, 'a pid not compared holds');
 });
 
 test('the refusals name the pid, where and since when it ticks, its last pass, and how to stop it — the node process, not the npm wrapper', () => {
-  const up = holdRefusal(holder(), 'up', '/store', NOW);
+  const held = (file: DaemonFile, how = live) => holderAgainst(daemonStanding(text(file), how), 1)!;
+  const up = holdRefusal(held(holder()), 'up', '/store', NOW);
   assert.match(up, /^wf up: \/store is held by the wf up of pid 4242, started 2026-09-22T11:00:00\.000Z in \/home\/me\/repo, every 4000ms — last pass 3s ago \(2026-09-22T11:59:57\.000Z\)\. /);
   assert.match(up, /stop it with kill 4242 — that pid is the node process that ticks, not an npm exec wrapper around it/);
   assert.match(up, /a holder silent for 15m00s is taken over by the next wf up\.$/);
-  const tick = holdRefusal(holder({ passedAt: null, startedAt: ago(0.5) }), 'tick', '/store', NOW);
+  const tick = holdRefusal(held(holder({ passedAt: null, startedAt: ago(0.5) })), 'tick', '/store', NOW);
   assert.match(tick, /^wf tick: \/store is held by the wf up of pid 4242, started \S+ in \/home\/me\/repo, every 4000ms — no pass completed yet, started 30s ago \(\S+\), which runs this same pass within its interval: a pass by hand beside it would be a second writer\. /);
   assert.match(tick, /kill 4242 — that pid is the node process that ticks, not an npm exec wrapper .* and tick by hand then\.$/);
+  // A pid that could not be confirmed as the daemon is never handed over as a pid to kill as it stands: it is named, said unconfirmed, and
+  // how to check it comes before the kill.
+  for (const [file, why] of [[holder({ procStart: 99 }), 'no /proc/4242/stat to compare its start with'], [holder(), 'the file names no process start']] as const) {
+    const refusal = holdRefusal(held(file, as('unknown')), 'up', '/store', NOW);
+    assert.doesNotMatch(refusal, /kill 4242 —/);
+    assert.ok(refusal.includes(`stop it with its pid, once checked: 4242 could not be confirmed here as the process that wrote daemon.json (${why}), `), refusal);
+    assert.match(refusal, /a pid is reused once its process ends — if ps -p 4242 -o lstart=,args= shows a wf up started at 2026-09-22T11:00:00\.000Z, kill 4242; /);
+  }
 });
 
 test('what wf up says of the store it took: a holder gone, stalled or unreadable is named, and a clean stop or an empty store is not', () => {
@@ -75,6 +93,10 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
   assert.equal(takeoverLine(standing(holder({ passedAt: ago(125) }), dead), '/store', NOW), 'took /store over from pid 4242, whose process is gone — its last pass 2h05m ago (2026-09-22T09:55:00.000Z)');
   assert.match(takeoverLine(standing(holder({ passedAt: ago(16) })), '/store', NOW)!, /^took \/store over from pid 4242, alive but silent for 16m00s, over the 15m00s that is stale at every 4000ms — it stops at its next pass/);
   assert.equal(takeoverLine(daemonStanding('{', live), '/store', NOW), 'took /store over from a daemon.json that did not read as a holder');
+  assert.equal(takeoverLine(standing(holder(), as('other')), '/store', NOW), 'took /store over from pid 4242, whose process is gone — that pid is another process\'s now, started after the wf up that wrote daemon.json — its last pass 3s ago (2026-09-22T11:59:57.000Z)');
+  const unsure = takeoverLine(standing(holder({ passedAt: ago(16) }), as('unknown')), '/store', NOW)!;
+  assert.doesNotMatch(unsure, /kill 4242 —/);
+  assert.match(unsure, /to stop it now, its pid, once checked: 4242 could not be confirmed here/);
   assert.equal(takeoverLine(standing(holder({ stoppedAt: ago(1) })), '/store', NOW), undefined);
   assert.equal(takeoverLine(daemonStanding(undefined, live), '/store', NOW), undefined);
 });
@@ -89,6 +111,9 @@ test("wf ls's line: whether a daemon ticks the store, and when its last pass was
   assert.equal(line(holder({ passedAt: ago(40), beatAt: ago(0.05) })), 'wf up: ticking, pid 4242, every 4000ms — last pass 40m00s ago (2026-09-22T11:20:00.000Z), a pass under way since — alive 3s ago (2026-09-22T11:59:57.000Z)');
   assert.equal(line(holder({ passedAt: ago(0.05), beatAt: ago(0.02) })), 'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)', 'a beat between passes is not a pass under way');
   assert.equal(line(holder(), dead), 'wf up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with wf up');
+  assert.equal(line(holder(), as('other')), 'wf up: none ticking — the wf up of pid 4242 is gone, that pid another process\'s now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with wf up');
+  assert.equal(line(holder(), as('unknown')), 'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z) (pid 4242 not confirmed here as the process that wrote daemon.json)');
+  assert.doesNotMatch(line(holder({ passedAt: ago(20) }), as('unknown')), /kill 4242 stops it/);
   assert.equal(line(holder({ passedAt: ago(6), stoppedAt: ago(5) })), 'wf up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with wf up');
 });
 

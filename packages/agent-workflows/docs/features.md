@@ -1940,9 +1940,11 @@ On 2026-09-16 four daemons ticked `~/.agent-workflows` at once; on 2026-09-22 st
 node child ticking, reparented to init, while a check on the wrapper's name counted none. And `tick.json` is written only when the caps
 change, so nothing said whether a daemon was ticking at all: a run `waiting` and a store nothing ticks read the same.
 
-- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, beatAt?, stoppedAt? }` — its node pid, its
-  start, where and how often it ticks, its last completed pass (`null` before the first), its beat — written on a timer of its interval,
-  while a pass awaits too — and `stoppedAt` once it stopped on a signal or a failure. `wf up [ms]` refuses, exit 2, an interval that is not
+- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, beatAt?, procStart?, stoppedAt? }` — its node pid,
+  its start, where and how often it ticks, its last completed pass (`null` before the first), its beat — written on a timer of its interval,
+  while a pass awaits too — its process's start from `/proc/<pid>/stat`, so a pid reused after a `kill -9` reads `gone` rather than
+  holding the store and being named as a pid to kill (round 3's finding; where it cannot be compared a live pid holds, said unconfirmed,
+  with `ps` to check it first) — and `stoppedAt` once it stopped on a signal or a failure. `wf up [ms]` refuses, exit 2, an interval that is not
   a whole number from 1 to 2147483647, before the store is taken: `-5` and `1e400` (JSON's `null`) would not read back, and a daemon whose
   file does not read holds nothing. Judged purely by `daemonStanding` (`src/daemon.ts`): `none`, `unreadable`, `stopped`, `gone`, `stalled` or `ticking`.
 - **A second `wf up`, and a `wf tick` by hand, are refused by name, exit 2, while the store is `ticking`** — a live pid whose start, last
@@ -1957,7 +1959,8 @@ Tested in `test/daemon.test.ts` (each standing, both sides of the threshold at 4
 dead-but-fresh, a long pass heard from by its beat, the intervals refused, the words) and `test/daemon-store.test.ts` (the file written pass by pass and let go; both refusals at shipped
 defaults, the file untouched and no pass run; a stale, gone, stopped and unreadable holder taken over; a daemon taken over mid-run
 stopping without writing over its successor; a hand tick writing nothing; SIGTERM writing `stoppedAt`, exit 143; a pass in flight beating
-and read as ticking throughout; the beat writing nothing but its own file; `wf up -5` refused with the store untouched). Each guard was
+and read as ticking throughout; the beat writing nothing but its own file; `wf up -5` refused with the store untouched; a live pid under
+another start taken over, with no `kill` of it printed anywhere; a pid that cannot be compared refused, said unconfirmed). Each guard was
 deleted in turn and failed a test; the link claim's retry on `EEXIST` is not covered, as nothing races two starts.
 
 ### Still to build: the board reads `daemon.json` (a card of its own)
@@ -1965,8 +1968,8 @@ deleted in turn and failed a test; the link claim's retry on `EEXIST` is not cov
 The api and the board still cannot tell `waiting` from nothing ticking. The card, in `apps/`:
 
 - **Judge it as `wf ls` does**: `daemonStanding()` from the package's root (runner.ts), one file read and one `kill(pid, 0)` per poll,
-  never per run, and `daemonLine` for the words — the api does not re-derive staleness. The kinds (`none`, `unreadable`, `stopped`, `gone`,
-  `stalled`, `ticking`), `staleAfterMs` and the file's shape — `pid, startedAt, cwd, every, passedAt | null, beatAt?, stoppedAt?`, at
+  never per run (plus one `/proc/<pid>/stat` read), and `daemonLine` for the words — the api does not re-derive staleness. The kinds (`none`, `unreadable`, `stopped`, `gone`,
+  `stalled`, `ticking`), `staleAfterMs` and the file's shape — `pid, startedAt, cwd, every, passedAt | null, beatAt?, procStart?, stoppedAt?`, at
   `daemonFile()` — are held stable for it.
 - **The api must run on the daemon's host**: liveness is a signal 0, which means nothing across machines.
 - **The board** says it once, beside the runs, where a run reads `waiting`: nothing ticks this store, and how to start `wf up`.

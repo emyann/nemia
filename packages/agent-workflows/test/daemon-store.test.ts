@@ -5,7 +5,8 @@
  *
  * A store of its own, since the verbs read every run under `WF_ROOT`. The engine is a fake whose tick is all a pass over an empty store asks
  * of it, so a test counts the passes and reads the file between them. A holder that is alive is a real process of the test's — a sleeper —
- * and one that is gone is a child that has exited.
+ * written with its own start from `/proc`, as `wf up` writes its own; one that is gone is a child that has exited; and a pid reused after
+ * a crash is the sleeper under a start that is not its own.
  */
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-daemon-'));
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_RUNS;
-const { beat, daemonFile, daemonStanding } = await import('../src/runner.ts');
+const { beat, daemonFile, daemonStanding, procStartOf } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const FILE = path.join(ROOT, 'daemon.json');
@@ -37,14 +38,14 @@ const GONE = spawnSync(process.execPath, ['-e', '0']).pid!;
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
-/** A holder's file, written as `wf up` writes one, over what is there. */
+/** A holder's file, written as `wf up` writes one — its process's start with its pid — over what is there. */
 const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
-  const text = `${JSON.stringify({ pid, startedAt: minutesAgo(30), cwd: '/elsewhere', every: 4000, passedAt: minutesAgo(0.05), ...over }, null, 2)}\n`;
+  const text = `${JSON.stringify({ pid, startedAt: minutesAgo(30), cwd: '/elsewhere', every: 4000, passedAt: minutesAgo(0.05), procStart: procStartOf(pid), ...over }, null, 2)}\n`;
   fs.writeFileSync(FILE, text);
   return text;
 };
 
-const read = () => JSON.parse(fs.readFileSync(FILE, 'utf8')) as { pid: number; startedAt: string; cwd: string; every: number; passedAt: string | null; beatAt?: string; stoppedAt?: string };
+const read = () => JSON.parse(fs.readFileSync(FILE, 'utf8')) as { pid: number; startedAt: string; cwd: string; every: number; passedAt: string | null; beatAt?: string; procStart?: number; stoppedAt?: string };
 
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
 
@@ -133,7 +134,8 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
   const { printed, threw } = await typed(t, ['up', '10'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, 3);
-  assert.deepEqual(seen.map((f) => [f.pid, f.cwd, f.every]), Array(3).fill([process.pid, process.cwd(), 10]));
+  assert.deepEqual(seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]), Array(3).fill([process.pid, process.cwd(), 10, procStartOf(process.pid)]));
+  assert.equal(typeof seen[0]!.procStart, 'number', 'its process named by its start, with /proc on this host');
   assert.equal(seen[0]!.passedAt, null, 'no pass completed before the first');
   assert.ok(Date.parse(seen[0]!.startedAt) >= before - 1);
   assert.ok(Date.parse(seen[1]!.passedAt!) >= Date.parse(seen[0]!.startedAt), 'the first pass written down before the second');
@@ -245,4 +247,38 @@ test('`wf up` stopped by a signal lets the store go on the way out, with the sig
     child.kill('SIGKILL');
     clear();
   }
+});
+
+test('REFUSED NOT: a pid alive but another process\'s — reused after a kill -9 — holds nothing, and is never named as one to kill', async (t) => {
+  // The sleeper under a start that is not its own: a live pid, a fresh pass, and not the process that wrote the file.
+  assert.equal(typeof procStartOf(LIVE), 'number', 'this test needs /proc');
+  const text = holdBy(LIVE, { procStart: procStartOf(LIVE)! + 1 });
+  const kill = new RegExp(`kill ${LIVE}\\b`);
+  const ls = await typed(t, ['ls'], engineOf());
+  assert.equal(ls.printed.at(-1), `wf up: none ticking — the wf up of pid ${LIVE} is gone, that pid another process's now; its ${ls.printed.at(-1)!.split('; its ')[1]}`);
+  const tick = engineOf(() => {});
+  const byHand = await typed(t, ['tick'], tick);
+  assert.equal(byHand.threw, undefined, 'a hand tick is not refused');
+  assert.equal(tick.passes, 1);
+  assert.equal(fs.readFileSync(FILE, 'utf8'), text);
+  let during: ReturnType<typeof read> | undefined;
+  const up = await typed(t, ['up'], engineOf(() => { during = read(); throw STOP; }));
+  assert.equal(up.threw, STOP, 'wf up took the store and ran');
+  assert.equal(during!.pid, process.pid);
+  assert.ok(up.printed.some((l) => l === `   took ${ROOT} over from pid ${LIVE}, whose process is gone — that pid is another process's now, started after the wf up that wrote daemon.json — ${l.split(' — ').at(-1)}`), up.printed.join('\n'));
+  for (const line of [...ls.printed, ...byHand.printed, ...up.printed]) assert.doesNotMatch(line, kill, line);
+  clear();
+});
+
+test('REFUSED at shipped defaults, unconfirmed: a live pid whose start cannot be compared holds the store — and its pid is not handed over bare', async () => {
+  // A file with no process start, as one written where there is no /proc reads everywhere: the pid is alive, so it holds.
+  const text = holdBy(LIVE, { procStart: undefined });
+  const e = engineOf();
+  const unconfirmed = new RegExp(`its pid, once checked: ${LIVE} could not be confirmed here as the process that wrote daemon\\.json \\(the file names no process start\\), .* if ps -p ${LIVE} -o lstart=,args= shows a wf up started at \\S+, kill ${LIVE}`);
+  await assert.rejects(main(['up'], e), refusedWith(new RegExp(`^wf up: ${ROOT} is held by the wf up of pid ${LIVE}, `), unconfirmed));
+  await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^wf tick: ${ROOT} is held by the wf up of pid ${LIVE}, `), unconfirmed));
+  await assert.rejects(main(['up'], e), (err: Error) => !new RegExp(`kill ${LIVE} —`).test(err.message));
+  assert.equal(e.passes, 0);
+  assert.equal(fs.readFileSync(FILE, 'utf8'), text);
+  clear();
 });

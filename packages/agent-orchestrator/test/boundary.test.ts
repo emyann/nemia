@@ -35,10 +35,10 @@ const sources = (): Array<{ file: string; imports: string[] }> =>
 const importsOf = (file: string) => sources().find((s) => s.file === file)!.imports;
 
 /** The files beneath runner.ts: I/O that never names the engine. */
-const BENEATH = ['./store.ts', './daemon-store.ts', './feed-store.ts', './worktree.ts', './branches.ts', './artifacts.ts', './authoring.ts', './inbox-store.ts'];
+const BENEATH = ['./workflow-store.ts', './store.ts', './daemon-store.ts', './feed-store.ts', './worktree.ts', './branches.ts', './artifacts.ts', './authoring.ts', './inbox-store.ts'];
 
 /** The bottom of that tree, the only files beneath runner.ts that another beneath it may import: the store, and git. */
-const BOTTOM = ['./store.ts', './worktree.ts'];
+const BOTTOM = ['./workflow-store.ts', './store.ts', './worktree.ts'];
 
 test('the scanner sees every way a file can name a module — or the rules below would pass by seeing nothing', () => {
   const text = [
@@ -63,9 +63,9 @@ test('only runner.ts imports agent-runtime — not even for a type', () => {
   assert.ok(importsOf('src/runner.ts').includes('agent-runtime'), 'and runner.ts does, so this is looking at the right files');
 });
 
-test('run.ts, timeline.ts, closeout.ts, retry.ts, daemon.ts, check.ts, radius.ts, plan.ts and inbox.ts read no disk, spawn nothing, and do not reach for the I/O module', () => {
+test('workflow.ts, run.ts, timeline.ts, closeout.ts, retry.ts, daemon.ts, check.ts, radius.ts, plan.ts and inbox.ts read no disk, spawn nothing, and do not reach for the I/O module', () => {
   const impure = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process', './runner.ts', ...BENEATH];
-  for (const file of ['src/run.ts', 'src/timeline.ts', 'src/closeout.ts', 'src/retry.ts', 'src/daemon.ts', 'src/check.ts', 'src/radius.ts', 'src/plan.ts', 'src/inbox.ts']) {
+  for (const file of ['src/workflow.ts', 'src/run.ts', 'src/timeline.ts', 'src/closeout.ts', 'src/retry.ts', 'src/daemon.ts', 'src/check.ts', 'src/radius.ts', 'src/plan.ts', 'src/inbox.ts']) {
     assert.deepEqual(importsOf(file).filter((m) => impure.includes(m)), [], file);
   }
 });
@@ -79,7 +79,8 @@ test('the files beneath runner.ts sit beneath it: none imports it, and none but 
     assert.ok(importsOf('src/runner.ts').includes(mod), `and runner.ts imports ${mod}, so this is looking at the right files`);
   }
   assert.deepEqual(importsOf('src/worktree.ts').filter((m) => BENEATH.includes(m)), ['./store.ts'], 'worktree.ts imports store.ts alone of the tree');
-  assert.deepEqual(importsOf('src/store.ts').filter((m) => BENEATH.includes(m)), [], 'store.ts is the bottom of the tree');
+  assert.deepEqual(importsOf('src/store.ts').filter((m) => BENEATH.includes(m)), ['./workflow-store.ts'], 'store.ts imports workflow-store.ts alone of the tree');
+  assert.deepEqual(importsOf('src/workflow-store.ts').filter((m) => BENEATH.includes(m)), [], 'workflow-store.ts is the bottom of the tree');
 });
 
 test('cli.ts reaches the package only through runner.ts and workflow.ts', () => {

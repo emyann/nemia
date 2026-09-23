@@ -9,7 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, frontmatterKey, isReadme, linkRefusal, loadAgents, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type StepDraft, type Workflow } from './workflow.ts';
+import { agentNameRefusal, agentsDir, agentsFolderRefusal, AGENTS_FOLDER, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type StepDraft, type Workflow } from './workflow.ts';
+import { agentUsers, agentVersion, loadAgents } from './workflow-store.ts';
 import { HOME, isDirectory } from './store.ts';
 
 /** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */

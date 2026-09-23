@@ -14,7 +14,7 @@ import { createEngine, type Engine } from 'agent-runtime';
 // The engine beside this package in THIS tree, by path — see the read-only test at the end.
 import { codex } from '../../agent-runtime/src/runner-codex.ts';
 import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
-import { loadWorkflows } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
 

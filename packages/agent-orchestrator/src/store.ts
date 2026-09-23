@@ -11,7 +11,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Pruned, type RoundAsk, type Run } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { loadWorkflows, orderSteps, type Workflow } from './workflow.ts';
+import { orderSteps, type Workflow } from './workflow.ts';
+import { loadWorkflows } from './workflow-store.ts';
 import { inputsRoot } from './places.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');

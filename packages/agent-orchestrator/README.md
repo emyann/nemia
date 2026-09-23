@@ -2285,7 +2285,8 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown, from disk or from text (`parseFolder`), and render a step back to it (`renderStep`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
+| `src/workflow.ts` | the format — pure: parse a folder of markdown from its text (`parseFolder`), and render a step or an agent back to it (`renderStep`, `renderAgent`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
+| `src/workflow-store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, and what a step is told, `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` included |
@@ -2307,6 +2308,11 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), an inbox card started (`startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/feed.ts` | the feed of what the tick judged: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges` — pure), the cursor and its refusal, and the file read, appended to and followed (`readFeedFile`, `recordFeedFile`, `watchFeedFile`); no engine |
 | `src/cli.ts` | the verbs |
+
+The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`) and
+`agent-orchestrator/workflow` (`src/workflow.ts`). Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
+folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
+`workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 

@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, parseInboxCard, queueOrder, queuedText, queueRefusal, type InboxCard, type InboxListing, type QueueTry } from './inbox.ts';
 import { workRoot } from './places.ts';
-import { isFolderTeam, loadWorkflows, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
+import { isFolderTeam, WorkflowError, type Workflow } from './workflow.ts';
+import { loadWorkflows, workflowFolder } from './workflow-store.ts';
 import { HOME, inboxDir, isDirectory, listRuns, runId, runsDir } from './store.ts';
 
 /** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */

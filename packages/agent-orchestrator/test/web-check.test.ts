@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CHECK, checkBrief } from '../src/check.ts';
-import { loadWorkflows } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-web-check-'));

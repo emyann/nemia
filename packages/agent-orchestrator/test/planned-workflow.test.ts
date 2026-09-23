@@ -14,7 +14,8 @@ import path from 'node:path';
 import { Ajv } from 'ajv';
 import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
 import { closeoutSchemaOf, type Closeout } from '../src/closeout.ts';
-import { loadWorkflows, loopSpan, terminalSteps, type Workflow } from '../src/workflow.ts';
+import { loopSpan, terminalSteps, type Workflow } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const PLANNED = path.join(REPO, 'workflows', 'dev-planned');

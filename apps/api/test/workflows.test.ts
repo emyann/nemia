@@ -22,9 +22,9 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 const { app } = await import('../src/app.ts');
 const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
-const { parentRecord, readRun } = await import('agent-orchestrator');
+const { loadWorkflows, parentRecord, readRun } = await import('agent-orchestrator');
 const { afterRefusal } = await import('agent-orchestrator/run');
-const { AGENTS_FOLDER, isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
+const { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
 

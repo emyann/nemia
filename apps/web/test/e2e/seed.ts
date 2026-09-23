@@ -452,7 +452,9 @@ export function seedFolder(root: string, now = Date.now()): void {
   }, null, 2));
 
   // Filed as the run files a folder step: in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it
-  // ran in rather than the engine's default.
+  // ran in rather than the engine's default. Written as the engine wrote a filing before 2026-09-23, the mode beside the task's fields
+  // rather than under `config`: the runtime reads it in today's shape (`upgrade` in agent-runtime's journal.ts), and the folder page's
+  // `dontAsk` is what proves an old journal reaches the board. Leave it in the old shape.
   const signedOff = (step: string, brief: string, began: number, ended: number, closeout: object): void =>
     write(path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`), lines([
       { kind: 'filed', at: ago(began), brief, cwd: wrote, maxAttempts: 1, harness: 'claude', permissionMode: 'dontAsk' },

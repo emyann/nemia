@@ -29,6 +29,7 @@ import {
   titleOf,
   toDecideOf,
   toggleOpen,
+  unfoldingNow,
   waitedMs,
   waitsOnYou,
   type Span,
@@ -407,6 +408,51 @@ test('a graph grown by a step dragged down claims the cells it now reaches for t
   const at = placeRuns(['b', 'c', 'd'], onFloor, null, grown, new Map(), new Set());
   assert.deepEqual(at.get('c'), { x: CELL_WIDTH, y: CELL_HEIGHT }, 'c stays under the step');
   assert.deepEqual(at.get('d'), { x: 2 * CELL_WIDTH, y: 0 }, 'and d takes the first cell clear of the graph');
+});
+
+test('a graph unfolds when it is drawn and was not on the last pass: opened, or back on the floor open — never because it grew', () => {
+  const one = new Map([['b', { columns: 3, rows: 1 }]]);
+  const grown = new Map([['b', { columns: 3, rows: 2 }]]);
+  const none = new Map<string, Span>();
+  const ids = (set: ReadonlySet<string>) => [...set].sort();
+
+  // Opened by a click: nothing while its steps are read, then its graph unfolds, once; grown by a step dragged, it does not again.
+  let pass = unfoldingNow(new Set(), none, ['b']);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [[], []]);
+  pass = unfoldingNow(pass.drawn, one, ['b']);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [['b'], ['b']]);
+  pass = unfoldingNow(pass.drawn, grown, ['b']);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [[], ['b']]);
+
+  // Off the floor — finished, and finished runs hidden — it is forgotten, so back on the floor open it unfolds again.
+  pass = unfoldingNow(pass.drawn, none, []);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [[], []]);
+  pass = unfoldingNow(pass.drawn, none, ['b']);
+  pass = unfoldingNow(pass.drawn, one, ['b']);
+  assert.deepEqual(ids(pass.unfolding), ['b']);
+
+  // Left open on the last visit: remembered while its steps are read, so drawn it unfolds over nobody.
+  pass = unfoldingNow(new Set(['b']), none, ['b']);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [[], ['b']]);
+  pass = unfoldingNow(pass.drawn, one, ['b']);
+  assert.deepEqual([ids(pass.unfolding), ids(pass.drawn)], [[], ['b']]);
+});
+
+test('an open run back on the floor, read after its card is down, moves the card that started under its graph while it was away', () => {
+  // f was left open at (0, 0), across three cells; finished and hidden, it held none, and c started in the cell beside it.
+  const saved = new Map([['f', { x: 0, y: 0 }], ['c', { x: CELL_WIDTH, y: 0 }]]);
+  const away = new Map([['c', { x: CELL_WIDTH, y: 0 }]]);
+  const graph = new Map([['f', { columns: 3, rows: 1 }]]);
+  // Shown again, its card goes back to its cell while its steps are read; its graph then unfolds over c, which moves aside.
+  let pass = unfoldingNow(new Set(), new Map(), ['f']);
+  const back = placeRuns(['f', 'c'], away, saved, new Map(), new Map(), pass.unfolding);
+  assert.deepEqual(back.get('f'), { x: 0, y: 0 });
+  pass = unfoldingNow(pass.drawn, graph, ['f']);
+  const read = placeRuns(['f', 'c'], back, saved, graph, new Map(), pass.unfolding);
+  assert.deepEqual(Object.fromEntries(read), { f: { x: 0, y: 0 }, c: { x: 3 * CELL_WIDTH, y: 0 } });
+  assert.deepEqual(overlapping(read, graph), []);
+  // Had it been on the last pass, drawn as it was, c would have been the person's to leave there.
+  assert.deepEqual(placeRuns(['f', 'c'], back, saved, graph, new Map(), unfoldingNow(new Set(['f']), graph, ['f']).unfolding).get('c'), { x: CELL_WIDTH, y: 0 });
 });
 
 test("a graph running past the grid's edge moves a card parked beyond it, and one parked clear of it stays", () => {

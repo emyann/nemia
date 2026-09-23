@@ -252,10 +252,30 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
 /**
+ * The open runs whose graphs are unfolding on the floor on this pass — `placeRuns`' `unfolding` — and what to remember for the
+ * next. A graph unfolds when it is drawn and was not on the last pass: opened by a click, or brought back onto the floor open,
+ * finished runs shown again or a run in flight waiting on it. A graph drawn on the last pass is not unfolding, however it grew:
+ * a step dragged out of it moves no card. `drawn` is what the last pass remembered, `spans` the graphs drawn now, and `reading`
+ * the open runs on the floor, some not yet drawn: one of them remembered stays remembered until its graph is read, so a graph
+ * that was on the floor as the page opened — left open on the last visit — is not taken for one unfolding over the cards a
+ * person left around it.
+ */
+export function unfoldingNow(
+  drawn: ReadonlySet<string>,
+  spans: ReadonlyMap<string, Span>,
+  reading: readonly string[],
+): { unfolding: Set<string>; drawn: Set<string> } {
+  return {
+    unfolding: new Set([...spans.keys()].filter((id) => !drawn.has(id))),
+    drawn: new Set([...spans.keys(), ...reading.filter((id) => drawn.has(id) && !spans.has(id))]),
+  };
+}
+
+/**
  * Where each run's card goes, for the runs on the floor, oldest first. `spans` holds the runs drawn open
  * and the cells each takes (`spanOf`), the run a person opened last first; a run not in it takes one cell.
- * `unfolding` holds the open runs whose graphs are unfolding now — opened by a person since the floor was
- * last laid out — and only those move a card aside: every open run by default.
+ * `unfolding` holds the open runs whose graphs are unfolding now — drawn since the floor was last laid out
+ * (`unfoldingNow`) — and only those move a card aside: every open run by default.
  *
  * Claims are made open runs first, the one opened last first, then closed cards oldest first — so the run
  * a person just opened is never the one moved aside. In order of claim:

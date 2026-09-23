@@ -41,6 +41,7 @@ import {
   titleOf,
   toDecideOf,
   toggleOpen,
+  unfoldingNow,
   waitsOnYou,
   type Span,
 } from '@/lib/factory';
@@ -131,8 +132,8 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that
  * starts takes the next free cell and moves no card already down — and after that wherever a person
  * dragged it, until "Reset layout". A click on a card, or Enter on one, opens it: its graph unfolds to
- * the right over as many cells as it needs, and the cards in them move aside (`placeRuns`) — when it opens,
- * and then only. The steps are the card's children in React Flow, placed relative to it, so they move with
+ * the right over as many cells as it needs, and the cards in them move aside (`placeRuns`) — when it unfolds,
+ * opened or brought back onto the floor open, and then only (`unfoldingNow`). The steps are the card's children in React Flow, placed relative to it, so they move with
  * it when it is dragged. Otherwise each piece on the floor moves alone, as in a factory modeller: a card
  * dragged moves that card and its own steps, a step dragged moves that step, and a drop moves nothing else —
  * a card dropped over another stays over it, since that is where the person put it. The edges between cards
@@ -237,9 +238,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const layoutKey = `${idsKey} ${spansKey}`;
   const [placedFor, setPlacedFor] = useState('');
 
-  // The runs a person opened whose graphs have not yet unfolded on the floor: the only thing that moves a card aside, once, when
-  // its steps are read (`placeRuns`' `unfolding`). A card or a step dropped moves nothing but itself.
-  const unfolding = useRef(new Set<string>());
+  // The open runs whose graphs the floor was last laid out with, or left open on the last visit and still being read: a graph not
+  // among them unfolds when it is drawn, and is the only thing that moves a card aside (`unfoldingNow`). A card or a step dropped
+  // moves nothing but itself.
+  const drawn = useRef(new Set(reading));
   // Cards placed while the runs left open are still being read, on no cell of their own yet — a run that started since the last
   // visit: laid out afresh until every graph is on the floor, or the first free cell is the one a graph is about to cover again.
   const provisional = useRef(new Set(restoring.current ? ids.filter((id) => !readFactoryLayout()?.has(id)) : []));
@@ -249,14 +251,14 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 
   // Runs that started, finished, were asked for, opened or closed since: every card where it belongs.
   useEffect(() => {
-    const opening = new Set([...unfolding.current].filter((id) => spans.has(id)));
-    for (const id of opening) unfolding.current.delete(id);
+    const { unfolding, drawn: now } = unfoldingNow(drawn.current, spans, reading);
+    drawn.current = now;
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
       if (restoring.current) for (const id of ids) if (!have.has(id)) provisional.current.add(id);
       const onFloor = new Map(current.filter((node) => !provisional.current.has(node.id)).map((node) => [node.id, node.position]));
-      // Cards on the floor stay put, unless a graph opening now covers them; one coming back yields its old cell.
-      const at = placeRuns(ids, onFloor, readFactoryLayout(), spans, after, opening);
+      // Cards on the floor stay put, unless a graph unfolding now covers them; one coming back yields its old cell.
+      const at = placeRuns(ids, onFloor, readFactoryLayout(), spans, after, unfolding);
       const next = shown.map((run) => {
         const node = have.get(run.id);
         const point = at.get(run.id)!;
@@ -336,9 +338,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // A click opens or closes a run. The run just opened is brought into view once its graph is on the floor.
   const [revealing, setRevealing] = useState<string | null>(null);
   const toggle = useCallback((runId: string) => {
-    // Opened, its graph moves aside the cards it unfolds over; closed before it did, it moves none.
-    if (latest.current.open.includes(runId)) unfolding.current.delete(runId);
-    else unfolding.current.add(runId);
+    // Opened by a click, its graph unfolds, and moves aside the cards under it — even a run left open on the last visit, closed and
+    // opened again before its steps were read.
+    if (!latest.current.open.includes(runId)) drawn.current.delete(runId);
     setOpen((current) => toggleOpen(current, runId));
     setSelected((current) => (current?.runId === runId ? null : current));
     setRevealing(runId);
@@ -481,7 +483,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // that keep them, their one writer each.
   const resetLayout = () => {
     forgetFactoryLayout();
-    unfolding.current.clear();
     setOpen([]);
     setDragged({ live: new Map(), dropped: new Map(), dragging: null });
     setSelected(null);
@@ -491,7 +492,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   };
   // Every graph folded away. The cards they moved aside stay where they went.
   const collapseAll = () => {
-    unfolding.current.clear();
     setOpen([]);
     setSelected(null);
   };

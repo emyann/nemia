@@ -29,7 +29,7 @@ half) — and the web app's components on shadcn's React Aria base (§7) — and
 workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
 with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — and a feed of what the
 tick judged, followed with `wf watch` (its package half; the board's half is a card of its own) — and one `wf up` per store, with a heartbeat
-in `daemon.json` that `wf ls` reads (its package half) — have shipped.
+in `daemon.json` that `wf ls` reads, and the Factory reads too — have shipped.
 tick judged, followed with `wf watch` (its package half), and streamed by the api (`GET /api/feed/stream`; the board reading it is a
 card of its own) — have shipped.
 
@@ -1999,16 +1999,29 @@ and read as ticking throughout; the beat writing nothing but its own file; `wf u
 another start taken over, with no `kill` of it printed anywhere; a pid that cannot be compared refused, said unconfirmed). Each guard was
 deleted in turn and failed a test; the link claim's retry on `EEXIST` is not covered, as nothing races two starts.
 
-### Still to build: the board reads `daemon.json` (a card of its own)
+### Shipped: the board reads `daemon.json`
 
-The api and the board still cannot tell `waiting` from nothing ticking. The card, in `apps/`:
+The api and the board could not tell `waiting` from nothing ticking: on 2026-09-22 cards read `waiting` for minutes because the daemon was
+stopped, and it was read as the machine being slow. What was built, in `apps/`:
 
-- **Judge it as `wf ls` does**: `daemonStanding()` from the package's root (runner.ts), one file read and one `kill(pid, 0)` per poll,
-  never per run (plus one `/proc/<pid>/stat` read), and `daemonLine` for the words — the api does not re-derive staleness. The kinds (`none`, `unreadable`, `stopped`, `gone`,
-  `stalled`, `ticking`), `staleAfterMs` and the file's shape — `pid, startedAt, cwd, every, passedAt | null, beatAt?, procStart?, stoppedAt?`, at
-  `daemonFile()` — are held stable for it.
-- **The api must run on the daemon's host**: liveness is a signal 0, which means nothing across machines.
-- **The board** says it once, beside the runs, where a run reads `waiting`: nothing ticks this store, and how to start `wf up`.
+- **`GET /api/daemon`** (`apps/api/src/daemon.ts`) judges it as `wf ls` does: `daemonStanding()` from the package's root, one file read,
+  one `kill(pid, 0)` and one `/proc/<pid>/stat` read per request, never per run, and never a write. It answers the kind, `ticking`, the
+  pid, `cwd`, `every`, `startedAt` (since when), `passedAt` (the last pass), `lastHeardAt` (the latest of start, pass and beat), `stoppedAt`,
+  `staleAfterMs`, the process table's `identity`, and `line`, which is `daemonLine`'s. A file that is there and cannot be read is a 500
+  with the reason, as `/api/ceilings` answers one. The api must run on the daemon's host: liveness is a signal 0.
+- **The Factory says it once, over the floor beside the cap and the quota** (`DaemonLine`, words in `apps/web/src/lib/daemon.ts`), and
+  only when nothing ticks: *Nothing ticks this store, so no run moves:* no wf up has held it / its file does not read / pid N stopped, is
+  gone, or is alive but silent — with how long ago — *Start one with `npx wf up` in* the last daemon's `cwd`, or *the repository*; for a
+  stalled holder or an unreadable file, that the new one takes the store over. `wf ls`'s own line is its `title`. *Recently* is the
+  package's `staleAfterMs` — 15 minutes at the shipped interval, measured from the beat — so the board and the takeover rule agree; a
+  stopped or killed daemon reads at once.
+- **Polled, not streamed**: the feed carries no pass of the daemon (a pass writes a line only where a word changed), so `daemonQuery`
+  reads on `pace(5_000)`, the cap's fallback — every minute while the feed is followed — and `polled()` counts it.
+
+Tested in `apps/api/test/daemon.test.ts` (each kind through the route, a long pass read as ticking by its beat, a 500 for a directory in
+the file's place, and after every read the file's bytes and mtime unchanged and no file made where there was none),
+`apps/web/test/daemon.test.ts` (the words of each kind, nothing for ticking) and the e2e's `daemon` page (the seeded store's `none` line, a
+stalled file's line and the floor fitted clear of it, no line for a fresh one, the file taken back).
 
 ## Shipped: freeing the space — `wf prune`
 

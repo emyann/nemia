@@ -834,7 +834,7 @@ test('UNSIGNED, though the engine settles it `failed`: a session that went quiet
 });
 
 test("UNSIGNED is the LAST attempt's word: a task of `maxAttempts: 2` whose attempt 1 went quiet `unsigned` and attempt 2 was `lost` reads `failed`, and is not waited on you — the other way round, it reads `unsigned`", async () => {
-  // `closeoutAsked` is runner.ts's, and pure: it reads the views it is handed, and nothing else.
+  // `closeoutAsked` is views.ts's (re-exported by runner.ts), and pure: it reads the views it is handed, and nothing else.
   const { closeoutAsked } = await import('../src/runner.ts');
   const at = (n: number) => `2026-09-16T10:0${n}:00.000Z`;
   /** The engine's view of a task filed with a closeout schema and `maxAttempts: 2`, settled `failed`, one attempt per reason, in order. */

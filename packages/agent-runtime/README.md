@@ -233,9 +233,11 @@ which is the test of whether the seam was in the right place.
 
 Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `createEngine` reaches it through the
 `@a2a-js/sdk` client, in this process, with no HTTP between them. A session is an A2A Task named for it, `ae/<task>/<n>`,
-whose `contextId` is the task; a spawn is a user Message marked with the runtime's extension
-(`urn:agent-runtime:session:v1`), the brief its one text part and the rest of the request — `config` whole and unopened —
-its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the session's Task. What A2A
+whose `contextId` is the harness's own id for the conversation — the `nativeId` that `--resume` takes — or empty until
+something has seen it; a spawn is a user Message marked with the runtime's extension (`urn:agent-runtime:session:v1`), the
+brief its one text part, the session it continues (`resumeFrom`) its `contextId`, and the rest of the request — `config`
+whole and unopened — its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the
+session's Task, in no context or the session's own. What A2A
 has no call for is the extension's methods: `findSession`, `sessionLogs`, `releaseSession` and `sessionTranscript`. The harness's card lists
 the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
 What a harness says comes back in
@@ -247,6 +249,20 @@ restarted mid-session answers for a session it never started, before its first t
 go is answered from the journal (`test/restart.test.ts`). It is not the SDK's `DefaultRequestHandler`, whose task store
 would be a second record beside the journal. Streaming, push notifications and an extended card are refused in the SDK's
 own errors, never taken and ignored.
+
+What a Task says (stage 2 part 5). **Its context is the conversation**, so a listing filtered by `contextId` is every
+attempt that continued one: a Claude Code job keeps its id on `-p --resume` (M12), so a step's tries and a held task's turns
+share one, while a `claude --bg` resume starts under a new id and so in a context of its own. A job's context is empty until
+its first `stream-json` line names the session. **What the workload closed with is the Task's one Artifact**, `closeout`:
+a `data` part, or `text/plain` for prose (Codex's), and the time it was given in its metadata when the harness said. A
+listing carries it only when it asks (`includeArtifacts`, A2A's default being no); `getTask` always does; the sighting
+`observe` reads is unchanged. **A signed session whose task is held open is `INPUT_REQUIRED` on `getTask`**, whether its
+harness still lists it `done` — a job is never let go — or not at all: the journal is read for that, once per read of a
+session listed `done`. A listing keeps the harness's `COMPLETED` of the same session, since `observe` reads the harness's
+word; the two differ on purpose. `answer` and `close` stay the engine's verbs, journalled; the agent reads the journal and
+never writes it. Not done, by the owner's decision at the plan gate: no `SubscribeToTask` (nothing reads a live stream —
+the api polls the facade — and every subscription opens with the Task, a listing here); no collected files as Artifacts
+(they are the orchestrator's, for its own Task, stage 6); and a Task is still one attempt, not one runtime task.
 
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
@@ -1154,8 +1170,9 @@ not started, an attempt running (`say` reaches a running session; `stop` ends it
 and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The Effect door (`answer`, `close` from `agent-runtime/effect`) refuses in the same words, as
 `InputRefused`. A close is a verdict on a signed turn, so it is refused while one runs, not queued behind it.
 
-**Not here yet.** An attempt is still an A2A Task of its own; the seam does not yet say a held task is one A2A Task that
-is `TASK_STATE_INPUT_REQUIRED` between turns (stage 2 part 5). Measured live on Claude Code jobs only — see open issue 28.
+**Through the seam** (stage 2 part 5), the attempt that signed is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
+waits, its closeout its Artifact, and each turn's attempt is a Task of its own in one context, the session's. A held task is
+not yet one A2A Task across its turns. Measured live on Claude Code jobs only — see open issue 28.
 
 ## What a read asks of the harness: `observe` and `find`
 
@@ -1340,7 +1357,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
-| `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task |
+| `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |

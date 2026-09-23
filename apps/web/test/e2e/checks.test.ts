@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectTheme, expectUncut, expectVisible, FEED_STREAM, idle, QUIET_MS, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedAlone, expectMovedWith, expectTexts, expectTheme, expectUncut, expectVisible, FEED_STREAM, idle, QUIET_MS, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 /**
@@ -209,6 +209,21 @@ test('a step that moves when it should stay put is refused, naming it — and so
     (err: Error) => err instanceof Refused && err.message === 'review moves with implement, and the other lane stays — run/theme moved too');
   await assert.rejects(expectMovedWith(review, implement, down('.step'), 'review moves with implement, and the other lane stays', page.locator('.gone')),
     (err: Error) => err instanceof Refused && err.message === 'review moves with implement, and the other lane stays — nothing to stay put: 0 found');
+});
+
+test('a step dragged alone that takes the step after it along is refused, naming that step — and so is a step that never moved', async () => {
+  const { page } = await pageWith(`<div class="step" data-id="run/implement" style="position:absolute;left:150px;top:0;width:100px;height:50px"></div>
+    <div class="step" data-id="run/review" style="position:absolute;left:300px;top:0;width:100px;height:50px"></div>`);
+  const down = (selector: string) => () =>
+    page.evaluate((s) => {
+      document.querySelectorAll<HTMLElement>(s).forEach((el) => (el.style.top = `${parseFloat(el.style.top) + 40}px`));
+    }, selector);
+  const [review, implement] = [page.locator('[data-id="run/review"]'), page.locator('[data-id="run/implement"]')];
+  await expectMovedAlone(implement, down('[data-id="run/implement"]'), 'implement moves alone, and review stays', review);
+  await assert.rejects(expectMovedAlone(implement, down('.step'), 'implement moves alone, and review stays', review),
+    (err: Error) => err instanceof Refused && err.message === 'implement moves alone, and review stays — run/review moved too');
+  await assert.rejects(expectMovedAlone(implement, async () => {}, 'implement moves alone, and review stays', review),
+    (err: Error) => err instanceof Refused && err.message === 'implement moves alone, and review stays — run/implement did not move');
 });
 
 test("an edge back that runs beside its steps, or over them, is refused, naming both — and so is a comparison with nothing on one side", async () => {

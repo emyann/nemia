@@ -48,8 +48,8 @@ export const FAKE = {
   waitingOnYou: ['implement', 'theme'],
   /** The steps that wait on no other, which the run's card leads into on the Factory. */
   first: ['implement', 'tokens'],
-  /** What a drag of `implement` on the Factory takes along — the steps that wait on it — and what it leaves: the other lane. */
-  drag: { along: ['review', 'respond'], stays: ['tokens', 'theme'] },
+  /** What a drag of `implement` on the Factory leaves where it is: the steps that wait on it, and the other lane. It moves alone. */
+  drag: { waiting: ['review', 'respond'], lane: ['tokens', 'theme'] },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
   branch: 'wf/give-the-board-a-look-e2e0/tokens',
   /** What the Factory's card says that branch touched, once the card is opened: `apps/web` and the root. */

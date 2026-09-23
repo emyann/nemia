@@ -329,8 +329,8 @@ export async function expectBeneath(these: Locator, row: Locator, assertion: str
 
 /**
  * While `move` runs, `leader` moves, and every element of `followers` moves by as much: an open run's steps
- * dragged with its card. And every element of `still`, when it is given, stays where it was: the steps a dragged
- * step waits on. Nothing matched in `still` is refused too. A pixel of slack for positions that round differently.
+ * dragged with its card. And every element of `still`, when it is given, stays where it was: the cards and steps
+ * beside what was dragged. Nothing matched in `still` is refused too. A pixel of slack for positions that round differently.
  */
 export async function expectMovedWith(followers: Locator, leader: Locator, move: () => Promise<void>, assertion: string, still?: Locator): Promise<void> {
   const [lead] = await boxesOf(leader);
@@ -357,3 +357,10 @@ export async function expectMovedWith(followers: Locator, leader: Locator, move:
   });
   if (strayed.length) throw new Refused(`${assertion} — ${strayed.map((s) => s.name).join(', ')} moved too`);
 }
+
+/**
+ * While `move` runs, `moved` moves, and every element of `still` stays where it was: a card or a step on the Factory dragged alone,
+ * and what waits on it left behind. Nothing matched in `still` is refused, as `moved` not moving is.
+ */
+export const expectMovedAlone = (moved: Locator, move: () => Promise<void>, assertion: string, still: Locator): Promise<void> =>
+  expectMovedWith(moved, moved, move, assertion, still);

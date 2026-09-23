@@ -12,6 +12,7 @@ import {
   inFlight,
   inFlightFirst,
   keepLayout,
+  NARROW_CELL_WIDTH,
   onYouOf,
   ONE_CELL,
   openSpan,
@@ -27,6 +28,7 @@ import {
   unfoldingNow,
   waitedMs,
   waitsOnYou,
+  widenLayout,
   type Span,
 } from '../src/lib/factory.ts';
 import { tilesOf } from '../src/lib/flow.ts';
@@ -246,6 +248,31 @@ function overlapping(at: ReadonlyMap<string, Point>, spans: ReadonlyMap<string, 
     boxes.slice(i + 1).filter((b) => a.x < b.right && b.x < a.right && a.y < b.bottom && b.y < a.bottom).map((b) => `${a.id}/${b.id}`),
   );
 }
+
+test('an arrangement saved while a cell was narrower is laid out on today\'s grid with no card over another', () => {
+  // A floor a person arranged at the old pitch: a row of four, a card dragged a little into its cell, one on the row below.
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+  const narrow = new Map<string, Point>([
+    ['a', { x: 0, y: 0 }],
+    ['b', { x: NARROW_CELL_WIDTH, y: 0 }],
+    ['c', { x: 2 * NARROW_CELL_WIDTH, y: 0 }],
+    ['d', { x: 3 * NARROW_CELL_WIDTH, y: 0 }],
+    ['e', { x: NARROW_CELL_WIDTH + 40, y: CELL_HEIGHT }],
+  ]);
+  // Read unchanged, each point rounds to a cell of its own and is kept, and the cards cover each other.
+  assert.notDeepEqual(overlapping(placeRuns(ids, new Map(), narrow)), []);
+  const at = placeRuns(ids, new Map(), widenLayout(narrow));
+  assert.deepEqual(overlapping(at), []);
+  // Each card is on the column it was on, as far into its cell, and on its row.
+  assert.deepEqual(Object.fromEntries(at), {
+    a: { x: 0, y: 0 },
+    b: { x: CELL_WIDTH, y: 0 },
+    c: { x: 2 * CELL_WIDTH, y: 0 },
+    d: { x: 3 * CELL_WIDTH, y: 0 },
+    e: { x: CELL_WIDTH + (40 * CELL_WIDTH) / NARROW_CELL_WIDTH, y: CELL_HEIGHT },
+  });
+  assert.equal(widenLayout(null), null);
+});
 
 test('a run opening moves the cards its graph now covers, never itself, and no card beside it', () => {
   const ids = ['a', 'b', 'c', 'd', 'e'];

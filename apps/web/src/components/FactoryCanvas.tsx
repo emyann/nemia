@@ -21,7 +21,16 @@ import { Switch } from '@/components/ui/switch';
 import { DaemonLine } from '@/components/DaemonLine';
 import { QuotaLine } from '@/components/QuotaLine';
 import { ceilingsQuery, daemonQuery, inboxQuery, quotaQuery, runQuery, type RunSummary } from '@/lib/api';
-import { forgetFactoryLayout, forgetFactoryOpen, forgetFactorySteps, readFactoryLayout, readFactoryOpen, saveFactoryLayout, saveFactoryOpen } from '@/lib/canvas';
+import {
+  forgetFactoryLayout,
+  forgetFactoryOpen,
+  forgetFactorySteps,
+  readFactoryLayout,
+  readFactoryOpen,
+  readNarrowFactoryLayout,
+  saveFactoryLayout,
+  saveFactoryOpen,
+} from '@/lib/canvas';
 import {
   CARD_WIDTH,
   CELL_HEIGHT,
@@ -37,6 +46,7 @@ import {
   toggleOpen,
   unfoldingNow,
   waitsOnYou,
+  widenLayout,
   type Span,
 } from '@/lib/factory';
 import { flowSteps, tilesOf } from '@/lib/flow';
@@ -48,6 +58,9 @@ import { RunNode, type RunFlowNode } from './RunNode';
 import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
 import { afterEdges } from './stepGraph';
+
+/** Where the cards were left in this browser: the arrangement saved at today's cell width, or else the one saved at the old, widened. */
+const savedLayout = (): Map<string, Point> | null => readFactoryLayout() ?? widenLayout(readNarrowFactoryLayout());
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { run: RunNode };
@@ -177,7 +190,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // opening or closing, and a reset. What a card shows is read below. The cards left open on the last visit claim their cells first,
   // and the ones saved around them stay where they were left unless one is under an open card.
   const [placed, setPlaced] = useState<RunFlowNode[]>(() => {
-    const at = placeRuns(ids, new Map(), readFactoryLayout(), spans, after, new Set());
+    const at = placeRuns(ids, new Map(), savedLayout(), spans, after, new Set());
     return shown.map((run) => nodeOf(run, at.get(run.id)!));
   });
   // Which runs and open cards `placed` was last laid out for: whatever reads the cards' positions waits for it.
@@ -199,7 +212,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       const have = new Map(current.map((node) => [node.id, node]));
       const onFloor = new Map(current.map((node) => [node.id, node.position]));
       // Cards on the floor stay put, unless a card opening now covers them; one coming back yields its old cell.
-      const at = placeRuns(ids, onFloor, readFactoryLayout(), spans, after, unfolding);
+      const at = placeRuns(ids, onFloor, savedLayout(), spans, after, unfolding);
       const next = shown.map((run) => {
         const node = have.get(run.id);
         const point = at.get(run.id)!;
@@ -217,7 +230,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     if (!moved.current) return;
     moved.current = false;
     // A card off the floor now keeps where it was left; a run the store no longer lists does not.
-    saveFactoryLayout(keepLayout(readFactoryLayout(), new Map(placed.map((node) => [node.id, node.position])), known));
+    saveFactoryLayout(keepLayout(savedLayout(), new Map(placed.map((node) => [node.id, node.position])), known));
   }, [placed, known]);
 
   useEffect(() => {

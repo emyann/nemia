@@ -198,8 +198,14 @@ export function parseLayout(raw: string | null): Map<string, Point> | null {
  */
 const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
 
-/** The Factory's arrangement, one per browser: where each run's card was left, by run id. */
-const FACTORY_KEY = 'hkb:factory-layout';
+/**
+ * The Factory's arrangement, one per browser: where each run's card was left, by run id.
+ *
+ * `v2` since a cell is wider, to hold a card's rail. The arrangement saved under the old key puts its cards a narrower cell apart: it is
+ * read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2` one is.
+ */
+const FACTORY_KEY = 'hkb:factory-layout:v2';
+const NARROW_FACTORY_KEY = 'hkb:factory-layout';
 
 /** The Factory's open runs, one list per browser, beside its arrangement: whose cards are open on their steps, in the order opened. */
 const FACTORY_OPEN_KEY = 'hkb:factory-open';
@@ -215,8 +221,16 @@ export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void 
 export const forgetLayout = (runId: string): void => forgetAt(layoutKey(runId));
 
 export const readFactoryLayout = (): Map<string, Point> | null => readAt(FACTORY_KEY, parseLayout, null);
-export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => saveAt(FACTORY_KEY, Object.fromEntries(at));
-export const forgetFactoryLayout = (): void => forgetAt(FACTORY_KEY);
+/** The arrangement saved while a cell was narrower, as it was saved: for `widenLayout`. */
+export const readNarrowFactoryLayout = (): Map<string, Point> | null => readAt(NARROW_FACTORY_KEY, parseLayout, null);
+export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => {
+  saveAt(FACTORY_KEY, Object.fromEntries(at));
+  forgetAt(NARROW_FACTORY_KEY);
+};
+export const forgetFactoryLayout = (): void => {
+  forgetAt(FACTORY_KEY);
+  forgetAt(NARROW_FACTORY_KEY);
+};
 
 export const readFactoryOpen = (): string[] => readAt(FACTORY_OPEN_KEY, parseOpen, []);
 export const saveFactoryOpen = (ids: readonly string[]): void => saveAt(FACTORY_OPEN_KEY, ids);

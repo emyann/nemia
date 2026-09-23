@@ -21,6 +21,7 @@ import {
   place,
   readFactoryLayout,
   readFactoryOpen,
+  readNarrowFactoryLayout,
   readLayout,
   saveFactoryLayout,
   saveFactoryOpen,
@@ -277,6 +278,24 @@ test("the Factory's arrangement is kept apart from every run's, until it is forg
   assert.equal(readLayout('r-1'), null);
   forgetFactoryLayout();
   assert.equal(readFactoryLayout(), null);
+});
+
+test("the Factory's arrangement saved at the old cell width is read apart, until one is saved or it is forgotten", (t) => {
+  const narrow = JSON.stringify({ 'r-1': { x: 320, y: 0 } });
+  const kept = new Map([['hkb:factory-layout', narrow]]);
+  stubStorage(t, memory(kept));
+  // Not read as today's arrangement: its cards are a narrower cell apart.
+  assert.equal(readFactoryLayout(), null);
+  assert.deepEqual(Object.fromEntries(readNarrowFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
+  // The first arrangement saved at today's width is the one read from then on.
+  saveFactoryLayout(new Map([['r-1', { x: 384, y: 0 }]]));
+  assert.equal(readNarrowFactoryLayout(), null);
+  assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 384, y: 0 } });
+  // And Reset layout forgets both.
+  kept.set('hkb:factory-layout', narrow);
+  forgetFactoryLayout();
+  assert.equal(readFactoryLayout(), null);
+  assert.equal(readNarrowFactoryLayout(), null);
 });
 
 function memory(kept: Map<string, string>) {

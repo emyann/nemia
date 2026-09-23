@@ -419,6 +419,20 @@ function cellsOf({ x, y }: Point, span: Span): string[] {
   return cells;
 }
 
+/** How wide a cell was before a card carried its rail: an arrangement saved then puts its cards this far apart. */
+export const NARROW_CELL_WIDTH = 320;
+
+/**
+ * An arrangement saved while a cell was `NARROW_CELL_WIDTH` wide, on today's grid: each card as many cells across as it was then, and
+ * as far into its cell, so a card on the third column is on the third column still. Read unchanged, the cards kept their old places
+ * `NARROW_CELL_WIDTH` apart, each on a cell of its own by `placeRuns`' rounding, and every card covered the right of the one beside it.
+ * Down is unchanged: a cell is as tall as it was.
+ */
+export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<string, Point> | null {
+  if (!saved) return null;
+  return new Map([...saved].map(([id, { x, y }]) => [id, { x: (x * CELL_WIDTH) / NARROW_CELL_WIDTH, y }]));
+}
+
 /**
  * What to save: every card where it was last left — the ones on the floor now over what was saved —
  * and nothing for a run the store no longer lists.

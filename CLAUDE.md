@@ -272,6 +272,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
   chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
   undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A new step status is a word the board draws as `working` until it knows it.** `stepState` (`apps/web/src/lib/status.ts`) falls
+  through to `working` for any word it does not match, so a status added to `StepStatus` in `run.ts` passes every orchestrator and api
+  test and shows on the board as a step still running — the one surface that says nothing is wrong. Add the word to `stepState`, its
+  meaning and class, `stepGraph`'s fill and `offersOf` in `asks.ts` in the same change, with a test of each. And the git fixture
+  (`agent-orchestrator/test/fixtures/git-runs-before.json`) pins every `Decision` whole, so a new list on `Decision` fails
+  `git-before-after.test.ts` on every folder: refresh it with `everything()` of `git-runs-pin.ts`, read the diff line by line — only the
+  new key may move — and say so in that test's doc (learned by the run that added `denials: fail`).
 - **A word from outside, printed into a column, is made one line before it is measured.** `wf ls` pads each status to the width of
   the widest (`cli.ts`), so a harness's `waitingFor` — free text, which can carry a newline — breaks its row in two and mis-aligns
   every other row of that run, and `wf decide` splits the same way. A browser would have collapsed it and nothing would have shown

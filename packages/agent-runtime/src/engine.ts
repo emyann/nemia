@@ -8,7 +8,7 @@
 import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
+import { decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
@@ -52,6 +52,8 @@ export type Filing = {
   brief: string; cwd: string; maxAttempts?: number;
   harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
   closeoutSchema?: object; budgetUsd?: number; priority?: number; id?: string;
+  /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
+  holdOpen?: true;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -94,6 +96,9 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
     return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
   }
+  if (spec.holdOpen !== undefined && spec.holdOpen !== true) {
+    return `\`holdOpen: ${JSON.stringify(spec.holdOpen)}\` is not a yes. Give true to have the task wait for an answer when an attempt signs, or leave it out to settle it then.`;
+  }
   if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
     return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
   }
@@ -114,7 +119,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
     maxAttempts: spec.maxAttempts ?? 1, harness: spec.harness, config: spec.config,
     deadlineSeconds: spec.deadlineSeconds, resume: spec.resume, resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema, budgetUsd: spec.budgetUsd, priority: spec.priority,
+    closeoutSchema: spec.closeoutSchema, budgetUsd: spec.budgetUsd, priority: spec.priority, holdOpen: spec.holdOpen,
   });
   return id;
 });
@@ -122,6 +127,76 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
 export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
   const journal = yield* Journal;
   yield* journal.append(taskId, { kind: 'stop-requested', at: new Date().toISOString() });
+});
+
+/** An answer or a close a task held open would not journal, and why, in words that say what to do instead. Nothing was written. */
+export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * Why a task cannot take an answer or a close now — or `undefined`. Only a task held open that waits for one does
+ * (`waitsForInput`): its current turn signed, nothing is running, and nothing has been said since. Read off the record
+ * alone, so it costs no registry call, and the same at both doors.
+ */
+const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
+  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state.holdOpen) return `\`${taskId}\` was not filed to be held open, so it settles when an attempt signs and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
+  if (state.settled) return `\`${taskId}\` has settled (${state.settled}): it waits for nothing. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (state.closed) return `\`${taskId}\` has been closed: the next pass settles it. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (state.stopRequested) return `\`${taskId}\` has been asked to stop: the next pass settles it.`;
+  if (waitsForInput(state)) return undefined;
+  const last = state.attempts.at(-1);
+  if (!last) return `\`${taskId}\` has not started an attempt yet. Ask again once \`ae ls\` says \`input-required\`.`;
+  if (last.ended === null) {
+    return `\`${taskId}\`'s attempt ${last.n} is running.${verb === 'answer' ? ' `say` tells a running session something;' : ' `stop` ends it now;'} ask again once \`ae ls\` says \`input-required\`.`;
+  }
+  if ((last.turn ?? 0) < state.inputs.length) return `\`${taskId}\` has been answered already, and its next turn starts on the next pass. Ask again once \`ae ls\` says \`input-required\`.`;
+  return `\`${taskId}\`'s attempt ${last.n} ended \`${last.ended}\`, and the task is between attempts, not waiting for an answer. Ask again once \`ae ls\` says \`input-required\`, or \`stop\` it.`;
+};
+
+/** Why `answer` would not journal these words — the task's state, the words, the budget — or `undefined`. */
+export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, budgetUsd?: unknown): string | undefined => {
+  if (typeof text !== 'string' || !text.trim()) return '`text` is empty. Give the words the next turn should begin with.';
+  if (budgetUsd !== undefined && !(typeof budgetUsd === 'number' && Number.isFinite(budgetUsd) && budgetUsd > 0)) {
+    return `\`budgetUsd: ${typeof budgetUsd === 'number' ? budgetUsd : JSON.stringify(budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for the task's own.`;
+  }
+  return waitRefusalOf('answer', taskId, state);
+};
+
+/** Why `close` would not journal a close, or `undefined`. */
+export const closeRefusalOf = (taskId: string, state: State | undefined): string | undefined => waitRefusalOf('close', taskId, state);
+
+/**
+ * A person's answer to a task held open (R1) that waits for one. Journalled as an `input`, and returned; the next pass
+ * starts the task's next turn — an attempt that continues the session that signed, told `text` — under `budgetUsd` if
+ * given, else the task's own. A budget is the harness's to keep, so one given here is asked of it as a filing's is.
+ */
+export const answer = Effect.fn('answer')(function* (taskId: string, text: string, budgetUsd?: number) {
+  const journal = yield* Journal;
+  const events = yield* journal.read(taskId);
+  const state = events.length ? fold(taskId, events) : undefined;
+  const runner = yield* Runner;
+  const refused = answerRefusalOf(taskId, state, text, budgetUsd)
+    ?? (budgetUsd !== undefined && state ? runner.refuses?.(filingOf(state, budgetUsd)) : undefined);
+  if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
+  const input: Input = { at: new Date().toISOString(), text, ...(budgetUsd !== undefined ? { budgetUsd } : {}) };
+  yield* journal.append(taskId, { kind: 'input', ...input });
+  return input;
+});
+
+/** Settle a task held open that waits for an answer: `succeeded`, on the next pass. Journalled as `closed`. */
+export const close = Effect.fn('close')(function* (taskId: string) {
+  const journal = yield* Journal;
+  const events = yield* journal.read(taskId);
+  const refused = closeRefusalOf(taskId, events.length ? fold(taskId, events) : undefined);
+  if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
+  yield* journal.append(taskId, { kind: 'closed', at: new Date().toISOString() });
+});
+
+/** The task as it was filed, with another budget: what a harness is asked of an answer's budget. */
+export const filingOf = (state: State, budgetUsd?: number): Filing => ({
+  brief: state.brief, cwd: state.cwd, harness: state.harness, config: state.config, budgetUsd,
 });
 
 /**
@@ -217,7 +292,9 @@ export const step = Effect.fn('step')(function* (
       const failed = yield* runner.spawn({
         name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd, harness: state.harness,
         // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's.
-        config: state.config, closeoutSchema: state.closeoutSchema, budgetUsd: state.budgetUsd, resumeFrom: attempt?.resumeFrom,
+        config: state.config, closeoutSchema: state.closeoutSchema, resumeFrom: attempt?.resumeFrom,
+        // The turn's: an answer may give its own (`answer`), and a task that is never answered has only the filing's.
+        budgetUsd: turnOf(state, attempt?.turn ?? 0).budgetUsd,
       }).pipe(
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
@@ -430,6 +507,8 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
   const live = last && last.ended === null ? sighting?.state : undefined;
   const phase = state.settled
     ? state.settled
+    // Held open (R1), signed and waiting for a person's answer or close: A2A's TASK_STATE_INPUT_REQUIRED, and nothing running.
+    : waitsForInput(state) ? 'input-required'
     : needsHuman(state, observed) ? 'needs-human'
     // `working` and not busy: it believes it has work and is computing nothing. Said out loud,
     // because it is indistinguishable from progress in every other view and it is what a stalled

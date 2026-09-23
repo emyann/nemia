@@ -26,7 +26,7 @@
  */
 
 // ─── file work, ask about it, stop it ───────────────────────────────────────
-export { file, FileRefused, requestStop, view, tick, step, settleTask, GRACE_MS, DEFAULT_MAX_CONCURRENT } from './engine.ts';
+export { file, FileRefused, requestStop, answer, close, InputRefused, view, tick, step, settleTask, GRACE_MS, DEFAULT_MAX_CONCURRENT } from './engine.ts';
 export type { Filing, TaskView } from './engine.ts';
 
 // ─── the feed: how an upper layer reacts without polling a task ─────────────
@@ -47,7 +47,7 @@ export { sdkRunner } from './runner-sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
 // ─── the vocabulary ─────────────────────────────────────────────────────────
-export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said, Denial } from './domain.ts';
+export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said, Denial, Input } from './domain.ts';
 export { denialText, fold, nameFor } from './domain.ts';
 // The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';

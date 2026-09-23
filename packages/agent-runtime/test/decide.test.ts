@@ -609,7 +609,8 @@ test('HELD OPEN: the deadline runs from the current turn\'s first attempt, not t
 test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed turn retries, continuing where the turn began', () => {
   const failed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', nativeId: 'native-1' })]);
   assert.deepEqual(decide(failed, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-1', nudge: 'make it smaller' },
-    'two attempts on the task, one in this turn: one left; the harness failed, so clean — which in a later turn is where it began');
+    'two attempts on the task, one in this turn: one left; the harness failed, so not its own session but the one the turn continued — ' +
+    'which on a harness that resumes under the same id, as claude -p does, holds the failed attempt too (open issue 28)');
   const lost = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' })]);
   assert.deepEqual(decide(lost, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-2', nudge: 'make it smaller' }, 'a lost one continues its own');
   const unsigned = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' })]);
@@ -624,6 +625,21 @@ test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed tu
   const spent = fold(TASK, [...held(), answer(60_000, 'w', 0.5), ...turn1(61_000, { observed: 'failed', reason: 'budget' })]);
   assert.deepEqual(decide(spent, seen(), now(70_000)),
     { do: 'settle', outcome: 'failed', note: 'attempt 2 spent its budget. File the task again with a larger one to run it again' });
+});
+
+test('HELD OPEN: a later turn continues only the session that signed the turn before — none recorded, it settles failed rather than start cold', () => {
+  const unrecorded = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+    held(extra).map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
+  assert.deepEqual(decide(fold(TASK, unrecorded()), seen(), now(9_000)), { do: 'nothing', why: 'input-required' }, 'it signed: it waits, and a close settles it');
+  const settled = { do: 'settle', outcome: 'failed', note: 'turn 1 has no session to continue: its harness recorded none for the attempt that signed' };
+  assert.deepEqual(decide(fold(TASK, [...unrecorded(), answer(60_000)]), seen(), now(61_000)), settled);
+  // Not the session the task was filed against, which never heard the plan; nor an earlier attempt that failed.
+  assert.deepEqual(decide(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' }), answer(60_000)]), seen(), now(61_000)), settled);
+  const failedFirst: Event[] = [held()[0]!,
+    { kind: 'starting', at: at(500), attempt: 1 }, { kind: 'ended', at: at(900), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'failed-one' },
+    ...unrecorded().slice(1).map((e) => ('attempt' in e ? { ...e, attempt: 2 } : e)) as Event[], answer(60_000)];
+  assert.deepEqual(decide(fold(TASK, failedFirst), seen(), now(61_000)), settled);
+  assert.equal(turnOf(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' })])).continues, 'before-the-task', 'turn 0 continues what it was filed against');
 });
 
 test('HELD OPEN: a close settles it — succeeded on a signed turn, failed after one that did not sign, and never over an attempt in flight', () => {

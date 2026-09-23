@@ -136,7 +136,8 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
 
 /**
  * Why a task cannot take an answer or a close now — or `undefined`. Only a task held open that waits for one does
- * (`waitsForInput`): its current turn signed, nothing is running, and nothing has been said since. Read off the record
+ * (`waitsForInput`): its current turn signed, nothing is running, and nothing has been said since — and an answer only one
+ * whose signing session its harness recorded, since the answer is told to that session. Read off the record
  * alone, so it costs no registry call, and the same at both doors.
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
@@ -145,8 +146,12 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   if (state.settled) return `\`${taskId}\` has settled (${state.settled}): it waits for nothing. File a task that continues its session (\`resumeFrom\`) to go on.`;
   if (state.closed) return `\`${taskId}\` has been closed: the next pass settles it. File a task that continues its session (\`resumeFrom\`) to go on.`;
   if (state.stopRequested) return `\`${taskId}\` has been asked to stop: the next pass settles it.`;
-  if (waitsForInput(state)) return undefined;
   const last = state.attempts.at(-1);
+  if (waitsForInput(state)) {
+    return verb === 'answer' && !last!.nativeId
+      ? `\`${taskId}\`'s attempt ${last!.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
+      : undefined;
+  }
   if (!last) return `\`${taskId}\` has not started an attempt yet. Ask again once \`ae ls\` says \`input-required\`.`;
   if (last.ended === null) {
     return `\`${taskId}\`'s attempt ${last.n} is running.${verb === 'answer' ? ' `say` tells a running session something;' : ' `stop` ends it now;'} ask again once \`ae ls\` says \`input-required\`.`;

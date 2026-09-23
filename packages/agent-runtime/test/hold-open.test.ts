@@ -102,6 +102,10 @@ test('the Effect door refuses as the facade does: InputRefused, and nothing jour
   await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
   const count = async (task: string) => ((await run(Effect.flatMap(Journal, (j) => j.read(task)))) as { success: Event[] }).success.length;
   assert.equal(await count(held), 1, 'nothing journalled');
+  const unrecorded = (await run(file({ brief: 'b', cwd: '/r', holdOpen: true })) as { success: string }).success;
+  await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)), (e) => j.append(unrecorded, e))));
+  await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
+  assert.equal(await count(unrecorded), 4, 'nothing journalled');
   // Waiting, the words are taken; a budget its harness would not keep is refused by the harness, at this door too.
   await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(held, e))));
   await refusedWith(answer(held, 'go on', 2), /^keeps no cap$/);
@@ -205,6 +209,14 @@ test('answer and close refuse a task that is not waiting for one, each saying wh
     await refuses(b, id, () => b.engine.answer(id, 'go'), new RegExp(`^answer: \`${id}\`.*${answering.source}`));
     await refuses(b, id, () => b.engine.close(id), new RegExp(`^close: \`${id}\`.*${closing.source}`));
   }
+  // Signed with no session recorded — a harness that reports none — there is nothing for an answer to continue; a close is taken.
+  const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
+  b.write('t-unrecorded', unrecorded);
+  await refuses(b, 't-unrecorded', () => b.engine.answer('t-unrecorded', 'go'),
+    /^answer: `t-unrecorded`'s attempt 1 signed, but its harness recorded no session for it, so there is no conversation for an answer to continue\. `close` it/);
+  assert.equal((await b.engine.view('t-unrecorded')).phase, 'input-required');
+  await b.engine.close('t-unrecorded');
+  assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
   await refuses(b, 't-nope', () => b.engine.answer('t-nope', 'go'), /^answer: `t-nope` is not a task on this board/);
   await refuses(b, 't-nope', () => b.engine.close('t-nope'), /^close: `t-nope` is not a task on this board/);
   // And the control: the same board takes both from a task that waits.

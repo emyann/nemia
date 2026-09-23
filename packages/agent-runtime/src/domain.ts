@@ -465,8 +465,8 @@ export function fold(taskId: string, events: readonly Event[]): State {
 // Pure arithmetic over the fold, so `decide` reads a turn and not the journal's order.
 
 /**
- * Turn `n` of a task (the current one by default): its attempts; the session it continues — the last one an earlier turn
- * ran, or what the task was filed against; the words it is told instead of the brief — every answer given since the turn
+ * Turn `n` of a task (the current one by default): its attempts; the session it continues — for a later turn, the one that
+ * signed the turn before it, and none if its harness recorded none; for the first, what the task was filed against; the words it is told instead of the brief — every answer given since the turn
  * before it started, so two answers that raced are both heard; and its spend cap per attempt — the last one given with
  * those words, else the filing's. Turn 0 is the task as filed: every attempt of a task not held open, told the brief.
  */
@@ -476,7 +476,7 @@ export function turnOf(state: State, n = state.inputs.length) {
   const given = n === 0 ? [] : state.inputs.slice(before.at(-1)?.turn ?? 0, n);
   return {
     n, attempts,
-    continues: [...before].reverse().find((a) => a.nativeId)?.nativeId ?? state.resumeFrom,
+    continues: n === 0 ? state.resumeFrom : before.at(-1)?.nativeId ?? undefined,
     words: given.length ? given.map((i) => i.text).join('\n\n') : undefined,
     budgetUsd: [...given].reverse().find((i) => i.budgetUsd !== undefined)?.budgetUsd ?? state.budgetUsd,
   };
@@ -581,6 +581,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
       const why = ended?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
       return { do: 'settle', outcome: 'failed', note: `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded${why}` };
     }
+    // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
+    if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {

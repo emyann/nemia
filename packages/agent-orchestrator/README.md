@@ -2300,6 +2300,7 @@ holding a concurrency slot forever.
 | `src/store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/daemon-store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`) and `daemon.json` read, judged by `src/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
 | `src/feed-store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
+| `src/places.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `workflow-store.ts`, and reads no git |
 | `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
@@ -2335,10 +2336,14 @@ for the same reason, and so does the `wf` command.
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
-`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
-and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
-split as the engine, one layer up. `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
-`artifacts.ts`, `authoring.ts` and `inbox-store.ts` sit beneath `runner.ts`, which re-exports them: none imports the
-engine or `runner.ts`, none but `store.ts` and `worktree.ts` (whose `git` the branch and artifact readers use) is
-imported by another, `worktree.ts` imports only `store.ts` of them and `store.ts` none, and no pure file imports any
-of them — the same test refuses each.
+`assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
+file in `src/` and `bin/` is of one of three kinds, and `test/boundary.test.ts` names each and fails the suite on a file
+it does not. **Pure** files (`run.ts`, `workflow.ts`, `check.ts` and the rest of `PURE`) import no runtime, read no disk,
+spawn nothing, and import no file of the other two kinds. **Store** files are the I/O beneath the controllers: they import
+no runtime and never a controller, and load as a tree — `places.ts` and `workflow-store.ts` at the bottom, `store.ts` on
+those two, `worktree.ts` on `store.ts` and `places.ts`, and every other store file imported by `runner.ts` alone, which
+re-exports them. **Controllers** may use the runtime: `runner.ts`, `cli.ts` and `bin/wf.ts`, and `cli.ts` reaches the
+package only through `runner.ts` and `workflow.ts`. Of them, `runner.ts` alone imports agent-runtime, a type included:
+the runtime is reached through one client (`CLIENT` in the same test). Outside the package, the apps reach it through
+`agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`).
+`docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.

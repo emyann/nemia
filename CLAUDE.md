@@ -442,6 +442,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   never fires, and a worker that ends a job's stdin at its result would hold the job open for ever: a job reading
   `--input-format stream-json` does not exit at its result, only when its stdin ends. The worker parses each output line
   and reads the key (`closesOn` in `bin/ae-worker.ts`; learned by the run that let `say` reach a job).
+- **The engine can say a task waits before its harness has let the session go.** `closedOut` (`agent-runtime/src/engine.ts`)
+  ends an attempt on a statement on disk while the session is `working` and not busy, and Codex writes `-o` before it exits:
+  for that moment `view` says `input-required` and `getTask` still answers the harness's `WORKING`, with the process alive. A
+  test that asserts the Task the instant `view` moves passes alone and fails under `npx turbo run test --force`'s load. Hold the
+  fake's exit on a file and assert both sides, or wait for the Task (learned by the run that proved Codex as an A2A agent;
+  open issue 31).
 
 ## Rules the code keeps
 

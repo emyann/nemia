@@ -333,6 +333,18 @@ test("a closed card dropped on an open run's graph stays there, and so does the 
   assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], onFloor, null, spans, new Map(), new Set())), Object.fromEntries(onFloor));
 });
 
+test("on the next visit, a card saved over an open card is a stack saved, as two in one cell are: the open card keeps its cells, the other takes a free one", () => {
+  // As the floor starts (`FactoryCanvas`): nothing on it yet, the saved layout, the open cards' spans, and nothing opening. A left
+  // over b's second cell, where a drop put it and the visit before kept it (the test above); c in a cell of its own.
+  const spans = new Map([['b', { columns: 2, rows: 1 }]]);
+  const saved = new Map([['a', { x: CELL_WIDTH + 12, y: 8 }], ['b', { x: 0, y: 0 }], ['c', { x: 0, y: CELL_HEIGHT }]]);
+  const at = placeRuns(['a', 'b', 'c'], new Map(), saved, spans, new Map(), new Set());
+  assert.deepEqual(Object.fromEntries(at), { a: { x: 2 * CELL_WIDTH, y: 0 }, b: { x: 0, y: 0 }, c: { x: 0, y: CELL_HEIGHT } });
+  assert.deepEqual(overlapping(at, spans), []);
+  // Older than b or not: the open card claims first, as a card just opened is never the one moved aside.
+  assert.deepEqual(placeRuns(['b', 'a', 'c'], new Map(), saved, spans, new Map(), new Set()), at);
+});
+
 test("a card left over an open run's graph stays when a run starts, and the run that starts takes a cell clear of both", () => {
   const spans = new Map([['b', { columns: 3, rows: 1 }]]);
   const onFloor = new Map([['a', { x: CELL_WIDTH, y: 0 }], ['b', { x: 0, y: 0 }]]);

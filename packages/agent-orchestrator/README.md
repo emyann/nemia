@@ -2306,7 +2306,14 @@ holding a concurrency slot forever.
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
-| `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), an inbox card started (`startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
+| `src/views.ts` | what the engine's views of a run's tasks say: a step's phase (`phaseOfView`), whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
+| `src/start.ts` | a run started (`start`), a plan's cards started (`readPlan`, `startPlan`), an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
+| `src/tick.ts` | a pass over every run, started runs first and the rest admitted oldest first (`tick`, `advance`), the first steps given their parents' closeouts (`parentCloseouts`), and what a pass filed and never wrote down, adopted |
+| `src/verbs.ts` | what a person asks of a run: `cancel`, `retry`, `approve`, `say`, `round`, `accept` |
+| `src/forget.ts` | a run forgotten (`forget`, `wf rm`) and its worktrees pruned (`prune`) |
+| `src/decide.ts` | what a person reads of a run: `wf ls` (`list`) and `wf decide` (`decide`) |
+| `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), and a line in words (`feedLineWords`); the file is `src/feed-store.ts`'s |
 | `src/cli.ts` | the verbs |
 
@@ -2337,13 +2344,16 @@ for the same reason, and so does the `wf` command.
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
 `assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
-file in `src/` and `bin/` is of one of three kinds, and `test/boundary.test.ts` names each and fails the suite on a file
+file in `src/` and `bin/` is of one of four kinds, and `test/boundary.test.ts` names each and fails the suite on a file
 it does not. **Pure** files (`run.ts`, `workflow.ts`, `check.ts` and the rest of `PURE`) import no runtime, read no disk,
-spawn nothing, and import no file of the other two kinds. **Store** files are the I/O beneath the controllers: they import
-no runtime and never a controller, and load as a tree — `places.ts` and `workflow-store.ts` at the bottom, `store.ts` on
-those two, `worktree.ts` on `store.ts` and `places.ts`, and every other store file imported by `runner.ts` alone, which
-re-exports them. **Controllers** may use the runtime: `runner.ts`, `cli.ts` and `bin/wf.ts`, and `cli.ts` reaches the
-package only through `runner.ts` and `workflow.ts`. Of them, `runner.ts` alone imports agent-runtime, a type included:
-the runtime is reached through one client (`CLIENT` in the same test). Outside the package, the apps reach it through
+spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
+no runtime, never a controller and not the client, and load as a tree — `places.ts` and `workflow-store.ts` at the bottom,
+`store.ts` on those two, `worktree.ts` on `store.ts` and `places.ts` — and outside the store only the client and the
+controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which
+re-exports; `views.ts`, `start.ts`, `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts`, which import one another one way,
+with no cycle; and `cli.ts` and `bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and
+`bin/wf.ts` only through `cli.ts`. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the
+runtime is reached through one client (`CLIENT` in the same test), which every controller beneath the CLI imports and
+which imports no controller. Outside the package, the apps reach it through
 `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`).
 `docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.

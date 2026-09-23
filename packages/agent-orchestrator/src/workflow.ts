@@ -759,7 +759,7 @@ const fileRuleRefusal = (named: string, rule: string, key: 'disallow' | 'allow')
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it
  * either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a word.
- * Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in runner.ts).
+ * Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in start.ts).
  */
 function remoteOf(step: string, remote: string | undefined): boolean | undefined {
   if (remote === undefined) return undefined;

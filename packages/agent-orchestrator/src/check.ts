@@ -22,7 +22,7 @@
  * hung suite ends at the task's deadline, and checks have a concurrency pool of their own, so a
  * ten-minute suite never holds an agent's slot or the tick itself.
  *
- * Pure: no disk, no process, no engine. `runner.ts` is the file that files these.
+ * Pure: no disk, no process, no engine. `tick.ts` is the file that files these.
  */
 
 /** The seconds a check may run before the engine stops it. A hung suite must not hold a run for ever. */
@@ -113,7 +113,7 @@ export const checkScript = (command: string): string => [
 
 /**
  * The harness. A `HarnessSpec` in shape, typed here by its shape rather than imported: this file is pure,
- * and only the client, `runner.ts`, imports the runtime and hands this to it (`docs/architecture.md`).
+ * and only the client, `runtime-client.ts`, imports the runtime and hands this to it (`docs/architecture.md`).
  */
 export const CHECK = {
   name: 'check',

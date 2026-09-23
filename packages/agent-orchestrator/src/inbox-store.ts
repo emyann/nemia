@@ -3,8 +3,8 @@
  * (`dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files — the tries the tick wrote down of a queued card's start
  * (`queueDir`, `queueTries`). The judgement is `inbox.ts`'s; this reads and writes.
  *
- * Beneath `runner.ts`, beside `store.ts`: it imports neither the engine nor `runner.ts`, which re-exports what it exported of this before.
- * A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and stays there, beside `start`.
+ * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what it exported of
+ * this before. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and is `start.ts`'s, beside `start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

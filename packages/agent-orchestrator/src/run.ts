@@ -36,7 +36,7 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one — a task from before closeouts; `true`,
  * asked; `unsigned`, asked, and its last attempt ended without it — the attempt's `reason`, on a session that went quiet, which the
- * engine settles `failed`. `stepStatus` reads it; a caller with only a yes or a no gives that (`closeoutAsked` in runner.ts reads all three).
+ * engine settles `failed`. `stepStatus` reads it; a caller with only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
@@ -108,7 +108,7 @@ type RunBase = {
   inputs?: string[];
   /**
    * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox` in
-   * runner.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this run,
+   * start.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this run,
    * and `wf decide` names the card under the run's line. Absent on a run started any other way, and on every record from before the inbox.
    */
   from?: { inbox: string };
@@ -300,7 +300,7 @@ export function assess(
    */
   standings: readonly BranchStanding[] = [],
   /**
-   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts),
+   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts),
    * if one is: such a step is not filed while another is working there, whatever else is ready. Left out, nothing holds the checkout.
    */
   checkout?: CheckoutHold,
@@ -646,7 +646,7 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
 export type CheckoutHold = { run: string; step: string };
 
 /**
- * A run's claim on a repository's own checkout on a pass (`checkoutHold` in runner.ts): the `workspace: main` step that works there, the
+ * A run's claim on a repository's own checkout on a pass (`checkoutHold` in tick.ts): the `workspace: main` step that works there, the
  * repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`, the
  * time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
  */
@@ -972,7 +972,7 @@ export const ceilingLines = (c: { sessions: number; runs: number }): string[] =>
 ];
 
 /**
- * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in runner.ts): its record, when the store has one;
+ * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in views.ts): its record, when the store has one;
  * whether it shipped, as its own `wf decide` would say; and the result branches it recorded that git no longer has, when there are any.
  */
 export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
@@ -1555,7 +1555,7 @@ export function retryable(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   steps: readonly Workflow[] = [],
-  /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in runner.ts). */
+  /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in views.ts). */
   harnessBlocked: (taskId: string) => boolean = () => false,
   /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`. */
   spendOf: SpendOf = () => undefined,
@@ -1968,7 +1968,7 @@ export function answerLines(
 
 /**
  * A person's words, said to a step's session while it ran (`wf say`), as the engine journalled them: when, to which attempt of the step's
- * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: runner.ts reads it off
+ * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.ts reads it off
  * the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
  */
 export type Said = { at: string; attempt: number; text: string };
@@ -2968,8 +2968,8 @@ export function pruneLines(p: Pruning): string[] {
 // ─── files a person gave the run ────────────────────────────────────────────
 
 /**
- * A file `wf start --input` was given, as runner.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
- * judges; runner.ts looks, and this file does not.
+ * A file `wf start --input` was given, as start.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
+ * judges; start.ts looks, and this file does not.
  */
 export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
 
@@ -3224,7 +3224,7 @@ export function decision(
   harnessBlocked: (taskId: string) => boolean = () => false,
   /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person. */
   spendOf: SpendOf = () => undefined,
-  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run is still running for. */
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts): what this run is still running for. */
   checkout?: CheckoutHold,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
@@ -3383,15 +3383,15 @@ export function listing(
   slot?: RunSlot,
   /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts): what says a finished run is one nobody has decided. */
   standings: readonly BranchStanding[] = [],
-  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run's ending says where `waiting` would be. */
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts): what this run's ending says where `waiting` would be. */
   checkout?: CheckoutHold,
   /**
    * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's `needs-human`
    * on the step's line, and nowhere else.
    *
    * **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and by everything that reads a step's
-   * status — `harnessBlocked` in runner.ts, the api's `needsOf`, `stepState` on the board — so the phase a decision is made on stays
-   * the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in runner.ts passes this; the api does not, and
+   * status — `harnessBlocked` in views.ts, the api's `needsOf`, `stepState` on the board — so the phase a decision is made on stays
+   * the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in decide.ts passes this; the api does not, and
    * its step's `status` reaches the board's chip unchanged.
    */
   waitingOf: (taskId: string) => string | undefined = () => undefined,
@@ -3754,7 +3754,7 @@ export function composeBrief(
   round?: RoundBriefing,
   /**
    * For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded (`fromRunSection`),
-   * gathered by runner.ts. Given to no other step: a run without `after`, and every step after a root, is composed as it always was.
+   * gathered by tick.ts. Given to no other step: a run without `after`, and every step after a root, is composed as it always was.
    */
   parents?: readonly ParentCloseout[],
   /** The directory the run copied `wf start --input` files into (`inputsDir` in store.ts): named, with `run.inputs`, under what was asked for. */
@@ -4334,7 +4334,7 @@ export type ParentStep = { step: Workflow; said: Closeout } | { name: string; un
 
 /**
  * A run this one waited on (`--after`), as the pass that files this run's roots read it off the store and the engine (`parentCloseouts` in
- * runner.ts): the first line of what it was asked and its terminal steps — or why the run itself cannot be read.
+ * tick.ts): the first line of what it was asked and its terminal steps — or why the run itself cannot be read.
  */
 export type ParentCloseout = { run: string; asked: string; steps: readonly ParentStep[] } | { run: string; unreadable: string };
 

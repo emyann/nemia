@@ -14,7 +14,7 @@
  * serve more than one. And an inbox card has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
  *
  * `queued:` marks a card to start on its own (`wf inbox queue`): the time it was queued, which orders the queue. The tick starts the oldest
- * such card when a run slot is free (`queueOrder`, `startQueued` in runner.ts).
+ * such card when a run slot is free (`queueOrder`, `startQueued` in start.ts).
  *
  * `gate:` names a step of the card's workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, for the
  * run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
@@ -25,7 +25,7 @@
  * removed; a card still there whose name a record carries is one whose removal failed, and `wf inbox` says it was started, composed on read.
  *
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one (inbox-store.ts
- * and runner.ts read them).
+ * and start.ts read them).
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from './plan.ts';
@@ -248,7 +248,7 @@ export const nextQueued = (listing: readonly InboxListing[], repo: string): Inbo
   queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === (l.repo ?? repo)));
 
 /**
- * What the tick did with the queue on a pass (`startQueued` in runner.ts): started the next card as a run — and whether the card left the inbox,
+ * What the tick did with the queue on a pass (`startQueued` in start.ts): started the next card as a run — and whether the card left the inbox,
  * and why not — or tried to, and was refused, in the package's words, or failed for another reason: `again` when it failed as it did on the pass
  * before, on the same repository. `on` is the repository it was tried on, for a card that names none.
  */
@@ -263,7 +263,7 @@ export type QueueStarted =
  * `cardRepoRefusal`, or by hand, may still carry one. Said and not refused, since a card on disk cannot be edited from the board.
  *
  * One writer, so a person reads the same sentence wherever the card was started: `wf start` prints it under the run, and a tick's
- * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in runner.ts is what both are given.
+ * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in start.ts is what both are given.
  */
 export const ignoredRepoLine = (repo: string): string =>
   `the card's repo: ${repo} was not looked at — this workflow's steps work in folders, with no git repository`;

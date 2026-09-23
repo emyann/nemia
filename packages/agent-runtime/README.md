@@ -1247,6 +1247,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-codex-transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/runner-detached-output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
 | `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
+| `src/runner-claude-code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |

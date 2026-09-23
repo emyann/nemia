@@ -12,8 +12,22 @@ model: opus
 effort: high
 # The one session here that never ends: continued on every answer, it grows for as long as it lives, so it compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; agent-runtime open issue 26). Every answer continues it on this window.
 context: 200k
-# Bridged to claude.ai, so the person who has to answer can answer from a phone.
+# A background session (`claude --bg`), the one step that is not a job: it outlives each brief, `claude agents` lists it,
+# and a person can attach to it and say words to it. Every other shipped step runs as `claude -p` and ends on its own.
+# And so it keeps no `budget:` — a background session has no spend cap to keep (agent-runtime's open issue 17).
+background: true
+# Bridged to claude.ai, so the person who has to answer can answer from a phone. Only a background session can be.
 remote: true
+# Fenced, as the planner and the reviewer are: `dontAsk` denies what the list below does not allow, with no prompt, and the
+# session reads the refusal and carries on — a background session in any mode that asks waits for ever on a prompt
+# nobody is there to answer (CLAUDE.md). The list is what the prose below asks of it: the `wf` verbs, the diagnosis
+# (`claude agents`, `ae ls`, `ps`, and `kill` for a background shell holding a session), a bounded wait, the git it reads
+# and the bookkeeping it commits, reading anywhere — the store and the runs' worktrees are outside this checkout — and
+# writing only where the next agent reads. `.claude/settings.json`'s allow rules count too, as they do for a job
+# (agent-runtime's open issue 28, M11). Unlike a job's, a background session's denials are not read (open issue 28): a
+# command it needs and was not given shows as a stall, not as a line on `wf ls`.
+permissionMode: dontAsk
+allow: Bash(wf:*), Bash(npx wf:*), Bash(claude agents:*), Bash(ae ls:*), Bash(ps:*), Bash(kill:*), Bash(sleep:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git add:*), Bash(git commit:*), Read, Grep, Glob, Skill, Edit(CLAUDE.md), Edit(docs/**), Edit(packages/*/docs/**)
 # Denied by name what no step needs and an unattended session otherwise has, as implement is: messaging other
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.
 #
@@ -108,9 +122,8 @@ rather than run.
 
 ## When nothing needs a person
 
-Wait, and read again. A foreground wait that ends by itself: `sleep 60`, then another `wf ls` — or a bounded
-one, `timeout 300 bash -c 'until wf ls | grep -q "waiting on you"; do sleep 20; done'`, which returns
-whatever happens. **Never a background loop**: one that outlived the command that started it held a session
+Wait, and read again. A foreground wait that ends by itself: `sleep 60`, then another `wf ls`. Nothing else
+waits: your `allow:` lets `sleep` through and not a shell loop. **Never a background loop**: one that outlived the command that started it held a session
 for seventy-seven minutes with nothing running in it, and nothing settled the step (CLAUDE.md;
 agent-runtime's open issue 24). End anything you start before you sign off.
 

@@ -8,7 +8,8 @@
  * `everything()` of `git-runs-pin.ts` over it, and read the fixture's diff: every changed line must be the sentence that was reworded,
  * and nothing else. (Done once, on 2026-09-19: main reworded the ui implementer's line about where a new e2e page goes while this
  * branch was in flight, and the ship step's check refused the merged tree. Done again on 2026-09-23, when the packages were renamed: the
- * package's `ui` copy moved folder, and the supervisor's brief names both packages' docs by their folders.)
+ * package's `ui` copy moved folder, and the supervisor's brief names both packages' docs by their folders. And once more the same day,
+ * when the supervisor became a background session in `dontAsk`: its wait is `sleep 60` alone, as its `allow:` lets no shell loop through.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

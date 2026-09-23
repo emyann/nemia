@@ -25,6 +25,18 @@ what is in it. It is a named list, not a complete one. What its bookkeeping need
 sandbox — `git -C <dir> merge` is not `git merge` — so it stops the command a session should not have typed,
 not a session that means to get round it.
 
+**It is the one background session among the shipped steps** (`background: true`). Every other shipped step runs as
+a job — `claude -p`, which runs its brief, exits, and asks nobody in any mode — and this one runs as `claude --bg`, which
+outlives each brief, is listed in `claude agents`, and can be attached to, said words to and bridged. So it is fenced as
+the planner and the reviewer are: `permissionMode: dontAsk` with an `allow:` list of what its prose asks of it — the `wf`
+verbs, `claude agents`, `ae ls`, `ps` and `kill` to diagnose a stall, `sleep` to wait, the git it reads and the `git add` and
+`git commit` its bookkeeping needs, `Read`, `Grep` and `Glob` anywhere (the store and the runs' worktrees are outside this
+checkout), the look skill, and `Edit` of `CLAUDE.md` and the `docs/` folders only. A background session in a mode that
+asks would wait on a prompt nobody is there to answer; in `dontAsk` a call it was not given is denied and it carries on.
+A job's denials are read and put on `wf ls`; a background session's are not (agent-runtime's open issue 28), so a command
+it needs and was not given shows as a stall, and the fix is a line in its `allow:`. It keeps no `budget:`: a background
+session has no spend cap to keep, and the parser refuses one beside `background: true`.
+
 `slot: none` keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`). The cap holds the work this
 machine does at once; a supervisor behind it would be held by the very runs it exists to answer.
 
@@ -35,7 +47,7 @@ implement, review and ship. A supervisor that is watching is a session at work, 
 answered. Raise the ceiling before you start it — `WF_MAX_CONCURRENT=3 wf up`, or higher — or accept that
 the board halves.
 
-`remote: true` bridges its sessions to claude.ai, so the person it asks can answer from a phone —
+`remote: true` bridges its sessions to claude.ai — which only a background session can be — so the person it asks can answer from a phone —
 which is the point of it: the moments it exists for are the ones where somebody is not at their desk.
 
 **Its questions are gates on its own run.** It signs off `blocked` with the brief in `summary` and the

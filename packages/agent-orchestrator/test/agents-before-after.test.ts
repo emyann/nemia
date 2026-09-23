@@ -41,7 +41,8 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * `apps/web/test/e2e/pages/`: its brief said to add a new page to that array, which no longer exists. Both ui folders name that agent.
  *
  * The supervisor's body moved when the packages were renamed (2026-09-23): it names the runtime's open issues and the orchestrator's
- * features.md by their folders, and those are new words for the same pages.
+ * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
+ * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allow:` lets no shell loop through.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
@@ -76,10 +77,17 @@ const AGENTS: Record<string, string> = {
 /**
  * The keys a shipped step gained after the snapshot, as `<folder>/<step>` and each key with its value: nothing an agent moved, and each
  * held to that value. The supervisor, which names no agent, got its `context:` window once the agent refactor had shipped
- * (docs/pivot-2026-09-18.md §6, P1): the one session here that never ends is the one a cap is for. No other key of it moved.
+ * (docs/pivot-2026-09-18.md §6, P1): the one session here that never ends is the one a cap is for.
+ *
+ * When steps became jobs (`claude -p`, thin runtime stage 2 part 2) the supervisor alone stayed a background session, and its mode was
+ * written by its role: `background: true`, `permissionMode: dontAsk` and an `allow:` list, read here from its file rather than copied.
+ * The agents that build and ship — implementer, ui-implementer, shipper — say `permissionMode: auto`, the engine's default, so the mode
+ * of every role is written where the role is. Each step naming one of them gains that key and nothing else.
  */
+const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allow!;
 const KEYS_ADDED: Record<string, Record<string, unknown>> = {
-  'workflows/supervisor/supervise': { context: 200_000 },
+  'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allow: SUPERVISOR_ALLOW },
+  ...Object.fromEntries(Object.entries(AGENTS).filter(([, agent]) => ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at]) => [at, { permissionMode: 'auto' }])),
 };
 
 /**

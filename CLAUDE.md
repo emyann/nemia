@@ -335,19 +335,18 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A fake engine's closeout is flat, as a harness writes it.** `parseCloseout` moves the fields beside `outcome` — a schema's
   `title`, `gist` — under `output`; a test that hands the fake an `output` already nested reads the step as `unsigned`, and the next
   step is never filed. Give the fake `{ ...SIGNED, title, gist }` (learned by the run that added `workspace: folder`).
-- **A session in a folder nobody has opened blocks for ever in any mode that can ask.** A `workspace: folder` step
-  works in a directory the run just made: no settings file, nothing trusted. The first call outside it — reading the
-  artifacts directory beside it, say — raises an ordinary permission prompt, `claude agents` reads the session
-  `blocked` with `waitingFor: 'permission prompt'`, and nobody is there to answer (thirty-one minutes in
-  `acceptEdits`, and `auto`, the engine's default, does the same). `dontAsk` denies the call with no prompt and the
-  session reads the refusal and carries on, so a folder team may run in no other mode (`validateFolderMode`). It is
-  not the workspace-trust dialog: a folder run does start unattended on `claude --bg` (measured on Claude Code
-  2.1.278, by the first live `note` run). What was measured is Claude Code's prompt, so the guard reads the step's
-  own harness: `codex exec` is not interactive — one shell, fenced by the sandbox its `permissionMode` names — and a
-  codex folder team passes in every mode codex has. A guard written from one harness's measurement, applied to
-  another's words, sent a codex author from the tightest sandbox to the widest mode, by way of a fix codex refuses.
-  A refusal that names a mode must name one that harness takes: the test loops over `HARNESSES`, so the next harness
-  added fails until it has a list of its unasking modes and a default.
+- **A background session in a folder nobody has opened blocks for ever in any mode that can ask; a job never does.**
+  A `workspace: folder` step works in a directory the run just made: no settings file, nothing trusted. The first
+  call outside it — reading the artifacts directory beside it, say — raises an ordinary permission prompt in a
+  `claude --bg` session, `claude agents` reads it `blocked` with `waitingFor: 'permission prompt'`, and nobody is
+  there to answer (thirty-one minutes in `acceptEdits`, and `auto` does the same; Claude Code 2.1.278, the first live
+  `note` run — not the workspace-trust dialog, which a folder run starts past unattended). A job, `claude -p`, waits
+  on nobody in any mode: the call is denied, recorded on the attempt, and the session carries on (M1, 2.1.280). Every
+  step has been a job since thin runtime stage 2 part 2, so `validateFolderMode` judges only a step that says
+  `background: true`, which must run `dontAsk` or `bypassPermissions`. The rule was written for every step while every
+  step was `--bg`, and a guard kept past the measurement that justified it refuses modes that no longer stall anything.
+  What was measured is Claude Code's prompt: `codex exec` is not interactive, and `background:` is refused on any
+  harness but claude, so a codex folder team passes in every mode codex has (learned by the run that made steps jobs).
 - **A session started anywhere under `~/.claude/` cannot write there, in any mode.** Claude Code reads that directory
   as its own and refuses a write into it — *"sits under `~/.claude/`, which the harness treats as sensitive"* — whatever
   `--permission-mode` and `--allowedTools` say. `$CLAUDE_JOB_DIR/tmp` is under it, so a live `wf` store put there

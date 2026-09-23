@@ -2095,9 +2095,26 @@ Where it departs from the plan:
 
 Left for later:
 
-- **The api and the board** (the next two cards): the api carries `hold` and `holding` on a run and says the hold where its Decide
-  section would offer a command. The board shows it on the run's card and page, with a way to lift it.
+- **The board** (the third card): it shows the hold on the run's card and page, with a way to lift it, off the api's `holding`.
 - **`wf cancel` and `wf say` on a held run** are allowed. Cancelling ends the hold's meaning, and `wf say` files no work.
+
+## Shipped: holding a run — the api's half
+
+The second of the three cards. The api says a held run is held, not waiting on you, in `wf ls`'s and `wf decide`'s words:
+
+- **The list and the detail** carry `heldUntil`, the runs the hold names, and `holding`: each run as `holdsOf` reads it, `word`
+  (`holdWord`), `advice` (`holdAdvice`), and `onYou`, true when only a person can lift the hold: it names no run, or a run that is
+  missing, cancelled or whose branch is gone. A run nobody holds, or one called off, carries `[]` and `null`. The runs a hold names are
+  read with `seenBy`, as `--after` reads its runs, so no harness is asked anything more.
+- **Nothing waits on you**: `waitingOnYou`, `onYou` and `toDecide` are empty, as `listing` says, and no step is offered an approval or a
+  raise (`costOf` reads the hold beside the cancel and the prune).
+- **The decision is `{ holding }`**, and `{ waiting, holding }` for a run started `--after` and held as well. It offers no command, since
+  `decide` offers nothing on a held run, so `ONCE_MORE` has nothing to parse, and `heldLater`'s words carry no `wf` verb.
+- **The verbs the board sends** answer 409 in the package's own words (`heldRefusal`), since the api calls the package's verbs.
+
+Where it departs from the plan: **`moving` is true for a held run while its hold may lift on its own**, when the run would move
+unheld. That is the rule `--after` keeps: the tick files the work in the same pass that lifts the hold. For a hold only a person can lift,
+only work in flight counts. `apps/api/test/hold.test.ts` holds each of these against `list()` and `decide()`, over a store with real git.
 
 ## Shipped: two small items from the plan's queue
 

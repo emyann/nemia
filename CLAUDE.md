@@ -442,6 +442,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   never fires, and a worker that ends a job's stdin at its result would hold the job open for ever: a job reading
   `--input-format stream-json` does not exit at its result, only when its stdin ends. The worker parses each output line
   and reads the key (`closesOn` in `bin/ae-worker.ts`; learned by the run that let `say` reach a job).
+- **A hold's `Wait` carries `shipped`, which an `--after` wait never does.** The api's `neverShips` (`apps/api/src/judged.ts`) reads any
+  key beyond `run` as a run that will not ship, so, read for a hold, it would take a run that has shipped for one only a person can lift.
+  A hold is read by `holdNeedsYou`, which asks the three facts by name (`missing`, `cancelledAt`, `gone`): read a `Wait` by the key you
+  mean, never by what else is on it (learned by the run that put the hold on the api).
 
 ## Rules the code keeps
 

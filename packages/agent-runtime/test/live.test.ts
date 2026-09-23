@@ -41,7 +41,7 @@
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -251,15 +251,16 @@ const NAME_CLOSEOUT = {
   additionalProperties: false,
 };
 
-test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
-  skip,
-  timeout: 15 * 60_000,
-}, async (t) => {
+/**
+ * Told a file name while it works, a session writes that file; the same session never told writes none. A `--bg` session
+ * is told through Claude Code's inbox, and a job (`claude -p`) on its stdin, by its worker.
+ */
+const sayReaches = (background: boolean) => async (t: TestContext) => {
   // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
   const engine = createEngine({ root: tmp('say-board') });
   const told = tmp('say-told');
   const control = tmp('say-control');
-  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'], background: true } };
+  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'], ...(background ? { background } : {}) } };
   const ids = {
     told: await engine.file({ ...common, cwd: told }),
     control: await engine.file({ ...common, cwd: control }),
@@ -291,14 +292,31 @@ test('say reaches a working --bg session: told a file name, it writes that file;
     assert.ok(said, 'the told session was seen working within five minutes, and told');
   });
 
-  // The session's own record has the words too, as the transcript reader gives them to a board: a system event
-  // whose text is the words, or Claude Code's sentence around them on a line of their own — never the model's own
+  // The session's own record has the words too, as the transcript reader gives them to a board — never the model's own
   // mention of the file's name, which would pass with the reader of words sent in broken.
   const { events } = await engine.transcript(ids.told);
+  if (!background) {
+    // A job's words are a user message on its stdin; said while it works, Claude Code keeps them as an attachment the
+    // reader gives as the user's words, as the brief is (2.1.280).
+    const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
+    assert.equal(arrived.length, 1, `the told job's transcript carries the words once, as the person's: ${JSON.stringify(events.filter((e) => e.role === 'user'))}`);
+    return;
+  }
+  // A `--bg` session's, a system event whose text is the words, or Claude Code's sentence around them on a line of their own.
   const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
   assert.equal(arrived.length, 1, `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
   t.diagnostic(`the words arrived ${arrived[0]!.text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`);
-});
+};
+
+test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, sayReaches(true));
+
+test('say reaches a working job on its stdin: told a file name, it writes that file; the same job never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, sayReaches(false));
 
 const WORD_CLOSEOUT = {
   type: 'object',
@@ -531,9 +549,11 @@ const started = (args: string[], cwd: string, stdin: 'ignore' | 'pipe' = 'ignore
   const child = spawn('claude', [...PRINT, ...args], { cwd, stdio: [stdin, 'pipe', 'ignore'] });
   let out = '';
   child.stdout!.on('data', (d) => { out += d; });
+  child.stdin?.on('error', () => {});
   const exited = new Promise<number | null>((r) => child.on('exit', (code, signal) => r(code ?? (signal ? 128 + (os.constants.signals[signal] ?? 0) : null))));
   return {
     child,
+    raw: () => out,
     lines: () => streamOf(out),
     exit: (ms: number) => Promise.race([exited, new Promise<'running'>((r) => setTimeout(() => r('running'), ms))]),
   };
@@ -744,4 +764,95 @@ test('M6, for wf say: a claude -p reading stream-json on its stdin takes a secon
   } finally {
     job.child.kill('SIGKILL');
   }
+});
+
+/*
+ * Stage 2 part 2a: a job's words come on its stdin (`--input-format stream-json`), so that a person's can follow them. Before
+ * the worker ran a job so, what a job is given as flags was measured under it against the same job given a plain prompt:
+ * the closeout (`--json-schema`), the spend cap (`--max-budget-usd`) and a denial. Each streamed job is run as the worker
+ * runs it: its brief the first line on its stdin, and its stdin ended at the first line of its stream that is a result.
+ */
+
+/** One line of stream-json input: a user message, as M6 wrote them. */
+const userLine = (text: string) => `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
+
+/** A `claude -p` given its brief as a prompt, run to its end: its exit, its stream, and whether its stream ended on a result line. */
+const plainJob = async (brief: string, args: string[], cwd: string, bound = 300_000) => {
+  const job = started([brief, ...args], cwd);
+  const exit = await job.exit(bound);
+  if (exit === 'running') job.child.kill('SIGKILL');
+  return { exit, lines: job.lines(), raw: job.raw() };
+};
+
+/**
+ * A `claude -p --input-format stream-json` run as the worker runs it: the brief its first stdin line, stdin held open until
+ * the first result, then ended. Also whether it exited on its own, stdin still open, within five seconds of its result.
+ */
+const streamedJob = async (brief: string, args: string[], cwd: string, bound = 300_000) => {
+  const job = started(['--input-format', 'stream-json', ...args], cwd, 'pipe');
+  job.child.stdin!.write(userLine(brief));
+  // The line parsed, and its own `type` read: measured on 2.1.280, a result line prints `type` far down its object, both here
+  // and under a prompt — `{"duration_api_ms":…` — so a line that starts `{"type":"result"` is never seen, and stdin never ended.
+  const resulted = await until(() => job.lines().some((l) => l.type === 'result'), bound);
+  const onItsOwn = resulted ? await job.exit(5_000) : 'running';
+  job.child.stdin!.end();
+  const exit = await job.exit(30_000);
+  if (exit === 'running') job.child.kill('SIGKILL');
+  return { exit, onItsOwn, lines: job.lines(), raw: job.raw(), resulted };
+};
+
+test('M8, M9, M10: a job reading its brief from stream-json on its stdin keeps its closeout, its spend cap and its denials as a job given the brief as a prompt does', {
+  skip,
+  timeout: 20 * 60_000,
+}, async (t) => {
+  const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
+  t.diagnostic(`claude --version: ${version}`);
+  const probe = tmp('m8');
+  const dir = (label: string) => { const d = path.join(probe, label); fs.mkdirSync(d); return d; };
+  const notes = (label: string) => { const d = dir(label); fs.writeFileSync(path.join(d, 'NOTES.txt'), NOTES); return d; };
+  const schema = ['--json-schema', JSON.stringify(FINISHED_CLOSEOUT)];
+  const CLOSE = 'Give your closing statement, with finished set to true. Call no tool first.';
+  const budget = ['--tools', 'Read', '--max-budget-usd', '0.01'];
+  const denied = (label: string): [string, string[]] => [DENIED_BRIEF(path.join(probe, `outside-${label}`)), [...schema, '--permission-mode', 'auto', '--permission-prompts', 'none']];
+  const [m8p, m8s, m9p, m9s, m10p, m10s] = await Promise.all([
+    plainJob(CLOSE, schema, dir('m8-plain')),
+    streamedJob(CLOSE, schema, dir('m8-streamed')),
+    plainJob(LOOP_BRIEF, budget, notes('m9-plain')),
+    streamedJob(LOOP_BRIEF, budget, notes('m9-streamed')),
+    plainJob(...denied('m10-plain'), dir('m10-plain')),
+    streamedJob(...denied('m10-streamed'), dir('m10-streamed')),
+  ]);
+  const shown = (r: { exit: number | null | 'running'; lines: StreamLine[] } & { onItsOwn?: unknown }) => {
+    const result = resultOf(r.lines);
+    return `exit ${r.exit}${r.onItsOwn !== undefined ? ` (on its own, stdin open: ${r.onItsOwn})` : ''}, results ${r.lines.filter((l) => l.type === 'result').length}, subtype ${result?.subtype}, structured_output ${JSON.stringify(result?.structured_output)}, cost ${result?.total_cost_usd}, denied ${JSON.stringify(((result?.permission_denials ?? []) as Array<{ tool_name?: string }>).map((d) => d.tool_name))}`;
+  };
+  for (const [label, r] of Object.entries({ m8p, m8s, m9p, m9s, m10p, m10s })) t.diagnostic(`${label}: ${shown(r)}`);
+  const firstKey = (raw: string) => raw.split('\n').find((l) => { try { return JSON.parse(l).type === 'result'; } catch { return false; } })?.slice(0, 24);
+  t.diagnostic(`a result line starts ${firstKey(m8s.raw)} streamed, ${firstKey(m8p.raw)} prompted`);
+
+  for (const s of [m8s, m9s, m10s]) {
+    assert.ok(s.resulted, 'each streamed job printed a result line — the line the worker ends stdin at');
+    assert.equal(s.onItsOwn, 'running', 'and was still running five seconds after it, its stdin open: ending stdin is what lets a job exit');
+    assert.equal(s.lines.filter((l) => l.type === 'result').length, 1, 'and one result: the brief is one turn');
+  }
+  // M8: the closeout.
+  assert.deepEqual(resultOf(m8p.lines)?.structured_output, { finished: true }, 'M8 control: a prompted job gives its structured_output');
+  assert.deepEqual(resultOf(m8s.lines)?.structured_output, { finished: true }, 'M8: a streamed job gives its structured_output');
+  assert.equal(m8s.exit, m8p.exit, 'M8: and exits as the prompted job did, once its stdin is ended');
+  // M9: the spend cap.
+  assert.equal(resultOf(m9p.lines)?.subtype, 'error_max_budget_usd', 'M9 control: a prompted job stops at its cap');
+  assert.equal(resultOf(m9s.lines)?.subtype, 'error_max_budget_usd', 'M9: a streamed job stops at its cap');
+  assert.equal(m9s.exit, m9p.exit, 'M9: and exits with the code the prompted job did');
+  assert.ok(Number(resultOf(m9s.lines)?.total_cost_usd) < 0.05, `M9: having spent about its cap, not run past it: ${resultOf(m9s.lines)?.total_cost_usd}`);
+  // M10: a denial.
+  for (const [label, r] of [['M10 control', m10p], ['M10', m10s]] as const) {
+    const result = resultOf(r.lines);
+    const denials = (result?.permission_denials ?? []) as Array<{ tool_name?: string; tool_use_id?: string }>;
+    const events = r.lines.filter((l) => l.type === 'system' && l.subtype === 'permission_denied');
+    assert.ok(denials.some((d) => d.tool_name === 'Write'), `${label}: the result says the write outside was denied`);
+    assert.deepEqual(events.map((e) => e.tool_use_id), denials.map((d) => d.tool_use_id), `${label}: a permission_denied line for each denial`);
+    assert.deepEqual(result?.structured_output, { finished: true }, `${label}: and it carried on to its closeout`);
+  }
+  assert.equal(m10s.exit, m10p.exit, 'M10: the streamed job exits as the prompted one did');
+  assert.equal(fs.existsSync(path.join(probe, 'outside-m10-streamed', 'x.txt')), false, 'M10: nothing was written outside its folder');
 });

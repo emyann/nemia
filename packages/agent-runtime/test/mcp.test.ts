@@ -96,7 +96,9 @@ test("no mcp and no .mcp.json: Claude Code is spawned strict, with no config —
     assert.ok(args.includes('--no-chrome'), `${harness}: nor the operator's Chrome, which no config names and strict leaves on`);
     assert.equal(args.includes('--mcp-config'), false, `${harness}: and no server is named in their place`);
     assert.deepEqual(configsUnder(root), [], `${harness}: nothing written for a task that named no servers`);
-    assert.ok(args.includes('the prompt'), `${harness}: the prompt survives`);
+    // A job reads its prompt on its stdin, where no list can take it; `claude-detached` takes it as `-p`'s value.
+    if (harness === 'claude-detached') assert.equal(args[args.indexOf('-p') + 1], 'the prompt', `${harness}: the prompt survives`);
+    else assert.equal(args.includes('the prompt'), false, `${harness}: the prompt is not an argument`);
   }
 });
 
@@ -111,10 +113,10 @@ test(".mcp.json in the checkout: named, so strict keeps the repository's servers
     assert.equal(next, '--strict-mcp-config', `${harness}: still strict, and the variadic list is ended by it, not by the prompt`);
     assert.ok(args.includes('--no-chrome'), `${harness}: and still no Chrome`);
   }
-  // `claude --bg` takes its prompt last, after the list; a job takes it as `-p`'s own value, ahead of every list.
+  // `claude --bg` takes its prompt last, after the list; a job on its stdin, where no list reaches it.
   assert.equal((await spawnAtDefaults({ cwd, harness: 'claude', config: { background: true } })).args?.at(-1), 'the prompt');
   const job = (await spawnAtDefaults({ cwd, harness: 'claude' })).args!;
-  assert.equal(job[job.indexOf('-p') + 1], 'the prompt');
+  assert.equal(job.includes('the prompt'), false);
 });
 
 test('a checkout whose .mcp.json is not JSON is refused before anything runs: unstartable, naming the file', async () => {

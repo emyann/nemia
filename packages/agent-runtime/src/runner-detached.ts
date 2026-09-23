@@ -75,11 +75,27 @@ export type HarnessSpec = {
   };
   /**
    * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to
-   * do instead. This runner has no `say` — a harness that runs a prompt and exits takes nothing in the
-   * meantime — so `say` refuses every task of a spec with this sentence, and a spec without one with the
-   * engine's.
+   * do instead. A spec without `input` has no `say` — a harness that runs a prompt and exits takes nothing in the
+   * meantime — so `say` refuses every task of it with this sentence, and a spec without one with the engine's.
    */
   noChannel?: string;
+  /**
+   * A harness that reads its messages as lines on its stdin, and so can be told something while it runs: `claudeJob`
+   * (`claude -p --input-format stream-json`). Set, `command` leaves the brief out, and the worker writes it as the first
+   * line on the harness's stdin; each word a person says after it is appended by `say` to the run's inbox — a file of
+   * lines beside its run file, the person's, which the worker only reads — and the worker writes it on. At the first line
+   * of the harness's output that closes (`closesOn`) the worker ends stdin: a harness that reads its stdin for more waits
+   * for its end before it exits, and words said after it are refused.
+   */
+  input?: {
+    /** The one line a message is written as — the brief, then each word said. Pure, and holds no newline. */
+    line: (text: string) => string;
+    /**
+     * The line of the harness's output after which it takes no more words: one that parses as a JSON object whose own
+     * `key` is `value`. Read as data, never as a prefix: Claude Code prints its result's `type` far down the line.
+     */
+    closesOn: { key: string; value: string };
+  };
   /**
    * The context windows this harness can be given, in tokens, both ends included: a task's `contextTokens` is handed to
    * `command`, and `file()` refuses one outside the range. Absent: the harness has no such knob, and `file()` refuses a
@@ -133,6 +149,7 @@ export const STALE_MS = 30_000;
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
 const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+const sizeOf = (p: string) => { try { return fs.statSync(p).size; } catch { return 0; } };
 
 /**
  * What the worker writes about one session, and the whole of what a detached harness knows of it.
@@ -148,7 +165,24 @@ type RunFile = {
   nativeId?: string; logFile: string; exitCode?: number;
   /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
   resumeFrom?: string;
+  /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
+  input?: RunInput;
+  /**
+   * How far into the inbox the worker has written on, in bytes: every line before it was handed to the harness, or was
+   * about to be — the worker writes this before it writes the line, so a worker started again on this run file never
+   * writes one twice. Absent, nothing has been, and the worker starts at `input.from`.
+   */
+  inputAt?: number;
+  /** The harness printed the line that closes its input, and the worker ended its stdin: words said now reach nobody. */
+  inputClosed?: true;
 };
+
+/**
+ * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
+ * on — the inbox's size when the run was spawned, so a run spawned again under a name finds no words said to the one
+ * before it — until a line of the harness's output `closesOn`.
+ */
+export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
 
@@ -172,6 +206,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const closeoutFile = (name: string) => path.join(dir, `${safe(name)}.closeout.json`);
   const schemaFile = (name: string) => path.join(dir, `${safe(name)}.schema.json`);
   const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
+  // `.jsonl`, so `readAll` never takes it for a run file.
+  const inboxFile = (name: string) => path.join(dir, `${safe(name)}.inbox.jsonl`);
 
   const readAll = (): Array<{ name: string; run: RunFile }> => {
     if (!fs.existsSync(dir)) return [];
@@ -270,6 +306,32 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       catch: (cause) => new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
     });
 
+  /**
+   * Words for a running session, appended to its inbox as the line its harness reads, for its worker to write on. Its own
+   * run file alone is read, as `find` reads it. Appended is not read: the worker writes a line on within a second, and one
+   * appended in the second before the harness's closing line is never written on (open issue 29). Refused, with nothing
+   * appended, where no worker would write the words on: no run under the name; a run its worker started with no input (one
+   * started before jobs took words); a run whose harness has printed its closing line; and one that is not working.
+   */
+  const sayTo = (input: NonNullable<HarnessSpec['input']>): NonNullable<RunnerOps['say']> => (session, text) =>
+    Effect.try({
+      try: () => {
+        const { name } = session;
+        let run: RunFile | undefined;
+        try { run = JSON.parse(fs.readFileSync(runFile(name), 'utf8')) as RunFile; } catch { /* none, or mid-write: refused below */ }
+        if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
+        if (!run.input) throw new Error(`\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
+        if (run.inputClosed) throw new Error(`\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
+        const state = observedState(run, Date.now());
+        if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
+        const line = input.line(text);
+        // A line with a newline in it would reach the harness as two, or as half a message.
+        if (/[\r\n]/.test(line)) throw new Error(`the words make a line with a line break in it, which the harness would read as two. Nothing was said.`);
+        fs.appendFileSync(inboxFile(name), `${line}\n`);
+      },
+      catch: (cause) => new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+    });
+
   return {
     spawn: (asked) =>
       Effect.try({
@@ -298,10 +360,16 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
           const { cmd, args } = spec.command(r, io);
+          // The inbox is never written or cleared here: it is the person's, and a run spawned again under the name starts
+          // past what was said to the one before it.
+          const input: RunInput | undefined = spec.input && {
+            first: spec.input.line(r.brief), inbox: inboxFile(r.name), from: sizeOf(inboxFile(r.name)), closesOn: spec.input.closesOn,
+          };
           const plan = {
             name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
             ...(spec.resumeCostCarried && r.resumeFrom ? { resumeFrom: r.resumeFrom } : {}),
+            ...(input ? { input } : {}),
           };
           // Written before the spawn, with no pid: the run is intended, and a crash here leaves
           // a file that says so. The worker overwrites it with its own pid the moment it starts.
@@ -375,5 +443,6 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       }),
 
     ...(spec.transcript ? { transcript: transcriptOf(spec.transcript) } : {}),
+    ...(spec.input ? { say: sayTo(spec.input) } : {}),
   };
 };

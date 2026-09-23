@@ -438,6 +438,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the first was paged refused the first's next page, and a tick read the harness as empty. Its tests had pinned that
   refusal as the rule. Open listings are kept by id, dropped at their last page, and bounded (`OPEN_LISTINGS`); a test
   pages two observes at once (learned by the run that put the A2A seam in the runtime, round 2).
+- **A stream-json line is parsed for its `type`, never matched at its start.** `claude -p --output-format stream-json`
+  prints its `result` line as `{"duration_api_ms":…`, with `type` far down it (2.1.280), so a check for `{"type":"result"`
+  never fires, and a worker that ends a job's stdin at its result would hold the job open for ever: a job reading
+  `--input-format stream-json` does not exit at its result, only when its stdin ends. The worker parses each output line
+  and reads the key (`closesOn` in `bin/ae-worker.ts`; learned by the run that let `say` reach a job).
 
 ## Rules the code keeps
 

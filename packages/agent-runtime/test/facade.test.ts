@@ -583,14 +583,19 @@ test('file() refuses background on every harness with no such mode, and remoteCo
   }
 });
 
-test('say() to a job at shipped defaults is refused before anything is read: it takes no words while it runs', async () => {
+test('say() to a job at shipped defaults is refused only as any task is — here, before its attempt — and never for its mode', async () => {
   const { engine } = shipped();
-  const id = await engine.file({ brief: 'b', cwd: '/r' });
-  await assert.rejects(engine.say(id, 'hello'), (e: Error & { exitCode?: number }) => {
-    assert.equal(e.exitCode, 2, e.message);
-    assert.match(e.message, /^say: A job \(`claude -p`\) is given its brief and takes no words while it runs\. File the task with `config\.background: true`/);
-    return true;
-  });
+  for (const config of [undefined, { permissionMode: 'bypassPermissions' as const }]) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', config });
+    await assert.rejects(engine.say(id, 'hello'), (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, e.message);
+      assert.match(e.message, /has not started an attempt yet/, "a job's words go on its stdin, which takes a mode Claude Code's inbox does not");
+      return true;
+    });
+  }
+  // A background session's are refused in that mode before anything is read.
+  const bg = await engine.file({ brief: 'b', cwd: '/r', config: { background: true, permissionMode: 'bypassPermissions' } });
+  await assert.rejects(engine.say(bg, 'hello'), (e: Error & { exitCode?: number }) => e.exitCode === 2 && /permissionMode: bypassPermissions`/.test(e.message));
 });
 
 test('file() refuses a contextTokens that is not a whole number of tokens, one outside what Claude Code takes, and any on codex — and journals one both Claude harnesses take', async () => {

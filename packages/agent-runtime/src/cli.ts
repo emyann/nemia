@@ -92,7 +92,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   }
   const background = meta.get('background');
   if (background !== undefined && background !== 'true' && background !== 'false') {
-    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which \`ae say\` can reach, or leave it out to run it as a job.`);
+    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`);
   }
   const resume = meta.get('resume');
   if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
@@ -267,7 +267,8 @@ const HELP = `ae — an engine for agent sessions
   ae show <id>                 the journal, line by line
   ae logs <id>                 the session's output
   ae stop <id>                 ask it to stop
-  ae say <id> "<text>"         tell its running background session something, and journal it
+  ae say <id> "<text>"         tell its running session something, and journal it: a job on
+                               its stdin until its result, a background session in its inbox
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae watch [cursor]            the same, followed
 
@@ -285,8 +286,9 @@ const HELP = `ae — an engine for agent sessions
                      codex:  none | minimal | low | medium | high | xhigh | max
     budgetUsd        dollars one attempt may spend — a job on claude, or claude-detached:
                      claude -p ends the session at it; a background session keeps no cap
-    background       true — claude only: run the session as claude --bg, which ae say
-                     can reach, instead of as a job (claude -p, the default)
+    background       true — claude only: run the session as claude --bg, which a person
+                     can attach to, instead of as a job (claude -p, the default); ae say
+                     reaches either
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
   a key not listed here, or a value the harness cannot take, is refused (exit 2)

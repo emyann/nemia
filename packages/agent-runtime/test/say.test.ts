@@ -33,8 +33,9 @@ type Row = { name: string; sessionId: string; state: string; status: string; sta
 
 /**
  * A fake `claude`. `agents` prints its rows, each with a `pid`, busy, as a session at work is listed; `--bg --name <n>`
- * adds one; `stop` and `rm` do what they do; `-p`, a job, works for ten seconds and prints nothing. While
- * `<bin>/agents-fails` exists, `agents` fails.
+ * adds one; `stop` and `rm` do what they do. `-p`, a job, reads its stdin a line at a time, as 2.1.280 does, and writes
+ * each line to `<bin>/<brief>.stdin`, the brief being its first line's words; told `finish`, it prints its result, and
+ * exits once its stdin ends — told `finish and linger`, not for a minute. While `<bin>/agents-fails` exists, `agents` fails.
  */
 const fakeClaude = () => {
   const bin = tmp('bin');
@@ -57,7 +58,26 @@ if (args[0] === 'stop' || args[0] === 'rm') {
   save();
   process.exit(0);
 }
-if (args[0] === '-p') setTimeout(() => {}, 10_000);
+if (args[0] === '-p') {
+  setTimeout(() => process.exit(0), 60_000);
+  let got = '', brief, linger = false;
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (d) => {
+    got += d;
+    for (let nl = got.indexOf('\\n'); nl !== -1; nl = got.indexOf('\\n')) {
+      const line = got.slice(0, nl);
+      got = got.slice(nl + 1);
+      const words = JSON.parse(line).message.content;
+      brief ??= words;
+      fs.appendFileSync(require('node:path').join(${JSON.stringify(bin)}, brief + '.stdin'), line + '\\n');
+      if (words === 'finish' || words === 'finish and linger') {
+        linger = words === 'finish and linger';
+        process.stdout.write(JSON.stringify({ subtype: 'success', is_error: false, result: 'done', type: 'result' }) + '\\n');
+      }
+    }
+  });
+  process.stdin.on('end', () => { if (!linger) process.exit(0); });
+}
 if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now(), cwd: process.cwd(), pid: 900000 + rows.length });
   save();
@@ -68,6 +88,10 @@ if (args[0] === '--bg') {
     rows: () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[],
     setRows: (rows: Row[]) => fs.writeFileSync(registry, JSON.stringify(rows)),
     agentsFails: (fails: boolean) => (fails ? fs.writeFileSync(agentsFails, '') : fs.rmSync(agentsFails, { force: true })),
+    /** What the job whose brief is `brief` has read on its stdin, a user message a line; none before it has started. */
+    stdin: (brief: string) => {
+      try { return fs.readFileSync(path.join(bin, `${brief}.stdin`), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as { type: string; message: { role: string; content: string } }); } catch { return undefined; }
+    },
   };
 };
 
@@ -112,7 +136,7 @@ const register = (row: Row, fields: Record<string, unknown>) => {
 
 /**
  * A task filed and ticked once, so its session is listed working — and, unless told not to, registered with an inbox. A
- * background session: at shipped defaults a Claude task is a job, which has no inbox.
+ * background session: at shipped defaults a Claude task is a job, which is told on its stdin (`job`, below).
  */
 const running = async (engine: Engine, spec: Partial<TaskSpec> = {}, withInbox = true) => {
   const id = await engine.file({ brief: 'do the work', cwd: work, ...spec, config: { background: true, ...spec.config } });
@@ -206,6 +230,83 @@ test("a task journalled on claude before a job was its default runs --bg with no
   await box.close();
 });
 
+/** Until `read` answers, bounded. */
+const until = async <T>(read: () => T | undefined | Promise<T | undefined>, what: string): Promise<T> => {
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const got = await read();
+    if (got !== undefined) return got;
+    if (Date.now() > deadline) assert.fail(`never saw ${what}`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
+
+/** A job filed at shipped defaults — no `background` — and ticked until its harness has read its brief on its stdin. */
+const job = async (engine: Engine, brief: string, spec: Partial<TaskSpec> = {}) => {
+  const id = await engine.file({ brief, cwd: work, ...spec });
+  await engine.tick();
+  await until(() => fake.stdin(brief), `${brief} read its brief`);
+  return id;
+};
+
+test('at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled', async () => {
+  const engine = createEngine({ root: tmp('board') });
+  const id = await job(engine, 'job-told');
+  const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
+
+  const said = await engine.say(id, text);
+  assert.equal(said.attempt, 1);
+  assert.deepEqual((await engine.view(id)).state.said, [said], 'journalled');
+  const read = await until(() => { const l = fake.stdin('job-told'); return l && l.length > 1 ? l : undefined; }, 'the words on its stdin');
+  assert.deepEqual(read, [
+    { type: 'user', message: { role: 'user', content: 'job-told' } },
+    { type: 'user', message: { role: 'user', content: text } },
+  ], 'one line each, a line break in the words kept inside theirs');
+
+  await engine.say(id, 'and the web app');
+  await until(() => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
+  assert.equal(fake.stdin('job-told')![2]!.message.content, 'and the web app', 'in the order they were said');
+  await engine.stop(id);
+  await engine.tick();
+});
+
+test("a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox", async () => {
+  const engine = createEngine({ root: tmp('board') });
+  const id = await job(engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
+  await engine.say(id, 'carry on');
+  await until(() => (fake.stdin('job-bypass')!.length === 2 ? true : undefined), 'the words on its stdin');
+  assert.equal((await engine.view(id)).state.said.length, 1);
+  await engine.stop(id);
+  await engine.tick();
+});
+
+test('a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused', async () => {
+  const root = tmp('board');
+  const engine = createEngine({ root });
+  const id = await job(engine, 'job-lingers');
+  await engine.say(id, 'finish and linger');
+  // Where the worker keeps the job, named as the runner names its files.
+  const at = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
+  const runFile = at('.json');
+  await until(() => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
+  assert.equal(JSON.parse(fs.readFileSync(runFile, 'utf8')).state, 'working', 'and it is still running');
+
+  // Its harness lists it working, so this is the worker's word, not the engine's: a rejection, with no exit code.
+  await assert.rejects(engine.say(id, 'one more thing'), (e: Refusal) => {
+    assert.equal(e.exitCode, undefined, `not a refusal: ${e.message}`);
+    assert.match(e.message, /has given its result and reads no more words/);
+    return true;
+  });
+  assert.deepEqual((await engine.view(id)).state.said.map((s) => s.text), ['finish and linger'], 'nothing more journalled');
+  assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
+  const inbox = fs.readFileSync(at('.inbox.jsonl'), 'utf8');
+  assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
+
+  await engine.stop(id);
+  for (let i = 0; i < 20 && !(await engine.view(id)).state.settled; i++) { await engine.tick(); await new Promise((r) => setTimeout(r, 50)); }
+  await refused(engine, id, 'hello', /has settled/);
+});
+
 // ─── refusals: exit 2, nothing sent, nothing journalled ─────────────────────
 
 test('refused: empty words, and words that are only whitespace', async () => {
@@ -240,22 +341,24 @@ test('refused: a Claude task in bypassPermissions, though its session runs and h
   await box.close();
 });
 
+test('refused: a task journalled on claude before a job was its default, in bypassPermissions — known for a background session once its harness lists it', async () => {
+  const root = tmp('board');
+  const engine = createEngine({ root });
+  const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
+  const journal = path.join(root, 'tasks', `${id}.jsonl`);
+  const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
+  const event = JSON.parse(filed!);
+  delete event.config.background;
+  fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
+  await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);
+  await box.close();
+});
+
 test("refused: words longer than Claude Code's inbox reads", async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, box } = await running(engine);
   await refused(engine, id, 'x'.repeat(CLAUDE_INBOX_LINE_MAX), /inbox drops a line over 1048576/, box);
   await box.close();
-});
-
-test('refused: a job that is running — listed working under its name, it takes no words — in words that name the mode that does', async () => {
-  const engine = createEngine({ root: tmp('board') });
-  const id = await engine.file({ brief: 'do the work', cwd: work });
-  await engine.tick();
-  const seen = await engine.view(id);
-  assert.equal(seen.state.attempts.at(-1)?.ended, null, 'its attempt is running');
-  await refused(engine, id, 'hello', /^say: A job \(`claude -p`\) is given its brief and takes no words while it runs\. File the task with `config\.background: true`/);
-  await engine.stop(id);
-  await engine.tick();
 });
 
 test('refused: a task that has not started an attempt', async () => {

@@ -17,7 +17,7 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { allowRuleOf, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
 import { answerOf, dueNote, messageRefusal, modeWord, retriesSpent, signoffsSpent, spentAsks, tryOf, type EarlierTry, type Retry, type RetryAsk, type RetryHow, type RetryMode } from './retry.ts';
@@ -1922,7 +1922,7 @@ export function retryLines(
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
     } else if (status === 'denied') {
-      lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [])}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
+      lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], step, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
     } else {
       lines.push(`${step.name}: ${status}.${shipAgain} Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
@@ -1935,17 +1935,31 @@ const RULE_CAP = 240;
 
 /**
  * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allow:` needs for a new run
- * (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, and a file
- * written, by any tool, `Edit(…)`. Each rule one line (`oneLine`), since the harness's words are free text; at most `DENIED_SHOWN`, then how
- * many more, as `deniedWords` names the calls themselves. Pure.
+ * (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a file
+ * written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A call
+ * the step's own `disallow:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would allow
+ * nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are free
+ * text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
  */
-export function deniedOffer(denied: readonly string[]): string {
-  const rules = [...new Set(denied.map(allowRuleOf))];
-  const named = rules.slice(0, DENIED_SHOWN).map((rule) => oneLine(rule, RULE_CAP));
-  const more = rules.length - named.length;
-  const them = rules.length === 1 ? 'it' : 'them';
-  const add = rules.length ? ` For a new run, add ${named.join(', ')}${more ? ` and ${more} more (wf logs)` : ''} to the folder's allow:, which allows ${them}.` : '';
-  return `denied — its harness denied its try ${rules.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add} This run's allow: is frozen at wf start, so a try of it is denied the same again.`;
+export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallow'> = {}, at: DeniedAt = {}): string {
+  const calls = [...new Set(denied)];
+  const fenced = calls.flatMap((call) => {
+    const rule = disallowedBy(call, step.disallow ?? [], at);
+    return rule ? [{ call, rule }] : [];
+  });
+  const rules = [...new Set(calls.filter((call) => !fenced.some((f) => f.call === call)).map((call) => allowRuleOf(call, at)))];
+  const add = rules.length ? ` For a new run, add ${shownList(rules)} to the folder's allow:, which allows ${rules.length === 1 ? 'it' : 'them'}.` : '';
+  const own = fenced.length
+    ? ` ${shownList(fenced.map((f) => f.call))} may be its own disallow: at work (${shownList([...new Set(fenced.map((f) => f.rule))])}), which beats any allow:, so no rule is offered for ${fenced.length === 1 ? 'it' : 'them'}.`
+    : '';
+  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allow: is frozen at wf start, so a try of it is denied the same again.`;
+}
+
+/** Rules or calls as `deniedOffer` names them: each one line, the first `DENIED_SHOWN`, then how many more. Pure. */
+function shownList(words: readonly string[]): string {
+  const named = words.slice(0, DENIED_SHOWN).map((word) => oneLine(word, RULE_CAP));
+  const more = words.length - named.length;
+  return `${named.join(', ')}${more ? ` and ${more} more (wf logs)` : ''}`;
 }
 
 /**

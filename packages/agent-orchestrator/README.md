@@ -454,9 +454,12 @@ not run, `retries:` spends nothing on it and never retries it, and the run waits
 The run's `allow:` is frozen on its record at `wf start`, so another try of the same run is denied the same call again. What
 `wf decide` offers says both ways out: the rule to add to the folder's `allow:` for a new run, and `wf retry <run> <step>
 --fresh`, a new session whose brief names what the last one was denied and tells it to do without (or `wf retry <run> <step>`
-to continue the session; never `--recheck`, since no check ran). A denied `Bash(npm test)` is offered as `Bash(npm test:*)`,
-and a denied write, by any file-editing tool, as `Edit(<path>)`, with an absolute path written `//path`: Claude Code matches
-every file write against `Edit` rules alone. There is no verb that widens `allow:` on a live run.
+to continue the session; never `--recheck`, since no check ran). A denied `Bash(npm)` is offered as `Bash(npm:*)` (the
+runtime keeps a command's first word), and a denied write, by any file-editing tool, as `Edit(<path>)`: Claude Code matches
+every file write against `Edit` rules alone. A path in the step's own directory is offered from it, `Edit(notes.md)`, since
+the next run's step works in a worktree named by its own id; any other absolute path is written `//path`, with this run's id
+as `*`. A call the step's own `disallow:` may have denied is offered no rule, since a deny beats every allow: the offer names
+the deny rule instead. There is no verb that widens `allow:` on a live run.
 
 Refused at load: any word but `fail`; the key on `codex`, which records no denials (its fence is the sandbox); and the key
 beside `background: true`, whose denials are not read. On any of them the line would never stop anything.

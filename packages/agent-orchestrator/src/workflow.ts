@@ -1000,26 +1000,86 @@ const EDITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 const PATH_TOOLS = ['Read', ...EDITING_TOOLS];
 
 /**
+ * Where a denied call was made: the session's own directory (the step's workspace on the run record) and the run's id. A new run works
+ * in directories named by its own id — `worktrees/<id>/<step>`, `runs/<id>/…` — so a path offered as denied would name this run's and
+ * never match the next's.
+ */
+export type DeniedAt = { cwd?: string; runId?: string };
+
+/** A call or a rule, `Tool` or `Tool(what)`, split. Pure. */
+const callOf = (written: string): { tool: string; what?: string } => {
+  const call = /^([^()]+)\((.*)\)$/s.exec(written);
+  return call ? { tool: call[1]!, what: call[2]! } : { tool: written };
+};
+
+/** A directory as a prefix: no trailing slash. */
+const dirOf = (cwd: string): string => cwd.replace(/\/+$/, '');
+
+/**
  * The rule that would allow a denied call, in `allow:`'s words, from the call as the runtime words it (`denialText`: `Bash(pytest)`,
  * `Write(/abs/notes.md)`, `SendMessage`). Pure. Claude Code's rules, which `allow:` is written in (`fileRuleRefusal`):
  *
  *   - a file-editing call is `Edit(…)`, whatever tool made it: Write, MultiEdit and NotebookEdit are matched against `Edit` rules alone,
  *     and `allow:` refuses a path rule on any of them;
- *   - an absolute path takes a second `/` (`Edit(//abs/notes.md)`): one `/` reads as a path from the settings' folder, not the root;
+ *   - a path in the session's own directory is written from it (`Edit(notes.md)`), as a rule without a leading `/` is read: the next
+ *     run's step works in a directory of its own, named by its own id, and an absolute path to this run's would never match it;
+ *   - any other absolute path takes a second `/` (`Edit(//abs/notes.md)`): one `/` reads as a path from the settings' folder, not the
+ *     root. A part of it that is this run's id is `*`, which matches the next run's: a path under `runs/<id>/artifacts` is offered with `*` for `<id>`;
  *   - a command is `Bash(<its first word>:*)`, since its first word is all the runtime keeps of it (`Bash(pytest)`), and a rule without
  *     `:*` allows that bare word and no command that goes on past it;
  *   - any other call is as it was denied: `Skill(look)`, `SendMessage`.
  *
  * What a person adds to a folder's `allow:` for a new run; nothing here widens the run that was denied, whose `allow:` is frozen.
  */
-export function allowRuleOf(denied: string): string {
-  const call = /^([^()]+)\((.*)\)$/s.exec(denied);
-  if (!call) return denied;
-  const [, tool, what] = call as unknown as [string, string, string];
+export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
+  const { tool, what } = callOf(denied);
+  if (what === undefined) return denied;
   if (tool === 'Bash') return `Bash(${what}:*)`;
   if (!PATH_TOOLS.includes(tool)) return denied;
-  const path = what.startsWith('/') && !what.startsWith('//') ? `/${what}` : what;
-  return `${EDITING_TOOLS.includes(tool) ? 'Edit' : tool}(${path})`;
+  return `${EDITING_TOOLS.includes(tool) ? 'Edit' : tool}(${pathRuleOf(what, at)})`;
+}
+
+function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
+  if (!path.startsWith('/') || path.startsWith('//')) return path;
+  if (cwd && path.startsWith(`${dirOf(cwd)}/`)) return path.slice(dirOf(cwd).length + 1);
+  return `/${runId ? path.split('/').map((part) => (part === runId ? '*' : part)).join('/') : path}`;
+}
+
+/**
+ * The first of a step's `disallow:` rules that may be what denied a call, or undefined. Pure. A deny beats every allow, so a call one
+ * of them denied is denied again in a new run whatever its `allow:` says, and is offered no allow rule (`deniedOffer`). *May*: the
+ * runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallow: Bash(npm run build)` at work, or `npm test` that
+ * nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names nothing, or names
+ * that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's directory for any
+ * other; `~` is nobody's here, and matches nothing), or exactly what the call names.
+ */
+export function disallowedBy(denied: string, disallow: readonly string[], at: DeniedAt = {}): string | undefined {
+  const call = callOf(denied);
+  return disallow.find((written) => {
+    const rule = callOf(written);
+    if (rule.tool !== call.tool && !(rule.tool === 'Edit' && EDITING_TOOLS.includes(call.tool))) return false;
+    if (rule.what === undefined) return true;
+    if (call.what === undefined) return false;
+    if (call.tool === 'Bash') {
+      const first = rule.what.replace(/:\*$/, '').trim().split(/\s+/)[0];
+      return first === call.what || first === '*';
+    }
+    if (PATH_TOOLS.includes(call.tool)) return pathUnder(rule.what, call.what, at.cwd);
+    return rule.what === call.what;
+  });
+}
+
+/** Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. Pure. */
+function pathUnder(pattern: string, path: string, cwd: string | undefined): boolean {
+  const target = path.startsWith('/') ? path.replace(/^\/\//, '/') : cwd ? `${dirOf(cwd)}/${path.replace(/^\.\//, '')}` : undefined;
+  if (target === undefined || pattern.startsWith('~')) return false;
+  const relative = !pattern.startsWith('//');
+  if (relative && !cwd) return false;
+  const bare = relative ? pattern.replace(/^\.?\//, '') : pattern.slice(1);
+  const glob = bare.split(/(\*\*|\*|\?)/).map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&'))).join('');
+  // A relative pattern with no `/` in it names a file at any depth below the directory, as a gitignore line does.
+  const from = relative ? `${dirOf(cwd!).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
+  return new RegExp(`^${from}${glob}(?:/.*)?$`, 's').test(target);
 }
 
 /** The words `slot:` takes. One: a run is counted against the cap on runs in flight, or it is one that watches the counted ones. */

@@ -11,7 +11,7 @@ import { loadWorkflows, workflowDescription, workflowFolder } from '../src/workf
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/workflow-store.ts';
-import { allowRuleOf, DENIALS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
+import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -1055,6 +1055,44 @@ test('`allowRuleOf`: the rule a folder\'s `allow:` takes for a call the harness 
   for (const denied of ['Write(/tmp/w/notes.md)', 'MultiEdit(src/a.ts)', 'NotebookEdit(n.ipynb)', 'Bash(pytest)']) {
     assert.doesNotThrow(() => fm('review', `allow: ${allowRuleOf(denied)}`), denied);
   }
+});
+
+test("`allowRuleOf` of a path this run made: from the step's own directory inside it, and the run's id as `*` outside it — the next run works in directories named by its own id", () => {
+  const at = { cwd: '/home/me/.agent-workflows/worktrees/r-7/implement', runId: 'r-7' };
+  assert.equal(allowRuleOf('Write(/home/me/.agent-workflows/worktrees/r-7/implement/notes.md)', at), 'Edit(notes.md)');
+  assert.equal(allowRuleOf('Write(/home/me/.agent-workflows/worktrees/r-7/implement/docs/a.md)', at), 'Edit(docs/a.md)');
+  assert.equal(allowRuleOf('Write(/home/me/.agent-workflows/runs/r-7/artifacts/implement/shot.png)', at), 'Edit(//home/me/.agent-workflows/runs/*/artifacts/implement/shot.png)');
+  assert.equal(allowRuleOf('Read(/home/me/.agent-workflows/worktrees/r-7/plan/PLAN.md)', at), 'Read(//home/me/.agent-workflows/worktrees/*/plan/PLAN.md)', "a sibling's worktree");
+  assert.equal(allowRuleOf('Write(/home/me/.agent-workflows/worktrees/r-7/implement-2/x)', at), 'Edit(//home/me/.agent-workflows/worktrees/*/implement-2/x)', 'a directory whose name starts as the cwd\'s is not in it');
+  assert.equal(allowRuleOf('Write(/tmp/r-70/x)', at), 'Edit(//tmp/r-70/x)', 'a part is the run\'s id whole, or it is kept');
+  assert.equal(allowRuleOf('Bash(pytest)', at), 'Bash(pytest:*)');
+  for (const denied of ['Write(/home/me/.agent-workflows/worktrees/r-7/implement/notes.md)', 'Write(/home/me/.agent-workflows/runs/r-7/artifacts/implement/shot.png)']) {
+    assert.doesNotThrow(() => fm('review', `allow: ${allowRuleOf(denied, at)}`), denied);
+  }
+});
+
+test("`disallowedBy`: the step's own deny rule that may have denied a call, which no allow rule overrides — and none for a call no rule of it names", () => {
+  const at = { cwd: '/w/r-7/implement', runId: 'r-7' };
+  assert.equal(disallowedBy('SendMessage', ['Bash(npm run build)', 'SendMessage']), 'SendMessage', 'a bare tool');
+  assert.equal(disallowedBy('Bash(npm)', ['Bash(npm run build)']), 'Bash(npm run build)', 'the command\'s first word is all the call keeps');
+  assert.equal(disallowedBy('Bash(git)', ['Bash(git push:*)']), 'Bash(git push:*)');
+  assert.equal(disallowedBy('Bash(rm)', ['Bash']), 'Bash');
+  assert.equal(disallowedBy('Write(/etc/hosts)', ['Edit(//etc/**)']), 'Edit(//etc/**)', 'an `Edit` rule covers every file-editing tool');
+  assert.equal(disallowedBy('Write(/w/r-7/implement/secrets/k.pem)', ['Edit(secrets/**)'], at), 'Edit(secrets/**)', 'a relative rule is the session\'s directory\'s');
+  assert.equal(disallowedBy('Read(/w/r-7/implement/deep/.env)', ['Read(.env)'], at), 'Read(.env)', 'a name with no slash, at any depth');
+  assert.equal(disallowedBy('Read(/w/r-7/implement/a/b.ts)', ['Read(//w/r-7/implement/a)'], at), 'Read(//w/r-7/implement/a)', 'a directory names what is under it');
+  assert.equal(disallowedBy('Skill(look)', ['Skill(look)']), 'Skill(look)');
+  // Refused: a rule on another tool, another command, another path, another skill; a relative rule with no directory to read it from.
+  assert.equal(disallowedBy('Bash(pytest)', ['Bash(npm run build)', 'SendMessage']), undefined);
+  assert.equal(disallowedBy('Bash(npm)', ['Read']), undefined);
+  assert.equal(disallowedBy('Write(/tmp/x)', ['Edit(//etc/**)']), undefined);
+  assert.equal(disallowedBy('Write(/etc/hostsx)', ['Edit(//etc/hosts)']), undefined, 'a path is matched whole');
+  assert.equal(disallowedBy('Read(/w/r-7/implement/a.ts)', ['Edit(**)'], at), undefined, 'an `Edit` rule is no `Read` rule');
+  assert.equal(disallowedBy('Write(/w/r-7/implement/src/a.ts)', ['Edit(secrets/**)'], at), undefined);
+  assert.equal(disallowedBy('Write(/w/r-7/implement/secrets/k.pem)', ['Edit(secrets/**)']), undefined, 'no directory: a relative rule is not read');
+  assert.equal(disallowedBy('Write(/home/me/x)', ['Edit(~/x)'], at), undefined, '`~` is nobody\'s here');
+  assert.equal(disallowedBy('Skill(look)', ['Skill(shadcn)']), undefined);
+  assert.equal(disallowedBy('SendMessage', []), undefined);
 });
 
 test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {

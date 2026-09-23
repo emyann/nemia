@@ -2931,6 +2931,33 @@ test("`wf decide` offers a denied step a new session with the bare `wf retry <ru
   assert.deepEqual(retryLines(DENYING, { ...r, pruned: { at: '2026-09-23T00:00:00Z' } } as Run, d, p, signedDone, asked, denied), [], 'pruned: nothing to try');
 });
 
+test("a denied step's offer names a rule the next run can match: a path in its worktree from the worktree, not by this run's id", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const wt = '/home/me/.agent-workflows/worktrees/r-1/implement';
+  const r = run({ implement: 't1', review: null });
+  const placed: Run = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement!, workspace: wt } } };
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: [`Write(${wt}/notes.md)`, 'Write(/home/me/.agent-workflows/runs/r-1/artifacts/implement/shot.png)'] });
+  const d = decision(DENYING, placed, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  const [line] = retryLines(DENYING, placed, d, p, signedDone, asked, denied);
+  assert.match(line!, /add Edit\(notes\.md\), Edit\(\/\/home\/me\/\.agent-workflows\/runs\/\*\/artifacts\/implement\/shot\.png\) to the folder's allow:/);
+  assert.doesNotMatch(line!, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
+});
+
+test("a denied step's offer gives no allow rule for a call its own disallow: may have denied, since a deny beats every allow, and says which rule", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail', disallow: ['Bash(npm run build)', 'SendMessage'] }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: ['Bash(npm)', 'SendMessage', 'Bash(pytest)'] });
+  const d = decision(DENYING, r, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  assert.deepEqual(retryLines(DENYING, r, d, p, signedDone, asked, denied), [
+    "implement: denied — its harness denied its try calls, and denials: fail passes none on. For a new run, add Bash(pytest:*) to the folder's allow:, which allows it. Bash(npm), SendMessage may be its own disallow: at work (Bash(npm run build), SendMessage), which beats any allow:, so no rule is offered for them. This run's allow: is frozen at wf start, so a try of it is denied the same again. A new session, told to do without it:  wf retry r-1 implement --fresh  (or continue its session: wf retry r-1 implement)",
+  ]);
+  const only = deniedOffer(['SendMessage'], { disallow: ['SendMessage'] });
+  assert.doesNotMatch(only, /add .* to the folder's allow:/, 'every call its own deny: nothing to add');
+  assert.match(only, /its try a call, .* SendMessage may be its own disallow: at work \(SendMessage\), which beats any allow:, so no rule is offered for it\./);
+});
+
 test("`deniedOffer`: each rule once, one line, the first five named and the rest counted", () => {
   assert.match(deniedOffer(['Skill(look)']), /its try a call, .* add Skill\(look\) to the folder's allow:, which allows it\./);
   const many = deniedOffer(['Bash(a)', 'Bash(b)', 'Bash(c)', 'Bash(d)', 'Bash(e)', 'Bash(f)', 'Bash(a)']);

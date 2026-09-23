@@ -4110,8 +4110,10 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
   'blocked'`).
 - **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allow:` for a new run, worded as Claude Code
-  matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm test:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`, an
-  absolute path as `//path`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What
+  matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
+  the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path
+  as `//path`, the run's id as `*`), except for a call the step's own `disallow:` may have denied, which no allow overrides
+  (`disallowedBy`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What
   your session was denied`), or the same session continued. `--recheck` is refused: no check ran. A pruned run offers nothing.
 - **Refused at load:** any word but `fail`; the key on codex, which records no denials; and beside `background: true`, whose denials
   are not read (issue 28).

@@ -606,7 +606,7 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
 `config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M11).
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -662,6 +662,18 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   settings read (this machine's lists no `npm run`, so the first reading stands). So M11 names its two scripts afresh on
   every run (`m11-allowed-<nonce>`, `m11-unlisted-<nonce>`), on no list but the checkout's; measured again so, on 2.1.280,
   the same day: the same result, the allowed one ran in both and the unlisted one was denied in both.
+- **M12: a job held open waits with nothing running, and an answer resumes it.** Stage 2 part 4a (R1), on **2.1.281**,
+  haiku, `dontAsk`, a store under `/tmp`: a task filed `holdOpen: true` whose brief gives a code word signed, and read
+  `input-required` with no process of its name in `ps` and nothing started by two more passes. Answered — *give the code
+  word I gave you*, `--budget 0.3` — the next pass resumed the session that signed (attempt 2's `resumeFrom` its first's id,
+  and its own id the same), the job was spawned with `--max-budget-usd 0.3`, and it answered the code word, which only that
+  session was told; it read 8,020 tokens from the prompt cache. It signed, waited again, and a close settled it `succeeded`,
+  note `closed`. Measured first by hand through `ae start`, `ae answer` and `ae close` (the same shape: an animal it picked,
+  and that animal back with `-again`), then as M12. Not measured: a held task on `codex` or on a `--bg` session
+  (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
+  `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
+  `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
+  conversation at full price.
 
 What a job gives up, or what is not done:
 

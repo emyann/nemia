@@ -300,6 +300,22 @@ orchestrator's calls to the runtime change.
    thirty characters) and a `denied` row on the step's section. The words are made one line and clipped to five calls
    (`deniedWords`), one writer for every surface. Nothing is decided on them: `denials: fail`, a step key that fails a step
    on a denial, is a card of its own.
+
+   **Part 4a done, the same day: the runtime holds a task open (R1).** A task filed `holdOpen: true` does not settle when an
+   attempt signs: `view` says `input-required` — A2A's `TASK_STATE_INPUT_REQUIRED` — and nothing runs, the signed session
+   let go as any ended attempt's is. `answer` journals an `input`, and the next pass starts the task's next turn, an attempt
+   that `--resume`s the session that signed, told the words in place of the brief; `close` journals `closed`, and the next
+   pass settles it `succeeded`. Two events and one optional key on `filed`; `decide` reads a turn — the inputs journalled
+   before an attempt's `starting` — and counts `maxAttempts`, the deadline and the budget per turn, so a task may wait on a
+   person as long as they take. A journal written before any of this folds to turn 0 and decides as it did. The journal
+   held up as the record of an open task: nothing was needed beyond an append, since the wait is read, not remembered. Where
+   it bends: no lock serialises two writers of one journal, so two answers before a turn starts are both told to it, in
+   order. Measured live on a Claude Code job (M12, 2.1.281, issue 28): it waited with no process, the answer's turn
+   remembered what only the signed session was told, under the answer's own `--max-budget-usd`, and a close settled it.
+   The A2A seam is unchanged: an attempt is still a Task of its own. **What waits on the owner's reading:** the
+   orchestrator filing a gate or a blocked sign-off as a held task and answering it (4b) — `wf ls`, the api and the board
+   learn `input-required` beside `needs-human`, never in it — and a step's tries and rounds as attempts of one task (4c, or
+   folded into part 5).
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

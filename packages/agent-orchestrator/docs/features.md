@@ -4094,8 +4094,9 @@ reviewers' fences rest on.
   `bypassPermissions`.
 - **`wf say` keeps its meaning**: part 2a writes a word to a job's stdin until its result (issue 29).
 
-**What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and nothing in `wf ls`, `wf decide` or the board says them
-yet. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+**What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and since part 3a (the same day) `wf ls`, `wf decide`, the
+api and the board say them: a `denied:` note beside the status, never in it. Nothing is decided on them yet — `denials: fail`,
+§10. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
 
 ## 1. A run that grows steps from a plan
 
@@ -4386,6 +4387,30 @@ how long such a session lasts before the harness compacts it, and what it forget
 
 Order: §8, then the workflow folder and a first run supervising this repository for a day, with the operator watching what
 it asks and what it gets wrong.
+
+## 10. `denials: fail`: a step that fails on what it was denied
+
+**Registered** 2026-09-23, as part 3 of thin runtime stage 2 (`docs/eval-thin-runtime.md` §5); part 3a shipped the surfaces
+and left this. A denial is recorded on every job's attempt and said on every surface, and nothing is decided on one: a
+reviewer in `dontAsk` denied the command it was told to run signs off all the same, and a person learns it only by reading
+the `denied:` line.
+
+**What it needs.** A step key, `denials: fail` (absent: record only, as today), read by the tick off the attempt's
+`denials` as `refusedCheck` reads a check: a signed try that was denied anything settles the step failed, with the denied
+calls as the reason, spending `retries:` like any failure. Its obligations: `STEP_KEYS` and the three outside the package
+(`KINDS`, `WorkflowStepSpec` and `specOf`, the board's mirror with `UNSET`), and a test that makes it *refuse* — a denied
+try failed — at shipped defaults. A background step's denials are not read (issue 28), so the key is refused beside
+`background: true` rather than accepted and never met.
+
+## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)
+
+**Registered** 2026-09-23, the orchestrator's half of R1. Part 4a shipped the runtime's: a task filed `holdOpen: true` waits
+`input-required` with nothing running when an attempt signs, `answer` starts a turn that `--resume`s its session, and
+`close` settles it (`packages/agent-runtime/README.md`, *Waiting for a person*; measured live as M12). Today a gate's
+answer is a new task filed with `resumeFrom`; with 4b a gated step, or a sign-off the harness blocked, would be one task
+held open: `wf approve` its close, and the words a person sends back with it (`--message`) its answer. **Waits on the owner's reading**, with 4c — a step's tries
+and rounds as attempts of one task — which may fold into part 5. Its trap is known: `input-required` is a phase four places
+compare exactly, so it goes beside `needs-human` on every surface, never into it (CLAUDE.md).
 
 ## Engine-side work
 

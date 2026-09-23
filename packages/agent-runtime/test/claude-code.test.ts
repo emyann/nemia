@@ -23,8 +23,10 @@ const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
 
 /**
- * A fake `claude`: `-p` records its arguments and prints a stream (and waits first when its brief is `wait`); `--bg`
- * records its arguments; `agents` lists what `agents.json` holds; `stop` and `rm` are recorded in order.
+ * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as
+ * 2.1.280 does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin
+ * ends. The result names its `type` last, as 2.1.280's does. `--bg` records its arguments; `agents` lists what
+ * `agents.json` holds; `stop` and `rm` are recorded in order.
  */
 const fake = () => {
   const dir = tmp('bin');
@@ -38,9 +40,11 @@ const fake = () => {
     `  --bg) printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
     `  -p) printf '%s\\n' "$@" > '${dir}/job-args.tmp'; mv '${dir}/job-args.tmp' '${dir}/job-args'`,
     echo({ type: 'system', subtype: 'init', session_id: JOB_ID }),
-    '      if [ "$2" = wait ]; then sleep 30; fi',
-    echo({ type: 'result', subtype: 'success', is_error: false, session_id: JOB_ID, total_cost_usd: 0.03, structured_output: { outcome: 'done' } }),
-    '      ;;',
+    `      while IFS= read -r line; do printf '%s\\n' "$line" >> '${dir}/job-stdin'`,
+    `        case "$line" in *'"content":"wait"'*) ;; *)`,
+    '  ' + echo({ subtype: 'success', is_error: false, session_id: JOB_ID, total_cost_usd: 0.03, structured_output: { outcome: 'done' }, type: 'result' }),
+    '        ;; esac',
+    '      done ;;',
     'esac',
     '',
   ].join('\n'), { mode: 0o755 });
@@ -66,12 +70,14 @@ const until = async <T>(read: () => Promise<T | undefined>, what: string, ms = 1
   }
 };
 
-test('a job is `claude -p` printing a stream, verbose, that no prompt can hold — the brief first and the lists ended before it could be taken', () => {
+test('a job is `claude -p` reading a stream and printing one, verbose, that no prompt can hold — its brief the first line on its stdin', () => {
   const args = claudeJob.command({
     name: 'ae/t/1', brief: 'the prompt', cwd: '/r', budgetUsd: 0.5, resumeFrom: BG_ID,
     config: { tools: ['Read', 'Bash'], permissionMode: 'dontAsk' },
   }).args;
-  assert.deepEqual(args.slice(0, 7), ['-p', 'the prompt', '--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none']);
+  assert.deepEqual(args.slice(0, 8), ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none']);
+  assert.equal(args.includes('the prompt'), false, 'the brief is not an argument');
+  assert.deepEqual(JSON.parse(claudeJob.input!.line('the prompt')), { type: 'user', message: { role: 'user', content: 'the prompt' } }, 'it is a user message, as M6 wrote one');
   assert.ok(args.indexOf('--tools') < args.indexOf('--permission-mode'), 'the variadic list is ended by the mode after it');
   assert.equal(args[args.indexOf('--permission-mode') + 1], 'dontAsk');
   assert.equal(args[args.indexOf('--max-budget-usd') + 1], '0.5', 'a job keeps its cap');
@@ -90,6 +96,7 @@ test('a task is run as a job unless it asks for a background session, which is `
       return s?.state === 'done' ? s : undefined;
     }, 'the job done');
     assert.equal(f.read('job-args')?.[0], '-p');
+    assert.deepEqual(f.read('job-stdin')?.map((l) => JSON.parse(l).message.content), ['go'], 'the brief on its stdin, and its stdin ended at the result');
     assert.equal(f.read('bg-args'), undefined, 'no background session for a job');
     assert.equal(seen.sessionId, 'ae/j/1', 'a job is known by its name');
     assert.equal(seen.nativeId, JOB_ID, "and carries Claude Code's own id, to resume and read by");
@@ -146,9 +153,33 @@ test('a stop, a release and words reach the mode the id belongs to, by its shape
     assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011']);
 
     const toJob = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
-    assert.match(toJob.message, /config\.background: true/, 'a job takes no words, and the refusal names the mode that does');
+    assert.match(toJob.message, /^claude: `ae\/j\/2` is `stopped`, not running/, "a job's words go to its worker, which refuses them once it has ended");
     const toBg = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/b/1', sessionId: BG_ID }, 'hello')));
     assert.match(toBg.message, /^claude --bg: /, 'words for a background session go to its inbox');
+  } finally { f.restore(); }
+});
+
+test('words said to a running job reach its stdin as the next user message, and once it has given its result it takes no more', async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const ops = opsIn(root);
+    await Effect.runPromise(ops.spawn({ name: 'ae/s/1', brief: 'wait', cwd: f.dir }));
+    await until(async () => f.read('job-stdin'), 'the brief read');
+    await Effect.runPromise(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'hello'));
+    const done = await until(async () => {
+      const s = (await Effect.runPromise(ops.observe)).get('ae/s/1');
+      return s?.state === 'done' ? s : undefined;
+    }, 'the job done on the words it was told');
+    assert.deepEqual(f.read('job-stdin')?.map((l) => JSON.parse(l)), [
+      { type: 'user', message: { role: 'user', content: 'wait' } },
+      { type: 'user', message: { role: 'user', content: 'hello' } },
+    ], 'the brief, then the words, each a user message on its stdin');
+    assert.deepEqual(done.closeout?.payload, { outcome: 'done' }, 'the result the words brought on');
+
+    const late = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'too late')));
+    assert.match(late.message, /^claude: `ae\/s\/1` has given its result and reads no more words/);
+    assert.equal(fs.readFileSync(path.join(root, 'runs', 'claude', 'ae_s_1.inbox.jsonl'), 'utf8').split('\n').filter(Boolean).length, 1, 'nothing appended once refused');
   } finally { f.restore(); }
 });
 

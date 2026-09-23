@@ -20,7 +20,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * A fake `claude` and `codex`, and a directory of gates. `claude agents` prints a registry, and `claude --bg --name <n>`
  * adds a session to it, working and busy. `claude -p` and `codex exec` run until a file named for their prompt is in
- * `gates` — the prompt is the task's id — so a test ends one session and leaves the rest running.
+ * `gates` — the prompt is the task's id, a job's read off its stdin — so a test ends one session and leaves the rest running.
  */
 const fakes = () => {
   const bin = tmp('bin');
@@ -42,7 +42,21 @@ if (args[0] === '--bg') {
   fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
   process.exit(0);
 }
-${runUntilGate('args[args.indexOf("-p") + 1]')}
+// A job reads its brief as the first line on its stdin; \`claude-detached\` takes it as \`-p\`'s value.
+if (args.includes('--input-format')) {
+  let got = '';
+  process.stdin.on('data', (c) => {
+    got += c;
+    const nl = got.indexOf('\\n');
+    if (nl === -1) return;
+    process.stdin.pause();
+    const prompt = JSON.parse(got.slice(0, nl)).message.content;
+    ${runUntilGate('prompt')}
+  });
+} else {
+  const prompt = args[args.indexOf("-p") + 1];
+  ${runUntilGate('prompt')}
+}
 `, { mode: 0o755 });
   fs.writeFileSync(path.join(bin, 'codex'), `#!${process.execPath}
 const fs = require('node:fs');

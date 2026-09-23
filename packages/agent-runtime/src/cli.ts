@@ -92,7 +92,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   }
   const background = meta.get('background');
   if (background !== undefined && background !== 'true' && background !== 'false') {
-    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which \`ae say\` can reach, or leave it out to run it as a job.`);
+    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`);
   }
   const resume = meta.get('resume');
   if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {

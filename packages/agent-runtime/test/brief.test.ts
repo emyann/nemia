@@ -68,7 +68,7 @@ test('`background:` is true or false, as written — anything else is refused, n
   assert.equal(parse(brief('background: false')).config?.background, false, 'false is a job, said out loud');
   assert.equal(parse(brief('model: opus')).config?.background, undefined, 'absent: the harness default, a job');
   for (const bad of ['yes', 'True', '1', 'bg']) {
-    refuses(brief(`background: ${bad}`), /is not true or false\. Write `background: true` to run the session as `claude --bg`, which `ae say` can reach, or leave it out to run it as a job/);
+    refuses(brief(`background: ${bad}`), /is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job/);
   }
 });
 

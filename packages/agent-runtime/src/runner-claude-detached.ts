@@ -15,6 +15,14 @@ import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
 export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, output: string[]): string[] => [
   '-p', r.brief,
   ...output,
+  ...claudePrintFlags(r, io),
+];
+
+/**
+ * What `claude -p` is given beside its brief and its formats: the same whether the brief is `-p`'s value or the first line
+ * on its stdin (`claudeJob`).
+ */
+export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): string[] => [
   // Variadic, and ended by the flag after it, as for `claude --bg`.
   ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
   ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
@@ -61,7 +69,7 @@ export const claudeDetached: HarnessSpec = {
   // The same transcript `claude --bg` writes, read the same way — but only once the session has exited:
   // its id is in the one object `--output-format json` prints, and that is printed last.
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
-  noChannel: "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude` with `config.background: true` to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
+  noChannel: "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,

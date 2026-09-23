@@ -64,9 +64,10 @@ export type HarnessArgs = {
   remoteControl?: boolean;
   /**
    * How Claude Code runs the session on the `claude` harness. Absent or false: as a job — `claude -p`, which runs its
-   * prompt to the end and exits, prints every event as it goes, and says what it was denied (`Sighting.denials`). True: as
-   * a background session — `claude --bg`, listed in `claude agents`, which a person can attach to, say words to while it
-   * runs, and bridge to claude.ai (`remoteControl`, which asks for it). Refused unless true or false, and `true` on any
+   * brief to the end and exits, prints every event as it goes, says what it was denied (`Sighting.denials`), and takes
+   * words said to it on its stdin until its result. True: as a background session — `claude --bg`, listed in
+   * `claude agents`, which a person can attach to, say words to while it runs, and bridge to claude.ai (`remoteControl`,
+   * which asks for it). Refused unless true or false, and `true` on any
    * other harness, none of which has two ways to run.
    */
   background?: boolean;

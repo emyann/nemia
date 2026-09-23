@@ -4,8 +4,9 @@
  * A job is `claude -p`, detached by the engine's worker (`runner-detached.ts`): it runs its brief to completion and exits,
  * so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it keeps. Under `-p` no mode
  * waits on a prompt; a call it may not make is denied and the session carries on, and the result says what was denied
- * (2.1.280, open issue 11). A background session (`config.background: true`) is `claude --bg` (`claudeOps`): a person can
- * attach to it, say words to it, and bridge it to claude.ai. One harness, two modes, chosen per task.
+ * (2.1.280, open issue 11). It reads its brief on its stdin, and words a person says while it works after it, until its
+ * result. A background session (`config.background: true`) is `claude --bg` (`claudeOps`): a person can attach to it,
+ * say words to it, and bridge it to claude.ai. One harness, two modes, chosen per task.
  *
  * Every verb given a session id finds its mode by the id's shape, with nothing remembered: a job is known by the name the
  * engine gave it (`ae/<task>/<n>`), and a background session by Claude Code's own id. So a stop or a read asked after a
@@ -17,9 +18,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Sighting } from './domain.ts';
 import { nameParts } from './a2a-map.ts';
-import { claudeOps, RunnerError, type ClaudeOptions, type RunnerOps } from './runner.ts';
+import { claudeOps, type ClaudeOptions, type RunnerOps } from './runner.ts';
 import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
-import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintArgs } from './runner-claude-detached.ts';
+import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from './runner-claude-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeCodeRefuses, claudeRefuses } from './runner-claude-vocabulary.ts';
 import { claudeStreamOutput } from './runner-detached-output.ts';
@@ -30,17 +31,27 @@ import { claudeStreamOutput } from './runner-detached-output.ts';
  * before its result still says what it was denied (`claudeStreamOutput`). `--verbose` is what `-p` needs to print a
  * stream at all. `--permission-prompts none` says what `-p` does in every mode, measured on 2.1.280: a call that would
  * ask is denied, never waited on — said here so a later default cannot make a job wait on a person who is not there.
+ *
+ * Its input is a stream too (`--input-format stream-json`): the brief is the first user message on its stdin, and each
+ * word said to it while it works is another, which it takes into the turn it is working (M6). It reads its stdin until
+ * it ends, so the worker ends it at the job's first result, and the job exits. Its closeout, its spend cap and what it is
+ * denied are as they are under a prompt (M8–M10, 2.1.280).
  */
 export const claudeJob: HarnessSpec = {
   name: 'claude',
   command: (r, io) => ({
     cmd: 'claude',
-    args: claudePrintArgs(r, io, ['--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none']),
+    args: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none', ...claudePrintFlags(r, io)],
   }),
+  // A user message, as M6 wrote them; the session is the job's own, so it names none.
+  input: {
+    line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
+    // Its result: the line after which a `-p` session reads nothing more, and whose `type` it prints far down the line (2.1.280).
+    closesOn: { key: 'type', value: 'result' },
+  },
   readOutput: claudeStreamOutput,
   nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
-  noChannel: 'A job (`claude -p`) is given its brief and takes no words while it runs. File the task with `config.background: true` to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).',
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
@@ -84,8 +95,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     // transcript file either way, which the background reader finds by that id.
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
 
-    say: (session, text) => isClaudeJob(session.sessionId)
-      ? Effect.fail(new RunnerError({ verb: 'say', message: `claude: ${claudeJob.noChannel}` }))
-      : bg.say!(session, text),
+    // A job's words go to its inbox, which its worker writes on to its stdin; a background session's to Claude Code's inbox.
+    say: (session, text) => of(session.sessionId).say!(session, text),
   };
 };

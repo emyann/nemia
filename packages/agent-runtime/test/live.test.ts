@@ -41,7 +41,7 @@
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -251,15 +251,16 @@ const NAME_CLOSEOUT = {
   additionalProperties: false,
 };
 
-test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
-  skip,
-  timeout: 15 * 60_000,
-}, async (t) => {
+/**
+ * Told a file name while it works, a session writes that file; the same session never told writes none. A `--bg` session
+ * is told through Claude Code's inbox, and a job (`claude -p`) on its stdin, by its worker.
+ */
+const sayReaches = (background: boolean) => async (t: TestContext) => {
   // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
   const engine = createEngine({ root: tmp('say-board') });
   const told = tmp('say-told');
   const control = tmp('say-control');
-  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'], background: true } };
+  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'], ...(background ? { background } : {}) } };
   const ids = {
     told: await engine.file({ ...common, cwd: told }),
     control: await engine.file({ ...common, cwd: control }),
@@ -291,14 +292,31 @@ test('say reaches a working --bg session: told a file name, it writes that file;
     assert.ok(said, 'the told session was seen working within five minutes, and told');
   });
 
-  // The session's own record has the words too, as the transcript reader gives them to a board: a system event
-  // whose text is the words, or Claude Code's sentence around them on a line of their own — never the model's own
+  // The session's own record has the words too, as the transcript reader gives them to a board — never the model's own
   // mention of the file's name, which would pass with the reader of words sent in broken.
   const { events } = await engine.transcript(ids.told);
+  if (!background) {
+    // A job's words are a user message on its stdin; said while it works, Claude Code keeps them as an attachment the
+    // reader gives as the user's words, as the brief is (2.1.280).
+    const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
+    assert.equal(arrived.length, 1, `the told job's transcript carries the words once, as the person's: ${JSON.stringify(events.filter((e) => e.role === 'user'))}`);
+    return;
+  }
+  // A `--bg` session's, a system event whose text is the words, or Claude Code's sentence around them on a line of their own.
   const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
   assert.equal(arrived.length, 1, `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
   t.diagnostic(`the words arrived ${arrived[0]!.text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`);
-});
+};
+
+test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, sayReaches(true));
+
+test('say reaches a working job on its stdin: told a file name, it writes that file; the same job never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, sayReaches(false));
 
 const WORD_CLOSEOUT = {
   type: 'object',

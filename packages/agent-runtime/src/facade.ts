@@ -21,7 +21,7 @@ import {
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
-import { claudeCodeOps, claudeJob, isClaudeJob } from './runner-claude-code.ts';
+import { claudeCodeOps, isClaudeJob } from './runner-claude-code.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { codex } from './runner-codex.ts';
@@ -187,10 +187,16 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing sent or journalled — for an empty
    * `text`; a task this engine has no record of; a harness with no channel into a running session (a
    * `HarnessSpec`, in its own words, or a `PromiseRunner` without `say`); what the harness cannot carry (Claude
-   * Code: a task in `bypassPermissions`, or words longer than its inbox reads); a task that has settled, or has
-   * been asked to stop; one with no attempt in flight; and one whose attempt its harness does not list running.
-   * A registry that cannot be read this time, or words the harness did not take, reject with the harness's
-   * error and no `exitCode`: ask again.
+   * Code's background session: a task in `bypassPermissions`, or words longer than its inbox reads); a task that
+   * has settled, or has been asked to stop; one with no attempt in flight; and one whose attempt its harness does
+   * not list running. A registry that cannot be read this time, or words the harness did not take, reject with the
+   * harness's error and no `exitCode`: ask again.
+   *
+   * A Claude Code job (`claude -p`) is told on its stdin: the words go to an inbox its worker writes on as the
+   * next user message, which the job takes into the turn it is working. Once it has given its result its input
+   * is closed, and words said then are not taken — a rejection with no `exitCode`, since the job is still
+   * `working` until it exits, and its record settles on the next tick. Words said in the half second before its
+   * result are taken and may never be read (open issue 29).
    */
   say(taskId: string, text: string): Promise<Said>;
   /** Everything that has happened since `after`, and where to resume. */
@@ -412,15 +418,14 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const h = harnesses[harness]!;
       const deliver = runner.say;
       const last = state.attempts.at(-1);
-      // A job takes its brief and nothing after it; only a background session has an inbox. The mode is the running
-      // session's, known by its id's shape as the runner knows it (below): a task filed on `claude` before jobs were its
-      // default runs `--bg` with no `background` in its config. With nothing running, the config says what it will be.
-      const running = !state.settled && !state.stopRequested && last !== undefined && last.ended === null;
-      if (h === 'claude' && !state.config?.background && !running) throw refuse(claudeJob.noChannel!);
       if (!deliver) {
         throw refuse((isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`);
       }
-      const cannot = isClaude(h) ? claudeSayRefuses(state.config ?? {}, text) : undefined;
+      // What Claude Code's inbox cannot carry is a background session's: a job's words go on its stdin. Asked here of a
+      // session that is one by its config, and below, once it is found, of one on `claude` that runs `--bg` without saying
+      // so — a task filed on it before jobs were its default.
+      const bgRefuses = () => claudeSayRefuses(state.config ?? {}, text);
+      const cannot = h === 'claude-bg' || (h === 'claude' && state.config?.background) ? bgRefuses() : undefined;
       if (cannot) throw refuse(cannot);
       // What the record says first, then what the harness says: a settled task is not asked about.
       if (state.settled) throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
@@ -440,7 +445,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
         if (registered) throw new Error(`say: the \`${harness}\` registry could not be read, or did not list ${name}, which Claude Code has registered. Nothing was said; ask again.`);
       }
       if (!sighting) throw refuse(`\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`);
-      if (h === 'claude' && isClaudeJob(sighting.sessionId)) throw refuse(claudeJob.noChannel!);
+      const cannotBg = h === 'claude' && !isClaudeJob(sighting.sessionId) ? bgRefuses() : undefined;
+      if (cannotBg) throw refuse(cannotBg);
       // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
       // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
       // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue

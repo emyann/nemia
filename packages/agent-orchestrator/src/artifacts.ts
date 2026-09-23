@@ -3,8 +3,8 @@
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`), and what that directory holds
  * (`artifactFiles`).
  *
- * Beneath `runner.ts`, beside `store.ts` and `worktree.ts`: it imports neither the engine nor `runner.ts`, which re-exports what it
- * exported of this before. The closeout itself is read off the engine's record, so `closeoutOf` stays there.
+ * Beneath the controllers, beside `store.ts` and `worktree.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports
+ * what it exported of this before. The closeout itself is read off the engine's record, so `closeoutOf` is `views.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';

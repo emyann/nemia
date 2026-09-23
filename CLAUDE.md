@@ -244,7 +244,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   would let through refuses the state the deletion makes — the wording is not the guard (learned by the run that let a person
   accept a loop out of rounds, round 2).
 - **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
-  `harnessBlocked` (`agent-orchestrator/src/runner.ts`), by `needsOf` in `apps/api/src/judged.ts`, by `stepState` in
+  `harnessBlocked` (`agent-orchestrator/src/views.ts`), by `needsOf` in `apps/api/src/judged.ts`, by `stepState` in
   `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes
   *beside* the phase, never into it: `listing` takes what the harness waits for as its own parameter (`waitingOf`) and decorates
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
@@ -405,14 +405,17 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
     built path into `src/`. `./workflow` is the pure format; the folder readers are exported from `agent-orchestrator`. The
     judge imports nothing from the workspace and nothing imports it (`packages/agent-runtime/test/contract.test.ts`,
     `packages/agent-orchestrator/test/contract.test.ts`, `packages/agent-judge/test/boundary.test.ts`).
-  - *Inside the orchestrator, every file is pure, store or controller* (`PURE`, `STORE`, `CONTROLLER` in
+  - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`). Pure files — `assess` in `run.ts` among them — read no disk, spawn
     nothing, and import no runtime and no file of the other kinds. Store files are the I/O beneath the controllers, import
-    no runtime and no controller, and load as a tree: `places.ts` and `workflow-store.ts` at the bottom, `store.ts` on
-    them, `worktree.ts` on `store.ts` and `places.ts`, the rest imported by `runner.ts` alone. `cli.ts` parses, calls,
-    prints, and reaches the package only through `runner.ts` and `workflow.ts`. A new file joins one kind, or the suite fails.
-  - *The runtime is reached through one client:* `src/runner.ts` alone imports agent-runtime, a type included (`CLIENT` in
-    the same test).
+    no runtime, no controller and not the client, and load as a tree: `places.ts` and `workflow-store.ts` at the bottom,
+    `store.ts` on them, `worktree.ts` on `store.ts` and `places.ts`; outside the store, only the client and the controllers
+    beneath the CLI import them. The controllers are `runner.ts`, the package's root, which re-exports by name; `views.ts`,
+    `start.ts`, `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts` beneath it, which import one another with no cycle; and
+    `cli.ts`, which parses, calls, prints, and reaches the package only through `runner.ts` and `workflow.ts`, as `bin/wf.ts`
+    reaches it only through `cli.ts`. A new file joins one kind, or the suite fails.
+  - *The runtime is reached through one client:* `src/runtime-client.ts` alone imports agent-runtime, a type included; every
+    controller beneath the CLI imports it, and it imports no controller (`CLIENT` in the same test).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes.
   A guard that only fires on a transition is wrong after a restart.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask)

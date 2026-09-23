@@ -19,7 +19,7 @@ export type Views = ReadonlyMap<string, TaskView>;
 
 /**
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
- * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in runner.ts).
+ * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the package's views.ts).
  * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
  * observation per filed task, read once for each state of a run. A run's page, which is polled, and the list of every
  * run read theirs with `everyView`.

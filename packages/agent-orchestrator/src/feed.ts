@@ -19,7 +19,7 @@
  * grows. A read stops at the last newline, so it never passes a line half written. Unlike the engine's, a cursor that is not at the start
  * of a line, or is past the end, is refused by name (`feedCursorRefusal`): read on from there and every line after it would be misread.
  *
- * Pure: the line, the fold and what a pass owes. The file — read, appended to and followed — is `feed-store.ts`'s, and `runner.ts` hands the
+ * Pure: the line, the fold and what a pass owes. The file — read, appended to and followed — is `feed-store.ts`'s, and the controllers hand the
  * rest of the package what it needs.
  */
 import type { FeedSaid, FeedWords } from './run.ts';

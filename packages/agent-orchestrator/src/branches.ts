@@ -4,8 +4,9 @@
  * and what a branch holds against the run's base — the files it added, one file's text, its diff stat, what it touched and the diff of
  * what decides a check.
  *
- * Beneath `runner.ts`, beside `store.ts` and `worktree.ts`, whose `git` helpers it reads through: it imports neither the engine nor
- * `runner.ts`, which re-exports what it exported of this before. What asks the engine as well — `parentOf`, `decide` — stays there.
+ * Beneath the controllers, beside `store.ts` and `worktree.ts`, whose `git` helpers it reads through: it imports neither the engine nor
+ * a controller, and `runner.ts` re-exports what it exported of this before. What asks the engine as well — `parentOf`, `decide` — is
+ * the controllers' (`views.ts`, `decide.ts`).
  */
 import { execFileSync } from 'node:child_process';
 import { isGitRun, resultSteps, type BranchStanding, type GitRun, type ParentRun, type Run, type Shipped } from './run.ts';

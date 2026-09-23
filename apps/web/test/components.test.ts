@@ -323,7 +323,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * theme waiting at its gate, an ending, on you.
  */
 function summaryRun(): RunSummary {
-  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null };
+  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null };
   const step = (name: string, status: string, extra = {}) => ({ name, taskId: `t-${name}`, branch: null, status, note: null, ...none, ...extra });
   const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
   return {
@@ -1145,9 +1145,9 @@ const LOGIN = 'Could not refresh your login because another Claude Code process 
 const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-1/1' };
 
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
-function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
   const run = runOf(status, over);
-  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, ...needs }] };
+  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs }] };
 }
 
 test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
@@ -1174,6 +1174,16 @@ test("a step's node says what it needs: a gate's question after `waiting on you`
   assert.ok(mute.includes(`title="blocked by the harness: ${LOGIN}"`) && mute.includes(`>blocked by the harness: ${LOGIN}</p>`), mute);
   assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
+});
+
+test("a step's node says how many calls its current try was denied, whole, and which on hover — and nothing when none was", () => {
+  const two = { words: 'denied: Skill(look), Bash(pytest)', calls: ['Skill(look)', 'Bash(pytest)'] };
+  const html = nodeMarkup(needing('unverified · done', { denied: two }, { waitingOnYou: [] }));
+  assert.ok(html.includes(`<p data-denied="true" title="${two.words}" class="truncate `), html);
+  assert.ok(html.includes('>denied 2 calls</p>'), html);
+  const one = nodeMarkup(needing('unverified · done', { denied: { words: 'denied: Edit(/a/very/long/path/to/a/file.ts)', calls: ['Edit(/a/very/long/path/to/a/file.ts)'] } }, { waitingOnYou: [] }));
+  assert.ok(one.includes('>denied 1 call</p>'), one);
+  assert.doesNotMatch(nodeMarkup(needing('unverified · done', {}, { waitingOnYou: [] })), /data-denied/);
 });
 
 /** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */

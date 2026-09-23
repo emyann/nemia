@@ -5,13 +5,13 @@
  * (`runtime-client.ts`).
  */
 import { nameFor, type Engine, type Usage } from './runtime-client.ts';
-import { acceptedLines, answerLines, assess, costLine, decision, gateLines, harnessWaitLine, hasStarted, listing, overBudgetLine, retriesDue, retryLines, roundLines, roundsDue, runCostLines, waitsOf, type BranchStanding, type CheckoutHold, type Decision, type Listing, type Round, type Run, type RunSlot, type SaidTo, type ToDecide, type Wait } from './run.ts';
+import { acceptedLines, answerLines, assess, costLine, decision, deniedWords, gateLines, harnessWaitLine, hasStarted, listing, overBudgetLine, retriesDue, retryLines, roundLines, roundsDue, runCostLines, waitsOf, type BranchStanding, type CheckoutHold, type Decision, type Listing, type Round, type Run, type RunSlot, type SaidTo, type ToDecide, type Wait } from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
 import { answerOf, type Retry } from './retry.ts';
 import { timeline, type Timeline } from './timeline.ts';
 import { readAnswers, readAsks, readRun, stepsOf } from './store.ts';
 import { shippedOf, standingsOf } from './branches.ts';
-import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, engineWord, harnessBlocked, parentsOf, readFilings, saidCount, saidIn, spendReader, taskPhases, waitingOf, type CheckReport } from './views.ts';
+import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, engineWord, harnessBlocked, parentsOf, readFilings, saidCount, saidIn, spendReader, taskPhases, waitingOf, type CheckReport } from './views.ts';
 import { checkoutHold, runSlots } from './tick.ts';
 
 /**
@@ -30,7 +30,7 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
   const standings = standingsOf(run);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
-  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views));
+  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views), deniedOf(views));
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
@@ -71,6 +71,11 @@ export async function decide(e: Engine, id: string): Promise<{
    * costs no observation; empty for a harness that says nothing, which is every harness but Claude Code's.
    */
   waitingOn: Record<string, string>;
+  /**
+   * For each step whose current try's sessions were denied a call, the line that names them (`deniedWords`): `denied: Skill(look),
+   * Bash(pytest)`. Off the engine's record of each ended attempt (`deniedOf`); empty for a step denied nothing, or whose harness cannot say.
+   */
+  denied: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
   waiting: Wait[];
   /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
@@ -154,6 +159,12 @@ export async function decide(e: Engine, id: string): Promise<{
     const attempt = views.get(record.taskId)?.state.attempts.at(-1)?.n;
     waitingOn[name] = harnessWaitLine(word, attempt === undefined ? null : nameFor(record.taskId, attempt));
   }
+  // What each step's current try was denied, off the same views: a tool it was not allowed, which a job carries on without.
+  const denied: Record<string, string> = {};
+  for (const [name, record] of Object.entries(run.steps)) {
+    const words = record.taskId ? deniedWords(deniedOf(views)(record.taskId)) : '';
+    if (words) denied[name] = words;
+  }
   // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
   // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is
@@ -174,6 +185,7 @@ export async function decide(e: Engine, id: string): Promise<{
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     accepted: acceptedLines(steps, run),
     waitingOn,
+    denied,
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),

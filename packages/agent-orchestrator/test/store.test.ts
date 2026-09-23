@@ -229,6 +229,8 @@ const board = () => {
   const deaf = new Set<string>();
   /** What the harness says each task's session waits for, as `claude agents` says it: the engine carries it onto the view (`TaskView.waitingFor`). */
   const waiting = new Map<string, string>();
+  /** What the harness denied each task's last attempt, as the runtime records it on the attempt's end (`Attempt.denials`): once it has settled. */
+  const denials = new Map<string, Array<{ tool: string; what?: string }>>();
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
@@ -247,7 +249,7 @@ const board = () => {
             ? { n: i + 1, ended: 'failed', reason, nativeId: `native-${id}`, exitCode: null, usage: null }
             : {
               n: i + 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
-              ...(reason ? { ended: 'failed', reason } : {}),
+              ...(reason ? { ended: 'failed', reason } : {}), ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
             })),
         },
       };
@@ -271,7 +273,7 @@ const board = () => {
     },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting };
+  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -2426,6 +2428,30 @@ test("a step whose harness blocked its session says what the harness waits for �
   b.waiting.delete(taskId);
   assert.equal(await status(), 'needs-human');
   assert.doesNotMatch(await decided(), /answer it in Claude Code/, 'no word, no line');
+});
+
+test("a step whose job was denied a call says so — on `wf ls` beside its line and on `wf decide` under it — and its status is unchanged", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.denials.set(taskId, [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'Skill', what: 'look' }]);
+  b.settle(taskId, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const printedBy = async (...args: string[]) => { printed.length = 0; await main(args, b.e); return printed.join('\n'); };
+
+  const [implement, review] = (await list(b.e, readRun(run.id))).steps;
+  assert.deepEqual([implement!.status, implement!.note], ['unverified · done', 'denied: Skill(look), Bash(pytest)'], 'each call once, and the status as it was');
+  assert.equal(review!.note, undefined, 'a step denied nothing says nothing');
+  assert.match(await printedBy('ls'), /^ {3}implement +unverified · done +master {2}· denied: Skill\(look\), Bash\(pytest\)$/m, '`wf ls`: after the branch, unpadded');
+  const decided = await decide(b.e, run.id);
+  assert.deepEqual(decided.denied, { implement: 'denied: Skill(look), Bash(pytest)' });
+  b.settle(`${run.id}-review`, 'succeeded', SIGNED);
+  assert.match(await printedBy('decide', run.id), /\n {2}implement\n(?: {4}.*\n)*? {4}denied: Skill\(look\), Bash\(pytest\)\n/, '`wf decide`: under the step');
+  assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
 });
 
 test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {

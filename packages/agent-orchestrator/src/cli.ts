@@ -973,7 +973,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, waitingOn, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, waitingOn, denied, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -1087,6 +1087,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (accepted[name]) console.log(`    accepted  ${accepted[name].split('\n').join('\n              ')}`);
         // And what its session is waiting for, when its harness blocked it and said what for: the wait is the step's whole story.
         if (waitingOn[name]) console.log(`    harness  ${waitingOn[name]}`);
+        // And what its sessions were denied: a tool it was not allowed, which a job carries on without, so its work may be short of it.
+        if (denied[name]) console.log(`    ${denied[name]}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
           // For a check that refused, the last of each stream, labelled: which pipe a line came from

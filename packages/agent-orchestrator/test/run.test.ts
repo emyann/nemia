@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, deniedWords, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, parseCloseout, placeText, REPLIES_SCHEMA, type Closeout } from '../src/closeout.ts';
 import { answerOf, dueNote, messageRefusal, nextTry, retriesSpent, sessionModel, signoffsSpent, spentAsks, tryOf, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry.ts';
 import { firstFiledAt, runStartedAt, taskUsage, timeline, timelineLines, timelineTotalLines, type TaskClock } from '../src/timeline.ts';
@@ -1265,6 +1265,38 @@ test("the word beside the phase disturbs nothing judged on it: the blocked step'
   assert.deepEqual(l.steps[0], { name: 'implement', status: 'needs-human: waiting for a permission prompt', branch: null,
     note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' },
     "`needs-human` is still compared exactly: the note says the harness blocked it, though the status says more");
+});
+
+// ─── what a step's sessions were denied ─────────────────────────────────────
+
+test('`deniedWords`: each denied call as a rule names it, one line each, the rest counted — and nothing for none', () => {
+  assert.equal(deniedWords(['Skill(look)', 'Bash(pytest)']), 'denied: Skill(look), Bash(pytest)');
+  assert.equal(deniedWords(['WebFetch']), 'denied: WebFetch');
+  assert.equal(deniedWords([]), '', 'none denied, or none recorded: no words at all');
+  // A path is the harness's free text: a newline in it would break `wf decide`'s line and the row `wf ls` prints it on.
+  const broken = deniedWords(['Edit(/tmp/a\nb)', 'Bash(rm\t-rf)']);
+  assert.equal(broken, 'denied: Edit(/tmp/a b), Bash(rm -rf)');
+  assert.doesNotMatch(broken, /\s\s|[\n\r\t]/);
+  assert.equal(deniedWords([`Read(${'x'.repeat(80)})`]), `denied: Read(${'x'.repeat(54)}…`, 'one long path is cut at 60');
+  assert.equal(deniedWords(['A', 'B', 'C', 'D', 'E', 'F', 'G']), 'denied: A, B, C, D, E and 2 more', 'five named, the rest counted');
+  assert.equal(deniedWords(['A', 'B', 'C', 'D', 'E']), 'denied: A, B, C, D, E');
+});
+
+test("`wf ls` says what a step's current try was denied in its note, never in its status", () => {
+  const r = run({ implement: 't1', review: 't2' });
+  const denied = (id: string) => (id === 't1' ? ['Skill(look)', 'Bash(pytest)'] : []);
+  const ls = (deniedOf?: (id: string) => readonly string[]) =>
+    listing(STEPS, r, shown({ t1: 'succeeded', t2: 'running (working)' }), signedOff({ implement: said('done') }), asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, [], undefined, () => undefined, deniedOf).steps;
+  const [implement, review] = ls(denied);
+  assert.deepEqual(implement, { name: 'implement', status: 'unverified · done', branch: null, note: 'denied: Skill(look), Bash(pytest)' },
+    'the status every reader compares is the one it was without the denials');
+  assert.equal(review!.note, undefined, 'a step denied nothing says nothing');
+  assert.deepEqual(ls(), ls(() => []), 'a caller that asks nothing reads as one told of none');
+  assert.equal(ls()[0]!.note, undefined);
+  // Beside whatever else its note says, after it.
+  const tried = listing(RETRIED, onTry([{ taskId: 't0', then: 'nudge' }], null), shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, [], undefined, () => undefined,
+    (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)'])).steps[0]!;
+  assert.match(tried.note ?? '', /^try 2.* · denied: Bash\(npm\)$/, "the current try's task, not the try before it");
 });
 
 // ─── a step that asks, answered ─────────────────────────────────────────────

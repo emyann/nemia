@@ -15,7 +15,7 @@ type Step = RunDetail['steps'][number];
 
 /** A step as a run's detail gives it, cut to what these read. */
 const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
-  ({ name, status, note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, lastLine: null, asked: null, check: null, ...over }) as Step;
+  ({ name, status, note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, lastLine: null, asked: null, check: null, ...over }) as Step;
 
 /** A run of these steps, waiting on `waitingOnYou`. */
 const run = (steps: Step[], waitingOnYou: string[], cancelledAt: string | null = null) => ({ steps, waitingOnYou, cancelledAt });

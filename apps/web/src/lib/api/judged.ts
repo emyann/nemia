@@ -42,6 +42,14 @@ export type RunWaiting = {
  * says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null where the harness said
  * nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a run's detail alone
  * (`lastLine`): the list reads no conversation. `approve`: what `wf ls` asks of you for a step waiting at its gate, `approve plan`; null for
- * any other step, and for one already sent back.
+ * any other step, and for one already sent back. `denied`: what the harness denied the step's current try, `calls` each as a permission rule
+ * names it (`Skill(look)`) and `words` the line `wf ls` says (`denied: Skill(look), Bash(pytest)`); null for a step denied nothing, and for
+ * one whose harness cannot say.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: boolean; waitingFor: { words: string; advice: string } | null; approve: string | null };
+export type StepNeeds = {
+  needs: string | null;
+  blockedByHarness: boolean;
+  waitingFor: { words: string; advice: string } | null;
+  approve: string | null;
+  denied: { words: string; calls: string[] } | null;
+};

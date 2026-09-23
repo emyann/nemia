@@ -78,6 +78,13 @@ export const needText = (need: Need): string => {
 export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
 
 /**
+ * What the harness denied a step's current try, as its node says it: how many calls, never which. The node's line is about thirty
+ * characters and truncates, and `denied: Skill(look), Bash(pytest)` is thirty-three — a path-scoped call alone can fill it — so the
+ * names would be cut on the one line that has to be read whole. They are the line's `title` and the step section's `denied` row.
+ */
+export const deniedNodeText = (calls: readonly string[]): string => `denied ${calls.length} call${calls.length === 1 ? '' : 's'}`;
+
+/**
  * A need with the step it is of, as the card and the banner say it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
  * and `approve plan`, whose words name their step already.
  */

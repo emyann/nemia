@@ -141,8 +141,8 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
  * run not over, anything that holds `wf rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on
  * no branch, or holds a change no commit has. A run with no worktree left answers `nothing`, and says why.
  *
- * Without `yes`, nothing is touched: each worktree and what it holds on disk (`du`, which counts a link and not what it points at — a
- * worktree's `node_modules` of links to the main checkout's costs nothing to keep). With it, the run is marked pruned first (`pruneFile`),
+ * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
+ * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it, the run is marked pruned first (`pruneFile`),
  * so that a pass reading it while its worktrees go files nothing (`advance`); then git removes each worktree — never `--force`, so a file
  * that turned up since it was read is git's refusal and not a loss — and the marker is written again with what was removed. A run left with
  * nothing removed and never pruned before is not marked. The tick never calls this.
@@ -208,7 +208,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || Boolean(run.pruned) });
   if (refusal) return { id, kind: 'refused', refusal, ...none };
 
-  const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path) }));
+  const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
   if (!yes) return { id, kind: 'prunable', worktrees, left: [] };
 
   const at = new Date().toISOString();
@@ -231,15 +231,22 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   return { id, kind: 'pruned', worktrees: removed, left, at };
 }
 
-/** What a directory holds on disk, in bytes, as `du` counts it: a link as a link. Zero when `du` cannot say. */
-function diskBytes(dir: string): number {
+/**
+ * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all while
+ * `beside` still holds it. `du` counts an inode once per invocation, at the first path it meets it under, so `beside` is named first and the
+ * directory's own line is read. Zero when `du` cannot say.
+ */
+function diskBytes(dir: string, beside: string): number {
+  const own = (out: string) => {
+    const line = out.trimEnd().split('\n').at(-1) ?? '';
+    return line.endsWith(`\t${dir}`) ? (Number.parseInt(line, 10) || 0) * 1024 : 0;
+  };
+  const args = fs.existsSync(beside) ? ['-sk', beside, dir] : ['-sk', dir];
   try {
-    const out = execFileSync('du', ['-sk', dir], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    return (Number.parseInt(out, 10) || 0) * 1024;
+    return own(execFileSync('du', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
   } catch (err) {
     // `du` says what it could not read on stderr, and still totals the rest.
-    const out = (err as { stdout?: string }).stdout ?? '';
-    return (Number.parseInt(out, 10) || 0) * 1024;
+    return own((err as { stdout?: string }).stdout ?? '');
   }
 }
 

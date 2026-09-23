@@ -119,12 +119,18 @@ const resultText = (content: unknown): string =>
  * event with those words, since the model is handed them as a reminder, not as its user's. Arriving while it
  * is idle, as the `isMeta` user line that starts its next turn, wrapped in Claude Code's own sentence about
  * where it came from: read as any `isMeta` line is.
+ *
+ * Words the session's own user said while it worked are the same attachment with the user's origin: `human` for a person
+ * typing into it, and none at all for a job's next message on its stdin (`-p --input-format stream-json`, measured on
+ * 2.1.280, which renders it to the model as "The user sent a new message while you were working"). Read as a `user`
+ * text event, as the words that started the turn are. A queued command that is not a prompt — Claude Code's notice that
+ * a task it ran in the background ended (`task-notification`) — gives nothing.
  */
 export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
   const line = entry as {
     type?: unknown; uuid?: unknown; timestamp?: unknown; subtype?: unknown; content?: unknown;
     isMeta?: unknown; isSidechain?: unknown; message?: { content?: unknown } | null;
-    attachment?: { type?: unknown; prompt?: unknown; origin?: { kind?: unknown } | null } | null;
+    attachment?: { type?: unknown; prompt?: unknown; commandMode?: unknown; origin?: { kind?: unknown } | null } | null;
   } | null;
   const at = isoTime(line?.timestamp);
   if (!line || !at || line.isSidechain === true) return [];
@@ -134,9 +140,10 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
   }
   if (line.type === 'attachment') {
     const a = line.attachment;
-    return a?.type === 'queued_command' && a.origin?.kind === 'peer' && typeof a.prompt === 'string'
-      ? [{ id, at, role: 'system', kind: 'system', text: a.prompt }]
-      : [];
+    if (a?.type !== 'queued_command' || typeof a.prompt !== 'string') return [];
+    const from = a.origin?.kind;
+    if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
+    return a.commandMode === 'prompt' && (from === 'human' || from === undefined) ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }] : [];
   }
   if (line.type !== 'user' && line.type !== 'assistant') return [];
   const role = line.isMeta === true ? 'system' : line.type;

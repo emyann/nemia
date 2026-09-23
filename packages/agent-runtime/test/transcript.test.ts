@@ -149,6 +149,22 @@ test('words another process sent a working session — a peer, or `say` — are 
   );
 });
 
+test("words the session's own user said while it worked — typed into it, or a job's next line on its stdin — are the user's; a notice of a background task is nothing", () => {
+  // As 2.1.280 wrote it into a `claude -p --input-format stream-json` job's transcript, for a user line on its stdin mid-turn.
+  const line = {
+    parentUuid: 'p', isSidechain: false, type: 'attachment', uuid: 'att-stdin', timestamp: at(0), sessionId: 's', entrypoint: 'sdk-cli',
+    attachment: { type: 'queued_command', prompt: 'The file to write is SAID-fcfc71ec.txt', source_uuid: 'src', commandMode: 'prompt', timestamp: at(0) },
+  };
+  const theirs = [{ id: 'att-stdin', at: at(0), role: 'user', kind: 'text', text: 'The file to write is SAID-fcfc71ec.txt' }];
+  assert.deepEqual(claudeTranscriptEvents(line, 0), theirs, 'no origin: the job\'s own user');
+  assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'human' } } }, 0), theirs, 'a person typing into it');
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, commandMode: 'task-notification', prompt: '<task-notification>done</task-notification>' } }, 0),
+    [],
+    'Claude Code\'s notice that a background task ended is not anyone\'s words',
+  );
+});
+
 test('read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read', async () => {
   const sessionId = randomUUID();
   const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));

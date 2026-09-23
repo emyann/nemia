@@ -1,5 +1,5 @@
 /**
- * The run store under `$WF_ROOT`: a run's record, the files a person owns beside it — its cancellation, its pruning, each ask, approval
+ * The run store under `$WF_ROOT`: a run's id and its record, the files a person owns beside it — its cancellation, its pruning, each ask, approval
  * and acceptance — and the directories a step's check stderr, artifacts and inputs are kept in, outside every workspace.
  *
  * Beneath `runner.ts`, as `retry.ts` is beneath `run.ts`: this file imports neither the engine nor `runner.ts`, which re-exports what it
@@ -400,3 +400,18 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
 export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 
 export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
+
+export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
+
+/**
+ * A run id a person can read.
+ *
+ * The engine lets the caller choose task ids, and a session's name is built from one — so the id
+ * IS what a human sees in `claude agents`. `t-mtxvs3nw-f4763a59` tells them nothing;
+ * `add-split-workflow-8imz` tells them which piece of work they are looking at, and the step
+ * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
+ */
+export const runId = (brief: string): string => {
+  const slug = brief.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28).replace(/-$/, '');
+  return `${slug || 'run'}-${Math.random().toString(36).slice(2, 6)}`;
+};

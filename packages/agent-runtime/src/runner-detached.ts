@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Observed, Sighting, Usage } from './domain.ts';
+import type { Denial, Observed, Sighting, Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
 import { writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
@@ -116,6 +116,8 @@ export type HarnessOutput = {
   usage?: Usage;
   /** The harness says it ended the session because it spent its budget. */
   budgetSpent?: true;
+  /** The tool calls the harness denied the session, in the order it first did. Absent when none, or when it does not say. */
+  denials?: Denial[];
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -291,6 +293,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
           ...(output?.read.usage ? { usage: output.read.usage } : {}),
           ...(output?.read.budgetSpent ? { budgetSpent: true as const } : {}),
+          ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
         });
       }
       return m;

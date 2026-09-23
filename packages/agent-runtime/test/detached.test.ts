@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { detachedOps, STALE_MS, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
 import { claudeResultOutput } from '../src/runner-detached-output.ts';
 import { trustedProjects } from '../src/runner-codex.ts';
 import { createEngine } from '../src/facade.ts';
@@ -586,6 +586,18 @@ test("a spec that reads its harness's output reports the answer found there, sta
   // A filesystem's clock, which some keep to the second: that much slack either side of the run.
   assert.ok(seen.closeout!.at >= before - 1_000 && seen.closeout!.at <= Date.now() + 1_000, `stamped ${seen.closeout!.at}, spawned ${before}`);
   assert.deepEqual(fs.readdirSync(workspace), []);
+});
+
+test("what a harness's output says it denied the session is on the session's sighting, as the spec read it — and nothing when it denied nothing", async () => {
+  const dir = root();
+  const denials = [{ tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
+  const says = (read: HarnessOutput): HarnessSpec => ({ name: 'sh', readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) });
+  const denied = detachedOps(says({ denials }), dir);
+  await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
+  assert.deepEqual((await settle(denied, 'ae/t23/1', 'done')).denials, denials);
+  const none = detachedOps(says({ denials: [] }), dir);
+  await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
+  assert.equal('denials' in (await settle(none, 'ae/t24/1', 'done')), false, 'an empty list is no key');
 });
 
 test("a run is not called over before the harness's last output is in its log — the answer read from it would be lost", async () => {

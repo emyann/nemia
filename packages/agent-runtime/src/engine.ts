@@ -229,13 +229,13 @@ export const step = Effect.fn('step')(function* (
     }
 
     case 'record-end': {
-      // What the attempt consumed and how its process exited are read off the same sighting the
-      // ending came from, and written beside it. Facts for the record; `decide` sees neither.
+      // What the attempt consumed, how its process exited and what its harness denied it are read off the same sighting
+      // the ending came from, and written beside it. Facts for the record; `decide` sees none of them.
       const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode,
+        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
       });
       break;
     }

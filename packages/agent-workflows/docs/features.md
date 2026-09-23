@@ -1924,7 +1924,7 @@ that leaves its timer holds `node --test` open, so run that mutant under `timeou
 
 ### Shipped: the api streams the feed
 
-The api's half of what was sketched here. What was built, in `apps/api/src/app.ts` beside the transcript stream:
+The api's half of what was sketched here. What was built, in `apps/api/src/feed.ts` beside the transcript stream (`steps.ts`):
 
 - **`GET /api/feed/stream`**, server-sent events over `watchFeed` from the package root: pushed by its `fs.watch` and backed by its 1 s
   timer, so the api keeps no poll of its own. One event a line: its name what the line is about (`feedEventOf`) — `step` for a line with
@@ -2250,7 +2250,7 @@ What was built:
   a DELETE of a card not in the queue, which writes nothing. The card's file keeps its mtime across the write: the package renames a new file
   over the card, and the mtime is the `filedAt` the Inbox page orders the cards by, so a card queued or taken back from the board would have
   jumped to the top of the list with the queue's time as its own. From review, round 2.
-- **`GET /api/ceilings`** (`apps/api/src/app.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
+- **`GET /api/ceilings`** (`apps/api/src/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
   before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
   whose non-count is a 500 in `runCapOf`'s sentence. `inFlight` lists the runs counted against the cap, oldest first. `held` lists the runs
   it holds, each with its count and `slotWord`'s words. With no cap nothing is read, as `runSlots` reads nothing. With a cap there is one
@@ -3180,11 +3180,11 @@ What it leaves:
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
   into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
   now what its brief tells it (round 4, above).
-- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/app.ts`) prints the hand-driven `git merge
+- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/decision.ts`) prints the hand-driven `git merge
   --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
   folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
   belongs with the board half above.
-- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/app.ts`), so
+- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/judged.ts`, `decision.ts`), so
   an ending held for the checkout draws as plain `waiting` — and a held try as one the next tick files — where `wf ls` says `waiting on the
   checkout (<run>'s ship has it)`.
 - **Answered: work that does not hold on the base branch once the ending has run.** `ship.md` aborts a trial merge that conflicts and signs
@@ -3214,7 +3214,7 @@ What the board calls:
   show this one all the same. `onYou` says `approve ship`, through `onYouWords`, and Approve on the run page reaches it — `needsOf` reads
   the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. It is also what tells
   such a gate from §6's on the board: a gate awaiting approval with no task is an ending's (`actsOnly` in apps/web).
-- **`resultSteps(steps)`** is the run's result, which `apps/api/src/app.ts` reads for a run's branches: `terminalSteps` there named, for a
+- **`resultSteps(steps)`** is the run's result, which `apps/api/src/decision.ts` reads for a run's branches: `terminalSteps` there named, for a
   folder with an ending step, a step with no branch.
 - **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for
   §6's gate; `sendBackTo(step, run)` says which step the send-back names, and `approvalRefusal` greys the button out in its words.
@@ -4010,7 +4010,7 @@ the try ended, in words, and draws each field by its shape (`apps/web/src/lib/ou
   a string is dropped), so the parsed closeout is not the statement. A statement `parseCloseout` refuses outright — JSON cut off, an
   array — has no closeout at all: the head says `unreadable`, said by the agent, with the parser's reason, and shows the statement whole
   beneath it (review, round 2: it had said only that a closeout could not be read, and hid what was said).
-- **Three api fields the tab lacked** (`apps/api/src/app.ts`): on `StepCloseout`, `schema`, each declared field's schema off the
+- **Three api fields the tab lacked** (`apps/api/src/tries.ts`): on `StepCloseout`, `schema`, each declared field's schema off the
   workflow the run froze, for a boolean's description and an empty array's item type, and `raw`, the statement as it came; and on each
   try, `unreadable`, the parser's error and the statement, where there is a statement and no closeout. Nothing else changed in the api,
   and nothing in this package.

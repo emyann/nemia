@@ -176,6 +176,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   e2e page that holds a read with `route` to fake a moment before a change routes before its `goto`: the say page's second page routed after
   the load, the replay's read went out first and came back after the journal said the session ended, and its box was closed for good in the
   dark theme only (learned by the run that made the board follow the feed, round 2).
+- **A suspense query keeps what it showed when a read again fails.** `useSuspenseQuery` throws only while it has no data
+  (`defaultThrowOnError` is `data === undefined`), and retries a failure three times first, so a run's page whose record read 404 after
+  `wf rm` still drew the run, and said nothing. Reading a query again is not a page saying what the read found: a page that must say a
+  thing is gone reads the query's `error` beside its `data`, and a query whose 404 is an answer does not retry it (`runGone` and `retryRun`
+  in `apps/web/src/lib/api.ts`; learned by the run that made a `removed` event read the run's record again, round 2).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the
@@ -213,7 +218,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
 - **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
-  `apps/api/src/app.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
+  `apps/api/src/decision.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
   English sentence — for a verb it does not know. Nothing fails: the board draws a `once more` button that copies
   *"review: enough — go on with what is there; its findings stay on the record, and …:  wf accept r-1 review --message …"*. So an offer
   the package gains adds its verb and its placeholder to that regex, a label to `DecideCommand` and to `apps/web/src/lib/api.ts`'s
@@ -227,7 +232,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   would let through refuses the state the deletion makes — the wording is not the guard (learned by the run that let a person
   accept a loop out of rounds, round 2).
 - **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
-  `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/app.ts`, by `stepState` in
+  `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/judged.ts`, by `stepState` in
   `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes
   *beside* the phase, never into it: `listing` takes what the harness waits for as its own parameter (`waitingOf`) and decorates
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the

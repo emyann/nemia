@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
+import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 
 /** GET /api/runs/:id answering `body`, for the length of the test. */
@@ -339,4 +339,42 @@ test("REFUSED: a run's detail without its gate — who it waits on in wf ls's wo
   }
   // Null is an answer: a step with no gate, and nothing to approve.
   assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })));
+});
+
+test('a run removed while its page is open is said as gone on the one read that finds none: its last read is kept, and a 404 is not tried again', async (t) => {
+  const before = globalThis.fetch;
+  const asked: string[] = [];
+  const said = "No run 'r-1' in this store. GET /api/runs (or `wf ls`) lists the runs it has; check WF_ROOT if you expected it here.";
+  globalThis.fetch = (async (url: string) => {
+    asked.push(url);
+    return new Response(JSON.stringify({ error: said }), { status: 404, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  const client = new QueryClient();
+  t.after(() => {
+    globalThis.fetch = before;
+    client.clear();
+  });
+  const last = detail({ graph });
+  client.setQueryData(runQuery('r-1').queryKey, last);
+  // A page open on the run, which read it on its load: nothing is read until the feed says so.
+  const observer = new QueryObserver(client, { ...runQuery('r-1'), refetchOnMount: false });
+  t.after(observer.subscribe(() => {}));
+
+  // What the feed's `removed` does: the record read again, exactly.
+  await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
+  const result = observer.getCurrentResult();
+  assert.equal(runGone(result.error), true, `the read that found none is told apart: ${String(result.error)}`);
+  assert.equal(result.error?.message, said, "in the api's words");
+  assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');
+  assert.deepEqual(asked, ['/api/runs/r-1'], 'read once: a run gone is said at once, not after three tries');
+});
+
+test('only a 404 is a run gone: any other failure is tried again three times, as before', () => {
+  assert.equal(runGone(new ReadRefusal('No run', 404)), true);
+  for (const other of [new ReadRefusal('the api is down', 502), new ReadRefusal('refused', 400), new Error('without its graph'), undefined]) {
+    assert.equal(runGone(other), false, String(other));
+    assert.equal(retryRun(0, other), true, `${String(other)} is tried again`);
+    assert.equal(retryRun(3, other), false, `${String(other)} three times, and no more`);
+  }
+  assert.equal(retryRun(0, new ReadRefusal('No run', 404)), false, 'a run gone is not tried again');
 });

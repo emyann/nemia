@@ -26,7 +26,7 @@ const base = git('rev-parse', 'HEAD').trim();
 const { app } = await import('../src/app.ts');
 const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } = await import('agent-workflows');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
-type Ceilings = import('../src/app.ts').Ceilings;
+type Ceilings = import('../src/ceilings.ts').Ceilings;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };

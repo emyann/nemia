@@ -24,8 +24,9 @@ fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\n
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
-const { app, diffFiles, DIFF_LINES } = await import('../src/app.ts');
-type DecideCommand = import('../src/app.ts').DecideCommand;
+const { app } = await import('../src/app.ts');
+const { diffFiles, DIFF_LINES } = await import('../src/decision.ts');
+type DecideCommand = import('../src/decision.ts').DecideCommand;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });

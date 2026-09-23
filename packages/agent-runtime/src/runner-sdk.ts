@@ -30,6 +30,7 @@ import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting, Usage } from './domain.ts';
 import { Runner, RunnerError } from './runner.ts';
 import { renderTranscript } from './runner-claude-transcript.ts';
+import type { HarnessArgs } from './harness-args.ts';
 
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: Observed; abort: AbortController; toolCalls: number; usage?: Usage };
@@ -37,15 +38,15 @@ type Live = { sessionId: string; state: Observed; abort: AbortController; toolCa
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
 
-  const pump = (name: string, r: { brief: string; cwd: string; model?: string; permissionMode?: string }, abort: AbortController) =>
+  const pump = (name: string, r: { brief: string; cwd: string; config?: Pick<HarnessArgs, 'model' | 'permissionMode'> }, abort: AbortController) =>
     Effect.promise(async () => {
       const q = query({
         prompt: r.brief,
         options: {
           cwd: r.cwd,
           abortController: abort,
-          ...(r.model ? { model: r.model } : {}),
-          ...(r.permissionMode ? { permissionMode: r.permissionMode as never } : {}),
+          ...(r.config?.model ? { model: r.config.model } : {}),
+          ...(r.config?.permissionMode ? { permissionMode: r.config.permissionMode as never } : {}),
         },
       });
       const set = (patch: Partial<Live>) => {

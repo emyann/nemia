@@ -206,7 +206,7 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   // runtime's src/ by path, when node_modules was a link into the main checkout; docs/architecture.md now
   // refuses that route (packages/agent-runtime/test/contract.test.ts).
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
-  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), permissionMode: 'read-only' });
+  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), config: { permissionMode: 'read-only' } });
   const sandbox = args[args.indexOf('-s') + 1];
   const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
   assert.ok(reviewCannotWrite, 'the shipped reviewer runs read-only on the engine in this tree');

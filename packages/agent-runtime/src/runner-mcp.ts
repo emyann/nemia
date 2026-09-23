@@ -5,7 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { McpServer, SpawnRequest } from './runner.ts';
+import type { McpServer } from './runner.ts';
+import type { HarnessArgs } from './harness-args.ts';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
@@ -68,7 +69,7 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
  * the task names none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
  * `headers` value may be a secret.
  */
-export const writeMcpConfig = (file: string, mcp: SpawnRequest['mcp']): string | undefined => {
+export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | undefined => {
   if (!mcp || !Object.keys(mcp).length) { fs.rmSync(file, { force: true }); return undefined; }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });

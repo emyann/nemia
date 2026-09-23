@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRIEF_KEYS, parseBrief, type BriefKey } from '../src/cli.ts';
+import { HARNESS_ARGS } from '../src/facade.ts';
 
 const brief = (front: string, body = 'do the thing') => `---\n${front}\n---\n${body}`;
 const parse = (text: string) => parseBrief(text, '/fallback');
@@ -49,7 +50,11 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
-    assert.deepEqual(parse(brief(`${key}: ${written}`))[key], read, key);
+    const spec = parse(brief(`${key}: ${written}`));
+    // A harness's argument is written as a key like any other, and filed under `config`, where the task carries it.
+    const where = (HARNESS_ARGS as readonly string[]).includes(key) ? (spec.config ?? {}) : spec;
+    assert.deepEqual((where as Record<string, unknown>)[key], read, key);
+    assert.equal(Object.hasOwn(spec, key) && where !== spec, false, `${key} is not left beside \`config\``);
   }
 });
 
@@ -78,7 +83,7 @@ test('a contextTokens that is not a whole number of tokens, in digits, is refuse
   for (const bad of ['0', '-1', '1e5', '200000.5', 'lots', '9'.repeat(400)]) {
     refuses(brief(`contextTokens: ${bad}`), /is not a number of tokens.*like `contextTokens: 200000`/);
   }
-  assert.equal(parse(brief('contextTokens: 150000')).contextTokens, 150000, 'the range is file()\'s to check');
+  assert.equal(parse(brief('contextTokens: 150000')).config?.contextTokens, 150000, 'the range is file()\'s to check');
 });
 
 test('a maxAttempts that is not a whole number from 1 is refused', () => {
@@ -129,7 +134,7 @@ test('a closeoutSchema that cannot be read, is not JSON, or is not an object is 
 test('comments, CRLF and `worktree: false` mean what a person writing them means', () => {
   const spec = parse(brief('# a note on its own line\nharness: codex   # the reviewer\nworktree: false').replace(/\n/g, '\r\n'));
   assert.equal(spec.harness, 'codex');
-  assert.equal(spec.worktree, undefined, '`false` is no worktree, not one named "false"');
+  assert.equal(spec.config?.worktree, undefined, '`false` is no worktree, not one named "false"');
   assert.equal(spec.brief, 'do the thing');
 });
 

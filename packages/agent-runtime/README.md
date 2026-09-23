@@ -38,8 +38,12 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd`, `contextTokens`, `remoteControl` — is a field
-carried on the task and read by a runner, never a callback into `decide`; so is `priority`, read by the pass that orders the board.
+knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
+into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
+`contextTokens`, `remoteControl`, `worktree` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
+`test/core-reads.test.ts` refuses either the day it reads one. `budgetUsd` is the task's own, read by a runner; `priority` is
+read by the pass that orders the board.
 
 ### The one real decision in here: resume policy
 
@@ -162,9 +166,10 @@ channels, the lot. Keep your `effect` version aligned with this package's if you
 tags are identity-based, and two copies in one tree do not see each other's services. A consumer
 who never imports Effect can never have that problem.
 
-Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — one function,
-`refusalOf` in `src/engine.ts`, and `test/refusal.test.ts` holds both doors to it — and fails with `FileRefused`,
-a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
+Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — `refusalOf` in
+`src/engine.ts` for the task's own fields, and `argsRefusalOf` in `src/harness-args.ts` for the checks every harness shares
+of its `config`, which every `Runner` asks (`Runner.layer`); `test/refusal.test.ts` holds both doors to both — and fails
+with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
 ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6).
 
 ## Several harnesses, one board
@@ -243,6 +248,9 @@ after a space starts a comment. The keys are a closed list:
 | `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
 
+A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
+`tools`, `effort`, `contextTokens` — under the task's `config`, where `file()` takes them.
+
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
@@ -250,7 +258,9 @@ of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journ
 and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
-**`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
+**`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
+`config`, where a key that is no harness argument is refused by name, and one filed beside `config` instead of in it is
+refused saying where it goes:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
@@ -1193,7 +1203,8 @@ selector, and it is why no attempt can ever run twice.
 | `src/facade.ts` | `createEngine`: the engine in Promises, and what `file()` refuses |
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
-| `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
+| `src/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
+| `src/harness-args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
 | `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — and Claude Code's `--bg` runner, which stays beside it: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so apart the two files would import each other |
 | `src/runner-transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/runner-claude-transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
@@ -1221,7 +1232,9 @@ selector, and it is why no attempt can ever run twice.
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
 | `test/pool.test.ts` | pools by subscription, at shipped defaults — fake `claude` and `codex` whose sessions run until the test lets them go: a `claude-detached` session counted against `claude`'s ceiling, `codex` and a `check` each in their own |
-| `test/journal.test.ts` | the store and the feed's cursor |
+| `test/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
+| `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
+| `test/core-reads.test.ts` | `domain.ts` and `engine.ts` read no harness argument: the `config` they carry is handed on unopened |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |

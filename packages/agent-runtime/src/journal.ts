@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
+import { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 
 /**
  * One entry of the board-wide feed: an event, and which task it happened to.
@@ -63,9 +64,40 @@ export type JournalOps = {
   readonly subscribe?: (onChange: () => void) => () => void;
 };
 
+/**
+ * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
+ * line is what was said when it was said, so a change to an event's shape is made where it is read.
+ *
+ * One change so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
+ * they are the adapter's configuration now, under `config` (`harness-args.ts`). A `filed` event with any of them at
+ * its top level has them moved under `config`, where a value already there is kept: `config` is the newer word. So
+ * `fold` reads one shape, and a store holding tasks filed on both sides of the change lists them alike.
+ */
+export const upgrade = (event: Event): Event => {
+  if (event.kind !== 'filed') return event;
+  const legacy = event as Event & Record<string, unknown>;
+  const moved = HARNESS_ARGS.filter((key) => Object.hasOwn(legacy, key));
+  if (!moved.length) return event;
+  const lifted: Record<string, unknown> = {};
+  const { config: given, ...rest }: Record<string, unknown> = legacy;
+  for (const key of moved) {
+    if (legacy[key] !== undefined) lifted[key] = legacy[key];
+    delete rest[key];
+  }
+  const config = { ...lifted, ...(given as HarnessArgs | undefined) };
+  return { ...(rest as Event & { kind: 'filed' }), ...(Object.keys(config).length ? { config } : {}) };
+};
+
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
-  /** Any implementation becomes a Layer. This is the only way a store reaches the engine. */
-  static layer = (ops: JournalOps) => Layer.succeed(Journal)(Journal.of(ops));
+  /**
+   * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where a journal written
+   * before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
+   */
+  static layer = (ops: JournalOps) => Layer.succeed(Journal)(Journal.of({
+    ...ops,
+    read: (taskId) => ops.read(taskId).pipe(Effect.map((events) => events.map(upgrade))),
+    feed: (after) => ops.feed(after).pipe(Effect.map(({ entries, cursor }) => ({ entries: entries.map((e) => ({ ...e, event: upgrade(e.event) })), cursor }))),
+  }));
 
   /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));

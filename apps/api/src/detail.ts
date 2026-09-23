@@ -516,7 +516,9 @@ export async function detail(run: Run): Promise<RunDetail> {
 function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
-  const { model, effort, contextTokens, permissionMode, tools, deadlineSeconds, maxAttempts } = view.state;
+  const { deadlineSeconds, maxAttempts } = view.state;
+  // The harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`); the engine carries them unread.
+  const { model, effort, contextTokens, permissionMode, tools } = view.state.config ?? {};
   return {
     model: model ?? null,
     askedModel: askedModelOf(record),
@@ -558,19 +560,20 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const name = state.harness ?? Object.keys(HARNESSES)[0]!;
   if (!Object.hasOwn(HARNESSES, name)) return null;
   const harness = HARNESSES[name as keyof typeof HARNESSES];
-  const by = state.permissionMode === undefined ? 'default' : 'filed';
-  if (harness === 'claude-bg') return { mode: state.permissionMode ?? 'auto', by };
+  const { permissionMode, tools: filedTools } = state.config ?? {};
+  const by = permissionMode === undefined ? 'default' : 'filed';
+  if (harness === 'claude-bg') return { mode: permissionMode ?? 'auto', by };
   if (typeof harness !== 'object' || !('command' in harness)) return null;
   const modeOf = (tools: string[] | undefined): string | undefined => {
     try {
-      const { args } = harness.command({ name: `${state.taskId}/mode`, brief: '', cwd: state.cwd || '/', permissionMode: state.permissionMode, tools });
+      const { args } = harness.command({ name: `${state.taskId}/mode`, brief: '', cwd: state.cwd || '/', config: { permissionMode, tools } });
       const at = args.findIndex((arg) => MODE_FLAGS.includes(arg));
       return at < 0 ? undefined : args[at + 1];
     } catch {
       return undefined;
     }
   };
-  const mode = modeOf(state.tools);
+  const mode = modeOf(filedTools);
   if (mode === undefined) return null;
-  return { mode, by: state.tools && modeOf(undefined) !== mode ? 'tools' : by };
+  return { mode, by: filedTools && modeOf(undefined) !== mode ? 'tools' : by };
 }

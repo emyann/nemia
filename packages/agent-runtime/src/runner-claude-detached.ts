@@ -18,27 +18,27 @@ export const claudeDetached: HarnessSpec = {
       // prints only the answer's prose — and which carries the session id `nativeIdPattern` looks for.
       '--output-format', 'json',
       // Variadic, and ended by the flag after it, as for `claude --bg`.
-      ...(r.tools ? ['--tools', r.tools.join(',')] : []),
-      ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
+      ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
+      ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
       // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
       // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
       // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
       // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
       // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
       // lists above are, and a deny still beats it.
-      ...(r.allowedTools?.length ? ['--allowedTools', r.allowedTools.join(',')] : []),
-      '--permission-mode', r.permissionMode ?? 'auto',
+      ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+      '--permission-mode', r.config?.permissionMode ?? 'auto',
       // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
       ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
-      ...(r.model ? ['--model', r.model] : []),
-      ...(r.effort ? ['--effort', r.effort] : []),
+      ...(r.config?.model ? ['--model', r.config?.model] : []),
+      ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
       // The context window, as for `claude --bg`: `claude -p` compacts past it and still gives its `structured_output` (2.1.278).
-      ...(r.contextTokens !== undefined ? ['--autocompact', String(r.contextTokens)] : []),
+      ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
       // The closing statement's shape, as for `claude --bg`; the answer comes back as the result's
       // `structured_output`. It used to be dropped, so a task on this harness never gave a closeout.
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
-      ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
+      ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
       // The spend cap: `claude -p` ends the session once a response takes it past, and says so in its result.
       ...(r.budgetUsd !== undefined ? ['--max-budget-usd', String(r.budgetUsd)] : []),
     ],

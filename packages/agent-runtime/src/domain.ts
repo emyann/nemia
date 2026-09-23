@@ -22,7 +22,7 @@
  * which kind of harness produced it.
  */
 
-import type { McpServer } from './runner.ts';
+import type { HarnessArgs } from './harness-args.ts';
 
 /**
  * What a harness reports for a session. Exactly the documented `state` values, no more.
@@ -234,12 +234,18 @@ export type Event =
   /** The desired state, stated once. */
   | {
       kind: 'filed'; at: string; brief: string; cwd: string; maxAttempts: number;
-      model?: string; permissionMode?: string; harness?: string;
+      /** Which harness runs it: the adapter's name. */
+      harness?: string;
       deadlineSeconds?: number; resume?: ResumePolicy;
       /** A session of this harness that the FIRST attempt should continue rather than start cold. */
       resumeFrom?: string;
-      /** Isolation: true for a harness-named worktree, a string to name it. */
-      worktree?: string | boolean;
+      /**
+       * The harness's arguments — model, permission mode, effort, tools, MCP servers, context window, worktree, bridge —
+       * as one object, `HarnessArgs`. Carried, never read here: a runner hands them to its harness, and `decide` never
+       * learns what any of them is. A journal written before they moved here has them beside it, and is read as though it
+       * had them here (`upgrade` in `journal.ts`).
+       */
+      config?: HarnessArgs;
       /**
        * A JSON Schema for the workload's closing statement, handed to the harness verbatim.
        *
@@ -249,46 +255,11 @@ export type Event =
        */
       closeoutSchema?: object;
       /**
-       * The only tools the session may have, in its harness's names for them. Carried, never read
-       * here: a runner turns it into whatever fence its harness has, and `decide` never learns what
-       * a tool is. Absent means the harness's own set.
-       */
-      tools?: string[];
-      /**
-       * What the session may not have, in its harness's permission rules. Carried, never read here, as
-       * `tools` is: a runner hands it to its harness, and `decide` never learns what a rule is.
-       */
-      disallowedTools?: string[];
-      /**
-       * What the session may do without being asked, in its harness's permission rules. Carried, never read here, as
-       * `disallowedTools` is.
-       */
-      allowedTools?: string[];
-      /** How hard the harness should think, in its own words. Carried, never read here. */
-      effort?: string;
-      /**
-       * The MCP servers the session may have, by name, beside its checkout's own. Carried, never
-       * read here: a runner hands them to its harness, and `decide` never learns what a server is.
-       */
-      mcp?: Record<string, McpServer>;
-      /**
        * The most one attempt's session may spend, in dollars — per attempt, as the harness keeps it: `claude -p
        * --max-budget-usd` counts one process's spend. Carried, never read here: a runner hands it to its harness, and
        * `decide` learns only that a harness ended a session on it (`Sighting.budgetSpent`).
        */
       budgetUsd?: number;
-      /**
-       * The context window the session is given, in tokens: past about it, the harness compacts the conversation and carries
-       * on. Carried, never read here: a runner hands it to its harness (Claude Code's `--autocompact`), and `decide` never
-       * learns what a context is.
-       */
-      contextTokens?: number;
-      /**
-       * Bridge the session to claude.ai, where it is listed in the agents view and can be driven — from a browser or a
-       * phone — not only seen. Never a default, for that reason. Carried, never read here: the Claude runner passes
-       * `--remote-control`, and `decide` never learns what a bridge is.
-       */
-      remoteControl?: boolean;
       /**
        * Which waiting task a free slot goes to first: higher first, and filing order within one; absent is 0. Read by the
        * pass when it orders the board (`admissionOrder` in `engine.ts`), and nowhere else — not by `decide`, which is
@@ -371,8 +342,6 @@ export type State = {
   brief: string;
   cwd: string;
   maxAttempts: number;
-  model?: string;
-  permissionMode?: string;
   /** Which harness runs it. `decide` never reads this — only the runner dispatches on it. */
   harness?: string;
   /** Wall clock across all attempts. Absent means no limit. */
@@ -380,21 +349,12 @@ export type State = {
   resume: ResumePolicy;
   /** What attempt 1 continues. Set at filing; later attempts follow `resume` policy instead. */
   resumeFrom?: string;
-  worktree?: string | boolean;
+  /** The harness's arguments, as filed. See the `filed` event. `decide` never reads them. */
+  config?: HarnessArgs;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
-  /** The session's tools, what it may not have, effort and MCP servers. See the `filed` event. `decide` never reads any of them. */
-  tools?: string[];
-  disallowedTools?: string[];
-  allowedTools?: string[];
-  effort?: string;
-  mcp?: Record<string, McpServer>;
   /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
   budgetUsd?: number;
-  /** The context window its sessions are given, in tokens. See the `filed` event. `decide` never reads it. */
-  contextTokens?: number;
-  /** Whether its sessions are bridged to claude.ai. See the `filed` event. `decide` never reads it. */
-  remoteControl?: boolean;
   /** Which waiting task a free slot goes to first. See the `filed` event. `decide` never reads it. */
   priority?: number;
   attempts: Attempt[];
@@ -415,13 +375,11 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'filed':
         s.filedAt = e.at;
         s.brief = e.brief; s.cwd = e.cwd; s.maxAttempts = e.maxAttempts;
-        s.model = e.model; s.permissionMode = e.permissionMode; s.harness = e.harness;
+        s.harness = e.harness;
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
-        s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.allowedTools = e.allowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
-        s.contextTokens = e.contextTokens;
-        s.remoteControl = e.remoteControl; s.priority = e.priority;
+        s.config = e.config; s.closeoutSchema = e.closeoutSchema;
+        s.budgetUsd = e.budgetUsd; s.priority = e.priority;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null });

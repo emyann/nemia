@@ -1142,7 +1142,7 @@ test('a statement that could not be read reaches the board as it came, with why 
 
 test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {
   // Filed as the tick files a step — with its effort, window and tools — and, as a step that sets neither, with no deadline and no max attempts.
-  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] });
+  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] } });
   writeRun({
     ...r2, id: 'r-51', workflowDir: gone,
     workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', context: 200_000, tools: ['Read', 'Grep'] }, { name: 'review', after: ['implement'], body: 'Review it.' }],
@@ -1178,7 +1178,9 @@ test('a step says the mode its session runs in, as its harness decides it — a 
     ['r-54-codex-bypass', { harness: 'codex', permissionMode: 'bypassPermissions' }, { mode: 'danger-full-access', by: 'filed' }],
   ];
   for (const [id, spec, runsIn] of cases) {
-    await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    // The step's keys are the workflow's; the engine is filed with the harness's arguments under `config`, as the tick files them.
+    const { harness, ...config } = spec;
+    await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness, config });
     writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
     const [implement] = (await (await app.request(`/api/runs/${id}`)).json()).steps;
     assert.deepEqual(implement.filed.runsIn, runsIn, id);
@@ -1192,7 +1194,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   const said = new Map<string, string>();
   for (const [id, permissionMode] of [['r-59-claude', undefined], ['r-59-claude-mode', 'dontAsk']] as const) {
     const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
-    await engine().file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    await engine().file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness: 'claude', ...(permissionMode ? { config: { permissionMode } } : {}) });
     writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
     const res = await app.request(`/api/runs/${id}`);
     assert.equal(res.status, 200, id);
@@ -1211,7 +1213,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
     process.env.PATH = before;
   });
   const spawnedWith = async (permissionMode: string | undefined) => {
-    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { permissionMode } : {}) }));
+    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) }));
     const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
     return args[args.indexOf('--permission-mode') + 1];
   };
@@ -1220,7 +1222,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
 });
 
 test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
-  await engine().file({ id: 'r-55-implement-try2', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', model: 'sonnet' });
+  await engine().file({ id: 'r-55-implement-try2', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', config: { model: 'sonnet' } });
   const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
   const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
     ['r-55', [asked], 'sonnet'],

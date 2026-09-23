@@ -53,7 +53,7 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  * settled; the feed has each filing.
  */
 const board = () => {
-  type Filed = { id: string; closeoutSchema?: object; priority?: number; remoteControl?: boolean };
+  type Filed = { id: string; closeoutSchema?: object; priority?: number; config?: { remoteControl?: boolean } };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; filedAt: number }>();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
@@ -71,7 +71,7 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t ? 'filed' : '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
-          ...(t && carries.on ? { priority: t.spec.priority, remoteControl: t.spec.remoteControl } : {}),
+          ...(t && carries.on ? { priority: t.spec.priority, config: t.spec.config } : {}),
           attempts: !t || t.phase === 'pending' ? [] : [{
             n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
             endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? t.reason ?? 'harness' : null,
@@ -211,7 +211,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
 test("`wf decide` and `wf ls` say nothing of a run's momentum or a step's Remote Control: the same screens, line for line, whether the engine's record carries the `priority` and `remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('remote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
-  assert.deepEqual(ids.map((id) => [filed(id)?.priority, filed(id)?.remoteControl]), [[undefined, true], [1, undefined], [1, undefined]], 'filed with them');
+  assert.deepEqual(ids.map((id) => [filed(id)?.priority, filed(id)?.config?.remoteControl]), [[undefined, true], [1, undefined], [1, undefined]], 'filed with them');
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();
   carries.on = false;

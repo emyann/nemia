@@ -246,7 +246,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
           // Written, or cleared, on every spawn: a re-spawn is given the servers its task names, no more.
-          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), r.mcp);
+          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), r.config?.mcp);
           if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
           const { cmd, args } = spec.command(r, io);

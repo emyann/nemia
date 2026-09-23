@@ -212,7 +212,7 @@ test('refused: a claude-detached task, in its own words — no session id to add
 
 test('refused: a Claude task in bypassPermissions, though its session runs and has an inbox — the words would wait for an approval nobody gives', async () => {
   const engine = createEngine({ root: tmp('board') });
-  const { id, box } = await running(engine, { permissionMode: 'bypassPermissions' });
+  const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
   await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);
   await box.close();
 });

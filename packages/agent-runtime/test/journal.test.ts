@@ -81,3 +81,81 @@ test('a missing board is empty, not an error', async () => {
   assert.deepEqual(await run(dir, Effect.flatMap(Journal, (j) => j.read('nope'))), []);
   assert.deepEqual((await run(dir, Effect.flatMap(Journal, (j) => j.feed(0)))).entries, []);
 });
+
+// ─── a journal written before the harness's arguments moved under `config` ───
+
+/** A `filed` line as the engine wrote one until 2026-09-23: the harness's arguments beside the task's own fields. */
+const LEGACY = {
+  kind: 'filed', at: '2026-09-01T00:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, budgetUsd: 2,
+  model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000,
+};
+const TODAY = { kind: 'filed', at: '2026-09-24T00:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, config: { model: 'haiku' } };
+const STARTING = { kind: 'starting', at: '2026-09-01T00:00:01Z', attempt: 1, name: 'ae-t-old-1' };
+
+/** A store on disk with `lines` for each task, in the task files and the feed, as they were written. */
+const legacyStore = (tasks: Record<string, object[]>) => {
+  const dir = root();
+  fs.mkdirSync(path.join(dir, 'tasks'));
+  for (const [id, lines] of Object.entries(tasks)) {
+    fs.writeFileSync(path.join(dir, 'tasks', `${id}.jsonl`), lines.map((l) => JSON.stringify(l) + '\n').join(''));
+    fs.appendFileSync(path.join(dir, 'feed.jsonl'), lines.map((event) => JSON.stringify({ taskId: id, event }) + '\n').join(''));
+  }
+  return dir;
+};
+const bytesOf = (dir: string) =>
+  [path.join(dir, 'feed.jsonl'), ...fs.readdirSync(path.join(dir, 'tasks')).map((f) => path.join(dir, 'tasks', f))]
+    .map((f) => fs.readFileSync(f, 'utf8'));
+
+test("an old filed event is read with the harness's arguments under config, and nothing on disk is rewritten", async () => {
+  const dir = legacyStore({ 't-old': [LEGACY, STARTING] });
+  const before = bytesOf(dir);
+
+  const [filed, starting] = await run(dir, Effect.flatMap(Journal, (j) => j.read('t-old')));
+  assert.deepEqual(filed, {
+    kind: 'filed', at: LEGACY.at, brief: 'b', cwd: '/r', maxAttempts: 1, budgetUsd: 2,
+    config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 },
+  });
+  assert.deepEqual(starting, STARTING, 'an event that never carried them is as written');
+
+  const { entries } = await run(dir, Effect.flatMap(Journal, (j) => j.feed(0)));
+  assert.deepEqual(entries.map((e) => e.event), [filed, starting], 'the feed reads the same shape as the task');
+
+  assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+});
+
+test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
+  const dir = legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] });
+  const { createEngine } = await import('../src/facade.ts');
+  const engine = createEngine({ root: dir });
+
+  const old = await engine.view('t-old');
+  assert.deepEqual(old.state.config, { model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 });
+  assert.equal((old.state as unknown as Record<string, unknown>).model, undefined, 'no argument is left on the state beside it');
+  assert.equal(old.state.budgetUsd, 2, "the task's own fields stay the task's");
+  assert.deepEqual((await engine.view('t-new')).state.config, { model: 'haiku' });
+});
+
+test('config is the newer word: a value there is kept over one beside it, and an undefined one is no argument', async () => {
+  const dir = legacyStore({ t: [{ ...LEGACY, config: { model: 'haiku' } }], bare: [{ ...TODAY, config: undefined, model: undefined }] });
+  const [both] = await run(dir, Effect.flatMap(Journal, (j) => j.read('t')));
+  assert.deepEqual((both as { config?: unknown }).config, { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 });
+  // JSON drops an undefined, so this is the in-memory case: a consumer's store that kept the key.
+  const [bare] = await Effect.runPromise(Effect.flatMap(Journal, (j) => j.read('bare')).pipe(Effect.provide(Journal.layer({
+    append: () => Effect.void, list: Effect.succeed(['bare']), feed: () => Effect.succeed({ entries: [], cursor: 0 }),
+    read: () => Effect.succeed([{ ...TODAY, config: undefined, model: undefined } as unknown as Event]),
+  }))));
+  assert.ok(!('model' in bare) && !('config' in bare), JSON.stringify(bare));
+});
+
+test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
+  const { createEngine } = await import('../src/facade.ts');
+  const events = [LEGACY as unknown as Event];
+  const engine = createEngine({
+    journal: {
+      append: async () => {}, read: async () => events, list: async () => ['t-old'],
+      feed: async () => ({ entries: events.map((event) => ({ taskId: 't-old', event })), cursor: 1 }),
+    },
+  });
+  assert.deepEqual((await engine.view('t-old')).state.config?.model, 'opus');
+  assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
+});

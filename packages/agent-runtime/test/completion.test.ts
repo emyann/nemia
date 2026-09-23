@@ -401,7 +401,7 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
 test('a context window reaches Claude Code as --autocompact and its digits, where no variadic flag can take it and it takes nothing', async () => {
   // Beside every flag that could swallow or be swallowed: `--tools` and `--disallowedTools` are variadic, `--remote-control`
   // and `--worktree` take an optional value, and the prompt is last.
-  const args = await argvOf({ contextTokens: 200000, tools: ['Read'], disallowedTools: ['SendMessage'], remoteControl: true, worktree: true, effort: 'high' });
+  const args = await argvOf({ config: { contextTokens: 200000, tools: ['Read'], disallowedTools: ['SendMessage'], remoteControl: true, worktree: true, effort: 'high' } });
   const i = args.indexOf('--autocompact');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], '200000', 'digits, never `200k`, and never below 1000, which the CLI reads as thousands');
@@ -414,7 +414,7 @@ test('a context window reaches Claude Code as --autocompact and its digits, wher
 test('remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {
   // `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap: directly before the prompt it would take the
   // prompt as the session's name, and the session would run with nothing to do. `--permission-mode` always follows it.
-  const args = await argvOf({ remoteControl: true, tools: ['Read'], disallowedTools: ['SendMessage'] });
+  const args = await argvOf({ config: { remoteControl: true, tools: ['Read'], disallowedTools: ['SendMessage'] } });
   const i = args.indexOf('--remote-control');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], '--permission-mode', 'a flag, not a value, comes next');
@@ -422,7 +422,7 @@ test('remoteControl reaches Claude Code as --remote-control, and a flag follows 
   assert.equal(args[args.indexOf('--tools') + 1], 'Read', 'the variadic lists before it keep their values');
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage');
   assert.equal(args.at(-1), 'the prompt');
-  assert.equal((await argvOf({ remoteControl: false })).includes('--remote-control'), false, 'false asks for nothing');
+  assert.equal((await argvOf({ config: { remoteControl: false } })).includes('--remote-control'), false, 'false asks for nothing');
 });
 
 test('at shipped defaults, a task filed with remoteControl: true is spawned with --remote-control, on every attempt, and one filed without it never is', async () => {
@@ -446,7 +446,7 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'ae-remote-')) });
-    await engine.file({ brief: 'bridged', cwd: dir, remoteControl: true, maxAttempts: 2 });
+    await engine.file({ brief: 'bridged', cwd: dir, config: { remoteControl: true }, maxAttempts: 2 });
     await engine.file({ brief: 'plain', cwd: dir, maxAttempts: 2 });
     await engine.tick();
     // Both fail: each is retried, and the retry is spawned from the record as the first attempt was.
@@ -464,7 +464,7 @@ if (args[0] === '--bg') {
 
 test('a budget reaches Claude Code as --max-budget-usd, and the prompt still comes last', async () => {
   // `file()` refuses a budget on this harness, which keeps none under `--bg`; a task that reaches the runner with one gets it.
-  const args = await argvOf({ budgetUsd: 0.5, tools: ['Read'] });
+  const args = await argvOf({ budgetUsd: 0.5, config: { tools: ['Read'] } });
   assert.equal(args[args.indexOf('--max-budget-usd') + 1], '0.5');
   assert.equal(args.at(-1), 'the prompt');
 });
@@ -472,7 +472,7 @@ test('a budget reaches Claude Code as --max-budget-usd, and the prompt still com
 test('tools reach Claude Code as --tools, and a flag ends the list before the prompt', async () => {
   // `--tools <tools...>` is variadic. Directly before the prompt it would take the prompt as a tool
   // name — the `--worktree` trap again — so it goes before `--permission-mode`, which always follows.
-  const args = await argvOf({ tools: ['Read', 'Grep', 'Glob'] });
+  const args = await argvOf({ config: { tools: ['Read', 'Grep', 'Glob'] } });
   const i = args.indexOf('--tools');
   assert.notEqual(i, -1);
   assert.equal(args[i + 1], 'Read,Grep,Glob');
@@ -481,26 +481,26 @@ test('tools reach Claude Code as --tools, and a flag ends the list before the pr
 });
 
 test('an empty tool list reaches Claude Code as no tools at all, not as every tool', async () => {
-  const args = await argvOf({ tools: [] });
+  const args = await argvOf({ config: { tools: [] } });
   assert.equal(args[args.indexOf('--tools') + 1], '');
 });
 
 test('disallowedTools reach Claude Code as --disallowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
   // Variadic, as `--tools` is: directly before the prompt it would take the prompt as a rule to deny.
-  const args = await argvOf({ tools: ['Read', 'Bash'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'] });
+  const args = await argvOf({ config: { tools: ['Read', 'Bash'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'] } });
   const i = args.indexOf('--disallowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Bash(npm run build),Bash(npm run e2e),SendMessage', 'a space inside a rule stays inside it');
   assert.equal(args[i + 2], '--permission-mode');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Bash', 'beside the tool list, not in its place');
   assert.equal(args.at(-1), 'the prompt');
-  assert.equal((await argvOf({ disallowedTools: [] })).includes('--disallowedTools'), false, 'an empty list denies nothing, and is not passed');
+  assert.equal((await argvOf({ config: { disallowedTools: [] } })).includes('--disallowedTools'), false, 'an empty list denies nothing, and is not passed');
 });
 
 test('allowedTools reach Claude Code as --allowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
   // Variadic, as the two lists beside it are, and joined the same way — measured on Claude Code 2.1.278, where
   // `--allowedTools "Write(**),Edit(**)"` allowed both.
-  const args = await argvOf({ tools: ['Read', 'Write'], disallowedTools: ['SendMessage'], allowedTools: ['Write(**)', 'Bash(npm test)'] });
+  const args = await argvOf({ config: { tools: ['Read', 'Write'], disallowedTools: ['SendMessage'], allowedTools: ['Write(**)', 'Bash(npm test)'] } });
   const i = args.indexOf('--allowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Write(**),Bash(npm test)', 'a space inside a rule stays inside it');
@@ -508,11 +508,11 @@ test('allowedTools reach Claude Code as --allowedTools, the rules in one argumen
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage', 'beside the deny list, not in its place');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write');
   assert.equal(args.at(-1), 'the prompt');
-  assert.equal((await argvOf({ allowedTools: [] })).includes('--allowedTools'), false, 'an empty list allows nothing extra, and is not passed');
+  assert.equal((await argvOf({ config: { allowedTools: [] } })).includes('--allowedTools'), false, 'an empty list allows nothing extra, and is not passed');
 });
 
 test('effort reaches Claude Code as --effort', async () => {
-  const args = await argvOf({ effort: 'high' });
+  const args = await argvOf({ config: { effort: 'high' } });
   assert.equal(args[args.indexOf('--effort') + 1], 'high');
   assert.equal(args.at(-1), 'the prompt');
 });

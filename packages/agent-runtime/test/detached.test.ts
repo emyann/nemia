@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
-import { claudeResultOutput } from '../src/runner-detached-output.ts';
+import { claudeResultOutput, claudeStreamOutput } from '../src/runner-detached-output.ts';
 import { trustedProjects } from '../src/runner-codex.ts';
 import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
@@ -568,6 +568,87 @@ test("what claude -p cost is its result's total_cost_usd, and its API time durat
   assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: 'a lot', duration_api_ms: null })), {}, 'what is not a number is not a measurement');
   assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: -1 })), {});
   assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
+});
+
+// ─── claude -p: what it was denied ──────────────────────────────────────────
+
+/** Lines of `claude -p --output-format stream-json --verbose`, shaped as 2.1.280 printed them (M1; keys trimmed). */
+const stream = {
+  init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
+  calls: (...uses: Array<[string, string, object]>) => JSON.stringify({
+    type: 'assistant', session_id: SESSION,
+    message: { role: 'assistant', content: uses.map(([id, name, input]) => ({ type: 'tool_use', id, name, input })) },
+  }),
+  denied: (id: string, tool: string, reason?: object) => JSON.stringify({
+    type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: id,
+    ...(reason ?? { decision_reason_type: 'asyncAgent', decision_reason: 'no approval surface in this session; permission request denied automatically' }),
+    message: 'Permission for this tool use was denied. It requires approval, and this session has no approval surface.', session_id: SESSION,
+  }),
+  toolResult: (id: string) => JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, is_error: true, content: 'denied' }] } }),
+};
+
+test("what claude -p was denied is its result's permission_denials, each by what a rule would name — and nothing when it was denied nothing", () => {
+  const denials = [
+    { tool_name: 'Write', tool_use_id: 'toolu_1', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
+    { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com', prompt: 'the title?' } },
+    { tool_name: 'Bash', tool_use_id: 'toolu_3', tool_input: { command: "  python3 -c 'import os; print(42)'", description: 'make it' } },
+    { tool_name: 'Skill', tool_use_id: 'toolu_4', tool_input: { skill: 'look' } },
+    { tool_name: 'NotebookEdit', tool_use_id: 'toolu_5', tool_input: { notebook_path: '/r/n.ipynb' } },
+    { tool_name: 'Bash', tool_use_id: 'toolu_6', tool_input: { command: '' } },
+    { tool_use_id: 'toolu_7', tool_input: { command: 'ls' } },
+    { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com' } },
+  ];
+  assert.deepEqual(claudeResultOutput(resultLine({ permission_denials: denials })).denials, [
+    { tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }, { tool: 'Bash', what: 'python3' }, { tool: 'Skill', what: 'look' },
+    { tool: 'NotebookEdit', what: '/r/n.ipynb' }, { tool: 'Bash' },
+  ], 'one per call, in order: a URL is not guessed at, an empty command is the tool alone, a call with no tool is skipped');
+  assert.equal('denials' in claudeResultOutput(resultLine({ permission_denials: [] })), false, 'none denied: no key');
+  assert.equal('denials' in claudeResultOutput(resultLine({ permission_denials: 'Write' })), false, 'not a list: not read');
+  assert.deepEqual(claudeStreamOutput(resultLine({ permission_denials: denials.slice(0, 1) })).denials, [{ tool: 'Write', what: '/tmp/outside/x.txt' }],
+    'the stream reads the same result');
+});
+
+test("claude -p's stream says what it was denied as it happens, the input off the call of the same id — once each beside its result", () => {
+  const log = [
+    stream.init,
+    stream.calls(['toolu_w', 'Write', { file_path: '/tmp/outside/x.txt', content: 'hi' }]),
+    stream.denied('toolu_w', 'Write', { decision_reason_type: 'workingDir', decision_reason: 'Path is outside allowed working directories' }),
+    stream.toolResult('toolu_w'),
+    stream.calls(['toolu_u', 'Bash', { command: 'uname -a' }]),
+    stream.toolResult('toolu_u'),
+    stream.calls(['toolu_s', 'Skill', { skill: 'look' }], ['toolu_f', 'WebFetch', { url: 'https://example.com' }]),
+    stream.denied('toolu_f', 'WebFetch', {}),
+    stream.toolResult('toolu_f'),
+    resultLine({
+      total_cost_usd: 0.02, structured_output: { outcome: 'done' },
+      permission_denials: [
+        { tool_name: 'Write', tool_use_id: 'toolu_w', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
+        { tool_name: 'WebFetch', tool_use_id: 'toolu_f', tool_input: { url: 'https://example.com' } },
+      ],
+    }),
+  ].join('\n');
+  assert.deepEqual(claudeStreamOutput(log), {
+    closeout: { payload: { outcome: 'done' } }, usage: { costUsd: 0.02 },
+    denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
+  }, 'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it');
+
+  // Killed before its result — a stop, a signal — the events are all it says, and every denial is still read.
+  const killed = log.split('\n').slice(0, -1).join('\n');
+  assert.deepEqual(claudeStreamOutput(killed), { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }] });
+  assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
+});
+
+test("a denial event whose call is not in the stream is the tool alone — and takes what its result says of it", () => {
+  const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
+  assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }] });
+  assert.deepEqual(claudeStreamOutput([lone, stream.denied('toolu_b', 'Bash'), 'not json "permission_denied"'].join('\n')), { denials: [{ tool: 'Bash' }] },
+    'named twice, once; a line that is not an event is skipped');
+  const withResult = [lone, stream.calls(['toolu_x', 'Read', { file_path: '/r/a' }]),
+    resultLine({ permission_denials: [{ tool_name: 'Bash', tool_use_id: 'toolu_b', tool_input: { command: 'pytest -q' } }, { tool_name: 'Read', tool_use_id: 'toolu_x', tool_input: { file_path: '/r/a' } }] })].join('\n');
+  assert.deepEqual(claudeStreamOutput(withResult).denials, [{ tool: 'Bash', what: 'pytest' }, { tool: 'Read', what: '/r/a' }],
+    'its place is the event\'s, its input the result\'s; what only the result names comes after');
+  assert.deepEqual(claudeStreamOutput([stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), stream.toolResult('toolu_q'), resultLine({})].join('\n')), {},
+    'a stream that denied nothing says nothing of it');
 });
 
 test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {

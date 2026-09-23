@@ -1,9 +1,9 @@
 /**
- * What a detached session's output says, as a spec's `readOutput` reads it: Codex's `exec --json` stream and
- * `claude -p`'s one result — its closeout, what it consumed and cost, and whether it spent its budget. Pure
- * functions of the text.
+ * What a detached session's output says, as a spec's `readOutput` reads it: Codex's `exec --json` stream, `claude -p`'s
+ * one result, and `claude -p`'s stream of events — its closeout, what it consumed and cost, whether it spent its budget,
+ * and what it was denied. Pure functions of the text.
  */
-import type { Usage } from './domain.ts';
+import type { Denial, Usage } from './domain.ts';
 import type { HarnessOutput } from './runner-detached.ts';
 
 /**
@@ -78,9 +78,10 @@ export const codexOutput = (output: string): HarnessOutput => {
  * answered in that shape. No result, a result without the field, or one whose field is `null`, is no answer.
  *
  * What the session cost is its `total_cost_usd`, and the time it waited on the API its `duration_api_ms` (2.1.272). The
- * cost is the process's own: a `claude -p --resume` printed $0.0042 of its own where the session it continued had
- * spent $0.018 — so it is the attempt's own, as the Claude runner's difference is. The result counts no tool time, and
- * its turns are not read here: `num_turns` counts prompts' turns, not responses.
+ * cost of a `--resume` is not the process's own since 2.1.278: it carries its parent's total on (measured again on
+ * 2.1.280: a parent's $0.0209649, and its resume's $0.0257381, the parent's and its own $0.0047732 to the digit — open
+ * issue 4). Read here as printed; a spec that knows the parent takes it off (`resumeCostCarried`). The result counts no
+ * tool time, and its turns are not read here: `num_turns` counts prompts' turns, not responses.
  *
  * Its tokens are its `usage`'s, in their classes — `input_tokens` uncached, `cache_creation_input_tokens` written,
  * `cache_read_input_tokens` read — and the process's own: on 2.1.278 a `--resume` printed a `usage` of 21,402 input
@@ -91,9 +92,19 @@ export const codexOutput = (output: string): HarnessOutput => {
  * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd` — measured on 2.1.272
  * at a $0.01 cap: exit 1, `is_error`, `terminal_reason: budget_exhausted`, "Reached maximum budget ($0.01)", and a
  * `total_cost_usd` of $0.018, since the cap is checked after the response that crosses it.
+ *
+ * What it was denied is its `permission_denials`, one `{tool_name, tool_use_id, tool_input}` for each tool call Claude
+ * Code refused without asking (2.1.280, in every permission mode: under `-p` nothing waits on a prompt, and the session
+ * carries on past the refusal). Read as `denialOf` words it, one per call, in the order given.
  */
-export const claudeResultOutput = (output: string): HarnessOutput => {
-  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown; usage?: Record<string, unknown> } | undefined;
+export const claudeResultOutput = (output: string): HarnessOutput => readClaude(output, [], new Map());
+
+/**
+ * `claudeResultOutput`, with the denials a stream named before its result (`claudeStreamOutput`) joined ahead of the
+ * result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
+ */
+const readClaude = (output: string, denied: readonly unknown[], inputs: ReadonlyMap<string, unknown>): HarnessOutput => {
+  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown; usage?: Record<string, unknown>; permission_denials?: unknown } | undefined;
   for (const line of output.split('\n')) {
     if (!line.includes('"result"')) continue;
     try {
@@ -101,7 +112,10 @@ export const claudeResultOutput = (output: string): HarnessOutput => {
       if (parsed?.type === 'result') result = parsed;
     } catch { /* not the result line */ }
   }
-  if (!result) return {};
+  if (!result) {
+    const denials = deniedCalls(denied, inputs);
+    return denials.length ? { denials } : {};
+  }
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
   const [costUsd, apiMs] = [n(result.total_cost_usd), n(result.duration_api_ms)];
   const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens']
@@ -111,9 +125,86 @@ export const claudeResultOutput = (output: string): HarnessOutput => {
     ? { inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
     : {};
   const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+  const denials = deniedCalls([...denied, ...(Array.isArray(result.permission_denials) ? result.permission_denials : [])], inputs);
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
     ...(Object.keys(usage).length ? { usage } : {}),
     ...(result.subtype === 'error_max_budget_usd' ? { budgetSpent: true as const } : {}),
+    ...(denials.length ? { denials } : {}),
   };
+};
+
+/** The tools whose calls name one file, and the key of their input that names it. */
+const FILE_KEYS: Readonly<Record<string, string>> = { Read: 'file_path', Write: 'file_path', Edit: 'file_path', MultiEdit: 'file_path', NotebookEdit: 'notebook_path' };
+
+/**
+ * A denied call as a person reads it, and as a permission rule would name it: a command by its first word
+ * (`Bash(pytest)`), a skill by its name (`Skill(look)`), a file tool by its path. Any other tool, or an input that says
+ * none of these, is the tool alone — never a guess at what the rest of its input meant.
+ */
+export const denialOf = (tool: string, input: unknown): Denial => {
+  const at = (key: string): string | undefined => {
+    const v = (input as Record<string, unknown> | null | undefined)?.[key];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  };
+  const what = tool === 'Bash' ? at('command')?.split(/\s+/)[0]
+    : tool === 'Skill' ? at('skill')
+    : FILE_KEYS[tool] ? at(FILE_KEYS[tool]!) : undefined;
+  return what ? { tool, what } : { tool };
+};
+
+/**
+ * Denied calls, each once by its `tool_use_id`, in the order first given: `{tool_name, tool_use_id, tool_input?}` as a
+ * result's `permission_denials` and a `permission_denied` event write them. An entry with no input takes the one its
+ * call was made with (`inputs`, by id), or else the one a later entry for the same call gives. One that names no tool is
+ * not a denial anyone can read, and is skipped.
+ */
+const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, unknown>): Denial[] => {
+  const seen = new Map<string, { denial: Denial; input: unknown }>();
+  let unnamed = 0;
+  for (const entry of entries) {
+    const { tool_name: tool, tool_use_id: id, tool_input: given } = (entry ?? {}) as Record<string, unknown>;
+    if (typeof tool !== 'string' || !tool) continue;
+    const key = typeof id === 'string' && id ? id : `(no id ${++unnamed})`;
+    const input = given ?? inputs.get(key);
+    // Named again, its place stays the first; an input the first naming lacked is taken from the later one.
+    const first = seen.get(key);
+    if (!first || (first.input === undefined && input !== undefined)) seen.set(key, { denial: denialOf(first?.denial.tool ?? tool, input), input });
+  }
+  return [...seen.values()].map((d) => d.denial);
+};
+
+/**
+ * What `claude -p --output-format stream-json --verbose` says: every event of the session, one JSON object a line, the
+ * last of them its `result` — read by `claudeResultOutput`, as the one line of `--output-format json` is.
+ *
+ * What it was denied is read off the stream as well as the result, so a session killed before its result still says
+ * it: each `{"type":"system","subtype":"permission_denied","tool_name","tool_use_id",…}` event (2.1.280), which names
+ * no input — the input is the one the assistant's `tool_use` block of the same id was called with. Joined with the
+ * result's `permission_denials`, one per call, in the order the stream first named each.
+ */
+export const claudeStreamOutput = (output: string): HarnessOutput => {
+  const events: unknown[] = [];
+  for (const line of output.split('\n')) {
+    if (!line.includes('"permission_denied"')) continue;
+    try {
+      const e = JSON.parse(line) as { type?: unknown; subtype?: unknown };
+      if (e?.type === 'system' && e.subtype === 'permission_denied') events.push(e);
+    } catch { /* not an event */ }
+  }
+  const wanted = new Set(events.map((e) => (e as { tool_use_id?: unknown }).tool_use_id).filter((id): id is string => typeof id === 'string'));
+  const inputs = new Map<string, unknown>();
+  if (wanted.size) {
+    for (const line of output.split('\n')) {
+      if (!line.includes('"tool_use"') || ![...wanted].some((id) => line.includes(id))) continue;
+      try {
+        const e = JSON.parse(line) as { type?: unknown; message?: { content?: unknown } };
+        if (e?.type !== 'assistant' || !Array.isArray(e.message?.content)) continue;
+        for (const block of e.message.content as Array<Record<string, unknown>>) {
+          if (block?.type === 'tool_use' && typeof block.id === 'string' && wanted.has(block.id)) inputs.set(block.id, block.input);
+        }
+      } catch { /* not an event */ }
+    }
+  }
+  return readClaude(output, events, inputs);
 };

@@ -13,7 +13,7 @@ import type { TaskPhase } from '../src/run.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-hold-'));
 process.env.WF_ROOT = ROOT;
-const { accept, advance, approve, decide, forget, hold, holdAdvice, holdRefusal, holdWord, holdsOf, readRun, retry, round, start, unhold } = await import('../src/runner.ts');
+const { accept, advance, approve, decide, forget, hold, holdAdvice, holdRefusal, holdWord, holdsOf, prune, readRun, retry, round, say, start, unhold } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -159,7 +159,10 @@ test('REFUSED at shipped defaults: wf hold with neither --until nor --off, with 
   await refused(t, b.e, /^--until takes the run to wait on/, 'hold', 'r-x', '--until', '--off');
   await refused(t, b.e, /^wf hold takes the run first/, 'hold', '--until', 'a');
   await refused(t, b.e, /wf hold writes its file under WF_ROOT by id/, 'hold', '../x', '--until', 'a');
-  await refused(t, b.e, /wf hold writes its file under WF_ROOT by id/, 'hold', 'r-x', '--until', '../a');
+  await refused(t, b.e, /^--until "\.\.\/a" is not a run's id, and wf hold writes its file under WF_ROOT by id .* as in wf hold r-x --until add-a-flag-x1y2\.$/, 'hold', 'r-x', '--until', '../a');
+  // A run named by one of its files is fixed on --until, with the run to hold kept.
+  await refused(t, b.e, /^--until "a-1\.json" is not a run's id: \.json is on the name of one of its files under runs\/, not on the run's\. Give the id wf ls prints: wf hold r-x --until a-1\.$/, 'hold', 'r-x', '--until', 'a-1.json');
+  await refused(t, b.e, /^"r-x\.hold" is not a run's id: .* Give the id wf ls prints: wf hold r-x\.$/, 'hold', 'r-x.hold', '--until', 'a-1');
   await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--until', 'a');
   await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--off');
   // --until= is the same flag, and holds: nothing is refused of it here but the run it names.
@@ -390,4 +393,128 @@ test('REFUSED at shipped defaults: wf rm of a run another holds on names the hol
   assert.equal((await forget(b.e, run.id, {})).kind, 'forgotten');
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold went with the run');
   assert.equal((await forget(b.e, target.id, {})).kind, 'forgotten');
+});
+
+/** A team whose one step works in a folder the run makes, with no repository. */
+const folderTeam = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  fs.writeFileSync(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite the note\n');
+  return dir;
+};
+
+test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, and --until a folder run, a run started --no-worktree, one on another base branch, and one whose result branch is gone', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const run = await aRunning(b, repo);
+  const id = run.id;
+  const target = await aRunning(b, repo);
+
+  const pruned = await aDone(b, repo);
+  assert.equal((await prune(b.e, pruned.id, { yes: true, unmerged: true })).kind, 'pruned');
+  await refused(t, b.e, new RegExp(`^${pruned.id} was pruned at .*: nothing of it is filed again, so there is nothing to hold\\.$`), 'hold', pruned.id, '--until', target.id);
+
+  const folder = start({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() });
+  await refused(t, b.e, new RegExp(`^${folder.id}'s team works in folders \\(workspace: folder\\)`), 'hold', folder.id, '--until', target.id);
+  await refused(t, b.e, new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(workspace: folder\\), which never ships onto a branch`), 'hold', id, '--until', folder.id);
+
+  const inPlace = start({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false });
+  await refused(t, b.e, new RegExp(`^--until ${inPlace.id}: ${inPlace.id} worked on main itself \\(--no-worktree\\), so it has no result branch to ship`), 'hold', id, '--until', inPlace.id);
+
+  git(repo, 'checkout', '-q', '-b', 'release');
+  const onRelease = start({ brief: 'onto release', repo, workflowDir: oneStep() });
+  git(repo, 'checkout', '-q', 'main');
+  await refused(t, b.e, new RegExp(`^--until ${onRelease.id}: ${onRelease.id} ships onto release, and ${id} onto main, so ${id} would wait on a branch it never meets`), 'hold', id, '--until', onRelease.id);
+
+  // Finished and never merged, then its worktree and branch deleted: git finds its work nowhere.
+  const dropped = await aDone(b, repo);
+  git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement!.workspace!);
+  git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/implement`);
+  await refused(t, b.e, new RegExp(`^--until ${dropped.id}: wf/${dropped.id}/implement is gone, and git cannot find it on main, so ${id} would wait for ever`), 'hold', id, '--until', dropped.id);
+
+  for (const r of [pruned, folder, run]) assert.ok(!fs.existsSync(holdFileOf(r.id)), `no hold written on ${r.id}`);
+});
+
+test('REFUSED at shipped defaults: a hold put again while the tick or --off lifts one is left standing, and a hold put first by another wins whole', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const other = await aRunning(b, repo);
+
+  // The tick read hold A; a person lifted it and put hold B before the tick's lift: B names what the tick never read, and stays.
+  const run = start({ brief: 'held twice', repo, workflowDir: oneStep() });
+  await hold(b.e, run.id, [target.id]);
+  const stale = readRun(run.id);
+  unhold(run.id);
+  await hold(b.e, run.id, [other.id]);
+  const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
+  assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
+  const wt = readRun(target.id).steps.implement!.workspace!;
+  fs.writeFileSync(path.join(wt, 'target.ts'), 'export const t = 1;\n');
+  git(wt, 'add', '-A');
+  git(wt, 'commit', '-q', '-m', 'target');
+  b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(target.id));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${target.id}/implement`);
+  const pass = await advance(b.e, stale);
+  assert.ok(!pass.notes.some((n) => n.startsWith('the hold is lifted')), pass.notes.join('\n'));
+  assert.equal(fs.readFileSync(holdFileOf(run.id), 'utf8'), second, 'hold B stands as it was put');
+  assert.ok(!b.filings.includes(`${run.id}-implement`), 'and nothing is filed under it');
+
+  // --off read hold B; another hold was put in the moment before the removal: --off is refused, and that hold stands.
+  const put = { at: '2099-01-01T00:00:00.000Z', until: [other.id] };
+  const read = fs.readFileSync;
+  let reads = 0;
+  t.mock.method(fs, 'readFileSync', function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
+    if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
+    return read.apply(this, args);
+  });
+  assert.throws(() => unhold(run.id), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === `${run.id}'s hold changed as it was lifted: read it again (wf ls ${run.id}), then lift it: wf hold ${run.id} --off.`);
+  t.mock.restoreAll();
+  assert.deepEqual(JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')), put);
+
+  // Two people hold one run at once: the second's exclusive write finds the first's file, is refused as already held, and writes nothing.
+  const race = await aRunning(b, repo);
+  const first = { at: '2099-01-02T00:00:00.000Z', until: [other.id] };
+  const write = fs.writeFileSync;
+  t.mock.method(fs, 'writeFileSync', function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
+    if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
+    return write.apply(this, args);
+  });
+  await assert.rejects(hold(b.e, race.id, [other.id]), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`${race.id} is already held until ${other.id} ships (wf hold, at ${first.at}). A hold is put once, whole`));
+  t.mock.restoreAll();
+  assert.deepEqual(JSON.parse(fs.readFileSync(holdFileOf(race.id), 'utf8')), first, 'the first hold, whole');
+});
+
+test('wf decide on a held run that also waits --after a run says both, and that --off lifts only the hold', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const parent = await aRunning(b, repo);
+  const target = await aRunning(b, repo);
+  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
+  await hold(b.e, child.id, [target.id]);
+  const screen = (await typed(t, b.e, 'decide', child.id)).printed;
+  assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
+  assert.match(screen, new RegExp(`\n  held until ${target.id} ships as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`), screen);
+  assert.doesNotMatch(screen, VERBS, screen);
+  // And a run named that never ships: how to let it go, on the same screen.
+  assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
+  assert.match((await typed(t, b.e, 'decide', child.id)).printed, new RegExp(`held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: wf hold ${child.id} --off, or wf cancel ${child.id}$`));
+});
+
+test('REFUSED while held or pruned: wf say to a step that has settled offers no wf retry, which either refuses', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const done = await aDone(b, repo);
+  // A step that signed off blocked: settled, and the run not finished, so it may be held.
+  const run = await aRunning(b, repo);
+  b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
+  await advance(b.e, readRun(run.id));
+  await assert.rejects(say(b.e, run.id, 'implement', 'hello'), (err: Error) => /: wf retry /.test(err.message), 'offered before the hold');
+  await hold(b.e, run.id, [target.id]);
+  await assert.rejects(say(b.e, run.id, 'implement', 'hello'), (err: Error & { exitCode?: number }) => err.exitCode === 2
+    && err.message.endsWith(`no try is filed while ${run.id} is held until ${target.id} ships: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`) && !VERBS.test(err.message));
+  unhold(run.id);
+  assert.equal((await prune(b.e, done.id, { yes: true, unmerged: true })).kind, 'pruned');
+  await assert.rejects(say(b.e, done.id, 'implement', 'hello'), (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message));
 });

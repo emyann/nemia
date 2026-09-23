@@ -450,7 +450,8 @@ What it leaves:
   under their own task ids (`tries` on the step's record). The line says what the try beside it used, not
   what the step cost in all.
 - **No runner `wf` files on reports cost.** The engine's SDK runner does (`total_cost_usd`). The claude-bg,
-  claude-detached and codex runners read transcripts and streams, which hold none.
+  claude-detached and codex runners read transcripts and streams, which hold none. (Since superseded: the engine measures
+  each attempt's cost, and since thin runtime stage 2 part 2 a `claude` step is a job that prints its own.)
 - **The board shows none of it.** `apps/api` returns no radius, lesson or usage. Each is a call to the
   functions above.
 - **The lesson line counts any change**, a deletion included. `CLAUDE.md +0 −12` is printed as what it is, and
@@ -4068,6 +4069,34 @@ The owner set the P3 reach plan aside ("too much … just keep it simple") and a
 deliberately, all of it. `output:` maps to no A2A field and stays a key of its own (A2A's nearest, a skill's `outputModes`, names media
 types). When P3's reach keys are built they want a name that is not `capabilities`, or the two vocabularies collide.
 
+## Shipped: steps as `claude -p` jobs, and a mode for each role (thin runtime stage 2 part 2)
+
+Every step on `claude` ran as a background session (`claude-bg`, `claude --bg`) until 2026-09-23. It runs as a job now,
+`claude -p` (`HARNESSES.claude` is the runtime's `claude`, `runtime-client.ts`), which ends at its result, keeps a spend cap, and
+waits on nobody in any mode (agent-runtime's open issue 28, M1). Asked at the plan gate and measured first: a job in `dontAsk`
+honours the checkout's `.claude/settings.json` allow rules as a `--bg` session does (M11, 2.1.280), which the planner's and the
+reviewers' fences rest on.
+
+- **`background: true`**, a step key, files every session of the step with the engine's `config.background`, as a `claude --bg`
+  session: the one a person attaches to or bridges. Refused on `codex` and `claude-detached`, and beside a `budget:`, in the engine's
+  words. `remote: true` needs it, refused at `wf start` without it. Its three obligations outside the package are met: the builder's
+  `KINDS` and `FLAGS`, `WorkflowStepSpec` and `specOf`, and the board's mirror with `UNSET`.
+- **`budget:` is the harness's to keep on a job.** Each filing is handed what is left of the cap as `--max-budget-usd`, as
+  `claude-detached` was; a gate's answer, a round and a retry stay new tasks filed with `resumeFrom` (`claude -p --resume`). A resume
+  prints its parent's cost on in its own, and the runtime takes it off (M2), so a step's tries add up once; its cap caps the resume's
+  own spend (M5). A `--bg` try from before the switch, resumed as a job, records no cost (M3).
+- **Modes by role.** The planner and the reviewers already ran `dontAsk`, fenced by the settings' allow list. The implementers and the
+  shipper say `permissionMode: auto`. The supervisor is the one background step: `dontAsk` with an `allow:` list of its own, and it
+  waits with `sleep 60`, since the list lets no shell loop through. Every job's denials are recorded on its attempt; a background
+  session's are not read (issue 28).
+- **The folder-team rule is redone on the measurement.** `validateFolderMode` judged every step, from a `--bg` session that waited
+  thirty-one minutes on a prompt; a job waits on none, so it judges a background step alone, which must run `dontAsk` or
+  `bypassPermissions`.
+- **`wf say` keeps its meaning**: part 2a writes a word to a job's stdin until its result (issue 29).
+
+**What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and nothing in `wf ls`, `wf decide` or the board says them
+yet. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -4097,7 +4126,8 @@ types). When P3's reach keys are built they want a name that is not `capabilitie
   false on any harness. Any other word is refused at load by name (`remote: yes`), as are an empty value and the line twice.
 - **Refused at `wf start`, with nothing written, in the engine's words**: `remote: true` on `codex` or `claude-detached`, which run a
   prompt and exit. `wf plan` refuses the card before its first run is started. `remoteRefusal` in start.ts judges by `HARNESSES` as the
-  engine's `file()` does (only `'claude-bg'` bridges). Its sentence is a copy, since `start` is synchronous and `file()` is not; a store
+  engine's `file()` does (only `'claude-bg'` bridged then; since thin runtime stage 2 part 2, `claude` with `background: true`,
+  and a `claude` step without it is refused in the engine's words too). Its sentence is a copy, since `start` is synchronous and `file()` is not; a store
   test asks an engine built on the same `HARNESSES` and fails when the two differ. Not at load, as a codex `budget:` is: the request put it at
   start, and the runtime client (`runtime-client.ts`) holds the engine's harness map.
 - **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,

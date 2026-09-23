@@ -180,8 +180,8 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
-`rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
+`permissionMode`, `tools`, `disallow`, `allow`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
+`gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
@@ -410,6 +410,30 @@ are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODE
 `test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
 
+### A job, or a session that stays: `background:`
+
+```md
+---
+background: true   # a Claude Code background session (`claude --bg`), which a person can attach to and bridge
+---
+Watch this repository's runs.
+```
+
+A step on `claude` runs as a **job**: `claude -p`, which works its brief to the end and exits. Its end is its result, it keeps a spend
+cap (`budget:`, below), and it asks nobody in any mode — a call its mode would ask about is denied, recorded on the attempt, and the
+session carries on (agent-runtime's open issue 28, M1). A person can still tell it something while it works: `wf say` writes to its
+stdin until its result (issue 29).
+
+`background: true` runs every session of the step — the first, each try and each round — as a **background session** instead,
+`claude --bg`, filed with the engine's `config.background`: one a person can attach to, and bridge to claude.ai (`remote:`, below). It
+keeps no spend cap, and its denials are not read (issue 17, issue 28). The shipped supervisor is the one step that says it: it does not
+end, and is answered from a phone. Every other shipped step is a job; until thin runtime stage 2 part 2 (2026-09-23) every step ran
+`--bg`.
+
+Refused at load: any word but `true` or `false`, and `true` on `codex` or `claude-detached`, which have no such mode; a `budget:` beside
+`background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
+that can ask (below).
+
 ### Who may drive a step's session: `remote:`
 
 ```md
@@ -420,15 +444,16 @@ Implement what was asked, in this repository.
 ```
 
 `remote: true` is carried on every filing of the step — the first, each try and each round — as the engine's `remoteControl: true`, so
-Claude Code's `--bg` session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
+Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
 from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
 phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
 `wf start`, with nothing written, on a harness the engine refuses `remoteControl` for, in the engine's words: `codex` and
-`claude-detached` run a prompt and exit, and only a Claude Code background session, `claude`, is bridged. The words are a copy, since
-`start` cannot wait on the engine's door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`
+`claude-detached` run a prompt and exit, and only a Claude Code background session, `claude` with `background: true`, is bridged; and on
+a `claude` step without `background: true`, since a job opens no bridge. The words are a copy, since `start` cannot wait on the engine's
+door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`
 say nothing of it yet.
 
 ### What a step may spend: `budget:`
@@ -452,8 +477,9 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude` | nothing. A `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18), so **a `claude` step is never stopped mid-flight by its budget, and can overrun it by one try** | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
-| `claude-detached` | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | as on `claude` |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
+| `claude-detached` | as a job on `claude` | as on `claude` |
 | `codex` | refused at load | — |
 
 A step reads **`over budget`** — `over budget $4.20 of $3` in `wf ls` — when its ended tries have together cost the cap in force or
@@ -479,8 +505,13 @@ loop asks for a round that would file it again.
   and a person raised it. Being over budget is why nothing was filed, not what the session has to fix.
 
 Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
-the same on both Claude harnesses — the tries together, against the cap — and on `claude-detached` the harness keeps it too, each session
-handed what is left.
+the same on both Claude harnesses — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
+
+**A resumed session is charged its own spend.** A try, a round or a gate's answer that continues a session is a new task filed with
+`resumeFrom` — `claude -p --resume` — and handed what is left of the cap. `claude -p --resume` caps the resume's own spend, not its
+session's (M5), and prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that
+session spent, and the tries add up to the step's spend once (agent-runtime's open issue 4). A resume of a session that was not a job of
+the engine's — a `--bg` try from before stage 2 part 2 — records no cost, and the step's spend reads `≥` that far.
 
 ## What one step knows of another
 
@@ -883,7 +914,7 @@ another repository and change that line.
 | `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or an ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
 | `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
-| `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (`claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
+| `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`, `claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
 
@@ -1501,9 +1532,10 @@ agent: note-writer
   continues another's session (a chain, `inherit`), which works in that step's folder, since a harness session belongs to
   its directory. A fork and a fan-in start with nothing of their own: nothing is merged, and what came before reaches them
   as declared output (`input:`), collected artifacts, and the copies below.
-- **What a step is told to read is in its own folder: `given/`.** A folder team's steps run in `dontAsk`
-  (`validateFolderMode`), fenced to their directory: a read outside it is denied with no prompt, and the session carries on
-  none the wiser. So the run copies in what its brief names, as it makes the folder — the files given with
+- **What a step is told to read is in its own folder: `given/`.** A folder team's steps run as jobs, fenced to their
+  directory: a read outside it that their mode would ask about is denied with no prompt, and the session carries on none the
+  wiser. A background step (`background: true`) would wait on that prompt for ever instead, so on a folder team it must run
+  `dontAsk` or `bypassPermissions` (`validateFolderMode`). So the run copies in what its brief names, as it makes the folder — the files given with
   `wf start --input` into `given/inputs`, and each folder this step waits on but did not continue into
   `given/from/<step>` — and the brief names those, by their path from the folder, and nothing under the store. Each is a
   copy taken as the step was filed: what a step does to one reaches nobody. A symlink is not copied through, nor a parent's
@@ -2276,6 +2308,14 @@ wants to run its own tests stops and waits for someone who, in a fleet, is not t
 `auto` is now the engine's default. `dontAsk` never stalls either, but it *denies* instead of
 asking — which fails quietly rather than visibly, and is right only when you have enumerated the
 tools a step may use. Set `permissionMode:` on a step to choose.
+
+Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, `claude -p`, and **a job waits on
+nobody in any mode**: a call that would ask is denied, the session carries on, and the attempt records
+what was denied (agent-runtime's open issue 28, M1). So a mode no longer decides whether a step stalls,
+only what it may do. The shipped agents choose by role: the planner and the reviewers run `dontAsk`,
+fenced by this repository's `.claude/settings.json` allow list, which a job honours as a `--bg` session
+does (M11); the implementers and the shipper run `auto`; and the supervisor, the one background session,
+runs `dontAsk` with an `allow:` of its own, since a `--bg` session in a mode that asks would wait.
 
 Whichever you pick, the engine makes the consequence visible rather than mysterious: a session
 waiting on a person is reported as `needs-human`, and a step's `deadlineSeconds` is what stops one

@@ -1280,7 +1280,7 @@ export function ownStatus(
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`), and
  * how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still running is
- * in neither: a `claude --bg` session writes its cost only as its process exits (agent-runtime's open issue 18).
+ * in neither: a `claude --bg` session writes its cost only as its process exits, and a job as it prints its result (agent-runtime's open issue 18).
  */
 export type Spend = { usd: number; measured: number; unmeasured: number };
 
@@ -1350,16 +1350,19 @@ export const loopOver = (steps: readonly Workflow[], looping: Workflow, run: Run
 export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd)}`;
 
 /**
- * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, on `claude-detached` only, whose
- * `claude -p` ends a session at it — so the harness holds the tries together to the cap, and not each session to a whole cap of its own. The
- * engine refuses one on `claude`, whose `--bg` sessions keep none (agent-runtime's open issue 17): there the run holds the cap between tries.
+ * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, on a harness that runs
+ * `claude -p` and ends a session at it — `claude-detached`, and `claude` as a job, which is every `claude` step without `background: true` —
+ * so the harness holds the tries together to the cap, and not each session to a whole cap of its own. A resume is charged its own spend
+ * (agent-runtime's open issue 28, M2), and a cap caps a resume's own spend (M5), so the remainder is what the next try may spend. The engine
+ * refuses one on a background session, which keeps none (open issue 17), and the parser refuses a budget beside `background: true`.
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
  * left is `over budget`, and filed nothing (`overBudget`). An attempt the engine starts again within one filing (`maxAttempts:`) is handed
  * the same amount, since the engine counts no spend of its own.
  */
 export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
-  if (step.harness !== 'claude-detached' || cap === undefined) return undefined;
+  const job = step.harness === 'claude-detached' || ((step.harness ?? 'claude') === 'claude' && !step.background);
+  if (!job || cap === undefined) return undefined;
   return Math.max(Math.ceil((cap - spent.usd) * 1e6 - 1e-6) / 1e6, 1e-6);
 }
 

@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Pruned, type RoundAsk, type Run } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { orderSteps, type Workflow } from './workflow.ts';
+import { asRan, orderSteps, type Workflow } from './workflow.ts';
 import { loadWorkflows } from './workflow-store.ts';
 import { inputsRoot } from './places.ts';
 
@@ -88,9 +88,10 @@ export const readRun = (id: string): Run => {
  * The folder is read only for a record from before the run froze its workflow — and a run started
  * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
  * Ordered on the way out too, so a record frozen before steps were ordered — in the folder's order,
- * alphabetical — reads in the order its steps run, as one written since does.
+ * alphabetical — reads in the order its steps run, as one written since does. And each step as it ran then (`asRan`): a step bridged to
+ * claude.ai before steps were jobs is the background session it was.
  */
-export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
+export const stepsOf = (run: Run): Workflow[] => orderSteps((run.workflow ?? loadWorkflows(run.workflowDir)).map(asRan));
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.

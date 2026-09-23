@@ -332,8 +332,9 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
-  // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
+  // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts. And `background:`, which is
+  // Claude Code's alone and keeps no `budget:`: read below too.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**), Bash(npm test)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
@@ -346,7 +347,9 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(watching.slot, 'none');
   const attached = parseWorkflow('build', '---\nagent: implementer\n---\nBuild it.\n', undefined, new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]));
   assert.equal(attached.agent?.name, 'implementer');
-  const all = { ...w, workspace: ending.workspace, slot: watching.slot, agent: attached.agent };
+  const session = fm('supervise', 'background: true');
+  assert.equal(session.background, true);
+  const all = { ...w, workspace: ending.workspace, slot: watching.slot, agent: attached.agent, background: session.background };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
@@ -386,7 +389,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -949,62 +952,68 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
     (e: WorkflowError) => e.exitCode === 2 && /^write says `workspace: folder`, and review does not/.test(e.message));
 });
 
-test('REFUSED at load: a step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`; judged per harness, so codex, fenced by its sandbox, passes in every one of its own', () => {
+test('REFUSED at load: a background step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`; a job, on claude or claude-detached, and a codex step pass in every mode their harness takes', () => {
   const team = (...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
-    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', background: true, ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
   const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
 
-  // The two modes that never ask: `dontAsk`, which denies instead, and `bypassPermissions`, which allows instead. A folder team may run in
-  // those and no other — measured on Claude Code 2.1.278, where a `--bg` session in `acceptEdits` and one in `auto` each sat on the first
-  // call outside their folder with `waitingFor: 'permission prompt'` and nobody to answer.
+  // A background session (`claude --bg`) asks, and nobody is there: measured on Claude Code 2.1.278, where one in `acceptEdits` and one in
+  // `auto` each sat on the first call outside their folder with `waitingFor: 'permission prompt'`. The two modes that never ask are
+  // `dontAsk`, which denies instead, and `bypassPermissions`, which allows instead.
   assert.doesNotThrow(() => validate(team('dontAsk', 'bypassPermissions')));
   // Every other mode the parser takes is refused, and the step that is in one is named — the second here, so a rule that only ever looked
   // at the first would fail.
   for (const mode of ['default', 'acceptEdits', 'plan', 'manual', 'auto']) {
-    refused(team('dontAsk', mode), new RegExp(`^s1: \`workspace: folder\` works in a folder nobody has opened, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`));
+    refused(team('dontAsk', mode), new RegExp(`^s1: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`));
   }
   // The line left off is the same defect: the engine files such a task in `auto`.
-  refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);
-  // And the fix is named, both halves of it.
-  refused(team(undefined), /Write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step that must write its own work needs `allow: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/);
+  refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);
+  // And the fix is named, all three ways.
+  refused(team(undefined), /Delete `background: true`, and the step runs as a job, which asks nobody in any mode; or write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step in `dontAsk` that must write its own work needs `allow: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/);
 
-  // A step of another harness is judged on that harness's modes, because what was measured is Claude Code's prompt. `codex exec` is not
-  // interactive: it has one shell, fenced by the sandbox its mode names, and a call outside the fence is denied there and then. Judged on
-  // Claude's words, a codex folder team in `workspace-write` — the tightest sandbox that writes, and codex's default — was refused at load
-  // and told to write `permissionMode: dontAsk`, which codex does not take, and `allow: Edit(**)`, which `rulesOf` refuses on codex: two
-  // refusals pointing at each other, whose only way through was `bypassPermissions`, the widest mode of all.
-  const on = (harness: string, ...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
-    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', harness, ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
-  for (const mode of PERMISSION_MODES.codex!) assert.doesNotThrow(() => validate(on('codex', 'workspace-write', mode)), `codex ${mode}`);
-  assert.doesNotThrow(() => validate(on('codex', undefined)), 'and a codex step that names no sandbox runs in `workspace-write`, which writes in its folder and asks nobody');
-  assert.doesNotThrow(() => parseFolder([['write', '---\nworkspace: folder\nharness: codex\npermissionMode: workspace-write\n---\nWrite.\n']]), 'as a person writes one');
-  // `claude-detached` is Claude Code by another road, and is judged as `claude` is.
-  refused(on('claude-detached', 'dontAsk', 'acceptEdits'), /^s1: `workspace: folder` works in a folder nobody has opened, and `permissionMode: acceptEdits` can stop and ask/);
-
-  // And for every harness there is: one a folder team can run in, and, where there is a refusal, a fix written in that harness's own
-  // vocabulary. A harness added to `PERMISSION_MODES` and forgotten in `UNASKING` would have every folder team of its own refused here,
-  // in another harness's words — which is what the codex refusal above was.
+  // A job waits on nobody in any mode: `claude -p` in `auto`, `dontAsk`, `default` and `acceptEdits`, in folders under `/tmp`, was denied each
+  // call it could not make and exited on its own (agent-runtime's open issue 28, M1, 2.1.280). So a claude step without `background: true`
+  // passes in every mode — named `false`, or left off — and so does `claude-detached`, which is `claude -p` by another road. And codex:
+  // `codex exec` is not interactive, and has one shell fenced by the sandbox its mode names. Judged on Claude's words, a codex folder team
+  // in `workspace-write` was once refused and told to write `permissionMode: dontAsk`, which codex does not take.
+  const on = (harness: string | undefined, background: boolean | undefined, ...modes: Array<string | undefined>): Workflow[] => modes.map((permissionMode, i) =>
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', workspace: 'folder', ...(harness ? { harness } : {}), ...(background !== undefined ? { background } : {}), ...(permissionMode ? { permissionMode } : {}) }) as Workflow);
   for (const harness of HARNESSES) {
-    const modes = PERMISSION_MODES[harness]!;
-    const says = (permissionMode: string): string | undefined => {
-      try { validate(on(harness, permissionMode)); return undefined; } catch (e) { return (e as WorkflowError).message; }
-    };
-    const refusals = modes.map((mode) => [mode, says(mode)] as const);
-    assert.ok(refusals.some(([, why]) => why === undefined), `${harness}: no permission mode it takes can run a folder team`);
-    for (const [mode, why] of refusals) {
-      if (why === undefined) continue;
-      const named = /Write `permissionMode: ([^`]+)`/.exec(why)?.[1];
-      assert.ok(named && modes.includes(named), `${harness} ${mode}: the refusal names \`permissionMode: ${named}\`, which ${harness} does not take — ${why}`);
+    for (const mode of [...PERMISSION_MODES[harness]!, undefined]) {
+      assert.doesNotThrow(() => validate(on(harness, undefined, mode)), `${harness} ${mode ?? 'with no mode'}, a job`);
+      if (harness !== 'codex') assert.doesNotThrow(() => validate(on(harness, false, mode)), `${harness} ${mode ?? 'with no mode'}, \`background: false\``);
     }
   }
+  assert.doesNotThrow(() => validate(on(undefined, undefined, 'acceptEdits', 'auto', undefined)), 'claude by default, a job');
+  assert.doesNotThrow(() => parseFolder([['write', '---\nworkspace: folder\nharness: codex\npermissionMode: workspace-write\n---\nWrite.\n']]), 'as a person writes one');
+  assert.doesNotThrow(() => parseFolder([['write', '---\nworkspace: folder\n---\nWrite.\n']]), 'and a claude step that names no mode, which a job runs in `auto`');
 
   // A team that is not a folder team is not judged on this at all: a git run's steps work in a checkout a person opened, with settings of
-  // its own, and every mode has always been theirs to choose.
-  assert.doesNotThrow(() => validate([{ name: 'implement', after: [], body: 'x', permissionMode: 'acceptEdits' } as Workflow]));
+  // its own, and every mode has always been theirs to choose — a background session's too.
+  assert.doesNotThrow(() => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' } as Workflow]));
 
   // At load, from files: the same refusal reaches a person writing a folder of markdown.
-  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\npermissionMode: acceptEdits\n---\nWrite.\n']]),
-    (e: WorkflowError) => e.exitCode === 2 && /^write: `workspace: folder` works in a folder nobody has opened, and `permissionMode: acceptEdits` can/.test(e.message));
+  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\nbackground: true\npermissionMode: acceptEdits\n---\nWrite.\n']]),
+    (e: WorkflowError) => e.exitCode === 2 && /^write: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can/.test(e.message));
+});
+
+test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice, any harness but claude, and a `budget:` beside it — in the engine\'s words', () => {
+  assert.equal(fm('supervise', 'background: true').background, true);
+  assert.equal(fm('supervise', 'harness: claude\nbackground: true').background, true);
+  assert.equal(fm('supervise', 'background: false').background, false);
+  assert.equal(fm('supervise', '').background, undefined);
+  assert.equal(fm('supervise', 'background: false\nbudget: 2').budget, 2, 'a job keeps a cap');
+  const refusedWith = (pattern: RegExp) => (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message);
+  assert.throws(() => fm('supervise', 'background: yes'), refusedWith(/^supervise: `background: yes` is not `true` or `false`\./));
+  assert.throws(() => fm('supervise', 'background:'), refusedWith(/^supervise: `background: ` is not `true` or `false`\.|^supervise: `background` has no value/));
+  assert.throws(() => fm('supervise', 'background: true\nbackground: true'), refusedWith(/background/));
+  for (const harness of ['codex', 'claude-detached']) {
+    assert.throws(() => fm('supervise', `harness: ${harness}\nbackground: true`),
+      refusedWith(new RegExp(`^supervise: \`background: true\` asks for a Claude Code background session \\(\`claude --bg\`\\), and the \`${harness}\` harness has no such mode: .*\\. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`\\.$`)), harness);
+    assert.doesNotThrow(() => fm('supervise', `harness: ${harness}\nbackground: false`), `${harness}: \`background: false\` asks for nothing`);
+  }
+  assert.throws(() => fm('supervise', 'background: true\nbudget: 2'),
+    refusedWith(/^supervise: `budget: 2` is a spend cap, and `background: true` runs the step as a background session: a `claude --bg` session does not keep one: .*\. Delete `background: true` to run the step as a job \(`claude -p`\), which ends its session at the cap, or delete the budget line\.$/));
 });
 
 test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {
@@ -1183,14 +1192,14 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
   // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
-  // `agent:` renders in test/agents.test.ts, which has agents to resolve it with.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
+  // `agent:` renders in test/agents.test.ts, which has agents to resolve it with, and `background:`, which keeps no `budget:`, below.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**),Bash(npm test)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
-  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot' && key !== 'agent') assert.notEqual(step[key], undefined, key);
+  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot' && key !== 'agent' && key !== 'background') assert.notEqual(step[key], undefined, key);
   const text = renderStep(step);
   assert.equal(text, [
     '---',
@@ -1236,6 +1245,13 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   const watched = renderStep(watching);
   assert.equal(watched, ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'));
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
+
+  // And `background: true`, which keeps no `budget:`: after `allow`, before `remote`; `background: false` is written too.
+  const session = parseWorkflow('supervise', '---\nremote: true\nbackground: true\nallow: Read\n---\nWatch the runs.\n');
+  const kept = renderStep(session);
+  assert.equal(kept, ['---', 'allow: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'));
+  assert.deepEqual(parseWorkflow('supervise', kept), session);
+  assert.match(renderStep({ ...session, background: false }), /^background: false$/m);
 });
 
 test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input`, `disallow` or `allow` are no line — and a step that sets nothing is its body', () => {

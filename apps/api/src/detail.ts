@@ -15,8 +15,9 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
  * it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the step's
  * tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they have cost
  * the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says `over budget` or
- * `budget exhausted` — where another session of it is the way on. A `claude --bg` session is not stopped at its cap (agent-runtime's issue
- * 17), so a step can finish past it with nothing waiting on a raise.
+ * `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a background session
+ * (`background: true`, `claude --bg`) keeps none and is not stopped (agent-runtime's issue 17), so such a step — the package refuses a
+ * budget beside it, but a run frozen before may have both — can finish past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
@@ -551,10 +552,11 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
  *
  * A harness the run brings as a spec — `codex`, `claude-detached` — is asked with its own `command`, a pure function of the request:
  * the mode it would spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task
- * named. So a rule the engine changes is the rule read here. `claude` is the engine's own `claude --bg` runner, whose spawn is no
- * function it exports: the mode filed, or `auto` (`claudeOps` in agent-runtime's runner.ts), which the api test holds to the command
- * that runner spawns. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api
- * cannot ask, or one whose command names no mode.
+ * named. So a rule the engine changes is the rule read here. `claude` is the engine's own harness, a job (`claude -p`) or, filed with
+ * `config.background`, a background session (`claude --bg`), whose spawn is no function it exports: either takes the mode filed, or
+ * `auto` (`claudePrintFlags` and `claudeOps` in agent-runtime), which the api test holds to the command each spawns. A task filed with
+ * no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api cannot ask, or one whose command names no
+ * mode.
  */
 function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const name = state.harness ?? Object.keys(HARNESSES)[0]!;
@@ -562,7 +564,7 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const harness = HARNESSES[name as keyof typeof HARNESSES];
   const { permissionMode, tools: filedTools } = state.config ?? {};
   const by = permissionMode === undefined ? 'default' : 'filed';
-  if (harness === 'claude-bg') return { mode: permissionMode ?? 'auto', by };
+  if (harness === 'claude') return { mode: permissionMode ?? 'auto', by };
   if (typeof harness !== 'object' || !('command' in harness)) return null;
   const modeOf = (tools: string[] | undefined): string | undefined => {
     try {

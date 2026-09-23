@@ -91,7 +91,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -142,7 +142,7 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   }
   // A flag's words are the ones the parser takes, and gate's `false` is refused.
   const flags = Object.fromEntries(form.keys.filter((k) => k.kind === 'flag').map((k) => [k.key, k.choices]));
-  assert.deepEqual(flags, { remote: ['true', 'false'], gate: ['true'] });
+  assert.deepEqual(flags, { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] });
   for (const [key, words] of Object.entries(flags)) for (const word of words!) assert.equal(refusedAs(key, word), null, `${key}: ${word}`);
   assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/);
   // The default harness is the parser's: a step that names none takes each of its modes, and not a mode only codex takes.
@@ -268,6 +268,13 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^context: 150k$/m);
   assert.equal((await windowed.json() as WorkflowSaved).workflow.steps.find((s) => s.name === 'build')?.spec.context, 150_000);
 
+  // A step run as a background session says so, and is listed back as one; a step that does not say is a job, listed as null.
+  const background = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, background: true } }, review] });
+  assert.equal(background.status, 200, await background.clone().text());
+  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^background: true$/m);
+  const listed = (await background.json() as WorkflowSaved).workflow.steps;
+  assert.deepEqual(listed.map((s) => [s.name, s.spec.background]), [['plan', null], ['build', true], ['review', null]]);
+
   // An edge deleted takes its key; a step gone takes its file. A key the listing leaves out is unset.
   const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { check: 'npm test' }, body: 'Build it.' }] });
   assert.equal(gone.status, 200, await gone.clone().text());
@@ -375,6 +382,7 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     [{ steps: [{ ...plan, spec: { deadlineSeconds: '5m' } }] }, /`deadlineSeconds` is a number, or null for unset, and this request's was "5m"/],
     [{ steps: [{ ...plan, spec: { budget: '$5' } }] }, /`budget` is a number/],
     [{ steps: [{ ...plan, spec: { context: '200k' } }] }, /`context` is a number, or null for unset, and this request's was "200k"/],
+    [{ steps: [{ ...plan, spec: { background: 'yes' } }] }, /`background` is true or false/],
     [{ steps: [{ ...plan, spec: { remote: 'yes' } }] }, /`remote` is true or false/],
     [{ steps: [{ ...plan, spec: { gate: 'true' } }] }, /`gate` is true or false/],
     [{ steps: [{ ...plan, spec: { output: { file: 'x.json' } } }] }, /`output` is a string, the schema file's name/],

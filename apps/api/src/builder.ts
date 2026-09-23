@@ -31,7 +31,7 @@ import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, t
  * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
- * `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
+ * `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`).
  * `workspace` is a `choice` of its words, `main` and `folder`, and `slot` of one word, `none`, since a step either says it or says nothing. `agent` is a
  * `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
  */
@@ -43,12 +43,12 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
-  tools: 'list', disallow: 'list', allow: 'list', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
+  tools: 'list', disallow: 'list', allow: 'list', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
 
-/** What a flag may be set to, as the parser reads it: `remote:` says either, and `gate:` only `true`, since `false` is a step without the line. */
-const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { remote: ['true', 'false'], gate: ['true'] };
+/** What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a step without the line. */
+const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] };
 
 /** The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then. The parser's, which it does not export. */
 export const DEFAULT_HARNESS = 'claude';

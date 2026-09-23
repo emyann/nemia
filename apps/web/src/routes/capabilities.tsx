@@ -307,7 +307,8 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                     {server.tools ? (
                       <span className="flex flex-wrap gap-1">
                         {server.tools.map((tool) => {
-                          const refused = tool.denied !== null || (allowed.dontAsk && !tool.allowed);
+                          // In dontAsk what no rule allows is denied; in dontAsk or on a job, what an ask rule makes ask is.
+                          const refused = tool.denied !== null || (allowed.dontAsk && !tool.allowed) || (allowed.askDenier !== null && tool.asks !== null);
                           return (
                             <span
                               key={tool.name}
@@ -319,7 +320,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                                 tool.denied
                                   ? `Denied by ${tool.denied.rule} (${tool.denied.source})`
                                   : tool.asks
-                                    ? `Asks by ${tool.asks.rule} (${tool.asks.source})${refused ? ', so dontAsk denies it without a prompt' : ''}`
+                                    ? `Asks by ${tool.asks.rule} (${tool.asks.source})${refused ? `, so ${allowed.askDenier} denies it without a prompt` : ''}`
                                     : refused
                                       ? 'No rule allows it, so dontAsk denies it without a prompt'
                                       : `mcp__${server.server}__${tool.name}`
@@ -366,7 +367,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                 ))}
               </span>
               <p className="text-xs text-neutral-500">
-                What these match asks, whatever an allow or the harness&apos;s own leave says{allowed.dontAsk ? ', and dontAsk denies it without a prompt' : ''}.
+                What these match asks, whatever an allow or the harness&apos;s own leave says{allowed.askDenier ? `, and ${allowed.askDenier} denies it without a prompt` : ''}.
               </p>
             </Reach>
           )}

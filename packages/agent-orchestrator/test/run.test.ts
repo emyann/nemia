@@ -2841,7 +2841,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   assert.equal(listing(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, unmeasured).steps[0]!.status, 'budget exhausted at $3');
 });
 
-test("`budgetUsdFor`: what is left of the cap in force, once the step's tries are taken off, goes to the engine on claude-detached — so its harness holds the tries together to the cap — never on claude, whose `--bg` sessions keep none, nor with no cap", () => {
+test("`budgetUsdFor`: what is left of the cap in force, once the step's tries are taken off, goes to the engine on every harness that runs `claude -p` — claude-detached, and claude as a job — so its harness holds the tries together to the cap; never to a background session, which keeps none, nor with no cap", () => {
   const detached: Workflow = { ...step('implement'), harness: 'claude-detached', budget: 3 };
   const cost = (usd: number) => ({ usd, measured: 1, unmeasured: 0 });
   assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't1' })), 3, 'nothing spent: the whole cap');
@@ -2849,8 +2849,14 @@ test("`budgetUsdFor`: what is left of the cap in force, once the step's tries ar
   assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge', budget: 10 }] }), cost(4.25)), 5.75, 'a raised cap, less what was spent');
   assert.equal(String(budgetUsdFor(detached, 3, cost(2.9999999))), '0.000001', 'digits, rounded up to a millionth: never 0, which the engine refuses');
   assert.equal(String(budgetUsdFor(detached, 0.3, cost(0.1))), '0.2');
-  assert.equal(budgetUsdFor({ ...step('implement'), budget: 3 }, 3, cost(1)), undefined, 'no harness: claude');
-  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude', budget: 3 }, 3), undefined);
+  // On claude, a job: named, or by default, a try after a $1 one is handed the $2 left.
+  assert.equal(budgetUsdFor({ ...step('implement'), budget: 3 }, 3, cost(1)), 2, 'no harness: claude');
+  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude', budget: 3 }, 3), 3);
+  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude', background: false, budget: 3 }, 3), 3, '`background: false` is a job');
+  // A background session keeps no cap, and the engine refuses one: none is handed, whatever the cap in force.
+  assert.equal(budgetUsdFor({ ...step('implement'), background: true }, 3, cost(1)), undefined, 'background, by default on claude');
+  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude', background: true }, 3), undefined, 'background, named');
+  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'codex', budget: 3 }, 3), undefined, 'codex keeps none');
   assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude-detached' }, undefined, cost(1)), undefined);
 });
 

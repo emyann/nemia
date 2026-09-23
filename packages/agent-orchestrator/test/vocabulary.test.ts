@@ -8,7 +8,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES, CODEX_EFFORTS, CODEX_SANDBOXES, claudeDetached, codex } from 'agent-runtime';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES, CODEX_EFFORTS, CODEX_SANDBOXES, claudeDetached, codex, createEngine } from 'agent-runtime';
 import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 
 type Lists = Readonly<Record<string, readonly string[]>>;
@@ -64,7 +67,7 @@ test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word ad
 });
 
 test("the parser's context windows are the engine's, harness by harness — and codex has none on either side", () => {
-  // `claude` is the engine's `claude-bg`, whose range is `CLAUDE_CONTEXT_TOKENS`; a spec declares its own.
+  // `claude` is the engine's `claude`, a job or a background session, whose range is `CLAUDE_CONTEXT_TOKENS` either way; a spec declares its own.
   const engine: Record<string, unknown> = { claude: CLAUDE_CONTEXT_TOKENS, 'claude-detached': claudeDetached.contextTokens, codex: codex.contextTokens };
   for (const h of HARNESSES) assert.deepEqual(CONTEXT_WINDOWS[h], engine[h], h);
   assert.deepEqual(CLAUDE_CONTEXT_TOKENS, { least: 100_000, most: 1_000_000 }, 'and the engine still has the range the CLI was measured to take');
@@ -75,7 +78,7 @@ test("every word the parser takes, the engine's own refusal takes too — asked 
     for (const permissionMode of PERMISSION_MODES[h]!) assert.equal(refuses({ brief: 'b', cwd: '/w', permissionMode }), undefined, `${h} ${permissionMode}`);
     for (const effort of EFFORTS[h]!) assert.equal(refuses({ brief: 'b', cwd: '/w', effort }), undefined, `${h} ${effort}`);
   }
-  // `claude` is `claude-bg`, whose refusal is Claude Code's lists — the same `claudeDetached.refuses` is.
+  // `claude` is the engine's `claude`, whose refusal is Claude Code's lists in either mode — the same `claudeDetached.refuses` is.
   assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached']);
   assert.deepEqual(EFFORTS.claude, EFFORTS['claude-detached']);
 });
@@ -87,7 +90,23 @@ test("REFUSED at load in the engine's words: a `budget:` on a codex step, which 
   const reason = /^`budgetUsd: 5` (.*?)\. Leave/.exec(engine)?.[1];
   assert.ok(reason, engine);
   assert.throws(() => parseWorkflow('review', '---\nharness: codex\nbudget: 5\n---\nreview it\n'), (e: Error) => e.message.startsWith(`review: \`budget: 5\` ${reason}.`));
-  // The harnesses a budget is taken on: `claude`, whose cap the run holds between tries, and `claude-detached`, whose harness keeps it too.
+  // The harnesses a budget is taken on: `claude`, run as a job, and `claude-detached`, whose `claude -p` each ends a session at the cap.
   assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/w', budgetUsd: 5 }), undefined);
   for (const harness of ['claude', 'claude-detached']) assert.equal(parseWorkflow('x', `---\nharness: ${harness}\nbudget: 5\n---\ndo it\n`).budget, 5, harness);
+});
+
+test("REFUSED at load in the engine's words: a `budget:` beside `background: true`, which a `claude --bg` session has no spend cap to keep — and a job's is taken", async () => {
+  const { parseWorkflow } = await import('../src/workflow.ts');
+  const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'wf-vocabulary-')), harnesses: { claude: 'claude' } });
+  const refusal = async (config: { background?: boolean }): Promise<string | undefined> => {
+    try { await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', budgetUsd: 5, config }); return undefined; } catch (e) { return (e as Error).message; }
+  };
+  const said = await refusal({ background: true });
+  const reason = /^file: `budgetUsd: 5` is a spend cap, and (.*?)\. Leave `config\.background` off/.exec(said ?? '')?.[1];
+  assert.ok(reason, said);
+  assert.throws(() => parseWorkflow('watch', '---\nbackground: true\nbudget: 5\n---\nwatch it\n'),
+    (e: Error) => e.message.startsWith(`watch: \`budget: 5\` is a spend cap, and \`background: true\` runs the step as a background session: ${reason}. Delete`), reason);
+  // A job keeps one, on both doors.
+  assert.equal(await refusal({}), undefined);
+  assert.equal(parseWorkflow('watch', '---\nbudget: 5\n---\nwatch it\n').budget, 5);
 });

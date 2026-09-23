@@ -8,6 +8,9 @@ model: opus
 effort: high
 # The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-runtime open issue 26).
 context: 200k
+# Said, though it is the engine's default: this role builds, tests and commits, so it runs unfenced. As a job (`claude -p`),
+# `auto` asks nobody — a call it may not make is denied, recorded on the attempt, and the session carries on (agent-runtime open issue 28, M1).
+permissionMode: auto
 # Denied by name what no step needs and an unattended session otherwise has: messaging other sessions, scheduling cron
 # jobs, firing remote triggers (measured, docs/plan-hold-the-bar.md §4b, "what a worker gets"). `--disallowedTools`.
 disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger

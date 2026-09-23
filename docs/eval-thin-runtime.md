@@ -258,7 +258,7 @@ orchestrator's calls to the runtime change.
    (`src/runner-claude-code.ts`), so a `--bg` session journalled on `claude` before is still observed, stopped, settled and said to.
    `say` and `remoteControl` on a job are refused in words that name `background: true`, a budget beside it is refused as
    `--bg` keeps none, and `background` on any other harness is refused. What a job was denied is on its attempt
-   (`denials`) and on `ae show`, and `decide` never reads it. The orchestrator stays on `claude-bg` until part 2. Done, on
+   (`denials`) and on `ae show`, and `decide` never reads it. The orchestrator stayed on `claude-bg` until part 2. Done, on
    the same day, measured first on Claude Code 2.1.280 (M1 to M7, `packages/agent-runtime/docs/open-issues.md` issue 28).
    **(2) steps become jobs**, with the orchestrator's `claude` mapped to the adapter. **(3) denials on every surface** — a
    `denied:` line on `wf decide`, `wf ls`, the api and the board — and a `denials: fail` step key. **(4) a gate or a blocked
@@ -278,6 +278,20 @@ orchestrator's calls to the runtime change.
    its stdin at the job's first result; measured first that `--json-schema`, `--max-budget-usd` and a denial are as under
    a prompt (M8 to M10, 2.1.280), and a word is written on at most once (`packages/agent-runtime/docs/open-issues.md`
    issue 29).
+
+   **Part 2 done, the same day: steps are jobs.** Measured first, as asked at its gate, that a job in `dontAsk` honours the
+   checkout's `.claude/settings.json` allow rules as a `--bg` session does (M11, 2.1.280): an allowed command ran, an unlisted
+   one was denied and the job's attempt recorded it. Then the orchestrator's `claude` became the runtime's `claude`, and every
+   step a job; `background: true`, a step key, files a session as `--bg`, and the shipped supervisor is the one that says it
+   (`remote:` needs it). Modes by role, written in the agents: planner and reviewers `dontAsk` on the settings' list,
+   implementers and shipper `auto`, the supervisor `dontAsk` with an `allow:` of its own. `validateFolderMode` judges a
+   background step alone, since a job asks nobody. **How resume cost is counted:** `budget:` is handed to a job as
+   `--max-budget-usd`, what is left of the cap on each filing; a gate's answer, a round or a retry is a new task with
+   `resumeFrom`, run as `claude -p --resume`, whose cap caps its own spend (M5) and whose printed cost carries its parent's
+   on (M2), which the runtime takes off — so each attempt costs what it spent and the step's tries add up once. A resume of
+   a session that was no job of the runtime's (a `--bg` try from before the switch) records no cost (M3, issue 4). Denials
+   are recorded on every job's attempt; a background session's are not read, and no surface of the orchestrator says them
+   yet — part 3.
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

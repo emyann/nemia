@@ -22,6 +22,8 @@ export type WorkflowStepSpec = {
   disallow: string[];
   /** What the session may do without being asked (`allow:`): empty where the step allows nothing beyond its mode. */
   allow: string[];
+  /** `background:` as written: null where the step has no line, and runs as a job. */
+  background: boolean | null;
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;

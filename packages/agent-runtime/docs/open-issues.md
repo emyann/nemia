@@ -254,8 +254,9 @@ sees a cost while the session runs, and sees one only after the engine has let i
 
 **Effect.** `file()` refuses `budgetUsd` beside `background: true` (engine `26020c1`, and stage 2 part 1), so nothing bounds
 what a `--bg` session spends. A job on `claude` keeps a cap (`claude -p --max-budget-usd`), and since stage 2 part 1 a job is
-what `claude` runs by default; it gives up `say` (issue 28). agent-orchestrator still runs its steps on `claude-bg` until
-stage 2 part 2 moves them.
+what `claude` runs by default. Since stage 2 part 2 (2026-09-23) agent-orchestrator files every step on `claude` as a job,
+and its `budget:` as the job's cap; a step that says `background: true` — the shipped supervisor alone — runs `--bg`, and the
+orchestrator refuses a `budget:` beside it, so no step has a cap it does not keep.
 
 **Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
 read of a running session says what it has spent. Pricing its transcript's tokens here would be a price list of the
@@ -605,7 +606,7 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
 `config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M10).
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M11).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -642,12 +643,25 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   one live test on 2.1.280, haiku, each a pair — `claude -p <brief>` beside `claude -p --input-format stream-json` with the
   brief as the first user message on a stdin held open — six jobs at once. M8: `--json-schema` gave the same
   `structured_output` (`{"finished":true}`), exit 0 both. M9: `--max-budget-usd 0.01` ended both `error_max_budget_usd`,
-  exit 1, at $0.0291 and $0.0292. M10: `dontAsk` with no allow rule, told to write outside, run `curl` and fetch a page:
-  both denied `Write`, `Bash` and `WebFetch`, a `permission_denied` line for each, gave their closeout, and wrote nothing
+  exit 1, at $0.0291 and $0.0292. M10: `auto` with `--permission-prompts none` and no allow rule — on haiku, so `default` —
+  told to write outside, run `curl` and fetch a page: both denied `Write`, `Bash` and `WebFetch`, a `permission_denied` line for each, gave their closeout, and wrote nothing
   outside. And one thing only the stream shows: a job reading its stdin does not exit at its result — it was still running
   five seconds after it in each streamed pair — and exits once its stdin ends, so the worker ends it. The result line's
   `type` is printed near its end, not first (`{"duration_api_ms":…`, both ways), so the worker parses each line for its
-  `type` rather than matching its start.
+  `type` rather than matching its start. (This record said M10 ran in `dontAsk` until stage 2 part 2 read the test again:
+  `test/live.test.ts` gives both jobs `--permission-mode auto --permission-prompts none`. `dontAsk` under a job is M1's, and
+  M11's.)
+- **M11: a job in `dontAsk` is fenced by its checkout's settings as a `--bg` session is.** Asked at stage 2 part 2's plan
+  gate, before the orchestrator filed its steps as jobs, since the planner and the reviewers run `dontAsk` with no allow rule
+  of their own and this repository's `.claude/settings.json` as their only list. Under the engine, on 2.1.280, haiku, a job
+  and a `--bg` session, each `dontAsk` with `tools: ['Bash']`, in a checkout inside this package whose settings allow
+  `Bash(npm run build)` alone, told to run `npm run build` and then `npm run e2e`: both ran the build, neither ran the e2e,
+  both closed saying `npm run e2e` was denied, and the job's attempt carries the one denial, `Bash(npm)` (a denial names a
+  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails. But
+  `build` is a name a person's own `~/.claude/settings.json` may allow, and that allow alone would run it with no project
+  settings read (this machine's lists no `npm run`, so the first reading stands). So M11 names its two scripts afresh on
+  every run (`m11-allowed-<nonce>`, `m11-unlisted-<nonce>`), on no list but the checkout's; measured again so, on 2.1.280,
+  the same day: the same result, the allowed one ran in both and the unlisted one was denied in both.
 
 What a job gives up, or what is not done:
 
@@ -655,7 +669,8 @@ What a job gives up, or what is not done:
   claude.ai, still files it with `background: true`.
 - **A background session's denials are not read.** M1's two shapes are `claude -p`'s output, which a `--bg` session does
   not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
-  `denials`.
+  `denials`. Since stage 2 part 2 every orchestrator step is a job, and its attempt carries its denials, but for a step that
+  says `background: true`: the shipped supervisor, in `dontAsk`, whose calls off its `allow:` list are denied unread.
 - **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
   observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
   running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
@@ -760,6 +775,10 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   job at $0.0434 and the job resumed from it charged $0.0033; a resume capped at $0.02 under its session's $0.0467
   finished at $0.0032. M7: a resume of a denied job carried none of its parent's denials, at $0.0041. The $0.01 budget
   test, on `claude-detached`, whose arguments part 2a rebuilt: `failed`, reason `budget`, $0.0184, no attempt 2.
+- **A job fenced by its checkout's settings** (issue 28's M11, thin runtime stage 2 part 2). `test/live.test.ts` on Claude Code
+  2.1.280, 2026-09-23, haiku, twice by the implementing step: the job exited 0, wrote `BUILT` and not `E2E`, and recorded
+  `[{"tool":"Bash","what":"npm"}]`; the `--bg` control wrote `BUILT` and not `E2E`, and records no denials (issue 28). The
+  first run failed only on the test's own assertion, which looked for the whole command in a denial that keeps its first word.
 
 ## Verified by tests, not by a live run
 

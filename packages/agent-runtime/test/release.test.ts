@@ -110,7 +110,7 @@ test('a task that gave its closeout settles, and its session is stopped and remo
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
@@ -140,7 +140,7 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
     claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, ...(worktree ? { config: { worktree: true } } : {}) });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, config: { background: true, ...(worktree ? { worktree: true } : {}) } });
       await engine.tick();
       const [row] = claude.rows();
       await sleep(10);
@@ -167,7 +167,7 @@ test('a session listed done whose process still runs is stopped before it goes â
   claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!, 0);
@@ -185,7 +185,7 @@ test('a task that asked for a worktree has its session stopped and never removed
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { worktree: true }, closeoutSchema: { type: 'object' } });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { background: true, worktree: true }, closeoutSchema: { type: 'object' } });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
@@ -205,7 +205,7 @@ test('a session ended by quiet is stopped before it goes â€” its end is on the r
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), ...(worktree ? { config: { worktree: true } } : {}) });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { background: true, ...(worktree ? { worktree: true } : {}) } });
       await engine.tick();
       const [row] = claude.rows();
       wrote(row!, 10 * 60_000);
@@ -227,7 +227,7 @@ test('no session is released while its attempt runs; one a person stopped is rel
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!, 0);
@@ -252,7 +252,7 @@ test('a session stopped at its deadline is released once its task settles, as on
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds: 0.2 });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds: 0.2 });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(300);
@@ -303,11 +303,11 @@ test('a release the harness refuses fails nothing else in the pass, and is asked
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const done = await engine.file({ brief: 'exits on its own', cwd: tmp('cwd') });
+    const done = await engine.file({ config: { background: true }, brief: 'exits on its own', cwd: tmp('cwd') });
     await engine.tick();
     claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done' })));
     claude.rmFails(true);
-    const next = await engine.file({ brief: 'filed after', cwd: tmp('cwd') });
+    const next = await engine.file({ config: { background: true }, brief: 'filed after', cwd: tmp('cwd') });
 
     await engine.tick();
     assert.equal((await engine.view(done)).state.settled, 'succeeded');

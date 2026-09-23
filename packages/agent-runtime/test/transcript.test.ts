@@ -397,11 +397,11 @@ const fakeCodex = (thread: string) => {
   return bin;
 };
 
-test("at shipped defaults, a Claude task's transcript is its session's, read through its own harness from the cursor given — and logs is as it was", async () => {
+test("at shipped defaults, a Claude background session's transcript is its session's, read through its own harness from the cursor given — and logs is as it was", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd') });
+    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd'), config: { background: true } });
 
     const before = await engine.transcript(id);
     assert.deepEqual(before.events, [], 'no session yet: nothing to read');
@@ -516,7 +516,7 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd') });
+    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd'), config: { background: true } });
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');

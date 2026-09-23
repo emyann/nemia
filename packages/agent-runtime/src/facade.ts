@@ -20,7 +20,8 @@ import {
   claudeOps, Runner, RunnerError, type RunnerOps, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
+import { claudeCodeOps, claudeJob } from './runner-claude-code.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { codex } from './runner-codex.ts';
@@ -43,15 +44,17 @@ export type PromiseJournal = {
 };
 
 /**
- * A harness, as one of three things:
- *   `'claude-bg'`   Claude Code's own background sessions — it keeps the registry
+ * A harness, as one of four things:
+ *   `'claude'`      Claude Code as the engine runs it by default: each task a job (`claude -p`, detached by us), or a
+ *                   background session (`claude --bg`, its registry Claude Code's) when its `config.background` is true
+ *   `'claude-bg'`   Claude Code's own background sessions, every task — it keeps the registry
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
  *   a `PromiseRunner` anything else at all
  *
- * Each is counted in a pool under the ceiling: `'claude-bg'` in Claude Code's, `claude`, as the engine's `claudeDetached`
- * is, whatever either is called; any other in the `pool` it names, or in its own name's.
+ * Each is counted in a pool under the ceiling: `'claude'` and `'claude-bg'` in Claude Code's, `claude`, as the engine's
+ * `claudeDetached` is, whatever each is called; any other in the `pool` it names, or in its own name's.
  */
-export type HarnessConfig = 'claude-bg' | HarnessSpec | PromiseRunner;
+export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | PromiseRunner;
 
 export type EngineOptions = {
   /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
@@ -131,7 +134,9 @@ export type Engine = {
    * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
    * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
    * on a harness with no context window to set (`codex`); a `remoteControl` that is not true or false, or `true` on a
-   * harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`).
+   * harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
+   * a task whose `background` is not true); a `background` that is not true or false, or `true` on any harness not
+   * brought as `'claude'`; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep.
    * A harness brought as a `PromiseRunner` is asked nothing of its own.
    */
   file(spec: TaskSpec): Promise<string>;
@@ -163,7 +168,7 @@ export type Engine = {
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2 — for a task this engine has no record of;
    * a harness that keeps no conversation this engine can read (a `HarnessSpec` or `PromiseRunner`
-   * without `transcript`); and, for the engine's own readers (`claude-bg` and a `HarnessSpec`), an
+   * without `transcript`); and, for the engine's own readers (`claude`, `claude-bg` and a `HarnessSpec`), an
    * `after` that none of them gave. A `PromiseRunner`'s cursor is its own, and passed through.
    */
   transcript(taskId: string, after?: TranscriptCursor): Promise<Transcript>;
@@ -219,22 +224,25 @@ const journalOf = (j: PromiseJournal) => Journal.layer({
 });
 
 const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
+/** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
+const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
 
 /** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
 const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Record<string, RunnerOps> =>
   Object.fromEntries(Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
     name,
-    h === 'claude-bg' ? claudeOps({ root })
+    h === 'claude' ? claudeCodeOps({ root })
+      : h === 'claude-bg' ? claudeOps({ root })
       : isSpec(h) ? detachedOps(h, root)
       : promiseOps(h),
   ]));
 
 /**
- * The pool each configured harness is counted in under the ceiling: Claude Code's for `'claude-bg'` — the pool the
- * engine's `claudeDetached` names — whatever it is configured as; the one a spec or a runner names; or its own name.
+ * The pool each configured harness is counted in under the ceiling: Claude Code's for `'claude'` and `'claude-bg'` — the
+ * pool the engine's `claudeDetached` names — whatever each is configured as; the one a spec or a runner names; or its own name.
  */
 const poolsOf = (harnesses: Record<string, HarnessConfig>): Record<string, string> =>
-  Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [name, h === 'claude-bg' ? CLAUDE_POOL : h.pool ?? name]));
+  Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [name, isClaude(h) ? CLAUDE_POOL : h.pool ?? name]));
 
 // ─── what the door refuses ──────────────────────────────────────────────────
 
@@ -253,11 +261,17 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   const h = harnesses[spec.harness]!;
   // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
   // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
-  const { contextTokens, remoteControl } = spec.config ?? {};
-  if (contextTokens !== undefined && (h === 'claude-bg' || isSpec(h))) {
-    const range = h === 'claude-bg' ? CLAUDE_CONTEXT_TOKENS : h.contextTokens;
+  const { contextTokens, remoteControl, background } = spec.config ?? {};
+  // A mode of the engine's own Claude Code, and of no other harness: dropped without a word, a task that asked for a
+  // session a person can reach would run as whatever the harness runs.
+  if (background && h !== 'claude') {
+    const modal = Object.keys(harnesses).filter((name) => harnesses[name] === 'claude').map((name) => `\`${name}\``);
+    return `\`background: true\` asks for a Claude Code background session, and the \`${spec.harness}\` harness has no such mode${h === 'claude-bg' ? ': every session of it is one already. Leave `background` off' : `. ${modal.length ? `File the task on ${modal.join(' or ')}, or leave \`background\` off` : "Leave `background` off: none of this engine's harnesses has the mode"}`}.`;
+  }
+  if (contextTokens !== undefined && (isClaude(h) || isSpec(h))) {
+    const range = isClaude(h) ? CLAUDE_CONTEXT_TOKENS : h.contextTokens;
     if (!range) {
-      const windowed = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return o === 'claude-bg' || (isSpec(o) && o.contextTokens); }).map((name) => `\`${name}\``);
+      const windowed = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return isClaude(o) || (isSpec(o) && o.contextTokens); }).map((name) => `\`${name}\``);
       return `\`contextTokens: ${contextTokens}\` sets the session's context window, and the \`${spec.harness}\` harness has no such knob: it would run on its own window, whatever the task says. ${windowed.length ? `File the task on ${windowed.join(' or ')}, whose sessions compact past it, or leave \`contextTokens\` off.` : "Leave `contextTokens` off: none of this engine's harnesses sets a session's window."}`;
     }
     if (contextTokens < range.least || contextTokens > range.most) {
@@ -267,10 +281,11 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   // Only Claude Code's background sessions are bridged. A spec's harness runs a prompt and exits — `claude -p` among them,
   // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
   if (remoteControl && isSpec(h)) {
-    const bridged = Object.keys(harnesses).filter((name) => harnesses[name] === 'claude-bg').map((name) => `\`${name}\``);
+    const bridged = Object.keys(harnesses).filter((name) => isClaude(harnesses[name]!))
+      .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
-  return (h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
+  return (h === 'claude' ? claudeCodeRefuses : h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
 };
 
 // ─── the engine ─────────────────────────────────────────────────────────────
@@ -278,7 +293,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
 export function createEngine(options: EngineOptions = {}): Engine {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const harnesses = options.harnesses ?? {
-    claude: 'claude-bg',
+    claude: 'claude',
     codex,
     'claude-detached': claudeDetached,
   };
@@ -370,7 +385,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // A cursor is its reader's. The engine's own readers give one shape, and one they did not give is
       // refused at the door; a PromiseRunner's is passed through as it gave it.
       const h = harnesses[harness]!;
-      if (after !== undefined && (h === 'claude-bg' || isSpec(h)) && !isTranscriptCursor(after)) {
+      if (after !== undefined && (isClaude(h) || isSpec(h)) && !isTranscriptCursor(after)) {
         throw refuse(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
       }
       // The start, as a read of no session gives it, is handed to no runner: it is asked from the start.
@@ -396,10 +411,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const runner = runners[harness]!;
       const h = harnesses[harness]!;
       const deliver = runner.say;
+      // A job takes its brief and nothing after it; only a background session has an inbox.
+      if (h === 'claude' && !state.config?.background) throw refuse(claudeJob.noChannel!);
       if (!deliver) {
         throw refuse((isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`);
       }
-      const cannot = h === 'claude-bg' ? claudeSayRefuses(state.config ?? {}, text) : undefined;
+      const cannot = isClaude(h) ? claudeSayRefuses(state.config ?? {}, text) : undefined;
       if (cannot) throw refuse(cannot);
       // What the record says first, then what the harness says: a settled task is not asked about.
       if (state.settled) throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
@@ -413,6 +430,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
         throw new Error(`say: the \`${harness}\` registry could not be read (${e instanceof Error ? e.message : String(e)}), so ${name} could not be found. Nothing was said; ask again.`);
       }
       const sighting = observed.get(name);
+      // Registered and not listed: on `claude`, whose listing reads past a registry that failed so its jobs stay seen, that
+      // is the registry failing (or a session between states), not a session that is not running. Rejected, as above.
+      if (!sighting && isClaude(h) && runner.find) {
+        const registered = await go(runner.find(name)).catch(() => undefined);
+        if (registered) throw new Error(`say: the \`${harness}\` registry could not be read, or did not list ${name}, which Claude Code has registered. Nothing was said; ask again.`);
+      }
       if (!sighting) throw refuse(`\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`);
       // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
       // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting

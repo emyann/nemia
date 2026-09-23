@@ -499,20 +499,24 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
   assert.deepEqual((filed as { config?: { mcp?: unknown } }).config?.mcp, mcp, 'on the record, for the runner');
 });
 
-test('file() refuses a budgetUsd that is not dollars above 0, and one on a harness that would keep no cap — and journals one claude-detached keeps', async () => {
+test('file() refuses a budgetUsd that is not dollars above 0, and one on a session that would keep no cap — and journals one a job keeps', async () => {
   const { journal, engine } = shipped();
   for (const budgetUsd of [0, -1, Number.NaN, Infinity, '5' as unknown as number]) {
     await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', budgetUsd }, /is not an amount of dollars\. Give dollars above 0/);
   }
-  // Measured: a `claude --bg` session given a $0.01 cap spent $0.19. The default harness is that one.
-  await refused(engine, { brief: 'b', cwd: '/r', budgetUsd: 5 }, /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*File the task on `claude-detached`/);
+  // Measured: a `claude --bg` session given a $0.01 cap spent $0.19. The default harness runs one when asked for a background session.
+  await refused(engine, { brief: 'b', cwd: '/r', budgetUsd: 5, config: { background: true } },
+    /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*Leave `config\.background` off to run the task as a job \(`claude -p`\), which ends the session at its cap/);
   await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', budgetUsd: 5 }, /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', budgetUsd: 0.25 });
-  const [filed] = await journal.read(id);
-  assert.equal((filed as { budgetUsd?: number }).budgetUsd, 0.25, 'on the record, for the runner');
-  assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
+  // A job keeps its cap: `claude -p` ends the session at it, on the default harness as on `claude-detached`.
+  for (const harness of ['claude-detached', 'claude']) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', harness, budgetUsd: 0.25 });
+    const [filed] = await journal.read(id);
+    assert.equal((filed as { budgetUsd?: number }).budgetUsd, 0.25, 'on the record, for the runner');
+    assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
+  }
 });
 
 test('file() refuses a priority that is not a finite number, on every harness — and journals one that is, below 0 or between whole numbers too', async () => {
@@ -557,6 +561,36 @@ test('file() refuses remoteControl on every harness with no such flag, by name �
   // Named by what the engine has: no harness brought as 'claude-bg', none to file on.
   const bare = createEngine({ journal: memoryJournal(), harnesses: { codex } });
   await refused(bare, { brief: 'b', cwd: '/r', config: { remoteControl: true } }, /the `codex` harness has no such flag.*Leave `remoteControl` off: none of this engine's harnesses bridges a session/);
+});
+
+test('file() refuses background on every harness with no such mode, and remoteControl on a job — claude journals a background session, bridged or not', async () => {
+  const { journal, engine } = shipped();
+  for (const harness of ['codex', 'claude-detached']) {
+    await refused(engine, { brief: 'b', cwd: '/r', harness, config: { background: true } },
+      new RegExp(`\`background: true\` asks for a Claude Code background session, and the \`${harness}\` harness has no such mode\. File the task on \`claude\`, or leave \`background\` off`));
+  }
+  const bg = createEngine({ journal: memoryJournal(), harnesses: { claude: 'claude-bg' } });
+  await refused(bg, { brief: 'b', cwd: '/r', config: { background: true } }, /the `claude` harness has no such mode: every session of it is one already\. Leave `background` off/);
+  // A job runs `claude -p`, which opens no bridge: at shipped defaults, a task is one unless it asks for a background session.
+  await refused(engine, { brief: 'b', cwd: '/r', config: { remoteControl: true } },
+    /`remoteControl: true` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `remoteControl` off/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  for (const config of [{ background: true }, { background: true, remoteControl: true }, { background: false }]) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', config });
+    const [filed] = await journal.read(id);
+    assert.deepEqual((filed as { config?: object }).config, config, 'on the record, for the runner');
+  }
+});
+
+test('say() to a job at shipped defaults is refused before anything is read: it takes no words while it runs', async () => {
+  const { engine } = shipped();
+  const id = await engine.file({ brief: 'b', cwd: '/r' });
+  await assert.rejects(engine.say(id, 'hello'), (e: Error & { exitCode?: number }) => {
+    assert.equal(e.exitCode, 2, e.message);
+    assert.match(e.message, /^say: A job \(`claude -p`\) is given its brief and takes no words while it runs\. File the task with `config\.background: true`/);
+    return true;
+  });
 });
 
 test('file() refuses a contextTokens that is not a whole number of tokens, one outside what Claude Code takes, and any on codex — and journals one both Claude harnesses take', async () => {

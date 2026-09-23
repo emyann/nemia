@@ -55,7 +55,7 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 /** A task whose one session the registry lists blocked, and the engine that reads it. */
 const blocked = async (bin: string) => {
   const engine = createEngine({ root: tmp('root') });
-  const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+  const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
   await engine.tick();
   return { engine, id };
 };

@@ -109,7 +109,7 @@ test('a --bg session with tools: Read, Grep, Glob cannot write a file; the same 
   const engine = createEngine({ root: tmp('board') });
   const fenced = tmp('fenced');
   const open = tmp('open');
-  const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low' } };
+  const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
   const ids = {
     fenced: await engine.file({ ...common, cwd: fenced, config: { ...common.config, tools: ['Read', 'Grep', 'Glob'] } }),
     open: await engine.file({ ...common, cwd: open }),
@@ -159,7 +159,7 @@ test('a --bg session in dontAsk, in a checkout whose settings allow npm run buil
   const fenced = allowingCheckout('deny-fenced');
   const open = allowingCheckout('deny-open');
   // The shipped reviewer's fence, less what this does not need: Bash only, in dontAsk.
-  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] } };
+  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'], background: true } };
   try {
     const ids = {
       fenced: await engine.file({ ...common, cwd: fenced, config: { ...common.config, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] } }),
@@ -220,7 +220,7 @@ test("a --bg session filed with no mcp, in an empty directory, has no MCP tools 
   const engine = createEngine({ root: tmp('mcp-board') });
   const server = path.join(tmp('mcp-server'), 'server.mjs');
   fs.writeFileSync(server, PROBE_SERVER);
-  const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low' } };
+  const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
   const ids = {
     bare: await engine.file({ ...common, cwd: tmp('mcp-bare') }),
     given: await engine.file({ ...common, cwd: tmp('mcp-given'), config: { ...common.config, mcp: { aeprobe: { command: process.execPath, args: [server] } } } }),
@@ -259,7 +259,7 @@ test('say reaches a working --bg session: told a file name, it writes that file;
   const engine = createEngine({ root: tmp('say-board') });
   const told = tmp('say-told');
   const control = tmp('say-control');
-  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'] } };
+  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, config: { effort: 'low', tools: ['Bash', 'Write'], background: true } };
   const ids = {
     told: await engine.file({ ...common, cwd: told }),
     control: await engine.file({ ...common, cwd: control }),
@@ -326,7 +326,7 @@ test('a settled --bg session is stopped and removed from claude agents — and a
     return engine.view(id);
   };
   const sessions = new Set<string>();
-  const common = { cwd, deadlineSeconds: 480, config: { model: 'haiku' }, closeoutSchema: WORD_CLOSEOUT };
+  const common = { cwd, deadlineSeconds: 480, config: { model: 'haiku', background: true }, closeoutSchema: WORD_CLOSEOUT };
   try {
     const firstId = await engine.file({ ...common, brief: `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.` });
     const first = await settled(firstId);
@@ -391,7 +391,7 @@ test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reaso
   });
 });
 
-test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends on its own — why file() refuses a budget on claude — and what it spent is measured once it is let go', {
+test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends on its own — why file() refuses a budget beside background: true — and what it spent is measured once it is let go', {
   skip,
   timeout: 12 * 60_000,
 }, async (t) => {
@@ -412,7 +412,7 @@ test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends 
     t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
     assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
     // `claude -p` at this cap stopped after its first response or two, under $0.03.
-    assert.ok((a?.usage?.toolCalls ?? 0) >= 5, `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusal in claudeBgRefuses`);
+    assert.ok((a?.usage?.toolCalls ?? 0) >= 5, `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusals in claudeBgRefuses and claudeCodeRefuses`);
     assert.ok((a?.usage?.costUsd ?? 0) > 0.03, `and what it spent, past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`);
   } finally {
     const session = v.sessionId ?? v.state.attempts.at(-1)?.nativeId;
@@ -433,9 +433,9 @@ test('a --bg session asked for a closing statement that ends its turn without on
   skip,
   timeout: 15 * 60_000,
 }, async (t) => {
-  // Shipped defaults but the model: `claude`, `auto`, one attempt. Quiet takes ninety seconds to be called.
+  // Shipped defaults but the model and the mode: `claude` as a background session, `auto`, one attempt. Quiet takes ninety seconds to be called.
   const engine = createEngine({ root: tmp('unsigned-board') });
-  const ids = { unsigned: await engine.file({ brief: UNSIGNED_BRIEF, cwd: tmp('unsigned'), closeoutSchema: WORD_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku' } }) };
+  const ids = { unsigned: await engine.file({ brief: UNSIGNED_BRIEF, cwd: tmp('unsigned'), closeoutSchema: WORD_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', background: true } }) };
 
   await settleThenCheck(engine, ids, (views) => {
     const v = views.unsigned!;
@@ -464,7 +464,7 @@ test('a --bg session filed with remoteControl: true is bridged — its registrat
   timeout: 6 * 60_000,
 }, async (t) => {
   const engine = createEngine({ root: tmp('remote-board') });
-  const common = { brief: 'Reply with the single word ok, and nothing else.', config: { model: 'haiku', tools: [] as string[] } };
+  const common = { brief: 'Reply with the single word ok, and nothing else.', config: { model: 'haiku', tools: [] as string[], background: true } };
   const ids = {
     bridged: await engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, remoteControl: true } }),
     control: await engine.file({ ...common, cwd: tmp('remote-none') }),

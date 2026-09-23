@@ -111,7 +111,10 @@ test(".mcp.json in the checkout: named, so strict keeps the repository's servers
     assert.equal(next, '--strict-mcp-config', `${harness}: still strict, and the variadic list is ended by it, not by the prompt`);
     assert.ok(args.includes('--no-chrome'), `${harness}: and still no Chrome`);
   }
-  assert.equal((await spawnAtDefaults({ cwd, harness: 'claude' })).args?.at(-1), 'the prompt');
+  // `claude --bg` takes its prompt last, after the list; a job takes it as `-p`'s own value, ahead of every list.
+  assert.equal((await spawnAtDefaults({ cwd, harness: 'claude', config: { background: true } })).args?.at(-1), 'the prompt');
+  const job = (await spawnAtDefaults({ cwd, harness: 'claude' })).args!;
+  assert.equal(job[job.indexOf('-p') + 1], 'the prompt');
 });
 
 test('a checkout whose .mcp.json is not JSON is refused before anything runs: unstartable, naming the file', async () => {

@@ -405,9 +405,9 @@ then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
 are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
-`CODEX_EFFORTS`. They are copies because only `runner.ts` may import the engine, and the engine refuses a
-word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
-lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
+`CODEX_EFFORTS`, which it exports. They are copies because `workflow.ts` is pure and imports no runtime
+(`docs/architecture.md`), and the engine refuses a word only when the step is filed, after the run exists.
+`test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
 
 ### Who may drive a step's session: `remote:`

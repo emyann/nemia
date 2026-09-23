@@ -297,14 +297,14 @@ const REFUSED: Record<string, string> = {
 const DEFAULT_HARNESS = 'claude';
 
 /*
- * The words each harness takes, copied from the engine — which is the source. `CLAUDE_PERMISSION_MODES` and
- * `CLAUDE_EFFORTS` are agent-runtime's `src/runner-claude-vocabulary.ts`; `CODEX_SANDBOXES` and `CODEX_EFFORTS` its
- * `src/runner-codex.ts`, whose `codex.refuses` also takes `bypassPermissions`, as the widest sandbox.
+ * The words each harness takes, copied from the engine — which is the source. agent-runtime exports them:
+ * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, and `codex.refuses` also takes
+ * `bypassPermissions`, as the widest sandbox.
  *
- * A copy and not an import, because `runner.ts` is the only file here that imports the engine, and the engine
- * refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked here,
- * so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the engine's lists and fails
- * the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
+ * A copy and not an import, because this file is pure and imports no runtime (`docs/architecture.md`), and the
+ * engine refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked
+ * here, so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the runtime's lists and
+ * fails the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
  */
 const CLAUDE_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];

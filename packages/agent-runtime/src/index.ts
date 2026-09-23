@@ -46,6 +46,9 @@ export { sdkRunner } from './runner-sdk.ts';
 // ─── the vocabulary ─────────────────────────────────────────────────────────
 export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said } from './domain.ts';
 export { fold, nameFor } from './domain.ts';
+// The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 
 // NOT exported, on purpose: `decide`. It is the engine's judgement, and a consumer that wants to
 // influence it is asking for a knob on the workload (attempts, ceiling, harness) — which is a

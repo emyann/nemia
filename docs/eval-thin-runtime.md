@@ -96,6 +96,54 @@ inspect(session) → state                    say(session, text)
 Later still, the runtime could *speak* A2A as well as call it: a hosted runtime would then be an A2A endpoint for its own
 sessions (the pivot's P6).
 
+### A2A is the interface, not only its shape
+
+The owner's decision (2026-09-23, later the same day): adopt A2A itself as the way the runtime talks to every harness and agent,
+and fill the gap for those that do not speak it. Grounded in two sources a session can read (planners and reviewers carry
+`WebFetch`, and `.claude/settings.json` allows it):
+
+- **The specification, v1.0.0** — <https://a2a-protocol.org/v1.0.0/specification/>. A `Task` has an `id`, a `contextId`, a
+  `status` (`TaskState`: `TASK_STATE_SUBMITTED`, `_WORKING`, `_COMPLETED`, `_FAILED`, `_CANCELED`, `_REJECTED`,
+  `_INPUT_REQUIRED`, `_AUTH_REQUIRED`), `artifacts` and `history`. A `Message` (role user or agent) carries `Parts` — `text`,
+  `raw`, `url` or `data`. Operations: send a message, send a streaming message, get, list, cancel, subscribe to a task; push
+  notifications; the Agent Card. Bindings: JSON-RPC, gRPC, HTTP+JSON. A follow-up message with the same `taskId` and
+  `contextId` answers `TASK_STATE_INPUT_REQUIRED`.
+- **The SDK, `@a2a-js/sdk`** — <https://github.com/a2aproject/a2a-js>, v1.0, implementing spec v1.0.0, Apache-2.0. Client:
+  `ClientFactory` → `Client` with `sendMessage`, `sendMessageStream` (an async generator of task events), `getTask`,
+  `cancelTask`. Server: an `AgentExecutor` publishing to an `ExecutionEventBus`, run by a `DefaultRequestHandler` — usable
+  in-process, or mounted as JSON-RPC, REST or gRPC.
+
+What we have maps onto it:
+
+| Ours today | A2A v1.0.0 |
+|---|---|
+| a task, its attempts | `Task`, `TaskState` |
+| `needs-human` / blocked | `TASK_STATE_INPUT_REQUIRED`, answered by a follow-up `Message` on the same `taskId` |
+| resuming a session | a follow-up in the same `contextId` |
+| the brief; `say` | a user `Message` and its `Parts` |
+| the closeout (typed result) | an `Artifact` with a `data` Part |
+| collected files | `Artifact`s with `url` or `raw` Parts |
+| `transcript`, attach | `sendMessageStream` / subscribe: `TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent` |
+| stop | `cancelTask` |
+
+**The runtime, then:** a durable journal and the lifecycle (XState, on `TaskState`), whose driver interface *is* an A2A client.
+A remote A2A agent — an ADK agent, a cloud-hosted one — needs nothing but its URL. A harness that does not speak A2A gets an
+**adapter**: an `AgentExecutor` wrapping it, run in-process with no HTTP. Claude Code and Codex become A2A agents that way; the
+same adapters, mounted over HTTP later, make them A2A agents others can call (P6).
+
+**The pattern to follow for an adapter:** <https://github.com/jcwatson11/claude-a2a> (the owner's pointer). An
+`agent-executor.ts` bridges A2A to a `claude-runner.ts` pool; each session is one long-lived `claude` process speaking
+`--input-format stream-json --output-format stream-json` (messages in on stdin, events out on stdout); A2A's `contextId` is a
+Claude session; `--resume` recovers one after a restart. Three cautions: it targets A2A v0.3.0 (we target v1.0.0); it states no
+licence, so we take its shape, not its code; and it holds each session in a child process, where our `claude --bg` driver
+deliberately does not (a three-hour session is not a three-hour process of ours). Which of the two the Claude adapter uses is
+that card's design question.
+
+**The one thing to design in:** the SDK's server side is event-driven with an in-memory task store; the runtime is
+level-triggered and survives restarts. So no adapter holds the truth in memory: the journal stays the record, each adapter
+re-derives its task's state from the harness (`claude agents`, Codex's run files) and the journal, and the SDK's store is a view
+over them.
+
 ## 4. Why `decide` stays — smaller
 
 `decide(desired, observed) → one action` is the runtime's version of a Kubernetes controller's reconcile. The runtime README
@@ -154,20 +202,17 @@ same task twice.
 
 ## 5. Staged plan
 
-Each stage its own card or two, one layer's contract at a time, each ending green:
+Re-cut 2026-09-23 when A2A became the interface. Each stage its own card, chained, every plan read by the owner at its gate,
+each ending green; the orchestrator's runtime client (`the-orchestrator-reaches-the-mlxm`) lands first, as the one place the
+orchestrator's calls to the runtime change.
 
-1. **Driver interface and opaque arguments.** `TaskSpec` becomes `{ driver, input, cwd, args, deadline, resumeFrom }` plus what
-   the lifecycle needs; each driver owns and validates its `args`; `decide` and `engine.ts` read no harness argument. Today's
-   drivers move behind it unchanged in behaviour. The orchestrator (through its runtime client) builds each driver's `args`.
-   The lifecycle becomes the XState statechart of §4, with its test that every move is an edge.
-2. **Policy up.** Retries, the statement and its nudge, budgets, pools and priority move into the orchestrator's `assess` and
-   its controllers; the runtime's `decide` keeps the lifecycle. This is a contract change for both layers: the tests that pin
-   today's behaviour ("an unsigned session is nudged once", "a pool's ceiling admits oldest first") move with the rules, and
-   must refuse in their new home before the old one is deleted.
-3. **The A2A driver.** Start, stream, get, cancel and resubscribe against an A2A endpoint, with its task states mapped; first
-   against a local A2A agent in a test, then a real one.
-4. **Later:** a plain process driver; ACP if a coding agent is only reachable that way; drivers as packages of their own;
-   the runtime as an A2A endpoint.
-
-Before stage 1: the orchestrator's runtime client (`the-orchestrator-reaches-the-2r1w`) should land, because it is the one place
-the orchestrator's calls to the runtime change in stages 1 and 2.
+1. **A2A is the driver interface.** The runtime's driver contract becomes an A2A client (`@a2a-js/sdk`, spec v1.0.0) over
+   in-process A2A agents; today's drivers are wrapped as adapters unchanged in behaviour; harness arguments become each
+   adapter's configuration; `decide` and `engine.ts` read none of them. The journal stays the record.
+2. **The Claude Code adapter, done properly:** the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
+   `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's
+   call at the gate.
+3. **The Codex adapter.**
+4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
+5. **The lifecycle as an XState statechart on `TaskState`.**
+6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

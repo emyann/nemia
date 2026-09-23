@@ -573,7 +573,8 @@ session's name through the extension's `sessionTranscript`. What is still direct
   said by a person, rarely.
 - **The Effect door is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
   engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `createEngine`
-  takes.
+  takes. Its `Runner.transcript` is keyed by session id, as it always was, and goes through the seam by that id
+  (`sessionTranscript` takes a name or an id, never both); `createEngine`'s facade asks by name (`transcriptOf`).
 - **`listTasks` lists what the harness sees, never the journal.** An attempt the harness has let go is answered by
   `getTask`, off the journal; it is in no listing. So `observe` through the seam is the map it was.
 - **A stop of a session no harness lists fails in words** (`` the `<harness>` harness lists no session `<id>`: there is

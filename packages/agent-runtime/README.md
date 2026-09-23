@@ -248,7 +248,8 @@ own errors, never taken and ignored.
 
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
-facade did — the journal's, then `find` for an attempt in flight, then a listing. It is not A2A's `SubscribeToTask`: a
+facade did — the journal's, then `find` for an attempt in flight, then a listing. The same method takes a session's id
+instead, which is how `Runner.transcript` reaches it under `a2aRunner`. It is not A2A's `SubscribeToTask`: a
 transcript is a history read from a cursor, of a session that has often ended, and A2A refuses a subscription to a Task in
 a terminal state, and opens every one with the Task, which here is a listing. The call answers once and holds nothing, so no
 subscription outlives it. A test refuses any other driver call made with no A2A call in

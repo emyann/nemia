@@ -353,20 +353,19 @@ test('a stop of a session that ended since the listing does nothing, as a driver
 // session's name (`transcriptOf`), so the pin is reversed here on purpose, not loosened.
 test('part 4: every verb goes through the seam, the transcript by name; refuses alone reaches the driver directly', () => {
   const d = driven();
-  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say'] as const) {
+  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript'] as const) {
     assert.ok(d.runner[verb], `${verb} is offered`);
     assert.notEqual(d.runner[verb], d.ops[verb], `${verb} is the seam's, not the driver's`);
   }
-  assert.ok(d.runner.transcriptOf, 'the transcript is offered, by name');
-  assert.equal('transcript' in d.runner, false, "the driver's transcript, keyed by session id, is not handed on");
+  assert.ok(d.runner.transcriptOf, 'the transcript is offered by name too');
   assert.equal(d.runner.refuses, d.ops.refuses, 'refuses judges a task before any session: no call to make');
-  assert.deepEqual(Object.keys(d.runner).sort(), Object.keys(d.ops).map((k) => (k === 'transcript' ? 'transcriptOf' : k)).sort(),
-    'no verb added, none dropped');
+  assert.deepEqual(Object.keys(d.runner).sort(), [...Object.keys(d.ops), 'transcriptOf'].sort(),
+    "none of the driver's verbs dropped, and one added: the transcript by name");
 });
 
 test('REFUSED: a verb the driver lacks is not offered through the seam, since the card does not list it', () => {
   const d = driven({ bare: true });
-  assert.deepEqual(Object.keys(d.runner).sort(), ['logs', 'observe', 'refuses', 'spawn', 'stop', 'transcriptOf']);
+  assert.deepEqual(Object.keys(d.runner).sort(), ['logs', 'observe', 'refuses', 'spawn', 'stop', 'transcript', 'transcriptOf']);
   const none = a2aOps('fake', { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs }, async () => []);
   assert.deepEqual(Object.keys(none).sort(), ['logs', 'observe', 'spawn', 'stop']);
 });
@@ -410,6 +409,22 @@ test('REFUSED: a transcript through the seam of a name that is no session is ref
   assert.deepEqual(d.asked, []);
 });
 
+test("a transcript by id through the seam is the driver's read of that session, verbatim, with nothing looked up", async () => {
+  const d = driven();
+  d.sessions.set('ae/t-1/1', { sessionId: 's-7', state: 'working' });
+  assert.deepEqual(await Effect.runPromise(d.runner.transcript!('s-3', 'c-2')), { events: [conversed('s-3')], cursor: 's-3@c-2+1' });
+  assert.deepEqual(d.asked, [['transcript', ['s-3', 'c-2']]], 'no find, no listing: the caller named the session');
+});
+
+test('REFUSED: a transcript through the seam by an empty id is refused in words, and the driver is not asked', async () => {
+  const d = driven();
+  const e = await failure(d.runner.transcript!(''));
+  assert.deepEqual({ verb: e.verb, message: e.message }, {
+    verb: 'transcript', message: 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+  });
+  assert.deepEqual(d.asked, []);
+});
+
 test('say through the seam reaches the driver with the name and the id its harness lists, once', async () => {
   const d = driven();
   await Effect.runPromise(d.runner.spawn(request));
@@ -432,6 +447,7 @@ test("a driver's words through find, logs, release, say and transcript come back
     ['release', d.runner.release!({ sessionId: 's-1', state: 'done' }, {})],
     ['say', d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi')],
     ['transcript', d.runner.transcriptOf!(request.name)],
+    ['transcript', d.runner.transcript!('s-1')],
   ];
   for (const [verb, e] of cases) {
     const f = await failure(e);
@@ -446,7 +462,7 @@ test("a driver's defect through find, logs, release, say and transcript is the s
   d.sessions.set(request.name, { sessionId: 's-1', state: 'working' });
   for (const e of [
     d.runner.find!(request.name), d.runner.logs('s-1'), d.runner.release!({ sessionId: 's-1', state: 'done' }, {}),
-    d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'), d.runner.transcriptOf!(request.name),
+    d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'), d.runner.transcriptOf!(request.name), d.runner.transcript!('s-1'),
   ]) {
     await assert.rejects(Effect.runPromise(e as Effect.Effect<unknown, RunnerError>), (x) => x === boom);
   }
@@ -503,4 +519,20 @@ test('the Effect door takes the same seam: a2aRunner spawns, stops and settles t
   // What no harness could use is refused beneath it, as through `Runner.layer`.
   const refusal = await run(Effect.flatMap(Runner, (r) => Effect.sync(() => r.refuses?.({ brief: 'b', cwd: '/r', config: { model: '' } }))));
   assert.equal(refusal, "`model` is empty. Leave it out for the harness's default.");
+});
+
+test("the Effect door keeps the transcript: a2aRunner's Runner reads it through the seam, and a driver without one has none", async () => {
+  const d = driven();
+  const run = <A, E>(ops: RunnerOps, e: Effect.Effect<A, E, Runner>) =>
+    Effect.runPromise(e.pipe(Effect.provide(a2aRunner(ops, 'fake').pipe(Layer.provideMerge(Journal.test())))));
+  const read = await run(d.ops, Effect.flatMap(Runner, (r) => r.transcript ? r.transcript('s-4', 'c-1') : Effect.succeed<unknown>('dropped')));
+  assert.deepEqual(read, { events: [conversed('s-4')], cursor: 's-4@c-1+1' }, "Runner.transcript is the driver's read");
+  assert.deepEqual(d.asked, [['transcript', ['s-4', 'c-1']]]);
+  // Only the seam answers this: a driver reached directly would be handed the empty id.
+  const e = await run(d.ops, Effect.flatMap(Runner, (r) => Effect.flip(r.transcript!(''))));
+  assert.equal(e.message, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.');
+  assert.equal(d.asked.length, 1);
+  // A driver that keeps no conversation: its card lists no sessionTranscript, and Runner has no transcript.
+  const bare = { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs };
+  assert.equal(await run(bare, Effect.map(Runner, (r) => r.transcript)), undefined);
 });

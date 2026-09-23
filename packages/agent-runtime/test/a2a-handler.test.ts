@@ -14,7 +14,7 @@ import {
   ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, RequestMalformedError, TaskNotCancelableError,
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
-import { HarnessFailed, HarnessHandler, OPEN_LISTINGS } from '../src/a2a-handler.ts';
+import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
@@ -221,6 +221,14 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
   ['a transcript for no name at all', (h) => h.handler.sessionTranscript({ name: undefined as unknown as string }, ctx),
     refusedWith(RequestMalformedError, '`undefined` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
+  ['a transcript by an empty id', (h) => h.handler.sessionTranscript({ sessionId: '' }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
+  ['a transcript by an id that is no string', (h) => h.handler.sessionTranscript({ sessionId: 7 as unknown as string }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
+  ['a transcript that names its session twice', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'ae/t-1/1', sessionId: 's-1' } as unknown as TranscriptRequest, ctx); },
+    refusedWith(RequestMalformedError, 'the request names the session twice, by `name` and by `sessionId`: send one.')],
+  ['a transcript by id on a harness that keeps none', (h) => h.handler.sessionTranscript({ sessionId: 's-1' }, ctx),
+    refusedWith(UnsupportedOperationError, "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs)."), { bare: true }],
 ];
 
 for (const [what, ask, says, setup] of REFUSALS) {
@@ -523,6 +531,14 @@ test('a transcript of an ended attempt with no id on the record, or of a name no
   h.sessions.set('ae/t-9/1', { sessionId: 's-9', state: 'working' });
   assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-9/1' }, ctx))?.cursor, 's-9@0+1');
   assert.deepEqual(h.asked.slice(2), [['find', 'ae/t-9/1'], ['transcript', ['s-9', undefined]]]);
+});
+
+test('a transcript by id is read as asked: no journal, no find, no listing, whatever the harness lists', async () => {
+  const h = harness();
+  h.journal.set('t-1', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'settled', at, outcome: 'failed', nativeId: 's-left' }]);
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  assert.equal((await h.handler.sessionTranscript({ sessionId: 's-9', after: 'c-3' }, ctx))?.cursor, 's-9@c-3+1');
+  assert.deepEqual(h.asked, [['transcript', ['s-9', 'c-3']]]);
 });
 
 test("a transcript the harness could not read throws its words, unchanged; a driver's defect is let through as it is", async () => {

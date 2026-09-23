@@ -23,7 +23,7 @@ import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
-  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods,
+  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods, type TranscriptRequest,
 } from './a2a-handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './a2a-map.ts';
 
@@ -103,7 +103,7 @@ export class InProcessTransport implements Transport {
     return this.handler.releaseSession(params, new ServerCallContext());
   }
 
-  sessionTranscript(params: { name: string; after?: TranscriptCursor }): Promise<Transcript | null> {
+  sessionTranscript(params: TranscriptRequest): Promise<Transcript | null> {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 }
@@ -137,10 +137,12 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
   );
 
 /**
- * What the seam offers the engine: a harness's verbs, but the transcript, asked by the session's name (`transcriptOf`)
- * rather than by an id the caller would have had to find first. `null` when no session goes by the name yet.
+ * What the seam offers the engine: a harness's verbs, and beside them the transcript asked by the session's name
+ * (`transcriptOf`) rather than by an id the caller would have had to find first; `null` when no session goes by the name
+ * yet. `transcript`, by id, stays too, through the seam: it is `Runner`'s verb, and `a2aRunner` hands the Effect door
+ * these ops as a `RunnerOps`, where a verb left off reads as a harness that keeps no conversation.
  */
-export type SeamOps = Omit<RunnerOps, 'transcript'> & {
+export type SeamOps = RunnerOps & {
   readonly transcriptOf?: (name: string, after?: TranscriptCursor) => Effect.Effect<Transcript | null, RunnerError>;
 };
 
@@ -150,7 +152,7 @@ export type SeamOps = Omit<RunnerOps, 'transcript'> & {
  * lists every page. `stop` cancels the session by name, read off the last listing, since the engine stops by session id;
  * a session no listing has is not stopped blindly but refused in words, where a driver was handed the id to make of what
  * it would. The engine stops only a session the pass has just seen live, so it never asks for that. `say` is a follow-up
- * message on the session's Task. `find`, `logs`, `release` and `transcriptOf` are the extension's methods. A verb is offered as the card
+ * message on the session's Task. `find`, `logs`, `release`, `transcript` and `transcriptOf` are the extension's methods. A verb is offered as the card
  * says — the verbs the harness's driver lacks are left off it — so the engine reads the same absences it read before.
  */
 export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
@@ -228,11 +230,16 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   const transcriptOf = (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
     call('transcript', () => transport.sessionTranscript({ name, after }));
 
+  // By id, a read always answers: the handler returns null only for a name it could not find a session under.
+  const transcript = (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
+    call('transcript', () => transport.sessionTranscript({ sessionId, after }))
+      .pipe(Effect.flatMap((read) => read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`))));
+
   return {
     spawn, observe, stop, logs,
     ...(offered.methods.includes('findSession') ? { find } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
-    ...(offered.methods.includes('sessionTranscript') ? { transcriptOf } : {}),
+    ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.say ? { say } : {}),
     // Direct by design, and for good: `refuses` is no call to a session (see the header).
     ...(ops.refuses ? { refuses: ops.refuses } : {}),

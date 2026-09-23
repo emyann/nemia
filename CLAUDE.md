@@ -180,7 +180,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (`defaultThrowOnError` is `data === undefined`), and retries a failure three times first, so a run's page whose record read 404 after
   `wf rm` still drew the run, and said nothing. Reading a query again is not a page saying what the read found: a page that must say a
   thing is gone reads the query's `error` beside its `data`, and a query whose 404 is an answer does not retry it (`runGone` and `retryRun`
-  in `apps/web/src/lib/api.ts`; learned by the run that made a `removed` event read the run's record again, round 2).
+  in `apps/web/src/lib/api/detail.ts`; learned by the run that made a `removed` event read the run's record again, round 2).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the
@@ -214,14 +214,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (learned by the run that closed engine issues 24 and 25).
 - **A key added to `STEP_KEYS` has three obligations outside the package.** `KINDS` in `apps/api/src/builder.ts`, or the
   api's typecheck fails; `WorkflowStepSpec` and `specOf` in `apps/api/src/workflows.ts`, or the key never reaches the
-  board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
+  board; and `apps/web/src/lib/api/workflows.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
 - **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
   `apps/api/src/decision.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
   English sentence — for a verb it does not know. Nothing fails: the board draws a `once more` button that copies
   *"review: enough — go on with what is there; its findings stay on the record, and …:  wf accept r-1 review --message …"*. So an offer
-  the package gains adds its verb and its placeholder to that regex, a label to `DecideCommand` and to `apps/web/src/lib/api.ts`'s
+  the package gains adds its verb and its placeholder to that regex, a label to `DecideCommand` and to `apps/web/src/lib/api/decision.ts`'s
   mirror, in the same change — with a test that asserts the *bare* command, since one asserting the offer is listed passes either way
   (learned by the run that let a person accept a loop out of rounds).
 - **A level-triggered ask is not a file a person can simply be told to delete.** The run reads a person's word off disk on

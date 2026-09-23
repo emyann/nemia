@@ -296,7 +296,7 @@ const DEFAULT_HARNESS = 'claude';
 /*
  * The words each harness takes, copied from the engine — which is the source. `CLAUDE_PERMISSION_MODES` and
  * `CLAUDE_EFFORTS` are agent-engine's `src/runner.ts`; `CODEX_SANDBOXES` and `CODEX_EFFORTS` its
- * `src/runner-detached.ts`, whose `codex.refuses` also takes `bypassPermissions`, as the widest sandbox.
+ * `src/runner-codex.ts`, whose `codex.refuses` also takes `bypassPermissions`, as the widest sandbox.
  *
  * A copy and not an import, because `runner.ts` is the only file here that imports the engine, and the engine
  * refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked here,
@@ -1697,7 +1697,7 @@ const UNASKING: Readonly<Record<string, readonly string[]>> = {
 
 /**
  * The mode a step runs in when it names none, which is what the guard below judges such a step on: the engine's `auto` on Claude Code
- * (`runner.ts`'s default), codex's `workspace-write` (`sandboxOf` in the engine's `runner-detached.ts`, which falls to it for a task
+ * (`runner.ts`'s default), codex's `workspace-write` (`sandboxOf` in the engine's `runner-codex.ts`, which falls to it for a task
  * that named no sandbox).
  */
 const DEFAULT_MODE: Readonly<Record<string, string>> = { claude: 'auto', 'claude-detached': 'auto', codex: 'workspace-write' };

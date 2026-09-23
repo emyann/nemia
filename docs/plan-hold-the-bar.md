@@ -812,7 +812,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   session and files the nudge, through the package (W4).*
 
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
-  mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
+  mapping (`sandboxOf` in `runner-codex.ts` honours `read-only`, `danger-full-access` and
   `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of
   the engine's lists and already differs: the engine takes `manual` for Claude, the parser does
   not; the engine takes `bypassPermissions` for codex, the parser does not. The engine now exports

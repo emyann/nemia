@@ -36,8 +36,10 @@ export type { FeedEntry, Cursor, JournalOps } from './journal.ts';
 // ─── harnesses: bring your own ──────────────────────────────────────────────
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
 export type { McpServer, RunnerOps, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
-export { detachedOps, codex, claudeDetached, STALE_MS } from './runner-detached.ts';
+export { detachedOps, STALE_MS } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
+export { codex } from './runner-codex.ts';
+export { claudeDetached } from './runner-claude-detached.ts';
 export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
 

@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner-claude-transcript.ts';
-import { codexOutput } from '../src/runner-detached.ts';
+import { codexOutput } from '../src/runner-detached-output.ts';
 import { attemptLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 

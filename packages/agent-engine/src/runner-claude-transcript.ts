@@ -1,7 +1,7 @@
 /**
  * A Claude Code session's transcript, read: where it is, the closeout it gave, its lines as events, and what it
  * consumed. Read by both runners that run Claude Code — `claude --bg` (`runner.ts`) and `claude -p`
- * (`runner-detached.ts`) — and `renderTranscript` by the Agent SDK's (`runner-sdk.ts`).
+ * (`runner-claude-detached.ts`) — and `renderTranscript` by the Agent SDK's (`runner-sdk.ts`).
  */
 import fs from 'node:fs';
 import os from 'node:os';

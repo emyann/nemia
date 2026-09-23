@@ -17,7 +17,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
 import { claudeOps } from '../src/runner.ts';
-import { codex, codexMcpServerNames, detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { codex } from '../src/runner-codex.ts';
+import { codexMcpServerNames } from '../src/runner-mcp.ts';
 
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-mcp-${label}-`));
 

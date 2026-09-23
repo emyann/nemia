@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
 import { agentCard, dollarsOf } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -67,6 +67,15 @@ const HELP = `wf — run a workflow of agent steps
                                Refused while a run is not over, owes a hand-off, is a folder run,
                                or has a worktree locked, on no branch, or with changes no commit
                                has; and a finished run not merged unless --unmerged
+  wf hold <runId> --until <runId> [--until <runId> ...]
+                               file nothing more of a run until other runs ship, as --after would
+                               have: what is in flight finishes, nothing new is filed, and nothing
+                               is asked of you — wf ls and wf decide say held until <run> ships, and
+                               what a step asks is asked once the hold lifts. The tick lifts it when
+                               every run named has shipped. Refused of a run cancelled, pruned,
+                               finished or already held, and of a run named that is unknown, the run
+                               itself, or one that already waits on it, through --after or a hold
+  wf hold <runId> --off        lift the hold now: the next tick goes on as if it had never been put
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
   wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
@@ -438,6 +447,28 @@ function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: bool
     else if (!ids.includes(arg)) ids.push(arg);
   }
   return { ids, unmerged, yes };
+}
+
+/**
+ * `wf hold`'s arguments after the run: `--until <runId>`, once for each run to wait on, or `--off` alone. Refused before any run is read:
+ * neither, both, a flag it does not take, and `--until` with no run. A run named twice is the verb's to refuse (`holdRefusal`), in its words.
+ */
+function holdHow(argv: string[]): { until: string[]; off: boolean } {
+  const shape = 'wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off';
+  const until: string[] = [];
+  let off = false;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--off') off = true;
+    else if (arg === '--until' || arg.startsWith('--until=')) {
+      const id = arg === '--until' ? argv[++i] : arg.slice('--until='.length);
+      if (!id || id.startsWith('-')) usage(`--until takes the run to wait on, by id: ${shape}.`);
+      until.push(id);
+    } else usage(`wf hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${shape}.`);
+  }
+  if (off && until.length) usage(`wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${shape}.`);
+  if (!off && !until.length) usage(`wf hold needs the runs to wait on, or --off to lift a hold: ${shape}.`);
+  return { until, off };
 }
 
 /** A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes. */
@@ -839,7 +870,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (const run of runs) {
         // A pruned run is still a run: said beside its line, as a cancelled one is, since what is left of it is its branches.
         const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
-        const { steps, waitingOnYou, waiting, cost, toDecide } = await list(e, run, held.get(run.id));
+        const { steps, waitingOnYou, waiting, holding, cost, toDecide } = await list(e, run, held.get(run.id));
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
@@ -860,6 +891,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (onYou.length) console.log(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
         // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
         if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
+        // A held run asks nothing of anyone while its hold stands (`listing` offers nothing): what holds it, in place of what it would ask —
+        // and, for a run named that never ships, or a hold that names none, how it is let go.
+        if (holding) {
+          const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
+          const lifting = holding.length > 0 && holding.every((w) => w.shipped);
+          console.log(`   → ${holdWord(holding)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`);
+        }
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
@@ -962,6 +1000,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return refusedNamed();
     }
 
+    // A person's word that a run waits for others to ship, given after it started: its own file (`runs/<id>.hold`), which the tick lifts.
+    case 'hold': {
+      if (!rest[0] || rest[0].startsWith('-')) usage('wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.');
+      const { until, off } = holdHow(rest.slice(1));
+      if (off) {
+        const { run } = unhold(rest[0]);
+        return console.log(`${run.id}  hold lifted — the next tick goes on, and what its steps ask is asked`);
+      }
+      const { run } = await hold(e, rest[0], until);
+      return console.log(`${run.id}  ${holdWord(until.map((u) => ({ run: u })))} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`);
+    }
+
     // The run does not end by going quiet. A review and a reply are two opinions and something
     // has to say what ships — which is a person's job, so the run's last act is to put the
     // material in front of one. Read-only on purpose: it shows the choice and the exact commands,
@@ -973,7 +1023,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, waitingOn, denied, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, holding, waitingOn, denied, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -986,6 +1036,14 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
       // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
       if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
+      // Nor while a person holds it (wf hold): what is in flight finishes, and what its steps ask is asked once the hold lifts — so the hold,
+      // and what is still running, are the whole of what there is to say, and nothing is offered.
+      if (run.hold) {
+        console.log(`${head}\n\n  ${holdWord(holding)}`);
+        if (decision.kind === 'running' && decision.waiting.length) console.log(`  still running: ${decision.waiting.join(', ')}`);
+        for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
+        return console.log(`  ${holdAdvice(run, holding)}`);
+      }
       // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
       if (held) return console.log(`${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`);
       // An ending a person's word would file, waiting for the repository's own checkout: which run's step is in it, and what frees this one.

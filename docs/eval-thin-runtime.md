@@ -113,6 +113,40 @@ kubelet."* It exists for three reasons, and all three survive a thin runtime:
   harness. The reason is the project's own history: the board this replaced had its reconcile as one 1,390-line effectful
   function (`packages/agent-runtime/docs/hkb-migration.md`), where one change meant holding fifteen phases in mind at once.
 
+### The lifecycle as a statechart, with XState
+
+The owner's decision (2026-09-23): the loop keeps its job, and the machine it drives becomes explicit, as a statechart in
+XState. Today the allowed moves live only in `decide`'s `if`s; Substrate has the same weakness (its states are drawn in a doc,
+its edges checked in separate steps). With the policy moved out (§2), the lifecycle is small, and its states are A2A's, so an
+A2A driver maps onto it with no second vocabulary:
+
+```
+                 file
+   [submitted] ───────▶ [starting] ──spawn ok──▶ [working] ◀──input given──┐
+                            │  ▲                    │   │                   │
+          spawn refused     │  │ crash: adopt       │   └─needs a person──▶ [input-required]
+                            ▼  │ by name            │
+                        [failed]                    ├── harness says done ───▶ [completed]
+                                                    ├── harness says failed ─▶ [failed]
+   any live state ──stop / cancel──▶ [stopping] ────┴──────────────────────▶ [canceled]
+   any live state ──deadline passed──▶ [stopping] ─────────────────────────▶ [failed: deadline]
+   [completed | canceled | failed] ──resume(input)──▶ [starting]   (continues the same session)
+```
+
+`decide` splits in two, and stays level-triggered:
+1. **Observe** — from the journal and what the driver reports, work out the event: spawned, done, failed, needs a person, stop
+   asked, deadline passed, found by name after a crash. Recomputed from the whole state on every pass, never remembered.
+2. **Transition** — hand that event to the XState machine: it gives the next state and the one action, or refuses an event
+   with no edge from the current state (as Substrate refuses "MarkSuspending prerequisite not met").
+
+What XState brings: the diagram is the code (its visualiser draws the machine the runtime runs, so the doc cannot drift), the
+editor for changing it, guards and actions named on the edges, and a machine the board could draw per session. What to design
+in: XState is used as a pure transition function (`machine.transition(state, event)` or its current equivalent — check the
+version), never as a running interpreter holding state in the process, because the runtime carries nothing between passes; the
+journal stays the state. Guards (deadline past, a session under this name) stay plain functions the machine names. A test holds
+that every move the runtime makes is an edge of the machine, and that an event with no edge is refused. XState is a
+dependency of the runtime alone; nothing above it sees the library.
+
 What leaves `decide` is the policy (§2): who retries, whether the statement came, the nudge, budgets, admission. What stays is
 the lifecycle — start, spawned, observed ended, stop asked, deadline, settle, adopt after a crash. With an A2A driver the remote
 agent owns much of that state, and `decide` mostly maps it and still guards the one thing only the caller can: not starting the
@@ -125,6 +159,7 @@ Each stage its own card or two, one layer's contract at a time, each ending gree
 1. **Driver interface and opaque arguments.** `TaskSpec` becomes `{ driver, input, cwd, args, deadline, resumeFrom }` plus what
    the lifecycle needs; each driver owns and validates its `args`; `decide` and `engine.ts` read no harness argument. Today's
    drivers move behind it unchanged in behaviour. The orchestrator (through its runtime client) builds each driver's `args`.
+   The lifecycle becomes the XState statechart of §4, with its test that every move is an edge.
 2. **Policy up.** Retries, the statement and its nudge, budgets, pools and priority move into the orchestrator's `assess` and
    its controllers; the runtime's `decide` keeps the lifecycle. This is a contract change for both layers: the tests that pin
    today's behaviour ("an unsigned session is nudged once", "a pool's ceiling admits oldest first") move with the rules, and

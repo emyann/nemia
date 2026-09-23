@@ -365,7 +365,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // second while a session runs, and no other harness's registry can name the session.
       const harness = harnessOf(state);
       const runner = runners[harness]!;
-      const read = runner.transcript;
+      const read = runner.transcriptOf;
       if (!read) throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
       // A cursor is its reader's. The engine's own readers give one shape, and one they did not give is
       // refused at the door; a PromiseRunner's is passed through as it gave it.
@@ -375,23 +375,14 @@ export function createEngine(options: EngineOptions = {}): Engine {
       }
       // The start, as a read of no session gives it, is handed to no runner: it is asked from the start.
       const start = noTranscript().cursor;
-      // An attempt that has ended — or whose task settled with it open — has its session's id on the record,
-      // and no registry is asked for it: what `logs` falls back to. Only an attempt in flight needs one, and only
-      // its id: found by name when the harness can `find` it, and observed when it cannot or finds none — a session
-      // not registered yet, or one that exited before its end was written. A registry that cannot be read this time
-      // is nothing observed, as `composite` reads it for a pass, and a `find` that fails is nothing found.
+      // No session to read — none started yet, or none its harness can name this time: nothing new, and the cursor
+      // asked with, so a moment the registry could not be read costs a caller a poll rather than a read from the start.
+      const nothing = { events: [], cursor: after ?? start };
       const last = state.attempts.at(-1);
-      const found = !last?.nativeId && last?.ended === null && runner.find
-        ? await go(runner.find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))))
-        : undefined;
-      const sessionId = last?.nativeId ?? found?.sessionId ?? (await go(runner.observe.pipe(
-        Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
-        Effect.flatMap((observed) => view(taskId, observed)),
-      ))).sessionId;
-      // No session to read: nothing new, and the cursor asked with, so a moment the registry could not be
-      // read costs a caller a poll rather than a read from the start.
-      if (!sessionId) return { events: [], cursor: after ?? start };
-      return go(read(sessionId, after === start ? undefined : after));
+      if (!last) return nothing;
+      // The session is asked for by name, and its harness's agent finds its id: the one on the record for an attempt
+      // that has ended, else found or observed on the harness (`sessionTranscript` in `a2a-handler.ts`).
+      return (await go(read(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     },
     say: async (taskId, text) => {
       const refuse = (why: string) => Object.assign(new Error(`say: ${why}`), { exitCode: 2 });

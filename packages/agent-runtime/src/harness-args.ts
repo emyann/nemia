@@ -3,8 +3,9 @@
  *
  * The runtime keeps a durable journal, a deadline and the lifecycle; how a session is started — which model, what it may
  * touch, how hard it thinks — is the adapter's. So a task carries these under `config`, `domain.ts` and `engine.ts` pass
- * the object through without opening it (`test/core-reads.test.ts`), and the checks every adapter shares live here, asked
- * through the `Runner` at both doors (`Runner.layer`), in the words they always had. What one harness takes and refuses
+ * the object through without opening it (`test/core-reads.test.ts`), and the checks every adapter shares live here, in the
+ * words they always had: asked by every `Runner` made with `Runner.layer`, and by `file` itself at both doors, so a runner
+ * built with `Runner.of` alone is refused them too. What one harness takes and refuses
  * — its modes, its efforts, its windows — stays with that harness's runner.
  */
 import type { McpServer } from './runner.ts';

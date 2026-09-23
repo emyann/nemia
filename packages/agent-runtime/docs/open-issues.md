@@ -80,9 +80,11 @@ and one line of `refusalOf` (its cases fail).
 and `contextTokens` that are not values of their kind — with three new refusals of where an argument is (one beside
 `config`, a `config` that is no object, a key in it that is no argument). Every `Runner` asks them first through
 `Runner.layer`'s `refuses`, then its own `RunnerOps.refuses`, which `composite` forwards to the task's harness; the Effect
-`file` asks `refusalOf` and then `runner.refuses`, so it needs `Runner` beside `Journal`. That is the first half of the
-paragraph below, done: `RunnerOps` took the optional verb. `test/refusal.test.ts` holds the words at both doors, and
-fails at the Effect door with `argsRefusalOf` taken out of `Runner.layer`.
+`file` asks `refusalOf`, then `argsRefusalOf` itself — `Runner.of` is exported, and the SDK runner was built with it and no
+layer, so it journalled a `config` no harness could use — and then `runner.refuses`, so it needs `Runner` beside `Journal`.
+That is the first half of the paragraph below, done: `RunnerOps` took the optional verb. `test/refusal.test.ts` holds the
+words at both doors, and fails with `argsRefusalOf` taken out of both `file` and `Runner.layer`; `test/harness-args.test.ts`
+fails with it out of either (a runner built with `Runner.of` through `file`, and every runner's own `refuses`).
 
 **What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace

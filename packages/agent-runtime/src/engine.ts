@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import type { HarnessArgs } from './harness-args.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
@@ -68,8 +68,8 @@ const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always:
  *
  * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN` was
- * journalled as `null` and stopped its task on the first pass. The harness's arguments under `config` are the runner's to
- * refuse (`argsRefusalOf` in `harness-args.ts`, asked through `Runner.refuses`), and `file` asks it next.
+ * journalled as `null` and stopped its task on the first pass. The harness's arguments under `config` are the adapter's to
+ * check (`argsRefusalOf` in `harness-args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
  * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade.ts`), which this
  * door never learns (open issue 6).
  */
@@ -103,7 +103,9 @@ export const refusalOf = (spec: Filing): string | undefined => {
 /** File a task. The only write a person makes; everything after is the loop's. */
 export const file = Effect.fn('file')(function* (spec: Filing) {
   const runner = yield* Runner;
-  const refused = refusalOf(spec) ?? runner.refuses?.(spec);
+  // The shared checks are asked here as well as by `Runner.layer`: `Runner.of` is exported, and a runner built without the
+  // layer — `sdkRunner` was — would otherwise journal a `config` no harness could use. The spec is handed on whole, unopened.
+  const refused = refusalOf(spec) ?? argsRefusalOf(spec) ?? runner.refuses?.(spec);
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.

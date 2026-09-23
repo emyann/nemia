@@ -159,7 +159,8 @@ export type RunnerOps = {
    * Why this runner would not take a task, as a sentence that says what to write instead — or `undefined`. Asked by `file`
    * before anything is journalled, so a task no harness could start is never a promise the loop keeps trying to honour.
    * Optional: every runner made a `Runner` by `Runner.layer` refuses what no harness could use (`argsRefusalOf`) before
-   * it is asked, so a runner answers for its own vocabulary alone.
+   * it is asked, so a runner answers for its own vocabulary alone; `file` asks those checks itself too, for a runner built
+   * with `Runner.of` and no layer.
    */
   readonly refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
 };

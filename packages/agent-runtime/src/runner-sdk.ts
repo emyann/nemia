@@ -25,7 +25,7 @@
  * The engine does not change between them — only what is true after a crash does. That is the
  * whole reason this is a seam and not an import.
  */
-import { Effect, Layer } from 'effect';
+import { Effect } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting, Usage } from './domain.ts';
 import { Runner, RunnerError } from './runner.ts';
@@ -89,7 +89,8 @@ export const sdkRunner = () => {
       }
     });
 
-  return Layer.succeed(Runner)(Runner.of({
+  // Through `Runner.layer`, as every runner is: it asks the checks every harness shares of a task's `config` (`argsRefusalOf`).
+  return Runner.layer({
     spawn: (r) =>
       Effect.gen(function* () {
         const abort = new AbortController();
@@ -118,5 +119,5 @@ export const sdkRunner = () => {
         try: () => getSessionMessages(sessionId),
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }).pipe(Effect.map(renderTranscript)),
-  }));
+  });
 };

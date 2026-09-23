@@ -168,7 +168,8 @@ who never imports Effect can never have that problem.
 
 Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — `refusalOf` in
 `src/engine.ts` for the task's own fields, and `argsRefusalOf` in `src/harness-args.ts` for the checks every harness shares
-of its `config`, which every `Runner` asks (`Runner.layer`); `test/refusal.test.ts` holds both doors to both — and fails
+of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built with `Runner.of`
+alone is no way round them; `test/refusal.test.ts` holds both doors to both — and fails
 with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
 ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6).
 

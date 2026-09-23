@@ -9,10 +9,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { argsRefusalOf, HARNESS_ARGS, type HarnessArgs } from '../src/harness-args.ts';
 import { Runner, testOps, type RunnerOps } from '../src/runner.ts';
 import { composite } from '../src/runner-composite.ts';
+import { sdkRunner } from '../src/runner-sdk.ts';
+import { Journal } from '../src/journal.ts';
+import { file, type Filing } from '../src/engine.ts';
 
 const task = { brief: 'b', cwd: '/r' };
 type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
@@ -89,4 +92,45 @@ test("a composite asks the task's own harness, as a spawn is sent", () => {
   assert.equal(both.refuses?.(task), 'a refuses', 'and the fallback for a task that names none');
   // Through the layer, the shared checks come first whichever harness is named.
   assert.match(refusedBy(both, { ...task, harness: 'b', config: { effort: '' } }) ?? '', /^`effort` is empty\./);
+});
+
+/** A task no harness could use, one of each kind: a value, a list, where a key is, what `config` is, and a key it holds. */
+const UNUSABLE: [Record<string, unknown>, RegExp][] = [
+  [{ config: { model: '' } }, /^`model` is empty\./],
+  [{ config: { tools: ['Read,Grep'] } }, /^`tools: \["Read,Grep"\]` is not a list of tool names\./],
+  [{ model: 'opus' }, /^`model` is the harness's configuration/],
+  [{ config: 'opus' }, /^`config: "opus"` is not a harness's configuration\./],
+  [{ config: { budgetUsd: 5 } }, /^`config\.budgetUsd` is not a harness argument\./],
+];
+
+/** `file` through the Effect door over `runner`, and what it journalled. */
+const filedOver = async (runner: Layer.Layer<Runner>, spec: Filing) => {
+  const layer = Layer.mergeAll(Journal.test(), runner);
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const err = await run(Effect.flip(file(spec)));
+  return { err, listed: await run(Effect.flatMap(Journal, (j) => j.list)) };
+};
+
+test('the SDK runner is made a Runner by Runner.layer, so it refuses the shared checks as every runner does', () => {
+  // It was built with `Layer.succeed(Runner)(Runner.of(…))`, and so asked nothing: its `refuses` was undefined.
+  const refuses = (t: Asked) => Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(sdkRunner())));
+  for (const [bad, says] of UNUSABLE) assert.match(refuses({ ...task, ...bad } as never) ?? '', says, JSON.stringify(bad));
+  assert.equal(refuses({ ...task, config: { model: 'opus' } }), undefined);
+});
+
+test('file refuses the shared checks over any runner, the SDK runner and one built by hand without Runner.layer', async () => {
+  // `Runner` and `Runner.of` are exported, so a consumer can build a runner that skips the layer: the door asks the checks
+  // itself, and a runner so built is refused what every other is.
+  const RUNNERS: [string, Layer.Layer<Runner>][] = [
+    ['sdkRunner()', sdkRunner()],
+    ['Runner.of by hand', Layer.succeed(Runner)(Runner.of(testOps()))],
+  ];
+  for (const [label, runner] of RUNNERS) {
+    for (const [bad, says] of UNUSABLE) {
+      const { err, listed } = await filedOver(runner, { ...task, ...bad } as Filing);
+      assert.equal(err._tag, 'FileRefused', `${label}, ${JSON.stringify(bad)}: failed with ${err._tag}`);
+      assert.match(err.message, says, `${label}, ${JSON.stringify(bad)}`);
+      assert.deepEqual(listed, [], `${label}: nothing journalled`);
+    }
+  }
 });

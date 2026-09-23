@@ -44,6 +44,7 @@ export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
+export { a2aRunner } from './a2a-client.ts';
 
 // ─── the vocabulary ─────────────────────────────────────────────────────────
 export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said } from './domain.ts';

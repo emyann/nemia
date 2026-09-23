@@ -6,13 +6,21 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Role, TaskState } from '@a2a-js/sdk';
+import { Effect, Layer } from 'effect';
+import { A2A_PROTOCOL_VERSION, Role, TaskState } from '@a2a-js/sdk';
+import {
+  ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, UnsupportedOperationError,
+} from '@a2a-js/sdk/errors';
+import { a2aOps, a2aRunner, InProcessTransport } from '../src/a2a-client.ts';
+import { file, requestStop, tick } from '../src/engine.ts';
+import { Journal } from '../src/journal.ts';
+import { HarnessHandler } from '../src/a2a-handler.ts';
 import {
   failedSpawnTask, messageOf, messageRefusal, nameParts, observedOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt,
   taskOfSighting, wordsOf,
 } from '../src/a2a-map.ts';
 import type { Attempt, Observed, Sighting } from '../src/domain.ts';
-import type { SpawnRequest } from '../src/runner.ts';
+import { Runner, RunnerError, testOps, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */
 const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)));
@@ -142,4 +150,193 @@ test('an attempt the harness no longer lists is answered from the journal', () =
     assert.deepEqual(overTheWire(t.metadata), t.metadata);
   }
   assert.equal(wordsOf(taskOfAttempt('ae/t-1/1', { ...attempt, ...cases[2]![0] }, 'm')), 'fake: no binary');
+});
+
+// ─── through the client ─────────────────────────────────────────────────────
+
+/** A driver a test moves by hand, what it was asked, and the same driver behind the A2A client. */
+const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: string } = {}) => {
+  const sessions = new Map<string, Sighting>();
+  const asked: Array<[string, unknown]> = [];
+  let n = 0;
+  const ops: RunnerOps = {
+    spawn: (r: SpawnRequest) => Effect.suspend(() => {
+      asked.push(['spawn', r]);
+      if (o.spawnFails instanceof RunnerError) return Effect.fail(o.spawnFails);
+      if (o.spawnFails) return Effect.die(o.spawnFails);
+      sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
+      return Effect.void;
+    }),
+    observe: Effect.suspend(() => {
+      asked.push(['observe', undefined]);
+      return o.observeFails ? Effect.fail(new RunnerError({ verb: 'observe', message: o.observeFails })) : Effect.succeed(new Map(sessions));
+    }),
+    stop: (id) => Effect.suspend(() => {
+      asked.push(['stop', id]);
+      if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      return Effect.void;
+    }),
+    logs: (id) => Effect.succeed(`logs of ${id}`),
+    find: (name) => Effect.succeed(sessions.get(name)),
+  };
+  const runner = a2aOps('fake', ops, async () => []);
+  return { ops, runner, sessions, asked, acted: () => asked.filter(([verb]) => verb !== 'observe') };
+};
+
+/** The error an effect failed with, or a failure of the test when it succeeded. */
+const failure = <A>(e: Effect.Effect<A, RunnerError>) => Effect.runPromise(Effect.flip(e));
+
+test('a spawn through the client reaches the driver as the engine asked for it, every key, config whole', async () => {
+  const d = driven();
+  await Effect.runPromise(d.runner.spawn(request));
+  assert.deepEqual(d.acted(), [['spawn', request]]);
+  // The engine's spawn has every key, some undefined: the driver is handed the same keys back.
+  const bare: SpawnRequest = {
+    name: 'ae/t-2/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined, budgetUsd: undefined,
+    resumeFrom: undefined,
+  };
+  await Effect.runPromise(d.runner.spawn(bare));
+  assert.deepEqual(d.acted()[1], ['spawn', bare]);
+  assert.deepEqual(Object.keys(d.acted()[1]![1] as object).sort(), Object.keys(bare).sort());
+});
+
+test("a refused spawn is the harness's refusal, in its words, `refused`", async () => {
+  const d = driven({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true }) });
+  const e = await failure(d.runner.spawn(request));
+  assert.ok(e instanceof RunnerError);
+  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
+    verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true,
+  });
+});
+
+test('a spawn that may have started is not `refused`, and keeps its words', async () => {
+  const d = driven({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: the launcher lost its acknowledgement' }) });
+  const e = await failure(d.runner.spawn(request));
+  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
+    verb: 'spawn', message: 'fake: the launcher lost its acknowledgement', refused: undefined,
+  });
+  assert.equal('refused' in e && e.refused !== undefined, false, 'an ambiguous spawn carries no `refused` at all');
+});
+
+test("a driver's defect passes through the client as the same defect", async () => {
+  const boom = new TypeError('the driver fell over');
+  const d = driven({ spawnFails: boom });
+  await assert.rejects(Effect.runPromise(d.runner.spawn(request)), (e) => e === boom);
+});
+
+test('a spawn the seam refuses reaches no driver, and says why in A2A\'s words', async () => {
+  const d = driven();
+  const e = await failure(d.runner.spawn({ ...request, name: 'not-a-session' }));
+  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
+    verb: 'spawn', message: '`not-a-session` is not a session name: a session is named `ae/<task>/<n>`, n from 1.', refused: undefined,
+  });
+  assert.deepEqual(d.acted(), []);
+});
+
+test("observe through the client is the driver's map, every page of it, from one observe", async () => {
+  const d = driven();
+  for (let i = 1; i <= 250; i++) {
+    d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'done' : 'working', busy: i % 2 === 0 });
+  }
+  d.sessions.set('ae/t-001/2', full);
+  const seen = await Effect.runPromise(d.runner.observe);
+  assert.deepEqual(seen, d.sessions);
+  assert.equal(d.asked.filter(([verb]) => verb === 'observe').length, 1, 'the pages after the first are served from its listing');
+});
+
+test("an observe that failed is the harness's words", async () => {
+  const d = driven({ observeFails: 'fake: `fake ls` exited 3' });
+  const e = await failure(d.runner.observe);
+  assert.deepEqual({ verb: e.verb, message: e.message }, { verb: 'observe', message: 'fake: `fake ls` exited 3' });
+});
+
+test('a stop through the client reaches the driver by session id', async () => {
+  const d = driven();
+  await Effect.runPromise(d.runner.spawn(request));
+  await Effect.runPromise(d.runner.observe);
+  await Effect.runPromise(d.runner.stop('s-1'));
+  assert.deepEqual(d.acted().at(-1), ['stop', 's-1']);
+  assert.equal(d.sessions.get(request.name)!.state, 'stopped');
+});
+
+test('a stop with no listing yet lists first, and stops', async () => {
+  const d = driven();
+  d.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'blocked' });
+  await Effect.runPromise(d.runner.stop('s-9'));
+  assert.deepEqual(d.acted(), [['stop', 's-9']]);
+});
+
+test("a stop the driver failed is the driver's words", async () => {
+  const d = driven({ stopFails: 'fake: `fake stop s-1` exited 1' });
+  await Effect.runPromise(d.runner.spawn(request));
+  const e = await failure(d.runner.stop('s-1'));
+  assert.deepEqual({ verb: e.verb, message: e.message }, { verb: 'stop', message: 'fake: `fake stop s-1` exited 1' });
+});
+
+test('a stop of a session no harness lists is refused in words, and the driver is asked nothing', async () => {
+  const d = driven();
+  const e = await failure(d.runner.stop('s-404'));
+  assert.deepEqual({ verb: e.verb, message: e.message }, {
+    verb: 'stop', message: 'the `fake` harness lists no session `s-404`: there is nothing to stop.',
+  });
+  assert.deepEqual(d.acted(), []);
+});
+
+test('a stop of a session that ended since the listing does nothing, as a driver did', async () => {
+  const d = driven();
+  await Effect.runPromise(d.runner.spawn(request));
+  await Effect.runPromise(d.runner.observe);
+  d.sessions.set(request.name, { sessionId: 's-1', state: 'done' });
+  await Effect.runPromise(d.runner.stop('s-1'));
+  assert.deepEqual(d.acted(), [['spawn', request]]);
+});
+
+test("what part 3 moves still reaches the driver directly", () => {
+  const d = driven();
+  assert.equal(d.runner.logs, d.ops.logs);
+  assert.equal(d.runner.find, d.ops.find);
+});
+
+test('the in-process transport maps the three names the handler spells otherwise, and refuses what the agent does not do', async () => {
+  const d = driven();
+  const t = new InProcessTransport(new HarnessHandler('fake', d.ops, async () => []));
+  assert.equal(t.protocolName, 'in-process');
+  assert.equal(t.protocolVersion, A2A_PROTOCOL_VERSION);
+  await assert.rejects(t.getExtendedAgentCard({ tenant: '' }), (e) => e instanceof ExtendedAgentCardNotConfiguredError
+    && e.message === 'the `fake` harness has no extended card: its card is the whole of it.');
+  await assert.rejects(t.listTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', pageSize: 0, pageToken: '' }),
+    (e) => e instanceof PushNotificationNotSupportedError && e.message === 'the `fake` harness sends no notifications: poll getTask.');
+  const drain = async (g: AsyncGenerator<unknown>) => { for await (const _ of g) { /* nothing is yielded */ } };
+  await assert.rejects(drain(t.resubscribeTask({ tenant: '', id: 'ae/t-1/1' })),
+    (e) => e instanceof UnsupportedOperationError && e.message === 'this agent does not stream: poll getTask.');
+  await assert.rejects(drain(t.sendMessageStream({ tenant: '', message: undefined, configuration: undefined, metadata: undefined })),
+    (e) => e instanceof UnsupportedOperationError
+      && e.message === 'this agent does not stream: send the message with returnImmediately and poll getTask.');
+  assert.deepEqual(d.asked, []);
+});
+
+test('the Effect door takes the same seam: a2aRunner spawns, stops and settles through the client, off the Journal it is given', async () => {
+  const sessions = new Map<string, Sighting>();
+  const spawned: SpawnRequest[] = [];
+  const layer = a2aRunner(testOps({ sessions, spawned }), 'fake').pipe(Layer.provideMerge(Journal.test()));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+
+  const id = await run(file({ brief: 'do the thing', cwd: '/repo' }));
+  await run(tick());
+  assert.equal(spawned.length, 1);
+  assert.equal(spawned[0]!.name, `ae/${id}/1`);
+  assert.equal(sessions.get(`ae/${id}/1`)!.state, 'working');
+
+  await run(requestStop(id));
+  await run(tick());
+  assert.equal(sessions.get(`ae/${id}/1`)!.state, 'stopped', 'the stop reached the driver through cancelTask');
+
+  // Only the seam answers this: a driver reached directly is handed any id, and testOps does nothing with one it lacks.
+  const e = await run(Effect.flatMap(Runner, (r) => Effect.flip(r.stop('fake-404'))));
+  assert.equal(e.message, 'the `fake` harness lists no session `fake-404`: there is nothing to stop.');
+
+  // What no harness could use is refused beneath it, as through `Runner.layer`.
+  const refusal = await run(Effect.flatMap(Runner, (r) => Effect.sync(() => r.refuses?.({ brief: 'b', cwd: '/r', config: { model: '' } }))));
+  assert.equal(refusal, "`model` is empty. Leave it out for the harness's default.");
 });

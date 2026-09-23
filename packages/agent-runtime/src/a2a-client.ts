@@ -1,0 +1,183 @@
+/**
+ * The engine's side of the A2A seam: a harness's `RunnerOps`, rebuilt as calls through the SDK's `Client` to that
+ * harness's `HarnessHandler`, in this process, with no HTTP between them.
+ *
+ * `spawn`, `observe` and `stop` go through the client; `logs`, `find`, `release`, `transcript`, `say` and `refuses` still
+ * reach the driver directly, until part 3. Nothing the engine reads changes: a harness's words come back as the same
+ * `RunnerError`, `refused` where the harness vouched nothing started, and a driver's defect as the defect it is.
+ */
+import { Effect, Layer } from 'effect';
+import { A2A_PROTOCOL_VERSION, TaskState } from '@a2a-js/sdk';
+import type {
+  AgentCard, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
+  GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigsRequest,
+  ListTaskPushNotificationConfigsResponse, ListTasksRequest, ListTasksResponse, SendMessageRequest, StreamResponse,
+  SubscribeToTaskRequest, Task, TaskPushNotificationConfig, SendMessageResult,
+} from '@a2a-js/sdk';
+import { Client, type Transport } from '@a2a-js/sdk/client';
+import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
+import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
+import { randomUUID } from 'node:crypto';
+import type { Event, Sighting } from './domain.ts';
+import { Journal } from './journal.ts';
+import { Runner, RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE } from './a2a-handler.ts';
+import { messageOf, sightingOf, wordsOf } from './a2a-map.ts';
+
+/**
+ * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that
+ * arrived by HTTP would. The transport's names and the handler's differ in three places — the extended card, the
+ * push-config listing, a resubscribe — and are mapped here.
+ */
+export class InProcessTransport implements Transport {
+  private readonly handler: A2ARequestHandler;
+
+  constructor(handler: A2ARequestHandler) {
+    this.handler = handler;
+  }
+
+  get protocolName(): string {
+    return 'in-process';
+  }
+
+  get protocolVersion(): string {
+    return A2A_PROTOCOL_VERSION;
+  }
+
+  getExtendedAgentCard(params: GetExtendedAgentCardRequest): Promise<AgentCard> {
+    return this.handler.getAuthenticatedExtendedAgentCard(params, new ServerCallContext());
+  }
+
+  sendMessage(params: SendMessageRequest): Promise<SendMessageResult> {
+    return this.handler.sendMessage(params, new ServerCallContext());
+  }
+
+  async *sendMessageStream(params: SendMessageRequest): AsyncGenerator<StreamResponse, void, undefined> {
+    yield* this.handler.sendMessageStream(params, new ServerCallContext());
+  }
+
+  createTaskPushNotificationConfig(params: TaskPushNotificationConfig): Promise<TaskPushNotificationConfig> {
+    return this.handler.createTaskPushNotificationConfig(params, new ServerCallContext());
+  }
+
+  getTaskPushNotificationConfig(params: GetTaskPushNotificationConfigRequest): Promise<TaskPushNotificationConfig> {
+    return this.handler.getTaskPushNotificationConfig(params, new ServerCallContext());
+  }
+
+  listTaskPushNotificationConfig(params: ListTaskPushNotificationConfigsRequest): Promise<ListTaskPushNotificationConfigsResponse> {
+    return this.handler.listTaskPushNotificationConfigs(params, new ServerCallContext());
+  }
+
+  deleteTaskPushNotificationConfig(params: DeleteTaskPushNotificationConfigRequest): Promise<void> {
+    return this.handler.deleteTaskPushNotificationConfig(params, new ServerCallContext());
+  }
+
+  getTask(params: GetTaskRequest): Promise<Task> {
+    return this.handler.getTask(params, new ServerCallContext());
+  }
+
+  cancelTask(params: CancelTaskRequest): Promise<Task> {
+    return this.handler.cancelTask(params, new ServerCallContext());
+  }
+
+  listTasks(params: ListTasksRequest): Promise<ListTasksResponse> {
+    return this.handler.listTasks(params, new ServerCallContext());
+  }
+
+  async *resubscribeTask(params: SubscribeToTaskRequest): AsyncGenerator<StreamResponse, void, undefined> {
+    yield* this.handler.resubscribe(params, new ServerCallContext());
+  }
+}
+
+/** A client of one harness, over its handler in this process. `polling`: a send answers once the session starts. */
+export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): Client =>
+  new Client(new InProcessTransport(new HarnessHandler(harness, ops, events)), cardOf(harness), { polling: true });
+
+/**
+ * A client call as a driver's verb: its value, or the harness's words — or the seam's own refusal, in A2A's words — as a
+ * `RunnerError`. Anything else thrown is a defect, and dies as one, as it would have reaching the driver directly.
+ */
+const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerError> =>
+  Effect.tryPromise({ try: f, catch: (cause) => cause }).pipe(
+    Effect.catch((cause) => cause instanceof HarnessFailed || cause instanceof A2AError
+      ? Effect.fail(new RunnerError({ verb, message: (cause as Error).message }))
+      : Effect.die(cause)),
+  );
+
+/**
+ * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
+ * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
+ * lists every page. `stop` cancels the session by name, read off the last listing, since the engine stops by session id;
+ * a session no listing has is not stopped blindly but refused in words, where a driver was handed the id to make of what
+ * it would. The engine stops only a session the pass has just seen live, so it never asks for that.
+ */
+export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): RunnerOps => {
+  const client = clientOf(harness, ops, events);
+  let names = new Map<string, string>();
+
+  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
+    call('spawn', () => client.sendMessage({
+      tenant: '', message: messageOf(r, randomUUID()), metadata: undefined,
+      configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+    })).pipe(Effect.flatMap((answer) => {
+      const state = 'status' in answer ? answer.status?.state : undefined;
+      if (state === TaskState.TASK_STATE_WORKING) return Effect.void;
+      const words = 'status' in answer ? wordsOf(answer) : undefined;
+      if (state === TaskState.TASK_STATE_REJECTED) {
+        return Effect.fail(new RunnerError({ verb: 'spawn', message: words ?? `the \`${harness}\` harness refused \`${r.name}\` and said nothing.`, refused: true }));
+      }
+      return Effect.fail(new RunnerError({
+        verb: 'spawn',
+        message: words ?? `the \`${harness}\` harness answered the spawn of \`${r.name}\` with ${state === undefined ? 'a message, not a task' : TaskState[state]}: whether a session started is not known.`,
+      }));
+    }));
+
+  const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.gen(function* () {
+    const seen = new Map<string, Sighting>();
+    let pageToken = '';
+    do {
+      const page = yield* call('observe', () => client.listTasks({
+        tenant: '', contextId: '', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: MOST_PER_PAGE, pageToken,
+        historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false,
+      }));
+      for (const t of page.tasks) {
+        const s = sightingOf(t);
+        if (!s) {
+          return yield* Effect.fail(new RunnerError({ verb: 'observe', message: `the \`${harness}\` harness listed \`${t.id}\` with no sighting it could be read by.` }));
+        }
+        seen.set(t.id, s);
+      }
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
+    return seen;
+  });
+
+  const stop = (sessionId: string): Effect.Effect<void, RunnerError> => Effect.gen(function* () {
+    if (!names.has(sessionId)) yield* observe;
+    const name = names.get(sessionId);
+    if (name === undefined) {
+      return yield* Effect.fail(new RunnerError({ verb: 'stop', message: `the \`${harness}\` harness lists no session \`${sessionId}\`: there is nothing to stop.` }));
+    }
+    // A session that ended between the listing and the stop has nothing to stop, as a driver's stop of an ended session
+    // did nothing: the next pass reads how it ended.
+    yield* call('stop', () => client.cancelTask({ tenant: '', id: name, metadata: undefined }).then(
+      () => undefined,
+      (cause) => { if (cause instanceof TaskNotCancelableError) return undefined; throw cause; },
+    ));
+  });
+
+  return { ...ops, spawn, observe, stop };
+};
+
+/**
+ * The same seam beneath the Effect door: a runner's session verbs through the A2A client, its agent answering off the
+ * `Journal` the program provides. `Runner.layer(ops)` stays direct; this is the one to use for the path `createEngine`
+ * takes. A function beside `Runner`, as `sdkRunner` is, rather than a static on it: `runner.ts` would then import this
+ * file, which imports `runner.ts`.
+ */
+export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runner, never, Journal> =>
+  Layer.unwrap(Effect.gen(function* () {
+    const journal = yield* Journal;
+    return Runner.layer(a2aOps(harness, ops, (taskId) => Effect.runPromise(journal.read(taskId))));
+  }));

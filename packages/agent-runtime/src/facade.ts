@@ -26,6 +26,7 @@ import { detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { codex } from './runner-codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
+import { a2aOps } from './a2a-client.ts';
 import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -367,12 +368,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
   // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
   const journalOps = options.journal ? undefined : Journal.filesOps(root);
-  const runners = runnersOf(harnesses, root);
+  const journal = options.journal ? journalOf(options.journal) : Journal.layer(journalOps!);
+  // Each harness behind its A2A agent, reached through the SDK's client in this process (`a2a-client.ts`). Its agent
+  // holds nothing: it answers a task it never started off the harness and this journal, so a restart loses no session.
+  const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
+  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, a2aOps(name, ops, events)]));
   const pools = poolsOf(harnesses);
-  const layer = Layer.mergeAll(
-    options.journal ? journalOf(options.journal) : Journal.layer(journalOps!),
-    Runner.layer(composite(runners, fallback)),
-  );
+  const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)));
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
   // services are shared across calls exactly as they would be inside one Effect program.
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> =>

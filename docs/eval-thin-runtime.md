@@ -236,8 +236,13 @@ orchestrator's calls to the runtime change.
    handler holds nothing — every answer is read off the harness and the journal — so a restarted runtime answers for a
    session it never started before its first tick (`test/restart.test.ts`). Only `src/a2a-*.ts` import the SDK
    (`test/a2a-boundary.test.ts`). The Effect door takes the seam through `a2aRunner`, beside `Runner` as `sdkRunner` is.
-   **(3) the rest of the calls through the client:** logs, transcript, release, `say` and `find`, still direct (open
-   issue 27).
+   **(3) the rest of the calls through the client.** Done, on the same day: `say` is A2A's follow-up, a message on the
+   session's Task; `find`, `logs` and `release`, which A2A has no call for, are the runtime extension's methods
+   (`urn:agent-runtime:session:v1`), which the harness's card lists as its driver answers them, and a spawn carries the
+   same extension as its mark, since a plain message naming a Task continues it. `refuses` stays direct by design: it
+   judges a task before any session exists. `test/driver-calls.test.ts` refuses any other driver call made with no A2A
+   call in flight (open issue 27). **(4) `transcript` as `SubscribeToTask`**, the one call still direct, and the first
+   the agent streams.
 2. **The Claude Code adapter runs a step as a job:** `-p` by default, a gate as `TASK_STATE_INPUT_REQUIRED`, denials loud, `auto`
    by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's

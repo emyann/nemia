@@ -231,8 +231,12 @@ which is the test of whether the seam was in the right place.
 
 Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `createEngine` reaches it through the
 `@a2a-js/sdk` client, in this process, with no HTTP between them. A session is an A2A Task named for it, `ae/<task>/<n>`,
-whose `contextId` is the task; a spawn is a user Message, the brief its one text part and the rest of the request —
-`config` whole and unopened — its metadata; `observe` is a listing, and `stop` a cancel. What a harness says comes back in
+whose `contextId` is the task; a spawn is a user Message marked with the runtime's extension
+(`urn:agent-runtime:session:v1`), the brief its one text part and the rest of the request — `config` whole and unopened —
+its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the session's Task. What A2A
+has no call for is the extension's methods: `findSession`, `sessionLogs` and `releaseSession`. The harness's card lists
+the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
+What a harness says comes back in
 the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
 `SUBMITTED` and waits out the grace window, as before.
 
@@ -242,9 +246,11 @@ go is answered from the journal (`test/restart.test.ts`). It is not the SDK's `D
 would be a second record beside the journal. Streaming, push notifications and an extended card are refused in the SDK's
 own errors, never taken and ignored.
 
-`logs`, `find`, `release`, `transcript`, `say` and `refuses` still reach the driver directly, and so does a runner an
-Effect program provides with `Runner.layer`; `a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts`
-import the SDK, and neither entry exports a name of its (`test/a2a-boundary.test.ts`).
+Two verbs still reach the driver directly: `transcript`, until it becomes a `SubscribeToTask`, and `refuses`, which judges
+a task before any session exists and so is no call to one. A test refuses any other driver call made with no A2A call in
+flight (`test/driver-calls.test.ts`). A runner an Effect program provides with `Runner.layer` is direct too;
+`a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts` import the SDK, and neither entry exports a name of
+its (`test/a2a-boundary.test.ts`).
 
 ## What a task may say, and what is refused
 
@@ -1239,9 +1245,9 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
-| `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message with `config` in its metadata, a sighting or a journalled attempt a Task |
-| `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, holding nothing — every answer read afresh off the harness and the journal |
-| `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's `spawn`, `observe` and `stop` as calls through the SDK's `Client` |
+| `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task |
+| `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
+| `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
@@ -1267,6 +1273,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
+| `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |
 | `test/journal-words.test.ts` | the journal's words for four runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |

@@ -752,7 +752,14 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   brief never told wrote none and closed with an empty one; the journal has the words once. The first run failed only on the
   transcript: Claude Code writes words a job reads mid-turn as a `queued_command` attachment with no `origin`, which the
   reader dropped, and it reads them as the user's now. The same test on a `--bg` session, run again after it was shared
-  with the job's, passed with the words arriving while the session worked, as a `system` event.
+  with the job's, passed with the words arriving while the session worked, as a `system` event. And, asked in review, the
+  live tests that run jobs through the engine, again on the stream-json path (2.1.280, haiku, each run file read after:
+  `--input-format stream-json`, no brief in the arguments, its input closed at the result). M1 under the engine: the denied
+  job settled `succeeded` with `Write`, `Bash(curl)` and `WebFetch` denied, and the control with none. M2, M3, M5, with
+  the brief of each resume on its stdin: a job resumed from a `--bg` session remembered its word and recorded no cost; a
+  job at $0.0434 and the job resumed from it charged $0.0033; a resume capped at $0.02 under its session's $0.0467
+  finished at $0.0032. M7: a resume of a denied job carried none of its parent's denials, at $0.0041. The $0.01 budget
+  test, on `claude-detached`, whose arguments part 2a rebuilt: `failed`, reason `budget`, $0.0184, no attempt 2.
 
 ## Verified by tests, not by a live run
 

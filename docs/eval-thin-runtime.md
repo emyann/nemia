@@ -292,6 +292,14 @@ orchestrator's calls to the runtime change.
    a session that was no job of the runtime's (a `--bg` try from before the switch) records no cost (M3, issue 4). Denials
    are recorded on every job's attempt; a background session's are not read, and no surface of the orchestrator says them
    yet — part 3.
+
+   **Part 3a done, the same day: a denial is said everywhere a step is.** What the harness denied a step's current try —
+   every attempt of its task, each call once, in the runtime's words (`denialText`, `Skill(look)`) — is a `denied: …` note
+   on `wf ls`, beside the status and never in it, a line under the step on `wf decide`, a `denied` field (`{ words, calls }`)
+   on the api's steps, a count on the step's node on the board (`denied 2 calls`, the calls on hover: the node's line is
+   thirty characters) and a `denied` row on the step's section. The words are made one line and clipped to five calls
+   (`deniedWords`), one writer for every surface. Nothing is decided on them: `denials: fail`, a step key that fails a step
+   on a denial, is a card of its own.
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

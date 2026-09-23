@@ -446,7 +446,10 @@ test("at shipped defaults, a Codex task's transcript is read from its rollout, b
     let read = await engine.transcript(id);
     for (const until = Date.now() + 15_000; !read.events.length && Date.now() < until; read = await engine.transcript(id)) await sleep(50);
     assert.deepEqual(read.events, CODEX_EVENTS);
-    assert.match(await engine.logs(id), /"thread\.started"/);
+    // The worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after: wait for that too.
+    let logs = await engine.logs(id);
+    for (const until = Date.now() + 15_000; !/"thread\.started"/.test(logs) && Date.now() < until; logs = await engine.logs(id)) await sleep(50);
+    assert.match(logs, /"thread\.started"/);
   });
 });
 

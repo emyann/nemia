@@ -23,7 +23,7 @@ const FEED = path.join(ROOT, 'feed.jsonl');
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_RUNS;
 const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } = await import('../src/runner.ts');
-const { main } = await import('../src/cli.ts');
+const { main, watchPrinted } = await import('../src/cli.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -479,6 +479,31 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   } finally {
     child.kill();
   }
+});
+
+test('`wf watch` says it is watching only once it holds its cursor: a feed cut the moment the banner is read is said, not refused', async (t) => {
+  emptyStore();
+  const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
+  fs.writeFileSync(FEED, `${line}\n${line}\n`);
+  const from = size();
+  // A reader acting on the banner at once, as fast as it can: in this process, before the next line of the watch's own start.
+  const out: string[] = [];
+  const err: string[] = [];
+  t.mock.method(console, 'log', (...a: unknown[]) => {
+    out.push(a.join(' '));
+    if (a.join(' ').startsWith('watching from')) fs.truncateSync(FEED, 0);
+  });
+  t.mock.method(console, 'error', (...a: unknown[]) => { err.push(a.join(' ')); });
+  const watch = watchPrinted(from);
+  try {
+    assert.deepEqual(out, [`watching from ${from}, ^C to stop`]);
+    const bound = performance.now() + 10_000;
+    while (!err.length) {
+      assert.ok(performance.now() < bound, 'the truncation was not said in 10s');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    assert.match(err[0]!, /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+  } finally { watch.stop(); }
 });
 
 test('REFUSED: a watch not told what to do about a cut feed refuses to read it, on every beat — the api ends its stream on that', async () => {

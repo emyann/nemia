@@ -226,6 +226,17 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   faster than its interval proves no overlap guard: the old test passed with `start()`'s guard deleted. Run a mutant of a
   loop under `timeout`: one whose `stop()` no longer clears its interval holds `node --test` open for ever (learned by the
   run that made the timer test pass under load).
+- **A test that fails only under load is a race until shown otherwise, and it is made to happen on demand before it is fixed.**
+  Of the three a loaded suite failed on 2026-09-23, two were races in the code. The detached worker published its pid and only
+  then installed its SIGTERM handler, so a stop sent in between killed it by the signal's default action and its harness ran on
+  under a run file that said `working`; it installs its handlers first now (`ae-worker.ts`). And `wf watch` printed
+  `watching from N` before the watch checked N, so a reader that cut the feed on the banner had the watch refuse its cursor and
+  die with a stack; the banner is printed once the watch holds it (`watchPrinted` in `cli.ts`). The third was the test's: a Codex
+  task's thread id is on its run file before its output is on disk, since the log is a write stream, and the test read the logs
+  once. Each was made to happen every time with a throwaway `--import` hook passed through `NODE_OPTIONS` to the one process
+  concerned (freeze the worker with `SIGSTOP` after its first rename, delay its `fs.write`, pause the watch's child after its
+  banner), and the test for the worker keeps its hook. Wait on a frozen process with `ps -o stat=` before continuing it: a
+  `SIGCONT` sent before its own `SIGSTOP` leaves it stopped for good (learned by the run that found them).
 - **A rule about order or names is not proven by a fixture that already has it.** The equal-times admission test read
   a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping

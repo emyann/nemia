@@ -357,7 +357,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // level-triggering is for. Never a special case, never a wait.
           if (hit && hit.run.pid > 0) {
             // SIGTERM the worker, which kills the harness's process group and writes `stopped`.
-            // Not our business to write that state: the worker is the one that saw it happen.
+            // Not our business to write that state: the worker is the one that saw it happen. It hears
+            // SIGTERM from the moment its pid is on disk, so a stop that lands any time after is heard.
             try { process.kill(hit.run.pid, 'SIGTERM'); } catch { /* already gone */ }
           }
         },

@@ -569,6 +569,24 @@ function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
   return argv[0] === undefined ? 0 : Number(argv[0]);
 }
 
+/**
+ * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, and a cut feed said on stderr, until `stop()`.
+ *
+ * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it —
+ * finds a watch already there to see it. Printed first, a cut in that moment had the watch refuse the cursor it was given and end with a stack
+ * (learned under a loaded suite, whose test truncated the feed on the banner).
+ */
+export function watchPrinted(from: number): { stop(): void } {
+  // A feed cut under the watch is said once, and followed from the start of the feed there is now (`watchFeedFile`).
+  const watch = watchFeed({
+    from, onLine: (line) => console.log(feedLineWords(line)),
+    onCut: (said) => console.error(`wf watch: ${said}`),
+    onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`),
+  });
+  console.log(`watching from ${from}, ^C to stop`);
+  return watch;
+}
+
 /** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
 export async function main(argv: string[], e: ReturnType<typeof engine> = engine()): Promise<void> {
   const [verb, ...rest] = argv;
@@ -807,16 +825,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const from = feedCursor('watch', rest);
       const refusal = feedCursorRefusal(from);
       if (refusal) usage(refusal);
-      console.log(`watching from ${from}, ^C to stop`);
       // For ever: the watch holds the process open until ^C, as \`wf up\` does.
-      return new Promise<void>(() => {
-        // A feed cut under the watch is said once, and followed from the start of the feed there is now (`watchFeedFile`).
-        watchFeed({
-          from, onLine: (line) => console.log(feedLineWords(line)),
-          onCut: (said) => console.error(`wf watch: ${said}`),
-          onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`),
-        });
-      });
+      return new Promise<void>(() => { watchPrinted(from); });
     }
 
     case 'ls': {

@@ -46,7 +46,9 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
 const { StepInspector } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
-const { afterEdges, cardEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
+const { afterEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
+const { StepRail, StepTiles } = await import('../src/components/StepRail.tsx');
+const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
@@ -58,6 +60,7 @@ type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
+type RunSummary = import('../src/lib/api.ts').RunSummary;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
@@ -191,12 +194,8 @@ function loopRun(notes: { implement: string | null; review: string | null }): Ru
   };
 }
 
-test("the card's edge reaches only the root, and the loop's edge goes back to its target, whatever the steps' specs lack", () => {
+test("the loop's edge goes back to its target, whatever the steps' specs lack", () => {
   const run = loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' });
-
-  assert.deepEqual(cardEdges(run, 'r-1', 'r-1/').map(({ id, source, target, type, data }) => ({ id, source, target, type, data })), [
-    { id: 'r-1/->implement', source: 'r-1', target: 'r-1/implement', type: 'state', data: { state: 'done', loop: false } },
-  ]);
 
   const edges = stepEdges(run, 'r-1/');
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({ id, source, target, type, sourceHandle, targetHandle, label, data });
@@ -212,10 +211,9 @@ test("the card's edge reaches only the root, and the loop's edge goes back to it
   const first = stepEdges(loopRun({ implement: null, review: null }));
   assert.deepEqual([first[1]!.label, first[1]!.data], [undefined, { state: 'to-come', loop: true }]);
 
-  // A run with no loop draws no edge back, and its card still reaches every root it has.
+  // A run with no loop draws no edge back.
   const chain = { ...run, graph: { roots: ['implement', 'review'], edges: [] } };
   assert.deepEqual(stepEdges(chain), []);
-  assert.deepEqual(cardEdges(chain, 'r-1', 'r-1/').map((e) => e.target), ['r-1/implement', 'r-1/review']);
 });
 
 /**
@@ -293,10 +291,10 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     ['ask', 'needs-human', 'tokens'],
     ['draft', 'running (working)'],
   ]);
-  const drawn = [...stepEdges(run), ...cardEdges(run, 'r-1', 'r-1/')];
+  const drawn = stepEdges(run);
   const html = new Map(drawn.map((edge) => [edge.id, withMotion(false, () => edgeMarkup(edge))]));
-  const moving = ['implement->review', 'tokens->theme', 'r-1/->draft'];
-  assert.deepEqual([...html].filter(([, markup]) => travelling(markup).length > 0).map(([id]) => id), moving, 'into a step at work or at its check, from a step or a card');
+  const moving = ['implement->review', 'tokens->theme'];
+  assert.deepEqual([...html].filter(([, markup]) => travelling(markup).length > 0).map(([id]) => id), moving, 'into a step at work or at its check');
 
   for (const id of moving) {
     const markup = html.get(id)!;
@@ -318,6 +316,67 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     // The travelling dot is the one animation: never React Flow's dash march as well.
     assert.equal(edge.animated, undefined, edge.id);
   }
+});
+
+/**
+ * The Factory's fake run as `GET /api/runs` lists it: implement → review → respond, implement → respond, tokens → theme; review at work,
+ * theme waiting at its gate, an ending, on you.
+ */
+function summaryRun(): RunSummary {
+  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null };
+  const step = (name: string, status: string, extra = {}) => ({ name, taskId: `t-${name}`, branch: null, status, note: null, ...none, ...extra });
+  const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
+  return {
+    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Tile it', workflowDir: '/code/app/workflow', createdAt: at, startedAt: at,
+    cancelledAt: null, after: [], waiting: null, status: 'running', moving: true, cost: null,
+    steps: [
+      step('implement', 'verified ✓'), step('review', 'running (working)'), step('respond', 'waiting', { taskId: null }),
+      step('tokens', 'unverified · done'), step('theme', 'awaiting approval', { approve: 'approve theme' }),
+    ],
+    graph: { roots: ['implement', 'tokens'], edges: [after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme')] },
+    waitingOnYou: ['theme'], onYou: ['approve theme'],
+    toDecide: { kind: 'approve', step: 'theme', back: [] },
+  } as unknown as RunSummary;
+}
+const railMarkup = (run: RunSummary, reduce = false): string =>
+  withMotion(reduce, () => renderToStaticMarkup(createElement(StepRail, { run, flow: railOf(run.steps.map((s) => s.name), run.graph, flowSteps(run), false) })));
+const tilesMarkup = (run: RunSummary, selected: string | null = null, reduce = false): string =>
+  withMotion(reduce, () => renderToStaticMarkup(createElement(StepTiles, {
+    run, detail: null, selected, onStep: () => {}, flow: tilesOf(run.steps.map((s) => s.name), run.graph, flowSteps(run), false),
+  })));
+
+test("a card at rest draws its run's steps as a rail: a pill each in its state, the ones at work or waiting on you ringed, and an arrow between each, the one into work moving", () => {
+  const html = railMarkup(summaryRun());
+  const pills = [...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"( data-live="true")?/g)].map((m) => [m[1], m[2], Boolean(m[3])]);
+  assert.deepEqual(pills, [
+    ['implement', 'verified', false], ['tokens', 'unverified', false], ['review', 'working', true], ['theme', 'awaiting-approval', true], ['respond', 'waiting', false],
+  ], html);
+  const arrows = Object.fromEntries([...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1]!.replaceAll('&gt;', '>'), m[2]]));
+  assert.deepEqual(arrows, {
+    'step:implement->step:review': 'running', 'step:review->step:respond': 'to-come', 'step:implement->step:respond': 'to-come', 'step:tokens->step:theme': 'to-come',
+  });
+  // One dot, on the arrow into the step at work; none where the person asked for reduced motion, where the colour says it alone.
+  assert.equal(travelling(html).length, 1, html);
+  assert.equal(travelling(railMarkup(summaryRun(), true)).length, 0);
+  assert.match(html, /<ul aria-label="Steps">/);
+  // A pill's name is cut to its width; hovering says it whole, with its status and what that means.
+  assert.match(html, /title="review: running \(working\) — /);
+});
+
+test("an opened card's tiles each name the step, its chip and what it waits on a person for, and press to inspect it", () => {
+  const html = tilesMarkup(summaryRun(), 'review');
+  assert.match(html, /<section aria-label="The run&#x27;s steps"/);
+  const tiles = [...html.matchAll(/data-tile="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(tiles, [['implement', 'verified'], ['tokens', 'unverified'], ['review', 'working'], ['theme', 'awaiting-approval'], ['respond', 'waiting']]);
+  assert.match(html, /aria-label="Inspect step theme"/);
+  // The gate that ends the run says what approving it does, in the node's words.
+  assert.match(html, /<span data-need="approve" title="[^"]*" class="[^"]*">approve theme to run it<\/span>/, html);
+  // The step being inspected is pressed, and only it.
+  assert.deepEqual([...html.matchAll(/aria-pressed="true"[^>]*data-tile="([^"]+)"|data-tile="([^"]+)"[^>]*aria-pressed="true"/g)].map((m) => m[1] ?? m[2]), ['review']);
+  // Before the run's detail is read, a tile's attempt line waits for it.
+  assert.equal([...html.matchAll(/<span class="truncate">…<\/span>/g)].length, 5);
+  assert.equal(travelling(html).length, 1);
+  assert.equal(travelling(tilesMarkup(summaryRun(), null, true)).length, 0);
 });
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {

@@ -9,10 +9,10 @@
  *
  * Opened, the card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
  */
-import type { RunGraph } from './api';
+import type { RunGraph, RunSummary } from './api';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
-import { isGate, satisfiesAfter, type StepState } from './status.ts';
+import { isGate, satisfiesAfter, stepState, type StepState } from './status.ts';
 
 /**
  * One box of a flow. `step`, a step of the run; `fold`, the columns before or after the ones the rail shows, each step of them;
@@ -54,6 +54,10 @@ export const RAIL_WIDTH = 328;
 const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 /** The open card's tiles (`w-44`), the arrow's room between columns and between lanes, and the room over and under for arcs. */
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
+
+/** A run's steps as its flow reads them, off the list's record of it: each one's name, its state and its note. */
+export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'>): EdgeStep[] =>
+  run.steps.map((step) => ({ name: step.name, state: stepState(step.status, run.cancelledAt !== null), note: step.note }));
 
 /** The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. */
 export function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {

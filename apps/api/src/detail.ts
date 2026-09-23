@@ -30,7 +30,7 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
  * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
- * `failed (check)`, `failed`, `stopped` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
+ * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
  * says which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };

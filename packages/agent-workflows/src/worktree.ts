@@ -3,7 +3,8 @@
  * into it and the `node_modules` it is given (`deps.ts` decides, this applies), and the hand-off commit of what a step left uncommitted.
  *
  * Beneath `runner.ts`, beside `store.ts`: it imports neither the engine nor `runner.ts`, which re-exports what it exported of this before.
- * What reads a branch once the run has one — its standing, its artifacts, its diff, `wf rm`'s removal — stays in `runner.ts` for now.
+ * What reads a branch once the run has one — its standing, its diff — is `branches.ts`'s, and a step's artifacts `artifacts.ts`'s, both
+ * through the `git` helpers here, so this file imports `store.ts` alone of those beside it; `wf rm`'s removal stays in `runner.ts`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

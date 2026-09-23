@@ -3,7 +3,7 @@
  * record). One so far, `folder` (`workspace: folder`), and nothing here reads git, the network, or the engine.
  *
  * A git run's steps work in worktrees of its repository, and every word about them — cut, merge and hand-off commit in worktree.ts;
- * branch, standing and forget in runner.ts — stays in those two, where the shipped folders' runs are pinned (`git-before-after.test.ts`). A folder run is the other kind,
+ * branch and standing in branches.ts, forget in runner.ts — stays in those three, where the shipped folders' runs are pinned (`git-before-after.test.ts`). A folder run is the other kind,
  * whole: what `advance` makes for a step, what it does when the step is finished, and where it all lives, which is under the run's own
  * directory in the store, so `wf rm` forgets it with the record and runs no git.
  */

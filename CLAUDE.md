@@ -383,9 +383,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   judgement lives in the pure function.
 - **In agent-workflows, `assess` is pure and `runner.ts` is the only file that imports the
   engine.** `run.ts` reads no disk and calls no engine. `cli.ts` parses, calls, prints. The I/O that never names the
-  engine sits beneath `runner.ts` — `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts` — importing neither
-  the engine nor `runner.ts`, which re-exports them; none but `store.ts` is imported by another, and no pure file imports
-  any of them (`test/boundary.test.ts`). A new such file joins that test's `BENEATH`.
+  engine sits beneath `runner.ts` — `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
+  `artifacts.ts`, `authoring.ts`, `inbox-store.ts` — importing neither the engine nor `runner.ts`, which re-exports them;
+  none but the bottom, `store.ts` and `worktree.ts`, is imported by another (`worktree.ts` imports `store.ts` alone of them,
+  `store.ts` none), and no pure file imports any of them (`test/boundary.test.ts`). A new such file joins that test's `BENEATH`.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes.
   A guard that only fires on a transition is wrong after a restart.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask)

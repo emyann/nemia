@@ -6,9 +6,10 @@
  * CLI parses, calls and prints, so it reaches the package through `runner.ts` and the format through
  * `workflow.ts`, and nothing else. A rule a session can re-break is a rule this suite refuses.
  *
- * What of the I/O never names the engine sits beneath `runner.ts`: `store.ts`, `daemon-store.ts`, `feed-store.ts` and `worktree.ts`.
- * They import neither the engine nor `runner.ts`, and only `store.ts` of each other, so they load as a tree beneath it, with no cycle;
- * and no pure file reaches the disk through them.
+ * What of the I/O never names the engine sits beneath `runner.ts`: `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`,
+ * `branches.ts`, `artifacts.ts`, `authoring.ts` and `inbox-store.ts`. They import neither the engine nor `runner.ts`, and of each other
+ * only the two at the bottom — `store.ts`, and `worktree.ts`, whose `git` helpers the branch and artifact readers ask through — and
+ * `worktree.ts` only `store.ts`: so they load as a tree beneath it, with no cycle; and no pure file reaches the disk through them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,7 +35,10 @@ const sources = (): Array<{ file: string; imports: string[] }> =>
 const importsOf = (file: string) => sources().find((s) => s.file === file)!.imports;
 
 /** The files beneath runner.ts: I/O that never names the engine. */
-const BENEATH = ['./store.ts', './daemon-store.ts', './feed-store.ts', './worktree.ts'];
+const BENEATH = ['./store.ts', './daemon-store.ts', './feed-store.ts', './worktree.ts', './branches.ts', './artifacts.ts', './authoring.ts', './inbox-store.ts'];
+
+/** The bottom of that tree, the only files beneath runner.ts that another beneath it may import: the store, and git. */
+const BOTTOM = ['./store.ts', './worktree.ts'];
 
 test('the scanner sees every way a file can name a module — or the rules below would pass by seeing nothing', () => {
   const text = [
@@ -66,14 +70,15 @@ test('run.ts, timeline.ts, closeout.ts, retry.ts, daemon.ts, check.ts, radius.ts
   }
 });
 
-test('store.ts, daemon-store.ts, feed-store.ts and worktree.ts sit beneath runner.ts: none imports it, and none but store.ts is imported by another', () => {
+test('the files beneath runner.ts sit beneath it: none imports it, and none but store.ts and worktree.ts is imported by another', () => {
   for (const mod of BENEATH) {
     const file = `src/${mod.slice(2)}`;
     const imports = importsOf(file);
     assert.ok(!imports.includes('./runner.ts'), `${file} imports runner.ts, which imports it: a cycle`);
-    assert.deepEqual(imports.filter((m) => BENEATH.includes(m) && m !== './store.ts'), [], `${file} imports a sibling beneath runner.ts other than store.ts`);
+    assert.deepEqual(imports.filter((m) => BENEATH.includes(m) && !BOTTOM.includes(m)), [], `${file} imports a sibling beneath runner.ts other than store.ts and worktree.ts`);
     assert.ok(importsOf('src/runner.ts').includes(mod), `and runner.ts imports ${mod}, so this is looking at the right files`);
   }
+  assert.deepEqual(importsOf('src/worktree.ts').filter((m) => BENEATH.includes(m)), ['./store.ts'], 'worktree.ts imports store.ts alone of the tree');
   assert.deepEqual(importsOf('src/store.ts').filter((m) => BENEATH.includes(m)), [], 'store.ts is the bottom of the tree');
 });
 

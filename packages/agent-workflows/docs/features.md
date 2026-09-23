@@ -422,8 +422,8 @@ What it leaves:
 
 Plan §4 G. On a run waiting on you, `wf decide` prints three things between the verdicts and the closeouts:
 what the result branch touched, the lesson line, and the whole diff of the check-affecting files. Beside
-each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy`,
-`sensitiveDiff` and `consumption` in `src/runner.ts` ask git and the engine. `decide` returns `used` off the
+each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy` and
+`sensitiveDiff` in `src/branches.ts` ask git, and `consumption` in `src/runner.ts` the engine. `decide` returns `used` off the
 views it already read, so the screen still reads each task once (each view is a harness observe, plan §4b). The README section *What the
 screen puts in front of you* is the account.
 
@@ -1117,7 +1117,7 @@ What was built:
   - `escapes`: one that climbs out of it, such as `../notes.md`;
   - `files`: an absolute path in the step's directory;
   - `outside`: any other absolute path.
-- `collectArtifacts` in `runner.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
+- `collectArtifacts` in `artifacts.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
   works in its workspace. It copies each `workspace` file into the step's directory at the same path, and the pass's note names
   what it copied. It is level-triggered, so a pass that dies halfway loses nothing: the next copies only what changed, by size
   and by time within a millisecond. Nothing is copied for:
@@ -2701,7 +2701,7 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
   `dev-planned`, `dev-planned-build` and `ui`, the package's `workflows/` and `workflows/ui`, and the examples. It renders each step,
   parses it again and gets the same step back, and a second render gives the same text. Another test does this for a step that sets
   every key.
-- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in runner.ts. The whole folder is judged before a byte is written:
+- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in authoring.ts. The whole folder is judged before a byte is written:
   - where the folder is;
   - each name as a file's name (`stepNameRefusal`: no slash, no leading dot, no comma, no spaces around it, no `.md`, not the
     README's, a file name of at most 255 bytes);
@@ -3207,7 +3207,7 @@ What the board calls:
 
 - **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
   line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
-  branch standings last (`branchStandings(run, resultBranches(run))` in runner.ts, which reads git); without them only the gate says a run
+  branch standings last (`branchStandings(run, resultBranches(run))` in branches.ts, which reads git); without them only the gate says a run
   is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
 - **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
@@ -4153,7 +4153,7 @@ the packages renders a step back to markdown.
 **What it needs.**
 
 - **Package, small.** A pure `renderStep(step)` — frontmatter in `STEP_KEYS` order, then the body — the inverse of the
-  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in runner.ts:
+  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in authoring.ts:
   renders every step, parses the rendered folder in memory before a byte is written, so every parser refusal surfaces
   first (a key it does not have, `after:` naming no step, a cycle, a loop that is not a back edge), then writes the
   files, removes a step's file that is no longer in the set, and leaves `output:` schema files and the README as they

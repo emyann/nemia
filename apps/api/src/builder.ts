@@ -2,7 +2,7 @@
  * The workflow builder, for the board: a folder of yours put back from its steps as the Workflows page lists them, a new folder with a first
  * step, a schema beside the steps, and what a step's form is drawn from.
  *
- * A folder is written by the package's `writeWorkflow` (agent-workflows' runner.ts), which judges the whole folder before a byte is written:
+ * A folder is written by the package's `writeWorkflow` (agent-workflows' authoring.ts), which judges the whole folder before a byte is written:
  * each refusal is the parser's sentence, naming the step, and the api answers it with a 422 carrying the steps it names (`stepsNamed`), so
  * the board shows it by them. The body's shape is the api's own to refuse (400), and what was written is answered read back from disk
  * (`listed`), never echoed from the request.

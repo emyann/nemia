@@ -6,22 +6,23 @@
  * consumer of the engine should need to learn three functions, not a library.
  *
  * What of the I/O never names the engine sits beneath this file, which re-exports what it exported of them: `store.ts` (the run store —
- * a run's record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon-store.ts` (`tick.json` and who ticks
- * the store), `feed-store.ts` (the feed's file) and `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit). They
- * import neither the engine nor this file, and `store.ts` is the only one of them the others import, so they load as a tree and no cycle
- * can form (`test/boundary.test.ts`). The package's root is this file still.
+ * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon-store.ts` (`tick.json` and who
+ * ticks the store), `feed-store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
+ * `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step hands over), `authoring.ts` (a workflow
+ * folder and an agent written) and `inbox-store.ts` (the inbox and the queue on disk). They import neither the engine nor this file, and
+ * `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree and
+ * no cycle can form (`test/boundary.test.ts`). The package's root is this file still.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { isDeepStrictEqual } from 'node:util';
 import { claudeDetached, codex, createEngine, type Engine, nameFor, type TaskView, type Usage } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
-import { inside, refusalLines } from './deps.ts';
+import { refusalLines } from './deps.ts';
 
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LARGE_CONTEXT, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, peakMark, readWords, rebuiltCache, sumUsage, touchedLines, usedLines } from './radius.ts';
-import { radius, sensitivePaths, sumUsage, type Consumed, type Radius, type Touched } from './radius.ts';
+import { sumUsage, type Consumed } from './radius.ts';
 export { isGitRun, placeOf } from './run.ts';
 export { answerIn, harnessWaitLine, waitingWords } from './run.ts';
 /**
@@ -40,34 +41,43 @@ export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Acceptance, Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, Spend, SpendOf, TaskSpend, Wait } from './run.ts';
 export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry.ts';
-import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, isFolderTeam, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { fansOut, isFolderTeam, loadWorkflows, sessionContext, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
-import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
+import { inboxListing, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxCard, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { folderPlace, workRoot } from './places.ts';
-import { acceptanceOf, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { acceptanceOf, type Acceptance, admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, triedFrom, type Approval, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ParentRun, type RunSlot, type Wait } from './run.ts';
 import { feedPhase, feedWords, type FeedWords } from './run.ts';
 export { feedLineWords, REMOVED } from './feed.ts';
 export type { FeedLine } from './feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
-import { acceptAsk, acceptedLines, answerLines, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, cancelPlan, inputRefusal, capOf, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, owesReplies, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, stepStatus, stepTaskId, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Decision, type Listing, type ParentCloseout, type ParentStep, type Round, type RoundAsk, type Run, type Pruning, pruneRefusal, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { acceptAsk, acceptedLines, answerLines, askingTry, assess, gateLines, harnessWaitLine, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, cancelPlan, inputRefusal, capOf, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, owesReplies, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, stepStatus, stepTaskId, type Assessment, type CancelPlan, type InputFile, type Decision, type Listing, type ParentCloseout, type ParentStep, type Round, type RoundAsk, type Run, type Pruning, pruneRefusal, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { answerOf, modeWord, nextTry, sessionModel, tryOf, type Retry, type RetryAsk, type RetryHow } from './retry.ts';
 import { taskUsage, timeline, type Timeline } from './timeline.ts';
 export { DAEMON_FILE, DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, STALE_PASSES, daemonLine, everyOf, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
 export type { DaemonFile, DaemonStanding, Identity } from './daemon.ts';
-import { HOME, acceptFile, acceptanceIn, approvalFile, approvalIn, artifactsDir, askFile, askIn, asksDir, cancelFile, checkStderr, consumeAsks, inboxDir, inputsDir, listRuns, lstatOf, markCancelled, pruneFile, readAnswers, readAsks, readRun, rewriteRun, roundAskFile, roundAskIn, runFile, runsDir, stepsOf, writeAsk, writeRun } from './store.ts';
-export { HOME, acceptFile, approvalFile, artifactsDir, askFile, checkStderr, inboxDir, inputsDir, listRuns, markCancelled, readAcceptances, readAnswers, readApprovals, readAsks, readRun, roundAskFile, stepsOf } from './store.ts';
+import { HOME, acceptFile, acceptanceIn, approvalFile, approvalIn, artifactsDir, askFile, askIn, asksDir, cancelFile, checkStderr, consumeAsks, inboxDir, inputsDir, isDirectory, listRuns, lstatOf, markCancelled, pruneFile, readAnswers, readAsks, readRun, rewriteRun, roundAskFile, roundAskIn, runFile, runId, runsDir, stepsOf, writeAsk, writeRun } from './store.ts';
+export { HOME, acceptFile, approvalFile, artifactsDir, askFile, checkStderr, inboxDir, inputsDir, listRuns, markCancelled, readAcceptances, readAnswers, readApprovals, readAsks, readRun, roundAskFile, runId, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
 export { alive, beat, ceilings, daemonFile, daemonStanding, identify, lastCeilings, passed, procStartOf, releaseStore, stillHeld, storeRefusal, takeStore } from './daemon-store.ts';
 export type { TakenStore } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed-store.ts';
-import { git, gitSays, handOff, makeWorkspace, readInclude, workspaceFor } from './worktree.ts';
+import { gitSays, handOff, makeWorkspace, readInclude, workspaceFor } from './worktree.ts';
 export { lockfileParts, provisionDeps } from './worktree.ts';
+import { collectArtifacts } from './artifacts.ts';
+export { artifactFiles, missingArtifacts } from './artifacts.ts';
+import { parentRecord, refsOf, shippedOf, standingsOf } from './branches.ts';
+export { artifacts, branchStandings, diffStat, isShipped, parentRecord, readArtifact, resultBranches, sensitiveDiff, touchedBy } from './branches.ts';
+export { AgentWriteError, agentPlaces, findAgent, listAgents, removeAgent, writeAgent, writeWorkflow } from './authoring.ts';
+export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritten } from './authoring.ts';
+import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
+export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
+export type { InboxDropped, InboxQueued } from './inbox-store.ts';
 
 /**
  * The engine, with one harness of the run's own beside the three it ships.
@@ -354,19 +364,6 @@ const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string
   views.get(taskId)?.state.attempts.at(-1)?.nativeId ?? undefined;
 
 /**
- * A run id a person can read.
- *
- * The engine lets the caller choose task ids, and a session's name is built from one — so the id
- * IS what a human sees in `claude agents`. `t-mtxvs3nw-f4763a59` tells them nothing;
- * `add-split-workflow-8imz` tells them which piece of work they are looking at, and the step
- * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
- */
-export const runId = (brief: string): string => {
-  const slug = brief.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28).replace(/-$/, '');
-  return `${slug || 'run'}-${Math.random().toString(36).slice(2, 6)}`;
-};
-
-/**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix: a folder that is not a workflow
  * (`loadWorkflows`), one that can run two steps at once where they would share a directory (`isolate: false`), and a step named for another
  * step's check or try. What `startPlan` asks of every card before the first run is started.
@@ -515,316 +512,6 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
   return run;
 }
 
-/** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */
-export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
-
-/**
- * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.
- *
- * Judged whole before a byte is written, so a folder refused is the folder it was: where it is (`workflowPlaceRefusal`), each step's name as
- * a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory as
- * `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So every
- * refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a cycle, a
- * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
- * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
- *
- * Then the `.md` of each step no longer in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
- * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
- * its old name, which is the same file. After that each step's `<name>.md` is written, but for one whose file already reads as the step,
- * which is left as it is, comments and all, since a render has none. A `*.schema.json` is left as it is: a step names one, and the builder
- * writes none. The README is written only when `readme` is given, to the name the folder's README already has.
- *
- * A `.md` in the folder that is a link is refused by name, before any of it: a write follows a link, so a step would be rendered into
- * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
- * linked README is refused only when a `readme` is given, since that is when it would be written.
- *
- * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
- * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. A run
- * is not changed by any of it: it froze its folder at `wf start`.
- */
-export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?: string, { anywhere = false }: { anywhere?: boolean } = {}): WorkflowWritten {
-  const at = path.resolve(dir);
-  const refuse = (why: string | undefined) => { if (why) throw new WorkflowError(why); };
-  refuse(agentsFolderRefusal(at));
-  if (!anywhere) refuse(workflowPlaceRefusal(at));
-  if (fs.existsSync(at) && !isDirectory(at)) refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
-  // The folder as it is, read before a byte is written — and a workflow's files are its own, so a `.md` among them that is a link is refused.
-  let entries: fs.Dirent[] = [];
-  try { entries = fs.readdirSync(at, { withFileTypes: true }); } catch { /* not there: a new workflow's folder is made below */ }
-  const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
-  if (linked) {
-    refuse(linkRefusal(path.join(at, linked.name), "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes."));
-  }
-  if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
-  for (const step of steps) refuse(stepNameRefusal(step?.name));
-  const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
-  if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
-  const texts = steps.map((step) => [step.name, renderStep(step)] as const);
-  const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(at, file), 'utf8'); } catch { return undefined; }
-  };
-  const agents = loadAgents(agentsDir(at));
-  const parsed = parseFolder(texts, read, agents);
-
-  fs.mkdirSync(at, { recursive: true });
-  const written: string[] = [];
-  const kept: string[] = [];
-  /** Write `text` to `file`, unless what is there already reads as `same` does. */
-  const put = (file: string, text: string, same: (there: string) => boolean) => {
-    const there = read(file);
-    if (there !== undefined && same(there)) return kept.push(file);
-    fs.writeFileSync(path.join(at, file), text);
-    return written.push(file);
-  };
-  // The steps the folder no longer has lose their files first: where the filesystem does not tell case apart, a step renamed by case is
-  // written to the file its old name names, and removing that name afterwards would remove what was just written.
-  const names = new Set(texts.map(([name]) => `${name}.md`));
-  const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
-  for (const file of removed) fs.rmSync(path.join(at, file));
-  for (const [name, text] of texts) {
-    const step = parsed.find((s) => s.name === name);
-    put(`${name}.md`, text, (there) => {
-      try { return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step); } catch { return false; }
-    });
-  }
-  if (readme !== undefined) put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
-  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
-}
-
-/**
- * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the store's
- * `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below it, nor
- * the `workflows/` that holds it: those are the folders the board lists as workflows.
- */
-function workflowPlaceRefusal(at: string): string | undefined {
-  const holder = path.dirname(at);
-  const store = path.resolve(HOME, 'workflows');
-  if (isWorkflowsHolder(holder)) return undefined;
-  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
-}
-
-/** Whether `dir` holds the workflows the board lists: the store's `workflows/`, or a repository's, beside its `.git`. */
-function isWorkflowsHolder(dir: string): boolean {
-  if (dir === path.resolve(HOME, 'workflows')) return true;
-  return path.basename(dir) === 'workflows' && fs.existsSync(path.join(path.dirname(dir), '.git'));
-}
-
-/**
- * A refusal of an agent's write, in the package's words, and what kind it is: `missing` for an agent that is not there, `stale` for one
- * that changed since it was read, `exists` for a name another agent has, `in-use` for one steps still name — `users` says which, as
- * `<workflow>/<step>` — and `refused` for the rest: a place, a name, a key or a value the parser refuses.
- */
-export class AgentWriteError extends WorkflowError {
-  readonly why: 'missing' | 'stale' | 'exists' | 'in-use' | 'refused';
-  readonly users: string[];
-  constructor(message: string, why: AgentWriteError['why'] = 'refused', users: string[] = []) {
-    super(message);
-    this.why = why;
-    this.users = users;
-  }
-}
-
-/** What `writeAgent` did: the agent as it now reads, its version, and its files by name — written, and removed. */
-export type AgentWritten = { dir: string; agent: Agent; version: string; written: string[]; removed: string[] };
-
-/**
- * A file written beside an agent, named by one of the agent's own keys: the result schema its `output:` names, or the skills its `skills:`
- * names. Its file is a plain `.json` name in the folder — no folder of its own, and not another agent's file.
- */
-export type AgentSidecar = { file: string; text: string };
-
-/** A result schema written with an agent: its file, beside the agent, and what it holds. */
-export type AgentSchema = AgentSidecar;
-
-/** The agent keys that name a file beside the agent, and what a refusal calls each. */
-const SIDECARS = [
-  { key: 'skills' as const, what: 'skills file', a: 'the skills file', suggest: (name: string) => `${name}.skills.json` },
-  { key: 'output' as const, what: 'result schema', a: 'the result schema', suggest: (name: string) => `${name}.schema.json` },
-];
-
-/**
- * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board lists
- * — the store's (`<store>/workflows/agents`) or a repository's (`<repo>/workflows/agents`). Anywhere else only with `{ anywhere: true }`.
- */
-function agentPlaceRefusal(dir: string, anywhere: boolean): string | undefined {
-  if (path.basename(dir) !== AGENTS_FOLDER) {
-    return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
-  }
-  if (anywhere || isWorkflowsHolder(path.dirname(dir))) return undefined;
-  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), AGENTS_FOLDER)}) nor a repository's (<repo>/workflows/${AGENTS_FOLDER}, beside its .git), the two places the board lists agents from. Write it to one of the two, or pass { anywhere: true } to write ${dir} all the same.`;
-}
-
-/** Whether two paths are one file on disk: a rename by case, where the filesystem does not tell case apart. */
-function sameFile(a: string, b: string): boolean {
-  const [x, y] = [fs.statSync(a, { throwIfNoEntry: false }), fs.statSync(b, { throwIfNoEntry: false })];
-  return Boolean(x && y && x.ino === y.ino && x.dev === y.dev);
-}
-
-const inUse = (name: string, users: readonly string[], does: string): string =>
-  `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} beside it — ${users.join(', ')} — and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent, or remove the \`agent:\` line, first.`;
-
-/**
- * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir` is
- * a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps name, at
- * `wf start`, so a write changes what a later `wf start` freezes and nothing else.
- *
- * `version` is the agent's as it was read (`agentVersion`), or `null` for a new agent; `from` names the agent the draft was read from, when
- * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's
- * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent no longer there or changed
- * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
- * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words.
- *
- * `schema` is the result schema the agent's `output:` names and `skills` the skills its `skills:` names, each written beside it with it: a
- * `.json` file's name with no folder, the one that key names, and not a file another agent names — that one is its agent's to change.
- * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
- * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
- */
-export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, skills, anywhere = false }: { version: string | null; from?: string; schema?: AgentSidecar | null; skills?: AgentSidecar | null; anywhere?: boolean }): AgentWritten {
-  const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
-  refuse(agentPlaceRefusal(at, anywhere));
-  const name = draft?.name;
-  refuse(agentNameRefusal(name));
-  const old = from ?? name;
-  if (from !== undefined) refuse(agentNameRefusal(from));
-  if (from !== undefined && version === null) refuse(`a new agent is not renamed from another: to rename ${AGENTS_FOLDER}/${from}.md, give the version it was read at.`);
-  const file = (n: string) => path.join(at, `${n}.md`);
-  const linked = (target: string) => Boolean(fs.lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink());
-  const linkWhy = "an agent's file is its own: a write follows a link, and would write into whatever it points at, outside the folder.";
-  for (const target of new Set([file(name), file(old)])) if (linked(target)) refuse(linkRefusal(target, linkWhy));
-  const renamed = old !== name;
-  if (version === null) {
-    if (fs.existsSync(file(name))) refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
-  } else {
-    const now = agentVersion(at, old);
-    if (now === null) refuse(`${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`, 'missing');
-    if (now !== version) refuse(`${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`, 'stale');
-  }
-  if (renamed) {
-    if (fs.existsSync(file(name)) && !sameFile(file(name), file(old))) refuse(`${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`, 'exists');
-    const users = agentUsers(path.dirname(at), old);
-    if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
-  }
-  const text = renderAgent(draft);
-  // Each file the agent names beside it, judged whole before a byte is written: its name, that the agent's own key names it, that it is not
-  // a link, and that it is not another agent's to change.
-  const given = SIDECARS.map((kind) => ({ ...kind, sidecar: (kind.key === 'skills' ? skills : schema) ?? null, named: frontmatterKey(text, kind.key) }));
-  for (const { key, what, a, suggest, sidecar, named: mine } of given) {
-    if (!sidecar) continue;
-    const bad = typeof sidecar.file !== 'string' || !/^[^\\/]+\.json$/.test(sidecar.file) || sidecar.file.startsWith('.');
-    if (bad) refuse(`\`${sidecar?.file}\` is not a ${what}'s name: it is a .json file beside the agent, named with no folder — ${suggest(name)}, say.`);
-    if (sidecar.file !== mine) refuse(`${a} is ${sidecar.file}, and ${AGENTS_FOLDER}/${name}.md ${mine === undefined ? 'names none' : `names ${mine}`}: a ${what} travels with the agent whose \`${key}:\` names it. Set \`${key}: ${sidecar.file}\`, or send none.`);
-    if (linked(path.join(at, sidecar.file))) refuse(linkRefusal(path.join(at, sidecar.file), `a ${what} is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder.`));
-    const others = (fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }) : []).filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
-      .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), key) === sidecar.file; } catch { return false; } })
-      .map((e) => path.basename(e.name, '.md'));
-    if (others.length) refuse(`${sidecar.file} is the ${what} of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} ${key === 'skills' ? 'say they can do' : 'declare'}. Name one of this agent's own: ${suggest(name)}, say.`);
-  }
-  const sending = given.flatMap(({ sidecar }) => sidecar ?? []);
-  const read = (f: string): string | undefined => {
-    const sent = sending.find((s) => s.file === f);
-    if (sent) return sent.text;
-    try { return fs.readFileSync(path.resolve(at, f), 'utf8'); } catch { return undefined; }
-  };
-  const agent = parseAgent(name, text, read);
-
-  fs.mkdirSync(at, { recursive: true });
-  const written: string[] = [];
-  const removed: string[] = [];
-  const held = (f: string): string | undefined => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
-  const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
-  try {
-    for (const { sidecar, was } of before) {
-      if (was === sidecar.text) continue;
-      fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
-      written.push(sidecar.file);
-    }
-    // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
-    if (renamed && sameFile(file(name), file(old))) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
-    fs.writeFileSync(file(name), text);
-    written.push(`${name}.md`);
-  } catch (err) {
-    // Each file beside it goes back to what it was, so an agent that was not written leaves nothing of itself behind — including a write
-    // that failed part-way through those files, which is why they are written in here too.
-    for (const { sidecar, was } of before) {
-      if (!written.includes(sidecar.file)) continue;
-      was === undefined ? fs.rmSync(path.join(at, sidecar.file), { force: true }) : fs.writeFileSync(path.join(at, sidecar.file), was);
-    }
-    throw err;
-  }
-  if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
-  // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
-  // the board by mistake must not cost a person the schema or the skills they wrote: a file nothing names is harmless, and a person
-  // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
-  return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
-}
-
-/**
- * An agent removed: its file, and each file it names beside it — the skills its `skills:` names, the result schema its `output:` names —
- * unless another agent names that one too. Refused, by name, as a write
- * is — the place, the name, a link, an agent not there or changed since `version` was read — and while any step of any workflow beside
- * it still names it, saying which: removed, each of those workflows would stop loading.
- */
-export function removeAgent(dir: string, name: string, { version, anywhere = false }: { version: string; anywhere?: boolean }): { dir: string; removed: string[] } {
-  const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
-  refuse(agentPlaceRefusal(at, anywhere));
-  refuse(agentNameRefusal(name));
-  const file = path.join(at, `${name}.md`);
-  if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
-  const now = agentVersion(at, name);
-  if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, 'missing');
-  if (now !== version) refuse(`${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`, 'stale');
-  const users = agentUsers(path.dirname(at), name);
-  if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
-  const read = (f: string) => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
-  const mine = SIDECARS.map(({ key }) => ({ key, named: frontmatterKey(read(`${name}.md`) ?? '', key) }));
-  fs.rmSync(file);
-  const removed = [`${name}.md`];
-  for (const { key, named } of mine) {
-    if (named === undefined || !/^[^\\/]+\.json$/.test(named)) continue;
-    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(read(f) ?? '', key) === named);
-    const sidecarAt = path.join(at, named);
-    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(named); }
-  }
-  return { dir: at, removed };
-}
-
-/** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
-export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
-  { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
-  { from: 'yours', dir: path.join(HOME, 'workflows', AGENTS_FOLDER) },
-];
-
-export type AgentPlace = 'repo' | 'yours';
-
-/** Every agent of both places, in the order the places come, each read now. An agent that does not read carries its refusal. */
-export function listAgents(repo: string): Array<{ from: AgentPlace; dir: string; name: string; agent: Agent | WorkflowError }> {
-  return agentPlaces(repo).flatMap(({ from, dir }) =>
-    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })));
-}
-
-/**
- * One agent by name, from `from` when it is given and otherwise the first place that has it. Refused, naming the fix, when no place has it,
- * when both do and nothing says which, or when the file is there and does not read — that last in the parser's own words.
- */
-export function findAgent(name: string, repo: string, from?: AgentPlace): { from: AgentPlace; dir: string; agent: Agent } {
-  const places = agentPlaces(repo).filter((place) => from === undefined || place.from === from);
-  const found = places.flatMap((place) => {
-    const agent = loadAgents(place.dir).get(name);
-    return agent === undefined ? [] : [{ ...place, agent }];
-  });
-  const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
-  if (!found.length) {
-    const has = agentPlaces(repo).filter((place) => fs.existsSync(place.dir)).map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
-    throw new WorkflowError(`no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${has.length ? has.join(' and ') : agentPlaces(repo).map((p) => p.dir).join(' and ')}. wf agents lists them.`);
-  }
-  if (found.length > 1) throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
-  const one = found[0]!;
-  if (one.agent instanceof Error) throw one.agent;
-  return { from: one.from, dir: one.dir, agent: one.agent };
-}
-
 /**
  * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it
  * by its name and a trailing `/`, a markdown file with its text.
@@ -888,195 +575,6 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
     }
   }
   return { started, folderOf };
-}
-
-const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
-
-/** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */
-function inboxFiles(): Array<{ file: string; text: string }> {
-  let names: string[];
-  try { names = fs.readdirSync(inboxDir()); } catch { return []; }
-  return names.map((name) => {
-    const at = path.join(inboxDir(), name);
-    if (isDirectory(at)) return { file: `${name}/`, text: '' };
-    try { return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' }; } catch { return { file: name, text: '' }; }
-  });
-}
-
-/** The names of the inbox's cards, as `wf inbox` lists them. */
-const inboxCards = (): string[] => inboxListing(inboxFiles(), [], () => true).filter((l) => l.file.endsWith('.md')).map((l) => l.name);
-
-/**
- * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
- * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is no longer queued as it
- * was — started, taken back, dropped or edited.
- */
-const queueDir = (): string => path.join(HOME, 'queue');
-
-/** The tries the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
-function queueTries(): Map<string, QueueTry> {
-  const tries = new Map<string, QueueTry>();
-  let names: string[];
-  try { names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json')); } catch { return tries; }
-  for (const file of names) {
-    try {
-      const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueTry>;
-      if (typeof r.at === 'string' && typeof r.text === 'string' && typeof r.repo === 'string' && typeof r.why === 'string' && typeof r.refused === 'boolean') {
-        tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-      }
-    } catch { /* torn, or removed since the listing */ }
-  }
-  return tries;
-}
-
-/**
- * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
- * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started; and
- * the tick's tries, so a queued card whose start was refused, or failed, says why.
- */
-export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
-
-/**
- * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
- * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
- *
- * Refused wherever a card's `workflow:` is written — `addToInbox` (`wf inbox add`, and the board's Inbox) and `queueInInbox`
- * (`wf inbox queue --workflow`, which writes that key over the card's own) — in the words `wf start --repo` is refused in: the same
- * sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no way to edit one from the
- * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
- * (`InboxStarted.ignoredRepo`).
- *
- * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
- * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
- */
-function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string }): string | null {
-  if (opts.repo === undefined || opts.workflow === undefined) return null;
-  let steps: readonly Workflow[];
-  try {
-    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo));
-  } catch {
-    return null;
-  }
-  if (!isFolderTeam(steps)) return null;
-  return `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
-    + `File the card without a repository, or name a workflow whose steps work on one.`;
-}
-
-/**
- * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
- * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it; `dir` is the folder a path in the text's own
- * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
- * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
- */
-export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
-  const refusedRepo = cardRepoRefusal(opts);
-  if (refusedRepo) throw new WorkflowError(refusedRepo);
-  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
-  fs.mkdirSync(inboxDir(), { recursive: true });
-  for (;;) {
-    const name = runId(body.split('\n')[0]!);
-    const file = path.join(inboxDir(), `${name}.md`);
-    try {
-      // `wx`: a name already taken is drawn again, never written over.
-      fs.writeFileSync(file, text, { flag: 'wx' });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
-      throw err;
-    }
-    return { card: parseInboxCard(`${name}.md`, text, isDirectory), file };
-  }
-}
-
-/** What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it. */
-export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
-
-/**
- * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
- * takes the mark back. The card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the
- * file keeps the time it was last written, since the rename would give it the time of the queue, and a card has no filing time of its own but
- * its mtime: a board orders its cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea.
- *
- * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card — naming the cards
- * there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names, one already queued, and one with no
- * workflow and none given. `off` on a card not queued writes nothing, and says so.
- */
-export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
-  const refused = inboxNameRefusal(name);
-  if (refused) throw new WorkflowError(refused);
-  const file = path.join(inboxDir(), `${name}.md`);
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new WorkflowError(`${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`);
-  }
-  // Taken back whatever its `repo:` names: a card whose repository is gone leaves the queue as any card does, and is listed with why.
-  const exists = how.off ? () => true : isDirectory;
-  const card = parseInboxCard(`${name}.md`, text, exists);
-  if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
-  if (!how.off) {
-    const listing = readInbox();
-    const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
-    if (why) throw new WorkflowError(why);
-  }
-  // `--workflow` writes that key over the card's own — queued or taken off the queue, `queuedText` below writes it either way — which
-  // makes this a writer of the pair a card's `repo:` is judged against: a card filed with a repository is not put onto a folder team,
-  // to start on a repository no step of it looks at. With no `--workflow` nothing is refused — the card is as it was, and a card on disk
-  // cannot be edited from the board.
-  if (how.workflow !== undefined) {
-    const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });
-    if (refusedRepo) throw new WorkflowError(refusedRepo);
-  }
-  const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
-  // When the card was last written, to set back over the rename below: the card's filing time, as a board reads it.
-  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
-  const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
-  fs.writeFileSync(hidden, written);
-  fs.renameSync(hidden, file);
-  if (filed) {
-    try {
-      fs.utimesSync(file, filed, filed);
-    } catch {
-      // The queue is written all the same: the card lists at the time of the queue, until it is written again.
-    }
-  }
-  const now = parseInboxCard(`${name}.md`, written, exists);
-  if (how.off) return { card: now, file, was: 'taken back' };
-  const order = queueOrder(readInbox());
-  const place = order.findIndex((l) => l.name === name) + 1;
-  return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued' };
-}
-
-/** What `wf inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
-export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
-
-/**
- * `wf inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with no
- * card is normal — dropped already, or never filed — and says which cards there are.
- */
-export function dropFromInbox(name: string): InboxDropped {
-  const refused = inboxNameRefusal(name);
-  if (refused) throw new WorkflowError(refused);
-  const file = path.join(inboxDir(), `${name}.md`);
-  try {
-    fs.rmSync(file);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { removed: false, cards: inboxCards() };
-    throw Object.assign(new Error(`wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`), { exitCode: 1 });
-  }
-  return { removed: true, file };
-}
-
-/**
- * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on the
- * way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `wf start <path>` go through `startFromInbox`. A card
- * not there is still a card's path, refused by name at start.
- */
-export function inboxNameAt(given: string): string | null {
-  const real = (at: string): string => { try { return fs.realpathSync(at); } catch { return at; } };
-  const at = path.resolve(given);
-  return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxDir()));
 }
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
@@ -2407,233 +1905,6 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
 };
 
 /**
- * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`).
- *
- * The whole point of declaring them. The first real run lost the reviewer's entire output because
- * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
- * and empty. A declared file the run does not have is now a mismatch somebody can see.
- *
- * A path from the workspace root is read where the tick collected it (`collectArtifacts`), and the workspace says why when it is not
- * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
- * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
- * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
- * at (`artifactPlace`).
- */
-export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
-  if (!closeout || 'error' in closeout) return [];
-  const dir = artifactsDir(run, stepName);
-  const missing: MissingArtifact[] = [];
-  for (const file of closeout.artifacts) {
-    const place = artifactPlace(file, dir);
-    const why = place === 'outside' || place === 'escapes' ? place
-      : place === 'files' ? (isFileIn(file, dir) ? undefined : 'missing')
-      : workspaceArtifact(run, stepName, file, dir);
-    if (why) missing.push({ path: file, why });
-  }
-  return missing;
-}
-
-/**
- * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
- * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, or a
- * directory. A file in the workspace whose copy something a step made in `dir` refuses (`copyBlocked`) is `not collected`, even when it is
- * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, as it was before collection —
- * so a run from before it, whose worktree is still there and whose steps are past hand-off, reads as it did — and one on no branch either,
- * a file git ignores that its step has not handed off yet, is `not collected`. With nothing in the workspace, the branch answers too.
- */
-function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
-  const rel = path.normalize(file);
-  if (isFileIn(path.join(dir, rel), dir)) return undefined;
-  const { workspace, branch } = run.steps[stepName] ?? {};
-  const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
-  if (at.kind === 'outside') return 'escapes';
-  if (at.kind === 'directory') return 'directory';
-  if (at.kind === 'file' && copyBlocked(dir, rel)) return 'not collected';
-  const onBranch = branch && isGitRun(run) ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
-  if (at.kind === 'file') return onBranch === 'blob' ? undefined : 'not collected';
-  return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
-}
-
-/**
- * What is at a path from a workspace's root, every link on the way followed: a file, and where it really is; a directory; something else;
- * nothing — or `outside`, when a link leads out of the workspace, which is not looked at further.
- */
-function inWorkspace(workspace: string, rel: string): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
-  let root: string;
-  let real: string;
-  try {
-    root = fs.realpathSync(workspace);
-    real = fs.realpathSync(path.join(workspace, rel));
-  } catch { return { kind: 'absent' }; }
-  if (real !== root && !inside(root, real)) return { kind: 'outside' };
-  const at = fs.statSync(real, { throwIfNoEntry: false });
-  return at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' };
-}
-
-/**
- * Copy each file a step's closeout names from its workspace root into the step's files directory, at the same path — so a step that cannot
- * write outside its worktree (Codex in `workspace-write`, which the engine gives no other directory) still hands its files over, and the
- * steps after it and `wf decide` read them from one place (`missingArtifacts`, `artifactFiles`).
- *
- * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
- * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and time is left as
- * it is. Nothing is copied, and `wf decide` says why, for a path that climbs out of the workspace (never read), a link that leads out of it
- * (not followed), a directory, and a file that is not there. Nothing is written through a link in the files directory, which a step may
- * have made. It never throws, as a hand-off does not. The pass's note names what was copied.
- */
-function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
-  const workspace = run.steps[stepName]?.workspace;
-  if (!closeout || !workspace) return [];
-  const dir = artifactsDir(run, stepName);
-  const copied: string[] = [];
-  for (const file of closeout.artifacts) {
-    if (artifactPlace(file, dir) !== 'workspace') continue;
-    const rel = path.normalize(file);
-    const at = inWorkspace(workspace, rel);
-    if (at.kind !== 'file') continue;
-    try {
-      if (copyBlocked(dir, rel)) continue;
-      const to = path.join(dir, rel);
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      const from = fs.statSync(at.real);
-      const there = lstatOf(to);
-      // Within a millisecond: the time a copy is given goes through a `Date` and a float of seconds, and reads back a hair off the source's.
-      if (there && there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1) continue;
-      fs.copyFileSync(at.real, to);
-      fs.utimesSync(to, from.atime, from.mtime);
-      copied.push(rel);
-    } catch { /* not collected, and `wf decide` says so */ }
-  }
-  return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
-}
-
-/**
- * Whether a copy of `rel` into `dir` would go through something a step may have made there: `dir`, or a directory on the way to the copy,
- * that is there and is not a plain directory — a link, a file — or something in the copy's place that is not a regular file. Looks, and
- * makes nothing: what `collectArtifacts` refuses to write through, and what `missingArtifacts` names as the copy refused.
- */
-function copyBlocked(dir: string, rel: string): boolean {
-  let at = dir;
-  for (const part of ['.', ...path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')]) {
-    at = path.join(at, part);
-    const st = lstatOf(at);
-    // Nothing there yet: made as a plain directory, and nothing below it can be in the way.
-    if (!st) return false;
-    if (!st.isDirectory()) return true;
-  }
-  const there = lstatOf(path.join(dir, rel));
-  return Boolean(there && !there.isFile());
-}
-
-/** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */
-function isFileIn(file: string, dir: string): boolean {
-  try {
-    const real = fs.realpathSync(file);
-    return artifactPlace(real, fs.realpathSync(dir)) === 'files' && fs.statSync(real).isFile();
-  } catch { return false; }
-}
-
-/**
- * Every file in a step's files directory, every level down, with its size: what `wf decide` lists after
- * the step's closeout. Regular files only, and no link is followed, so nothing outside the directory is
- * listed because something inside it points there.
- */
-export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
-  const found: ArtifactFile[] = [];
-  const walk = (dir: string): void => {
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      const at = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(at);
-      else if (entry.isFile()) found.push({ path: at, bytes: fs.lstatSync(at).size });
-    }
-  };
-  walk(artifactsDir(run, stepName));
-  return found.sort((a, b) => a.path.localeCompare(b.path));
-}
-
-/**
- * Has this branch landed on the base branch? Git's answer, not ours — and which yes it is (`Shipped`).
- *
- * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
- * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
- *
- * A yes is `'unchanged'` when nothing is committed on the branch past the run's base: it was cut there, so it
- * has been on the base branch since it was cut, and `decision` calls that shipped only for a run whose steps
- * all succeeded. Asked the same way the other way round — is the branch within the base — and `'unchanged'`
- * too when git cannot say, so a run on a base git cannot read is decided by a person, never waved through.
- *
- * A branch git no longer has — deleted after the merge — is asked by the tip the run's tick recorded
- * once the run had finished (`tipsSeen`): still git's answer, about the commit the branch named. Git
- * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
- * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
- */
-export function isShipped(run: GitRun, branch: string): Shipped {
-  const within = (commit: string, base: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
-  // On the base branch already: with commits past the run's base, or none. Exit 1 is git's no — the commit is not within the run's base.
-  const landed = (commit: string): Shipped => {
-    try {
-      within(commit, run.baseRef);
-      return 'unchanged';
-    } catch (err) {
-      return (err as { status?: number }).status === 1 ? true : 'unchanged';
-    }
-  };
-  try {
-    within(branch, run.branch);
-  } catch (err) {
-    // Exit 1 is git's no. Anything else is a name git cannot read, and the tip is asked instead — only then, since a branch that is
-    // still there and not on the base has not landed, whatever an older tip of it says.
-    const tip = run.tips?.[branch];
-    if ((err as { status?: number }).status === 1 || !tip) return false;
-    try {
-      within(tip, run.branch);
-    } catch { return false; }
-    return landed(tip);
-  }
-  return landed(branch);
-}
-
-/**
- * Where each of a run's result branches stands against the base branch it was cut from, as git says it now (`BranchStanding`): on it
- * (`isShipped`, either yes), gone — git no longer has it, and no recorded tip puts it on the base — or ahead of it, by the commits the
- * base branch does not have.
- *
- * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
- * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
- */
-/** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
-const standingsOf = (run: Run): BranchStanding[] => (isGitRun(run) ? branchStandings(run, resultBranches(run)) : []);
-
-/** Whether a branch of the run is on its base (`isShipped`): never, for a folder run, which has no branch to ask about. */
-const shippedOf = (run: Run) => (branch: string): Shipped => (isGitRun(run) ? isShipped(run, branch) : false);
-
-export function branchStandings(run: GitRun, branches: readonly string[]): BranchStanding[] {
-  return [...new Set(branches)].map((branch): BranchStanding => {
-    if (isShipped(run, branch) !== false) return { branch, where: 'on' };
-    if (gitSays(run.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) === undefined) return { branch, where: 'gone' };
-    const count = Number(gitSays(run.repo, 'rev-list', '--count', `${run.branch}..${branch}`)?.trim());
-    return { branch, where: 'ahead', commits: Number.isSafeInteger(count) ? count : 0 };
-  });
-}
-
-/**
- * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
- * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
- * edge by (`afterRefusal`), and where `parentOf` starts.
- */
-export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
-  let record: Run;
-  try { record = readRun(id); } catch { return {}; }
-  let branches: string[];
-  try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
-  const git = isGitRun(record) ? record : undefined;
-  const gone = git ? branches.filter((b) => gitSays(git.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined && !isShipped(git, b)) : [];
-  return { record, ...(gone.length ? { gone } : {}) };
-}
-
-/**
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
  *
  * Shipped is the run's own `wf decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
@@ -2720,80 +1991,6 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
     out.push({ run: id, asked: record.brief.split('\n')[0]!, steps: said });
   }
   return out;
-}
-
-/** Each of these branches git has, and the commit it is at, in one `for-each-ref`. A branch git does not have is left out. */
-function refsOf(repo: string, branches: readonly string[]): Record<string, string> {
-  const listed = gitSays(repo, 'for-each-ref', '--format=%(objectname) %(refname)', ...branches.map((b) => `refs/heads/${b}`)) ?? '';
-  const refs: Record<string, string> = {};
-  for (const line of listed.split('\n')) {
-    const space = line.indexOf(' ');
-    const branch = line.slice(space + 1).replace(/^refs\/heads\//, '');
-    if (space > 0 && branches.includes(branch)) refs[branch] = line.slice(0, space);
-  }
-  return refs;
-}
-
-/**
- * The files this run ADDED — what its steps wrote for whoever reads next.
- *
- * Read out of git rather than off disk, because the worktree a step ran in is gone by the time
- * anybody decides anything, while the branch is exactly as it was left.
- *
- * "Added" is the whole rule. A step that wants to tell a person something writes a file, the same
- * way it tells the next step — so the artifacts are the new files, and no frontmatter key has to
- * be invented to declare them.
- */
-export function artifacts(run: GitRun, branch: string): string[] {
-  try {
-    return git(run.repo, 'diff', '--diff-filter=A', '--name-only', `${run.baseRef}...${branch}`)
-      .split('\n').map((l) => l.trim()).filter(Boolean);
-  } catch { return []; }
-}
-
-/** One artifact's text, out of the branch. */
-export function readArtifact(run: GitRun, branch: string, file: string): string {
-  try { return git(run.repo, 'show', `${branch}:${file}`); } catch { return ''; }
-}
-
-/** How much the run changed, in one line. */
-export function diffStat(run: GitRun, branch: string): string {
-  try { return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`); } catch { return ''; }
-}
-
-/**
- * What a branch touched (`radius`), off `git diff --numstat` against the run's base, renames found
- * whatever the repository's config says. An error when git cannot say, or says what `radius` cannot
- * read: a branch that is gone is not a branch that changed nothing.
- */
-export function touchedBy(run: GitRun, branch: string): Radius | { error: string } {
-  const numstat = gitSays(run.repo, '-c', 'core.quotePath=false', 'diff', '--numstat', '--find-renames', `${run.baseRef}...${branch}`);
-  if (numstat === undefined) return { error: `git could not diff ${run.baseRef.slice(0, 12)}...${branch}` };
-  try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
-}
-
-/**
- * The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them, and handed on
- * as written: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` on the screen (`workspaceGlob`, `deepWorkspaces`).
- */
-function workspacesOf(run: GitRun): string[] {
-  try {
-    const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');
-    const globs: unknown = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
-    return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
-  } catch { return []; }
-}
-
-/**
- * The whole diff, base to branch, of the changed files these globs name — by default the ones that decide
- * what a check means. Both ends of a rename are asked for, so git shows it as one. Empty when no changed
- * file is named; undefined when the branch could not be read, or git cannot say.
- */
-export function sensitiveDiff(run: GitRun, t: Touched, globs: readonly string[]): string | undefined {
-  if ('error' in t.radius) return undefined;
-  const paths = sensitivePaths(t.radius.changes, globs);
-  if (!paths.length) return '';
-  return gitSays(run.repo, '-c', 'core.quotePath=false', '--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--find-renames', `${run.baseRef}...${t.branch}`, '--', ...paths);
 }
 
 /**
@@ -2974,11 +2171,4 @@ export async function decide(e: Engine, id: string): Promise<{
     ...(checkout ? { checkout } : {}),
     ...(decide ? { toDecide: decide } : {}),
   };
-}
-
-export function resultBranches(run: Run): string[] {
-  const steps = stepsOf(run);
-  return resultSteps(steps)
-    .map((s) => run.steps[s.name]?.branch)
-    .filter((b): b is string => Boolean(b));
 }

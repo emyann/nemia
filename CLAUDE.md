@@ -224,6 +224,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping
   deleted. Give the fixture the opposite order, or another name, and check the test fails without the rule
   (learned by the run that closed engine issues 24 and 25).
+- **An e2e page run against the old code proves only its first failing assertion.** The page stops at the first `Refused`, so
+  the Factory page's card drags failing on the old canvas said nothing of its step drag further down. To prove each new assertion
+  fails without the change, skip the earlier ones in a throwaway edit (`if (0) await …`), run again, and put the page back
+  (learned by the run that let every card and step move alone).
 - **A key added to `STEP_KEYS` has three obligations outside the package.** `KINDS` in `apps/api/src/builder.ts`, or the
   api's typecheck fails; `WorkflowStepSpec` and `specOf` in `apps/api/src/workflows.ts`, or the key never reaches the
   board; and `apps/web/src/lib/api/workflows.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can

@@ -21,11 +21,9 @@ import {
   place,
   readFactoryLayout,
   readFactoryOpen,
-  readFactorySteps,
   readLayout,
   saveFactoryLayout,
   saveFactoryOpen,
-  saveFactorySteps,
   saveLayout,
   type EdgeStep,
 } from '../src/lib/canvas.ts';
@@ -303,31 +301,22 @@ test("the Factory's open runs are kept in the order opened, apart from its arran
   assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
 });
 
-test("the Factory's steps a person dragged are kept by their node, apart from its arrangement and its open runs, until forgotten", (t) => {
-  stubStorage(t, memory(new Map()));
-  assert.deepEqual(readFactorySteps(), new Map(), 'nothing dragged yet: an empty map, not null — the floor reads it as it is');
-  saveFactorySteps(new Map([['r-1/review', { x: 40, y: -10 }]]));
-  assert.deepEqual(Object.fromEntries(readFactorySteps()), { 'r-1/review': { x: 40, y: -10 } });
-  assert.equal(readFactoryLayout(), null, "a step's move is not a card's place");
-  assert.deepEqual(readFactoryOpen(), [], 'nor an open run');
+test("the Factory's dragged steps, kept by a floor that drew them, are forgotten, and nothing else with them", (t) => {
+  const kept = new Map([['hkb:factory-steps', JSON.stringify({ 'r-1/review': { x: 40, y: -10 } })]]);
+  stubStorage(t, memory(kept));
   saveFactoryOpen(['r-1']);
-  forgetFactoryOpen();
-  forgetFactoryLayout();
-  assert.deepEqual(Object.fromEntries(readFactorySteps()), { 'r-1/review': { x: 40, y: -10 } }, 'closing the runs and forgetting the arrangement leave the moves');
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
   forgetFactorySteps();
-  assert.deepEqual(readFactorySteps(), new Map());
-  // Kept as a layout is: anything but a map of finite points is not read.
-  stubStorage(t, memory(new Map([['hkb:factory-steps', JSON.stringify({ 'r-1/review': { x: 'far', y: 0 } })]])));
-  assert.deepEqual(readFactorySteps(), new Map());
+  assert.equal(kept.has('hkb:factory-steps'), false);
+  assert.deepEqual(readFactoryOpen(), ['r-1'], 'the open runs stay');
+  assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } }, 'and the arrangement');
 });
 
-test('a browser that refuses storage has no step dragged, and throws nothing', (t) => {
+test('a browser that refuses storage forgets no step, and throws nothing', (t) => {
   const refuse = () => {
     throw new Error('SecurityError: storage is disabled');
   };
   stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
-  assert.deepEqual(readFactorySteps(), new Map());
-  assert.doesNotThrow(() => saveFactorySteps(new Map([['r-1/review', { x: 1, y: 2 }]])));
   assert.doesNotThrow(() => forgetFactorySteps());
 });
 

@@ -59,8 +59,8 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
  * an edge per `after`, and for a loop, the edge back from its looping step to the step a round runs again, under both
  * nodes and labelled with the round once past the first. Each says what `edgesOf` reads off the steps at its ends.
  *
- * `prefix` goes before every node's id: nothing on the run's page, the run on the Factory, where two
- * runs may each have an `implement`.
+ * `prefix` goes before every node's id, for a floor that draws two runs' steps, which may each have an
+ * `implement`: nothing on the run's page and the workflow's, which draw one.
  */
 export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
   const runCancelled = run.cancelledAt !== null;
@@ -74,23 +74,9 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
 }
 
 /**
- * The edges from a run's card on the Factory, which is the head of its graph: one into each root the api's graph names — a
- * step with no `after` — and none into a step that waits on another, whatever its spec says or lacks. Each says what its
- * root is doing: done once the root's work is, running while work moves into it, and to come otherwise.
- */
-/**
  * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that waits on it, out of the one card's right
  * side and into the other's left, drawn as every edge is — dashed while the card waits, solid once its run has started.
  */
 export function afterEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): StateFlowEdge[] {
   return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
-}
-
-export function cardEdges(run: RunDetail, card: string, prefix: string): StateFlowEdge[] {
-  const runCancelled = run.cancelledAt !== null;
-  const states = new Map(run.steps.map((s) => [s.name, stepState(s.status, runCancelled)]));
-  return run.graph.roots.flatMap((root) => {
-    const state = states.get(root);
-    return state ? [drawn(`${prefix}->${root}`, card, prefix + root, edgeState(true, state), false)] : [];
-  });
 }

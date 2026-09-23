@@ -328,7 +328,20 @@ orchestrator's calls to the runtime change.
    consumer yet, the api polling the facade, and would pay a transcript read per event (open issue 27); the collected
    files as Artifacts, which are the orchestrator's Task's, stage 6; and one A2A Task per runtime task rather than per
    attempt.
-3. **The Codex adapter.**
+3. **The Codex adapter.** **Done, 2026-09-23.** Part 5a had already built the Codex Task in stage 2's shape, since the
+   seam is one handler over every driver, so the card proved that shape on Codex rather than building a second one:
+   `packages/agent-runtime/test/codex-agent.test.ts` drives the real detached worker through the SDK's client with a fake
+   `codex` — the thread id as `contextId` (empty until `thread.started`), the `-o` file as the `closeout` Artifact (a `data`
+   part, `text/plain` for prose), a `cancelTask` that ends the harness and what it started, and a held task's answered turn
+   running `codex exec … resume <thread>` in the same context. Measured live (M13, codex-cli 0.154.0, open issue 31): a
+   resumed thread keeps its id and its rollout, and remembered what only the signed thread was told. What Codex cannot do is
+   said rather than faked: no words while it runs (its card says `say: false`, and an A2A follow-up is refused naming a
+   spawn in the session's context as the way on — the only handler change; `wf` and the board keep their words), never
+   `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way: a cancel landing before
+   the worker has written its pid is answered `CANCELED` and sends nothing, harmless under the engine's re-issuing tick and
+   misleading to a direct A2A caller (open issue 30). **The `claude -p` driver stays with stage 2**, unchanged: it shares
+   the worker, but its Task shape, its stdin (issue 29) and M12 were stage 2's, and nothing in it moved. **Still deferred**,
+   as the owner decided at stage 2's gate: the stream (`SubscribeToTask`).
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

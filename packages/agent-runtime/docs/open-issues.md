@@ -14,7 +14,8 @@ with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small item
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
 admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
 `0e7b02a`. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
-only when its task asks with `config.background: true` (issue 28).
+only when its task asks with `config.background: true` (issue 28). Since stage 3 (the same day), Codex is proven as an A2A agent in the
+same shape (issue 31).
 
 ## Bugs
 
@@ -691,7 +692,7 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   and its own id the same), the job was spawned with `--max-budget-usd 0.3`, and it answered the code word, which only that
   session was told; it read 8,020 tokens from the prompt cache. It signed, waited again, and a close settled it `succeeded`,
   note `closed`. Measured first by hand through `ae start`, `ae answer` and `ae close` (the same shape: an animal it picked,
-  and that animal back with `-again`), then as M12. Not measured: a held task on `codex` or on a `--bg` session
+  and that animal back with `-again`), then as M12. A held task on `codex` is M13 (issue 31). Not measured: a held task on a `--bg` session
   (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
   `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
   `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
@@ -739,6 +740,59 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   whose result the output reader takes as the job's (`claudeStreamOutput`, the last result). Not seen live.
 - **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
   and a `--bg` session's words are refused past it; a job's are not refused on length.
+
+### 30. A cancel before the worker's pid is on disk is answered `CANCELED` and sends nothing
+
+A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
+(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
+group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
+`stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
+answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
+told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
+re-issuing tick. The fix would be the handler answering the Task as it stands (`WORKING`) when the listing does not yet say
+`stopped`, a change to every harness's cancel; not made. `test/codex-agent.test.ts` cancels only once the Task has a context,
+which the worker publishes after its pid.
+
+### 31. Codex as an A2A agent: what maps, and what `codex exec` cannot do
+
+Since thin runtime stage 3 (2026-09-23), the detached Codex driver is proven as an A2A agent in stage 2's shape, through the
+real worker and the SDK's client, with a fake `codex` first on PATH (`test/codex-agent.test.ts`): its context is the thread id,
+empty until `thread.started` is printed, and a listing by `contextId` finds it; its `-o` file is the `closeout` Artifact, a
+`data` part under a schema and `text/plain` for prose, carried by a listing only with `includeArtifacts`; `cancelTask` ends the
+harness and a grandchild it started, a repeat cancel is answered `CANCELED` again, and a cancel of a finished session is
+refused `TaskNotCancelableError`; a held task's signed attempt is `INPUT_REQUIRED` on `getTask` (`COMPLETED` in a listing), its
+answered turn runs `codex exec … resume <thread> <words>` and is `WORKING`, then waits again in the same context. The plan said
+a second cancel is refused; the handler answers it `CANCELED`, as a stop is idempotent, so the refusal is proven on a session
+that has ended instead.
+
+- **M13: a resumed Codex thread keeps its id and its rollout.** On **codex-cli 0.154.0**, the default model, effort `low`,
+  `read-only`, a store under `/tmp` (`test/live.test.ts`, `AE_LIVE=1`, run once, about 15 s): a held task whose brief gave a
+  code word signed `{word: 'ready'}` and waited with its worker gone; answered *give the code word I gave you*, the next pass
+  resumed the thread (attempt 2's `resumeFrom` its first's id), which answered the code word only that thread was told, under
+  the same thread id; `codexRolloutFile` named one file for both. So a held Codex task is one A2A context across its turns,
+  as a Claude Code job's is (M12), and a resumed attempt's transcript holds its parent's conversation. A close settled it
+  `succeeded`. Not measured: a turn that fails and is retried, whose conversation then holds the failure as a job's does.
+
+What `codex exec` cannot do, said and not faked:
+
+- **No words while it runs.** It reads its prompt and then only its own shell. Its card says `say: false`; an A2A
+  follow-up is refused `UnsupportedOperationError` naming the way on — a spawn in the session's context — and the facade
+  refuses first in the harness's own words (`noChannel`), which `wf` and the board print unchanged.
+- **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
+  so only a held task's signed attempt, between turns, waits on a person.
+- **No spend cap.** A budget is refused at `file` and at `answer`.
+- **No live stream.** `SubscribeToTask` is refused for every harness, by the owner's decision at stage 2's plan gate; a
+  transcript is read from a cursor.
+
+And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
+attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/engine.ts`), and Codex writes
+`-o` before it exits; the worker writes `done` only once Codex has exited and its pipes have drained. For that moment `view`
+says `input-required` while `getTask` still answers the harness's `WORKING`, and the process is still there. It closes by
+itself, and the test pins both sides of it with a fake that holds its exit (`test/codex-agent.test.ts`). Nothing reads the
+two together; were something to, the handler would read the journal for a listed `working` session too, one more journal
+read per read of a running session.
+
+The `claude -p` job, which shares the worker, is stage 2's and unchanged here: its stdin (issue 29) is what Codex lacks.
 
 ## Verified live, once
 
@@ -832,9 +886,8 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   shapes of the 150 transcripts last written on this machine (Claude Code up to 2.1.270), the Codex
   reader against the 34 rollouts here (codex-cli 0.154.0); each is checked on a file the test writes,
   and end to end only with a fake `claude` or `codex`. No board has polled a running session with it
-  yet. Not measured: whether `codex exec resume` goes on writing its thread's rollout or starts another
-  — so whether a resumed Codex attempt's transcript holds its parent's conversation, as Claude Code's
-  does; any rollout item of a type other than the five read; a Codex thread whose reasoning has a
+  yet. `codex exec resume` goes on writing its thread's rollout, so a resumed Codex attempt's transcript
+  holds its parent's conversation, as Claude Code's does (M13, issue 31). Not measured: any rollout item of a type other than the five read; a Codex thread whose reasoning has a
   summary; and how long a command's item waits to be written, since none of the commands in those
   rollouts ran long.
 - **What a poll of a running Claude session costs** (§6 item 17). Measured on this machine's board (2.1.271, 231 rows

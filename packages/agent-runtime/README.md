@@ -264,6 +264,24 @@ never writes it. Not done, by the owner's decision at the plan gate: no `Subscri
 the api polls the facade — and every subscription opens with the Task, a listing here); no collected files as Artifacts
 (they are the orchestrator's, for its own Task, stage 6); and a Task is still one attempt, not one runtime task.
 
+**Codex as an A2A agent** (stage 3). The detached `codex exec` driver answers in the same shape, through the real worker
+and the SDK's client, with a fake `codex` (`test/codex-agent.test.ts`) and once live (M13, open issue 31):
+
+| A2A | Codex | Proven by |
+|---|---|---|
+| `contextId` | the thread id from `thread.started`; empty until that line is printed | a Task found by `listTasks({ contextId })` |
+| a held task's turns | `codex exec … resume <thread> <words>`, the same thread id and the same rollout file | M13, codex-cli 0.154.0 |
+| the `closeout` Artifact | the `-o` file: a `data` part under a schema, `text/plain` without one parsed | a listing without `includeArtifacts` carries none |
+| `cancelTask` | SIGTERM to the worker, which ends the harness's process group, then `CANCELED` | the harness and its grandchild end; a done session is refused |
+| `INPUT_REQUIRED` | only a signed attempt of a held task, between turns | the answered turn is `WORKING`, then waits again |
+
+What `codex exec` cannot do, said rather than faked: **it takes no words while it runs** — the card says `say: false`, and a
+follow-up is refused in A2A's own terms, naming a spawn in the session's context as the way on, while `wf` and the board keep
+the harness's own words (`noChannel`); **it never asks mid-run** — the worker has no `blocked` to write, so a running Codex
+Task is never `INPUT_REQUIRED`, only a held one between turns; **it keeps no spend cap**, so a budget is refused at `file`
+and at `answer`; and **its context is empty until its first line** is printed. As for every detached run, a cancel that
+lands before the worker has published its pid is answered `CANCELED` and sends nothing (open issue 30). The `claude -p` job shares the worker and is stage 2's, unchanged.
+
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
 facade did — the journal's, then `find` for an attempt in flight, then a listing. The same method takes a session's id
@@ -1172,7 +1190,8 @@ and its next turn not begun. An answer, not a close, is refused too where the at
 
 **Through the seam** (stage 2 part 5), the attempt that signed is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
 waits, its closeout its Artifact, and each turn's attempt is a Task of its own in one context, the session's. A held task is
-not yet one A2A Task across its turns. Measured live on Claude Code jobs only — see open issue 28.
+not yet one A2A Task across its turns. Measured live on Claude Code jobs (M12, open issue 28) and on Codex threads (M13,
+open issue 31); not on a `--bg` session.
 
 ## What a read asks of the harness: `observe` and `find`
 
@@ -1385,6 +1404,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |
+| `test/codex-agent.test.ts` | Codex as an A2A agent through the real worker and the SDK's client, a fake `codex` on PATH: its context, its closeout Artifact, a cancel that ends what it started, a held task's turns in one context, and no words while it runs |
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |

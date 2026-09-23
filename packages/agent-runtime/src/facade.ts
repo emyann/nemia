@@ -13,11 +13,11 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
+import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeOps, Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
+  claudeOps, Runner, RunnerError, type RunnerOps, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses } from './runner-claude-vocabulary.ts';
@@ -27,6 +27,7 @@ import { codex } from './runner-codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps } from './a2a-client.ts';
+import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -39,55 +40,6 @@ export type PromiseJournal = {
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
   // No `watch` here: a store only has to answer `feed`. `Engine.watch` is built on it, and a
   // required `watch` on the store was a method nothing ever called.
-};
-
-/** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
-export type PromiseRunner = {
-  /**
-   * Start the session; reject if that fails. When you know nothing started under `r.name`, reject
-   * with an error whose `refused` is `true`, and the attempt ends `unstartable` at once. Otherwise
-   * the engine cannot rule a session out, and its grace window finds out: the session is adopted if
-   * it appears, the attempt `lost` if it never does.
-   */
-  spawn(r: SpawnRequest): Promise<void>;
-  observe(): Promise<Map<string, Sighting>>;
-  /**
-   * Optional. The session running under `name` — a name the engine chose — found without observing every other, or
-   * `undefined` when none runs. Only which session it is: a read that needs its state asks `observe`, and takes
-   * `observe`'s word. Without it, `view`, `transcript` and `logs` observe this harness as they always have.
-   */
-  find?(name: string): Promise<{ sessionId: string } | undefined>;
-  stop(sessionId: string): Promise<void>;
-  logs(sessionId: string): Promise<string>;
-  /**
-   * Optional. Let go of a session whose attempt's end the engine has written down — stop it if it
-   * runs, drop it from your registry. Called on every pass that still observes it, so make it
-   * idempotent; a rejection is asked again on the next. Resolve with what the session consumed, read
-   * once you stopped it, when your harness writes part of that only as a session exits: the engine
-   * records it on the attempt (a `measured` entry). Resolve with nothing when you stopped nothing.
-   */
-  release?(session: Sighting, task: { worktree?: string | boolean }): Promise<Usage | void>;
-  /**
-   * Optional. The session's conversation as events from `after` — a cursor this method returned, in
-   * whatever shape you chose, or none for the start — and the cursor to ask again with. The engine passes
-   * your cursor through as you gave it, and never hands you one of its own. Asked with the session's id as
-   * observed while its attempt runs, and with the `nativeId` recorded once the attempt has ended — as
-   * `logs` is once a session is released. Without it, `transcript` refuses this harness's tasks, and
-   * `logs` is what they have.
-   */
-  transcript?(sessionId: string, after?: TranscriptCursor): Promise<Transcript>;
-  /**
-   * Optional. Hand `text` to the running session `session` names — the name the engine chose, and the id your
-   * `observe` listed it under on the pass just made — and resolve once your harness has taken it; reject when it
-   * did not, and nothing is journalled. Without it, `say` refuses this harness's tasks.
-   */
-  say?(session: { name: string; sessionId: string }, text: string): Promise<void>;
-  /**
-   * Optional. The pool this harness's sessions are counted in under the concurrency ceiling: what one rate limit covers,
-   * a subscription. Harnesses that name the same pool share one ceiling — a runner that drives Claude Code says `claude`.
-   * Absent: the name the harness is configured under, a pool of its own.
-   */
-  pool?: string;
 };
 
 /**
@@ -274,36 +226,7 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
     name,
     h === 'claude-bg' ? claudeOps({ root })
       : isSpec(h) ? detachedOps(h, root)
-      : {
-          spawn: (r: SpawnRequest) => Effect.tryPromise({
-            try: () => h.spawn(r),
-            // A rejection is not proof that nothing started; a runner that knows says `refused`.
-            catch: (cause) => new RunnerError({
-              verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
-              ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
-            }),
-          }),
-          observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
-          ...(h.find ? {
-            find: (name: string) => wrap(() => h.find!(name), (m) => new RunnerError({ verb: 'find', message: m })),
-          } : {}),
-          stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
-          logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
-          ...(h.release ? {
-            release: (session: Sighting, task: { worktree?: string | boolean }) =>
-              wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })).pipe(
-                Effect.map((used) => used || undefined),
-              ),
-          } : {}),
-          ...(h.transcript ? {
-            transcript: (id: string, after?: TranscriptCursor) =>
-              wrap(() => h.transcript!(id, after), (m) => new RunnerError({ verb: 'transcript', message: m })),
-          } : {}),
-          ...(h.say ? {
-            say: (session: { name: string; sessionId: string }, text: string) =>
-              wrap(() => h.say!(session, text), (m) => new RunnerError({ verb: 'say', message: m })),
-          } : {}),
-        },
+      : promiseOps(h),
   ]));
 
 /**
@@ -312,10 +235,6 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
  */
 const poolsOf = (harnesses: Record<string, HarnessConfig>): Record<string, string> =>
   Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [name, h === 'claude-bg' ? CLAUDE_POOL : h.pool ?? name]));
-
-/** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
-const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
-  Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
 
 // ─── what the door refuses ──────────────────────────────────────────────────
 
@@ -584,6 +503,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 }
 
 // ─── the vocabulary, all plain data ─────────────────────────────────────────
+export type { PromiseRunner } from './runner-promise.ts';
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 // The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.

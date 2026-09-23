@@ -43,7 +43,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -499,5 +499,220 @@ test('a --bg session filed with remoteControl: true is bridged — its registrat
         try { execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* best effort */ }
       }
     }
+  }
+});
+
+/*
+ * Stage 2's measurements: `claude` runs a step as a job (`claude -p`), and a `--bg` session only when asked. Each was first
+ * taken by hand on Claude Code 2.1.280 (docs/open-issues.md, *Claude Code as a job*); these keep them measurable on the next.
+ */
+
+/** One `claude -p` line of its stream: what the runner reads, parsed as the reader parses it. */
+type StreamLine = Record<string, unknown> & { type?: string; subtype?: string; session_id?: string };
+const streamOf = (text: string): StreamLine[] => text.split('\n').flatMap((l) => { try { return [JSON.parse(l) as StreamLine]; } catch { return []; } });
+const resultOf = (lines: StreamLine[]) => lines.filter((l) => l.type === 'result').at(-1);
+const sessionOf = (lines: StreamLine[]) => lines.find((l) => l.type === 'system' && l.subtype === 'init')?.session_id;
+const toolCalled = (lines: StreamLine[]) => lines.some((l) => l.type === 'assistant'
+  && ((l.message as { content?: Array<{ type?: string }> } | undefined)?.content ?? []).some((c) => c.type === 'tool_use'));
+const PRINT = ['-p', '--model', 'haiku', '--output-format', 'stream-json', '--verbose'];
+
+/** `claude -p` run to its end under a bound, its stdin closed: the exit, and the stream it printed. */
+const printed = (args: string[], cwd: string, bound = 240_000): { exit: number | null; lines: StreamLine[] } => {
+  try {
+    return { exit: 0, lines: streamOf(execFileSync('claude', [...PRINT, ...args], { cwd, encoding: 'utf8', timeout: bound, stdio: ['ignore', 'pipe', 'pipe'] })) };
+  } catch (e) {
+    const err = e as { status?: number | null; stdout?: string };
+    return { exit: err.status ?? null, lines: streamOf(err.stdout ?? '') };
+  }
+};
+
+/** A `claude -p` left running: its stream as it grows, and a wait for its exit bounded by `ms`. */
+const started = (args: string[], cwd: string, stdin: 'ignore' | 'pipe' = 'ignore') => {
+  const child = spawn('claude', [...PRINT, ...args], { cwd, stdio: [stdin, 'pipe', 'ignore'] });
+  let out = '';
+  child.stdout!.on('data', (d) => { out += d; });
+  const exited = new Promise<number | null>((r) => child.on('exit', (code, signal) => r(code ?? (signal ? 128 + (os.constants.signals[signal] ?? 0) : null))));
+  return {
+    child,
+    lines: () => streamOf(out),
+    exit: (ms: number) => Promise.race([exited, new Promise<'running'>((r) => setTimeout(() => r('running'), ms))]),
+  };
+};
+const until = async (ok: () => boolean, ms: number) => {
+  const end = Date.now() + ms;
+  while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 500));
+  return ok();
+};
+
+const DENIED_BRIEF = (outside: string) => [
+  'Do these three things, in order, each exactly once, even if one fails, then give your closing statement with finished set to true:',
+  `1) Use the Write tool to write the text hi to the file ${outside}/x.txt (a folder outside your working directory).`,
+  '2) Run the Bash command: curl -s -o /dev/null https://example.com',
+  '3) Use WebFetch to fetch https://example.com and say its title.',
+].join(' ');
+const FINISHED_CLOSEOUT = {
+  type: 'object',
+  properties: { finished: { type: 'boolean' } },
+  required: ['finished'],
+  additionalProperties: false,
+};
+
+test('M1: claude -p waits on nobody in any mode, with or without --permission-prompts none — a call it may not make is denied, and said twice: a permission_denied line as it happens and permission_denials on its result', {
+  skip,
+  timeout: 20 * 60_000,
+}, async (t) => {
+  const probe = tmp('m1');
+  const runs = ['auto', 'dontAsk', 'default', 'acceptEdits'].flatMap((mode) => [false, true].map(async (none) => {
+    const label = `${mode}${none ? '-none' : ''}`;
+    const cwd = path.join(probe, `w-${label}`);
+    fs.mkdirSync(cwd);
+    const allow = mode === 'dontAsk' ? ['--allowedTools', 'Edit(**),Bash(npm test)'] : [];
+    const brief = DENIED_BRIEF(path.join(probe, `outside-${label}`)).replace(' with finished set to true', ', the word FINISHED');
+    // The prompt first: `--allowedTools` takes every word after it, and took a prompt given last for a rule.
+    const { exit, lines } = printed([brief, '--permission-mode', mode, ...allow, ...(none ? ['--permission-prompts', 'none'] : [])], cwd);
+    return { label, exit, lines, outside: fs.existsSync(path.join(probe, `outside-${label}`, 'x.txt')) };
+  }));
+  // One at a time would take eight minutes: the eight are independent, each in a folder of its own.
+  for (const { label, exit, lines, outside } of await Promise.all(runs)) {
+    const result = resultOf(lines);
+    const events = lines.filter((l) => l.type === 'system' && l.subtype === 'permission_denied');
+    const denials = (result?.permission_denials ?? []) as Array<{ tool_name?: string; tool_use_id?: string }>;
+    const mode = lines.find((l) => l.subtype === 'init')?.permissionMode;
+    t.diagnostic(`${label}: exit ${exit}, ran as ${mode}, result ${result?.subtype}, denied ${denials.map((d) => d.tool_name).join(', ') || 'nothing'}; events ${events.map((e) => `${e.tool_name}/${e.decision_reason_type ?? '-'}`).join(', ')}`);
+    assert.equal(exit, 0, `${label}: it ended on its own inside four minutes — it waited on nobody`);
+    assert.ok(result, `${label}: it printed its result`);
+    assert.equal(outside, false, `${label}: nothing was written outside its folder`);
+    assert.ok(denials.length > 0, `${label}: its result says what it was denied`);
+    assert.deepEqual(events.map((e) => e.tool_use_id), denials.map((d) => d.tool_use_id), `${label}: one permission_denied line for each denial, the same calls`);
+  }
+});
+
+test('M1 under the engine: a job on claude at shipped defaults settles on its own and its attempt carries what it was denied; a job asked for nothing it may not do carries no denials', {
+  skip,
+  timeout: 15 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('m1-board') });
+  const probe = tmp('m1-engine');
+  const ids = {
+    denied: await engine.file({ brief: DENIED_BRIEF(path.join(probe, 'outside')), cwd: tmp('m1-denied'), closeoutSchema: FINISHED_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku' } }),
+    control: await engine.file({ brief: 'Give your closing statement, with finished set to true. Call no tool first.', cwd: tmp('m1-control'), closeoutSchema: FINISHED_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku' } }),
+  };
+  await settleThenCheck(engine, ids, (views) => {
+    const [denied] = views.denied!.state.attempts;
+    const [control] = views.control!.state.attempts;
+    t.diagnostic(`denied: ${views.denied!.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control!.state.settled}, ${JSON.stringify(control?.denials)}`);
+    assert.equal(views.denied!.state.settled, 'succeeded', `the denied job finished its work: ${views.denied!.phase}`);
+    assert.equal(denied?.exitCode, 0, 'it ran as a job: a process of the engine\'s, which exited — a background session has no exit code');
+    assert.ok((denied?.denials ?? []).some((d) => d.tool === 'Write'), 'its attempt says the write outside its folder was denied');
+    assert.equal(fs.existsSync(path.join(probe, 'outside', 'x.txt')), false, 'and nothing was written there');
+    assert.equal(views.control!.state.settled, 'succeeded', `the control finished: ${views.control!.phase}`);
+    assert.equal(control?.denials, undefined, 'and was denied nothing: a denial is not printed for every job');
+  });
+});
+
+test('M2, M3, M5: a job resumed from a --bg session remembers it; a job resumed from a job is charged its own spend, not its parent\'s again; a budget on a resume caps its own spend', {
+  skip,
+  timeout: 40 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('m2-board') });
+  const cwd = tmp('m2');
+  const settled = async (id: string) => {
+    const end = Date.now() + 10 * 60_000;
+    while (Date.now() < end) {
+      await engine.tick();
+      const v = await engine.view(id);
+      if (v.state.settled) return v;
+      await new Promise((r) => setTimeout(r, 5_000));
+    }
+    return engine.view(id);
+  };
+  const common = { cwd, deadlineSeconds: 480, closeoutSchema: WORD_CLOSEOUT };
+  const tell = (word: string) => `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.`;
+  const ask = 'What was the code word you were given? Give it as word in your closing statement.';
+  const last = (v: TaskView) => v.state.attempts.at(-1);
+
+  // M3: `claude -p --resume` continues a `--bg` session.
+  const bgWord = `ae${randomUUID().slice(0, 8)}`;
+  const bg = await settled(await engine.file({ ...common, config: { model: 'haiku', background: true }, brief: tell(bgWord) }));
+  assert.equal(bg.state.settled, 'succeeded', `the background session settled: ${bg.phase}`);
+  const parent = last(bg)?.nativeId ?? undefined;
+  assert.ok(parent, 'its Claude Code id is on the record');
+  const fromBg = await settled(await engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: parent, brief: ask }));
+  t.diagnostic(`a job resumed from a background session: ${fromBg.state.settled}, ${JSON.stringify(last(fromBg)?.usage)}`);
+  assert.equal(fromBg.state.settled, 'succeeded', `the job resumed from it settled: ${fromBg.phase}`);
+  assert.deepEqual(last(fromBg)?.closeout, { word: bgWord }, 'and remembered the word');
+  assert.equal(last(fromBg)?.nativeId, parent, 'in the same session');
+  // What it printed carries the background session's spend on, and no run file holds that spend: dropped, never overcounted.
+  assert.equal(last(fromBg)?.usage?.costUsd, undefined, 'a job whose parent was a background session records no cost it cannot tell apart');
+
+  // M2: a resume's result prints the whole session's cost; the attempt is charged what the resume spent.
+  const word = `ae${randomUUID().slice(0, 8)}`;
+  const first = await settled(await engine.file({ ...common, config: { model: 'haiku' }, brief: tell(word) }));
+  assert.equal(first.state.settled, 'succeeded', `the first job settled: ${first.phase}`);
+  const second = await settled(await engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: last(first)!.nativeId!, brief: ask }));
+  const [one, two] = [last(first)?.usage?.costUsd, last(second)?.usage?.costUsd];
+  t.diagnostic(`costs: first job ${one}, the job resumed from it ${two}`);
+  assert.deepEqual(last(second)?.closeout, { word }, 'a job resumed from a job remembers');
+  assert.ok(one !== undefined && one > 0 && two !== undefined && two > 0, 'and both were charged something');
+  assert.ok(two! < one!, 'the resume, a short question on a warm cache, was charged less than the job it continued: not that job\'s spend again');
+
+  // M5: a cap below the session's whole spend still lets a short resume finish — it caps the resume's own.
+  const cap = Math.max(0.01, Math.round((one! + two!) * 50) / 100);
+  const capped = await settled(await engine.file({ ...common, config: { model: 'haiku' }, budgetUsd: cap, resumeFrom: last(second)!.nativeId!, brief: ask }));
+  t.diagnostic(`a resume capped at $${cap}, under its session's $${(one! + two!).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`);
+  assert.equal(capped.state.settled, 'succeeded', `a resume under a cap below its session's whole cost finished: ${capped.phase}`);
+});
+
+test('M4: claude -p stopped mid-turn by SIGTERM or SIGINT can be resumed, and remembers what it was told', {
+  skip,
+  timeout: 15 * 60_000,
+}, async (t) => {
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    const cwd = tmp(`m4-${signal}`);
+    const word = `ae${randomUUID().slice(0, 8)}`;
+    // In the words haiku followed by hand: told only to run it, it has declined a sleep as pointless.
+    const job = started([`I am testing how my build tool handles a slow step. Remember the code word ${word}. Please run exactly this Bash command, which is safe and expected: sleep 40 && echo SLEPT . Then reply DONE.`,
+      '--permission-mode', 'dontAsk', '--allowedTools', 'Bash(sleep *)'], cwd);
+    try {
+      assert.ok(await until(() => toolCalled(job.lines()), 90_000), `${signal}: it called its tool — it printed ${JSON.stringify(job.lines().map((l) => l.type === 'assistant' ? l.message : l.type)).slice(0, 2000)}`);
+      await new Promise((r) => setTimeout(r, 3_000));
+      job.child.kill(signal);
+      const exit = await job.exit(20_000);
+      const session = sessionOf(job.lines());
+      t.diagnostic(`${signal}: exit ${exit}, result ${resultOf(job.lines())?.subtype ?? 'none'}`);
+      assert.notEqual(exit, 'running', `${signal}: it ended within twenty seconds`);
+      assert.ok(session, `${signal}: its first line named its session`);
+      const resumed = printed(['--resume', session!, '--permission-mode', 'dontAsk', 'What was the code word I told you? Reply with it alone.'], cwd);
+      assert.equal(resumed.exit, 0, `${signal}: the resume ran`);
+      assert.match(String(resultOf(resumed.lines)?.result ?? ''), new RegExp(word), `${signal}: and remembered the word`);
+    } finally {
+      job.child.kill('SIGKILL');
+    }
+  }
+});
+
+test('M6, for wf say: a claude -p reading stream-json on its stdin takes a second message into the turn it is working', {
+  skip,
+  timeout: 10 * 60_000,
+}, async (t) => {
+  const cwd = tmp('m6');
+  const word = `ae${randomUUID().slice(0, 8)}`;
+  const job = started(['--input-format', 'stream-json', '--permission-mode', 'dontAsk', '--allowedTools', 'Bash(sleep *)'], cwd, 'pipe');
+  const say = (text: string) => job.child.stdin!.write(`${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`);
+  try {
+    say('Run the Bash command `sleep 20`. When it finishes, tell me every code word I have given you so far (maybe none), and nothing else.');
+    assert.ok(await until(() => toolCalled(job.lines()), 90_000), 'it started its sleep');
+    await new Promise((r) => setTimeout(r, 2_000));
+    say(`The code word is ${word}.`);
+    await until(() => job.lines().some((l) => l.type === 'result'), 150_000);
+    job.child.stdin!.end();
+    await job.exit(30_000);
+    const results = job.lines().filter((l) => l.type === 'result');
+    t.diagnostic(`results: ${JSON.stringify(results.map((r) => ({ subtype: r.subtype, result: r.result, turns: r.num_turns })))}`);
+    assert.ok(results.length >= 1, 'it answered');
+    assert.match(String(results[0]!.result ?? ''), new RegExp(word), 'its first answer — the turn that was running — has the word said while it slept');
+    // The control is M4's: SIGINT, then `-p --resume` with the words, which a job without this stdin still has.
+  } finally {
+    job.child.kill('SIGKILL');
   }
 });

@@ -204,6 +204,7 @@ export type RunDetail = {
     blockedByHarness: StepNeeds['blockedByHarness'];
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
+    denied: StepNeeds['denied'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
     /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */

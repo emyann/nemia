@@ -133,8 +133,8 @@ test('runs are read from the workflow store and summarized, with what each step 
     cost: null,
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
-      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null },
-      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null },
+      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null },
+      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null },
     ],
     // No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page.
     graph: { roots: ['implement', 'review'], edges: [] },
@@ -209,7 +209,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     files: [], filesError: null,
     note: null,
     // Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet.
-    needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+    needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
     ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
     used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
@@ -228,7 +228,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: undefined,
     workspace: null, branch: null, files: [], filesError: null,
     note: null,
-    needs: null, blockedByHarness: false, waitingFor: null, approve: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+    needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
     ...reviewTry,
     // Not filed: it consumed nothing, and has no try on the clock.
     used: null,
@@ -299,7 +299,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
     {
       name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
       workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement', files: [], filesError: null,
-      note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+      note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
       ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
       spent: null, budget: null, raise: null,
@@ -308,7 +308,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
     },
     {
       name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, files: [], filesError: null, note: null,
-      needs: null, blockedByHarness: false, waitingFor: null, approve: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+      needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
       ...reviewTry, used: null, spent: null, budget: null, raise: null, tries: firstTry(reviewTry), timeline: [],
     },
   ]);
@@ -355,7 +355,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.deepEqual(original, {
     name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
     workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original', files: [], filesError: null,
-    note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+    note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
     ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
     spent: null, budget: null, raise: null,
@@ -511,7 +511,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   // The list is kept as it was, with the note `wf ls` prints beside a step — none, for a step on its first try — and what a person
   // has to know to act on it.
-  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve']);
+  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied']);
   assert.equal((await listed('r-7')).steps[0].note, null);
 });
 
@@ -1425,4 +1425,28 @@ test("the detail carries where each step's time went — per try and per check, 
   writeRun({ ...record, steps: { ...record.steps, implement: { taskId: 'r-60-implement-try3', tries: [...record.steps.implement.tries, { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' }] } } });
   const again = await (await app.request('/api/runs/r-60')).json();
   assert.deepEqual(words(again.steps[0].timeline[2].session), { at: 'running', filedAt: T(40), spawnedAt: T(40, 7), endedAt: null, queued: '7s', ran: 'still running, no end yet' });
+});
+
+test("a step whose attempts were denied calls says which, on the list and on the run's page, beside a status that is unchanged", async () => {
+  // Two attempts of one filing: the first denied `look` and `pytest`, the second `look` again and a path with a newline in it.
+  journal('t-denied', [
+    { ...filed('t-denied'), maxAttempts: 2 },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-denied/1', observed: 'failed', reason: 'lost', denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }] },
+    { kind: 'starting', at, attempt: 2 },
+    { kind: 'spawned', at, attempt: 2 },
+    { kind: 'ended', at, attempt: 2, sessionId: 'ae/t-denied/2', observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Edit', what: '/tmp/a\nb' }] },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]);
+  settledTask('t-clean', { outcome: 'done', summary: 'did it', artifacts: [], needs: null });
+  writeRun({ ...r2, id: 'r-denied', steps: { implement: { taskId: 't-denied', branch: 'wf/r-denied/implement' }, review: { taskId: 't-clean' } } });
+  const denied = { words: 'denied: Skill(look), Bash(pytest), Edit(/tmp/a b)', calls: ['Skill(look)', 'Bash(pytest)', 'Edit(/tmp/a\nb)'] };
+
+  const [implement, review] = (await listed('r-denied')).steps;
+  assert.deepEqual([implement.status, implement.denied], ['unverified · done', denied], 'each call once, and the status the chip reads as it was');
+  assert.equal(implement.note, null, 'nor in the note: the board says it once, from its own field');
+  assert.equal(review.denied, null, 'a step denied nothing: null, not an empty list');
+  const page = (await (await app.request('/api/runs/r-denied')).json()).steps;
+  assert.deepEqual([page[0].status, page[0].denied, page[1].denied], ['unverified · done', denied, null]);
 });

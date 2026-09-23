@@ -2,7 +2,7 @@
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
  */
-import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, exitVerdicts, harnessBlocked, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-orchestrator';
+import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-orchestrator';
 import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
@@ -90,8 +90,19 @@ export type RunWaiting = {
  *
  * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for: `approve
  * plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
+ *
+ * `denied` is what the harness denied the step's current try, off the engine's record of each ended attempt (`deniedOf`, the same views):
+ * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
+ * `wf ls` and `wf decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word the
+ * board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: boolean; waitingFor: { words: string; advice: string } | null; approve: string | null };
+export type StepNeeds = {
+  needs: string | null;
+  blockedByHarness: boolean;
+  waitingFor: { words: string; advice: string } | null;
+  approve: string | null;
+  denied: { words: string; calls: string[] } | null;
+};
 
 /**
  * The runs a run's roots wait on (`waitsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
@@ -316,10 +327,12 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
   // (`nameFor`, the engine's). Only for a step the harness blocked: nothing else has a wait for a person to answer.
   const word = blockedByHarness ? view?.waitingFor : undefined;
   const attempt = view?.state.attempts.at(-1)?.n;
+  const calls = view ? deniedOf(views)(run.steps[name]!.taskId!) : [];
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
     waitingFor: word ? { words: waitingWords(word), advice: answerIn(attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt)) } : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
+    denied: calls.length ? { words: deniedWords(calls), calls } : null,
   };
 }

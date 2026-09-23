@@ -13,18 +13,18 @@ import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
-import { admissionOrder, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type RunSlot, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
 import { feedPhase, feedWords, type FeedWords } from './run.ts';
 import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, type RetryAsk } from './retry.ts';
-import { artifactsDir, cancelFile, checkStderr, consumeAsks, inputsDir, listRuns, pruneFile, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
+import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { gitSays, handOff, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
 import { refsOf } from './branches.ts';
-import { closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf } from './views.ts';
+import { closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf } from './views.ts';
 import { startQueued } from './start.ts';
 
 /**
@@ -335,6 +335,21 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // there, this run's is not filed, whatever its approval says. Read from the world on this pass, including what the pass has already
   // filed, so the order a pass takes the runs in decides nothing, and a restart changes nothing.
   const checkout = await checkoutHold(e, run, steps);
+  // A person's hold lifts on the pass that reads every run it names shipped, as `--after` reads shipped (`parentOf`), and the run goes on
+  // on this same pass. Level-triggered: a hold is a wait on the world, so a pass after a restart reads the same runs and lifts it the same.
+  // A lift sticks, as a start after `--after` does: a run that shipped and is then reverted does not hold the run again. Only the hold this
+  // pass read is lifted (`removeHold`): one put again since, by a person who lifted it by hand, names what this pass never read, and stays.
+  // One that names no run is never lifted here, and says so (`holdAdvice`).
+  const liftNotes: string[] = [];
+  if (run.hold && !run.cancelledAt && run.hold.until.length) {
+    let shipped = true;
+    for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
+    if (shipped && removeHold(run.id, run.hold.at)) {
+      const { until } = run.hold;
+      liftNotes.push(`the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`);
+      delete run.hold;
+    }
+  }
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const { check, retry, round, blocked, status } = assessed;
   // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
@@ -353,7 +368,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // `pending`. Off the same reads as the judgement, and nothing read again: the feed only reports what the pass decided on.
   const feed = feedWords(listing(
     steps, run, (taskId) => feedPhase(engineWord(views)(taskId)), (name) => closeoutOf(views, run, name), asked, verdictOf, asks, roundAsks,
-    readAnswers(run.id), waiting, saidCount(views, run), spendOf, held, [], checkout, waitingOf(views),
+    readAnswers(run.id), waiting, saidCount(views, run), spendOf, held, [], checkout, waitingOf(views), undefined, holdsOf(run, parent),
   ), run, assessed, (name) => closeoutOf(views, run, name));
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
@@ -361,15 +376,16 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
-  const notes: string[] = [...askNotes, ...collected];
+  const notes: string[] = [...askNotes, ...collected, ...liftNotes];
   // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
   // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
   // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
   // filed on this pass. A pruned run is called off the same way: whatever a person's ask says, what it would file works in a worktree
   // `wf prune` removed, or inherits one — and the marker is written before the first removal, so a pass that read the run a moment
-  // before stops here too.
+  // before stops here too. And a held run: a person who holds it while this pass is at work holds what the pass would file next.
   let calledOff = false;
-  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)) || fs.existsSync(pruneFile(run.id)));
+  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)) || fs.existsSync(pruneFile(run.id))
+    || fs.existsSync(holdFile(run.id)));
   const endingSaid = (ending: Workflow): EndingStopped => {
     const said = signedOff(ending.name);
     return {

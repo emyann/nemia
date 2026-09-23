@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
 import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, handOffDue, heldWorktree, idRefusal, isGitRun, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type Pruning } from './run.ts';
-import { HOME, askFile, asksDir, cancelFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
+import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
 import { gitSays, handOff } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
@@ -275,7 +275,7 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
     fs.rmSync(at, { recursive: true, force: true });
     removed.push(`${path.relative(HOME, at)}${st.isDirectory() ? '/' : ''}`);
   };
-  for (const at of [runFile(id), cancelFile(id), pruneFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
+  for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
   const checks = path.join(HOME, 'checks');
   let logs: string[] = [];
   try { logs = fs.readdirSync(checks); } catch { /* no check ever ran */ }

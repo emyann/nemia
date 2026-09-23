@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Pruned, type RoundAsk, type Run } from './run.ts';
+import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Hold, type Pruned, type RoundAsk, type Run } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
 import { asRan, orderSteps, type Workflow } from './workflow.ts';
 import { loadWorkflows } from './workflow-store.ts';
@@ -62,7 +62,61 @@ function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), each
+ * That a person holds the run until other runs ship (`wf hold`): `{ at, until }`, a person's fact in a file of its own for the reason
+ * `cancelFile` is. Written by `hold` alone, exclusively; removed by `wf hold --off`, by the tick once every run it names has shipped
+ * (`removeHold`), and by `wf rm` with the run. Composed onto the run on read as `hold`.
+ */
+export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
+
+/**
+ * The hold, read: undefined for a run nobody holds. A file that no longer reads as a hold still holds the run, on no run named: the tick
+ * never lifts a hold that names nothing, so only `wf hold --off` lifts it, and the run files nothing while the file is there (`advance`).
+ */
+function readHold(id: string): Hold | undefined {
+  let text: string;
+  try { text = fs.readFileSync(holdFile(id), 'utf8'); } catch { return undefined; }
+  try {
+    const { at, until } = JSON.parse(text) as Partial<Hold>;
+    return { at: typeof at === 'string' ? at : '', until: Array.isArray(until) ? until.filter((u): u is string => typeof u === 'string') : [] };
+  } catch {
+    return { at: '', until: [] };
+  }
+}
+
+/**
+ * Write down that this run is held until `until` ship, and answer with the hold written — or null, when a hold already stands. `wx`, so a
+ * hold two people put at once is the first one's, whole, and a hold is never edited: changing what it names is `--off` and a new hold.
+ */
+export const writeHold = (id: string, until: readonly string[]): Hold | null => {
+  fs.mkdirSync(runsDir(), { recursive: true });
+  const hold: Hold = { at: new Date().toISOString(), until: [...until] };
+  try {
+    fs.writeFileSync(holdFile(id), JSON.stringify(hold, null, 2), { flag: 'wx' });
+    return hold;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return null;
+    throw err;
+  }
+};
+
+/**
+ * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
+ * the hold, spends seconds asking git and the engine whether its runs shipped, and lifts it; a person who lifted it and held the run again
+ * in those seconds put a hold the tick never read, and it stays.
+ */
+export const removeHold = (id: string, at: string): boolean => {
+  if (readHold(id)?.at !== at) return false;
+  try {
+    fs.rmSync(holdFile(id));
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+};
+
+/**
+ * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold (`holdFile`), each
  * approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is ever written into
  * the record (`rewriteRun`).
  */
@@ -71,13 +125,14 @@ export const readRun = (id: string): Run => {
   // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
-  const { approvals: _, acceptances: __, pruned: ___, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
   const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
   const pruned = readPruned(id);
+  const hold = readHold(id);
   const { approvals } = readApprovals(id);
   const { acceptances } = readAcceptances(id);
   return {
-    ...run, ...(at ? { cancelledAt: at } : {}), ...(pruned ? { pruned } : {}),
+    ...run, ...(at ? { cancelledAt: at } : {}), ...(pruned ? { pruned } : {}), ...(hold ? { hold } : {}),
     ...(approvals.length ? { approvals } : {}), ...(acceptances.length ? { acceptances } : {}),
   };
 };
@@ -354,10 +409,10 @@ export const writeRun = (run: Run) => {
  * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
  * after it is opened takes the write with it.
  *
- * Without the approvals, acceptances and pruning `readRun` composed onto it: they are a person's files, and a copy in the record would
+ * Without the approvals, acceptances, pruning and hold `readRun` composed onto it: they are a person's files, and a copy in the record would
  * outlive the file it was read from.
  */
-export const rewriteRun = ({ approvals: _, acceptances: __, pruned: ___, ...run }: Run): boolean => {
+export const rewriteRun = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');

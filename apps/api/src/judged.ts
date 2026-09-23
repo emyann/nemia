@@ -341,7 +341,7 @@ export function judge(
   // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
   // inputs as `assess`, so the words and the judgement are the package's single reading.
   const standings = readStandings(status, steps);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings, undefined, undefined, undefined, holds);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings);
   const waiting = waitingOf(run, said.waiting);
   const holding = holdingOf(run, holds);
   // What the tick files once the hold lifts, for a hold that lifts on its own: the run as it stands without it. A held run has nothing due.

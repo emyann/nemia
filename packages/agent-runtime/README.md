@@ -196,7 +196,7 @@ Three are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
-| `claude` | a job: `claude -p --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
+| `claude` | a job: `claude -p --input-format stream-json --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
 
@@ -280,7 +280,7 @@ after a space starts a comment. The keys are a closed list:
 | `effort` | how hard the harness thinks, in its own words — see below |
 | `budgetUsd` | the most one attempt may spend, in dollars, digits only — a job on `claude`, or `claude-detached`; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
-| `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which `ae say` can reach, instead of as a job (`claude -p`); see below |
+| `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
 `tools`, `effort`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
@@ -986,7 +986,9 @@ Claude Code's lines are read as it writes them, measured on the 150 transcripts 
 machine: one event per content block; a `system` line as a `system` event; a line Claude Code put into
 the conversation itself (`isMeta` — "Continue from where you left off.") as `system` too; a subagent's
 lines left to its own transcript, as the SDK leaves them; a block of a type not read named, as `logs`
-names one.
+names one. Words said to a session while it works are a `queued_command` attachment: another session's (origin `peer`)
+a `system` event, and its own user's — a person typing into it, or a job's next line on its stdin, with no origin at
+all (2.1.280) — a `user` text event, as the words that started its turn are.
 
 **Codex, as far as its records allow** (codex-cli 0.154.0, read on the 34 rollouts on this machine). A
 rollout says most things twice — as the model was given them, and as the thread items Codex itself
@@ -1070,9 +1072,26 @@ harness itself holds up is another matter — one stalled on a login refresh (20
 cross-session message reached it — and `claude agents` does not say which wait a session is in, so neither is
 refused (`docs/open-issues.md`, issue 16).
 
+**How the words reach a job.** A job reads its messages on its stdin (`--input-format stream-json`): its worker writes
+the brief there as the first user message, keeps stdin open, and writes each word said to it as another, which the job
+takes into the turn it is working (M6, measured on 2.1.280). `say` appends the line to the run's inbox,
+`runs/claude/<name>.inbox.jsonl`, which the worker only reads — within half a second — so the file has one writer, the
+facade, as the run file has one, the worker. A job reads its stdin until it ends, so the worker ends it at the job's
+first `result` line and the job exits; its closeout, its spend cap and what it is denied are as they are under a prompt
+(M8–M10, 2.1.280). Words said once the result is out are refused by the runner (`has given its result and reads no more
+words`); the job is still `working` until it exits, so the rejection comes with no exit code, and the next tick settles
+the task. Claude Code tells the model the words are its user's, sent while it worked, and `transcript` gives them as a
+`user` event.
+
+**A worker says no word twice.** How far into the inbox it has written on is on the run file (`inputAt`), written before
+each line is: a worker started again on its run file goes on from there, and a run spawned again under the name starts
+at the inbox's end as it was then (`input.from`). So a word is written on at most once, never twice. What a worker
+started again cannot give its new harness is the words the one before heard, and words appended in the half second
+before the result are journalled and never written on (open issue 29).
+
 | harness | how | refused |
 |---|---|---|
-| `claude`, a job | — | always: a job is given its brief and takes no words while it runs; file with `background: true`, or continue it with a new task (`resumeFrom`) |
+| `claude`, a job | a user message on the job's stdin, by way of its worker's inbox | none of its own: a job's words need no approval, and its stdin reads a line of any length Claude Code takes. Once it has given its result, rejected (above) |
 | `claude` with `background: true` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
 | `codex` | — | always: `codex exec` reads its prompt once and takes nothing while it runs |
 | `claude-detached` | — | always: its session's id is known only once `claude -p` exits |

@@ -603,8 +603,9 @@ session's name through the extension's `sessionTranscript`. What is still direct
 
 Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
-`config.background: true` (`src/runner-claude-code.ts`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M7).
+`config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
+said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M10).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -630,18 +631,28 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 - **M6, for `wf say`: a job can be told something, over its stdin.** A `claude -p --input-format stream-json
   --output-format stream-json --verbose` given a second user message on stdin while a turn ran a `sleep 20` answered with
   the word from that message in the same turn's one result (`num_turns: 2`). So words can reach a running job, if its stdin
-  is kept open — the worker gives the harness none today (`stdio: ['ignore', …]` in `bin/ae-worker.ts`). That is stage 2 part 2's choice (the plan's option (d)); until then `say`
-  refuses a job in words that name `background: true` and `resumeFrom`. The control, SIGINT and then `-p --resume` with the
-  words, is M4.
+  is kept open, and since part 2a the worker keeps it open until the job's first result (the plan's option (d); issue 29).
+  The control, SIGINT and then `-p --resume` with the words, is M4.
 - **M7: a resume is not charged its parent's denials.** Asked in review after the rest, and measured by hand the same
   way: a job denied a write outside its folder, then `claude -p --resume` of it told to call nothing, printed
   `permission_denials: []` and no `permission_denied` line, under the same session id — where its cost (M2) is carried on.
   So a resumed job's result is read for denials as a first job's is, and a round, a retry or a gate's answer resumed from
   a denied attempt says only what it was itself denied. Were a later version to carry them, M7 fails.
+- **M8, M9, M10: a job given its brief on its stdin is the job given it as a prompt.** Measured before part 2a was built,
+  one live test on 2.1.280, haiku, each a pair — `claude -p <brief>` beside `claude -p --input-format stream-json` with the
+  brief as the first user message on a stdin held open — six jobs at once. M8: `--json-schema` gave the same
+  `structured_output` (`{"finished":true}`), exit 0 both. M9: `--max-budget-usd 0.01` ended both `error_max_budget_usd`,
+  exit 1, at $0.0291 and $0.0292. M10: `dontAsk` with no allow rule, told to write outside, run `curl` and fetch a page:
+  both denied `Write`, `Bash` and `WebFetch`, a `permission_denied` line for each, gave their closeout, and wrote nothing
+  outside. And one thing only the stream shows: a job reading its stdin does not exit at its result — it was still running
+  five seconds after it in each streamed pair — and exits once its stdin ends, so the worker ends it. The result line's
+  `type` is printed near its end, not first (`{"duration_api_ms":…`, both ways), so the worker parses each line for its
+  `type` rather than matching its start.
 
 What a job gives up, or what is not done:
 
-- **`say` to a job is refused** (above). A person who means to speak to a step files it with `background: true`.
+- **A job is told on its stdin, until its result** (issue 29). A person who means to attach to a step, or bridge it to
+  claude.ai, still files it with `background: true`.
 - **A background session's denials are not read.** M1's two shapes are `claude -p`'s output, which a `--bg` session does
   not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
   `denials`.
@@ -649,6 +660,32 @@ What a job gives up, or what is not done:
   observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
   running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
 - **A job resumed from a `--bg` session records no cost** (issue 4).
+
+### 29. A job's stdin: words at most once, and none after its result
+
+Since thin runtime stage 2 part 2a (2026-09-23), `say` into a job appends a user message to the run's inbox
+(`runs/claude/<name>.inbox.jsonl`), which only the facade writes, and the job's worker (`bin/ae-worker.ts`) writes each whole
+line on to the job's stdin, looking every half second. It records how far it has written on (`inputAt`) on the run file
+before each line, and a run spawned under the name starts at the inbox's end as it was (`input.from`). At the job's first
+`result` line it writes `inputClosed` and ends the stdin, and the job exits. What that leaves:
+
+- **At most once, never twice — so a word can be lost.** A worker killed between recording a line and writing it on has
+  recorded words its harness never read, and a worker started again on its run file goes on past them. The other order would
+  write them twice. Nothing in the runtime starts a worker again on its run file; it is what a person doing so by hand gets
+  (`test/detached.test.ts`).
+- **A worker started again gives its new harness nothing the old one heard.** Its brief line again, then only the words said
+  since. A continued session (`resumeFrom`) has its conversation; a fresh one does not.
+- **Words said in the half second before the result are journalled and never written on.** The inbox is looked at every
+  500 ms, and the look stops at the result: a line appended in between is on the record as `said` and reached no model. A
+  word said after the result is refused. Whether a job reads a word that reached its stdin after its last turn began and
+  before its result was not measured; M6 measured one said mid-turn.
+- **A word refused after the result carries no exit code.** The job is still `working` until it exits, so the facade asks the
+  runner, and the runner's refusal crosses the A2A seam as an error, not a refusal: `ae say` exits 1, not 2. The next tick
+  settles the task, and a word said then is refused with exit 2.
+- **A second result is read over the first.** A word written on in the same look as the result may start a second turn,
+  whose result the output reader takes as the job's (`claudeStreamOutput`, the last result). Not seen live.
+- **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
+  and a `--bg` session's words are refused past it; a job's are not refused on length.
 
 ## Verified live, once
 
@@ -709,6 +746,13 @@ What a job gives up, or what is not done:
   with no `denials` in the same session, charged $0.0052. The first run
   failed M1's `dontAsk` pair — `--allowedTools` took the prompt given after it for a rule, so the test puts the prompt first
   as the job's spec does — and M4, on a brief haiku did not follow; both passed on the second.
+- **A job told on its stdin** (issues 28 and 29, thin runtime stage 2 part 2a). `test/live.test.ts` on Claude Code 2.1.280,
+  2026-09-23, haiku. M8 to M10 as issue 28 says, before the harness was changed. Then `say` under the engine, twice: a job
+  on `claude`, seen working in its `sleep` loop and told a file's name, wrote that file and closed with its name; the same
+  brief never told wrote none and closed with an empty one; the journal has the words once. The first run failed only on the
+  transcript: Claude Code writes words a job reads mid-turn as a `queued_command` attachment with no `origin`, which the
+  reader dropped, and it reads them as the user's now. The same test on a `--bg` session, run again after it was shared
+  with the job's, passed with the words arriving while the session worked, as a `system` event.
 
 ## Verified by tests, not by a live run
 

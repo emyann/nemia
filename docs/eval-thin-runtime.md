@@ -273,7 +273,11 @@ orchestrator's calls to the runtime change.
    **`wf say` to a job (M6).** A `claude -p --input-format stream-json` process given a second user message on its stdin
    while a turn ran took it into that turn, before its one result. So part 2 can keep a job's stdin open and hand it a
    person's words — the long-lived `stream-json` process above — rather than stop the job and resume it with the words,
-   which M4 showed also works (SIGTERM or SIGINT, then `-p --resume`, the session intact). Until part 2, `say` refuses a job.
+   which M4 showed also works (SIGTERM or SIGINT, then `-p --resume`, the session intact). Done as part 2a, the same day:
+   the worker writes the brief and each word said on the job's stdin, through an inbox only the facade writes, and ends
+   its stdin at the job's first result; measured first that `--json-schema`, `--max-budget-usd` and a denial are as under
+   a prompt (M8 to M10, 2.1.280), and a word is written on at most once (`packages/agent-runtime/docs/open-issues.md`
+   issue 29).
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

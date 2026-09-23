@@ -139,8 +139,8 @@ A worktree the run cuts no longer links the main checkout's whole `node_modules`
 branch's app imported main's workspace packages, and M1's check was refused four times over it (plan
 §4b): a dependency the branch pinned was not in the shared tree, and main moving under the branch
 failed tests the branch never touched. `depsPlan` (`src/deps.ts`, pure) gives the worktree a directory
-of its own. Workspace packages link to the worktree's copies and third-party packages to main's, and
-`.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
+of its own. Workspace packages link to the worktree's copies and third-party packages to main's (hardlinked
+since 2026-09-23, the next section), and `.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
 package main's `node_modules` does not have on disk (`lockfileParting`), `provisionDeps` runs `npm ci`
 there instead, and the brief says so under *Where to look*. The gitignored
 paths `.worktreeinclude` lists are copied from the main checkout at the cut, and `node_modules` is never
@@ -160,8 +160,8 @@ What it leaves:
   version, is not provisioned. Here `apps/web/node_modules` holds only vite's caches. The day one holds
   a package, the worktree resolves the root's version of it.
 - **The cut is the only time the run provisions.** A step that changes the lockfile mid-session installs
-  for itself. `npm install` in a linked worktree replaces the links it touches with directories and
-  writes nothing of main's (measured with a local tarball, not a registry).
+  for itself. `npm install` in a linked worktree replaced the links it touched with directories and
+  wrote nothing of main's (measured with a local tarball, not a registry, before packages were hardlinked).
 - **npm only.** The worktree's `package-lock.json` is compared with what is on disk in main's
   `node_modules`, so a change to another package manager's lockfile goes unseen and that tree is linked
   as npm's would be.
@@ -180,6 +180,60 @@ What it leaves:
   root of the repository. Patterns would need `git ls-files --others --ignored` and a matcher.
 - **Worktrees cut before this keep their link.** `provisionDeps` leaves a `node_modules` that is a link
   alone (`shared`), and nothing re-provisions a worktree after its cut.
+
+## Shipped: a worktree's third-party packages hardlinked, so a fenced step can read them
+
+Since stage 2 part 2 every Claude step is a `claude -p` job, and the planner and reviewer run in `dontAsk`, where a call
+nothing allows is denied with no prompt. A worktree's `node_modules` linked each third-party package to main's, and Claude
+Code allows a path through a symlink only when the link and its target both match: a read of `node_modules/hono/package.json`
+was a read of `/home/…/hkb-v2/node_modules/hono/package.json`, outside the step's working directory, and denied. Main's
+packages are now made again in the worktree, each directory the worktree's own and each file hardlinked to main's
+(`{ kind: 'tree' }` in `depsPlan`, `hardlinkTree` in `worktree.ts`), so every path under `node_modules` is inside the
+worktree, for every harness and every tool. Workspace packages keep their links to the worktree's copies; `.bin` keeps the
+relative links npm wrote, which now resolve in the worktree; npm's dot files are still left out, and a lockfile main has not
+installed still gets `npm ci`. A package is made under `.wf-making-<name>` and renamed into place whole, so a pass that died
+halfway leaves nothing that reads as a package, and the next pass makes it again; one a step installed itself is never added to.
+`provisionDeps` answers `{ tree: 'hardlinked', made }`.
+
+**What it costs**, measured 2026-09-23 on this repository's tree (WSL2, ext4, Node 24.20; the store and the checkout on one
+filesystem): main's `node_modules` is 729 MB in 3,134 directories, 37,154 files and 46 links. A walk hardlinking all of it took
+0.79, 0.54 and 0.51 s over three runs, and `du` over main's tree and the copy together counts 13 MB for the copy — its
+directories. `provisionDeps` itself, on the real tree, took 0.58 s. `npm ci` took about a minute and 729 MB.
+
+**The live proof**, the same day, Claude Code 2.1.281: a `claude -p --permission-mode dontAsk --tools Read,Grep,Bash` job in a
+directory provisioned by `provisionDeps`, asked to `Read` `node_modules/hono/package.json`, `Grep` it and `ls node_modules/hono`,
+ended with `permission_denials: []`; the same job over the same tree linked as before was denied all three. $0.34 for both.
+
+**The denials recorded on live runs before this**, read off the jobs' `permission_denials` on the plan and review steps of the
+2026-09-23 runs (23 on 13 steps), by cause:
+
+- *Under the worktree's `node_modules`, fixed by this (3):* `ls node_modules/@a2a-js/sdk/ …` and `Read …/plan/node_modules/@a2a-js/sdk/package.json`
+  (part 5's plan), `Grep` in `…/plan/node_modules/@a2a-js/sdk/dist` (part 5's review).
+- *Outside the worktree, denied rightly (9):* `Grep` in `~/.agent-engine` (three steps), `Grep` in main's `node_modules` by its absolute
+  path, `find` and three `stat`s on main's `node_modules` and the worktrees directory (this card's plan), and `ls` of a run's artifacts
+  directory and of the stores (two steps). A step reads a path outside its folder only when its brief names it; these were a step exploring.
+- *A command no rule covers, denied and recorded as before (11):* `cd <dir> && …` compounds (six, on five steps — the list has
+  `Bash(cd:*)`, but a compound is allowed only when each part is), a `for` loop (two steps), `grep … | xargs …`,
+  `timeout 500 bash -c '…'`, and one `grep` over a path written with `\$`.
+
+So three of twenty-three. The rest are the fence doing its job, or a role reaching for a command its rules do not cover, and they
+stay on the `denied:` line, where `denials: fail` can stop a step on them. A bare `ls` inside the worktree needs no rule in `dontAsk`
+(the live proof above).
+
+What it leaves:
+
+- **A hardlinked file is main's file.** A tool that rewrites one in place under the worktree's `node_modules` writes main's too.
+  npm replaces a package's files rather than writing into them, and nothing else here writes under `node_modules`, but it is not
+  isolation.
+- **A kept worktree holds main's replaced files.** After main's next `npm install`, a worktree still holding the old files keeps their
+  blocks until `wf prune`. `du` of a worktree alone counts every hardlinked file, so `wf prune` measures it beside main's
+  `node_modules` in one `du` and reads the worktree's line (`diskBytes`): what removing it frees.
+- **A store on another filesystem falls back to links.** A hardlink there fails `EXDEV` (or `EPERM`, `ENOTSUP` where the filesystem
+  refuses one); main's packages are then linked as before, `provisionDeps` answers `{ tree: 'linked', why }`, and the run's notes say
+  that a fenced step's reads under `node_modules` are denied. A second pass reads the links it left and says so again.
+- **Worktrees cut before this keep their links.** `provisionDeps` adds only what a worktree lacks.
+- **Node resolves a third-party package's real path in the worktree, not in main.** The tree's shape is the same; a tool that caches
+  by real path across checkouts sees a copy per worktree.
 
 ## Shipped: trying again — `retries:` and `wf retry`
 

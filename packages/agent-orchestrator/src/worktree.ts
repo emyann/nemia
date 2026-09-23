@@ -87,19 +87,46 @@ function listDeps(modules: string): DepsListing | null {
 }
 
 /**
- * Give a worktree a `node_modules` of its own: `depsPlan`'s links, or `npm ci` when its lockfile differs.
+ * What a hardlink to main's files meets where it cannot be made: another filesystem (`EXDEV`), or one that refuses them. On any of these,
+ * provisioning links main's packages instead, as it did before 2026-09-23; any other failure is a failure.
+ */
+const HARDLINK_REFUSED = new Set(['EXDEV', 'EPERM', 'ENOTSUP']);
+
+/**
+ * Main's entry at `from`, made again at `to`: each directory made, each file hardlinked, each link copied as written and never followed —
+ * so no loop, and nothing outside `from` is read. What it made, counted; a socket or a pipe is nobody's dependency, and left out.
+ */
+function hardlinkTree(from: string, to: string): number {
+  const st = fs.lstatSync(from);
+  if (st.isSymbolicLink()) { fs.symlinkSync(fs.readlinkSync(from), to); return 1; }
+  if (st.isDirectory()) {
+    fs.mkdirSync(to);
+    let made = 1;
+    for (const name of fs.readdirSync(from)) made += hardlinkTree(path.join(from, name), path.join(to, name));
+    return made;
+  }
+  if (st.isFile()) { fs.linkSync(from, to); return 1; }
+  return 0;
+}
+
+/**
+ * Give a worktree a `node_modules` of its own: `depsPlan`'s links and hardlinked packages, or `npm ci` when its lockfile differs.
  *
  * A worktree holds tracked files only, so without this a step that runs the tests fails on its first
  * command through no fault of its own. It used to be one link to the main checkout's whole tree, which
- * tested a branch against main's workspace packages and hid a dependency the branch added. Links cost no
- * install; when the worktree's `package-lock.json` asks for packages main has not installed they would be
- * the wrong tree, so `npm ci` installs one here — about a minute, which the step is told (`depsLines`).
+ * tested a branch against main's workspace packages and hid a dependency the branch added. Hardlinks cost
+ * no install, and keep every path inside the worktree, where a fenced step may read it; when the worktree's
+ * `package-lock.json` asks for packages main has not installed they would be the wrong tree, so `npm ci`
+ * installs one here — about a minute, which the step is told (`depsLines`). Where a hardlink cannot be made
+ * — the store on another filesystem — main's packages are linked, and the answer is `linked` with why.
  *
  * Idempotent, so a pass that died halfway can run it again and a second call changes nothing: a tree npm
  * installed (it has `.package-lock.json`, which the plan never makes) is left alone, and so is a
  * `node_modules` that is one link, cut before this; a tree the plan made gains only what it lacks, and
- * nothing already there is replaced. It writes nothing under the main checkout. It does not throw: a
- * tick that threw here would throw on every pass after, and a step can run `npm ci` itself.
+ * nothing already there is replaced or added to. A package is made under a dot name beside its place and
+ * renamed into it whole, so one a pass died making is never taken for a package, and is made again. It
+ * writes nothing under the main checkout. It does not throw: a tick that threw here would throw on every
+ * pass after, and a step can run `npm ci` itself.
  */
 export async function provisionDeps(mainRoot: string, worktree: string): Promise<Provisioned> {
   const modules = path.join(worktree, 'node_modules');
@@ -119,17 +146,38 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   const listing = listDeps(path.join(mainRoot, 'node_modules'));
   if (!listing) return { tree: 'absent' };
   let made = 0;
+  // Why main's packages are linked rather than hardlinked: met by this call, or read off a link an earlier pass left.
+  let why: string | undefined;
   try {
     for (const action of depsPlan(mainRoot, worktree, listing)) {
-      if (lstatOf(action.path)) continue;
+      const there = lstatOf(action.path);
+      if (there) {
+        if (action.kind === 'tree' && there.isSymbolicLink() && fs.readlinkSync(action.path) === action.from) why ??= 'an earlier pass linked them';
+        continue;
+      }
       if (action.kind === 'dir') fs.mkdirSync(action.path);
-      else fs.symlinkSync(action.target, action.path);
+      else if (action.kind === 'link') fs.symlinkSync(action.target, action.path);
+      else if (why) fs.symlinkSync(action.from, action.path);
+      else {
+        const making = path.join(path.dirname(action.path), `.wf-making-${path.basename(action.path)}`);
+        fs.rmSync(making, { recursive: true, force: true });
+        try {
+          hardlinkTree(action.from, making);
+          fs.renameSync(making, action.path);
+        } catch (err) {
+          fs.rmSync(making, { recursive: true, force: true });
+          const { code, syscall } = err as NodeJS.ErrnoException;
+          if (syscall !== 'link' || !code || !HARDLINK_REFUSED.has(code)) throw err;
+          why = (err as Error).message;
+          fs.symlinkSync(action.from, action.path);
+        }
+      }
       made++;
     }
   } catch (err) {
     return { tree: 'failed', error: (err as Error).message };
   }
-  return { tree: 'linked', made };
+  return why ? { tree: 'linked', made, why } : { tree: 'hardlinked', made };
 }
 
 /** `.worktreeinclude` at the root of the main checkout, parsed — or null, when the repository has none. */
@@ -267,6 +315,7 @@ export async function workspaceFor(
   const deps = await provisionDeps(run.repo, workspace);
   if (deps.tree === 'own' && deps.installed) notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
   if (deps.tree === 'failed') notes.push(`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`);
+  if (deps.tree === 'linked') notes.push(`node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`);
   return { workspace, branch, conflicted, deps, notes };
 }
 

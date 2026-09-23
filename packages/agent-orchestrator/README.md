@@ -713,9 +713,14 @@ filed, it fills in the rest:
   are links whose real path is the main checkout, so through that link a branch's app imported main's
   packages: the branch was tested against code it did not contain. Now the worktree gets a directory in
   which each workspace package (`packages/*`, `apps/*`) links to the worktree's own copy. Every
-  third-party package links to the main checkout's, one inode and no install. `.bin` and each `@scope`
-  are directories of the worktree's own, so installing into the worktree never writes main's tree, and a
-  workspace package's bin runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
+  third-party package is main's, hardlinked: directories of the worktree's own, each file one inode with
+  main's, no install and no data copied (about half a second here). Hardlinked and not linked, because
+  every path then lies inside the worktree: Claude Code allows a path through a symlink only when the
+  link and its target both match, so a `dontAsk` step was denied reads under a linked tree. Where the
+  store is on another filesystem and a hardlink fails, the packages are linked as before and the run's
+  notes say so. `.bin` and each `@scope` are directories of the worktree's own, so installing into the
+  worktree never writes main's tree; `.bin` holds npm's relative links, so a workspace package's bin
+  runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
   `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/worktree.ts`
   does the work.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's

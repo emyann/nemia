@@ -772,10 +772,11 @@ test('a step\'s worktree gets what .worktreeinclude lists from the main checkout
   assert.ok(!fs.existsSync(path.join(wt, 'notes.txt')), 'nor one git does not ignore');
   assert.equal(gitOut(wt, 'status', '--porcelain'), '', 'so the cut leaves nothing for the hand-off to commit');
 
-  // `node_modules` was listed, and is not a copy: a directory of the worktree's own, linking main's
-  // packages, without the file npm keeps for main's tree.
+  // `node_modules` was listed, and is not a copy: a directory of the worktree's own, main's packages
+  // hardlinked into it, without the file npm keeps for main's tree.
   assert.ok(fs.lstatSync(path.join(wt, 'node_modules')).isDirectory());
-  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isDirectory());
+  assert.equal(fs.statSync(path.join(wt, 'node_modules/third/index.js')).ino, fs.statSync(path.join(repo, 'node_modules/third/index.js')).ino);
   assert.equal(fs.realpathSync(path.join(wt, 'node_modules/x')), fs.realpathSync(path.join(wt, 'packages/x')), 'its workspace package is its own');
   assert.ok(!fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')));
 
@@ -786,6 +787,18 @@ test('a step\'s worktree gets what .worktreeinclude lists from the main checkout
     'implement: .worktreeinclude: refused "notes.txt" is not gitignored — the hand-off would commit it',
   ]);
   assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
+});
+
+test('a worktree whose main packages could only be linked — its store on another filesystem — says so in the run\'s notes: a fenced step\'s reads under them are denied', async (t) => {
+  const run = isolated(aNodeRepo());
+  t.mock.method(fs, 'linkSync', () => { throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' }); });
+  const { e } = board();
+  const pass = await advance(e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  assert.deepEqual(pass.notes, [
+    "implement: node_modules: main's packages linked, not hardlinked — EXDEV: cross-device link not permitted, link 'a' -> 'b'; a fenced step's reads under it leave its worktree and are denied",
+  ]);
 });
 
 test('wf start refuses a .worktreeinclude line outside the repository, by name, before a run is written', () => {

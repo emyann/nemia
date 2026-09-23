@@ -8,9 +8,18 @@
  *   npm workspaces are links whose real path is the main checkout — so a worktree's apps imported
  *   main's packages: a branch's api change was tested against main's agent-orchestrator, and once main
  *   moved under the branch its check failed on tests it never touched. `depsPlan` gives the worktree
- *   a `node_modules` of its own made of links: a workspace package to the worktree's own copy, every
- *   other package to main's. When the branch's lockfile asks for a tree main has not installed, links
- *   would lie, and the runner runs `npm ci` instead (`lockfileParting`).
+ *   a `node_modules` of its own: a workspace package is a link to the worktree's own copy, and every
+ *   other package is main's, hardlinked file by file into a directory of the worktree's. When the
+ *   branch's lockfile asks for a tree main has not installed, main's would lie, and the runner runs
+ *   `npm ci` instead (`lockfileParting`).
+ *
+ *   Hardlinked, not linked, because a link out of the worktree is a path out of the step's working
+ *   directory: Claude Code allows a read through a symlink only when the link and its target both
+ *   match, so a `dontAsk` job was denied `Read`, `Grep` and `ls` under `node_modules` with no prompt
+ *   (recorded on the live runs of 2026-09-23). A hardlink is no path anywhere else: every file's path is
+ *   inside the worktree. It copies no data either — measured 2026-09-23 on this repository's tree (WSL2,
+ *   ext4, 729 MB, 3,134 directories, 37,154 files, 46 links): 0.5 to 0.8 s and 13 MB of directories per
+ *   worktree, where `npm ci` takes a minute and 729 MB.
  * - **`.worktreeinclude`**, the gitignored paths a repository says a new worktree needs, the file
  *   Claude Code's `--worktree` reads. `worktreeInclude` parses it.
  */
@@ -29,13 +38,25 @@ export type DepsListing = {
   bins: readonly DepEntry[];
 };
 
-/** One thing to make in the worktree: a directory of its own, or a link. A link's target is written as given. */
-export type DepsAction = { kind: 'dir'; path: string } | { kind: 'link'; path: string; target: string };
+/**
+ * One thing to make in the worktree: a directory of its own, a link — its target written as given — or a `tree`, main's entry at `from`
+ * made again at `path` with every file hardlinked and every link inside it copied as written, never followed.
+ */
+export type DepsAction =
+  | { kind: 'dir'; path: string }
+  | { kind: 'link'; path: string; target: string }
+  | { kind: 'tree'; path: string; from: string };
 
 /** What a worktree's `node_modules` turned out to be. `worktree.ts`'s `provisionDeps` returns it. */
 export type Provisioned =
-  /** Made from `depsPlan`: `made` is how many entries this call added, so 0 on a second call. */
-  | { tree: 'linked'; made: number }
+  /** Made from `depsPlan`, main's packages hardlinked: `made` is how many entries this call added, so 0 on a second call. */
+  | { tree: 'hardlinked'; made: number }
+  /**
+   * Made from `depsPlan` with main's packages linked, not hardlinked — every worktree before 2026-09-23, and one whose store is where
+   * a hardlink to main's files cannot be made (another filesystem): `why` is what the hardlink met. A fenced step's reads through those
+   * links leave its working directory, and are denied.
+   */
+  | { tree: 'linked'; made: number; why?: string }
   /** A tree npm installed here, because the lockfile asks for one main has not installed. `installed`: this call ran `npm ci`. */
   | { tree: 'own'; installed: boolean }
   /** It could not be made: `npm ci` exited non-zero or timed out, or a link could not be written. */
@@ -44,12 +65,6 @@ export type Provisioned =
   | { tree: 'absent' }
   /** `node_modules` is one link to a whole tree, as worktrees were cut before this: left as it is. */
   | { tree: 'shared' };
-
-/** The part of a path under `node_modules` that names a package: `third`, or `@scope/name`. */
-const packageOf = (rel: string): string => {
-  const [first, second] = rel.split(path.sep);
-  return first?.startsWith('@') && second ? path.join(first, second) : first ?? '';
-};
 
 /** `p` relative to `root` when it lies strictly inside it, else null. */
 export const inside = (root: string, p: string): string | null => {
@@ -64,10 +79,13 @@ export const inside = (root: string, p: string): string | null => {
  *   its `node_modules` (`packages/*`, `apps/*` here) — is linked to the same path in the worktree, the
  *   relative link npm writes. That is the whole point: the worktree resolves its own copy. A package the
  *   branch does not have becomes a link to nothing, which is true of the branch.
- * - **Every other package** is linked to main's entry: one inode, no install.
- * - **An `@scope` directory is the worktree's own**, holding a link per package, and so is **`.bin`**: a
- *   bin of a workspace package points through the worktree's link to its own file, every other bin at
- *   main's. Linked whole, either would let `npm install` in the worktree write main's tree.
+ * - **Every other package** is main's, as a `tree`: a directory of the worktree's whose files are main's,
+ *   hardlinked — one inode each, no install, and every path inside the worktree. A package main has as a
+ *   link that leads elsewhere (`npm link`) is linked where main's leads.
+ * - **An `@scope` directory is the worktree's own**, holding a package each, and so is **`.bin`**, whose
+ *   links are written as npm wrote them (`../vite/bin/vite.js`), so each resolves in the worktree: a bin
+ *   of a workspace package through its link to the branch's file, every other bin to the worktree's
+ *   hardlinks of main's. Linked whole, either would let `npm install` in the worktree write main's tree.
  * - **Every other dot entry is left out** — `.package-lock.json`, `.vite-temp`, `.cache` — because it
  *   belongs to the tree it is in, and a tool writing it through a link would write main's. That is also
  *   how the runner tells a tree npm installed (it has `.package-lock.json`) from one this plan made.
@@ -76,18 +94,19 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
   const mainModules = path.join(mainRoot, 'node_modules');
   const modules = path.join(worktree, 'node_modules');
   const actions: DepsAction[] = [{ kind: 'dir', path: modules }];
-  const workspaces = new Set<string>();
 
   const place = (name: string, entry: DepEntry) => {
     const at = path.join(modules, name);
-    const resolved = entry.link === undefined ? null : path.resolve(path.dirname(path.join(mainModules, name)), entry.link);
-    const inRepo = resolved === null ? null : inside(mainRoot, resolved);
-    if (inRepo && resolved !== mainModules && !inside(mainModules, resolved!)) {
-      workspaces.add(name);
-      actions.push({ kind: 'link', path: at, target: path.relative(path.dirname(at), path.join(worktree, inRepo)) });
-    } else {
-      actions.push({ kind: 'link', path: at, target: path.join(mainModules, name) });
+    const from = path.join(mainModules, name);
+    if (entry.link === undefined) {
+      actions.push({ kind: 'tree', path: at, from });
+      return;
     }
+    const resolved = path.resolve(path.dirname(from), entry.link);
+    const inRepo = inside(mainRoot, resolved);
+    actions.push(inRepo && resolved !== mainModules && !inside(mainModules, resolved)
+      ? { kind: 'link', path: at, target: path.relative(path.dirname(at), path.join(worktree, inRepo)) }
+      : { kind: 'link', path: at, target: from });
   };
 
   for (const entry of main.entries) {
@@ -104,10 +123,8 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
     const bins = path.join(modules, '.bin');
     actions.push({ kind: 'dir', path: bins });
     for (const bin of main.bins) {
-      const owner = bin.link === undefined ? null : inside(mainModules, path.resolve(mainModules, '.bin', bin.link));
-      actions.push(owner && workspaces.has(packageOf(owner))
-        ? { kind: 'link', path: path.join(bins, bin.name), target: bin.link! }
-        : { kind: 'link', path: path.join(bins, bin.name), target: path.join(mainModules, '.bin', bin.name) });
+      const at = path.join(bins, bin.name);
+      actions.push(bin.link === undefined ? { kind: 'tree', path: at, from: path.join(mainModules, '.bin', bin.name) } : { kind: 'link', path: at, target: bin.link });
     }
   }
   return actions;

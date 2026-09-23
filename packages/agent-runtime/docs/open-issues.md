@@ -673,7 +673,11 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
   `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
   `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
-  conversation at full price.
+  conversation at full price. Nor a failed later turn retried: since `-p --resume` keeps the id, the turn's failed attempt
+  ends with the id the turn continued, and the retry resumes a conversation that holds the failure — under any `resume`,
+  so a later turn's `interrupted` is `always` on Claude Code. Where the turn began would be kept by resuming each turn
+  with `--fork-session`, a new id per turn and the signed session left as it was: not built, a change to the runner's
+  arguments for one harness.
 
 What a job gives up, or what is not done:
 

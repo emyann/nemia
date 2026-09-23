@@ -1138,7 +1138,11 @@ the answer or the close off the record.
 current turn's first, and the budget is the answer's if it gave one, the filing's if not. So a task may wait on a person
 for as long as they take — the deadline times work, not reading — and a turn that fails is retried as a first turn is:
 continuing its own session where `resume` says so, and where it would start cold, the session the turn continued, since
-cold would lose the conversation the answer is about. A turn that runs out of attempts settles the task `failed`.
+cold would lose the conversation the answer is about. On Claude Code that is not quite where the turn began: `-p --resume`
+keeps the session's id (M12), so the conversation the retry continues holds the failed attempt too, and a later turn's
+retry reads as `resume: 'always'` whatever the task says (open issue 28). A turn that runs out of attempts settles the task
+`failed`. A later turn continues only the session that signed the turn before it: where its harness recorded none, an
+answer is refused, and one journalled all the same settles the task `failed` rather than start a session cold on it.
 Two answers journalled before the next turn starts are told to it both, in order, and the last budget given is its own:
 nothing serialises two writers of one journal, so the record says both and the turn reads both. A `stop` settles a
 waiting task `stopped`, as it does any other.
@@ -1147,7 +1151,7 @@ waiting task `stopped`, as it does any other.
 above 0, or one the task's harness would not keep (as `file` refuses one: `claude --bg` and `codex` keep none); a task the
 engine has no record of; one not filed to be held open; one settled, closed or asked to stop; and one that is not waiting —
 not started, an attempt running (`say` reaches a running session; `stop` ends it), between attempts, or answered already
-and its next turn not begun. The Effect door (`answer`, `close` from `agent-runtime/effect`) refuses in the same words, as
+and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The Effect door (`answer`, `close` from `agent-runtime/effect`) refuses in the same words, as
 `InputRefused`. A close is a verdict on a signed turn, so it is refused while one runs, not queued behind it.
 
 **Not here yet.** An attempt is still an A2A Task of its own; the seam does not yet say a held task is one A2A Task that

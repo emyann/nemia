@@ -449,7 +449,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           tools: step.tools,
           disallowedTools: step.disallow,
           allowedTools: step.allow,
-          // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
+          // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
+          background: step.background,
           remoteControl: step.remote,
         },
         deadlineSeconds: step.deadlineSeconds,
@@ -507,6 +508,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           tools: target.tools,
           disallowedTools: target.disallow,
           allowedTools: target.allow,
+          background: target.background,
           remoteControl: target.remote,
         },
         deadlineSeconds: target.deadlineSeconds,
@@ -606,14 +608,16 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
         // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
         contextTokens: sessionContext(step, steps),
-        // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
-        // unattended by definition, and a mode that prompts is a mode that stalls.
+        // Left to the engine's default (`auto`) unless the step says otherwise. A job asks nobody in any mode: a call it may not make
+        // is denied, recorded, and the session carries on (agent-runtime's open issue 28, M1).
         permissionMode: step.permissionMode,
         // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
         tools: step.tools,
         // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
         disallowedTools: step.disallow,
         allowedTools: step.allow,
+        // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
+        background: step.background,
         // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
         remoteControl: step.remote,
       },

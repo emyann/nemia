@@ -62,7 +62,8 @@ test('the engine the run builds keeps its three harnesses, and gains the check',
   const { HARNESSES } = await import('../src/runner.ts');
   const engine = await import('agent-runtime');
   assert.deepEqual(Object.keys(HARNESSES), ['claude', 'codex', 'claude-detached', 'check'], 'claude first: it is the fallback');
-  assert.equal(HARNESSES.claude, 'claude-bg');
+  // The engine's own Claude Code harness, which runs a step as a job and one that says `background: true` as a background session.
+  assert.equal(HARNESSES.claude, 'claude');
   assert.equal(HARNESSES.codex, engine.codex);
   assert.equal(HARNESSES['claude-detached'], engine.claudeDetached);
   assert.equal(HARNESSES.check, CHECK);

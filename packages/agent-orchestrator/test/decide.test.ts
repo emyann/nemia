@@ -209,7 +209,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
 });
 
 test("`wf decide` and `wf ls` say nothing of a run's momentum or a step's Remote Control: the same screens, line for line, whether the engine's record carries the `priority` and `remoteControl` the run's filings were made with or not", async (t) => {
-  const { run, e, carries, filed } = await awaiting('remote: true\n');
+  const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
   assert.deepEqual(ids.map((id) => [filed(id)?.priority, filed(id)?.config?.remoteControl]), [[undefined, true], [1, undefined], [1, undefined]], 'filed with them');
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });

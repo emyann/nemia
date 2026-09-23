@@ -133,18 +133,29 @@ export type Workflow = {
    * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
    * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
-   * `wf start` on a harness the engine has no such flag for: only Claude Code's background sessions, `claude`, are bridged.
+   * `wf start` on a harness the engine has no such flag for, and on `claude` without `background: true`: only Claude Code's background
+   * sessions are bridged, and a job (`claude -p`) opens no bridge.
    */
   remote?: boolean;
+  /**
+   * `background: true`: every session of the step runs as a Claude Code background session, `claude --bg` — the engine's
+   * `config.background` — which never ends on its own, is listed in `claude agents`, and can be attached to and bridged (`remote:`).
+   * Without it a `claude` step runs as a job, `claude -p`: it runs its brief to its end and exits, waits on nobody in any permission
+   * mode (a call it may not make is denied and recorded on its attempt), takes `wf say` on its stdin until its result, and keeps a spend
+   * cap (`budget:`). So the line is for a session that must outlive a brief — the supervisor — and nothing else. Refused on a harness
+   * other than `claude`, which has no second way to run, and beside `budget:`, which a background session does not keep. A step's key,
+   * not an agent's: it is how a step's session is run, not who does the work.
+   */
+  background?: boolean;
   deadlineSeconds?: number;
   maxAttempts?: number;
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
-   * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). A `claude` session is never
-   * stopped by it mid-flight: `--bg` keeps no cap, and writes its cost only as its process exits, so a step can overrun by one try. On
-   * `claude-detached` what is left of it is handed to the engine as `budgetUsd` too, and the harness ends a session once the tries together
-   * reach it. Refused on codex, which has none.
+   * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). On `claude` and
+   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `budgetUsd` too, and the harness
+   * ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which has none, and beside `background: true`,
+   * whose `claude --bg` keeps none either.
    */
   budget?: number;
   /**
@@ -230,7 +241,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -262,7 +273,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
   allow: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
-  remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only",
+  background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
+  remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   maxAttempts: COUNTS.maxAttempts.counts,
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
@@ -425,6 +437,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
+  const background = backgroundOf(name, meta.background, harness);
   const output = outputOf(name, meta.output, read);
 
   return {
@@ -442,10 +455,11 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     tools: toolsOf(name, meta.tools, harness),
     disallow: rulesOf(name, 'disallow', meta.disallow, harness),
     allow: rulesOf(name, 'allow', meta.allow, harness),
+    background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
-    budget: budgetOf(name, meta.budget, harness),
+    budget: budgetOf(name, meta.budget, harness, background),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
     gate: gateOf(name, meta.gate),
@@ -768,6 +782,22 @@ function remoteOf(step: string, remote: string | undefined): boolean | undefined
   return refuse(`${step}: \`remote: ${remote}\` is not \`true\` or \`false\`. \`remote: true\` bridges every session of the step to claude.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not. Write one of the two, or delete the line.`);
 }
 
+/**
+ * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons — and `true` refused on a harness other than `claude`,
+ * as the engine refuses `config.background` there (agent-runtime's `file()`), here so a folder is refused at `wf start` and not on its first
+ * pass. `codex exec` and `claude-detached`'s `claude -p` each run one way.
+ */
+function backgroundOf(step: string, background: string | undefined, harness: string | undefined): boolean | undefined {
+  if (background === undefined) return undefined;
+  if (background !== 'true' && background !== 'false') {
+    refuse(`${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job (\`claude -p\`). Write one of the two, or delete the line.`);
+  }
+  if (background === 'true' && (harness ?? DEFAULT_HARNESS) !== 'claude') {
+    refuse(`${step}: \`background: true\` asks for a Claude Code background session (\`claude --bg\`), and the \`${harness}\` harness has no such mode: ${harness === 'codex' ? '`codex exec` runs a prompt and exits' : '`claude-detached` runs `claude -p` and nothing else'}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`.`);
+  }
+  return background === 'true';
+}
+
 function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const { least, counts, example } = COUNTS[key];
@@ -858,14 +888,24 @@ export function dollarsOf(written: string): number | undefined {
 const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none: 0.154.0 has no such flag, and reports no cost to cap';
 
 /**
- * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), and on codex. `$5` and `5 USD` are what the author meant, so
+ * Why a `claude --bg` session keeps no budget, in the engine's words (agent-runtime's `claudeCodeRefuses`), which `test/vocabulary.test.ts`
+ * holds this copy to.
+ */
+const BACKGROUND_KEEPS_NO_CAP = 'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured)';
+
+/**
+ * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), on codex, and beside `background: true`, as the engine refuses a
+ * `budgetUsd` there — here, so a folder is refused at `wf start` and not on its first pass. `$5` and `5 USD` are what the author meant, so
  * the refusal writes the amount back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
  */
-function budgetOf(step: string, budget: string | undefined, harness: string | undefined): number | undefined {
+function budgetOf(step: string, budget: string | undefined, harness: string | undefined, background: boolean | undefined): number | undefined {
   if (budget === undefined) return undefined;
   const named = `${step}: \`budget: ${budget}\``;
   if (harness === 'codex') {
-    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude, where the run files nothing more for it once its tries have cost the budget, or on claude-detached, whose harness also ends a session at the cap.`);
+    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude or claude-detached, whose \`claude -p\` ends a session once the step's tries together have cost the budget.`);
+  }
+  if (background) {
+    refuse(`${named} is a spend cap, and \`background: true\` runs the step as a background session: ${BACKGROUND_KEEPS_NO_CAP}. Delete \`background: true\` to run the step as a job (\`claude -p\`), which ends its session at the cap, or delete the budget line.`);
   }
   const amount = dollarsOf(budget);
   if (amount !== undefined) return amount;
@@ -1531,36 +1571,15 @@ function validateFolder(steps: readonly Workflow[]): void {
 }
 
 /**
- * The permission modes that never stop to ask a person, per harness — because a mode is the harness's word, and what it does with a
- * call it was not given is the harness's too.
- *
- * On Claude Code (`claude`, `claude-detached`): `dontAsk`, which denies what it is not given and lets the session read the refusal and
- * carry on, and `bypassPermissions`, which allows everything. Every other mode asks, `auto` — the engine's default — among them.
- *
- * On codex: every mode it has. `codex exec` is not interactive; it has one shell, fenced by the sandbox `permissionMode` names, and a
- * call outside the fence is denied there and then. `read-only` reads and writes nothing, `workspace-write` writes in the workspace and
- * asks nobody — this file's own `allow:` refusal says exactly that to anyone who writes a rule list on codex — and the two widest allow
- * more, not less. So a codex folder team is not judged on this at all, and is not pushed off its sandbox to reach the widest mode.
- *
- * Every harness has a list here and a default below, held by the loop over `HARNESSES` in `test/workflow.test.ts`: a harness added with
- * neither would have every folder team of its own refused, in another harness's words. (`test/vocabulary.test.ts` holds the engine's own
- * lists against this file's; the pair of lists below is the workflow test's.)
+ * The permission modes in which a Claude Code background session (`claude --bg`) never stops to ask a person: `dontAsk`, which denies what
+ * it is not given and lets the session read the refusal and carry on, and `bypassPermissions`, which allows everything. Every other mode
+ * asks, `auto` — the engine's default, and what a step that names no mode runs in — among them.
  */
-const UNASKING: Readonly<Record<string, readonly string[]>> = {
-  claude: ['dontAsk', 'bypassPermissions'],
-  'claude-detached': ['dontAsk', 'bypassPermissions'],
-  codex: PERMISSION_MODES.codex!,
-};
+const BACKGROUND_UNASKING = ['dontAsk', 'bypassPermissions'] as const;
+const DEFAULT_MODE = 'auto';
 
 /**
- * The mode a step runs in when it names none, which is what the guard below judges such a step on: the engine's `auto` on Claude Code
- * (`runner.ts`'s default), codex's `workspace-write` (`sandboxOf` in the engine's `runner-codex.ts`, which falls to it for a task
- * that named no sandbox).
- */
-const DEFAULT_MODE: Readonly<Record<string, string>> = { claude: 'auto', 'claude-detached': 'auto', codex: 'workspace-write' };
-
-/**
- * The way a step of a folder team cannot be run: in a permission mode that can stop and ask.
+ * The way a step of a folder team cannot be run: as a background session in a permission mode that can stop and ask.
  *
  * Measured, on Claude Code 2.1.278, in folders no settings file had ever named. A fenced `--bg` session whose first act is anything
  * outside its own directory — reading the run's artifacts directory beside it, or the store, to learn what it is writing about — is
@@ -1569,35 +1588,29 @@ const DEFAULT_MODE: Readonly<Record<string, string>> = { claude: 'auto', 'claude
  * same way for as long as it was watched. In `dontAsk` the same call is denied with no prompt, the session is told so, and it carries
  * on — measured beside it, on `--bg`, in the same kind of folder.
  *
+ * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
+ * `default` and `acceptEdits`, in folders under `/tmp`, told to write outside its folder, run a command and fetch a page, was denied
+ * each call it could not make, carried on and exited on its own. So a step run as a job — every `claude` step without `background: true`,
+ * every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one shell, fenced by the sandbox its
+ * mode names, and asks nobody in any of them. What is judged is the one way left to ask: a `background: true` step.
+ *
  * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
- * api — passes.
- *
- * Judged against the step's own harness (`UNASKING`), since what was measured is Claude Code's prompt. A codex step is fenced by a
- * sandbox and asks nobody in any of its modes, so a codex folder team passes here — judged on Claude's words, the tightest sandbox it
- * has would be refused and told to write a mode codex does not take.
- *
- * It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allow:` gives back, scoped to the step's own
- * folder (`Edit(**)`).
+ * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allow:` gives back, scoped to the
+ * step's own folder (`Edit(**)`).
  */
 function validateFolderMode(steps: readonly Workflow[]): void {
   if (!isFolderTeam(steps)) return;
-  const asks = (s: Workflow): boolean => {
-    const harness = s.harness ?? DEFAULT_HARNESS;
-    return !(UNASKING[harness] ?? []).includes(s.permissionMode ?? DEFAULT_MODE[harness] ?? '');
-  };
-  const asking = steps.find(asks);
+  const asking = steps.find((s) => s.background && !(BACKGROUND_UNASKING as readonly string[]).includes(s.permissionMode ?? DEFAULT_MODE));
   if (!asking) return;
-  const on = asking.harness ?? DEFAULT_HARNESS;
-  const unasking = UNASKING[on] ?? [];
   const mode = asking.permissionMode
     ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
-    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE[on]}\`, which can stop and ask a person to approve something`;
+    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
-    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, and ${mode}`
-    + ' — a read or a write outside the folder can, and an unattended session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
-    + ` Write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.`
-    + " A step that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
+    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}`
+    + ' — a read or a write outside the folder can, and an unattended background session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
+    + ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.`
+    + " A step in `dontAsk` that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }
 

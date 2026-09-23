@@ -27,15 +27,25 @@ import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
 const NOT_BRIDGED = 'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
 
 /**
- * The first step that says `remote: true` on a harness the engine refuses `remoteControl` for — every one of `HARNESSES` but Claude Code's
- * background sessions, as the engine's own door judges — refused by name in the engine's words (`NOT_BRIDGED`), or undefined. A step without
- * a `harness:` runs on `claude`, the engine's first.
+ * Why the engine refuses `remoteControl: true` on a Claude Code job, in its words (agent-runtime's `claudeCodeRefuses`), which
+ * `test/store.test.ts` holds this copy to by asking the engine: a `claude` step without `background: true` runs `claude -p`.
+ */
+const JOB_NOT_BRIDGED = 'only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge';
+
+/**
+ * The first step that says `remote: true` where the engine refuses `remoteControl` — every one of `HARNESSES` but Claude Code's, as the
+ * engine's own door judges (`NOT_BRIDGED`), and on Claude Code every step but a background session (`JOB_NOT_BRIDGED`) — refused by name
+ * in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
  */
 function remoteRefusal(steps: readonly Workflow[]): string | undefined {
-  const bridged = Object.entries(HARNESSES).filter(([, h]) => h === 'claude-bg').map(([name]) => name);
+  const bridged = Object.entries(HARNESSES).filter(([, h]) => h === 'claude').map(([name]) => name);
   const step = steps.find((s) => s.remote && !bridged.includes(s.harness ?? 'claude'));
-  if (!step) return undefined;
-  return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
+  if (step) {
+    return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} with \`background: true\` — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
+  }
+  const job = steps.find((s) => s.remote && !s.background);
+  if (job) return `${job.name}: \`remote: true\` bridges a session to claude.ai, and ${JOB_NOT_BRIDGED}. Write \`background: true\` beside it, or delete \`remote: true\`.`;
+  return undefined;
 }
 
 /**

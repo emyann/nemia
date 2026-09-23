@@ -1630,32 +1630,33 @@ test("REFUSED without the momentum: at a ceiling of one, the engine's own admiss
 
 // ─── a step reachable from a phone: `remote:` ───────────────────────────────
 
-test('a step with `remote: true` reaches `e.file` with `remoteControl: true` — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the line, with none', async () => {
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nremote: true', 'failed', 1);
-  assert.equal(tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, true, 'the first filing');
+test('a step with `background: true` and `remote: true` reaches `e.file` with both — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the lines, with neither', async () => {
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nbackground: true\nremote: true', 'failed', 1);
+  const both = (id: string) => [tasks.get(id)!.spec.config?.background, tasks.get(id)!.spec.config?.remoteControl];
+  assert.deepEqual(both(`${run.id}-implement`), [true, true], 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.config?.remoteControl, nudged.resumeFrom], [true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.background, nudged.config?.remoteControl, nudged.resumeFrom], [true, true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
-  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.config?.remoteControl, true, 'a new session, bridged the same');
+  assert.deepEqual(both(`${run.id}-implement-try3`), [true, true], 'a new session, bridged the same');
 
   // The check is the run's own, on a harness the engine refuses a bridge for; and review never said the word.
-  assert.deepEqual([tasks.get(`${run.id}-implement-check`)!.spec.harness, tasks.get(`${run.id}-implement-check`)!.spec.config?.remoteControl], ['check', undefined]);
+  assert.deepEqual([tasks.get(`${run.id}-implement-check`)!.spec.harness, ...both(`${run.id}-implement-check`)], ['check', undefined, undefined]);
   settle(`${run.id}-implement-try3`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement-try3-check`, 'succeeded', undefined, 0);
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
-  assert.equal(tasks.get(`${run.id}-review`)!.spec.config?.remoteControl, undefined, 'never a default');
+  assert.deepEqual(both(`${run.id}-review`), [undefined, undefined], 'never a default: a job, unbridged');
 });
 
 test('a round files its target bridged as the target says, and the looping step — a new session each round — as it says', async () => {
-  const run = started(looped('remote: true\n'));
+  const run = started(looped('background: true\nremote: true\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
   assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, undefined);
@@ -1666,57 +1667,73 @@ test('a round files its target bridged as the target says, and the looping step 
   await toReview(b, run.id, 2, false);
   assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.config?.remoteControl, true, "round 2's review");
 
-  const other = started(looped('', 'remote: true\n'));
+  const other = started(looped('', 'background: true\nremote: true\n'));
   const c = board();
   await advance(c.e, readRun(other.id));
   await toReview(c, other.id, 1, true);
   assert.deepEqual((await advance(c.e, readRun(other.id))).looped, ['review']);
   assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.config?.remoteControl], [true, undefined]);
+  // And run as the target says, a round being a session of it: a background session again, and review a job.
+  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.background, c.tasks.get(`${other.id}-review`)!.spec.config?.background], [true, undefined]);
 });
 
-test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `remoteControl` for — codex and claude-detached — and taken on claude, and `remote: false` on any", async () => {
+test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
   const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
-  /** What the engine's own door says to `remoteControl: true` on `harness`: its reason, or undefined when it files the task. */
-  const engineSays = async (harness: string): Promise<string | undefined> => {
+  /** What the engine's own door says to `remoteControl: true` on `harness`: the whole message, or undefined when it files the task. */
+  const engineRefuses = async (harness: string, background?: boolean): Promise<string | undefined> => {
     try {
-      await engine.file({ brief: 'b', cwd: '/w', harness, config: { remoteControl: true } });
+      await engine.file({ brief: 'b', cwd: '/w', harness, config: { remoteControl: true, ...(background ? { background } : {}) } });
       return undefined;
     } catch (err) {
-      const reason = new RegExp(`^file: \`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec((err as Error).message)?.[1];
-      assert.ok(reason, (err as Error).message);
-      return reason;
+      return (err as Error).message;
     }
+  };
+  /** Its reason on a harness that bridges nothing. */
+  const engineSays = async (harness: string): Promise<string | undefined> => {
+    const said = await engineRefuses(harness);
+    if (said === undefined) return undefined;
+    const reason = new RegExp(`^file: \`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec(said)?.[1];
+    assert.ok(reason, said);
+    return reason;
   };
   const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
   const withRemote = (harness: string, word = 'true') => folder(`harness: ${harness}\nremote: ${word}`);
-
-  for (const harness of ['codex', 'claude-detached']) {
-    const reason = await engineSays(harness);
-    assert.ok(reason, `the engine refuses it on ${harness}`);
-    const dir = withRemote(harness);
+  const refusedAtStart = (dir: string, message: string, label: string) => {
     const repo = aRepo();
     const before = runs();
-    assert.throws(() => start({ brief: 'add a flag', repo, workflowDir: dir, isolate: false }), (err: Error & { exitCode?: number }) => err.exitCode === 2
-      && err.message === `implement: \`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`remote: true\`.`, harness);
-    assert.deepEqual(runs(), before, `nothing written for ${harness}`);
+    assert.throws(() => start({ brief: 'add a flag', repo, workflowDir: dir, isolate: false }), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === message, label);
+    assert.deepEqual(runs(), before, `nothing written for ${label}`);
     assert.equal(gitOut(repo, 'branch', '--list').split('\n').length, 1, 'and no branch cut');
     // And a plan whose card names such a workflow is refused before its first run is started.
     const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
     fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${dir}\n---\nadd a flag\n`);
-    assert.throws(() => startPlan({ dir: plan, repo }), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes(`\`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}.`));
-    assert.deepEqual(runs(), before, `nothing written for a plan on ${harness}`);
+    assert.throws(() => startPlan({ dir: plan, repo }), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes(message), `a plan on ${label}`);
+    assert.deepEqual(runs(), before, `nothing written for a plan on ${label}`);
+  };
 
+  for (const harness of ['codex', 'claude-detached']) {
+    const reason = await engineSays(harness);
+    assert.ok(reason, `the engine refuses it on ${harness}`);
+    refusedAtStart(withRemote(harness), `implement: \`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}. Run the step on claude with \`background: true\` — delete \`harness: ${harness}\` — or delete \`remote: true\`.`, harness);
     // `remote: false` asks for nothing, and the engine files it on any harness: so does start.
     assert.ok(started(withRemote(harness, 'false')).id);
   }
 
-  // On claude the engine files it, and so does start — named, or by default.
-  assert.equal(await engineSays('claude'), undefined);
-  for (const dir of [withRemote('claude'), folder('remote: true')]) {
+  // On claude, a job opens no bridge: the engine refuses it, and so does start — named, or by default — in its words.
+  const job = await engineRefuses('claude');
+  const why = /^file: `remoteControl: true` bridges a session to claude\.ai, and (.*?)\. Give `config\.background: true` as well/.exec(job ?? '')?.[1];
+  assert.ok(why, job);
+  for (const [dir, label] of [[withRemote('claude'), 'claude named'], [folder('remote: true'), 'claude by default']] as const) {
+    refusedAtStart(dir, `implement: \`remote: true\` bridges a session to claude.ai, and ${why}. Write \`background: true\` beside it, or delete \`remote: true\`.`, label);
+  }
+
+  // A background session is bridged: the engine files it, and so does start.
+  assert.equal(await engineRefuses('claude', true), undefined);
+  for (const dir of [folder('harness: claude\nbackground: true\nremote: true'), folder('background: true\nremote: true')]) {
     const run = started(dir);
     const b = board();
     await advance(b.e, readRun(run.id));
-    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, true);
+    assert.deepEqual([b.tasks.get(`${run.id}-implement`)!.spec.config?.background, b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl], [true, true]);
   }
 });
 
@@ -3142,7 +3159,7 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
     assert.deepEqual([pass.tried, pass.filed, pass.checked, pass.blocked, pass.status], [[], [], [], ['review'], 'failed'], `pass ${i + 1}`);
   }
   assert.deepEqual(filings, [implement, `${implement}-check`], '`retries: 2` files nothing past the cap');
-  assert.equal(tasks.get(implement)!.spec.budgetUsd, undefined, 'a claude step is filed with no budgetUsd: a --bg session keeps none');
+  assert.equal(tasks.get(implement)!.spec.budgetUsd, 3, 'a claude step runs as a job, which keeps the cap: filed with it whole');
   const l = await list(e, readRun(run.id));
   assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['over budget $4.25 of $3', ['implement']]);
   await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(/^implement is over budget: its tries have cost \$4\.25 of its \$3 budget, .*: wf retry \S+ implement --budget <amount>\.$/));
@@ -3161,7 +3178,7 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
   assert.ok(pass.notes.includes('implement: try 2 — wf retry --nudge --budget 10'), pass.notes.join('\n'));
   assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: implement, check: { taskId: `${implement}-check` }, then: 'nudge', budget: 10 }]);
   const spec = tasks.get(try2)!.spec;
-  assert.deepEqual([spec.resumeFrom, spec.budgetUsd], [`native-${implement}`, undefined]);
+  assert.deepEqual([spec.resumeFrom, spec.budgetUsd], [`native-${implement}`, 5.75], 'the job resumed, handed what is left of $10 after the $4.25 its tries cost: a resume is charged its own spend');
   assert.match(spec.brief, /A person asked for this try: `wf retry --nudge --budget 10`, raising this step's budget to \$10\./);
   assert.match(spec.brief, /^## Try 2\n\nAfter the last try signed off, the run executed this step's check, and it did not pass\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\n/);
 
@@ -3239,7 +3256,7 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
   assert.deepEqual(pass.looped, ['review']);
   assert.ok(pass.notes.includes('review: round 2 — wf round --budget 10; implement goes again'), pass.notes.join('\n'));
   assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: `${run.id}-implement`, check: { taskId: `${run.id}-implement-check` }, then: 'round', budget: 10 }]);
-  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.budgetUsd, undefined, "on claude the cap is the run's to hold");
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.budgetUsd, 5.75, 'on claude, a job, the round is handed what is left of the raised cap');
   assert.equal((await list(b.e, readRun(run.id))).steps[0]!.note, 'round 2 of 3, budget $10');
 });
 

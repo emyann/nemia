@@ -26,9 +26,14 @@ export { nameFor } from 'agent-runtime';
  * `check` runs a step's `check:` command (`src/check.ts`). Passing `harnesses` REPLACES the engine's
  * default map rather than adding to it, so the defaults are named again here — leaving them out would
  * quietly send every `claude` step to whichever harness came first.
+ *
+ * A `claude` step runs on the engine's `claude`: a job (`claude -p`), which ends on its own, asks nobody in any mode, and keeps a spend
+ * cap; a step that says `background: true` is filed with `config.background` and runs as a background session (`claude --bg`), which
+ * a person can talk to and bridge to claude.ai. It ran every step on `claude-bg` until stage 2 of the thin runtime
+ * (`docs/eval-thin-runtime.md`).
  */
 export const HARNESSES = {
-  claude: 'claude-bg',
+  claude: 'claude',
   codex,
   'claude-detached': claudeDetached,
   check: CHECK,

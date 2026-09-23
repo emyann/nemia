@@ -14,7 +14,7 @@ import {
   ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, RequestMalformedError, TaskNotCancelableError,
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
-import { HarnessFailed, HarnessHandler } from '../src/a2a-handler.ts';
+import { HarnessFailed, HarnessHandler, OPEN_LISTINGS } from '../src/a2a-handler.ts';
 import { messageOf, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
@@ -102,9 +102,9 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
   ['a page of 1.5', (h) => h.handler.listTasks(listing({ pageSize: 1.5 }), ctx),
     refusedWith(RequestMalformedError, '`pageSize: 1.5` is not a page: give a whole number from 1 to 100, or none for 50.')],
   ['a page of a listing never made', (h) => h.handler.listTasks(listing({ pageToken: '1:1' }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: 1:1` is not a page of the latest listing: list again from the first page.')],
+    refusedWith(RequestMalformedError, '`pageToken: 1:1` is not a page of a listing still open: list again from the first page.')],
   ['a page token that is no token', (h) => h.handler.listTasks(listing({ pageToken: 'next' }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: next` is not a page of the latest listing: list again from the first page.')],
+    refusedWith(RequestMalformedError, '`pageToken: next` is not a page of a listing still open: list again from the first page.')],
   ['a listing since a time', (h) => h.handler.listTasks(listing({ statusTimestampAfter: '2026-09-23T00:00:00Z' }), ctx),
     refusedWith(UnsupportedOperationError, 'this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.')],
   ['a session nobody knows', (h) => h.handler.getTask({ tenant: '', id: 'ae/t-9/1' }, ctx),
@@ -141,19 +141,45 @@ for (const [what, ask, says] of REFUSALS) {
   });
 }
 
-test('a page of an older listing is refused: the list moved since, and the first page is the one to ask again', async () => {
+test('listings overlap: each is paged from the listing its token names, whatever was listed since', async () => {
   const h = harness();
   for (let i = 1; i <= 3; i++) h.sessions.set(`ae/t-${i}/1`, { sessionId: `s-${i}`, state: 'working' });
-  const first = await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
-  assert.equal(first.nextPageToken, '1:1');
-  await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: first.nextPageToken }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: 1:1` is not a page of the latest listing: list again from the first page.'));
-  const latest = await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: latest.nextPageToken, contextId: 't-2' }), ctx),
+  const first = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
+  assert.equal(first.nextPageToken, '1:2');
+  // A second listing, made while the first is still being paged, sees a harness that moved.
+  h.sessions.set('ae/t-4/1', { sessionId: 's-4', state: 'working' });
+  const second = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
+  assert.equal(second.nextPageToken, '2:2');
+  const rest = await h.handler.listTasks(listing({ pageSize: 2, pageToken: first.nextPageToken }), ctx);
+  assert.deepEqual(rest.tasks.map((t) => t.id), ['ae/t-3/1'], 'the first listing, as it was when it was made');
+  assert.equal(rest.nextPageToken, '');
+  const theirs = await h.handler.listTasks(listing({ pageSize: 2, pageToken: second.nextPageToken }), ctx);
+  assert.deepEqual(theirs.tasks.map((t) => t.id), ['ae/t-3/1', 'ae/t-4/1']);
+  assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 2, 'one observe a listing');
+});
+
+test('REFUSED: a page of a listing whose last page was served, of one dropped, of other filters, or past its end', async () => {
+  const h = harness();
+  for (let i = 1; i <= 3; i++) h.sessions.set(`ae/t-${i}/1`, { sessionId: `s-${i}`, state: 'working' });
+  const refused = (token: string) => refusedWith(RequestMalformedError, `\`pageToken: ${token}\` is not a page of a listing still open: list again from the first page.`);
+
+  // Served to its end: its pages are gone with it.
+  const done = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
+  await h.handler.listTasks(listing({ pageSize: 2, pageToken: done.nextPageToken }), ctx);
+  await assert.rejects(h.handler.listTasks(listing({ pageSize: 2, pageToken: done.nextPageToken }), ctx), refused(done.nextPageToken));
+
+  // Left part-way, then outnumbered: the oldest of more than OPEN_LISTINGS open is dropped, and the rest still served.
+  const tokens: string[] = [];
+  for (let i = 0; i <= OPEN_LISTINGS; i++) tokens.push((await h.handler.listTasks(listing({ pageSize: 1 }), ctx)).nextPageToken);
+  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[0] }), ctx), refused(tokens[0]!));
+  assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[1] }), ctx)).tasks.length, 1);
+  assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens.at(-1) }), ctx)).tasks.length, 1);
+
+  const open = await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
+  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: open.nextPageToken, contextId: 't-2' }), ctx),
     refusedWith(RequestMalformedError, 'a page is asked for with other filters than its listing: ask every page with the filters of the first.'));
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: '3:4' }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: 3:4` is not a page of the latest listing: list again from the first page.'));
+  const past = open.nextPageToken.replace(/:[0-9]+$/, ':4');
+  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: past }), ctx), refused(past));
 });
 
 test('a spawn the harness takes: the request reaches it whole, and the Task is working, with the message that asked', async () => {

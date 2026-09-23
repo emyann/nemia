@@ -405,6 +405,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `PushNotificationNotSupportedError` before the transport unless the card says `pushNotifications`, so a test of the
   handler's own refusal calls the transport; and `Client.sendMessage` fills `returnImmediately` from the client's `polling`,
   so a refusal of a send without it is reached only by the handler directly (same run).
+- **A paged read is served from the listing its token names, never from the latest.** The runtime's A2A handler kept one
+  snapshot behind its page tokens, and every view, transcript, `say` and tick in one process observes: with more than a
+  hundred sessions — `check`, `codex` and `claude-detached` list every session they ever ran — a second listing made while
+  the first was paged refused the first's next page, and a tick read the harness as empty. Its tests had pinned that
+  refusal as the rule. Open listings are kept by id, dropped at their last page, and bounded (`OPEN_LISTINGS`); a test
+  pages two observes at once (learned by the run that put the A2A seam in the runtime, round 2).
 
 ## Rules the code keeps
 

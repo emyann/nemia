@@ -2,8 +2,8 @@
  * One harness as an A2A agent: the SDK's public `A2ARequestHandler`, over the driver the runtime already had.
  *
  * It holds no truth. Every answer is derived afresh from the harness (`ops.observe`) and the journal (`events`, folded),
- * so a restarted runtime answers at once, for sessions it never started. The one thing it keeps is the snapshot behind
- * a `listTasks` page token, which lives between the pages of one listing and is replaced by the next.
+ * so a restarted runtime answers at once, for sessions it never started. The one thing it keeps is each listing that
+ * still has pages to serve, under the id its page tokens name, until its last page is served.
  *
  * Not the SDK's `DefaultRequestHandler`: that one runs an `AgentExecutor` against a `TaskStore` it writes, and a store
  * the handler writes is a second record beside the journal — the thing a level-triggered runtime cannot have. This is
@@ -45,6 +45,13 @@ export class HarnessFailed extends Error {
 export const MOST_PER_PAGE = 100;
 const DEFAULT_PER_PAGE = 50;
 
+/**
+ * How many listings may have pages still to serve at once. Listings overlap — every read of a view, a transcript or a
+ * tick observes — so a page is served from the listing its token names, never only the latest. A client that stops
+ * paging part-way leaves its listing behind; past this many, the oldest is dropped, and a token of it refused.
+ */
+export const OPEN_LISTINGS = 64;
+
 /** A harness's card: what it is called, and that it answers a message once and is polled after. */
 export const cardOf = (harness: string): AgentCard => ({
   name: harness,
@@ -62,7 +69,7 @@ export class HarnessHandler implements A2ARequestHandler {
   private readonly harness: string;
   private readonly ops: RunnerOps;
   private readonly events: (taskId: string) => Promise<readonly Event[]>;
-  private snapshot: Snapshot | undefined;
+  private readonly open = new Map<number, Snapshot>();
   private listings = 0;
 
   constructor(harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>) {
@@ -142,8 +149,9 @@ export class HarnessHandler implements A2ARequestHandler {
 
   /**
    * Every session the harness lists, by name, filtered by `contextId` and `status`. The first page observes once; the
-   * pages after it are served from that listing by its token, `<listing>:<offset>`, and a token of an older listing is
-   * refused rather than served a list that moved under it.
+   * pages after it are served from that listing by its token, `<listing>:<offset>`, whatever other listings were made
+   * since. A token of a listing whose last page was served, or that was dropped, is refused rather than served a list
+   * that moved under it.
    */
   async listTasks(params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
     if (params.statusTimestampAfter !== undefined) {
@@ -163,12 +171,12 @@ export class HarnessHandler implements A2ARequestHandler {
         .filter((t) => (!params.contextId || t.contextId === params.contextId)
           && (status === TaskState.TASK_STATE_UNSPECIFIED || t.status!.state === status))
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-      snap = this.snapshot = { id: ++this.listings, contextId: params.contextId, status, tasks };
+      snap = { id: ++this.listings, contextId: params.contextId, status, tasks };
     } else {
       const m = /^([0-9]+):([0-9]+)$/.exec(params.pageToken);
-      const current = this.snapshot;
-      if (!m || !current || Number(m[1]) !== current.id || Number(m[2]) > current.tasks.length) {
-        throw new RequestMalformedError(`\`pageToken: ${params.pageToken}\` is not a page of the latest listing: list again from the first page.`);
+      const current = m ? this.open.get(Number(m[1])) : undefined;
+      if (!m || !current || Number(m[2]) > current.tasks.length) {
+        throw new RequestMalformedError(`\`pageToken: ${params.pageToken}\` is not a page of a listing still open: list again from the first page.`);
       }
       if (current.contextId !== params.contextId || current.status !== status) {
         throw new RequestMalformedError('a page is asked for with other filters than its listing: ask every page with the filters of the first.');
@@ -178,6 +186,12 @@ export class HarnessHandler implements A2ARequestHandler {
     }
     const tasks = snap.tasks.slice(offset, offset + size);
     const next = offset + size < snap.tasks.length ? `${snap.id}:${offset + size}` : '';
+    if (next) {
+      this.open.set(snap.id, snap);
+      if (this.open.size > OPEN_LISTINGS) this.open.delete(this.open.keys().next().value!);
+    } else {
+      this.open.delete(snap.id);
+    }
     return { tasks, nextPageToken: next, pageSize: size, totalSize: snap.tasks.length };
   }
 

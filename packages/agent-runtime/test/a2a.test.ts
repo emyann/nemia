@@ -245,6 +245,27 @@ test("observe through the client is the driver's map, every page of it, from one
   assert.equal(d.asked.filter(([verb]) => verb === 'observe').length, 1, 'the pages after the first are served from its listing');
 });
 
+test('two observes at once over more than a page each read the whole map: a listing made since does not end one being paged', async () => {
+  const d = driven();
+  for (let i = 1; i <= 250; i++) d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: 'working' });
+  // The driver answers neither first page until both are asked, so both listings are made before either asks its second.
+  let release!: () => void;
+  const both = new Promise<void>((r) => { release = r; });
+  let pending = 0;
+  const gated = a2aOps('fake', {
+    ...d.ops,
+    observe: Effect.promise(async () => {
+      if (++pending === 2) release();
+      await both;
+      return new Map(d.sessions);
+    }),
+  }, async () => []);
+  const [one, two] = await Effect.runPromise(Effect.all([gated.observe, gated.observe], { concurrency: 'unbounded' }));
+  assert.equal(pending, 2, 'the driver was observed once a listing');
+  assert.deepEqual(one, d.sessions);
+  assert.deepEqual(two, d.sessions);
+});
+
 test("an observe that failed is the harness's words", async () => {
   const d = driven({ observeFails: 'fake: `fake ls` exited 3' });
   const e = await failure(d.runner.observe);

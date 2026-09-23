@@ -2,8 +2,10 @@
  * The engine's side of the A2A seam: a harness's `RunnerOps`, rebuilt as calls through the SDK's `Client` to that
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
- * `spawn`, `observe` and `stop` go through the client; `logs`, `find`, `release`, `transcript`, `say` and `refuses` still
- * reach the driver directly, until part 3. Nothing the engine reads changes: a harness's words come back as the same
+ * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs` and `release`, which A2A
+ * has no call for, through the runtime extension's methods on the same transport. Two reach the driver directly:
+ * `transcript`, until part 4 makes it `SubscribeToTask`, and `refuses`, which is no call to a session but the harness
+ * judging a task before any is filed. Nothing the engine reads changes: a harness's words come back as the same
  * `RunnerError`, `refused` where the harness vouched nothing started, and a driver's defect as the defect it is.
  */
 import { Effect, Layer } from 'effect';
@@ -18,21 +20,23 @@ import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
 import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { Event, Sighting } from './domain.ts';
+import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner, RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
-import { cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE } from './a2a-handler.ts';
-import { messageOf, sightingOf, wordsOf } from './a2a-map.ts';
+import {
+  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods,
+} from './a2a-handler.ts';
+import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './a2a-map.ts';
 
 /**
  * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that
  * arrived by HTTP would. The transport's names and the handler's differ in three places — the extended card, the
- * push-config listing, a resubscribe — and are mapped here.
+ * push-config listing, a resubscribe — and are mapped here. The runtime extension's methods are forwarded as they are.
  */
 export class InProcessTransport implements Transport {
-  private readonly handler: A2ARequestHandler;
+  private readonly handler: A2ARequestHandler & SessionMethods;
 
-  constructor(handler: A2ARequestHandler) {
+  constructor(handler: A2ARequestHandler & SessionMethods) {
     this.handler = handler;
   }
 
@@ -87,11 +91,36 @@ export class InProcessTransport implements Transport {
   async *resubscribeTask(params: SubscribeToTaskRequest): AsyncGenerator<StreamResponse, void, undefined> {
     yield* this.handler.resubscribe(params, new ServerCallContext());
   }
+
+  findSession(params: { name: string }): Promise<{ sessionId: string } | null> {
+    return this.handler.findSession(params, new ServerCallContext());
+  }
+
+  sessionLogs(params: { sessionId: string }): Promise<{ logs: string }> {
+    return this.handler.sessionLogs(params, new ServerCallContext());
+  }
+
+  releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
+    return this.handler.releaseSession(params, new ServerCallContext());
+  }
 }
+
+/** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
+const seamOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>) => {
+  const card = cardOf(harness, ops);
+  const transport = new InProcessTransport(new HarnessHandler(harness, ops, events));
+  return { card, transport, client: new Client(transport, card, { polling: true }) };
+};
 
 /** A client of one harness, over its handler in this process. `polling`: a send answers once the session starts. */
 export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): Client =>
-  new Client(new InProcessTransport(new HarnessHandler(harness, ops, events)), cardOf(harness), { polling: true });
+  seamOf(harness, ops, events).client;
+
+/** What a card says of the runtime extension: the methods its agent answers, and whether a session takes words. */
+const extensionOf = (card: AgentCard): RuntimeExtensionParams => {
+  const params = card.capabilities?.extensions.find((e) => e.uri === RUNTIME_EXTENSION)?.params as Partial<RuntimeExtensionParams> | undefined;
+  return { methods: params?.methods ?? [], say: params?.say === true };
+};
 
 /**
  * A client call as a driver's verb: its value, or the harness's words — or the seam's own refusal, in A2A's words — as a
@@ -109,10 +138,13 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
  * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
  * lists every page. `stop` cancels the session by name, read off the last listing, since the engine stops by session id;
  * a session no listing has is not stopped blindly but refused in words, where a driver was handed the id to make of what
- * it would. The engine stops only a session the pass has just seen live, so it never asks for that.
+ * it would. The engine stops only a session the pass has just seen live, so it never asks for that. `say` is a follow-up
+ * message on the session's Task. `find`, `logs` and `release` are the extension's methods. A verb is offered as the card
+ * says — the verbs the harness's driver lacks are left off it — so the engine reads the same absences it read before.
  */
 export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): RunnerOps => {
-  const client = clientOf(harness, ops, events);
+  const { card, transport, client } = seamOf(harness, ops, events);
+  const offered = extensionOf(card);
   let names = new Map<string, string>();
 
   const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
@@ -167,7 +199,30 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     ));
   });
 
-  return { ...ops, spawn, observe, stop };
+  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
+    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
+
+  const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
+    call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
+
+  const release = (session: Sighting, task: { worktree?: string | boolean }): Effect.Effect<Usage | void, RunnerError> =>
+    call('release', () => transport.releaseSession({ session, task })).pipe(Effect.map((r) => r.usage ?? undefined));
+
+  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> =>
+    call('say', () => client.sendMessage({
+      tenant: '', message: followUpOf(session.name, text, randomUUID()), metadata: undefined,
+      configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+    })).pipe(Effect.asVoid);
+
+  return {
+    spawn, observe, stop, logs,
+    ...(offered.methods.includes('findSession') ? { find } : {}),
+    ...(offered.methods.includes('releaseSession') ? { release } : {}),
+    ...(offered.say ? { say } : {}),
+    // Direct by design: `transcript` until part 4, `refuses` for good (see the header).
+    ...(ops.transcript ? { transcript: ops.transcript } : {}),
+    ...(ops.refuses ? { refuses: ops.refuses } : {}),
+  };
 };
 
 /**

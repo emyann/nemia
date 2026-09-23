@@ -6,6 +6,10 @@
  * text part, and the rest of the request in its metadata, `config` whole and never opened. What a harness sees of a
  * session — the `Sighting` — rides whole in the Task's metadata, and its state is also the Task's, mapped below.
  *
+ * A spawn is marked with the runtime's extension, `RUNTIME_EXTENSION`: it names a Task that does not exist yet, which a
+ * plain A2A message may not (a message with a `taskId` continues that task). A message without the mark is plain A2A —
+ * words said to a session that runs, a follow-up on its Task.
+ *
  * Nothing here is stored. A Task is built from a sighting or from the journal each time it is asked for
  * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
  */
@@ -20,6 +24,20 @@ export const nameParts = (name: string): { taskId: string; n: number } | undefin
   const parts = { taskId: m[1]!, n: Number(m[2]) };
   return nameFor(parts.taskId, parts.n) === name ? parts : undefined;
 };
+
+/**
+ * The runtime's A2A extension. On a message, it marks a spawn: a session started under the name the message gives. On a
+ * card, it says which of the runtime's own methods the agent answers (`SESSION_METHODS`) and whether a running session
+ * takes words (`say`).
+ */
+export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
+
+/**
+ * The extension's methods, beside A2A's: a session found by name, a session's logs, a session let go of. Each keeps the
+ * driver's own key — a name, a session id, the sighting — since none of them is a Task's to answer.
+ */
+export const SESSION_METHODS = ['findSession', 'sessionLogs', 'releaseSession'] as const;
+export type SessionMethod = (typeof SESSION_METHODS)[number];
 
 const STATES: Record<Observed, TaskState> = {
   working: TaskState.TASK_STATE_WORKING,
@@ -55,17 +73,30 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
   metadata: clean({
     cwd: r.cwd, harness: r.harness, config: r.config, resumeFrom: r.resumeFrom, closeoutSchema: r.closeoutSchema, budgetUsd: r.budgetUsd,
   }),
-  extensions: [], referenceTaskIds: [],
+  extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
 });
+
+/** Words said to a running session, as A2A's follow-up: a user Message on the session's Task, one text part, no mark. */
+export const followUpOf = (name: string, text: string, messageId: string): Message => ({
+  messageId, contextId: nameParts(name)?.taskId ?? '', taskId: name, role: Role.ROLE_USER,
+  parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
+});
+
+/** Why a message's taskId is not a session's, in words — or `undefined`. Asked of a spawn and of a follow-up alike. */
+const sessionRefusal = (taskId: string, contextId: string): string | undefined => {
+  const parts = nameParts(taskId);
+  if (!parts) return `\`${taskId}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`;
+  if (contextId && contextId !== parts.taskId) {
+    return `the message's contextId \`${contextId}\` is not the task its name carries, \`${parts.taskId}\`: send that, or none.`;
+  }
+  return undefined;
+};
 
 /** Why a message cannot be read as a spawn, in words — or `undefined`. What `spawnOf` reads, it has checked here. */
 export const messageRefusal = (m: Message): string | undefined => {
   if (!m.taskId) return 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.';
-  const parts = nameParts(m.taskId);
-  if (!parts) return `\`${m.taskId}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`;
-  if (m.contextId && m.contextId !== parts.taskId) {
-    return `the message's contextId \`${m.contextId}\` is not the task its name carries, \`${parts.taskId}\`: send that, or none.`;
-  }
+  const named = sessionRefusal(m.taskId, m.contextId);
+  if (named) return named;
   if (m.role !== Role.ROLE_USER) return 'a spawn is a message from the user: its role is ROLE_USER.';
   if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
     return `the brief is one text part, and this message has ${m.parts.length === 1 ? 'one part that is not text' : `${m.parts.length} parts`}.`;
@@ -73,6 +104,27 @@ export const messageRefusal = (m: Message): string | undefined => {
   if (typeof m.metadata?.cwd !== 'string' || !m.metadata.cwd) return "the message's metadata has no `cwd`: say where the session works.";
   return undefined;
 };
+
+/**
+ * Why a message cannot be read as words said to a session, in words — or `undefined`. A message with no taskId asks
+ * A2A for a new Task, and this agent starts a session only on a spawn, which carries the mark.
+ */
+export const followUpRefusal = (m: Message): string | undefined => {
+  if (!m.taskId) {
+    return `a message with no taskId asks for a new task, and a session is started only by a spawn, marked \`${RUNTIME_EXTENSION}\`: to speak to a running session, send its name, \`ae/<task>/<n>\`, as the taskId.`;
+  }
+  const named = sessionRefusal(m.taskId, m.contextId);
+  if (named) return named;
+  if (m.role !== Role.ROLE_USER) return 'words said to a session are a message from the user: its role is ROLE_USER.';
+  if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
+    return `words said to a session are one text part, and this message has ${m.parts.length === 1 ? 'one part that is not text' : `${m.parts.length} parts`}.`;
+  }
+  if (!m.parts[0]!.content.value.trim()) return 'the words are empty: give the words the session should hear.';
+  return undefined;
+};
+
+/** The words a message `followUpRefusal` passed says. */
+export const followUpText = (m: Message): string => (m.parts[0]!.content as { $case: 'text'; value: string }).value;
 
 /**
  * The spawn a message asks for, every key of the request present, as the engine builds it: a harness is handed the same

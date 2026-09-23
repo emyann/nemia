@@ -5,6 +5,10 @@
  * read no disk and spawn nothing, which is what lets `assess` and the verdict be tested as data. The
  * CLI parses, calls and prints, so it reaches the package through `runner.ts` and the format through
  * `workflow.ts`, and nothing else. A rule a session can re-break is a rule this suite refuses.
+ *
+ * What of the I/O never names the engine sits beneath `runner.ts`: `store.ts`, `daemon-store.ts`, `feed-store.ts` and `worktree.ts`.
+ * They import neither the engine nor `runner.ts`, and only `store.ts` of each other, so they load as a tree beneath it, with no cycle;
+ * and no pure file reaches the disk through them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +32,9 @@ const sources = (): Array<{ file: string; imports: string[] }> =>
     .map((f) => ({ file: `${dir}/${f}`, imports: importsIn(fs.readFileSync(path.join(PKG, dir, f), 'utf8')) })));
 
 const importsOf = (file: string) => sources().find((s) => s.file === file)!.imports;
+
+/** The files beneath runner.ts: I/O that never names the engine. */
+const BENEATH = ['./store.ts', './daemon-store.ts', './feed-store.ts', './worktree.ts'];
 
 test('the scanner sees every way a file can name a module — or the rules below would pass by seeing nothing', () => {
   const text = [
@@ -53,10 +60,21 @@ test('only runner.ts imports agent-engine — not even for a type', () => {
 });
 
 test('run.ts, timeline.ts, closeout.ts, retry.ts, daemon.ts, check.ts, radius.ts, plan.ts and inbox.ts read no disk, spawn nothing, and do not reach for the I/O module', () => {
-  const impure = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process', './runner.ts'];
+  const impure = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process', './runner.ts', ...BENEATH];
   for (const file of ['src/run.ts', 'src/timeline.ts', 'src/closeout.ts', 'src/retry.ts', 'src/daemon.ts', 'src/check.ts', 'src/radius.ts', 'src/plan.ts', 'src/inbox.ts']) {
     assert.deepEqual(importsOf(file).filter((m) => impure.includes(m)), [], file);
   }
+});
+
+test('store.ts, daemon-store.ts, feed-store.ts and worktree.ts sit beneath runner.ts: none imports it, and none but store.ts is imported by another', () => {
+  for (const mod of BENEATH) {
+    const file = `src/${mod.slice(2)}`;
+    const imports = importsOf(file);
+    assert.ok(!imports.includes('./runner.ts'), `${file} imports runner.ts, which imports it: a cycle`);
+    assert.deepEqual(imports.filter((m) => BENEATH.includes(m) && m !== './store.ts'), [], `${file} imports a sibling beneath runner.ts other than store.ts`);
+    assert.ok(importsOf('src/runner.ts').includes(mod), `and runner.ts imports ${mod}, so this is looking at the right files`);
+  }
+  assert.deepEqual(importsOf('src/store.ts').filter((m) => BENEATH.includes(m)), [], 'store.ts is the bottom of the tree');
 });
 
 test('cli.ts reaches the package only through runner.ts and workflow.ts', () => {

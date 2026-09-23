@@ -55,7 +55,8 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
 };
 
 const filing = { id: 't-r', brief: 'keep at it', cwd: '/repo', harness: 'fake' };
-const listing = { tenant: '', contextId: 't-r', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: 50, pageToken: '', historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false };
+/** Listed by the session's context: the id its harness gave it, `s-1`, which a new process learns only from the harness. */
+const listing = { tenant: '', contextId: 's-1', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: 50, pageToken: '', historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false };
 
 test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async () => {
   const w = world();
@@ -71,7 +72,7 @@ test('a restarted runtime answers for a session it never started, then stops it 
   assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING);
   assert.deepEqual(sightingOf(task), w.sessions.get('ae/t-r/1'));
   const listed = await fresh.listTasks(listing);
-  assert.deepEqual(listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]), [['ae/t-r/1', 't-r', TaskState.TASK_STATE_WORKING]]);
+  assert.deepEqual(listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]), [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]]);
 
   // Stopped by the second runtime: its tick cancels the session through its agent, which stops it on the harness.
   await b.stop(id);

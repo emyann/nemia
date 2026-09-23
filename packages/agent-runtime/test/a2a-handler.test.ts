@@ -15,7 +15,7 @@ import {
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
-import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
+import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
@@ -127,8 +127,6 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(RequestMalformedError, 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.')],
   ['a spawn under a name that is not a session name', (h) => h.handler.sendMessage(spawn('ae/t-1/0', { contextId: '' }), ctx),
     refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ["a spawn whose context is not its name's task", (h) => h.handler.sendMessage(spawn('ae/t-1/1', { contextId: 't-2' }), ctx),
-    refusedWith(RequestMalformedError, "the message's contextId `t-2` is not the task its name carries, `t-1`: send that, or none.")],
   ['a spawn said by the agent', (h) => h.handler.sendMessage(spawn('ae/t-1/1', { role: Role.ROLE_AGENT }), ctx),
     refusedWith(RequestMalformedError, 'a spawn is a message from the user: its role is ROLE_USER.')],
   ['a spawn with no text part', (h) => h.handler.sendMessage(spawn('ae/t-1/1', {
@@ -181,8 +179,14 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(TaskNotFoundError, 'no session `ae/t-1/1` for the `fake` harness to hear anything: it lists none.')],
   ['words to a name that is not a session name', (h) => h.handler.sendMessage(said('fake-1'), ctx),
     refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ["words whose context is not their session's task", (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 't-2' }), ctx),
-    refusedWith(RequestMalformedError, "the message's contextId `t-2` is not the task its name carries, `t-1`: send that, or none.")],
+  ["words in a context that is not their session's", (h) => {
+    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', nativeId: 'conv-a' });
+    return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 'conv-b' }), ctx);
+  }, refusedWith(RequestMalformedError, "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.")],
+  ["words in a context, to a session none is known for yet", (h) => {
+    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+    return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 't-1' }), ctx);
+  }, refusedWith(RequestMalformedError, "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.")],
   ['words said by the agent', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { role: Role.ROLE_AGENT }), ctx),
     refusedWith(RequestMalformedError, 'words said to a session are a message from the user: its role is ROLE_USER.')],
   ['words that are not text', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', {
@@ -290,7 +294,7 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
   }]]);
   assert.ok('status' in t);
   assert.equal(t.id, 'ae/t-1/1');
-  assert.equal(t.contextId, 't-1');
+  assert.equal(t.contextId, '', 'no context until the harness lists the session with an id');
   assert.equal(t.status!.state, TaskState.TASK_STATE_WORKING);
   assert.deepEqual(t.history, [asked.message]);
 });
@@ -340,7 +344,7 @@ test('listing 250 sessions: sorted by name, in pages, every sighting whole, and 
   assert.deepEqual(seen, [...names].sort());
   assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 1, 'one observe for the whole listing');
 
-  const one = await h.handler.listTasks(listing({ contextId: 't-007' }), ctx);
+  const one = await h.handler.listTasks(listing({ contextId: 'n-7' }), ctx);
   assert.deepEqual(one.tasks.map((t) => t.id), ['ae/t-007/1']);
   const blocked = await h.handler.listTasks(listing({ status: TaskState.TASK_STATE_INPUT_REQUIRED }), ctx);
   assert.equal(blocked.totalSize, 50);
@@ -382,9 +386,108 @@ test('a session is answered as the harness sees it, and else as the journal has 
   assert.equal((await answer('ae/t-2/3')).status!.state, TaskState.TASK_STATE_CANCELED);
   const open = await answer('ae/t-2/4');
   assert.equal(open.status!.state, TaskState.TASK_STATE_SUBMITTED);
-  assert.equal(open.contextId, 't-2');
+  assert.equal(open.contextId, '', 'an attempt with no id recorded is in no context');
   await assert.rejects(answer('ae/t-2/5'), TaskNotFoundError);
   assert.deepEqual(h.acted(), []);
+});
+
+test('a spawn that continues a session carries it as its context, and the harness is handed it as `resumeFrom`', async () => {
+  const h = harness();
+  await h.handler.sendMessage(spawn('ae/t-1/2', { contextId: 'conv-a' }), ctx);
+  assert.equal((h.acted()[0]![1] as SpawnRequest).resumeFrom, 'conv-a');
+  await h.handler.sendMessage(spawn('ae/t-2/1', { contextId: '' }), ctx);
+  assert.equal((h.acted()[1]![1] as SpawnRequest).resumeFrom, undefined, 'no context is a cold start');
+});
+
+test("a listing by context is every attempt that continued the conversation, whatever the runtime's task", async () => {
+  const h = harness();
+  // Filed in the opposite order to the names, so a listing that kept the harness's order or sorted by id alone would differ.
+  h.sessions.set('ae/t-2/1', { sessionId: 'job-3', state: 'working', nativeId: 'conv-a' });
+  h.sessions.set('ae/t-1/2', { sessionId: 'job-2', state: 'done', nativeId: 'conv-a' });
+  h.sessions.set('ae/t-1/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-b' });
+  h.sessions.set('ae/t-1/3', { sessionId: 'job-4', state: 'working' });
+  const a = await h.handler.listTasks(listing({ contextId: 'conv-a' }), ctx);
+  assert.deepEqual(a.tasks.map((t) => [t.id, t.contextId]), [['ae/t-1/2', 'conv-a'], ['ae/t-2/1', 'conv-a']]);
+  assert.deepEqual((await h.handler.listTasks(listing({ contextId: 'conv-b' }), ctx)).tasks.map((t) => t.id), ['ae/t-1/1']);
+  assert.deepEqual((await h.handler.listTasks(listing({ contextId: 't-1' }), ctx)).tasks, [], "the runtime's task is no context");
+});
+
+test('a listing carries what each session closed with only when it asks for artifacts; a read of one session always does', async () => {
+  const h = harness();
+  const closeout = { payload: { outcome: 'done' }, at: 1790000000000 };
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done', nativeId: 'conv-a', closeout });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'working' });
+  const bare = await h.handler.listTasks(listing(), ctx);
+  assert.deepEqual(bare.tasks.map((t) => t.artifacts), [[], []], "A2A's default: no artifacts");
+  assert.deepEqual(sightingOf(bare.tasks[0]!)?.closeout, closeout, 'the sighting, which the engine reads, is whole either way');
+  const full = await h.handler.listTasks({ ...listing(), includeArtifacts: true }, ctx);
+  assert.deepEqual(full.tasks.map((t) => t.artifacts.map((a) => a.artifactId)), [['closeout'], []]);
+  assert.deepEqual(closeoutOf(full.tasks[0]!), { outcome: 'done' });
+  // Paged: each page asks for itself.
+  const first = await h.handler.listTasks({ ...listing({ pageSize: 1 }), includeArtifacts: true }, ctx);
+  assert.equal(first.tasks[0]!.artifacts.length, 1);
+  const rest = await h.handler.listTasks({ ...listing({ pageSize: 1, pageToken: first.nextPageToken }) }, ctx);
+  assert.deepEqual(rest.tasks.map((t) => t.id), ['ae/t-2/1']);
+  assert.equal(closeoutOf(await h.handler.getTask({ tenant: '', id: 'ae/t-1/1' }, ctx)) !== undefined, true);
+});
+
+/** A task held open whose first attempt signed: waiting on a person, `ae/t-h/1` its session. */
+const held = (after: Event[] = []): Event[] => [
+  { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', maxAttempts: 2, holdOpen: true },
+  { kind: 'starting', at: '2026-09-23T10:00:00.000Z', attempt: 1 },
+  { kind: 'spawned', at: '2026-09-23T10:00:01.000Z', attempt: 1 },
+  { kind: 'ended', at: '2026-09-23T10:05:00.000Z', attempt: 1, sessionId: 'job-1', observed: 'done', reason: 'harness', nativeId: 'conv-h', closeout: { outcome: 'done' } },
+  ...after,
+];
+
+test('a signed session its task holds open is INPUT_REQUIRED on a read, listed by its harness or let go; a listing says what the harness does', async () => {
+  const listed = harness();
+  listed.journal.set('t-h', held());
+  // A Claude Code job is never let go: its harness lists it done while its task waits.
+  const job: Sighting = { sessionId: 'job-1', state: 'done', nativeId: 'conv-h', closeout: { payload: { outcome: 'done' }, at: 1790000000000 } };
+  listed.sessions.set('ae/t-h/1', job);
+  const read = await listed.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
+  assert.deepEqual([read.status!.state, read.contextId, closeoutOf(read)], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }]);
+  assert.equal(sightingOf(read), undefined, 'a Task whose state is not its sighting\'s carries none to read');
+  const inList = (await listed.handler.listTasks(listing(), ctx)).tasks;
+  assert.deepEqual(inList.map((t) => t.status!.state), [TaskState.TASK_STATE_COMPLETED]);
+  assert.deepEqual(sightingOf(inList[0]!), job, 'observe reads the harness, unchanged');
+
+  const gone = harness();
+  gone.journal.set('t-h', held());
+  const off = await gone.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
+  assert.deepEqual([off.status!.state, off.contextId, closeoutOf(off)], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }]);
+  assert.deepEqual(listed.acted().concat(gone.acted()), [], 'a read, and nothing asked of the harness');
+});
+
+test('REFUSED: a held task answered or closed waits on nobody, and a task not held open never did — each read COMPLETED', async () => {
+  const at = '2026-09-23T10:06:00.000Z';
+  const cases: Array<[string, Event[]]> = [
+    ['answered, its next turn not begun', held([{ kind: 'input', at, text: 'go on' }])],
+    ['closed', held([{ kind: 'closed', at }])],
+    ['not held open', held().map((e) => (e.kind === 'filed' ? { ...e, holdOpen: undefined } : e))],
+  ];
+  for (const [what, events] of cases) {
+    for (const listedDone of [true, false]) {
+      const h = harness();
+      h.journal.set('t-h', events);
+      if (listedDone) h.sessions.set('ae/t-h/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-h' });
+      assert.equal((await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status!.state, TaskState.TASK_STATE_COMPLETED,
+        `${what}, ${listedDone ? 'listed done' : 'let go'}`);
+    }
+  }
+  // The answer's turn signed, and waits again: its attempt is the one waiting; the first turn's is done.
+  const h = harness();
+  h.journal.set('t-h', held([
+    { kind: 'input', at, text: 'go on' },
+    { kind: 'starting', at, attempt: 2, resumeFrom: 'conv-h' },
+    { kind: 'spawned', at, attempt: 2 },
+    { kind: 'ended', at, attempt: 2, sessionId: 'job-2', observed: 'done', reason: 'harness', nativeId: 'conv-h' },
+  ]));
+  const states = await Promise.all(['ae/t-h/1', 'ae/t-h/2'].map((id) => h.handler.getTask({ tenant: '', id }, ctx)));
+  assert.deepEqual(states.map((t) => [t.status!.state, t.contextId]), [
+    [TaskState.TASK_STATE_COMPLETED, 'conv-h'], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h'],
+  ], 'two turns of one conversation, one context');
 });
 
 test('a stop: a live session is stopped and CANCELED, one already stopped is CANCELED again, and the harness asked once', async () => {

@@ -1,7 +1,7 @@
 /**
  * The subscription's quota, asked of Claude Code itself: the `claude` on the api's PATH, sent its `get_usage` control request (`askUsage`).
  * No prompt is sent, so no model is called and no token spent; it answers in about half a second with the plan's windows as claude.ai's
- * usage endpoint reports them (measured on Claude Code 2.1.278, packages/agent-workflows/docs/features.md, *the quota on the board*).
+ * usage endpoint reports them (measured on Claude Code 2.1.278, packages/agent-orchestrator/docs/features.md, *the quota on the board*).
  *
  * Nothing asks unless a board asks. `readQuota` answers from the last ask while it is younger than `QUOTA_KEEP_MS`, starts one ask
  * otherwise — a request that comes while one is in flight joins it — and waits for it at most `QUOTA_WAIT_MS` before it says `asking`.

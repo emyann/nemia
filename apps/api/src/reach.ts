@@ -14,7 +14,7 @@
  * removes the tool. A Codex step reads no `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the
  * page claims nothing else for it.
  */
-import { HARNESSES } from 'agent-workflows';
+import { HARNESSES } from 'agent-orchestrator';
 import { capabilitiesOf, denyingRule, MEASURED_TOOLS, READ_ONLY_COMMANDS, SETTINGS, type Capabilities, type DeniedRule } from './capabilities.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from './workflows.ts';
 

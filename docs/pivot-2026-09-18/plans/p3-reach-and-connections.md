@@ -1,5 +1,7 @@
 # P3, reach and connections — a plan set aside
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 *Planned on 19 September by run `what-an-agent-may-reach-is-d-kma1` ($4), and not built.* The owner, at its gate: the
 mailbox was only ever an example; a connection registry, a fake mail server and a fence of deny rules (or a proxy) are
 too much for now — "just keep it simple". What they want first is an agent's configuration shaped after the A2A

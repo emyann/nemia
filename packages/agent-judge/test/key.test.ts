@@ -55,4 +55,5 @@ test("the card's questions are pinned: a change of words fails here, and says th
   assert.deepEqual(keys, PINNED);
 });
 
-const PINNED = { web: '8620bc15afb12a79', plan: '9e603ee4e4cdaf9e', clear: '7916c347b43ec1a1', size: '0569630fff5cf6e0' };
+// Keyed afresh on 2026-09-23: the questions' words are as measured, and `REPOSITORY` names the renamed packages.
+const PINNED = { web: '052e54e65eea0eed', plan: '1cd148750dcb0206', clear: 'acb88142113ca7b7', size: '63fcfd3e6c01733f' };

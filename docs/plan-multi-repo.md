@@ -15,7 +15,7 @@ checked; the P2 item *workspaces at the Factory's level* is most of it.
 ## 1. What already works
 
 - **A run carries its repository.** A git run's record holds `repo`, `baseRef`, `branch` and `workflowDir`, and freezes its
-  workflow (`packages/agent-workflows/src/run.ts:40-76`). `tick()` advances every run in the store
+  workflow (`packages/agent-orchestrator/src/run.ts:40-76`). `tick()` advances every run in the store
   (`runner.ts:2587-2604`); a `workspace: main` step runs in `run.repo` (`runner.ts:941`), and the one-at-a-time hold on a
   checkout is keyed by repository (`MainClaim.repo`, `run.ts:604`).
 - **The store is the machine's.** `WF_ROOT`, or `~/.agent-workflows` (`runner.ts:42`): runs, inbox, queue, checks and the
@@ -24,7 +24,7 @@ checked; the P2 item *workspaces at the Factory's level* is most of it.
 - **Worktrees are per run.** `$WF_ROOT/worktrees/<run>/<step>` on `wf/<run>/<step>` (`runner.ts:952-958`); the base is the
   repository's checked-out branch, not a hardcoded `main` (`runner.ts:910-911`).
 - **Sessions are the checkout's.** `claude --bg` and codex start in the step's workspace
-  (`agent-engine/src/runner-detached.ts:230-263`) and read that checkout's `.mcp.json`, `.claude/settings.json` and codex
+  (`agent-runtime/src/runner-detached.ts:230-263`) and read that checkout's `.mcp.json`, `.claude/settings.json` and codex
   rules. `.worktreeinclude` is read from `run.repo` (`runner.ts:846-850`).
 - **So the CLI can already drive another repository**, with a workflow folder written for it:
   `wf start "<brief>" --repo ~/projects/pipao-v2 --workflows <folder>`.
@@ -54,7 +54,7 @@ In the order they block.
 5. **`dontAsk` steps lean on the target's allow-list.** Planner and reviewers run in `dontAsk`: a command the repository's
    `.claude/settings.json` does not allow is denied with no prompt, and the session carries on without it — so a repository
    whose tests are `pytest`, or `npm run test:integration`, has to allow them, or its reviewer never runs them.
-6. **`wf` lives in this checkout.** It is `packages/agent-workflows`' `bin` (`bin/wf.ts`), reached with `npx wf` from here,
+6. **`wf` lives in this checkout.** It is `packages/agent-orchestrator`'s `bin` (`bin/wf.ts`), reached with `npx wf` from here,
    on Node's type stripping (>= 22.18). A card that names no repository starts where `wf up` was started
    (`cli.ts:657, 686`; `runner.ts:1773, 1837`).
 7. **A worktree's dependencies are npm's.** `provisionDeps` links the checkout's `node_modules` or runs `npm ci` when the
@@ -82,7 +82,7 @@ Read 2026-09-22 (`~/projects/pipao-v2`, main at `1dfe63b`).
 typecheck && npm run lint`), the agents' hkb-v2 words taken out, pipao's allow-list extended for what its reviewers must
 run, and `.worktreeinclude` for `apps/web/.env` if a check needs it. Run one or two real small cards through it with
 `wf start --repo ~/projects/pipao-v2`. What breaks there is the list the next steps answer, measured rather than guessed —
-the migration note's advice: "run your own real work through `agent-engine` + `agent-workflows` for a week first".
+the migration note's advice: "run your own real work through `agent-runtime` + `agent-orchestrator` for a week first".
 
 **Step 2 — the rest of P2, which is this work.** "Workspaces at the Factory's level — `folder | git repository | github
 repository`" is choosing a folder or one of the person's repositories. Small cards, chained with `--after` where they touch

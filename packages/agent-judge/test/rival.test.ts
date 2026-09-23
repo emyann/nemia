@@ -45,17 +45,27 @@ test('the plan rule needs a planning word AND three parts; each half alone does 
 });
 
 test('a part written as a brief writes it — a path — is one part, and `workflows/` is not its tail', () => {
-  // `workflows/` is the end of `packages/agent-workflows/src/run.ts`, which briefs write constantly. Counted by
+  // `workflows/` is the end of `packages/agent-orchestrator/src/run.ts`, which briefs write constantly. Counted by
   // substring it made one path two parts, and the plan rule fired on briefs naming two.
-  assert.equal(partsNamed('Fix `packages/agent-workflows/src/run.ts`.'), 1);
-  assert.equal(partsNamed('Fix `packages/agent-workflows/src/run.ts` and `apps/web/src/Board.tsx`.'), 2);
-  assert.equal(rival('Decide how `packages/agent-workflows/src/run.ts` and `apps/web/src/Board.tsx` agree.').plan, false);
+  assert.equal(partsNamed('Fix `packages/agent-orchestrator/src/run.ts`.'), 1);
+  assert.equal(partsNamed('Fix `packages/agent-orchestrator/src/run.ts` and `apps/web/src/Board.tsx`.'), 2);
+  assert.equal(rival('Decide how `packages/agent-orchestrator/src/run.ts` and `apps/web/src/Board.tsx` agree.').plan, false);
   // The repository's own folder still counts, written any of the ways a brief writes it.
   for (const said of ['the workflows/ folder', 'a step under workflows/dev', 'copy workflows/ui'])
     assert.equal(partsNamed(said), 1, said);
-  assert.equal(partsNamed('Read workflows/dev, apps/web/src and packages/agent-engine/src/domain.ts.'), 3);
+  assert.equal(partsNamed('Read workflows/dev, apps/web/src and packages/agent-runtime/src/domain.ts.'), 3);
   // And a path is still a path where a word runs up to it the other way round.
-  assert.equal(partsNamed('agent-workflows/src alone'), 0, 'a part named without its `packages/` is not that part');
+  assert.equal(partsNamed('agent-orchestrator/src alone'), 0, 'a part named without its `packages/` is not that part');
+});
+
+test('a part named by its former folder is still that part, and once with its new name', () => {
+  // The briefs already in a store name the folders as they were before the rename.
+  const engine = 'packages/agent-engine'; // renamed on 2026-09-23
+  const workflows = 'packages/agent-workflows'; // renamed on 2026-09-23
+  assert.equal(partsNamed(`Fix \`${workflows}/src/run.ts\`.`), 1);
+  assert.equal(partsNamed(`Read ${engine}/src/domain.ts and apps/web/src.`), 2);
+  assert.equal(partsNamed(`Read ${engine}/src and packages/agent-runtime/src.`), 1, 'one part under both its names is one part');
+  assert.equal(rival(`Decide it across ${engine}, packages/agent-orchestrator and apps/api.`).plan, true);
 });
 
 test('every planning word is a word, not a fragment, and case does not matter', () => {
@@ -199,7 +209,7 @@ test('the label is the folder\'s basename, and only the four are labels', () => 
     assert.deepEqual(labelOf(`/home/someone/hkb-v2/workflows/${f}/`), { label: f }, 'a trailing slash is not a folder of its own');
   }
   assert.deepEqual(labelOf('/x/workflows/ui'), { other: 'ui' });
-  assert.deepEqual(labelOf('/home/yrnd1/projects/agent-workflows/workflows'), { other: 'workflows' });
+  assert.deepEqual(labelOf('/home/yrnd1/projects/agent-orchestrator/workflows'), { other: 'workflows' });
   assert.deepEqual(labelOf('/x/workflows/dev-planned-build-2'), { other: 'dev-planned-build-2' }, 'a fifth dev* folder falls out of scope, and is not read as one of the four');
   assert.equal(labelOf(undefined), null);
   assert.equal(labelOf(''), null);

@@ -1,7 +1,7 @@
 /** The cap on runs in flight, and the runs it counts and holds: what the Factory says over its floor (`GET /api/ceilings`, app.ts). */
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, lastCeilings, listRuns, parentOf, type ParentRun, phaseOfView, readAsks, slotWord, spendReader, stepsOf } from 'agent-workflows';
-import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-workflows/run';
-import type { Workflow } from 'agent-workflows/workflow';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, lastCeilings, listRuns, parentOf, type ParentRun, phaseOfView, readAsks, slotWord, spendReader, stepsOf } from 'agent-orchestrator';
+import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
+import type { Workflow } from 'agent-orchestrator/workflow';
 import { everyView, seenBy } from './store.ts';
 
 /**

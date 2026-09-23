@@ -1,6 +1,6 @@
 /** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands. */
-import { branchesToRead, type BranchStanding, branchStandings, branchWord, CHECK_AFFECTING, closeoutAsked, closeoutReader, consumption, diffStat, exitVerdicts, harnessBlocked, isShipped, lessonLine, merges, phaseOfView, readAsks, resultSteps, runCostLines, sendBackTo, sensitiveDiff, touchedBy } from 'agent-workflows';
-import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-workflows/run';
+import { branchesToRead, type BranchStanding, branchStandings, branchWord, CHECK_AFFECTING, closeoutAsked, closeoutReader, consumption, diffStat, exitVerdicts, harnessBlocked, isShipped, lessonLine, merges, phaseOfView, readAsks, resultSteps, runCostLines, sendBackTo, sensitiveDiff, touchedBy } from 'agent-orchestrator';
+import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
 import { judge, type RunWaiting, waitingOf, waitsIn } from './judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { e, judgedSteps, stepNames, viewsOf, workflowsOf } from './store.ts';

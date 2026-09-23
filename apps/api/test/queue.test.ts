@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store, and so its inbox, when the module loads: point it at a scratch directory first. No cap from this shell.
+// agent-orchestrator locates its store, and so its inbox, when the module loads: point it at a scratch directory first. No cap from this shell.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-queue-'));
 process.env.WF_ROOT = root;
 delete process.env.WF_MAX_RUNS;
@@ -24,7 +24,7 @@ git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
 const { app } = await import('../src/app.ts');
-const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } = await import('agent-workflows');
+const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } = await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 type Ceilings = import('../src/ceilings.ts').Ceilings;
 

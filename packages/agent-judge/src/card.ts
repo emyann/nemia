@@ -15,8 +15,8 @@ export const MODEL = 'jev-1.13.0';
 
 /** What each part of the repository is: fixed text, so the state has one shape for every card. */
 export const REPOSITORY = {
-  'packages/agent-engine': 'runs one agent session to completion, durably; no user interface',
-  'packages/agent-workflows': 'sequences engine tasks into runs of steps; the wf command line; no user interface',
+  'packages/agent-runtime': 'runs one agent session to completion, durably; no user interface',
+  'packages/agent-orchestrator': 'sequences engine tasks into runs of steps; the wf command line; no user interface',
   'apps/api': 'a Node server that puts the workflows behind HTTP; the web app and its end-to-end test run against it',
   'apps/web': 'the React web app people look at: the Factory, a run\'s page, the inbox, the workflows and agents pages',
   'workflows/': 'folders of markdown that say which agents do a piece of work and in what order',

@@ -70,7 +70,7 @@ export default {
       // `wf decide`, on the same store: the words under the step, with when they were said, as data.
       let decided: string;
       try {
-        decided = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-workflows', 'bin', 'wf.ts'), 'decide', SAYING.run], { encoding: 'utf8', env: apiEnv, stdio: 'pipe' });
+        decided = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'decide', SAYING.run], { encoding: 'utf8', env: apiEnv, stdio: 'pipe' });
       } catch (err) {
         const { stdout, stderr } = err as { stdout?: string; stderr?: string };
         throw new Refused(`wf decide ${SAYING.run} runs on the e2e's store — it failed:\n${stdout ?? ''}${stderr ?? ''}`);

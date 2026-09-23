@@ -1,5 +1,7 @@
 # The experiments behind the pivot (2026-09-18)
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 The scripts, labels and results that `docs/pivot-2026-09-18.md` cites. They were written in a scratch
 directory during one session and copied here so the evidence outlives it. Nothing here is imported by
 the packages or run by `npm test`.

@@ -1,5 +1,7 @@
 # Hold the bar — the handoff plan
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 Written 2026-09-12 from [`docs/eval-2026-09-12/REPORT.md`](eval-2026-09-12/REPORT.md), for
 concurrent Claude Code sessions. Each package below is a brief a session can be handed cold:
 what it owns, what it must not touch, what "done" is, and which tests must make something

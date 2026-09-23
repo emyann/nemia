@@ -1,7 +1,7 @@
 /** One run in full, for a person reading it (`GET /api/runs/:id`): the spec, and per step what it was told and how it went. */
-import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, phaseOfView, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-workflows';
-import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-workflows/run';
-import { loopSpan, type Workflow } from 'agent-workflows/workflow';
+import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, phaseOfView, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
+import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-orchestrator/run';
+import { loopSpan, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
@@ -15,7 +15,7 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
  * it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the step's
  * tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they have cost
  * the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says `over budget` or
- * `budget exhausted` — where another session of it is the way on. A `claude --bg` session is not stopped at its cap (agent-engine's issue
+ * `budget exhausted` — where another session of it is the way on. A `claude --bg` session is not stopped at its cap (agent-runtime's issue
  * 17), so a step can finish past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
@@ -550,7 +550,7 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
  * A harness the run brings as a spec — `codex`, `claude-detached` — is asked with its own `command`, a pure function of the request:
  * the mode it would spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task
  * named. So a rule the engine changes is the rule read here. `claude` is the engine's own `claude --bg` runner, whose spawn is no
- * function it exports: the mode filed, or `auto` (`claudeOps` in agent-engine's runner.ts), which the api test holds to the command
+ * function it exports: the mode filed, or `auto` (`claudeOps` in agent-runtime's runner.ts), which the api test holds to the command
  * that runner spawns. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api
  * cannot ask, or one whose command names no mode.
  */

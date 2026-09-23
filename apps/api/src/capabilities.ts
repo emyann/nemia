@@ -188,7 +188,7 @@ const EDITS_WITH = 'Not named by any measurement. Every implement step of this r
  * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's test
  * refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no unfenced
  * measurement names, each with why, which the page marks as inferred and never as measured. `lacks` are the ones the measurement found absent.
- * MCP tools are in neither: the checkout's servers reach a step whatever its `tools:` (packages/agent-workflows/docs/features.md, measured),
+ * MCP tools are in neither: the checkout's servers reach a step whatever its `tools:` (packages/agent-orchestrator/docs/features.md, measured),
  * and each lists its own.
  */
 export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {

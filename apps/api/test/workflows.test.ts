@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory first. The api reads the
+// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The api reads the
 // repository from HKB_REPO on each request: a git repository, since `wf start` reads its HEAD.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-workflows-'));
 process.env.WF_ROOT = root;
@@ -22,9 +22,9 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 const { app } = await import('../src/app.ts');
 const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
-const { parentRecord, readRun } = await import('agent-workflows');
-const { afterRefusal } = await import('agent-workflows/run');
-const { AGENTS_FOLDER, isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
+const { parentRecord, readRun } = await import('agent-orchestrator');
+const { afterRefusal } = await import('agent-orchestrator/run');
+const { AGENTS_FOLDER, isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
 
@@ -362,10 +362,10 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
     assert.ok(w.description, `workflows/${w.name} has a README with a description`);
   }
 
-  const shipped = path.join(HOME_REPO, 'packages', 'agent-workflows', 'workflows');
+  const shipped = path.join(HOME_REPO, 'packages', 'agent-orchestrator', 'workflows');
   const reviewer = loadWorkflows(shipped).find((s) => s.name === 'review')!;
   // dev's check: the suite and the types, then the build and the e2e when, and only when, git says the work touched the web app
-  // (packages/agent-workflows/test/web-check.test.ts runs it against real git). dev-build's runs them whatever was touched.
+  // (packages/agent-orchestrator/test/web-check.test.ts runs it against real git). dev-build's runs them whatever was touched.
   const devCheck = "npm test && npm run typecheck && { if [ -n \"${WF_BASE_REF:-}\" ]; then range=\"$WF_BASE_REF...HEAD\"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only \"$range\" --) || { echo \"wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess\" >&2; false; }; } && if printf '%s\\n' \"$touched\" | grep -Eq '^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)'; then npm run build && npm run e2e; else echo \"wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e\"; fi";
   for (const [name, check] of [['dev', devCheck], ['dev-build', 'npm test && npm run typecheck && npm run build && npm run e2e']] as const) {
     const w = listed.find((x) => x.name === name)!;

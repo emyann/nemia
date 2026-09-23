@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store as its module loads: set first.
+// agent-orchestrator locates its store as its module loads: set first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-read-'));
 process.env.WF_ROOT = root;
 

@@ -6,7 +6,7 @@ model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
 # `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). An ending follows a script: a trial merge, the folder's check, a commit or an abort.
 effort: medium
-# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-engine open issue 26).
+# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-runtime open issue 26).
 context: 200k
 # Denied by name what no step needs and an unattended session otherwise has, as the implementer is: messaging other
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.

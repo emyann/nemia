@@ -300,11 +300,11 @@ alone, so the judge's numbers have something to beat.
   `trade-off`, `trade-offs`, `tradeoff`, `tradeoffs`. The list is fixed (`PLANNING_WORDS`): a form
   it does not hold, such as `deciding` or `option`, does not fire the rule. **And** the brief names
   at least three of the five
-  parts of the repository (`apps/web`, `apps/api`, `packages/agent-engine`,
-  `packages/agent-workflows`, `workflows/`), each counted once.
+  parts of the repository (`apps/web`, `apps/api`, `packages/agent-runtime`,
+  `packages/agent-orchestrator`, `workflows/`), each counted once.
 
 A part counts where it is named as itself: `workflows/` is the repository's own folder, not the tail
-of `packages/agent-workflows/src/run.ts`, which briefs write constantly.
+of `packages/agent-orchestrator/src/run.ts`, which briefs write constantly.
 
 Two things were tuned, once, on the runs it is scored on, and nothing else was. `apps/web` alone
 scored better on precision than the two paths together (0.74 against 0.71, both at recall 1.00) and

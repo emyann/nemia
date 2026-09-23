@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory first.
+// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-agents-'));
 process.env.WF_ROOT = root;
 const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-agents-repo-'));

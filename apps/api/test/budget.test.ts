@@ -12,13 +12,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store as its module loads: set first.
+// agent-orchestrator locates its store as its module loads: set first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-budget-'));
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { askFile, budgetRefusal, decide, engine, list, readRun, retry, round, roundAskFile, usedLines } = await import('agent-workflows');
-type RetryHow = import('agent-workflows').RetryHow;
+const { askFile, budgetRefusal, decide, engine, list, readRun, retry, round, roundAskFile, usedLines } = await import('agent-orchestrator');
+type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-15T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

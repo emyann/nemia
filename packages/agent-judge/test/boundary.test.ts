@@ -72,7 +72,7 @@ test('nothing in the workspace imports the judge or its SDK, or depends on them'
 
 test('the judge imports nothing from the workspace', () => {
   const names = workspaces().filter((d) => d !== PACKAGE).map(nameOf);
-  assert.ok(names.includes('agent-engine') && names.includes('agent-workflows'));
+  assert.ok(names.includes('agent-runtime') && names.includes('agent-orchestrator'));
   const pkg = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8'));
   assert.deepEqual(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((n) => names.includes(n)), []);
   const found = ['src', 'bin', 'test'].flatMap((sub) => sources(path.join(PACKAGE, sub)))

@@ -21,7 +21,7 @@ narrowing those allows is the settings' to do. `implement` is denied `SendMessag
 and pages and nothing else of implement (`input: implement`), reads the diff, and uses the look skill on
 the screenshots and the pages side by side. At this repository's settings review looks through the
 screenshots: in `dontAsk` a `browser_*` call is denied, because `.claude/settings.json` allows none
-(measured; `packages/agent-workflows/docs/features.md`, *Shipped: looking is a skill*). Review's findings are its closeout (`review.schema.json`), each
+(measured; `packages/agent-orchestrator/docs/features.md`, *Shipped: looking is a skill*). Review's findings are its closeout (`review.schema.json`), each
 naming a file and a line or a page and a theme, and `again: true` sends the change round again:
 implement's own session is continued with the findings, then a new review. After the third round, a
 person decides.
@@ -31,7 +31,7 @@ pictures another step took, and could not send the change round again.
 
 The two steps name `ui-implementer` and `ui-reviewer`, in `workflows/agents/` with `implement.schema.json`: the role
 keys above and the instructions are theirs, and the step files keep the wiring. Every file but this README is a
-copy of the package's `packages/agent-workflows/workflows/ui/`, and its two agents of `packages/agent-workflows/workflows/agents/`,
+copy of the package's `packages/agent-orchestrator/workflows/ui/`, and its two agents of `packages/agent-orchestrator/workflows/agents/`,
 which stay the package's shipped example, and a test holds the copy to them; the package README,
 *`workflows/ui/`: a change a person will see*, says more.
 

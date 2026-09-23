@@ -4,9 +4,9 @@ The harness kanban board, rebuilt on the two libraries that replaced its core.
 
 | | what it is | depends on |
 |---|---|---|
-| `packages/agent-engine` | runs one agent session to completion, durably; the `ae` CLI | — |
-| `packages/agent-workflows` | sequences engine tasks into runs of steps; the `wf` CLI | `agent-engine` |
-| `apps/api` | Node server (Hono) that puts the workflows behind HTTP | `agent-workflows` |
+| `packages/agent-runtime` | runs one agent session to completion, durably; the `ae` CLI | — |
+| `packages/agent-orchestrator` | sequences engine tasks into runs of steps; the `wf` CLI | `agent-runtime` |
+| `apps/api` | Node server (Hono) that puts the workflows behind HTTP | `agent-orchestrator` |
 | `apps/web` | React app: Vite, TanStack Router + Query, Tailwind | `apps/api`, over HTTP only |
 
 Dependencies point down this table, never up. The web app imports no package: the engine spawns
@@ -26,7 +26,7 @@ npx wf              # the workspace CLIs are linked at the root
 
 The packages and the API are TypeScript that Node runs directly (type stripping, Node >= 22.18).
 Node refuses to strip types under `node_modules`, but a workspace is a symlink whose realpath is
-outside it, so importing `agent-workflows` from the API runs the `.ts` source.
+outside it, so importing `agent-orchestrator` from the API runs the `.ts` source.
 
 The engine must also **not be bundled**: it finds its detached worker (`bin/ae-worker.ts`)
 relative to its own source file. That is why the API is a plain Node process and not a Next.js
@@ -86,8 +86,17 @@ If you installed the statusline an earlier version of this board asked for, take
 ## History
 
 Both packages keep their git history, imported from the standalone repositories at
-`agent-engine` master `102106b` and `agent-workflows` master `0c438ac`:
+`agent-engine` master `102106b` and `agent-workflows` master `0c438ac`, the names they had until they were renamed on 2026-09-23.
+
+On 2026-09-23 the two packages took the names of their layers: `agent-runtime` keeps one agent session
+alive to completion (create, resume, stop), and `agent-orchestrator` turns folders and cards into its
+tasks, watches them and reconciles. What people type and what is on disk kept its name: the `wf` and `ae`
+commands, the stores under `~/.agent-workflows` and `~/.agent-engine` with `WF_ROOT` and `AE_ROOT`, and the workflow
+folders' format. A path that crosses the rename is followed by naming both ends:
 
 ```bash
-git log -- packages/agent-engine
+git log -- packages/agent-runtime packages/agent-engine # renamed on 2026-09-23
 ```
+
+After pulling the rename, run `npm install` at the root (the workspace links are renamed) and restart a
+running `wf up`: a daemon started before it spawns its sessions from a worker path that is gone.

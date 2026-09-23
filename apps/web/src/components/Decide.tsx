@@ -445,7 +445,7 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
     // `step` in the ask names another step to try instead, for an ending step's gate, where the send-back goes to the work and not to the
-    // step at the gate (`sendBackTo` in agent-workflows); it is not part of the request the api takes.
+    // step at the gate (`sendBackTo` in agent-orchestrator); it is not part of the request the api takes.
     mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) => askTry(runId, to ?? step, how),
     onSuccess: () => {
       onAsked();

@@ -58,7 +58,7 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   return 'working';
 }
 
-/** Final, and a follower may be filed on it — `satisfiesAfter` in agent-workflows: verified, or done on its own word. */
+/** Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, or done on its own word. */
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
 
 /**

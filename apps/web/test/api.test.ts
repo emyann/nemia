@@ -103,7 +103,7 @@ test("a run's workflow is named by the last segment of its folder, as the Workfl
   assert.equal(workflowNameOf('/code/app/workflows/dev-build'), 'dev-build');
   assert.equal(workflowNameOf('/code/app/workflows/ui/'), 'ui');
   // The package's shipped default is a folder called `workflows`, and that is its name.
-  assert.equal(workflowNameOf('/code/app/packages/agent-workflows/workflows'), 'workflows');
+  assert.equal(workflowNameOf('/code/app/packages/agent-orchestrator/workflows'), 'workflows');
   assert.equal(workflowNameOf('C:\\code\\app\\workflows\\dev'), 'dev');
 });
 

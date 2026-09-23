@@ -2,7 +2,7 @@
 #
 # Codex's sandbox keeps .git read-only on purpose. This rule lets exactly `git add` and
 # `git commit` run outside it, and nothing else. Codex loads it only for a trusted project;
-# agent-engine extends the trust you gave this repository to the worktrees it runs steps in.
+# agent-runtime extends the trust you gave this repository to the worktrees it runs steps in.
 # Without it nothing breaks: the workflow commits whatever a step leaves behind.
 prefix_rule(
     pattern = ["git", ["add", "commit"]],

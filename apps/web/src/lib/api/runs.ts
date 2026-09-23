@@ -4,7 +4,7 @@ import { pace } from '../feed.ts';
 import { get } from './read.ts';
 import type { RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
 
-/** Mirrors `PlaceKind` in agent-workflows' run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
+/** Mirrors `PlaceKind` in agent-orchestrator's run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
 
 /** Mirrors `RunSummary` in apps/api/src/runs.ts. */

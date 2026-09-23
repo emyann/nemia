@@ -1,5 +1,7 @@
 # hkb-v2 against the bar — evaluation for the maintainer
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 Paths relative to `/home/yrnd1/projects/hkb-v2` unless prefixed `hkb:` (`/home/yrnd1/projects/harness-kanban-board`).
 Every cited line was read on 2026-09-12; `npm test` 109 + 72 + 3 pass, `npm run typecheck` 4/4. Claude Code 2.1.270, codex-cli 0.154.0.
 

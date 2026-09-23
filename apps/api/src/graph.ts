@@ -1,4 +1,4 @@
-import { DEFAULT_ROUNDS, type Workflow } from 'agent-workflows/workflow';
+import { DEFAULT_ROUNDS, type Workflow } from 'agent-orchestrator/workflow';
 
 /**
  * One edge of a run's graph. `after`: `to` waits on `from`. `loop`: `from` is the looping step, and `to` the step a round
@@ -29,7 +29,7 @@ export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop'
     if (!after.length) roots.push(step.name);
     for (const from of after) edges.push({ from, to: step.name, kind: 'after' });
     if (step.loop && names.has(step.loop) && step.loop !== step.name) {
-      // `capOf` in agent-workflows' run.ts: a loop that does not say runs the default.
+      // `capOf` in agent-orchestrator's run.ts: a loop that does not say runs the default.
       edges.push({ from: step.name, to: step.loop, kind: 'loop', rounds: step.rounds ?? DEFAULT_ROUNDS });
     }
   }

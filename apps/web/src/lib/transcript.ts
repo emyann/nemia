@@ -166,7 +166,7 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
  * What was said to a session, each with the first of the session's events that shows its words reaching it (`arrived`), and the events without
  * those. The session's line for words it was handed is the same words, so a person reads them once, as what they said (`withSaid`), where they
  * reached the session. Matched in the order said, each thing said to one event at most: words said twice are two arrivals. Words the transcript
- * does not show — queued behind a prompt nobody answers (agent-engine's open issue 16), or set aside (issue 12) — have none, and every other
+ * does not show — queued behind a prompt nobody answers (agent-runtime's open issue 16), or set aside (issue 12) — have none, and every other
  * line stays the session's. Nothing said leaves the events as they were.
  */
 export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {

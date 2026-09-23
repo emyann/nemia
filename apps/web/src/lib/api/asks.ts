@@ -1,6 +1,6 @@
 /** What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (apps/api/src/asks.ts). */
 
-/** Mirrors `Said` in agent-workflows, the engine's `said` entry: words a person said to a step's running session, when, and to which attempt of its task. */
+/** Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, and to which attempt of its task. */
 export type Said = { at: string; attempt: number; text: string };
 
 /** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */

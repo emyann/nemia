@@ -183,7 +183,7 @@ export function Gate({ runId, step, back = [step], acts = false, framed = true }
  *
  * An approval is about the gated step, and what follows it is filed — except at an ending step's gate (`acts`), where nothing follows and
  * the approval files that step itself. A send-back is about the step whose try was asked for, which at such a gate is the work and not the
- * step at the gate (`sendBackTo` in agent-workflows): naming the ending there would say a try was filed for a step that has not run.
+ * step at the gate (`sendBackTo` in agent-orchestrator): naming the ending there would say a try was filed for a step that has not run.
  */
 export const takenOf = (
   taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string },
@@ -196,7 +196,7 @@ export const takenOf = (
 
 /**
  * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `approvedFirst` in
- * agent-workflows): its gate holds before it is filed, and a person's approval is what files it.
+ * agent-orchestrator): its gate holds before it is filed, and a person's approval is what files it.
  *
  * A gate on a step that works, §6's, holds the handoff after the step has signed off, so that step has a task and a closeout to read; an
  * ending step acts where nothing can be taken back, and has no closeout of its own — what a person approves is the work it would act on.
@@ -263,7 +263,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
 /**
  * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off, and for a
  * step that ends the run in the checkout (`ends`, `endsTheRun`) once the work it acts on has, since such a step never signs off before its
- * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-workflows).
+ * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
  */
 export const gateWord = (gate: StepGate, ends = false): string =>
   (gate.approval ? `approved, try ${gate.approval.try}`
@@ -276,7 +276,7 @@ export const gateWord = (gate: StepGate, ends = false): string =>
  * after the gate is handed under `## Approved`.
  *
  * `ends` for the step that ends the run in the checkout (`endsTheRun`): nothing follows its gate, and the package hands the words to that
- * step itself — the terms it acts on (`approvedSection` in agent-workflows). Its approval is also what filed it, so the sentence says that
+ * step itself — the terms it acts on (`approvedSection` in agent-orchestrator). Its approval is also what filed it, so the sentence says that
  * and not that something after it was let through.
  */
 export function Approved({ step, approval, ends = false }: { step: string; approval: StepApproval; ends?: boolean }) {

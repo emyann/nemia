@@ -1,5 +1,7 @@
 # Which large file should be split, and how — asked of Jev (2026-09-22)
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 The owner's question: of this repository's files over 1,000 lines, which should be broken into modules? Three rounds,
 all on `jev-1.13.0`, about 600k input tokens in 43 requests (about 2.5 cents), main at `576df48`. No source code was
 sent: each file went as its outline — every top-level declaration's name, kind, size, whether it is exported and the

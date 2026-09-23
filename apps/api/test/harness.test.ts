@@ -12,7 +12,7 @@ import path from 'node:path';
 
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-root-'));
 const { app } = await import('../src/app.ts');
-const { engine } = await import('agent-workflows');
+const { engine } = await import('agent-orchestrator');
 
 test('every api test file imports the harness first, before anything that could observe this machine', () => {
   const dir = import.meta.dirname;

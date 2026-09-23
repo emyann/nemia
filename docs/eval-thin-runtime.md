@@ -259,7 +259,7 @@ orchestrator's calls to the runtime change.
    `say` and `remoteControl` on a job are refused in words that name `background: true`, a budget beside it is refused as
    `--bg` keeps none, and `background` on any other harness is refused. What a job was denied is on its attempt
    (`denials`) and on `ae show`, and `decide` never reads it. The orchestrator stays on `claude-bg` until part 2. Done, on
-   the same day, measured first on Claude Code 2.1.280 (M1 to M6, `packages/agent-runtime/docs/open-issues.md` issue 28).
+   the same day, measured first on Claude Code 2.1.280 (M1 to M7, `packages/agent-runtime/docs/open-issues.md` issue 28).
    **(2) steps become jobs**, with the orchestrator's `claude` mapped to the adapter. **(3) denials on every surface** — a
    `denied:` line on `wf decide`, `wf ls`, the api and the board — and a `denials: fail` step key. **(4) a gate or a blocked
    sign-off as `TASK_STATE_INPUT_REQUIRED` on one task**, the runtime holding it open; R1, a card of its own. **(5) the A2A

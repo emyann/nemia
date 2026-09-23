@@ -663,6 +663,35 @@ test('M2, M3, M5: a job resumed from a --bg session remembers it; a job resumed 
   assert.equal(capped.state.settled, 'succeeded', `a resume under a cap below its session's whole cost finished: ${capped.phase}`);
 });
 
+test('M7: a job resumed from a job that was denied is not charged its parent\'s denials — the result of a resume says only what the resume was denied, unlike its cost', {
+  skip,
+  timeout: 20 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('m7-board') });
+  const probe = tmp('m7');
+  const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: { model: 'haiku' } };
+  const settled = async (id: string) => {
+    const end = Date.now() + 10 * 60_000;
+    while (Date.now() < end) {
+      await engine.tick();
+      const v = await engine.view(id);
+      if (v.state.settled) return v;
+      await new Promise((r) => setTimeout(r, 5_000));
+    }
+    return engine.view(id);
+  };
+  const denied = await settled(await engine.file({ ...common, brief: DENIED_BRIEF(path.join(probe, 'outside')) }));
+  const parent = denied.state.attempts.at(-1);
+  assert.equal(denied.state.settled, 'succeeded', `the denied job settled: ${denied.phase}`);
+  assert.ok((parent?.denials ?? []).some((d) => d.tool === 'Write'), 'and its attempt says what it was denied');
+  const resumed = await settled(await engine.file({ ...common, resumeFrom: parent!.nativeId!, brief: 'Give your closing statement, with finished set to true. Call no tool first.' }));
+  const child = resumed.state.attempts.at(-1);
+  t.diagnostic(`parent denied ${JSON.stringify(parent?.denials)}; the resume: ${resumed.state.settled}, denied ${JSON.stringify(child?.denials)}, cost ${child?.usage?.costUsd}`);
+  assert.equal(resumed.state.settled, 'succeeded', `the resume settled: ${resumed.phase}`);
+  assert.equal(child?.nativeId, parent?.nativeId, 'in the same session');
+  assert.equal(child?.denials, undefined, "the resume, which called nothing, carries none of its parent's denials");
+});
+
 test('M4: claude -p stopped mid-turn by SIGTERM or SIGINT can be resumed, and remembers what it was told', {
   skip,
   timeout: 15 * 60_000,

@@ -604,7 +604,7 @@ session's name through the extension's `sessionTranscript`. What is still direct
 Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
 `config.background: true` (`src/runner-claude-code.ts`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M6).
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M7).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -633,6 +633,11 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
   is kept open — the worker gives the harness none today (`stdio: ['ignore', …]` in `bin/ae-worker.ts`). That is stage 2 part 2's choice (the plan's option (d)); until then `say`
   refuses a job in words that name `background: true` and `resumeFrom`. The control, SIGINT and then `-p --resume` with the
   words, is M4.
+- **M7: a resume is not charged its parent's denials.** Asked in review after the rest, and measured by hand the same
+  way: a job denied a write outside its folder, then `claude -p --resume` of it told to call nothing, printed
+  `permission_denials: []` and no `permission_denied` line, under the same session id — where its cost (M2) is carried on.
+  So a resumed job's result is read for denials as a first job's is, and a round, a retry or a gate's answer resumed from
+  a denied attempt says only what it was itself denied. Were a later version to carry them, M7 fails.
 
 What a job gives up, or what is not done:
 
@@ -691,7 +696,7 @@ What a job gives up, or what is not done:
   gone from `claude agents` afterwards. Whether the agents view listed the bridged one was not looked at: the registration's
   `bridgeSessionId` is what the 2.1.273 measurement found the view follows.
 
-- **Claude Code as a job** (issue 28, thin runtime stage 2 part 1). `test/live.test.ts`'s M1 to M6 on Claude Code 2.1.280,
+- **Claude Code as a job** (issue 28, thin runtime stage 2 part 1). `test/live.test.ts`'s M1 to M7 on Claude Code 2.1.280,
   2026-09-23, haiku, each run by the implementing step after the hand measurements. M1: all eight
   mode and flag pairs exited 0 with a result, nothing written outside the folder, one `permission_denied` line for each
   entry of `permission_denials`; `auto` ran as `default`. Under the engine, a job on `claude` at shipped defaults settled
@@ -699,7 +704,9 @@ What a job gives up, or what is not done:
   it may not do settled with none. M3: a job resumed from a `--bg` session remembered its word, under the same id, and
   recorded no cost (issue 4). M2: a job at $0.0438, and the job resumed from it charged $0.0034. M5: a resume capped at
   $0.02, under its session's $0.0473, finished at $0.0032. M4: SIGTERM exit 143, SIGINT exit 0, each resumed and
-  remembered its word. M6: one result, `num_turns: 2`, with the word said on stdin while `sleep 20` ran. The first run
+  remembered its word. M6: one result, `num_turns: 2`, with the word said on stdin while `sleep 20` ran. M7, run
+  in round 2: a job denied `Write`, `Bash(curl)` and `WebFetch`, then resumed and told to call nothing, settled `succeeded`
+  with no `denials` in the same session, charged $0.0052. The first run
   failed M1's `dontAsk` pair — `--allowedTools` took the prompt given after it for a rule, so the test puts the prompt first
   as the job's spec does — and M4, on a brief haiku did not follow; both passed on the second.
 

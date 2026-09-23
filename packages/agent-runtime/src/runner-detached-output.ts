@@ -125,6 +125,7 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
     ? { inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
     : {};
   const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+  // A resume's result names only what the resume was denied, though its cost is its session's (2.1.280, open issue 28, M7).
   const denials = deniedCalls([...denied, ...(Array.isArray(result.permission_denials) ? result.permission_denials : [])], inputs);
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),

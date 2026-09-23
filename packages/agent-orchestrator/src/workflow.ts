@@ -1644,6 +1644,7 @@ function validateSlot(steps: readonly Workflow[]): void {
  * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
  * steps that wait on each other go last, as given, rather than nowhere.
  */
+
 export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: readonly S[]): S[] {
   const names = new Set(steps.map((s) => s.name));
   const order: S[] = [];
@@ -1658,6 +1659,16 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
   }
   return [...order, ...pending];
 }
+
+/**
+ * A step read back off a record as it ran when it was frozen. Every `claude` step was a background session (`claude --bg`) until thin
+ * runtime stage 2 part 2, and `remote: true` was taken there: frozen with no `background`, such a step would now be filed as a job with a
+ * bridge, which the runtime refuses at `file` — and a refusal thrown out of one run's `advance` stops the whole pass, every run in the store
+ * with it, on every pass after. Read by `stepsOf` and never by `wf start`, which has refused `remote: true` without `background: true`
+ * since: so it changes only what was frozen before, and nothing a folder can say today. Pure.
+ */
+export const asRan = (step: Workflow): Workflow =>
+  step.remote && step.background === undefined && (step.harness ?? 'claude') === 'claude' ? { ...step, background: true } : step;
 
 /** Every step `name` waits on, directly or through another. */
 export function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {

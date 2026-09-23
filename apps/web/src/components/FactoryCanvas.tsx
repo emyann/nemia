@@ -28,15 +28,11 @@ import {
   CARD_WIDTH,
   CELL_HEIGHT,
   CELL_WIDTH,
-  draggedBy,
   floorRuns,
-  followersOf,
-  followingCards,
   graphAt,
   inFlight,
   keepDragged,
   keepLayout,
-  movedOpen,
   ONE_CELL,
   placeRuns,
   runOfNode,
@@ -49,7 +45,7 @@ import {
   type Span,
 } from '@/lib/factory';
 import { capLine, queueOf } from '@/lib/inbox';
-import { extentOf, layout, type Point, type StepEdges, stepsOf } from '@/lib/layout';
+import { extentOf, layout, type Point, stepsOf } from '@/lib/layout';
 import { stepState } from '@/lib/status';
 import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
@@ -110,15 +106,14 @@ const minimapFill = (node: FloorNode) =>
           : 'var(--color-sky-500)';
 
 /**
- * Where an open run's steps go beside its card before a person drags any, from their names and the `after` edges of its graph alone —
- * and those edges, which say what moves with a step dragged (`followersOf`); or why they cannot be drawn.
+ * Where an open run's steps go beside its card before a person drags any, from their names and the `after` edges of its graph alone;
+ * or why they cannot be drawn.
  */
-type Unfolded = { at: Map<string, Point>; steps: StepEdges[] } | { error: string };
+type Unfolded = { at: Map<string, Point> } | { error: string };
 
 function unfold(names: readonly string[], edges: RunDetail['graph']['edges']): Unfolded {
   try {
-    const steps = stepsOf(names, edges);
-    return { at: graphAt(layout(steps)), steps };
+    return { at: graphAt(layout(stepsOf(names, edges))) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
@@ -137,13 +132,12 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * starts takes the next free cell and moves no card already down — and after that wherever a person
  * dragged it, until "Reset layout". A click on a card, or Enter on one, opens it: its graph unfolds to
  * the right over as many cells as it needs, and the cards in them move aside (`placeRuns`) — when it opens,
- * and when a card or a step is dropped where a person dragged it. The steps
- * are the card's children in React Flow, placed relative to it, so they move with it when it is
- * dragged. Whatever is dragged takes along what waits on it — what the edges put to its right — and leaves
- * what it waits on where it is: a card takes the cards that wait on its run, directly or through others
- * (`followingCards`), each with its steps; a step, draggable on its own too, takes the steps that wait on it
- * (`followersOf`), and the cells its run takes follow on the drop. A click on a step opens its inspector beside the floor. Which runs are open, and how far each
- * step was dragged, are kept in this browser with the layout.
+ * and then only. The steps are the card's children in React Flow, placed relative to it, so they move with
+ * it when it is dragged. Otherwise each piece on the floor moves alone, as in a factory modeller: a card
+ * dragged moves that card and its own steps, a step dragged moves that step, and a drop moves nothing else —
+ * a card dropped over another stays over it, since that is where the person put it. The edges between cards
+ * and between steps stretch to follow; they pull nothing. A click on a step opens its inspector beside the
+ * floor. Which runs are open, and how far each step was dragged, are kept in this browser with the layout.
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
  * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`) —
@@ -213,15 +207,15 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   );
 
   // How far a person dragged each open run's steps from where the layering puts them, by the step's node: as they drag; as
-  // last dropped, which is what the floor is laid out for, so the cards under a step move aside on the drop and not as it
-  // passes over them; and the step under the pointer. Kept in this browser with the cards' arrangement.
+  // last dropped, which is what the cells a run takes are read from, so the floor is not laid out again on every pointer
+  // move; and the step under the pointer. Kept in this browser with the cards' arrangement.
   const [dragged, setDragged] = useState<{ live: ReadonlyMap<string, Point>; dropped: ReadonlyMap<string, Point>; dragging: string | null }>(() => {
     const saved = readFactorySteps();
     return { live: saved, dropped: saved, dragging: null };
   });
 
   // The cells each drawn graph takes — its steps where the layering puts them, moved where a person last dropped them — the run
-  // opened or moved last first: the order `placeRuns` claims cells in.
+  // opened last first: the order `placeRuns` claims cells in.
   const spansKey = JSON.stringify(
     [...reading].reverse().flatMap((id) => {
       const shape = unfolded.get(id);
@@ -230,28 +224,39 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   );
   const spans = useMemo(() => new Map<string, Span>(JSON.parse(spansKey)), [spansKey]);
 
+  // Runs left open on the last visit unfold once their steps are read, and the floor is fitted again then, once.
+  const restoring = useRef(reading.length > 0);
+
   // Where each card is and how big React Flow measured it, changed only through `onNodesChange`, a run
   // joining or leaving the floor or opening or closing, and a reset. What a card shows is read below.
   const [placed, setPlaced] = useState<RunFlowNode[]>(() => {
     const at = placeRuns(ids, new Map(), readFactoryLayout(), new Map(), after);
     return shown.map((run) => nodeOf(run, at.get(run.id)!));
   });
-  // Cards a person has dropped where they dragged them: the floor is laid out again on each drop, so a
-  // card left under a graph moves then, and not on whatever changes the floor next.
-  const [drops, setDrops] = useState(0);
-  // Which runs, graphs and drops `placed` was last laid out for: whatever reads the cards' positions waits for it.
-  const layoutKey = `${idsKey} ${spansKey} ${drops}`;
+  // Which runs and graphs `placed` was last laid out for: whatever reads the cards' positions waits for it.
+  const layoutKey = `${idsKey} ${spansKey}`;
   const [placedFor, setPlacedFor] = useState('');
+
+  // The runs a person opened whose graphs have not yet unfolded on the floor: the only thing that moves a card aside, once, when
+  // its steps are read (`placeRuns`' `unfolding`). A card or a step dropped moves nothing but itself.
+  const unfolding = useRef(new Set<string>());
+  // Cards placed while the runs left open are still being read, on no cell of their own yet — a run that started since the last
+  // visit: laid out afresh until every graph is on the floor, or the first free cell is the one a graph is about to cover again.
+  const provisional = useRef(new Set(restoring.current ? ids.filter((id) => !readFactoryLayout()?.has(id)) : []));
 
   // Set when a card has moved — dragged, or moved aside by a graph — and cleared once the arrangement is saved.
   const moved = useRef(false);
 
-  // Runs that started, finished, were asked for, opened, closed or dropped since: every card where it belongs.
+  // Runs that started, finished, were asked for, opened or closed since: every card where it belongs.
   useEffect(() => {
+    const opening = new Set([...unfolding.current].filter((id) => spans.has(id)));
+    for (const id of opening) unfolding.current.delete(id);
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
-      // Cards on the floor stay put, unless a graph now covers them; one coming back yields its old cell.
-      const at = placeRuns(ids, new Map(current.map((node) => [node.id, node.position])), readFactoryLayout(), spans, after);
+      if (restoring.current) for (const id of ids) if (!have.has(id)) provisional.current.add(id);
+      const onFloor = new Map(current.filter((node) => !provisional.current.has(node.id)).map((node) => [node.id, node.position]));
+      // Cards on the floor stay put, unless a graph opening now covers them; one coming back yields its old cell.
+      const at = placeRuns(ids, onFloor, readFactoryLayout(), spans, after, opening);
       const next = shown.map((run) => {
         const node = have.get(run.id);
         const point = at.get(run.id)!;
@@ -292,28 +297,17 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 
   // What the drag, the observers and the reveal read, as of the last commit.
   const frame = useRef<HTMLDivElement>(null);
-  const latest = useRef({ shown, placed, graphs, spans, inspecting: selected?.runId ?? null });
+  const latest = useRef({ open, placed, graphs, spans, inspecting: selected?.runId ?? null });
   useLayoutEffect(() => {
-    latest.current = { shown, placed, graphs, spans, inspecting: selected?.runId ?? null };
+    latest.current = { open, placed, graphs, spans, inspecting: selected?.runId ?? null };
   });
 
   const onNodesChange = useCallback((changes: NodeChange<FloorNode>[]) => {
-    const { shown, graphs } = latest.current;
-    // A card or a step dropped: the run it is of claims its cells first, as one opened last does, so what it lands on moves
-    // aside and not the card a person just put down, and not the steps they just put down; a closed card dropped on a graph
-    // takes a free cell. The cards a dragged card took along were put down too: each claims before the rest, the dragged one first.
-    const dropped = changes.flatMap((change) => {
-      if (change.type !== 'position' || change.dragging) return [];
-      const runId = runOfNode(change.id);
-      return runId === change.id ? [...followingCards(shown, runId), runId] : [runId];
-    });
-    if (dropped.length) {
-      moved.current = true;
-      setOpen((current) => dropped.reduce(movedOpen, current));
-      setDrops((n) => n + 1);
-    }
-    // A step dragged: React Flow says where it now is beside its card, and it and the steps that wait on it — the graph to its
-    // right — move by as far as that is from where it was. The steps it waits on stay.
+    const { graphs } = latest.current;
+    // A card dropped where a person dragged it stays there, over whatever it landed on, and the arrangement is kept.
+    if (changes.some((change) => change.type === 'position' && !change.dragging)) moved.current = true;
+    // A step dragged: React Flow says where it now is beside its card, and that is how far it is from where the layering put it.
+    // It moves alone; the steps beside it stay, and the edges into and out of it stretch.
     const steps = changes.flatMap((change) => {
       if (change.type !== 'position' || !change.position) return [];
       const runId = runOfNode(change.id);
@@ -322,33 +316,19 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     });
     if (steps.length) {
       setDragged(({ live, dropped }) => {
-        let next = live;
+        const next = new Map(live);
         for (const step of steps) {
           const at = step.graph.at.get(step.name);
-          if (!at) continue;
-          const was = next.get(step.id) ?? { x: 0, y: 0 };
-          const by = { x: step.to.x - at.x - was.x, y: step.to.y - at.y - was.y };
-          next = draggedBy(next, [step.name, ...followersOf(step.graph.steps, step.name)].map((name) => stepId(step.runId, name)), by);
+          if (at) next.set(step.id, { x: step.to.x - at.x, y: step.to.y - at.y });
         }
         const settled = steps.some((step) => !step.dragging);
         return { live: next, dropped: settled ? next : dropped, dragging: settled ? null : steps.at(-1)!.id };
       });
     }
     // Only cards are kept here, and a change to a step matches none of them. A card dragged is moved by React Flow's change, its
-    // steps with it as its children; the cards that wait on it — the cards to its right — move by as far as it did, from where
-    // they are, and the cards it waits on stay.
+    // steps with it as its children, and no other card: the cards joined to it by `after` stay, and their edges stretch.
     const kept = changes.filter((change) => change.type !== 'select' && change.type !== 'remove') as NodeChange<RunFlowNode>[];
-    setPlaced((current) => {
-      let next = current;
-      for (const change of changes) {
-        const card = change.type === 'position' && change.position ? next.find((node) => node.id === change.id) : undefined;
-        if (!card || change.type !== 'position' || !change.position) continue;
-        const by = { x: change.position.x - card.position.x, y: change.position.y - card.position.y };
-        const along = new Set(by.x || by.y ? followingCards(shown, card.id) : []);
-        if (along.size) next = next.map((node) => (along.has(node.id) ? { ...node, position: { x: node.position.x + by.x, y: node.position.y + by.y } } : node));
-      }
-      return applyNodeChanges(kept, next);
-    });
+    setPlaced((current) => applyNodeChanges(kept, current));
     const measured = changes.flatMap((change) => (change.type === 'dimensions' && change.dimensions ? [[change.id, change.dimensions] as const] : []));
     if (measured.length) setSizes((current) => new Map([...current, ...measured]));
   }, []);
@@ -356,6 +336,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // A click opens or closes a run. The run just opened is brought into view once its graph is on the floor.
   const [revealing, setRevealing] = useState<string | null>(null);
   const toggle = useCallback((runId: string) => {
+    // Opened, its graph moves aside the cards it unfolds over; closed before it did, it moves none.
+    if (latest.current.open.includes(runId)) unfolding.current.delete(runId);
+    else unfolding.current.add(runId);
     setOpen((current) => toggleOpen(current, runId));
     setSelected((current) => (current?.runId === runId ? null : current));
     setRevealing(runId);
@@ -387,7 +370,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             parentId: run.id,
             position: places.get(step.name)!,
             measured: sizes.get(id),
-            // Draggable each, with the steps that wait on it (`onNodesChange`); the cells the run takes follow on the drop.
+            // Draggable each, alone (`onNodesChange`).
             dragging: dragged.dragging === id,
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
@@ -463,11 +446,11 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
   }, [fits, placed, idsKey, fitView]);
 
-  // Runs left open on the last visit unfold once their steps are read, and the floor is fitted again then, once.
-  const restoring = useRef(reading.length > 0);
+  // Runs left open on the last visit unfold once their steps are read (`restoring`), and the floor is fitted again then, once.
   useEffect(() => {
     if (!restoring.current || placedFor !== layoutKey || [...graphs.values()].includes(null)) return;
     restoring.current = false;
+    provisional.current.clear();
     setFits((n) => n + 1);
   }, [placedFor, layoutKey, graphs]);
 
@@ -498,6 +481,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // that keep them, their one writer each.
   const resetLayout = () => {
     forgetFactoryLayout();
+    unfolding.current.clear();
     setOpen([]);
     setDragged({ live: new Map(), dropped: new Map(), dragging: null });
     setSelected(null);
@@ -507,6 +491,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   };
   // Every graph folded away. The cards they moved aside stay where they went.
   const collapseAll = () => {
+    unfolding.current.clear();
     setOpen([]);
     setSelected(null);
   };
@@ -627,7 +612,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
               >
                 {/* Only where the floor is wide enough for it beside the buttons: a step's inspector narrows it. */}
                 <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">
-                  Click a run for its steps · drag a card or a step, and what waits on it follows · kept in this browser
+                  Click a run for its steps · drag a card or a step, and it moves alone · kept in this browser
                 </Panel>
                 <Panel position="top-right" className="flex gap-2">
                   <Button variant="outline" size="sm" onPress={resetLayout}>

@@ -4,7 +4,7 @@
  */
 import type { RunSummary, RunToDecide } from './api';
 import { duration, type EdgeState } from './canvas.ts';
-import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point, type StepEdges } from './layout.ts';
+import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point } from './layout.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves
@@ -243,39 +243,6 @@ export function arranged(runId: string, at: ReadonlyMap<string, Point>, dragged:
   );
 }
 
-/**
- * The steps that move with `name` when a person drags it on the Factory: every step that waits on it, directly or through
- * others — the graph to its right — in the run's order, and not `name` itself. The steps it waits on, to its left, stay where
- * they are. Ends on any input: a step is taken once, so a cycle, which only a record edited by hand could have, is walked once.
- */
-export function followersOf(steps: readonly StepEdges[], name: string): string[] {
-  const found = new Set([name]);
-  for (const one of found) for (const step of steps) if (step.after.includes(one)) found.add(step.name);
-  return [...new Set(steps.map((step) => step.name))].filter((step) => step !== name && found.has(step));
-}
-
-/**
- * The cards that move with `id` when a person drags its card on the Factory, as a step's followers move with it: every card on
- * the floor that waits on it, directly or through others on the floor — the cards to its right, down the `after` edges the floor
- * draws (`runEdges`) — oldest first, and not `id` itself. The cards it waits on stay where they are. A run in an `after` that is
- * off the floor draws no edge, and nothing follows through it. Each card's steps go with it, as its children.
- */
-export const followingCards = (runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after'>>, id: string): string[] =>
-  followersOf(runs.map((run) => ({ name: run.id, after: run.after })), id);
-
-/**
- * How far each step was dragged, after `moving` are dragged `by` further: each of them moved by as much from where it was —
- * from where the layering put it, for one not dragged before — and every other step as it was.
- */
-export function draggedBy(dragged: ReadonlyMap<string, Point>, moving: readonly string[], by: Point): Map<string, Point> {
-  const next = new Map(dragged);
-  for (const id of moving) {
-    const was = dragged.get(id) ?? { x: 0, y: 0 };
-    next.set(id, { x: was.x + by.x, y: was.y + by.y });
-  }
-  return next;
-}
-
 /** Of the steps a person dragged, those of runs the store still lists — open or not, as `keepLayout` keeps a card off the floor — and nothing for a run it has lost. */
 export const keepDragged = (dragged: ReadonlyMap<string, Point>, known: ReadonlySet<string>): Map<string, Point> =>
   new Map([...dragged].filter(([id]) => known.has(runOfNode(id))));
@@ -285,24 +252,19 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
 /**
- * The Factory's open runs after a person drops a card they dragged: an open run moved claims its cells
- * first, as one opened last does. The same list when nothing changes: a closed card, or the last already.
- */
-export const movedOpen = (open: string[], id: string): string[] =>
-  open.includes(id) && open.at(-1) !== id ? [...open.filter((other) => other !== id), id] : open;
-
-/**
  * Where each run's card goes, for the runs on the floor, oldest first. `spans` holds the runs drawn open
- * and the cells each takes (`spanOf`), the run a person opened or moved last first; a run not in it
- * takes one cell.
+ * and the cells each takes (`spanOf`), the run a person opened last first; a run not in it takes one cell.
+ * `unfolding` holds the open runs whose graphs are unfolding now — opened by a person since the floor was
+ * last laid out — and only those move a card aside: every open run by default.
  *
- * Claims are made open runs first, the one opened or moved last first, then closed cards oldest first —
- * so the run a person just opened or dropped is never the one moved aside. In order of claim:
+ * Claims are made open runs first, the one opened last first, then closed cards oldest first — so the run
+ * a person just opened is never the one moved aside. In order of claim:
  *
- * 1. A card on the floor now stays where it is: a person is looking at it. Unless an open run that
- *    claimed before it is in any of its cells — a graph unfolding, or dropped, over the cards beside
- *    it, or a closed card dropped on a graph — and then it takes a free place (3). Cards never move for
- *    a closed card, even stacked: a person put them there.
+ * 1. A card on the floor now stays where it is: a person put it there, or is looking at it. Unless a run
+ *    unfolding that claimed before it is in any of its cells — a graph opening over the cards beside it —
+ *    and then it takes a free place (3). Nothing else moves a card on the floor: not a card or a step
+ *    dropped over it, nor a graph that grew when a step was dragged, even stacked — that is the person's
+ *    layout, as in a modeller where each piece moves alone.
  * 2. A card coming onto the floor goes back where it was left (`saved`), unless a card placed before
  *    it is in any of those cells. The cells were free while this card was off the floor — finished and
  *    hidden, say — and a run that started meanwhile took one; putting both there would hide one under
@@ -320,7 +282,7 @@ export const movedOpen = (open: string[], id: string): string[] =>
  *
  * A card is in the cell nearest its corner — both rows, for one the layering puts halfway down a row — and
  * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
- * graph running past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
+ * graph unfolding past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
  * floor holds no cell: finished runs pile up, and holding their cells would leave holes that never close.
  */
 export function placeRuns(
@@ -329,6 +291,7 @@ export function placeRuns(
   saved: ReadonlyMap<string, Point> | null,
   spans: ReadonlyMap<string, Span> = new Map(),
   after: ReadonlyMap<string, readonly string[]> = new Map(),
+  unfolding: ReadonlySet<string> = new Set(spans.keys()),
 ): Map<string, Point> {
   const floor = new Set(ids);
   const order = [...[...spans.keys()].filter((id) => floor.has(id)), ...ids.filter((id) => !spans.has(id))];
@@ -337,13 +300,13 @@ export function placeRuns(
   const parents = new Map(ids.map((id) => [id, [...new Set(after.get(id) ?? [])].filter((p) => floor.has(p) && p !== id)]));
   const children = new Map(ids.map((id) => [id, ids.filter((child) => parents.get(child)!.includes(id))]));
   const at = new Map<string, Point>();
-  // Every cell a placed card is in; and the cells of the open runs, which a card on the floor yields to.
+  // Every cell a placed card is in; and the cells of the runs unfolding, which a card on the floor yields to.
   const taken = new Set<string>();
   const unfolded = new Set<string>();
   const mark = (id: string, point: Point) => {
     for (const cell of cellsOf(point, spanOfId(id))) {
       taken.add(cell);
-      if (spans.has(id)) unfolded.add(cell);
+      if (spans.has(id) && unfolding.has(id)) unfolded.add(cell);
     }
   };
   const put = (id: string, point: Point) => {

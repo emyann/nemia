@@ -3,8 +3,9 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Conversation } from '@/components/conversation/Conversation';
 import { PromptBox } from '@/components/conversation/PromptBox';
+import { RunGone } from '@/components/RunGone';
 import { StatusChip, StepNote } from '@/components/StatusChip';
-import { runQuery, type RunDetail, type Said } from '@/lib/api';
+import { runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
@@ -33,7 +34,18 @@ type Step = RunDetail['steps'][number];
  */
 function SessionPage() {
   const { runId, step: name } = Route.useParams();
-  const { data: run } = useSuspenseQuery(runQuery(runId));
+  const { data: run, error } = useSuspenseQuery(runQuery(runId));
+  // Removed while the page was open: the session is not followed, nor offered words, for a run that is not there.
+  if (runGone(error)) {
+    return (
+      <div className="space-y-3 p-4">
+        <Link to="/runs" className="text-sm text-muted-foreground hover:text-foreground">
+          ← Runs
+        </Link>
+        <RunGone run={run} />
+      </div>
+    );
+  }
   const step = run.steps.find((s) => s.name === name);
   if (!step) {
     return (

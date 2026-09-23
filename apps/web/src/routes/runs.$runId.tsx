@@ -8,11 +8,12 @@ import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, Told, when } from '../components/Facts';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
+import { RunGone } from '../components/RunGone';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
 import { WorkflowLink } from '../components/WorkflowLink';
-import { runQuery, type RunDetail } from '../lib/api';
+import { runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
@@ -36,7 +37,16 @@ type Step = RunDetail['steps'][number];
 
 function RunPage() {
   const { runId } = Route.useParams();
-  const { data: run } = useSuspenseQuery(runQuery(runId));
+  const { data: run, error } = useSuspenseQuery(runQuery(runId));
+  // Removed while the page was open: its last read is kept by the query, and not drawn as if it were still there.
+  if (runGone(error)) {
+    return (
+      <div className="space-y-3">
+        <BackToRuns />
+        <RunGone run={run} />
+      </div>
+    );
+  }
   // Keyed by run: the step selected and where the nodes were dragged belong to the run they were on.
   return <Run key={run.id} run={run} />;
 }

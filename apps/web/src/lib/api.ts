@@ -529,12 +529,21 @@ export const transcriptPath = (runId: string, step: string) =>
 export const readTranscript = (runId: string, step: string, signal?: AbortSignal) =>
   get<StepTranscript>(transcriptPath(runId, step), { signal });
 
+/** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`runGone`). */
+export class ReadRefusal extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function get<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   if (!res.ok) {
     // The api says what to do next in `error`, which is worth more than the status line.
     const said = await res.json().then((body: { error?: unknown }) => body.error, () => undefined);
-    throw new Error(typeof said === 'string' ? said : `GET ${path} answered ${res.status} ${res.statusText}`);
+    throw new ReadRefusal(typeof said === 'string' ? said : `GET ${path} answered ${res.status} ${res.statusText}`, res.status);
   }
   return (await res.json()) as T;
 }
@@ -1309,11 +1318,22 @@ export async function sayToStep(runId: string, step: string, text: string): Prom
   throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
 }
 
+/**
+ * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as `wf rm` leaves it. A page open on the run keeps what it
+ * last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's `error`
+ * beside its `data`, and say the run is gone rather than draw it as it was.
+ */
+export const runGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
+
+/** Every failure is tried again three times, as react-query does by default, but a run gone from the store: said at once, not seconds later. */
+export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
+
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
     queryFn: () => get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
     refetchInterval: () => pace(5_000),
+    retry: retryRun,
   });
 
 /**

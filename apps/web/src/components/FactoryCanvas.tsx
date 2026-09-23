@@ -19,8 +19,9 @@ import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { DaemonLine } from '@/components/DaemonLine';
 import { QuotaLine } from '@/components/QuotaLine';
-import { ceilingsQuery, inboxQuery, quotaQuery, type RunDetail, runQuery, type RunSummary } from '@/lib/api';
+import { ceilingsQuery, daemonQuery, inboxQuery, quotaQuery, type RunDetail, runQuery, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, forgetFactorySteps, readFactoryLayout, readFactoryOpen, readFactorySteps, saveFactoryLayout, saveFactoryOpen, saveFactorySteps } from '@/lib/canvas';
 import {
   arranged,
@@ -145,9 +146,10 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * step was dragged, are kept in this browser with the layout.
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
- * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`). The
- * cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed carries no card's
- * events yet: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
+ * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`) —
+ * and, when no wf up ticks the store, that nothing does and how to start one (`DaemonLine`), since a run waiting its turn and a run nobody moves
+ * look alike on the floor. The cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed
+ * carries no card's events yet: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   return (
@@ -542,6 +544,16 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     wasQuota.current = quotaShown;
     setFits((n) => n + 1);
   }, [quotaShown]);
+  // Whether a wf up ticks the store, read in the route's loader too: the line comes when nothing ticks and goes when one does, and changes
+  // its words with how, which may wrap it — the floor is fitted again to the header's new height.
+  const daemon = useQuery(daemonQuery);
+  const daemonShown = daemon.error ? 'error' : daemon.data && !daemon.data.ticking ? daemon.data.kind : 'nothing';
+  const wasDaemon = useRef(daemonShown);
+  useEffect(() => {
+    if (wasDaemon.current === daemonShown) return;
+    wasDaemon.current = daemonShown;
+    setFits((n) => n + 1);
+  }, [daemonShown]);
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -564,6 +576,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             {waiting > 0 && ` · ${waiting} waiting on you`}
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />
+          <DaemonLine daemon={daemon.data} error={daemon.error} />
           <QuotaLine quota={quota.data} error={quota.error} />
         </div>
         {/* The aria switch is a label of its own, round its input, so its words are a label beside it that names that input. */}

@@ -101,9 +101,9 @@ test('each event names the queries it can change, and no other: a step its run a
   }
 });
 
-test('the polled queries are the runs, a run, and the cap — never a decision, the inbox, or anything else', () => {
-  for (const key of [['runs'], ['runs', 'r-1'], ['ceilings']]) assert.equal(polled(key), true, JSON.stringify(key));
-  for (const key of [['runs', 'r-1', 'decision', 'stamp'], ['inbox'], ['inbox', 'card'], ['quota'], ['workflows'], ['ceilings', 'x']]) {
+test('the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else', () => {
+  for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) assert.equal(polled(key), true, JSON.stringify(key));
+  for (const key of [['runs', 'r-1', 'decision', 'stamp'], ['inbox'], ['inbox', 'card'], ['quota'], ['workflows'], ['ceilings', 'x'], ['daemon', 'x']]) {
     assert.equal(polled(key), false, JSON.stringify(key));
   }
 });

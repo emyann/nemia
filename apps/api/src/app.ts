@@ -8,6 +8,7 @@ import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName,
 import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
+import { readDaemon } from './daemon.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { inbox } from './inbox.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
@@ -2082,6 +2083,16 @@ export const app = new Hono()
       return c.json(await ceilingsOf());
     } catch (err) {
       // `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's (`runCapOf`), or a record that does not parse.
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  })
+  // Whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process table as wf ls reads them,
+  // and never written — the file is the daemon's. What the Factory says over its floor when nothing ticks.
+  .get('/api/daemon', (c) => {
+    try {
+      return c.json(readDaemon());
+    } catch (err) {
+      // A daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call it free.
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
   })

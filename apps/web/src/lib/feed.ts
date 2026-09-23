@@ -35,9 +35,12 @@ export function keysOf(event: FeedEvent, run: string): QueryKey[] {
   }
 }
 
-/** Whether a query is one the board polls for what the feed says: the runs, a run's record, and the cap — at `pace`, and read again when the stream goes down. */
+/**
+ * Whether a query is one the board polls at `pace`, and reads again when the stream goes down: what the feed says — the runs, a run's record,
+ * and the cap — and whether a daemon ticks the store, which no event of the feed says (`daemonQuery`).
+ */
 export const polled = (key: QueryKey): boolean =>
-  (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings')) || (key.length === 2 && key[0] === 'runs' && typeof key[1] === 'string');
+  (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings' || key[0] === 'daemon')) || (key.length === 2 && key[0] === 'runs' && typeof key[1] === 'string');
 
 // Whether the feed's stream is open now: one stream a page, so one flag, set by `followFeed` alone.
 let live = false;

@@ -209,6 +209,13 @@ orchestrator's calls to the runtime change.
 1. **A2A is the driver interface.** The runtime's driver contract becomes an A2A client (`@a2a-js/sdk`, spec v1.0.0) over
    in-process A2A agents; today's drivers are wrapped as adapters unchanged in behaviour; harness arguments become each
    adapter's configuration; `decide` and `engine.ts` read none of them. The journal stays the record.
+   Planned 2026-09-23 as three parts, each ending green, and the owner approved the first alone, the others filed as cards of
+   their own: **(1) the configuration becomes the adapter's** — the ten harness arguments are one `config: HarnessArgs` on
+   the task, the filed event, the state and the spawn; their refusals are the adapter's (`argsRefusalOf`, asked through
+   `Runner.layer`) in the same words; a journal written before is read in today's shape (`upgrade` in `Journal.layer`) and
+   never rewritten; `test/core-reads.test.ts` refuses a read of one in `domain.ts` or `engine.ts`. Done, on the same day.
+   **(2) the A2A seam** — `@a2a-js/sdk` in process, the drivers as adapters behind it, `config` in a message's metadata.
+   **(3) the rest of the calls through the client.**
 2. **The Claude Code adapter, done properly:** the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's
    call at the gate.

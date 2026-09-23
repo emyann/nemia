@@ -74,6 +74,16 @@ words. `test/refusal.test.ts`: every one of those refusals made to refuse at the
 Promise door's message the Effect door's behind `file: `; checked by deleting the call in `file` (every case fails)
 and one line of `refusalOf` (its cases fail).
 
+**What changed again** (2026-09-23, thin runtime stage 1, part 1). The harness's arguments are one `config` on the task
+(`HarnessArgs`), and the checks of them that every harness shares left `refusalOf` for the adapter side, in the same words:
+`argsRefusalOf` in `harness-args.ts` — an empty model or effort, tool lists and permission rules, `mcp`, `remoteControl`
+and `contextTokens` that are not values of their kind — with three new refusals of where an argument is (one beside
+`config`, a `config` that is no object, a key in it that is no argument). Every `Runner` asks them first through
+`Runner.layer`'s `refuses`, then its own `RunnerOps.refuses`, which `composite` forwards to the task's harness; the Effect
+`file` asks `refusalOf` and then `runner.refuses`, so it needs `Runner` beside `Journal`. That is the first half of the
+paragraph below, done: `RunnerOps` took the optional verb. `test/refusal.test.ts` holds the words at both doors, and
+fails at the Effect door with `argsRefusalOf` taken out of `Runner.layer`.
+
 **What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
 window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;

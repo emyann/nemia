@@ -18,7 +18,7 @@ import path from 'node:path';
 import type { Sighting } from './domain.ts';
 import { nameParts } from './a2a-map.ts';
 import { claudeOps, RunnerError, type ClaudeOptions, type RunnerOps } from './runner.ts';
-import { detachedOps, type HarnessSpec } from './runner-detached.ts';
+import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintArgs } from './runner-claude-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeCodeRefuses, claudeRefuses } from './runner-claude-vocabulary.ts';
@@ -55,6 +55,7 @@ const isJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const job = detachedOps(claudeJob, root);
+  const findJob = detachedFind(claudeJob, root);
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isJob(sessionId) ? job : bg);
 
@@ -69,10 +70,9 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.map(([jobs, sessions]) => new Map([...jobs, ...sessions])),
     ),
 
-    // The job's run file first — a directory read — and then Claude Code's registration.
-    find: (name) => job.observe.pipe(
-      Effect.flatMap((jobs) => (jobs.has(name) ? Effect.succeed({ sessionId: jobs.get(name)!.sessionId }) : bg.find!(name))),
-    ),
+    // The job's own run file first — one file, never the jobs' output, which a transcript in flight would re-read on
+    // every poll — and then Claude Code's registration.
+    find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),
 
     stop: (sessionId) => of(sessionId).stop(sessionId),
     logs: (sessionId) => of(sessionId).logs(sessionId),

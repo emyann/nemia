@@ -150,9 +150,24 @@ type RunFile = {
   resumeFrom?: string;
 };
 
+const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
+
+/**
+ * A run found by its name, from its own run file alone: no other run is read, and no output. A detached run's handle
+ * is its name, so that is the id found. A file whose name is not this one — `safe` folds two names into one path — is
+ * not this run, and a file that cannot be read yet is not found, as `observe` skips it.
+ */
+export const detachedFind = (spec: HarnessSpec, root: string) => (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
+  Effect.sync(() => {
+    try {
+      const run = JSON.parse(fs.readFileSync(runFileOf(spec, root, name), 'utf8')) as RunFile;
+      return run.name === name ? { sessionId: name } : undefined;
+    } catch { return undefined; }
+  });
+
 export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
-  const runFile = (name: string) => path.join(dir, `${safe(name)}.json`);
+  const runFile = (name: string) => runFileOf(spec, root, name);
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
   const closeoutFile = (name: string) => path.join(dir, `${safe(name)}.closeout.json`);
   const schemaFile = (name: string) => path.join(dir, `${safe(name)}.schema.json`);

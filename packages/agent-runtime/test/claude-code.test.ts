@@ -163,6 +163,44 @@ test('a job is found by its run file, and a name no job has is asked of Claude C
   } finally { f.restore(); }
 });
 
+test("finding a job reads its run file and nothing else — no other job's, and no job's output", async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const ops = opsIn(root);
+    for (const name of ['ae/j/1', 'ae/k/1']) await Effect.runPromise(ops.spawn({ name, brief: 'go', cwd: f.dir }));
+    // Both ended, and each has printed its stream: a find that listed the jobs would read every log that changed since.
+    await until(async () => {
+      const seen = await Effect.runPromise(ops.observe);
+      return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'done') || undefined;
+    }, 'both jobs done');
+    const runs = path.join(root, 'runs', 'claude');
+    for (const log of fs.readdirSync(runs).filter((n) => n.endsWith('.log'))) fs.appendFileSync(path.join(runs, log), '\n');
+    const read: string[] = [];
+    const readFileSync = fs.readFileSync;
+    fs.readFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+      read.push(String(file));
+      return (readFileSync as (...a: unknown[]) => unknown)(file, ...rest);
+    }) as typeof fs.readFileSync;
+    let found;
+    try { found = await Effect.runPromise(ops.find!('ae/j/1')); } finally { fs.readFileSync = readFileSync; }
+    assert.deepEqual(found, { sessionId: 'ae/j/1' });
+    assert.deepEqual(read, [path.join(runs, 'ae_j_1.json')], 'one file read, the run file of the job asked for');
+  } finally { f.restore(); }
+});
+
+test('a run file another name folds onto is not the job asked for', async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const ops = opsIn(root);
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/2', brief: 'go', cwd: f.dir }));
+    // `ae-j/2` is written at the same path as `ae/j/2`; the file says whose it is.
+    assert.equal(await Effect.runPromise(ops.find!('ae-j/2')), undefined);
+    assert.deepEqual(await Effect.runPromise(ops.find!('ae/j/2')), { sessionId: 'ae/j/2' });
+  } finally { f.restore(); }
+});
+
 test("a running job's conversation is read by its name, and an ended one's by Claude Code's id — the same transcript", async () => {
   const f = fake();
   try {

@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadWorkflows, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
+import { WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-'));
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.

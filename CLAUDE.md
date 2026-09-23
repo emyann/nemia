@@ -37,7 +37,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `packages/agent-orchestrator/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
 - **A package's former name is refused outside history, and turbo can replay that refusal's pass.** `packages/agent-orchestrator/test/names.test.ts`
   reads every file git lists, tracked or not yet added, and fails on a line naming either package by the name it had before 2026-09-23,
-  except in a file on its `HISTORY` (dated writing, each with a line at its top saying it keeps its words), in a store's path
+  except in a file on its `HISTORY` (dated writing, each with a line at its top saying it keeps its words — a `.md` one that
+  names a former package fails without the mark and that note in its first five lines), in a store's path
   (`~/.agent-workflows`, `~/.agent-engine`, whose names stay), or on a line that says `renamed on 2026-09-23`. New dated writing that
   quotes the old names joins `HISTORY`. Turbo caches the package's pass by the package's own files, so a change only to a doc or to
   another package replays it: run `npx turbo run test --force` after such a change (learned by the run that renamed the packages).
@@ -259,16 +260,21 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   under a chip that already said `needs-human`. The node says the wait alone (`needNodeText` in `apps/web/src/lib/asks.ts`), the whole
   sentence stays in its `title` and on the run's page, and the e2e proves it is read whole with `expectUncut` rather than assuming the
   width fits: a screenshot of a cut line looks like a line (learned by the same run, round 2).
-- **A name moved out of an engine file is imported from it by URL, too.** `agent-orchestrator/test/vocabulary.test.ts` reads the
-  engine's lists with `await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-runtime')))`, beside the
-  package's root, so a grep for `from '…/runner.ts'` misses it and only the other package's suite fails, reading `undefined`. Before
-  moving an export between the engine's files, grep the workspace for the file's bare name (learned by the run that split the
-  engine's `runner.ts`).
+- **Another package reaches the runtime through its exports, never by a URL beside them.** `agent-orchestrator/test/vocabulary.test.ts`
+  once read the harnesses' lists with `await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-runtime')))`,
+  which a grep for `from '…/runner.ts'` missed, so moving the export between the engine's files failed only the other package's suite,
+  reading `undefined` (learned by the run that split the engine's `runner.ts`). The runtime exports the lists now, and
+  `packages/agent-runtime/test/contract.test.ts` refuses a path into its `src` by any route, `import.meta.resolve` included.
 - **A name moved out of `run.ts` leaves the `agent-orchestrator/run` subpath, and the api's tests read that subpath by `await import`.**
   `const { messageRefusal } = await import('agent-orchestrator/run')` in `apps/api/test/asks.test.ts` is no `import … from` line, so a
   scan of static imports misses it, and no typecheck sees it: neither agent-orchestrator's nor the api's `tsconfig.json` includes `test/`.
   Only the api's suite fails. Before moving a name out of `run.ts`, grep the workspace for `agent-orchestrator/run'`, and re-export from
   `run.ts` what the api reads there, from a module beneath it, so no cycle (learned by the run that moved *trying again* into `retry.ts`).
+- **The same holds for `agent-orchestrator/workflow`, and a name that leaves it for the root is a contract change.** The api's tests took
+  `loadWorkflows` from `await import('agent-orchestrator/workflow')`, which nothing typechecks; moved into `workflow-store.ts`, the readers
+  are exported from `agent-orchestrator`, and `./workflow` is the pure format (`packages/agent-orchestrator/test/contract.test.ts` refuses a
+  reader back on it). Before moving a name out of `workflow.ts`, grep the workspace for `agent-orchestrator/workflow'` (learned by the run
+  that wrote `docs/architecture.md`).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by
@@ -387,17 +393,26 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 
 - **The engine is finished.** It runs one workload on one harness; anything that knows about a
   second workload is the upper layer. `decide` (`agent-runtime/src/domain.ts`) is pure and stays a
-  screen long; `agent-runtime/src/index.ts` is the export list and the boundary — `decide` is
-  not exported, on purpose. A knob on the workload is a field carried on the task and read by a
+  screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect` (`src/index.ts`) are the export lists and
+  the boundary — `decide` is exported by neither, on purpose. A knob on the workload is a field carried on the task and read by a
   runner, never a callback into `decide`.
 - **No `if` in `engine.ts` that belongs in `decide`.** Effectful code applies one decision; the
   judgement lives in the pure function.
-- **In agent-orchestrator, `assess` is pure and `runner.ts` is the only file that imports the
-  engine.** `run.ts` reads no disk and calls no engine. `cli.ts` parses, calls, prints. The I/O that never names the
-  engine sits beneath `runner.ts` — `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
-  `artifacts.ts`, `authoring.ts`, `inbox-store.ts` — importing neither the engine nor `runner.ts`, which re-exports them;
-  none but the bottom, `store.ts` and `worktree.ts`, is imported by another (`worktree.ts` imports `store.ts` alone of them,
-  `store.ts` none), and no pure file imports any of them (`test/boundary.test.ts`). A new such file joins that test's `BENEATH`.
+- **Three rules hold the layers, each a test; `docs/architecture.md` states them and names the shape.**
+  - *Between packages, only the public contract.* Another package reaches the runtime through `agent-runtime` and
+    `agent-runtime/effect` alone, and the apps reach the orchestrator through `agent-orchestrator`, `agent-orchestrator/run`
+    and `agent-orchestrator/workflow` alone — never a subpath outside `exports`, a relative path, `import.meta.resolve` or a
+    built path into `src/`. `./workflow` is the pure format; the folder readers are exported from `agent-orchestrator`. The
+    judge imports nothing from the workspace and nothing imports it (`packages/agent-runtime/test/contract.test.ts`,
+    `packages/agent-orchestrator/test/contract.test.ts`, `packages/agent-judge/test/boundary.test.ts`).
+  - *Inside the orchestrator, every file is pure, store or controller* (`PURE`, `STORE`, `CONTROLLER` in
+    `packages/agent-orchestrator/test/boundary.test.ts`). Pure files — `assess` in `run.ts` among them — read no disk, spawn
+    nothing, and import no runtime and no file of the other kinds. Store files are the I/O beneath the controllers, import
+    no runtime and no controller, and load as a tree: `places.ts` and `workflow-store.ts` at the bottom, `store.ts` on
+    them, `worktree.ts` on `store.ts` and `places.ts`, the rest imported by `runner.ts` alone. `cli.ts` parses, calls,
+    prints, and reaches the package only through `runner.ts` and `workflow.ts`. A new file joins one kind, or the suite fails.
+  - *The runtime is reached through one client:* `src/runner.ts` alone imports agent-runtime, a type included (`CLIENT` in
+    the same test).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes.
   A guard that only fires on a transition is wrong after a restart.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask)
@@ -438,6 +453,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 
 ## Where things are
 
+- `docs/architecture.md` — the layers, what each owns and its public contract, and the three rules that hold them,
+  each with its test.
 - `docs/eval-2026-09-12/REPORT.md` — the evaluation against the four points of *how to hold the
   bar on production agent code*: gaps with `file:line`, the shape agent-orchestrator should take.
 - `docs/plan-hold-the-bar.md` — the handoff plan: packages, owners, definitions of done.

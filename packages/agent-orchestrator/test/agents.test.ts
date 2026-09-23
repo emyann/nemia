@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { AGENT_KEYS, agentsDir, loadAgents, loadWorkflows, parseAgent, parseWorkflow, renderStep, STEP_KEYS, workflowFolder, workflowsIn, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
+import { AGENT_KEYS, agentsDir, parseAgent, parseWorkflow, renderStep, STEP_KEYS, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
+import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/workflow-store.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-agents-'));
 process.env.WF_ROOT = ROOT;

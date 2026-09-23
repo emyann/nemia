@@ -3,9 +3,9 @@
  * its id, its workflow and the steps it is judged by, and the feed's filing times — read on from where the last read stopped.
  */
 import fs from 'node:fs';
-import { engine, listRuns, readFilings } from 'agent-orchestrator';
+import { engine, listRuns, loadWorkflows, readFilings } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
-import { loadWorkflows, type Workflow } from 'agent-orchestrator/workflow';
+import type { Workflow } from 'agent-orchestrator/workflow';
 
 /**
  * One engine for the process, and the api only reads through it — `list`, `view` and `logs`, never

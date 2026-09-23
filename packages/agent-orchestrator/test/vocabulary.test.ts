@@ -2,26 +2,14 @@
  * The parser's words are the engine's.
  *
  * `workflow.ts` refuses a permission mode or an effort its step's harness does not take, at load, before a run
- * exists. It cannot ask the engine — `runner.ts` is the only file that imports it — so it keeps a copy, and this
- * holds the copy to the engine's lists: the source. The first copies differed for months, unnoticed: the engine
- * took `manual` on Claude Code and `bypassPermissions` on codex, and the parser refused both.
+ * exists. It cannot ask the engine — it is pure, and imports no runtime (`docs/architecture.md`) — so it keeps a
+ * copy, and this holds the copy to the lists the runtime exports: the source. The first copies differed for months,
+ * unnoticed: the engine took `manual` on Claude Code and `bypassPermissions` on codex, and the parser refused both.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { claudeDetached, codex } from 'agent-runtime';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES, CODEX_EFFORTS, CODEX_SANDBOXES, claudeDetached, codex } from 'agent-runtime';
 import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
-
-// The lists are exports of the engine's modules, and not of its root (`agent-runtime` exports `.` and `./effect`),
-// so they are read from beside the root this package resolves: the modules `runner.ts` runs, not a second copy.
-const root = import.meta.resolve('agent-runtime');
-const runner = await import(new URL('./runner-claude-vocabulary.ts', root).href) as {
-  CLAUDE_PERMISSION_MODES: readonly string[]; CLAUDE_EFFORTS: readonly string[]; CLAUDE_CONTEXT_TOKENS: { least: number; most: number };
-};
-const detached = { ...await import(new URL('./runner-codex.ts', root).href), ...await import(new URL('./runner-claude-detached.ts', root).href) } as {
-  CODEX_SANDBOXES: readonly string[]; CODEX_EFFORTS: readonly string[]; codex: unknown; claudeDetached: unknown;
-};
-const { CLAUDE_PERMISSION_MODES, CLAUDE_EFFORTS } = runner;
-const { CODEX_SANDBOXES, CODEX_EFFORTS } = detached;
 
 type Lists = Readonly<Record<string, readonly string[]>>;
 
@@ -47,10 +35,8 @@ function drift(parser: { permissionMode: Lists; effort: Lists }): string[] {
   return lines;
 }
 
-test('these are the modules the package runs: the same codex and claude-detached `agent-runtime` exports', () => {
-  assert.equal(detached.codex, codex);
-  assert.equal(detached.claudeDetached, claudeDetached);
-  assert.ok(CLAUDE_PERMISSION_MODES.length && CLAUDE_EFFORTS.length && CODEX_SANDBOXES.length && CODEX_EFFORTS.length, 'and the lists are there to compare');
+test('the lists are exported by the runtime, and are there to compare', () => {
+  assert.ok(CLAUDE_PERMISSION_MODES.length && CLAUDE_EFFORTS.length && CODEX_SANDBOXES.length && CODEX_EFFORTS.length);
 });
 
 test("the parser's permission modes and efforts are the engine's, harness by harness", () => {
@@ -79,9 +65,9 @@ test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word ad
 
 test("the parser's context windows are the engine's, harness by harness — and codex has none on either side", () => {
   // `claude` is the engine's `claude-bg`, whose range is `CLAUDE_CONTEXT_TOKENS`; a spec declares its own.
-  const engine: Record<string, unknown> = { claude: runner.CLAUDE_CONTEXT_TOKENS, 'claude-detached': claudeDetached.contextTokens, codex: codex.contextTokens };
+  const engine: Record<string, unknown> = { claude: CLAUDE_CONTEXT_TOKENS, 'claude-detached': claudeDetached.contextTokens, codex: codex.contextTokens };
   for (const h of HARNESSES) assert.deepEqual(CONTEXT_WINDOWS[h], engine[h], h);
-  assert.deepEqual(runner.CLAUDE_CONTEXT_TOKENS, { least: 100_000, most: 1_000_000 }, 'and the engine still has the range the CLI was measured to take');
+  assert.deepEqual(CLAUDE_CONTEXT_TOKENS, { least: 100_000, most: 1_000_000 }, 'and the engine still has the range the CLI was measured to take');
 });
 
 test("every word the parser takes, the engine's own refusal takes too — asked of the harness, not only its list", () => {

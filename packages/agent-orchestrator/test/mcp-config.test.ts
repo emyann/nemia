@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type Engine, type TaskView } from 'agent-runtime';
-import { loadWorkflows } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));

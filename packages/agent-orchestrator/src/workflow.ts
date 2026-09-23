@@ -30,9 +30,12 @@
  * this replaces: `afer: implement` read as no `after` at all and started the reviewer at once,
  * beside the implementer, with write access; `deadlineSeconds: 5m` read as NaN and stopped the
  * step on its first tick. A `check:` the parser drops is a constraint nobody enforces.
+ *
+ * **This file is the format as data, and reads nothing.** It parses and checks text, and writes a step or an agent back to text;
+ * `workflow-store.ts` is what reads a folder from disk and hands it here (`loadWorkflows`, `loadAgents`, `workflowFolder`, …). So
+ * `agent-orchestrator/workflow`, this file, is the format alone, and the readers are exported from the package's root
+ * (`docs/architecture.md`).
  */
-import { createHash } from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 
 export type Workflow = {
@@ -294,14 +297,14 @@ const REFUSED: Record<string, string> = {
 const DEFAULT_HARNESS = 'claude';
 
 /*
- * The words each harness takes, copied from the engine — which is the source. `CLAUDE_PERMISSION_MODES` and
- * `CLAUDE_EFFORTS` are agent-runtime's `src/runner-claude-vocabulary.ts`; `CODEX_SANDBOXES` and `CODEX_EFFORTS` its
- * `src/runner-codex.ts`, whose `codex.refuses` also takes `bypassPermissions`, as the widest sandbox.
+ * The words each harness takes, copied from the engine — which is the source. agent-runtime exports them:
+ * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, and `codex.refuses` also takes
+ * `bypassPermissions`, as the widest sandbox.
  *
- * A copy and not an import, because `runner.ts` is the only file here that imports the engine, and the engine
- * refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked here,
- * so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the engine's lists and fails
- * the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
+ * A copy and not an import, because this file is pure and imports no runtime (`docs/architecture.md`), and the
+ * engine refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked
+ * here, so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the runtime's lists and
+ * fails the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
  */
 const CLAUDE_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -1201,26 +1204,7 @@ export const linkRefusal = (file: string, what: string): string =>
   `${file} is a link, and ${what} Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
 
 /** The files of a folder that are steps: every `.md` but its README, sorted. */
-const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
-
-/**
- * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
- * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
- * (`orderSteps`), not the folder's, each resolved against the agent it names (`agentsDir`).
- */
-export function loadWorkflows(dir: string): Workflow[] {
-  if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
-  const agents = agentsFolderRefusal(dir);
-  if (agents) throw new WorkflowError(agents);
-  const entries = fs.readdirSync(dir);
-  const files = stepFiles(entries);
-  if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it${noStepsBecause(dir, entries)}`);
-
-  const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
-  };
-  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, loadAgents(agentsDir(dir)));
-}
+export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
  * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the order
@@ -1235,57 +1219,6 @@ export function parseFolder(files: ReadonlyArray<readonly [name: string, text: s
   const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents));
   validate(steps);
   return orderSteps(steps);
-}
-
-/**
- * Why a folder has no steps, when the folder can say: a README, which is not one, or folders of steps beside each
- * other — `<repo>/workflows/`, which holds a repository's workflows, rather than one of them.
- */
-function noStepsBecause(dir: string, entries: readonly string[]): string {
-  const readme = entries.find(isReadme);
-  if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
-  const workflows = workflowsIn(dir, entries);
-  return workflows.length
-    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0]!)}.`
-    : '';
-}
-
-/** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
-export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
-  let names: readonly string[];
-  try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
-  return names.filter((name) => {
-    if (name === AGENTS_FOLDER) return false;
-    try {
-      return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
-    } catch {
-      return false;
-    }
-  }).sort();
-}
-
-const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
-
-/**
- * The workflow folder a person names: a path, relative to where it is written — the directory `wf start` is typed in, the plan folder a
- * card is in — or, when no folder is there and it is a bare name, the repository's workflow of that name: `dev` is `<repo>/workflows/dev`.
- * The path is looked at first, so a folder a person points at is never shadowed by one of the repository's.
- *
- * Refused when neither is a folder, naming where it looked and the workflows the repository has. Whether the folder is a workflow is
- * `loadWorkflows`' to say.
- */
-export function workflowFolder(given: string, from: string, repo: string): string {
-  const at = path.resolve(from, given);
-  if (isFolder(at)) return at;
-  const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
-  if (bare && given === AGENTS_FOLDER) refuse(agentsFolderRefusal(path.join(repo, 'workflows', given))!);
-  const workflows = path.join(repo, 'workflows');
-  if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
-  const theirs = workflowsIn(workflows);
-  return refuse(`no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. `
-    + (theirs.length
-      ? `The repository's workflows are: ${theirs.join(', ')} — name one, or give the path to a workflow folder.`
-      : `Give the path to a workflow folder, or the name of a folder of steps under ${workflows}.`));
 }
 
 /**
@@ -1348,34 +1281,6 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   stepFrom(file, keys, body, read);
   const skills = skillsOf(file, named, read);
   return { name, ...(description !== undefined && { description }), ...(skills !== undefined && { skills }), keys, body, read: read ?? (() => undefined) };
-}
-
-/**
- * The agents in `dir` — a workflow's are in `agentsDir(<workflow>)` — by name: every `.md` but a README, each read (`parseAgent`) or the
- * refusal of it, which is thrown only at a step that names it, so a broken agent stops no workflow that does not use it. A file that is a
- * link is refused by name: an agent's file is its own, as a step's is. None for a folder that is not there.
- */
-export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
-  const agents = new Map<string, Agent | WorkflowError>();
-  let entries: fs.Dirent[];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return agents; }
-  const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
-  };
-  for (const file of stepFiles(entries.map((e) => e.name))) {
-    const name = path.basename(file, '.md');
-    const at = path.join(dir, file);
-    try {
-      if (entries.find((e) => e.name === file)!.isSymbolicLink()) {
-        refuse(linkRefusal(at, `an agent's file is its own: read through a link, what every step naming ${AGENTS_FOLDER}/${file} is told would be whatever the link points at, outside the folder, and would change with it.`));
-      }
-      agents.set(name, parseAgent(name, fs.readFileSync(at, 'utf8'), read));
-    } catch (err) {
-      if (!(err instanceof WorkflowError)) throw err;
-      agents.set(name, err);
-    }
-  }
-  return agents;
 }
 
 /**
@@ -1509,60 +1414,12 @@ export function frontmatterKey(text: string, key: string): string | undefined {
 }
 
 /**
- * Every step, in every workflow in `workflowsDir`, that names the agent `name` (`agent:`), as `<workflow>/<step>`, sorted. Each step file is
- * read as the parser reads its `agent:` line, so a folder that does not load counts as much as one that does: a step that names the agent
- * is broken by its going, whether or not something else is broken beside it.
- */
-export function agentUsers(workflowsDir: string, name: string): string[] {
-  const users: string[] = [];
-  for (const workflow of workflowsIn(workflowsDir)) {
-    const dir = path.join(workflowsDir, workflow);
-    for (const file of stepFiles(fs.readdirSync(dir))) {
-      let text: string;
-      try { text = fs.readFileSync(path.join(dir, file), 'utf8'); } catch { continue; }
-      if (frontmatterKey(text, 'agent') === name) users.push(`${workflow}/${path.basename(file, '.md')}`);
-    }
-  }
-  return users.sort();
-}
-
-/**
- * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md` and of each file it names beside
- * it — the skills its `skills:` names and the schema its `output:` names — each by name with what it holds, so a file that cannot be read
- * counts as what it says. A write of the agent carries it, and is refused when the agent no longer holds it (`writeAgent`), rather than
- * written over what changed since it was read. A second sidecar has a second version function to keep right, the api's `versionOf`.
- */
-export function agentVersion(dir: string, name: string): string | null {
-  const at = path.join(dir, `${name}.md`);
-  if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
-  // A link counts as where it points, never as what it points at: that is outside the folder, and no write of the agent goes through it.
-  const read = (file: string): string | { unreadable: string } | { link: string } => {
-    if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
-    try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
-  };
-  const text = read(at);
-  // Every file the agent names beside it, in the order `renderAgent` writes the keys: what it can do, and what its steps declare.
-  const beside = typeof text === 'string' ? (['skills', 'output'] as const).flatMap((key) => frontmatterKey(text, key) ?? []) : [];
-  const files = [[`${name}.md`, text], ...beside.map((file) => [file, read(path.resolve(dir, file))])];
-  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
-}
-
-/**
- * What a workflow is for, in its author's words: the first paragraph of its folder's README, its lines joined into one.
+ * What a workflow is for, in its author's words, from the text of its folder's README: the first paragraph, its lines joined into one.
  *
- * A heading is the README's title, not a paragraph, and a frontmatter block is not prose, so both are passed over.
- * Null when the folder has no README, or the README has nothing else. Never throws: a README that cannot be read
- * describes nothing, and the steps beside it are `loadWorkflows`' to judge.
+ * A heading is the README's title, not a paragraph, and a frontmatter block is not prose, so both are passed over. Null when the README has
+ * nothing else. Pure: `workflowDescription` (`workflow-store.ts`) reads the README and asks this.
  */
-export function workflowDescription(dir: string): string | null {
-  let text: string;
-  try {
-    const readme = fs.readdirSync(dir).filter(isReadme).sort()[0];
-    if (!readme) return null;
-    text = fs.readFileSync(path.join(dir, readme), 'utf8');
-  } catch {
-    return null;
-  }
+export function readmeDescription(text: string): string | null {
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(FRONTMATTER, '');
   for (const block of text.split(/\n[ \t]*\n/)) {
     const lines = block.split('\n').map((line) => line.trim()).filter((line) => line && !/^#{1,6}(\s|$)/.test(line));

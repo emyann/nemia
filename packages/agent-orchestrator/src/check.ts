@@ -112,8 +112,8 @@ export const checkScript = (command: string): string => [
 ].join('\n');
 
 /**
- * The harness. A `HarnessSpec` in shape, typed here by its shape rather than imported: `runner.ts` is
- * the only file that imports the engine, and hands this to it.
+ * The harness. A `HarnessSpec` in shape, typed here by its shape rather than imported: this file is pure,
+ * and only the client, `runner.ts`, imports the runtime and hands this to it (`docs/architecture.md`).
  */
 export const CHECK = {
   name: 'check',

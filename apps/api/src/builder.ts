@@ -20,8 +20,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { HOME, writeWorkflow } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
+import { HOME, loadAgents, writeWorkflow } from 'agent-orchestrator';
+import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';

@@ -405,9 +405,9 @@ then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
 are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
-`CODEX_EFFORTS`. They are copies because only `runner.ts` may import the engine, and the engine refuses a
-word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
-lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
+`CODEX_EFFORTS`, which it exports. They are copies because `workflow.ts` is pure and imports no runtime
+(`docs/architecture.md`), and the engine refuses a word only when the step is filed, after the run exists.
+`test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
 
 ### Who may drive a step's session: `remote:`
@@ -2285,7 +2285,8 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown, from disk or from text (`parseFolder`), and render a step back to it (`renderStep`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
+| `src/workflow.ts` | the format — pure: parse a folder of markdown from its text (`parseFolder`), and render a step or an agent back to it (`renderStep`, `renderAgent`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
+| `src/workflow-store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, and what a step is told, `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` included |
@@ -2298,15 +2299,21 @@ holding a concurrency slot forever.
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
 | `src/store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/daemon-store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`) and `daemon.json` read, judged by `src/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
-| `src/feed-store.ts` | the feed over the store's `feed.jsonl`, with this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`) |
+| `src/feed-store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
+| `src/places.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `workflow-store.ts`, and reads no git |
 | `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
 | `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), an inbox card started (`startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
-| `src/feed.ts` | the feed of what the tick judged: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges` — pure), the cursor and its refusal, and the file read, appended to and followed (`readFeedFile`, `recordFeedFile`, `watchFeedFile`); no engine |
+| `src/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), and a line in words (`feedLineWords`); the file is `src/feed-store.ts`'s |
 | `src/cli.ts` | the verbs |
+
+The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`) and
+`agent-orchestrator/workflow` (`src/workflow.ts`). Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
+folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
+`workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 
@@ -2323,16 +2330,20 @@ for the same reason, and so does the `wf` command.
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
-| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
+| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed.ts`, `src/feed-store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
-`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
-and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
-split as the engine, one layer up. `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
-`artifacts.ts`, `authoring.ts` and `inbox-store.ts` sit beneath `runner.ts`, which re-exports them: none imports the
-engine or `runner.ts`, none but `store.ts` and `worktree.ts` (whose `git` the branch and artifact readers use) is
-imported by another, `worktree.ts` imports only `store.ts` of them and `store.ts` none, and no pure file imports any
-of them — the same test refuses each.
+`assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
+file in `src/` and `bin/` is of one of three kinds, and `test/boundary.test.ts` names each and fails the suite on a file
+it does not. **Pure** files (`run.ts`, `workflow.ts`, `check.ts` and the rest of `PURE`) import no runtime, read no disk,
+spawn nothing, and import no file of the other two kinds. **Store** files are the I/O beneath the controllers: they import
+no runtime and never a controller, and load as a tree — `places.ts` and `workflow-store.ts` at the bottom, `store.ts` on
+those two, `worktree.ts` on `store.ts` and `places.ts`, and every other store file imported by `runner.ts` alone, which
+re-exports them. **Controllers** may use the runtime: `runner.ts`, `cli.ts` and `bin/wf.ts`, and `cli.ts` reaches the
+package only through `runner.ts` and `workflow.ts`. Of them, `runner.ts` alone imports agent-runtime, a type included:
+the runtime is reached through one client (`CLIENT` in the same test). Outside the package, the apps reach it through
+`agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`).
+`docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.

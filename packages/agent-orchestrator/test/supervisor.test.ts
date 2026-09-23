@@ -15,7 +15,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
-import { loadWorkflows, terminalSteps, workflowDescription } from '../src/workflow.ts';
+import { terminalSteps } from '../src/workflow.ts';
+import { loadWorkflows, workflowDescription } from '../src/workflow-store.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-supervisor-'));
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });

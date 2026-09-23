@@ -8,7 +8,8 @@
 import path from 'node:path';
 import { composeBrief, decision, forgetLine, listing, toDecide, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
 import type { Closeout } from '../src/closeout.ts';
-import { loadWorkflows, outputFields, type Workflow } from '../src/workflow.ts';
+import { outputFields, type Workflow } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 export const REPO = path.join(import.meta.dirname, '..', '..', '..');
 

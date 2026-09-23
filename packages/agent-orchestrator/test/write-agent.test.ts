@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentNameRefusal, agentUsers, agentVersion, loadAgents, loadWorkflows, parseAgent, renderAgent, WorkflowError, type Agent, type AgentDraft } from '../src/workflow.ts';
+import { agentNameRefusal, parseAgent, renderAgent, WorkflowError, type Agent, type AgentDraft } from '../src/workflow.ts';
+import { agentUsers, agentVersion, loadAgents, loadWorkflows } from '../src/workflow-store.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-agent-'));
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.

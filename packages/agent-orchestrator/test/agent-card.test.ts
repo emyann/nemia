@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { agentCard, agentVersion, loadAgents, parseAgent, WorkflowError, type Agent } from '../src/workflow.ts';
+import { agentCard, parseAgent, WorkflowError, type Agent } from '../src/workflow.ts';
+import { agentVersion, loadAgents } from '../src/workflow-store.ts';
 
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'agents');
 

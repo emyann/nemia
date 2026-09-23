@@ -271,6 +271,10 @@ refuse one: an unknown `--effort` gets a warning and the default. Codex's effort
 API named when refusing a bad one, for the default model; Codex itself checks none, and a bad one
 fails the session. A harness brought as a `PromiseRunner` is asked nothing.
 
+The lists are exported, from both entries: `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`,
+`CODEX_SANDBOXES` and `CODEX_EFFORTS`. agent-orchestrator refuses the same words when it loads a workflow, before
+anything is filed, and holds its copy to these (`packages/agent-orchestrator/test/vocabulary.test.ts`).
+
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started — the OS would not create the process, a detached worker was never launched, or a
 `PromiseRunner` rejects with `refused: true` — the attempt ends `failed`, reason `unstartable`, in

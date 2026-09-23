@@ -11,8 +11,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { AgentWriteError, HOME, removeAgent, writeAgent, type AgentSchema } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, agentUsers, agentVersion, frontmatterKey, loadAgents, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
+import { AgentWriteError, agentUsers, agentVersion, HOME, loadAgents, removeAgent, writeAgent, type AgentSchema } from 'agent-orchestrator';
+import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { sourcesOf, type WorkflowSource } from './workflows.ts';

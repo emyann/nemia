@@ -10,11 +10,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type Engine } from 'agent-runtime';
-// The engine beside this package in THIS tree, by path — see the read-only test at the end.
-import { codex } from '../../agent-runtime/src/runner-codex.ts';
+import { codex, createEngine, type Engine } from 'agent-runtime';
 import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
-import { loadWorkflows } from '../src/workflow.ts';
+import { loadWorkflows } from '../src/workflow-store.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
 
@@ -203,9 +201,10 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   // closeout, declared with `output:`, and its `loop: implement` hands them back to implement as data. This
   // still refuses the day either file goes back to handing the review on as REVIEW.md.
   //
-  // It asks the engine in this tree, not the one `agent-runtime` resolves to: in a run's worktree,
-  // node_modules is a link into the main checkout, whose engine can be anything — a trial merge half
-  // done included. Asked that way, this failed in a worktree whose own engine had not changed.
+  // It asks the runtime through its contract, `agent-runtime`, which in a run's worktree is the worktree's
+  // own copy: each workspace package links to the worktree's tree (CLAUDE.md). It once reached into the
+  // runtime's src/ by path, when node_modules was a link into the main checkout; docs/architecture.md now
+  // refuses that route (packages/agent-runtime/test/contract.test.ts).
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
   const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), permissionMode: 'read-only' });
   const sandbox = args[args.indexOf('-s') + 1];

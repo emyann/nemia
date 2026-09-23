@@ -632,6 +632,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
 // ─── the vocabulary, all plain data ─────────────────────────────────────────
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
+// The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said } from './domain.ts';

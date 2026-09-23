@@ -139,6 +139,18 @@ licence, so we take its shape, not its code; and it holds each session in a chil
 deliberately does not (a three-hour session is not a three-hour process of ours). Which of the two the Claude adapter uses is
 that card's design question.
 
+### Steps are jobs; the observer is the session
+
+The owner's design (2026-09-23), after reading how A2A separates a task from the process that runs it: **a step runs as a job by
+default** — `claude -p --output-format stream-json`, followed live, resumed with `--resume` for a round, a retry or a gate's
+answer, with a real `--max-budget-usd` cap and exact cost. **A gate is `TASK_STATE_INPUT_REQUIRED`:** the run ends with its
+closeout, the task stays open with no process, and the answer resumes the step's own session, so it keeps the context it built.
+**Denials fail loud:** a tool a step is not allowed is recorded on the attempt and shown (`denied: Skill(look)`), and a step can
+fail on one — the owner prefers `auto`, the harness's judgement given the right tools, to `dontAsk`'s silent denials. **`--bg` is
+for the observer:** one long-lived session a person talks to, which watches the system, prepares each gate's decision, and answers
+it — what the operator's session did all of 2026-09-22 and 23, and what `workflows/supervisor` drafts. It holds the context across
+runs that a step's own session lacks, and can still ask a step to explain itself with one more `-p --resume`.
+
 **The one thing to design in:** the SDK's server side is event-driven with an in-memory task store; the runtime is
 level-triggered and survives restarts. So no adapter holds the truth in memory: the journal stays the record, each adapter
 re-derives its task's state from the harness (`claude agents`, Codex's run files) and the journal, and the SDK's store is a view
@@ -206,10 +218,12 @@ Re-cut 2026-09-23 when A2A became the interface. Each stage its own card, chaine
 each ending green; the orchestrator's runtime client (`the-orchestrator-reaches-the-mlxm`) lands first, as the one place the
 orchestrator's calls to the runtime change.
 
-1. **A2A is the driver interface.** The runtime's driver contract becomes an A2A client (`@a2a-js/sdk`, spec v1.0.0) over
+1. **A2A is the driver interface**, in three parts: the harness arguments into one opaque `config`; the A2A seam over
+   in-process agents; the remaining calls (logs, transcript, `say`, release) through the client. The runtime's driver contract becomes an A2A client (`@a2a-js/sdk`, spec v1.0.0) over
    in-process A2A agents; today's drivers are wrapped as adapters unchanged in behaviour; harness arguments become each
    adapter's configuration; `decide` and `engine.ts` read none of them. The journal stays the record.
-2. **The Claude Code adapter, done properly:** the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
+2. **The Claude Code adapter runs a step as a job:** `-p` by default, a gate as `TASK_STATE_INPUT_REQUIRED`, denials loud, `auto`
+   by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's
    call at the gate.
 3. **The Codex adapter.**

@@ -36,9 +36,19 @@ export type Pill = {
 /**
  * An arrow between two boxes, as `edgeStroke` and `edgeLine` draw it: `path` the line, `head` the arrowhead at its end, `loop`
  * a `loop` edge back. Between a fold, or a `more`, and anything, its state is running if any edge it stands for is, done if all
- * are, and to come otherwise.
+ * are, and to come otherwise. `round`: on a loop edge past its first round, the round it is on (`loopLabel`) and where its words
+ * go, under the middle of the curve; null otherwise.
  */
-export type Arrow = { id: string; from: string; to: string; loop: boolean; state: EdgeState; path: string; head: string };
+export type Arrow = {
+  id: string;
+  from: string;
+  to: string;
+  loop: boolean;
+  state: EdgeState;
+  path: string;
+  head: string;
+  round: { text: string; x: number; y: number } | null;
+};
 
 /** A flow laid out: its boxes and arrows, the room they take, and why it has no arrows when the steps' `after` go round in a cycle. */
 export type Flow = { pills: Pill[]; arrows: Arrow[]; width: number; height: number; error: string | null };
@@ -59,14 +69,22 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
 export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'>): EdgeStep[] =>
   run.steps.map((step) => ({ name: step.name, state: stepState(step.status, run.cancelledAt !== null), note: step.note }));
 
-/** The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. */
+/**
+ * The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. The same for a run listed with no
+ * graph, by an api process started before the list carried one: the list is read tolerantly (`onYouOf`), so each card says what to do
+ * rather than the floor refusing every run, or a card printing the TypeError reading `undefined` makes.
+ */
 export function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {
+  if (!Array.isArray((graph as Partial<RunGraph> | undefined)?.edges)) return { columns: names.map((name) => [name]), error: UNGRAPHED };
   try {
     return { columns: layers(stepsOf(names, graph.edges)), error: null };
   } catch (err) {
     return { columns: names.map((name) => [name]), error: (err as Error).message };
   }
 }
+
+/** What a card says of a run the api listed without its graph: which way its steps go is not known here, and a restart tells it. */
+export const UNGRAPHED = 'Listed without its steps\' graph by an api older than this board: restart the api, then reload the page.';
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
 export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
@@ -156,7 +174,7 @@ function capped(column: readonly string[], boxOf: ReturnType<typeof boxer>, stat
  */
 function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: readonly EdgeStep[], error: string | null): Flow {
   const boxOf = new Map(slots.flatMap((slot, s) => slot.flatMap((box) => box.names.map((name) => [name, { box, slot: s }] as const))));
-  const joined = new Map<string, { from: Box; to: Box; loop: boolean; states: EdgeState[]; skip: boolean }>();
+  const joined = new Map<string, { from: Box; to: Box; loop: boolean; states: EdgeState[]; skip: boolean; label: string | null }>();
   if (error === null) {
     for (const edge of edgesOf(graph, steps)) {
       const from = boxOf.get(edge.source);
@@ -164,7 +182,7 @@ function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: r
       const loop = edge.kind === 'loop';
       if (!from || !to || from.box === to.box || (loop && (from.box.kind !== 'step' || to.box.kind !== 'step'))) continue;
       const id = `${loop ? 'loop:' : ''}${from.box.id}->${to.box.id}`;
-      const one = joined.get(id) ?? { from: from.box, to: to.box, loop, states: [], skip: !loop && to.slot - from.slot > 1 };
+      const one = joined.get(id) ?? { from: from.box, to: to.box, loop, states: [], skip: !loop && to.slot - from.slot > 1, label: edge.label };
       one.states.push(edge.state);
       joined.set(id, one);
     }
@@ -178,14 +196,12 @@ function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: r
     return slot.map((box, lane): Pill => ({ ...box, x: s * (size.width + size.gap), y: top + lane * (size.height + size.lane), width: size.width, height: size.height }));
   });
   const at = new Map(pills.map((pill) => [pill.id, pill]));
-  const arrows = [...joined].map(([id, { from, to, loop, states, skip }]): Arrow => {
+  const arrows = [...joined].map(([id, { from, to, loop, states, skip, label }]): Arrow => {
     const [a, b] = [at.get(from.id)!, at.get(to.id)!];
-    const curve = loop
-      ? loopCurve(a, b, over + band + under - 3)
-      : skip
-        ? overCurve(a, b, 2)
-        : sideCurve(a, b);
-    return { id, from: from.id, to: to.id, loop, state: stateOf(states), path: curve.path, head: headAt(curve.end, curve.toward) };
+    const bottom = over + band + under - 3;
+    const curve = loop ? loopCurve(a, b, bottom) : skip ? overCurve(a, b, 2) : sideCurve(a, b);
+    const round = loop && label ? { text: label, x: (a.x + a.width / 2 + b.x + b.width / 2) / 2, y: bottom } : null;
+    return { id, from: from.id, to: to.id, loop, state: stateOf(states), path: curve.path, head: headAt(curve.end, curve.toward), round };
   });
   return {
     pills,

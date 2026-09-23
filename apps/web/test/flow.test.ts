@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
 import type { EdgeStep } from '../src/lib/canvas.ts';
-import { railOf, RAIL_WIDTH, tilesOf, TILE, windowOf, type Flow } from '../src/lib/flow.ts';
+import { railOf, RAIL_WIDTH, tilesOf, TILE, UNGRAPHED, windowOf, type Flow } from '../src/lib/flow.ts';
 import type { StepState } from '../src/lib/status.ts';
 
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
@@ -60,6 +60,30 @@ test("a loop is an arrow under the row, from the looping step back, running whil
   assert.ok(due.height > bottom, 'room under the row for the loop');
   const still = railOf(names, graph, stepsOf({ implement: 'verified', review: 'working' }), false);
   assert.equal(still.arrows.find((a) => a.loop)!.state, 'to-come');
+});
+
+test('a loop past its first round says the round it is on, under the middle of its curve, below the tiles', () => {
+  const names = ['implement', 'review'];
+  const graph = graphOf(after('implement', 'review'), loop('review', 'implement'));
+  const tiles = tilesOf(names, graph, stepsOf({ implement: 'verified', review: 'working' }, { implement: 'round 2 of 3', review: 'round 2 of 3' }), false);
+  const back = tiles.arrows.find((a) => a.loop)!;
+  assert.equal(back.round?.text, 'round 2 of 3');
+  const [a, b] = tiles.pills;
+  assert.equal(back.round!.x, (a!.x + a!.width / 2 + b!.x + b!.width / 2) / 2);
+  assert.ok(back.round!.y > Math.max(...tiles.pills.map((p) => p.y + p.height)), 'under the tiles, where the curve is');
+  // On its first round, a loop says nothing of it; and an `after` arrow never does.
+  const first = tilesOf(names, graph, stepsOf({ implement: 'working', review: 'waiting' }, { implement: 'round 1 of 3' }), false);
+  assert.equal(first.arrows.find((a) => a.loop)!.round, null);
+  assert.ok(tiles.arrows.filter((a) => !a.loop).every((a) => a.round === null));
+});
+
+test("a run listed without its graph, by an api older than the board: its steps in its order, no arrows, and what to do", () => {
+  const flow = railOf(['implement', 'review'], undefined as unknown as RunGraph, stepsOf({ implement: 'working', review: 'waiting' }), false);
+  assert.deepEqual(read(flow), [['implement'], ['review']]);
+  assert.deepEqual(flow.arrows, []);
+  assert.equal(flow.error, UNGRAPHED);
+  assert.match(flow.error!, /restart the api/);
+  assert.equal(tilesOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), false).error, UNGRAPHED);
 });
 
 test('the window: four slots around the live column, the rest folded into a pill that counts them', () => {

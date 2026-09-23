@@ -15,8 +15,10 @@ type SummaryStep = RunSummary['steps'][number];
 /**
  * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the running
  * colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), violet looping back.
+ * With `rounds`, a loop past its first round says the round it is on under its curve, as the run's page labels the edge: the open card's
+ * tiles have the room, and the rail at rest leaves it to the pill's hover.
  */
-function Arrows({ flow }: { flow: Flow }) {
+function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
   return (
     <svg width={flow.width} height={flow.height} aria-hidden className="pointer-events-none absolute top-0 left-0 overflow-visible">
       {flow.arrows.map((arrow) => {
@@ -26,6 +28,22 @@ function Arrows({ flow }: { flow: Flow }) {
             <path d={arrow.path} fill="none" style={{ stroke, ...edgeLine(arrow.state, arrow.loop) }} />
             <path d={arrow.head} fill={stroke} />
             {arrow.state === 'running' && <Travelling path={arrow.path} colour={stroke} />}
+            {/* After the dot, so the dot passes under the round and not over its words; ringed in the card's colour, over the curve. */}
+            {rounds && arrow.round && (
+              <text
+                data-round
+                x={arrow.round.x}
+                y={arrow.round.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={10}
+                strokeWidth={4}
+                strokeLinejoin="round"
+                style={{ fill: stroke, stroke: 'var(--card)', paintOrder: 'stroke' }}
+              >
+                {arrow.round.text}
+              </text>
+            )}
           </g>
         );
       })}
@@ -106,7 +124,7 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
     <section aria-label="The run's steps" className="border-l px-3">
       <p className="mb-1 h-4 text-[11px] leading-4 text-muted-foreground">Click a step for its inspector</p>
       <div className="relative" style={{ width: flow.width, height: flow.height }}>
-        <Arrows flow={flow} />
+        <Arrows flow={flow} rounds />
         {flow.pills.map((pill) => {
           const name = pill.names[0]!;
           const step = byName.get(name);

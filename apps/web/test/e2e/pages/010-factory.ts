@@ -412,6 +412,20 @@ export default {
     // Another card opened, over whichever of the diamond's cards it reaches: still a diamond, and the run called off still left of the run waiting on it.
     await expectDiamond(page, 'with the run beside it open too');
     await expectLeftOf(cardOf(page, DIAMOND.cancelled.id), cardOf(page, DIAMOND.orphan.id), `${DIAMOND.cancelled.id} is still left of ${DIAMOND.orphan.id}`);
+
+    // The loop out of rounds: at rest, its rail's arrow back says no round, which the pill's hover does; opened, the arrow back between its
+    // tiles says the round the loop is on, as the run's page labels its edge.
+    const looping = cardOf(page, LOOPING.id);
+    const back = `[data-arrow="loop:step:${LOOPING.exhausted}->step:${LOOPING.target}"]`;
+    await expectCount(looping.locator('ul[aria-label="Steps"]').locator('..').locator(back), 1, `${LOOPING.id}'s rail draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`);
+    await expectCount(looping.locator('[data-round]'), 0, 'and says no round on the card at rest');
+    await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
+    await looping.locator('time').click();
+    const loopOpen = looping.locator(`section[aria-label="The run's steps"]`);
+    await expectCount(loopOpen.locator('[data-tile]'), LOOPING.steps.length, `${LOOPING.id} opens on its steps`);
+    await expectTexts(loopOpen.locator(`${back} [data-round]`), [LOOPING.round], `the arrow back between its tiles says the loop is on ${LOOPING.round}`);
+    await settled(page);
+    await photographCard(page, looping, path.join(OUT, `factory-loop-open-${await themeOf(page)}.png`));
   },
 } satisfies PageSpec;

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
+import { decide, fold, nameFor, turnOf, waitsForInput, type Event, type Observed, type Sighting } from '../src/domain.ts';
 
 const T0 = new Date('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
@@ -535,4 +535,127 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
     }
   }
   assert.ok(walked > 100, `walked ${walked}`);
+});
+
+// ─── a task held open (R1): a signed end waits on a person, an answer is a turn, a close settles ──────────
+
+const N3 = nameFor(TASK, 3);
+/** A task held open whose first attempt signed at 3 s; `extra` on the filing. */
+const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
+  { kind: 'filed', at: at(0), brief: 'draft the plan', cwd: '/r', maxAttempts: 2, closeoutSchema: { type: 'object' }, holdOpen: true, ...extra },
+  { kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 },
+  { kind: 'ended', at: at(3_000), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'native-1', closeout: { plan: 'v1' } },
+];
+const answer = (ms: number, text = 'make it smaller', budgetUsd?: number): Event =>
+  ({ kind: 'input', at: at(ms), text, ...(budgetUsd !== undefined ? { budgetUsd } : {}) });
+/** Turn 1's first attempt, started at `ms`, and its end if given. */
+const turn1 = (ms: number, ended?: { observed: Observed; reason?: 'harness' | 'unsigned' | 'lost' | 'budget'; nativeId?: string }): Event[] => [
+  { kind: 'starting', at: at(ms), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' }, { kind: 'spawned', at: at(ms + 100), attempt: 2 },
+  ...(ended ? [{ kind: 'ended', at: at(ms + 2_000), attempt: 2, sessionId: 's1', observed: ended.observed, reason: ended.reason ?? 'harness', nativeId: ended.nativeId ?? 'native-1' } as Event] : []),
+];
+
+test('HELD OPEN: a signed end waits as input-required, not settled — and past its deadline too, since the deadline times work, not a person reading it', () => {
+  assert.deepEqual(decide(fold(TASK, held()), seen(), now(9_000)), { do: 'nothing', why: 'input-required' });
+  assert.deepEqual(decide(fold(TASK, held({ deadlineSeconds: 10 })), seen(), now(3_600_000)), { do: 'nothing', why: 'input-required' }, 'an hour past a 10 s deadline');
+  assert.deepEqual(decide(fold(TASK, held()), seen(), now(9_000, 30_000, 3, 3)), { do: 'nothing', why: 'input-required' }, 'a full board changes nothing');
+  // The control: the same journal without `holdOpen` settles on the signed end, as every task filed before did.
+  const plain = held().map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) as Event[];
+  assert.deepEqual(decide(fold(TASK, plain), seen(), now(9_000)), { do: 'settle', outcome: 'succeeded' });
+  assert.equal(fold(TASK, plain).holdOpen, undefined);
+});
+
+test('HELD OPEN: an answer is a turn — an attempt continuing the session that signed, told the words instead of the brief', () => {
+  const s = fold(TASK, [...held(), answer(60_000)]);
+  assert.deepEqual(decide(s, seen(), now(61_000)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' });
+  assert.deepEqual(decide(s, seen(), now(61_000, 30_000, 3, 3)).do, 'nothing', 'a new turn waits for a slot like any start');
+  // Under any policy: the answer continues a conversation, which `never` is no word about.
+  assert.deepEqual(decide(fold(TASK, [...held({ resume: 'never' }), answer(60_000)]), seen(), now(61_000)),
+    { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' });
+  // The turn's attempt carries its turn; the first does not, as none before holding open did.
+  const t = fold(TASK, [...held(), answer(60_000), ...turn1(61_000)]);
+  assert.deepEqual(t.attempts.map((a) => a.turn), [undefined, 1]);
+  assert.equal('turn' in t.attempts[0]!, false);
+  assert.deepEqual(decide(t, seen([N2, 'working']), now(62_000)).do, 'nothing', 'running');
+  // It signs, and waits again.
+  const signed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done' })]);
+  assert.deepEqual(decide(signed, seen(), now(70_000)), { do: 'nothing', why: 'input-required' });
+});
+
+test('HELD OPEN: the turn follows the journal order — an answer journalled before a start is that attempt\'s turn, after it is the next', () => {
+  const start2: Event[] = [{ kind: 'starting', at: at(61_000), attempt: 2 }, { kind: 'spawned', at: at(61_100), attempt: 2 }];
+  const before = fold(TASK, [...held(), answer(60_000), ...start2]);
+  const after = fold(TASK, [...held(), ...start2, answer(62_000)]);
+  assert.deepEqual(before.attempts.map((a) => a.turn ?? 0), [0, 1]);
+  assert.deepEqual(after.attempts.map((a) => a.turn ?? 0), [0, 0]);
+});
+
+test('HELD OPEN: two answers journalled before the turn started are both told, in order, and the last budget given is the turn\'s', () => {
+  const s = fold(TASK, [...held({ budgetUsd: 1 }), answer(60_000, 'first', 2), answer(60_500, 'second')]);
+  assert.deepEqual(decide(s, seen(), now(61_000)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'first\n\nsecond' });
+  assert.equal(turnOf(s).budgetUsd, 2, 'the budget given with the words');
+  assert.equal(turnOf(fold(TASK, [...held({ budgetUsd: 1 }), answer(60_000)])).budgetUsd, 1, 'none given: the filing\'s');
+  assert.equal(turnOf(fold(TASK, held({ budgetUsd: 1 }))).budgetUsd, 1, 'turn 0: the filing\'s');
+  assert.equal(turnOf(fold(TASK, [...held({ budgetUsd: 1 }), answer(60_000, 'w', 3)]), 0).budgetUsd, 1, 'an earlier turn keeps its own');
+});
+
+test('HELD OPEN: the deadline runs from the current turn\'s first attempt, not the task\'s', () => {
+  const s = fold(TASK, [...held({ deadlineSeconds: 10 }), answer(3_600_000), ...turn1(3_601_000)]);
+  assert.equal(decide(s, seen([N2, 'working']), now(3_605_000)).do, 'nothing', 'four seconds into the turn, an hour into the task');
+  assert.deepEqual(decide(s, seen([N2, 'working']), now(3_612_000)), { do: 'stop', sessionId: 's0', why: 'deadline' });
+  assert.equal(decide(fold(TASK, [...held({ deadlineSeconds: 10 }), answer(3_600_000)]), seen(), now(3_600_500)).do, 'start',
+    'an answer waiting for its turn is not past a deadline');
+});
+
+test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed turn retries, continuing where the turn began', () => {
+  const failed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', nativeId: 'native-1' })]);
+  assert.deepEqual(decide(failed, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-1', nudge: 'make it smaller' },
+    'two attempts on the task, one in this turn: one left; the harness failed, so clean — which in a later turn is where it began');
+  const lost = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' })]);
+  assert.deepEqual(decide(lost, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-2', nudge: 'make it smaller' }, 'a lost one continues its own');
+  const unsigned = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' })]);
+  const nudged = decide(unsigned, seen(), now(70_000));
+  assert.equal(nudged.do === 'start' && nudged.resumeFrom, 'native-2');
+  assert.match(nudged.do === 'start' ? nudged.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
+  const twice = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed' }),
+    { kind: 'starting', at: at(70_000), attempt: 3 }, { kind: 'spawned', at: at(70_100), attempt: 3 },
+    { kind: 'ended', at: at(72_000), attempt: 3, sessionId: 's2', observed: 'failed', reason: 'harness', nativeId: 'native-1' }]);
+  assert.deepEqual(decide(twice, seen(), now(73_000)), { do: 'settle', outcome: 'failed', note: '2 attempt(s) of turn 1, none succeeded' });
+  // A spent budget in a later turn is spent, as in the first.
+  const spent = fold(TASK, [...held(), answer(60_000, 'w', 0.5), ...turn1(61_000, { observed: 'failed', reason: 'budget' })]);
+  assert.deepEqual(decide(spent, seen(), now(70_000)),
+    { do: 'settle', outcome: 'failed', note: 'attempt 2 spent its budget. File the task again with a larger one to run it again' });
+});
+
+test('HELD OPEN: a close settles it — succeeded on a signed turn, failed after one that did not sign, and never over an attempt in flight', () => {
+  const closed: Event = { kind: 'closed', at: at(90_000) };
+  assert.deepEqual(decide(fold(TASK, [...held(), closed]), seen(), now(91_000)), { do: 'settle', outcome: 'succeeded', note: 'closed' });
+  assert.deepEqual(decide(fold(TASK, [...held({ deadlineSeconds: 10 }), closed]), seen(), now(3_600_000)), { do: 'settle', outcome: 'succeeded', note: 'closed' },
+    'past the deadline: the close, not the deadline');
+  const mid = fold(TASK, [...held(), answer(60_000), ...turn1(61_000), closed]);
+  assert.equal(decide(mid, seen([N2, 'working']), now(91_000)).do, 'nothing', 'a close that raced an answer lets its attempt run');
+  assert.deepEqual(decide(fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed' }), closed]), seen(), now(91_000)),
+    { do: 'settle', outcome: 'failed', note: 'closed: attempt 2 ended failed' }, 'with an attempt left: closed is closed');
+  assert.deepEqual(decide(fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done' }), closed]), seen(), now(91_000)),
+    { do: 'settle', outcome: 'succeeded', note: 'closed' });
+  // The control: `closed` on a task not held open is no word decide reads — it settles as it would have.
+  const plain = held().map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) as Event[];
+  assert.deepEqual(decide(fold(TASK, [...plain.slice(0, 3), closed]), seen([N1, 'working']), now(91_000)).do, 'nothing');
+});
+
+test('HELD OPEN: a stop outranks the wait — a task waiting settles stopped, and one mid-turn stops its session first', () => {
+  const stop: Event = { kind: 'stop-requested', at: at(90_000) };
+  assert.deepEqual(decide(fold(TASK, [...held(), stop]), seen(), now(91_000)), { do: 'settle', outcome: 'stopped', note: 'operator' });
+  assert.deepEqual(decide(fold(TASK, [...held(), answer(60_000), ...turn1(61_000), stop]), seen([N2, 'working']), now(91_000)),
+    { do: 'stop', sessionId: 's0', why: 'operator' });
+});
+
+test('HELD OPEN: waitsForInput is the signed current turn of a task held open, and nothing else', () => {
+  assert.equal(waitsForInput(fold(TASK, held())), true);
+  assert.equal(waitsForInput(fold(TASK, [...held(), answer(60_000)])), false, 'answered');
+  assert.equal(waitsForInput(fold(TASK, [...held(), { kind: 'closed', at: at(9) }])), false, 'closed');
+  assert.equal(waitsForInput(fold(TASK, [...held(), { kind: 'settled', at: at(9), outcome: 'stopped' }])), false, 'settled');
+  assert.equal(waitsForInput(fold(TASK, held().slice(0, 3))), false, 'in flight');
+  const plain = held().map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) as Event[];
+  assert.equal(waitsForInput(fold(TASK, plain)), false, 'not held open');
+  assert.equal(N3, 'ae/t-1/3');
 });

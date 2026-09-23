@@ -282,6 +282,12 @@ export type Event =
        * handed one task, and not by a runner, which is never told it. A pod's `priorityClassName`, without preemption.
        */
       priority?: number;
+      /**
+       * Held open (R1): an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
+       * running — rather than settled. Their answer (`input`) is a new turn, an attempt continuing the session; a `closed`
+       * settles it. Absent on every task filed before, which settles on its first signed end as ever.
+       */
+      holdOpen?: true;
     }
   /**
    * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
@@ -315,6 +321,14 @@ export type Event =
    */
   | ({ kind: 'said' } & Said)
   /**
+   * A person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the words
+   * its next turn is told, continuing the session that signed, and that turn's spend cap when they gave one. Read by
+   * `decide`: an input starts a turn. Refused by the facade unless the task waits for one.
+   */
+  | ({ kind: 'input' } & Input)
+  /** A person's word that a task held open is finished with: it settles once no attempt of it runs. Read by `decide`. */
+  | { kind: 'closed'; at: string }
+  /**
    * Terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open —
    * stopped by a person, or past its deadline, with no `ended` to carry it — as the harness still
    * listed it: what `logs` reads once that session has been let go. `decide` never reads it.
@@ -323,6 +337,9 @@ export type Event =
 
 /** Words said to a running attempt's session, and when the engine wrote them down. See the `said` event. */
 export type Said = { at: string; attempt: number; text: string };
+
+/** A person's answer to a task held open, and the spend cap of the turn it starts when they gave one. See the `input` event. */
+export type Input = { at: string; text: string; budgetUsd?: number };
 
 export type Attempt = {
   n: number;
@@ -349,6 +366,11 @@ export type Attempt = {
   exitCode: number | null;
   /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
   denials?: Denial[];
+  /**
+   * Which turn of a task held open it belongs to: how many `input`s were journalled before it started. Absent for turn 0,
+   * so every attempt of a task not held open — and of every journal written before — folds as it did.
+   */
+  turn?: number;
   /** What a failed spawn call said: the refusal behind `unstartable`, or an error after which a session may still exist. */
   error?: string;
 };
@@ -378,6 +400,12 @@ export type State = {
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
+  /** Filed to be held open (R1): a signed end waits on a person. See the `filed` event. */
+  holdOpen?: true;
+  /** A person's answers to a task held open, in the order given. Each starts a turn; the current turn is how many there are. */
+  inputs: Input[];
+  /** A person closed a task held open: it settles once no attempt of it runs. */
+  closed: boolean;
   stopRequested: boolean;
   settled: Outcome | null;
 };
@@ -386,7 +414,7 @@ export type State = {
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
     taskId, brief: '', cwd: '', maxAttempts: 1, resume: 'interrupted',
-    attempts: [], said: [], stopRequested: false, settled: null,
+    attempts: [], said: [], inputs: [], closed: false, stopRequested: false, settled: null,
   };
   for (const e of events) {
     switch (e.kind) {
@@ -398,9 +426,10 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.resumeFrom = e.resumeFrom;
         s.config = e.config; s.closeoutSchema = e.closeoutSchema;
         s.budgetUsd = e.budgetUsd; s.priority = e.priority;
+        if (e.holdOpen) s.holdOpen = true;
         break;
       case 'starting':
-        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null });
+        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null, ...(s.inputs.length ? { turn: s.inputs.length } : {}) });
         break;
       case 'spawned': {
         const a = s.attempts.find((x) => x.n === e.attempt);
@@ -419,6 +448,8 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'stop-requested': s.stopRequested = true; break;
       case 'said': s.said.push({ at: e.at, attempt: e.attempt, text: e.text }); break;
+      case 'input': s.inputs.push({ at: e.at, text: e.text, ...(e.budgetUsd !== undefined ? { budgetUsd: e.budgetUsd } : {}) }); break;
+      case 'closed': s.closed = true; break;
       case 'settled': {
         s.settled = e.outcome;
         const open = s.attempts.at(-1);
@@ -428,6 +459,33 @@ export function fold(taskId: string, events: readonly Event[]): State {
     }
   }
   return s;
+}
+
+// ─── a task held open: its turns ────────────────────────────────────────────
+// Pure arithmetic over the fold, so `decide` reads a turn and not the journal's order.
+
+/**
+ * Turn `n` of a task (the current one by default): its attempts; the session it continues — the last one an earlier turn
+ * ran, or what the task was filed against; the words it is told instead of the brief — every answer given since the turn
+ * before it started, so two answers that raced are both heard; and its spend cap per attempt — the last one given with
+ * those words, else the filing's. Turn 0 is the task as filed: every attempt of a task not held open, told the brief.
+ */
+export function turnOf(state: State, n = state.inputs.length) {
+  const attempts = state.attempts.filter((a) => (a.turn ?? 0) === n);
+  const before = state.attempts.filter((a) => (a.turn ?? 0) < n);
+  const given = n === 0 ? [] : state.inputs.slice(before.at(-1)?.turn ?? 0, n);
+  return {
+    n, attempts,
+    continues: [...before].reverse().find((a) => a.nativeId)?.nativeId ?? state.resumeFrom,
+    words: given.length ? given.map((i) => i.text).join('\n\n') : undefined,
+    budgetUsd: [...given].reverse().find((i) => i.budgetUsd !== undefined)?.budgetUsd ?? state.budgetUsd,
+  };
+}
+
+/** A task held open, its current turn signed, not closed and not settled: it waits on a person's answer, with no process running. */
+export function waitsForInput(state: State): boolean {
+  const last = state.attempts.at(-1);
+  return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
 }
 
 // ─── the decision ───────────────────────────────────────────────────────────
@@ -486,7 +544,15 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     return cut('operator') ?? { do: 'settle', outcome: 'stopped', note: 'operator' };
   }
 
-  // ---- the deadline, over the time the task has actually been RUNNING.
+  // ---- a task held open (R1), with no attempt in flight: closed, it settles on how its last attempt ended; signed, it
+  // waits on a person for as long as they take — before the deadline, which times work, not a person reading it.
+  const turn = turnOf(state);
+  if (state.holdOpen && (!last || last.ended !== null)) {
+    if (state.closed) return last?.ended === 'done' ? { do: 'settle', outcome: 'succeeded', note: 'closed' } : { do: 'settle', outcome: 'failed', note: `closed${last ? `: attempt ${last.n} ended ${last.ended}` : ' before any attempt'}` };
+    if (waitsForInput(state)) return { do: 'nothing', why: 'input-required' };
+  }
+
+  // ---- the deadline, over the time the task has actually been RUNNING — its current turn, for a task held open.
   //
   // Measured from the first attempt's intent rather than from filing: a task queued behind the
   // ceiling has not started burning its time, and a deadline that expires in the queue would be
@@ -495,33 +561,37 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
   // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
   // counts sessions at work, and one on a permission prompt makes no API calls.
-  if (state.deadlineSeconds !== undefined && state.attempts.length > 0) {
-    const ranFor = now.at.getTime() - new Date(state.attempts[0]!.startedAt).getTime();
+  if (state.deadlineSeconds !== undefined && turn.attempts.length > 0) {
+    const ranFor = now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {
       if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
       return cut('deadline') ?? { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
     }
   }
 
-  // ---- no attempt in flight: either we are done, out of attempts, or we start one.
+  // ---- no attempt in flight: either we are done, out of attempts, or we start one. Judged on the current turn's
+  // attempts, which are all of them for a task not held open; a turn with none yet starts its first.
   if (!last || last.ended !== null) {
-    if (last?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
-    if (last?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
+    const ended = turn.attempts.at(-1);
+    if (ended?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
+    if (ended?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
     // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
-    if (last?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${last.n} spent its budget. File the task again with a larger one to run it again` };
-    if (state.attempts.length >= state.maxAttempts) {
-      const why = last?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
-      return { do: 'settle', outcome: 'failed', note: `${state.attempts.length} attempt(s), none succeeded${why}` };
+    if (ended?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${ended.n} spent its budget. File the task again with a larger one to run it again` };
+    if (turn.attempts.length >= state.maxAttempts) {
+      const why = ended?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
+      return { do: 'settle', outcome: 'failed', note: `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded${why}` };
     }
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {
       return { do: 'nothing', why: `${state.harness ?? 'default'}'s pool is at its ceiling (${now.used}/${now.max})` };
     }
-    const resumeFrom = resumeTarget(state, last);
+    const resumeFrom = resumeTarget(state, turn);
     // An unsigned session is quiet, not gone: stopped before it is continued, or two would share one conversation.
     if (resumeFrom && sighting && isLive(sighting.state)) return { do: 'stop', sessionId: sighting.sessionId, why: 'to continue it' };
-    return { do: 'start', attempt: state.attempts.length + 1, resumeFrom, ...(resumeFrom && last?.reason === 'unsigned' ? { nudge: NUDGE } : {}) };
+    // Told why it is back when it stopped unsigned; else, in a later turn, the person's answer; else the brief.
+    const nudge = resumeFrom && ended?.reason === 'unsigned' && resumeFrom === ended.nativeId ? NUDGE : turn.words;
+    return { do: 'start', attempt: state.attempts.length + 1, resumeFrom, ...(nudge ? { nudge } : {}) };
   }
 
   // ---- an attempt is in flight. What does the machine say about the name we gave it?
@@ -568,17 +638,21 @@ function endOf(state: State, last: Attempt, sighting: Sighting): Action {
  * a model back into the context that produced a conclusion tends to reproduce it. Both other
  * answers are defensible for particular work, which is why this is a field on the task.
  */
-function resumeTarget(state: State, last: Attempt | undefined): string | undefined {
+function resumeTarget(state: State, turn: ReturnType<typeof turnOf>): string | undefined {
   // Attempt 1 continues whatever the task was filed against — a previous step's session, usually.
   // That is a fact about the work, not a retry policy, so `resume: 'never'` does not override it:
   // "do not resume a failure" and "this task IS a continuation" are different statements.
   // The same holds while every attempt so far was refused: an `unstartable` spawn ran nothing, and the
   // next attempt is still the first to run, the continuation the task was filed as. Not `spawnedAt`:
   // an attempt adopted after a crash never journalled its spawn, and its session did run.
-  if (!last || state.attempts.every((a) => a.reason === 'unstartable')) return state.resumeFrom;
-  if (!last.nativeId || state.resume === 'never') return undefined;
-  if (state.resume === 'always') return last.nativeId;
-  return last.reason === 'lost' || last.reason === 'unsigned' ? last.nativeId : undefined;
+  // A later turn of a task held open is a continuation the same way, of the session that signed the turn before it.
+  const last = turn.attempts.at(-1);
+  if (!last || turn.attempts.every((a) => a.reason === 'unstartable')) return turn.continues;
+  const own = !last.nativeId || state.resume === 'never' ? undefined
+    : state.resume === 'always' || last.reason === 'lost' || last.reason === 'unsigned' ? last.nativeId : undefined;
+  // Clean, in a later turn, is where the turn began: the conversation its session signed is judged work, and an answer
+  // told to a session that never heard the question means nothing.
+  return own ?? (turn.n > 0 ? turn.continues : undefined);
 }
 
 const isLive = (o: Observed | undefined): boolean =>

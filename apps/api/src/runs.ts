@@ -1,7 +1,7 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { Hono } from 'hono';
-import { listRuns, runStartedAt } from 'agent-workflows';
-import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-workflows/run';
+import { listRuns, runStartedAt } from 'agent-orchestrator';
+import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
 import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';

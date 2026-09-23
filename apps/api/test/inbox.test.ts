@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store, and so its inbox, when the module loads: point it at a scratch directory first.
+// agent-orchestrator locates its store, and so its inbox, when the module loads: point it at a scratch directory first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-inbox-'));
 process.env.WF_ROOT = root;
 const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-inbox-repo-'));
@@ -19,7 +19,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-workflows');
+const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 type InboxCardPage = import('../src/inbox.ts').InboxCardPage;
 

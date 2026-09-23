@@ -1,8 +1,8 @@
 /** A step's session output and its check's, as the board is given them: the end of each, and what a refused check said. */
 import fs from 'node:fs';
-import { checkStderr, phaseOfView, verdictWord } from 'agent-workflows';
-import type { Run } from 'agent-workflows/run';
-import type { Workflow } from 'agent-workflows/workflow';
+import { checkStderr, phaseOfView, verdictWord } from 'agent-orchestrator';
+import type { Run } from 'agent-orchestrator/run';
+import type { Workflow } from 'agent-orchestrator/workflow';
 import { e, type Views } from './store.ts';
 
 /**

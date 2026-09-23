@@ -1,7 +1,7 @@
 /**
  * The inbox, for the board: cards parked before they are started — listed, filed and dropped.
  *
- * The package's inbox (agent-workflows' `readInbox`, `addToInbox`, `dropFromInbox`), `wf inbox`'s own: `$WF_ROOT/inbox/`, a card per
+ * The package's inbox (agent-orchestrator's `readInbox`, `addToInbox`, `dropFromInbox`), `wf inbox`'s own: `$WF_ROOT/inbox/`, a card per
  * `<name>.md`, read from disk on each request, as the workflows are, so a card a person has just filed or dropped at the command line lists
  * as it is now. Starting a card is a start, so it is `POST /api/runs` with `card` (workflows.ts), through `startFromInbox`.
  *
@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono, type Context } from 'hono';
-import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, queueInInbox, readInbox, type InboxListing } from 'agent-workflows';
+import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, queueInInbox, readInbox, type InboxListing } from 'agent-orchestrator';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, type KeyRow, type WorkflowSource } from './workflows.ts';

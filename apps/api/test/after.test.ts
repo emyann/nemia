@@ -11,13 +11,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
+// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-after-'));
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { decide, engine, list, readRun, waitAdvice, waitWord } = await import('agent-workflows');
-type Wait = import('agent-workflows').Wait;
+const { decide, engine, list, readRun, waitAdvice, waitWord } = await import('agent-orchestrator');
+type Wait = import('agent-orchestrator').Wait;
 
 const git = (...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });

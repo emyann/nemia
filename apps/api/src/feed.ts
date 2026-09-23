@@ -1,7 +1,7 @@
 /** The workflow feed followed, as server-sent events: every line the tick writes, relayed as it is written. */
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { feedCursorRefusal, type FeedLine, REMOVED, watchFeed } from 'agent-workflows';
+import { feedCursorRefusal, type FeedLine, REMOVED, watchFeed } from 'agent-orchestrator';
 
 /**
  * What a line of the workflow feed is about, as its SSE event names it: a step's word (`step`), a run gone from the store (`removed`),

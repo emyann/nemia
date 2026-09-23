@@ -16,15 +16,15 @@ import { defaultStore, readRuns } from '../src/runs.ts';
 /** A step's frozen body, full of the words a brief would be searched for: nothing may read the workflow as a person's. */
 const WORKFLOW = [{
   name: 'implement', after: [], agent: 'implementer',
-  body: 'Read apps/web/src and apps/api/src. Decide the design, plan the change across packages/agent-engine, packages/agent-workflows and workflows/.',
+  body: 'Read apps/web/src and apps/api/src. Decide the design, plan the change across packages/agent-runtime, packages/agent-orchestrator and workflows/.',
 }];
 
 /** The runs, by the folder a person chose. Each brief is the only thing of a record that is ever read. */
 const RUNS: { id: string; folder: string; brief: string; createdAt: string; extra?: Record<string, unknown> }[] = [
   { id: 'typo', folder: 'dev', createdAt: '2026-09-10T00:00:00Z', brief: 'A typo in the engine\'s README\n\nOne word is wrong. Done when it is right.' },
   { id: 'inbox', folder: 'dev-build', createdAt: '2026-09-11T00:00:00Z', brief: 'Sort the inbox on the board\n\nNewest first, in apps/web/src. Done when the e2e sees the order.' },
-  { id: 'store', folder: 'dev-planned', createdAt: '2026-09-12T00:00:00Z', brief: 'Decide where the store interface lives\n\nIt spans packages/agent-engine, packages/agent-workflows and workflows/.' },
-  { id: 'agents', folder: 'dev-planned-build', createdAt: '2026-09-13T00:00:00Z', brief: 'Design the agents page\n\nIt spans apps/web, apps/api and packages/agent-workflows, and nobody has decided its shape.' },
+  { id: 'store', folder: 'dev-planned', createdAt: '2026-09-12T00:00:00Z', brief: 'Decide where the store interface lives\n\nIt spans packages/agent-runtime, packages/agent-orchestrator and workflows/.' },
+  { id: 'agents', folder: 'dev-planned-build', createdAt: '2026-09-13T00:00:00Z', brief: 'Design the agents page\n\nIt spans apps/web, apps/api and packages/agent-orchestrator, and nobody has decided its shape.' },
   // A folder run: no repo, and a workspace that is a directory of its own. Only `brief` and `workflowDir` are read.
   { id: 'note', folder: 'dev', createdAt: '2026-09-14T00:00:00Z', brief: 'Write a note about the week\n\nOne page at most.', extra: { workspace: '/tmp/somewhere/work', repo: undefined } },
   { id: 'colours', folder: 'dev-build', createdAt: '2026-09-15T00:00:00Z', brief: 'Warmer colours\n\nMake the board warmer. Done when it looks better.' },
@@ -62,7 +62,7 @@ const fixture = () => {
   const other = (name: string, over: Record<string, unknown>) =>
     write(name, { id: name, brief: 'A brief that says a thing about apps/web.', createdAt: '2026-09-16T00:00:00Z', workflow: WORKFLOW, ...over });
   other('look', { workflowDir: '/home/someone/hkb-v2/workflows/ui' });
-  other('elsewhere', { workflowDir: '/home/someone/projects/agent-workflows/workflows' });
+  other('elsewhere', { workflowDir: '/home/someone/projects/agent-orchestrator/workflows' });
   other('early', { workflowDir: '/home/someone/hkb-v2/workflows/dev', brief: undefined });
   other('older', { workflowDir: undefined });
   other('empty', { workflowDir: '/home/someone/hkb-v2/workflows/dev', brief: '---\nworkflow: dev\n---\n   \n' });
@@ -154,7 +154,7 @@ test('one request per run in scope, carrying the brief and the fixed repository 
   assert.equal(calls.length, 6, 'one request each, and none for a record that was skipped');
   const sent = calls[0]!.body.state as { card: string; repository: Record<string, string> };
   assert.equal(sent.card, RUNS[0]!.brief);
-  assert.deepEqual(Object.keys(sent.repository).sort(), ['apps/api', 'apps/web', 'packages/agent-engine', 'packages/agent-workflows', 'workflows/']);
+  assert.deepEqual(Object.keys(sent.repository).sort(), ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime', 'workflows/']);
   assert.deepEqual(Object.keys(calls[0]!.body.state as object).sort(), ['card', 'repository'], 'nothing of the record travels but the brief');
   const whole = JSON.stringify(calls.map((c) => c.body));
   for (const leak of ['workflowDir', 'hkb-v2/workflows', 'createdAt', 'implementer']) assert.ok(!whole.includes(leak), leak);

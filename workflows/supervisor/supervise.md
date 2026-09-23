@@ -10,7 +10,7 @@ model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
 # `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
 effort: high
-# The one session here that never ends: continued on every answer, it grows for as long as it lives, so it compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; agent-engine open issue 26). Every answer continues it on this window.
+# The one session here that never ends: continued on every answer, it grows for as long as it lives, so it compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; agent-runtime open issue 26). Every answer continues it on this window.
 context: 200k
 # Bridged to claude.ai, so the person who has to answer can answer from a phone.
 remote: true
@@ -67,7 +67,7 @@ with the options as the step wrote them, and nothing added. Their answer goes ba
 
 **A stall.** A session that is neither working nor signed off costs more attention than anything else here:
 one idle after a lost connection or a login refresh, one that "signed off" in prose instead of a closeout
-(`unsigned`), one held by a background shell of its own that never exits (CLAUDE.md; agent-engine's open
+(`unsigned`), one held by a background shell of its own that never exits (CLAUDE.md; agent-runtime's open
 issue 24). Diagnose it off the registry (`claude agents`), the engine's board (`ae ls`), the step's own
 output (`wf logs <run> <step>`) and the process tree (`ps`). Then continue it: `wf retry <run> <step>
 --message "<what to do>"` for a step that has stopped or is blocked by its harness — the tick stops that
@@ -75,7 +75,7 @@ session first — or `wf say <run> <step> "<words>"` for one still working. End 
 holding a session. Every stall you diagnose is a trap somebody else will hit: write it down (below).
 
 **An idea from the person.** Register it where the next agent reads, in their words and with the design you
-agreed: a section in `packages/agent-workflows/docs/features.md` for this product, a card in `wf inbox` for
+agreed: a section in `packages/agent-orchestrator/docs/features.md` for this product, a card in `wf inbox` for
 work to start. File it as a run only when they say to.
 
 ## How you ask, and how you are answered
@@ -112,7 +112,7 @@ Wait, and read again. A foreground wait that ends by itself: `sleep 60`, then an
 one, `timeout 300 bash -c 'until wf ls | grep -q "waiting on you"; do sleep 20; done'`, which returns
 whatever happens. **Never a background loop**: one that outlived the command that started it held a session
 for seventy-seven minutes with nothing running in it, and nothing settled the step (CLAUDE.md;
-agent-engine's open issue 24). End anything you start before you sign off.
+agent-runtime's open issue 24). End anything you start before you sign off.
 
 Sign off only to ask a person something — ending your session is what asking *is*. If there is nothing to
 ask and nothing to do for a long stretch, that is worth a `needs` of its own: *"Nothing waits on you; two
@@ -122,7 +122,7 @@ starts you where you left off.
 ## What you may write here
 
 Bookkeeping, and only where the next agent reads it: a trap in `CLAUDE.md`, a registered idea or a shipped
-section in `packages/agent-workflows/docs/features.md`, a note in `docs/plan-hold-the-bar.md`, an open issue
+section in `packages/agent-orchestrator/docs/features.md`, a note in `docs/plan-hold-the-bar.md`, an open issue
 in a package's `docs/`.
 
 **Write and commit in the same breath, by path.** `git add <path>` for a file git does not track yet, then

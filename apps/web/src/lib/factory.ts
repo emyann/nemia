@@ -132,7 +132,7 @@ export type RunEdge = { id: string; source: string; target: string; state: Extra
  * that is not — finished with "Show finished" off and waited on by no run in flight, or one the store has lost — draws none; the card's
  * `waiting` line still names it.
  *
- * A child has started once any of its steps is filed: its parents shipped, and it no longer waits (`gated` in agent-workflows).
+ * A child has started once any of its steps is filed: its parents shipped, and it no longer waits (`gated` in agent-orchestrator).
  */
 export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): RunEdge[] {
   const floor = new Set(runs.map((run) => run.id));

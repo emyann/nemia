@@ -15,13 +15,13 @@ import path from 'node:path';
 
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-gate-${label}-`));
 
-// agent-workflows locates its store as its modules load: set first.
+// agent-orchestrator locates its store as its modules load: set first.
 const root = tmp('root');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { approvalFile, approve, askFile, engine, list, readRun, retry } = await import('agent-workflows');
-const { approvalWordsRefusal, onYouWords } = await import('agent-workflows/run');
+const { approvalFile, approve, askFile, engine, list, readRun, retry } = await import('agent-orchestrator');
+const { approvalWordsRefusal, onYouWords } = await import('agent-orchestrator/run');
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

@@ -1,7 +1,7 @@
 /** A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them. */
-import type { RetryAsk } from 'agent-workflows';
-import { answerOf, declaredOutput, type EarlierTry, parseCloseout, roundIn, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
-import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-workflows/workflow';
+import type { RetryAsk } from 'agent-orchestrator';
+import { answerOf, declaredOutput, type EarlierTry, parseCloseout, roundIn, type Run, type StepRecord, tryNote } from 'agent-orchestrator/run';
+import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
 import { artifactOf, type StepArtifact } from './artifacts.ts';
 import { wordOf } from './judged.ts';
 import { checkIn, type StepCheck } from './logs.ts';

@@ -1,7 +1,7 @@
 # Every run adds a section to this file at the same place, so two runs that worked side by side always conflicted in it and
 # nowhere else (2026-09-19: three times in one morning). A union merge keeps both sides' lines. If two runs ever edit the same
 # existing sentence, both versions are kept and a person tidies them.
-packages/agent-workflows/docs/features.md merge=union
+packages/agent-orchestrator/docs/features.md merge=union
 
 # The root CLAUDE.md is a list too: every run that learns something appends a lesson to it, at the end of the same section, so two runs side by
 # side conflict in it though neither touched a line of the other's. A union merge keeps both lessons. The cost is the same as above: two

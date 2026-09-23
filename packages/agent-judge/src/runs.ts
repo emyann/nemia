@@ -1,7 +1,7 @@
 /**
  * A store's run records, read as files: the brief a run was started with, and the folder a person chose to run it on.
  *
- * Plain code, no Effect, and no import from the workspace — the judge reads `agent-workflows`' store as files, never
+ * Plain code, no Effect, and no import from the workspace — the judge reads `agent-orchestrator`'s store as files, never
  * through it (`test/boundary.test.ts`). Only two fields are read of a record, and both were checked against every one of
  * the 99 records in the owner's store on 2026-09-19:
  *

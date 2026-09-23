@@ -5,12 +5,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory first.
+// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-'));
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
-const { engine, list, readRun } = await import('agent-workflows');
-const { DEFAULT_ROUNDS } = await import('agent-workflows/workflow');
+const { engine, list, readRun } = await import('agent-orchestrator');
+const { DEFAULT_ROUNDS } = await import('agent-orchestrator/workflow');
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -1200,7 +1200,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   }
 
   // The engine's Effect surface, where its runners are: the Promise one has none.
-  const { claudeOps } = await import('agent-engine/effect');
+  const { claudeOps } = await import('agent-runtime/effect');
   const { Effect } = await import('effect');
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-claude-'));
   const argsFile = path.join(bin, 'args');
@@ -1336,7 +1336,7 @@ test("a step's file is served by name, with its type and no caching — and a na
 // ─── where the time went ────────────────────────────────────────────────────
 
 test("the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words", async (t) => {
-  const { readFilings, timeline } = await import('agent-workflows');
+  const { readFilings, timeline } = await import('agent-orchestrator');
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
   /** A task as the engine journals one: filed, a slot taken and spawned, and — given an end — ended and settled. */
   const ran = (taskId: string, harness: string, filedAt: string, spawnedAt: string, ended?: { at: string; outcome: 'succeeded' | 'failed'; more?: object }) => journal(taskId, [

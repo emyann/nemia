@@ -1,6 +1,6 @@
 /** What sessions consumed, in `wf decide`'s words: a step's, several steps' together, and what a run's sessions read. */
-import { consumption, dollars, peakMark, readWords, sumUsage, usedLines } from 'agent-workflows';
-import type { Workflow } from 'agent-workflows/workflow';
+import { consumption, dollars, peakMark, readWords, sumUsage, usedLines } from 'agent-orchestrator';
+import type { Workflow } from 'agent-orchestrator/workflow';
 
 /** What a session consumed as the engine's `Usage` carries it: a count nobody measured is absent, never 0. */
 export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;

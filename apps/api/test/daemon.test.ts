@@ -9,15 +9,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store as its module loads: set first.
+// agent-orchestrator locates its store as its module loads: set first.
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-daemon-'));
 const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
 
 const { app } = await import('../src/app.ts');
 const { daemonOf } = await import('../src/daemon.ts');
-const { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } = await import('agent-workflows');
+const { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } = await import('agent-orchestrator');
 type Daemon = import('../src/daemon.ts').Daemon;
-type DaemonFile = import('agent-workflows').DaemonFile;
+type DaemonFile = import('agent-orchestrator').DaemonFile;
 
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */
 const NO_PID = 2 ** 30;

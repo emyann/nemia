@@ -5,7 +5,7 @@ harness: claude
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings).
 # Every token a session writes it reads again on each later call, so a higher effort is paid for many times over.
 effort: high
-# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-engine open issue 26).
+# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-runtime open issue 26).
 context: 200k
 # Fenced by machinery: only these tools — no Edit, no Write, so nothing of its own is committed — and in dontAsk every
 # Bash command .claude/settings.json does not allow is denied without a prompt. These are Claude Code's built-in tools

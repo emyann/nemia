@@ -3,8 +3,8 @@
  * gate and an acceptance of a loop out of rounds — five writes, each through the package's own verb and guarded as a start is (guard.ts).
  */
 import { Hono } from 'hono';
-import { accept, approve, budgetRefusal, messageRefusal, retry, type RetryHow, round, type Said, say } from 'agent-workflows';
-import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-workflows/run';
+import { accept, approve, budgetRefusal, messageRefusal, retry, type RetryHow, round, type Said, say } from 'agent-orchestrator';
+import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-orchestrator/run';
 import { type Guarded, type Refusal, refusedBeforeReading } from './guard.ts';
 import { e, findRun, noSuchRun, taskOfStep } from './store.ts';
 

@@ -1,7 +1,7 @@
 /** A step's own reads: its session output, the files it wrote, and its conversation, read once from a cursor or followed. */
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { phaseOfView } from 'agent-workflows';
+import { phaseOfView } from 'agent-orchestrator';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { e, taskOfStep, type TaskView, workFolderOf } from './store.ts';
@@ -18,7 +18,7 @@ const served = (type: string) => ({
   'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
 });
 
-/** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-engine). */
+/** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-runtime). */
 export type TranscriptEvent = Awaited<ReturnType<typeof e.transcript>>['events'][number];
 
 /** A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, and whether more may come. */

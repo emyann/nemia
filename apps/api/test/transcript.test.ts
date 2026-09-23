@@ -17,14 +17,14 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-transcript-${label}-`));
 
-// agent-workflows locates its store, and the Claude runner where transcripts are, as their modules load: both are set first.
+// agent-orchestrator locates its store, and the Claude runner where transcripts are, as their modules load: both are set first.
 const root = tmp('root');
 process.env.WF_ROOT = root;
 const config = tmp('claude');
 process.env.CLAUDE_CONFIG_DIR = config;
 
 const { app } = await import('../src/app.ts');
-const { engine } = await import('agent-workflows');
+const { engine } = await import('agent-orchestrator');
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

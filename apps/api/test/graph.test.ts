@@ -1,7 +1,7 @@
 import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from 'agent-workflows/workflow';
+import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from 'agent-orchestrator/workflow';
 import { graphOf } from '../src/graph.ts';
 
 /** Steps as `wf start` freezes them: parsed and validated, so the graph is read off what the run is judged by. */

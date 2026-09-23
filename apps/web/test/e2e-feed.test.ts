@@ -21,7 +21,7 @@ after(() => {
 
 test('fed appends a line the package reads back, with a step and without', async () => {
   // The package's own reader, by URL: the web imports nothing of the package, and a static import would typecheck its sources here.
-  const { readFeedFile } = (await import(pathToFileURL(path.join(REPO, 'packages', 'agent-workflows', 'src', 'feed.ts')).href)) as {
+  const { readFeedFile } = (await import(pathToFileURL(path.join(REPO, 'packages', 'agent-orchestrator', 'src', 'feed.ts')).href)) as {
     readFeedFile: (file: string, after?: number) => { lines: Line[]; cursor: number };
   };
   const file = path.join(dir, 'feed.jsonl');

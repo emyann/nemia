@@ -2,7 +2,7 @@
 import { get } from './read.ts';
 
 /**
- * Mirrors `TranscriptEvent` in packages/agent-engine/src/runner.ts, as the api passes it on: one thing said in a session's
+ * Mirrors `TranscriptEvent` in packages/agent-runtime/src/runner.ts, as the api passes it on: one thing said in a session's
  * conversation. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together.
  */
 export type TranscriptEvent = {

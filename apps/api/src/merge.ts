@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
  * conflict in otherwise, as git names them; `error` where git could not say — a branch it no longer has, or a git older than 2.38, which has
  * no `--write-tree` — never a guess either way.
  *
- * The api's and not the package's: nothing in agent-workflows asks it, and an ending step that merges does its own trial merge when it runs.
+ * The api's and not the package's: nothing in agent-orchestrator asks it, and an ending step that merges does its own trial merge when it runs.
  * This is what a person reads before approving that step, so a conflict is seen at the gate rather than as the ending's abort. A git call a
  * branch, so read on a run's decision, which is read once for a state of the run, never on the list the Factory polls.
  */

@@ -21,7 +21,7 @@
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
  * lists, in the store's `inbox/`: CARDS, and the queued ones the Factory draws as ghosts, with the cap the daemon last ran with: QUEUE.
  *
- * Written by hand rather than through agent-workflows: the web app imports no package, and a record
+ * Written by hand rather than through agent-orchestrator: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
  */
 import { execFileSync } from 'node:child_process';
@@ -181,7 +181,7 @@ export const DRAFT_TRANSCRIPT = path.join('claude', 'projects', '-code-hkb-v2', 
 
 /**
  * The line a working Claude Code session writes into its transcript when it reads words another process posted to its inbox, between calls: a
- * `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-engine's transcript test), for the words `prompt`, at `at`.
+ * `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-runtime's transcript test), for the words `prompt`, at `at`.
  */
 export function arrivalLine(prompt: string, at: string): string {
   const uuid = `draft-arrival-${Date.parse(at)}`;
@@ -999,7 +999,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   };
 
   // ENDING's branch: eight lines of source, then five of docs and a line of CLAUDE.md rewritten — `ENDING.stat` against the base.
-  commit(ENDING.branch, 'Cap the runs in flight', [['packages/agent-workflows/src/queue.ts', [
+  commit(ENDING.branch, 'Cap the runs in flight', [['packages/agent-orchestrator/src/queue.ts', [
     '/** The cap on runs in flight, read on every pass. */',
     'export function capOf(env: string | undefined): number {',
     '  const n = Number(env);',
@@ -1010,7 +1010,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     'export const inFlight = (runs: readonly string[]): number => runs.length;',
   ].join('\n') + '\n']], true);
   commit(ENDING.branch, "Write the queue's rule down", [
-    ['packages/agent-workflows/docs/queue.md', '# The queue\n\nThe cap is read on every pass, and stored nowhere.\n\nA card that cannot start keeps its place.\n'],
+    ['packages/agent-orchestrator/docs/queue.md', '# The queue\n\nThe cap is read on every pass, and stored nowhere.\n\nA card that cannot start keeps its place.\n'],
     ['CLAUDE.md', "# hkb-v2 — contributor guide, with the queue's rule\n"],
   ]);
   commit(SHIPPED.branch, 'Say what shipping is', [['workflows/dev/ship.md', '---\nworkspace: main\ngate: true\n---\nMerge it onto the base branch.\n']], true);

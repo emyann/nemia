@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
+// agent-orchestrator locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
 const { app } = await import('../src/app.ts');
 const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } = await import('../src/capabilities.ts');

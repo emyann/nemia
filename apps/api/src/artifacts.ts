@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactsDir } from 'agent-workflows';
-import { artifactPlace, GIVEN, type Run } from 'agent-workflows/run';
+import { artifactsDir } from 'agent-orchestrator';
+import { artifactPlace, GIVEN, type Run } from 'agent-orchestrator/run';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
 export type ArtifactKind = 'image' | 'text' | 'other';

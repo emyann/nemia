@@ -3,7 +3,7 @@
  * and never written — the file is the daemon's alone — turned into facts the board words in the person's own time. `line` is `wf ls`'s last
  * line, so the board and the terminal say the same thing of the same file.
  */
-import { daemonLine, daemonStanding, type DaemonStanding, type Identity, staleAfterMs } from 'agent-workflows';
+import { daemonLine, daemonStanding, type DaemonStanding, type Identity, staleAfterMs } from 'agent-orchestrator';
 
 /**
  * Where the store stands (`kind`, the package's `DaemonStanding`): `ticking` alone is a daemon moving the runs. Every time is ISO, and null

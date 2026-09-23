@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { isGate, satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
 
 test('each word wf ls prints reads as the state a person acts on', () => {
-  // Every word `listing` in agent-workflows can say: `waiting`, `rounds exhausted`, the run's verdicts, and the engine's
+  // Every word `listing` in agent-orchestrator can say: `waiting`, `rounds exhausted`, the run's verdicts, and the engine's
   // own word for the step's task with how it signed off beside it.
   const cases: Array<[string, StepState]> = [
     ['running (working)', 'working'],

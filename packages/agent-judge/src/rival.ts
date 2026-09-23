@@ -35,7 +35,16 @@ export const PLANNING_WORDS = [
 ] as const;
 
 /** The parts of the repository, as `card.ts`'s `REPOSITORY` names them: a change across three is a change that spans. */
-export const PARTS = ['packages/agent-engine', 'packages/agent-workflows', 'apps/api', 'apps/web', 'workflows/'] as const;
+export const PARTS = ['packages/agent-runtime', 'packages/agent-orchestrator', 'apps/api', 'apps/web', 'workflows/'] as const;
+
+/**
+ * What a part was called before, and still counts as it: the briefs already in a store name the old folders, and a brief
+ * scored again must count the parts it counted then.
+ */
+export const FORMERLY: Partial<Record<(typeof PARTS)[number], string>> = {
+  'packages/agent-runtime': 'packages/agent-engine', // renamed on 2026-09-23
+  'packages/agent-orchestrator': 'packages/agent-workflows', // renamed on 2026-09-23
+};
 
 /** Three or more parts named is "several parts that must agree". */
 export const PARTS_FOR_PLAN = 3;
@@ -44,18 +53,19 @@ const WORD = new RegExp(`\\b(?:${PLANNING_WORDS.join('|')})\\b`, 'i');
 
 /**
  * A path named as itself, not as the tail of a longer one. `workflows/` is the end of
- * `packages/agent-workflows/src/run.ts`, which briefs write constantly, so a plain `includes` counted one path as two
+ * `packages/agent-orchestrator/src/run.ts`, which briefs write constantly, so a plain `includes` counted one path as two
  * parts and the plan rule fired on briefs that name two. A part counts where nothing word-like runs into it.
  */
 const pathIn = (path: string) => new RegExp(`(?<![\\w-])${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 
-const AT = Object.fromEntries([...WEB_PATHS, ...PARTS].map((p) => [p, pathIn(p)]));
+const AT = Object.fromEntries([...WEB_PATHS, ...PARTS, ...Object.values(FORMERLY)].map((p) => [p, pathIn(p)]));
 
 export const namesWeb = (brief: string): boolean => WEB_PATHS.some((p) => AT[p]!.test(brief));
 
 export const planningWord = (brief: string): boolean => WORD.test(brief);
 
-export const partsNamed = (brief: string): number => PARTS.filter((p) => AT[p]!.test(brief)).length;
+export const partsNamed = (brief: string): number =>
+  PARTS.filter((p) => AT[p]!.test(brief) || (FORMERLY[p] !== undefined && AT[FORMERLY[p]]!.test(brief))).length;
 
 export type Guess = {
   readonly web: boolean;

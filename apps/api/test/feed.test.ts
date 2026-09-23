@@ -14,13 +14,13 @@ import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 
-// agent-workflows locates its store as it loads: WF_ROOT is set first.
+// agent-orchestrator locates its store as it loads: WF_ROOT is set first.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-feed-'));
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { feedFile, freshFeedMemo, readFeed, recordFeed } = await import('agent-workflows');
-type FeedWords = import('agent-workflows').FeedWords;
+const { feedFile, freshFeedMemo, readFeed, recordFeed } = await import('agent-orchestrator');
+type FeedWords = import('agent-orchestrator').FeedWords;
 
 const STREAM = '/api/feed/stream';
 

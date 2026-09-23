@@ -22,22 +22,25 @@ export const REOPEN_MS = 5_000;
  *
  * A step's word moves the run's record and its row in the list. A run's own word does that, and moves what counts against the cap, and may
  * be a queued card started — the feed carries no card events yet, so the inbox is read again on it. A run removed is gone from the list and
- * from the cap; its record is not read again, since there is none to read.
+ * from the cap, and its record is read again too: the read that finds none is how a page open on the run learns it is gone.
+ *
+ * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, so a daemon started
+ * while the board says none does is seen on its first line, not on the fallback a minute later.
  */
 export function keysOf(event: FeedEvent, run: string): QueryKey[] {
   switch (event) {
     case 'step':
-      return [['runs'], ['runs', run]];
+      return [['runs'], ['runs', run], ['daemon']];
     case 'run':
-      return [['runs'], ['runs', run], ['ceilings'], ['inbox']];
+      return [['runs'], ['runs', run], ['ceilings'], ['inbox'], ['daemon']];
     case 'removed':
-      return [['runs'], ['ceilings']];
+      return [['runs'], ['runs', run], ['ceilings'], ['daemon']];
   }
 }
 
 /**
  * Whether a query is one the board polls at `pace`, and reads again when the stream goes down: what the feed says — the runs, a run's record,
- * and the cap — and whether a daemon ticks the store, which no event of the feed says (`daemonQuery`).
+ * and the cap — and whether a daemon ticks the store (`daemonQuery`), which every event reads again but none can say is gone.
  */
 export const polled = (key: QueryKey): boolean =>
   (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings' || key[0] === 'daemon')) || (key.length === 2 && key[0] === 'runs' && typeof key[1] === 'string');

@@ -176,6 +176,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   e2e page that holds a read with `route` to fake a moment before a change routes before its `goto`: the say page's second page routed after
   the load, the replay's read went out first and came back after the journal said the session ended, and its box was closed for good in the
   dark theme only (learned by the run that made the board follow the feed, round 2).
+- **A suspense query keeps what it showed when a read again fails.** `useSuspenseQuery` throws only while it has no data
+  (`defaultThrowOnError` is `data === undefined`), and retries a failure three times first, so a run's page whose record reads 404 after
+  `wf rm` still draws the run, and says nothing. Reading a query again is not a page saying what the read found: a page that must say a
+  thing is gone reads the query's `error` beside its `data` (learned by the run that made a `removed` event read the run's record again).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the

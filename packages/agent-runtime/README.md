@@ -271,7 +271,7 @@ after a space starts a comment. The keys are a closed list:
 | `model` | the harness's model name |
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
 | `maxAttempts` | a whole number from 1; default 1 |
-| `deadlineSeconds` | wall clock across all attempts, above 0; absent, no deadline |
+| `deadlineSeconds` | wall clock across all attempts — of a turn, when held open — above 0; absent, no deadline |
 | `resume` | `interrupted` (default), `always`, `never` — the retry policy |
 | `resumeFrom` | a session id to continue, instead of starting cold |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
@@ -281,6 +281,7 @@ after a space starts a comment. The keys are a closed list:
 | `budgetUsd` | the most one attempt may spend, in dollars, digits only — a job on `claude`, or `claude-detached`; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
 | `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
+| `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
 `tools`, `effort`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
@@ -289,7 +290,7 @@ A brief writes each key on a line of its own, and `ae start` files the harness's
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` that is not `true` or `false`, a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` or a `holdOpen` that is not `true` or `false`, a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
@@ -1105,6 +1106,57 @@ the fix is to continue a session that has ended, the sentence says so: a new tas
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.
 
+## Waiting for a person: `holdOpen`, `answer` and `close`
+
+A task filed with `holdOpen: true` does not settle when an attempt signs. It waits, with nothing running, until a
+person answers it or closes it — A2A's `TASK_STATE_INPUT_REQUIRED`, which is what `view` says: phase `input-required`.
+An answer is the task's next **turn**: an attempt that continues the session that signed (`--resume`), told the words in
+place of the brief. A close settles it `succeeded`, note `closed`. It is how a plan waits at its gate without a process
+kept alive for it, and how its next turn keeps the conversation that made the plan.
+
+```ts
+const id = await engine.file({ brief: 'Draft the plan.', cwd, holdOpen: true, closeoutSchema })
+// … it signs: view(id).phase is 'input-required', and its session is let go as any ended attempt's is
+await engine.answer(id, 'Cut step 3; keep the rest.', { budgetUsd: 2 })
+// { at: '…', text: 'Cut step 3; keep the rest.', budgetUsd: 2 } — the next tick resumes the session, told that
+await engine.close(id)      // once it signs again and waits: the next tick settles it succeeded
+```
+
+```bash
+node bin/ae.ts answer <id> Cut step 3, keep the rest. --budget 2   # the words are everything after the id
+node bin/ae.ts close <id>
+```
+
+**On the journal.** `filed` carries `holdOpen: true`; an answer is an `input` entry — `at`, `text`, and `budgetUsd` when
+given — and a close is `closed`. Each attempt folds with the `turn` it belongs to: the number of `input`s journalled before
+its `starting`, absent for the first turn, so a journal written before any of this folds and decides as it did. `decide`
+reads the three, and nothing else about them: the task waits while its current turn's last attempt signed; an `input`
+after it starts the next turn; a `closed` settles it. Level-triggered like the rest — a restarted engine reads the wait,
+the answer or the close off the record.
+
+**A turn is its own run of attempts.** `maxAttempts` counts the current turn's attempts, `deadlineSeconds` runs from the
+current turn's first, and the budget is the answer's if it gave one, the filing's if not. So a task may wait on a person
+for as long as they take — the deadline times work, not reading — and a turn that fails is retried as a first turn is:
+continuing its own session where `resume` says so, and where it would start cold, the session the turn continued, since
+cold would lose the conversation the answer is about. On Claude Code that is not quite where the turn began: `-p --resume`
+keeps the session's id (M12), so the conversation the retry continues holds the failed attempt too, and a later turn's
+retry reads as `resume: 'always'` whatever the task says (open issue 28). A turn that runs out of attempts settles the task
+`failed`. A later turn continues only the session that signed the turn before it: where its harness recorded none, an
+answer is refused, and one journalled all the same settles the task `failed` rather than start a session cold on it.
+Two answers journalled before the next turn starts are told to it both, in order, and the last budget given is its own:
+nothing serialises two writers of one journal, so the record says both and the turn reads both. A `stop` settles a
+waiting task `stopped`, as it does any other.
+
+**Refused, with exit code 2**, nothing journalled, and the fix in the sentence: empty words; a budget that is not dollars
+above 0, or one the task's harness would not keep (as `file` refuses one: `claude --bg` and `codex` keep none); a task the
+engine has no record of; one not filed to be held open; one settled, closed or asked to stop; and one that is not waiting —
+not started, an attempt running (`say` reaches a running session; `stop` ends it), between attempts, or answered already
+and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The Effect door (`answer`, `close` from `agent-runtime/effect`) refuses in the same words, as
+`InputRefused`. A close is a verdict on a signed turn, so it is refused while one runs, not queued behind it.
+
+**Not here yet.** An attempt is still an A2A Task of its own; the seam does not yet say a held task is one A2A Task that
+is `TASK_STATE_INPUT_REQUIRED` between turns (stage 2 part 5). Measured live on Claude Code jobs only — see open issue 28.
+
 ## What a read asks of the harness: `observe` and `find`
 
 `observe` lists every session a harness has, and for Claude Code that is `claude agents --all --json`: about a third
@@ -1311,6 +1363,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
+| `test/hold-open.test.ts` | a task held open, through both doors: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
@@ -1318,7 +1371,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |
-| `test/journal-words.test.ts` | the journal's words for four runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
+| `test/journal-words.test.ts` | the journal's words for five runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |

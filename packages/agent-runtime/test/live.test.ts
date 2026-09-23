@@ -923,3 +923,54 @@ test('M11: a job in dontAsk honours the checkout\'s settings as a --bg session d
     for (const dir of [job, bg]) fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+const M12_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false };
+
+test('M12: a job held open signs and waits with no process, an answer resumes its session under its own cap and it remembers, a close settles it', {
+  skip,
+  timeout: 15 * 60_000,
+}, async (t) => {
+  t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
+  const root = tmp('m12-board');
+  const engine = createEngine({ root });
+  // Said in the brief and nowhere else: only a session that continues the first knows it.
+  const secret = `m12-${randomUUID().slice(0, 8)}`;
+  const id = await engine.file({
+    brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
+    cwd: tmp('m12-work'), closeoutSchema: M12_CLOSEOUT, holdOpen: true, budgetUsd: 0.5, maxAttempts: 2, deadlineSeconds: 300,
+    config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'] },
+  });
+  const until = async (phase: string) => {
+    const by = Date.now() + 5 * 60_000;
+    let v = await engine.view(id);
+    while (v.phase !== phase && !v.state.settled && Date.now() < by) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      await engine.tick();
+      v = await engine.view(id);
+    }
+    return v;
+  };
+  await engine.tick();
+  const waiting = await until('input-required');
+  t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify(waiting.state.attempts.map((a) => [a.ended, a.closeout, a.nativeId]))}`);
+  assert.equal(waiting.phase, 'input-required');
+  assert.deepEqual(waiting.state.attempts[0]?.closeout, { word: 'ready' });
+  assert.equal(execFileSync('ps', ['-eo', 'args'], { encoding: 'utf8' }).includes(nameFor(id, 1)), false, 'no process runs for it while it waits');
+  for (let i = 0; i < 2; i++) await engine.tick();
+  assert.equal((await engine.view(id)).state.attempts.length, 1, 'and ticks start nothing');
+
+  await engine.answer(id, 'Call no tool but StructuredOutput. Give your closing statement with word set to the code word I gave you.', { budgetUsd: 0.3 });
+  await engine.tick();
+  const answered = await until('input-required');
+  const [first, second] = answered.state.attempts;
+  t.diagnostic(`turn 1: ${answered.phase}, ${JSON.stringify([second?.ended, second?.closeout, second?.resumeFrom, second?.nativeId, second?.usage?.cacheReadTokens])}`);
+  assert.equal(answered.phase, 'input-required', 'signed again, it waits again');
+  assert.equal(second?.resumeFrom, first?.nativeId, 'the turn resumed the session that signed');
+  assert.deepEqual(second?.closeout, { word: secret }, 'and it remembered what only that session was told');
+  const args = fs.readFileSync(path.join(root, 'runs', 'claude', `${nameFor(id, 2).replaceAll('/', '_').replaceAll('-', '_')}.json`), 'utf8');
+  assert.match(args, /"--max-budget-usd","0\.3"/, "under the answer's cap");
+
+  await engine.close(id);
+  await engine.tick();
+  assert.equal((await engine.view(id)).state.settled, 'succeeded');
+});

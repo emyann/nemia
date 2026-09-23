@@ -13,7 +13,7 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
+import { fold, nameFor, type Event, type Input, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
@@ -29,7 +29,9 @@ import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps } from './a2a-client.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
-import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';
+import {
+  answer, answerRefusalOf, close, closeRefusalOf, DEFAULT_MAX_CONCURRENT, file, filingOf, refusalOf, requestStop, tick, view, type TaskView,
+} from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
 
@@ -113,6 +115,13 @@ export type TaskSpec = {
    * preemption. Refused unless a finite number.
    */
   priority?: number;
+  /**
+   * Hold the task open when an attempt signs, rather than settle it (R1): the task waits, phase `input-required` — A2A's
+   * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
+   * `close`s it, which settles it. A turn is attempts under `maxAttempts`, `deadlineSeconds` and a budget of its own, so a
+   * task may wait on a person for as long as they take. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
+   */
+  holdOpen?: true;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -199,6 +208,25 @@ export type Engine = {
    * result are taken and may never be read (open issue 29).
    */
   say(taskId: string, text: string): Promise<Said>;
+  /**
+   * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
+   * `text`, and `budgetUsd` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
+   * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
+   * brief, under `budgetUsd` if given and the task's own if not. Nothing is sent to any session: none is running.
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — for an empty `text`; a `budgetUsd`
+   * that is not dollars above 0, or one its harness would not keep (as `file` refuses one); a task this engine has no
+   * record of; one not filed to be held open; one settled, closed or asked to stop; and one not waiting — an attempt
+   * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
+   * Two answers journalled before the next turn begins are told to it both, in order.
+   */
+  answer(taskId: string, text: string, options?: { budgetUsd?: number }): Promise<Input>;
+  /**
+   * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
+   * `closed`, by the next tick. Refused — an `Error` whose `exitCode` is 2, nothing journalled — as `answer` is, for a task
+   * that is not waiting for one. To end one that is running, `stop` it.
+   */
+  close(taskId: string): Promise<void>;
   /** Everything that has happened since `after`, and where to resume. */
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
   /**
@@ -465,6 +493,20 @@ export function createEngine(options: EngineOptions = {}): Engine {
       }
       return said;
     },
+    answer: async (taskId, text, { budgetUsd } = {}) => {
+      const refuse = (why: string) => Object.assign(new Error(`answer: ${why}`), { exitCode: 2 });
+      const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
+      const state = events.length ? fold(taskId, events) : undefined;
+      // The budget is asked of the task's harness as a filing's is: `claude --bg` keeps none, and `codex` has none.
+      const refused = answerRefusalOf(taskId, state, text, budgetUsd)
+        ?? (state && budgetUsd !== undefined ? harnessRefusalOf({ ...filingOf(state, budgetUsd), harness: harnessOf(state) }, harnesses) : undefined);
+      if (refused) throw refuse(refused);
+      return go(answer(taskId, text, budgetUsd).pipe(Effect.catchTag('InputRefused', (e) => Effect.fail(refuse(e.message)))));
+    },
+    close: async (taskId) => {
+      const refuse = (why: string) => Object.assign(new Error(`close: ${why}`), { exitCode: 2 });
+      return go(close(taskId).pipe(Effect.catchTag('InputRefused', (e) => Effect.fail(refuse(e.message)))));
+    },
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
 
     watch: ({ onEntry, from = 0, intervalMs = 1_000, onError }) => {
@@ -535,7 +577,7 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { denialText, nameFor } from './domain.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said, Denial } from './domain.ts';
+export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';

@@ -22,7 +22,7 @@ import { createEngine, denialText, type Attempt, type Engine, type Event, type R
 export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
   'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
-  'contextTokens', 'background',
+  'contextTokens', 'background', 'holdOpen',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -94,6 +94,10 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   if (background !== undefined && background !== 'true' && background !== 'false') {
     throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`);
   }
+  const holdOpen = meta.get('holdOpen');
+  if (holdOpen !== undefined && holdOpen !== 'true' && holdOpen !== 'false') {
+    throw refuse(`\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`);
+  }
   const resume = meta.get('resume');
   if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
     throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
@@ -149,6 +153,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
     budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
+    ...(holdOpen === 'true' ? { holdOpen: true as const } : {}),
     ...(Object.keys(config).length ? { config } : {}),
   };
 }
@@ -230,13 +235,16 @@ export const attemptLine = (a: Attempt): string => {
 /**
  * One task, for `ae ls`: its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
  * turns — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
- * Code writes a session's cost as its process exits.
+ * Code writes a session's cost as its process exits. A task held open and answered counts the attempts of its current
+ * turn against `maxAttempts`, as `decide` does, and says which turn — `1/2 turn 1`.
  */
 export const taskLine = (v: TaskView) => {
+  const turn = v.state.inputs.length;
+  const tries = `${v.state.attempts.filter((a) => (a.turn ?? 0) === turn).length}/${v.state.maxAttempts}${turn ? ` turn ${turn}` : ''}`;
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const priority = v.state.priority !== undefined ? `  priority ${v.state.priority}` : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${tries}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
 /**
@@ -246,6 +254,7 @@ export const taskLine = (v: TaskView) => {
 const KINDS: Record<string, string> = {
   filed: 'filed', starting: 'starting', spawned: 'started',
   ended: 'ended', measured: 'measured', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
+  input: 'answered', closed: 'closed',
 };
 
 const entryLine = (taskId: string, event: Event) => {
@@ -254,6 +263,7 @@ const entryLine = (taskId: string, event: Event) => {
     : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
+    : event.kind === 'input' ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.budgetUsd !== undefined ? `  (budget $${event.budgetUsd})` : ''}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
@@ -269,13 +279,17 @@ const HELP = `ae — an engine for agent sessions
   ae stop <id>                 ask it to stop
   ae say <id> "<text>"         tell its running session something, and journal it: a job on
                                its stdin until its result, a background session in its inbox
+  ae answer <id> "<text>" [--budget <usd>]
+                               answer a task held open that waits (input-required): its
+                               next turn resumes the session that signed, told the words
+  ae close <id>                settle a task held open that waits: succeeded
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae watch [cursor]            the same, followed
 
   a brief is markdown with optional frontmatter:
     cwd, model, maxAttempts, permissionMode
     harness          claude (default) | codex | claude-detached
-    deadlineSeconds  wall clock across all attempts
+    deadlineSeconds  wall clock across all attempts (of a turn, when held open)
     resume           interrupted (default) | always | never — the RETRY policy
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
@@ -289,6 +303,8 @@ const HELP = `ae — an engine for agent sessions
     background       true — claude only: run the session as claude --bg, which a person
                      can attach to, instead of as a job (claude -p, the default); ae say
                      reaches either
+    holdOpen         true — when an attempt signs, wait for ae answer or ae close
+                     rather than settle: input-required, with nothing running
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
@@ -350,6 +366,26 @@ export async function main(argv: string[]): Promise<void> {
       const said = await engine.say(arg, argv.slice(2).join(' '));
       return console.log(entryLine(arg, { kind: 'said', ...said }));
     }
+
+    // As for `say`, the words are everything after the id — but a `--budget <usd>`, which is the next turn's cap.
+    case 'answer': {
+      if (!arg) return console.log(HELP);
+      const rest = argv.slice(2);
+      const at = rest.indexOf('--budget');
+      const budget = at === -1 ? undefined : rest[at + 1];
+      if (at !== -1 && !(budget !== undefined && /^\d*\.?\d+$/.test(budget) && Number(budget) > 0)) {
+        throw Object.assign(new Error(`answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`), { exitCode: 2 });
+      }
+      const words = (at === -1 ? rest : [...rest.slice(0, at), ...rest.slice(at + 2)]).join(' ');
+      const input = await engine.answer(arg, words, budget !== undefined ? { budgetUsd: Number(budget) } : {});
+      console.log(entryLine(arg, { kind: 'input', ...input }));
+      return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);
+    }
+
+    case 'close':
+      if (!arg) return console.log(HELP);
+      await engine.close(arg);
+      return console.log(`${arg}  closed: the next tick settles it`);
 
     case 'tick': {
       const r = await engine.tick();

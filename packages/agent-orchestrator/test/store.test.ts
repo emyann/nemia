@@ -926,7 +926,7 @@ test("`wf retry` writes a person's ask, and the tick honours it once: a second p
   const try2 = `${run.id}-implement-try2`;
   assert.deepEqual(first.tried, ['implement']);
   const spec = tasks.get(try2)!.spec;
-  assert.deepEqual({ model: spec.model, resumeFrom: spec.resumeFrom }, { model: 'opus', resumeFrom: undefined }, 'a new session, on the model asked for');
+  assert.deepEqual({ model: spec.config?.model, resumeFrom: spec.resumeFrom }, { model: 'opus', resumeFrom: undefined }, 'a new session, on the model asked for');
   assert.match(spec.brief, /## What was asked for\n\nadd a flag/, 'told everything a step starting cold is');
   assert.deepEqual(asksOf(run.id), [], 'consumed');
   assert.equal(fs.readFileSync(path.join(asksDir(run.id), 'done', 'retry-implement-2'), 'utf8'), written, 'moved whole');
@@ -1352,7 +1352,7 @@ test('the shipped workflow goes round as its folder says: review filed read-only
   await advance(b.e, readRun(run.id));
   await toReview(b, run.id, 1, true);
   const review = b.tasks.get(`${run.id}-review`)!.spec;
-  assert.deepEqual([review.harness, review.permissionMode], ['codex', 'read-only']);
+  assert.deepEqual([review.harness, review.config?.permissionMode], ['codex', 'read-only']);
   assert.deepEqual((review.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
   assert.match(review.brief, /\n## Round 1 of 3\n\nThis step closes a loop \(`loop: implement`\)/);
 
@@ -1407,11 +1407,11 @@ test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e
   const TOOLS = ['Read', 'Grep', 'Glob', 'Bash'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ntools: Read, Grep, Glob, Bash\neffort: high', 'failed', 1);
   const first = tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([first.tools, first.effort], [TOOLS, 'high'], 'the first filing');
+  assert.deepEqual([first.config?.tools, first.config?.effort], [TOOLS, 'high'], 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.tools, nudged.effort, nudged.resumeFrom], [TOOLS, 'high', `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.tools, nudged.config?.effort, nudged.resumeFrom], [TOOLS, 'high', `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
@@ -1419,33 +1419,33 @@ test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e
   await retry(e, run.id, 'implement', { mode: 'fresh', model: 'opus' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const fresh = tasks.get(`${run.id}-implement-try3`)!.spec;
-  assert.deepEqual([fresh.tools, fresh.effort, fresh.model, fresh.resumeFrom], [TOOLS, 'high', 'opus', undefined], 'a new session on the model asked for, fenced the same');
+  assert.deepEqual([fresh.config?.tools, fresh.config?.effort, fresh.config?.model, fresh.resumeFrom], [TOOLS, 'high', 'opus', undefined], 'a new session on the model asked for, fenced the same');
 
   // The check is the run's own, on a harness with no tools to narrow.
   const check = tasks.get(`${run.id}-implement-check`)!.spec;
-  assert.deepEqual([check.harness, check.tools, check.effort], ['check', undefined, undefined]);
+  assert.deepEqual([check.harness, check.config?.tools, check.config?.effort], ['check', undefined, undefined]);
 });
 
 test('a step with `context:` reaches `e.file` as its tokens, `contextTokens` — on its first filing, a try `retries:` files, and a try `wf retry` asks for; a check has none', async () => {
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ncontext: 200k', 'failed', 1);
-  assert.equal(tasks.get(`${run.id}-implement`)!.spec.contextTokens, 200_000, 'the first filing, as the number the line was read into');
+  assert.equal(tasks.get(`${run.id}-implement`)!.spec.config?.contextTokens, 200_000, 'the first filing, as the number the line was read into');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.contextTokens, nudged.resumeFrom], [200_000, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session on its window');
+  assert.deepEqual([nudged.config?.contextTokens, nudged.resumeFrom], [200_000, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session on its window');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
-  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.contextTokens, 200_000, 'a new session, on the same window');
+  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.config?.contextTokens, 200_000, 'a new session, on the same window');
 
-  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.contextTokens, undefined, "the check is the run's own, and has no session");
+  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.contextTokens, undefined, "the check is the run's own, and has no session");
   const plain = started(folder());
   const b = board();
   await advance(b.e, readRun(plain.id));
-  assert.equal(b.tasks.get(`${plain.id}-implement`)!.spec.contextTokens, undefined, "no line, no window: the model's own");
+  assert.equal(b.tasks.get(`${plain.id}-implement`)!.spec.config?.contextTokens, undefined, "no line, no window: the model's own");
 });
 
 test("a step that continues another's session (`resume:`) is filed with that session's window, and with no line of its own inherits it — a retry of it too", async () => {
@@ -1459,52 +1459,52 @@ test("a step that continues another's session (`resume:`) is filed with that ses
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['respond']);
   const respond = tasks.get(`${run.id}-respond`)!.spec;
-  assert.deepEqual([respond.resumeFrom, respond.contextTokens], [`native-${run.id}-implement`, 200_000]);
+  assert.deepEqual([respond.resumeFrom, respond.config?.contextTokens], [`native-${run.id}-implement`, 200_000]);
 
   settle(`${run.id}-respond`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['respond']);
   settle(`${run.id}-respond-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'respond', { mode: 'nudge', message: 'the test fails' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['respond']);
-  assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.contextTokens, 200_000, 'its nudge, continuing the same chain');
+  assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.config?.contextTokens, 200_000, 'its nudge, continuing the same chain');
 });
 
 test('a step with `disallow:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallow: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
-  assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.disallowedTools, RULES, 'the first filing');
+  assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.disallowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.disallowedTools, nudged.resumeFrom], [RULES, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.disallowedTools, nudged.resumeFrom], [RULES, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
-  assert.deepEqual(tasks.get(`${run.id}-implement-try3`)!.spec.disallowedTools, RULES, 'a new session, denied the same');
+  assert.deepEqual(tasks.get(`${run.id}-implement-try3`)!.spec.config?.disallowedTools, RULES, 'a new session, denied the same');
 
-  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.disallowedTools, undefined, "the check is the run's own, and denied nothing");
+  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.disallowedTools, undefined, "the check is the run's own, and denied nothing");
 });
 
 test('a step with `allow:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallow: Edit(**), Bash(npm test)', 'failed', 1);
-  assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.allowedTools, RULES, 'the first filing');
+  assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.allowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.allowedTools, nudged.resumeFrom], [RULES, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.allowedTools, nudged.resumeFrom], [RULES, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
-  assert.deepEqual(tasks.get(`${run.id}-implement-try3`)!.spec.allowedTools, RULES, 'a new session, allowed the same');
+  assert.deepEqual(tasks.get(`${run.id}-implement-try3`)!.spec.config?.allowedTools, RULES, 'a new session, allowed the same');
 
-  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.allowedTools, undefined, "the check is the run's own, and is allowed nothing");
+  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.allowedTools, undefined, "the check is the run's own, and is allowed nothing");
 });
 
 test("at shipped defaults a step names neither, and is filed with neither: the harness's own tools, at its own effort", async () => {
@@ -1512,7 +1512,7 @@ test("at shipped defaults a step names neither, and is filed with neither: the h
   const { e, tasks } = board();
   await advance(e, readRun(run.id));
   const spec = tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([spec.tools, spec.disallowedTools, spec.effort], [undefined, undefined, undefined]);
+  assert.deepEqual([spec.config?.tools, spec.config?.disallowedTools, spec.config?.effort], [undefined, undefined, undefined]);
 });
 
 test("a round files its target with the target's tools, deny list and effort, and the looping step — a new session each round — with its own", async () => {
@@ -1522,17 +1522,17 @@ test("a round files its target with the target's tools, deny list and effort, an
   const b = board();
   await advance(b.e, readRun(run.id));
   const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([implement1.tools, implement1.disallowedTools, implement1.allowedTools, implement1.effort], [EDITS, ['SendMessage'], ['Edit(**)'], 'low']);
+  assert.deepEqual([implement1.config?.tools, implement1.config?.disallowedTools, implement1.config?.allowedTools, implement1.config?.effort], [EDITS, ['SendMessage'], ['Edit(**)'], 'low']);
   await toReview(b, run.id, 1, true);
   const review1 = b.tasks.get(`${run.id}-review`)!.spec;
-  assert.deepEqual([review1.tools, review1.disallowedTools, review1.allowedTools, review1.effort], [REVIEWS, ['Bash(npm run build)'], undefined, 'max'], 'the looping step, which allows nothing of its own');
+  assert.deepEqual([review1.config?.tools, review1.config?.disallowedTools, review1.config?.allowedTools, review1.config?.effort], [REVIEWS, ['Bash(npm run build)'], undefined, 'max'], 'the looping step, which allows nothing of its own');
 
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
   const implement2 = b.tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([implement2.tools, implement2.disallowedTools, implement2.allowedTools, implement2.effort, implement2.resumeFrom], [EDITS, ['SendMessage'], ['Edit(**)'], 'low', `native-${run.id}-implement`], 'the round, continuing implement');
+  assert.deepEqual([implement2.config?.tools, implement2.config?.disallowedTools, implement2.config?.allowedTools, implement2.config?.effort, implement2.resumeFrom], [EDITS, ['SendMessage'], ['Edit(**)'], 'low', `native-${run.id}-implement`], 'the round, continuing implement');
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
-  assert.deepEqual([review2.tools, review2.disallowedTools, review2.effort, review2.resumeFrom], [REVIEWS, ['Bash(npm run build)'], 'max', undefined], "round 2's review");
+  assert.deepEqual([review2.config?.tools, review2.config?.disallowedTools, review2.config?.effort, review2.resumeFrom], [REVIEWS, ['Bash(npm run build)'], 'max', undefined], "round 2's review");
 });
 
 // ─── a run in flight keeps its momentum: `priority` ─────────────────────────
@@ -1632,46 +1632,46 @@ test("REFUSED without the momentum: at a ceiling of one, the engine's own admiss
 
 test('a step with `remote: true` reaches `e.file` with `remoteControl: true` — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the line, with none', async () => {
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nremote: true', 'failed', 1);
-  assert.equal(tasks.get(`${run.id}-implement`)!.spec.remoteControl, true, 'the first filing');
+  assert.equal(tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, true, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.remoteControl, nudged.resumeFrom], [true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.remoteControl, nudged.resumeFrom], [true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(e, run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
-  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.remoteControl, true, 'a new session, bridged the same');
+  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.config?.remoteControl, true, 'a new session, bridged the same');
 
   // The check is the run's own, on a harness the engine refuses a bridge for; and review never said the word.
-  assert.deepEqual([tasks.get(`${run.id}-implement-check`)!.spec.harness, tasks.get(`${run.id}-implement-check`)!.spec.remoteControl], ['check', undefined]);
+  assert.deepEqual([tasks.get(`${run.id}-implement-check`)!.spec.harness, tasks.get(`${run.id}-implement-check`)!.spec.config?.remoteControl], ['check', undefined]);
   settle(`${run.id}-implement-try3`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement-try3-check`, 'succeeded', undefined, 0);
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
-  assert.equal(tasks.get(`${run.id}-review`)!.spec.remoteControl, undefined, 'never a default');
+  assert.equal(tasks.get(`${run.id}-review`)!.spec.config?.remoteControl, undefined, 'never a default');
 });
 
 test('a round files its target bridged as the target says, and the looping step — a new session each round — as it says', async () => {
   const run = started(looped('remote: true\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
-  assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.remoteControl, undefined);
+  assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, undefined);
   await toReview(b, run.id, 1, true);
-  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.remoteControl, true);
+  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.config?.remoteControl, true);
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
-  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.remoteControl, undefined, 'the round, continuing implement');
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.config?.remoteControl, undefined, 'the round, continuing implement');
   await toReview(b, run.id, 2, false);
-  assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.remoteControl, true, "round 2's review");
+  assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.config?.remoteControl, true, "round 2's review");
 
   const other = started(looped('', 'remote: true\n'));
   const c = board();
   await advance(c.e, readRun(other.id));
   await toReview(c, other.id, 1, true);
   assert.deepEqual((await advance(c.e, readRun(other.id))).looped, ['review']);
-  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.remoteControl], [true, undefined]);
+  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.config?.remoteControl], [true, undefined]);
 });
 
 test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `remoteControl` for — codex and claude-detached — and taken on claude, and `remote: false` on any", async () => {
@@ -1679,7 +1679,7 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
   /** What the engine's own door says to `remoteControl: true` on `harness`: its reason, or undefined when it files the task. */
   const engineSays = async (harness: string): Promise<string | undefined> => {
     try {
-      await engine.file({ brief: 'b', cwd: '/w', harness, remoteControl: true });
+      await engine.file({ brief: 'b', cwd: '/w', harness, config: { remoteControl: true } });
       return undefined;
     } catch (err) {
       const reason = new RegExp(`^file: \`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec((err as Error).message)?.[1];
@@ -1716,7 +1716,7 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
     const run = started(dir);
     const b = board();
     await advance(b.e, readRun(run.id));
-    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.remoteControl, true);
+    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, true);
   }
 });
 

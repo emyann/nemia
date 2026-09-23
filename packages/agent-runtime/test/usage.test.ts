@@ -361,7 +361,7 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
 
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, ...extra });
-  assert.deepEqual(limitLines(fold('t-1', [filed({ contextTokens: 200000, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
+  assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000 }, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 

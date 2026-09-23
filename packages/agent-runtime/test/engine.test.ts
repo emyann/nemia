@@ -485,14 +485,14 @@ test('priority first, higher before lower, then filing order within one — no p
 
 test('worktree is declared by the task and passed to the harness untouched', async () => {
   const b = board();
-  await b.run(file({ ...spec, worktree: true }));
+  await b.run(file({ ...spec, config: { worktree: true } }));
   await b.run(tick(9));
-  assert.equal(b.spawned.at(-1)!.worktree, true);
+  assert.equal(b.spawned.at(-1)!.config?.worktree, true);
 
   const c = board();
-  await c.run(file({ ...spec, worktree: 'my-branch' }));
+  await c.run(file({ ...spec, config: { worktree: 'my-branch' } }));
   await c.run(tick(9));
-  assert.equal(c.spawned.at(-1)!.worktree, 'my-branch');
+  assert.equal(c.spawned.at(-1)!.config?.worktree, 'my-branch');
 });
 
 // ─── the closing statement ──────────────────────────────────────────────────
@@ -650,31 +650,31 @@ import fs from 'node:fs';
 test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5, contextTokens: 200000, remoteControl: true }));
+  await b.run(file({ ...spec, maxAttempts: 2, config: { tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, contextTokens: 200000, remoteControl: true }, budgetUsd: 0.5  }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
   assert.equal(b.spawned.length, 2, 'a retry was spawned');
   for (const r of b.spawned) {
-    assert.deepEqual(r.tools, ['Read', 'Grep'], 'the retry is fenced exactly as the first attempt was');
-    assert.deepEqual(r.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
-    assert.equal(r.effort, 'low');
-    assert.deepEqual(r.mcp, mcp, 'and given the same servers');
+    assert.deepEqual(r.config?.tools, ['Read', 'Grep'], 'the retry is fenced exactly as the first attempt was');
+    assert.deepEqual(r.config?.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
+    assert.equal(r.config?.effort, 'low');
+    assert.deepEqual(r.config?.mcp, mcp, 'and given the same servers');
     assert.equal(r.budgetUsd, 0.5, 'and the same cap');
-    assert.equal(r.contextTokens, 200000, 'and the same window: a continuation given none would run on the whole of it');
-    assert.equal(r.remoteControl, true, 'and bridged the same');
+    assert.equal(r.config?.contextTokens, 200000, 'and the same window: a continuation given none would run on the whole of it');
+    assert.equal(r.config?.remoteControl, true, 'and bridged the same');
   }
 
   const plain = board();
   await plain.run(file(spec));
   await plain.run(tick());
-  assert.equal(plain.spawned[0]!.tools, undefined, 'no list, no fence');
-  assert.equal(plain.spawned[0]!.disallowedTools, undefined, 'no deny list');
-  assert.equal(plain.spawned[0]!.effort, undefined);
-  assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
+  assert.equal(plain.spawned[0]!.config?.tools, undefined, 'no list, no fence');
+  assert.equal(plain.spawned[0]!.config?.disallowedTools, undefined, 'no deny list');
+  assert.equal(plain.spawned[0]!.config?.effort, undefined);
+  assert.equal(plain.spawned[0]!.config?.mcp, undefined, 'no map, no servers of its own');
   assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
-  assert.equal(plain.spawned[0]!.contextTokens, undefined, "no window: the harness's own");
-  assert.equal(plain.spawned[0]!.remoteControl, undefined, 'no Remote Control unless asked');
+  assert.equal(plain.spawned[0]!.config?.contextTokens, undefined, "no window: the harness's own");
+  assert.equal(plain.spawned[0]!.config?.remoteControl, undefined, 'no Remote Control unless asked');
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {

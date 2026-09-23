@@ -39,11 +39,12 @@ export const CLAUDE_POOL = 'claude';
 
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-  if (task.permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(task.permissionMode)) {
-    return `\`permissionMode: ${task.permissionMode}\` is not a mode Claude Code has. Its modes are: ${CLAUDE_PERMISSION_MODES.join(', ')}.`;
+  const { permissionMode, effort } = task.config ?? {};
+  if (permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(permissionMode)) {
+    return `\`permissionMode: ${permissionMode}\` is not a mode Claude Code has. Its modes are: ${CLAUDE_PERMISSION_MODES.join(', ')}.`;
   }
-  if (task.effort !== undefined && !CLAUDE_EFFORTS.includes(task.effort)) {
-    return `\`effort: ${task.effort}\` is not an effort Claude Code has. Its efforts are: ${CLAUDE_EFFORTS.join(', ')}.`;
+  if (effort !== undefined && !CLAUDE_EFFORTS.includes(effort)) {
+    return `\`effort: ${effort}\` is not an effort Claude Code has. Its efforts are: ${CLAUDE_EFFORTS.join(', ')}.`;
   }
   return undefined;
 };
@@ -62,4 +63,4 @@ export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | unde
  * so it is stable, greppable, and — the point — never absent.
  */
 export const worktreeName = (r: SpawnRequest): string =>
-  typeof r.worktree === 'string' ? r.worktree : r.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+  typeof r.config?.worktree === 'string' ? r.config.worktree : r.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');

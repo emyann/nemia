@@ -27,6 +27,9 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
   return {
     spawn: (r) => pick(r.harness).spawn(r),
 
+    // To the harness the task names, as a spawn is: its vocabulary is its own.
+    refuses: (task) => pick(task.harness).refuses?.(task),
+
     observe: Effect.forEach(
       Object.entries(harnesses),
       ([name, ops]) =>

@@ -13,7 +13,7 @@ import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { file, type Filing } from '../src/engine.ts';
-import { createEngine, type Event, type PromiseJournal, type Sighting } from '../src/facade.ts';
+import { createEngine, type Event, type HarnessArgs, type PromiseJournal, type Sighting } from '../src/facade.ts';
 
 /** The Effect door, over a store and a harness that cost nothing. */
 const effectDoor = () => {
@@ -37,7 +37,7 @@ const promiseDoor = () => {
 const ok: Filing = { brief: 'b', cwd: '/r' };
 
 /** Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are cast, as a JSON caller would send them. */
-const REFUSALS: Array<[Partial<Record<keyof Filing, unknown>>, RegExp]> = [
+const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs, unknown>>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
   [{ cwd: 'repo' }, new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`)],
@@ -48,24 +48,32 @@ const REFUSALS: Array<[Partial<Record<keyof Filing, unknown>>, RegExp]> = [
   [{ deadlineSeconds: 0 }, /^`deadlineSeconds: 0` is not a number of seconds\./],
   [{ deadlineSeconds: Infinity }, /^`deadlineSeconds: Infinity` is not a number of seconds\./],
   [{ resume: 'sometimes' }, /^`resume: sometimes` is not a retry policy\. It is one of: interrupted, always, never\.$/],
-  [{ model: '' }, /^`model` is empty\./],
+  [{ config: { model: '' } }, /^`model` is empty\./],
   [{ resumeFrom: '' }, /^`resumeFrom` is empty\./],
-  [{ effort: '' }, /^`effort` is empty\./],
-  [{ tools: ['Read,Grep'] }, /^`tools: \["Read,Grep"\]` is not a list of tool names\./],
-  [{ disallowedTools: ['Bash npm run build'] }, /^`disallowedTools: \["Bash npm run build"\]` is not a list of permission rules\./],
-  [{ allowedTools: ['Write(**'] }, /^`allowedTools: \["Write\(\*\*"\]` is not a list of permission rules\./],
-  [{ mcp: [] }, /^`mcp: \[\]` is not a map of MCP servers by name\./],
-  [{ mcp: { web: {} } }, /^`mcp\.web` has neither `command` nor `url`\./],
+  [{ config: { effort: '' } }, /^`effort` is empty\./],
+  [{ config: { tools: ['Read,Grep'] } }, /^`tools: \["Read,Grep"\]` is not a list of tool names\./],
+  [{ config: { disallowedTools: ['Bash npm run build'] } }, /^`disallowedTools: \["Bash npm run build"\]` is not a list of permission rules\./],
+  [{ config: { allowedTools: ['Write(**'] } }, /^`allowedTools: \["Write\(\*\*"\]` is not a list of permission rules\./],
+  [{ config: { mcp: [] } }, /^`mcp: \[\]` is not a map of MCP servers by name\./],
+  [{ config: { mcp: { web: {} } } }, /^`mcp\.web` has neither `command` nor `url`\./],
   [{ budgetUsd: 0 }, /^`budgetUsd: 0` is not an amount of dollars\./],
   [{ budgetUsd: Number.NaN }, /^`budgetUsd: NaN` is not an amount of dollars\./],
   [{ budgetUsd: '5' }, /^`budgetUsd: "5"` is not an amount of dollars\./],
   [{ priority: Number.NaN }, /^`priority: NaN` is not a number\./],
   [{ priority: Infinity }, /^`priority: Infinity` is not a number\./],
   [{ priority: 'high' }, /^`priority: "high"` is not a number\./],
-  [{ remoteControl: 'true' }, /^`remoteControl: "true"` is not true or false\./],
-  [{ contextTokens: 0 }, /^`contextTokens: 0` is not a number of tokens\./],
-  [{ contextTokens: 150000.5 }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
-  [{ contextTokens: '200k' }, /^`contextTokens: "200k"` is not a number of tokens\./],
+  [{ config: { remoteControl: 'true' } }, /^`remoteControl: "true"` is not true or false\./],
+  [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
+  [{ config: { contextTokens: 150000.5 } }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
+  [{ config: { contextTokens: '200k' } }, /^`contextTokens: "200k"` is not a number of tokens\./],
+  // Where a harness's argument goes: under `config`, and nothing else there. A caller that still files one beside it —
+  // an untyped one, or a record written before it moved — would otherwise start its session without it, saying nothing.
+  [{ model: 'opus' }, /^`model` is the harness's configuration: file it under `config`, as `config: \{ model: … \}`\.$/],
+  [{ permissionMode: 'dontAsk', config: { model: 'opus' } }, /^`permissionMode` is the harness's configuration: file it under `config`/],
+  [{ worktree: true }, /^`worktree` is the harness's configuration/],
+  [{ config: 'opus' }, /^`config: "opus"` is not a harness's configuration\. Give an object of its arguments, like \{ "model": "opus" \}, or leave it out\.$/],
+  [{ config: null }, /^`config: null` is not a harness's configuration\./],
+  [{ config: { budgetUsd: 5 } }, /^`config\.budgetUsd` is not a harness argument\. A harness's arguments are: model, permissionMode, /],
 ];
 
 for (const [bad, says] of REFUSALS) {
@@ -92,9 +100,11 @@ for (const [bad, says] of REFUSALS) {
 test('the Effect door journals a filing that refuses nothing, with every checked key set', async () => {
   const effect = effectDoor();
   const full: Filing = {
-    ...ok, maxAttempts: 2, deadlineSeconds: 60, resume: 'always', model: 'opus', resumeFrom: 's-1', effort: 'high',
-    tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'], allowedTools: ['Edit(**)'],
-    mcp: { web: { command: 'npx', args: ['web'] } }, budgetUsd: 0.25, priority: -1, remoteControl: false, contextTokens: 200000,
+    ...ok, maxAttempts: 2, deadlineSeconds: 60, resume: 'always', resumeFrom: 's-1', budgetUsd: 0.25, priority: -1,
+    config: {
+      model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
+      allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, contextTokens: 200000,
+    },
   };
   const id = await effect.run(file(full));
   assert.deepEqual(await effect.listed(), [id]);
@@ -103,6 +113,6 @@ test('the Effect door journals a filing that refuses nothing, with every checked
 test("the Effect door still journals a harness's own words: it has no harness to ask (issue 6, what is left)", async () => {
   // Pinned so the day the vocabulary half moves too, this test is the one that says so.
   const effect = effectDoor();
-  await effect.run(file({ ...ok, harness: 'banana', permissionMode: 'yolo' }));
+  await effect.run(file({ ...ok, harness: 'banana', config: { permissionMode: 'yolo' } }));
   assert.equal((await effect.listed()).length, 1);
 });

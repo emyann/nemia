@@ -57,8 +57,8 @@ const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
  * gets the default.
  */
 const sandboxOf = (r: SpawnRequest): string => {
-  if (r.tools && !r.tools.some((t) => WRITES.includes(t))) return 'read-only';
-  const asked = r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.permissionMode;
+  if (r.config?.tools && !r.config?.tools.some((t) => WRITES.includes(t))) return 'read-only';
+  const asked = r.config?.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.config?.permissionMode;
   return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
 };
 
@@ -90,21 +90,21 @@ export const codex: HarnessSpec = {
       // The sandbox the task named, as itself. `read-only` used to fall through to `workspace-write`,
       // so a task that asked for a reviewer that cannot write got one that could.
       '-s', sandboxOf(r),
-      ...(r.model ? ['-m', r.model] : []),
+      ...(r.config?.model ? ['-m', r.config?.model] : []),
       // Codex's worktree flag takes NO value, so it is safe immediately before the prompt —
       // unlike Claude's. The spec is where that difference lives, so the engine never learns
       // that harnesses disagree about anything.
-      ...(r.worktree ? ['--worktree'] : []),
+      ...(r.config?.worktree ? ['--worktree'] : []),
       // The closing statement, when the task asked for one. `--output-schema` makes the final
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
       // Effort is a config override: `codex exec` has no flag for it.
-      ...(r.effort ? ['-c', `model_reasoning_effort="${r.effort}"`] : []),
+      ...(r.config?.effort ? ['-c', `model_reasoning_effort="${r.config?.effort}"`] : []),
       // MCP servers, as one override of the whole table. Merged into the operator's own
       // `mcp_servers`, never put in their place — `-c mcp_servers={}` leaves every one of them
       // loaded (0.154.0) — so unlike Claude Code, a Codex task still has the operator's servers.
-      ...(r.mcp && Object.keys(r.mcp).length ? ['-c', `mcp_servers=${codexMcpServers(r.mcp)}`] : []),
+      ...(r.config?.mcp && Object.keys(r.config?.mcp).length ? ['-c', `mcp_servers=${codexMcpServers(r.config?.mcp)}`] : []),
       // Trust, as found by `prepare`: what lets a repository's own `.codex/rules` load in a worktree.
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
@@ -115,26 +115,27 @@ export const codex: HarnessSpec = {
     ],
   }),
   refuses: (task) => {
-    if (task.permissionMode !== undefined && task.permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(task.permissionMode)) {
-      return `\`permissionMode: ${task.permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`;
+    const { permissionMode, effort, disallowedTools, allowedTools, mcp } = task.config ?? {};
+    if (permissionMode !== undefined && permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(permissionMode)) {
+      return `\`permissionMode: ${permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`;
     }
-    if (task.effort !== undefined && !CODEX_EFFORTS.includes(task.effort)) {
-      return `\`effort: ${task.effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
+    if (effort !== undefined && !CODEX_EFFORTS.includes(effort)) {
+      return `\`effort: ${effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
     }
     // A deny list would be dropped without a word: Codex has no tool to take away, only a sandbox.
-    if (task.disallowedTools?.length) {
-      return `\`disallowedTools: ${JSON.stringify(task.disallowedTools)}\` is a deny list, and Codex has no tool list to take from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` runs commands and writes nothing. Leave \`disallowedTools\` off a Codex task, and name the sandbox.`;
+    if (disallowedTools?.length) {
+      return `\`disallowedTools: ${JSON.stringify(disallowedTools)}\` is a deny list, and Codex has no tool list to take from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` runs commands and writes nothing. Leave \`disallowedTools\` off a Codex task, and name the sandbox.`;
     }
     // An allow list would be dropped the same way, and for the same reason.
-    if (task.allowedTools?.length) {
-      return `\`allowedTools: ${JSON.stringify(task.allowedTools)}\` is an allow list, and Codex has no tool list to allow from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`workspace-write\` writes in the workspace and asks nobody. Leave \`allowedTools\` off a Codex task, and name the sandbox.`;
+    if (allowedTools?.length) {
+      return `\`allowedTools: ${JSON.stringify(allowedTools)}\` is an allow list, and Codex has no tool list to allow from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`workspace-write\` writes in the workspace and asks nobody. Leave \`allowedTools\` off a Codex task, and name the sandbox.`;
     }
     // A cap would be dropped without a word: `codex exec --help` (0.154.0) has no spend cap, and its stream counts tokens,
     // not dollars — its config's budgets are token budgets.
     if (task.budgetUsd !== undefined) {
       return `\`budgetUsd: ${task.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: 0.154.0 has no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
     }
-    const sse = Object.entries(task.mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
+    const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {
       return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;
     }
@@ -170,7 +171,7 @@ export const codex: HarnessSpec = {
     let toml: string;
     try { toml = fs.readFileSync(config, 'utf8'); } catch { return {}; }
     const operators = codexMcpServerNames(toml);
-    const taken = Object.keys(r.mcp ?? {}).filter((name) => operators.has(name));
+    const taken = Object.keys(r.config?.mcp ?? {}).filter((name) => operators.has(name));
     if (taken.length) {
       throw new Error(`${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`);
     }

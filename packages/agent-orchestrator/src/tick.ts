@@ -436,19 +436,22 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
-        // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
-        // after a `--model` try continues that session as it cached it.
-        model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
-        effort: step.effort,
-        // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
-        contextTokens: sessionContext(step, steps),
-        permissionMode: step.permissionMode,
-        // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
-        tools: step.tools,
-        disallowedTools: step.disallow,
-        allowedTools: step.allow,
-        // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
-        remoteControl: step.remote,
+        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+        config: {
+          // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
+          // after a `--model` try continues that session as it cached it.
+          model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
+          effort: step.effort,
+          // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
+          contextTokens: sessionContext(step, steps),
+          permissionMode: step.permissionMode,
+          // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
+          tools: step.tools,
+          disallowedTools: step.disallow,
+          allowedTools: step.allow,
+          // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
+          remoteControl: step.remote,
+        },
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
@@ -494,15 +497,18 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         }, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
-        // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
-        model: sessionModel(target, record),
-        effort: target.effort,
-        contextTokens: sessionContext(target, steps),
-        permissionMode: target.permissionMode,
-        tools: target.tools,
-        disallowedTools: target.disallow,
-        allowedTools: target.allow,
-        remoteControl: target.remote,
+        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+        config: {
+          // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
+          model: sessionModel(target, record),
+          effort: target.effort,
+          contextTokens: sessionContext(target, steps),
+          permissionMode: target.permissionMode,
+          tools: target.tools,
+          disallowedTools: target.disallow,
+          allowedTools: target.allow,
+          remoteControl: target.remote,
+        },
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
@@ -593,21 +599,24 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
       cwd: place.workspace,
       harness: step.harness,
-      model: step.model,
-      effort: step.effort,
-      // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
-      // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
-      contextTokens: sessionContext(step, steps),
-      // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
-      // unattended by definition, and a mode that prompts is a mode that stalls.
-      permissionMode: step.permissionMode,
-      // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
-      tools: step.tools,
-      // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
-      disallowedTools: step.disallow,
-      allowedTools: step.allow,
-      // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
-      remoteControl: step.remote,
+      // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+      config: {
+        model: step.model,
+        effort: step.effort,
+        // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
+        // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
+        contextTokens: sessionContext(step, steps),
+        // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
+        // unattended by definition, and a mode that prompts is a mode that stalls.
+        permissionMode: step.permissionMode,
+        // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
+        tools: step.tools,
+        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
+        disallowedTools: step.disallow,
+        allowedTools: step.allow,
+        // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
+        remoteControl: step.remote,
+      },
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       // What is left of the cap for this session, where its harness keeps one: `claude-detached`. A step on a later round has spent some of it.

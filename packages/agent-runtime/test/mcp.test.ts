@@ -131,7 +131,7 @@ test("a task's mcp is written outside the workspace and named after the checkout
   const cwd = tmp('checkout');
   fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
   for (const harness of CLAUDES) {
-    const { args } = await spawnAtDefaults({ cwd, harness, mcp: MCP });
+    const { args } = await spawnAtDefaults({ cwd, harness, config: { mcp: MCP } });
     assert.ok(args, `${harness} was spawned`);
     const { configs, next } = mcpConfigsOf(args);
     assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
@@ -151,7 +151,7 @@ test('a spawn whose task names no servers clears a config left under its name â€
   const bin = fakeBin();
   await onPath(bin, async () => {
     const ops = claudeOps({ root });
-    await Effect.runPromise(ops.spawn({ name: 'ae/t/1', brief: 'the prompt', cwd, mcp: { a: { command: 'x' } } }));
+    await Effect.runPromise(ops.spawn({ name: 'ae/t/1', brief: 'the prompt', cwd, config: { mcp: { a: { command: 'x' } } } }));
     const [written] = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv'))).configs;
     assert.ok(written && fs.existsSync(written), 'written the first time');
     await Effect.runPromise(ops.spawn({ name: 'ae/t/1', brief: 'the prompt', cwd }));
@@ -162,7 +162,7 @@ test('a spawn whose task names no servers clears a config left under its name â€
   let given: HarnessIO | undefined;
   const spy: HarnessSpec = { name: 'sh', command: (_r, io) => { given = io; return { cmd: 'sh', args: ['-c', 'exit 0'] }; } };
   const detached = detachedOps(spy, root);
-  await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, mcp: { a: { command: 'x' } } }));
+  await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { mcp: { a: { command: 'x' } } } }));
   const written = given?.mcpConfigFile;
   assert.ok(written && fs.existsSync(written), 'written the first time');
   await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd }));
@@ -171,7 +171,7 @@ test('a spawn whose task names no servers clears a config left under its name â€
 });
 
 test("codex is given a task's servers as one mcp_servers override, and a task without mcp is given none", async () => {
-  const given = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', mcp: MCP });
+  const given = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } });
   assert.ok(given.args, 'codex was spawned');
   const at = given.args.findIndex((a) => a.startsWith('mcp_servers='));
   assert.equal(given.args[at - 1], '-c');
@@ -191,7 +191,7 @@ test('codex quotes every name and value as TOML, and the override comes before `
   // codex-cli 0.154.0 (`codex mcp get --json`) as exactly these arguments.
   const args = codex.command({
     name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', resumeFrom: 'abc',
-    mcp: { 'a-b_c': { command: '/bin/x', args: ['say "hi"', 'back\\slash', 'two\nlines'], env: { 'K-1': 'v' } } },
+    config: { mcp: { 'a-b_c': { command: '/bin/x', args: ['say "hi"', 'back\\slash', 'two\nlines'], env: { 'K-1': 'v' } } } },
   }).args;
   const at = args.findIndex((a) => a.startsWith('mcp_servers='));
   assert.equal(args[at - 1], '-c');
@@ -209,7 +209,7 @@ test('a relative cwd or root still names each config by an absolute path â€” Cla
     fs.mkdirSync('repo');
     fs.writeFileSync(path.join('repo', '.mcp.json'), '{"mcpServers":{}}');
     await onPath(bin, () => Effect.runPromise(
-      claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', mcp: { a: { command: 'x' } } }),
+      claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', config: { mcp: { a: { command: 'x' } } } }),
     ));
     const { configs } = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv')));
     assert.deepEqual(configs, [path.join(here, 'repo', '.mcp.json'), path.join(here, 'board', 'mcp', 'ae_t_1.json')]);
@@ -227,12 +227,12 @@ test("a task's server named like one in the operator's Codex config is refused a
     '[mcp_servers.docs]', 'command = "operator-docs"', '', '[mcp_servers.docs.env]', 'SECRET = "operator"', '',
   ].join('\n'));
 
-  const clash = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', mcp: MCP }, home);
+  const clash = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } }, home);
   assert.equal(clash.args, undefined, 'codex never ran');
   assert.equal(clash.attempt?.reason, 'unstartable');
   assert.match(clash.attempt?.error ?? '', /`mcp.browser`, `mcp.docs`: .*config\.toml already has a server by that name.*Give the task's server another name/);
 
-  const apart = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', mcp: { mine: { command: 'x' } } }, home);
+  const apart = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: { mine: { command: 'x' } } } }, home);
   assert.ok(apart.args?.some((a) => a.startsWith('mcp_servers={"mine"')), 'a name the operator does not use is given to codex');
 });
 

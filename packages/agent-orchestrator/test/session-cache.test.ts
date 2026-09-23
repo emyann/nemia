@@ -37,7 +37,10 @@ const LOOPED = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'];
 /** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself — and the window the session keeps. */
 const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode', 'contextTokens'] as const;
 
-type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object } & Record<string, unknown>;
+type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object; config?: Record<string, unknown> } & Record<string, unknown>;
+
+/** What `f` was filed with under `key`: its schema is the task's, and the rest are its harness's arguments, under `config`. */
+const cachedOf = (f: Filed, key: (typeof CACHED)[number]): unknown => (key === 'closeoutSchema' ? f.closeoutSchema : f.config?.[key]);
 
 /**
  * Each continuation, against the task whose session it continues, named by the field that differs. A session is `native-<task id>` on
@@ -51,7 +54,7 @@ function chainDifferences(filed: readonly Filed[]): string[] {
     const from = byId.get(f.resumeFrom.replace(/^native-/, ''));
     if (!from) { out.push(`${f.id}: continues ${f.resumeFrom}, which no task here was`); continue; }
     for (const key of CACHED) {
-      if (JSON.stringify(f[key]) !== JSON.stringify(from[key])) out.push(`${f.id}: ${key} is not ${from.id}'s`);
+      if (JSON.stringify(cachedOf(f, key)) !== JSON.stringify(cachedOf(from, key))) out.push(`${f.id}: ${key} is not ${from.id}'s`);
     }
   }
   return out;
@@ -160,8 +163,8 @@ test("REFUSED before the fix, now kept: a `wf retry --model` session is continue
   // Try 2 a new session on sonnet (`--model sonnet`), blocked; try 3 answers it, continuing sonnet's session; round 2 continues try 3's.
   const { id, filed, target } = await walk(path.join(SHIPPED, 'dev'), { mode: 'fresh', model: 'sonnet' });
   const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
-  assert.deepEqual([2, 3, 4, 5].map((n) => [of(n).model, Boolean(of(n).resumeFrom)]), [['sonnet', false], ['sonnet', true], ['sonnet', true], ['sonnet', true]]);
-  assert.equal(filed.find((f) => f.id === `${id}-${target}`)!.model, 'opus', "the first try on the step's model");
+  assert.deepEqual([2, 3, 4, 5].map((n) => [of(n).config?.model, Boolean(of(n).resumeFrom)]), [['sonnet', false], ['sonnet', true], ['sonnet', true], ['sonnet', true]]);
+  assert.equal(filed.find((f) => f.id === `${id}-${target}`)!.config?.model, 'opus', "the first try on the step's model");
   assert.deepEqual(chainDifferences(filed), []);
 });
 
@@ -196,9 +199,9 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
     const { id, filed, target } = await walk(dir, first);
     assert.deepEqual(chainDifferences(filed), [], first.mode);
     const tries = filed.filter((f) => f.id.startsWith(`${id}-${target}`) && !f.id.endsWith('-check'));
-    assert.deepEqual(tries.map((f) => f.contextTokens), tries.map(() => 200_000), `${first.mode}: ${tries.map((f) => f.id).join(', ')}`);
+    assert.deepEqual(tries.map((f) => f.config?.contextTokens), tries.map(() => 200_000), `${first.mode}: ${tries.map((f) => f.id).join(', ')}`);
     assert.ok(tries.length >= 5, 'a first try, a nudge or a new session, an answer, and two rounds');
-    assert.ok(filed.filter((f) => f.id.includes('-review')).every((f) => f.contextTokens === 150_000), "the reviewer's sessions on its own window");
+    assert.ok(filed.filter((f) => f.id.includes('-review')).every((f) => f.config?.contextTokens === 150_000), "the reviewer's sessions on its own window");
   }
 });
 
@@ -208,17 +211,18 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
   const steps: Workflow[] = [target, { name: 'review', after: ['implement'], body: 'review it', loop: 'implement' }];
   const was = { ...closeoutSchemaOf(target, steps), properties: CLOSEOUT_SCHEMA.properties, required: CLOSEOUT_SCHEMA.required };
   const chain: Filed[] = [
-    { id: 'r-implement', closeoutSchema: was, model: 'opus', effort: 'high' },
-    { id: 'r-implement-try2', resumeFrom: 'native-r-implement', closeoutSchema: closeoutSchemaOf(target, steps), model: 'opus', effort: 'high' },
+    { id: 'r-implement', closeoutSchema: was, config: { model: 'opus', effort: 'high' } },
+    { id: 'r-implement-try2', resumeFrom: 'native-r-implement', closeoutSchema: closeoutSchemaOf(target, steps), config: { model: 'opus', effort: 'high' } },
   ];
   assert.deepEqual(chainDifferences(chain), ["r-implement-try2: closeoutSchema is not r-implement's"]);
   // Byte for byte: the same fields in another order is another tool.
   const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
   assert.deepEqual(chainDifferences([{ ...chain[1]!, id: 'r-implement' }, { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' }]), ["r-implement-try2: closeoutSchema is not r-implement's"]);
 
-  const same = { closeoutSchema: CLOSEOUT_SCHEMA, model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk', contextTokens: 200_000 };
+  const args = { model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk', contextTokens: 200_000 };
+  const same = { closeoutSchema: CLOSEOUT_SCHEMA, config: args };
   for (const [key, value] of [['model', 'sonnet'], ['effort', 'medium'], ['tools', ['Read', 'Bash']], ['disallowedTools', []], ['permissionMode', 'auto'], ['contextTokens', 150_000], ['contextTokens', undefined]] as const) {
-    assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same, [key]: value }]), [`a-try2: ${key} is not a's`], key);
+    assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same, config: { ...args, [key]: value } }]), [`a-try2: ${key} is not a's`], key);
   }
   assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), ['a-try2: continues native-a, which no task here was']);
   assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same }]), []);

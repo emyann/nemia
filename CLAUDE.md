@@ -379,6 +379,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   now reads `run.pruned`, so every surface that calls it agrees. A new marker that refuses verbs is checked against every string with `wf <verb>`
   in it (`grep -n "wf round \|wf retry \|wf approve \|wf accept " src/*.ts`), not against the callers you remember (learned by the run
   that made a pruned run say it was pruned).
+- **A field moved under another key makes every untyped read of it pass for the wrong reason.** When the ten harness arguments went
+  under `config`, the orchestrator's and the api's tests — not typechecked — still read `spec.contextTokens` and `f.model`: each one
+  asserting a value failed, and each asserting `undefined` passed, and `chainDifferences` in `session-cache.test.ts` compared
+  `undefined` with `undefined` on every key and found a chain that changes its model the same as one that keeps it. Grep the
+  untyped tests for the old key, read the passing ones too, and check a comparison still fails with a mutant (learned by the run
+  that made the harness's arguments one `config`). The runtime refuses the old place at `file` (`argsRefusalOf`), which is how an
+  untyped `...(worktree ? { worktree: true } : {})` in its own tests was found at all.
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

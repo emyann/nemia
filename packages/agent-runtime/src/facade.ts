@@ -14,9 +14,10 @@ import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeOps, Runner, RunnerError, type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
+  claudeOps, Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses } from './runner-claude-vocabulary.ts';
@@ -118,13 +119,18 @@ export type TaskSpec = {
   cwd: string;
   harness?: string;
   maxAttempts?: number;
-  model?: string;
-  permissionMode?: string;
   deadlineSeconds?: number;
   resume?: ResumePolicy;
   /** Continue an existing session of this harness instead of starting cold. */
   resumeFrom?: string;
-  worktree?: string | boolean;
+  /**
+   * How the harness starts the session — its model, permission mode, tools, effort, MCP servers, context window, Remote
+   * Control and worktree (`HarnessArgs`, each key described there). The adapter's configuration: carried on the task,
+   * handed to the runner at every spawn, and read by nothing else — `decide` and the loop never open it. Refused, before
+   * anything is journalled, when a key is no harness argument, a value is one no harness could use, or its harness does
+   * not take it; and a harness argument filed beside `config` rather than in it is refused, naming where it goes.
+   */
+  config?: HarnessArgs;
   /**
    * A JSON Schema for the workload's closing statement, handed to the harness verbatim.
    *
@@ -135,43 +141,6 @@ export type TaskSpec = {
    */
   closeoutSchema?: object;
   /**
-   * The only tools the session may have, in its harness's names — `['Read', 'Grep', 'Glob']`.
-   * Absent: the harness's own set; empty: none at all. Claude Code is given exactly the list
-   * (`--tools`). Codex has no tool list, so it runs `read-only` when the list has none of Bash,
-   * Write or Edit, and is not narrowed otherwise. Carried on the task; `decide` never reads it.
-   */
-  tools?: string[];
-  /**
-   * What the session may not have, in Claude Code's permission rules — `['SendMessage', 'Bash(npm run build)']`,
-   * one rule per entry: a tool, or a tool and what it may not run. Claude Code is given the list as
-   * `--disallowedTools`, and a deny beats an allow — the checkout's settings, `--allowedTools`, any permission
-   * mode. Absent or empty: nothing denied beyond the harness's own settings. Codex has no tool list, and refuses
-   * a task whose list denies anything. Carried on the task; `decide` never reads it.
-   */
-  disallowedTools?: string[];
-  /**
-   * What the session may do without being asked, in Claude Code's permission rules — `['Edit(src/**)', 'Bash(npm test)']`,
-   * one rule per entry, a path glob resolved against the session's `cwd`. Claude Code is given the list as
-   * `--allowedTools`, and a deny beats it. Absent or empty: only what the permission mode allows by itself, which in
-   * `dontAsk` is reads inside the cwd and nothing that writes — measured on 2.1.278, and why a fenced session in a
-   * fresh directory needs this to write its own work. Codex has no tool list, and refuses a task that allows anything.
-   * Carried on the task; `decide` never reads it.
-   */
-  allowedTools?: string[];
-  /**
-   * How hard the harness should think, in its own words: `--effort` for Claude Code,
-   * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
-   */
-  effort?: string;
-  /**
-   * MCP servers the session may have, by name, as a `.mcp.json` gives them —
-   * `{ browser: { command: 'npx', args: ['@playwright/mcp'] } }`. Claude Code gets these and its
-   * checkout's `.mcp.json`, and never the operator's own servers: every spawn is
-   * `--strict-mcp-config`. Codex gets these as config overrides, on top of its own config's. Carried
-   * on the task; `decide` never reads it.
-   */
-  mcp?: Record<string, McpServer>;
-  /**
    * The most one attempt's session may spend, in dollars — `0.25`, `5`. Given to Claude Code as `--max-budget-usd`:
    * `claude -p` ends the session once a response takes it past the cap, and the attempt ends `failed`, reason `budget`,
    * with what it cost — and the task settles `failed`, saying so: a budget spent is spent, so no attempt follows, whatever
@@ -181,24 +150,6 @@ export type TaskSpec = {
    * sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
    */
   budgetUsd?: number;
-  /**
-   * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
-   * the session compacts its conversation, a summary in place of what it read, and carries on, on `claude --bg` and
-   * `claude -p` alike. Every attempt gets the same window, a continuation included, so a task's session keeps one. Absent:
-   * the harness's own, which is the model's whole window. Refused unless a whole number of tokens in the range the harness
-   * takes (`CLAUDE_CONTEXT_TOKENS`: 100000 to 1000000 on Claude Code), and on a harness with no such knob: `codex`, and a
-   * `HarnessSpec` that declares no `contextTokens` range. A harness brought as a `PromiseRunner` is handed it and asked
-   * nothing. Resource limits' `limits`, for a session's memory. Carried on the task; `decide` never reads it.
-   */
-  contextTokens?: number;
-  /**
-   * Bridge the session to claude.ai: Claude Code's `--bg` session is given `--remote-control`, and is listed in the web's
-   * agents view, where anyone signed in to the account can drive it — type into it, answer its prompts, stop it — from a
-   * browser or a phone. Never a default, for that reason. Refused unless true or false, and `true` on a harness that has no
-   * such flag: `codex`, `claude-detached` — whose `claude -p` runs a prompt and exits — and any `HarnessSpec`. A harness
-   * brought as a `PromiseRunner` is handed it on the spawn and asked nothing. Carried on the task; `decide` never reads it.
-   */
-  remoteControl?: boolean;
   /**
    * Which waiting task a free slot goes to first, when a pool is at its ceiling — `1`, `-1`, `0.5`. Higher first, and
    * filing order within one; absent is 0. Read by a pass when it orders the board, and nowhere else: no runner is told it,
@@ -219,16 +170,16 @@ export type Engine = {
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
-   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
-   * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; a
-   * `disallowedTools` or `allowedTools` that is not a list of permission rules; an
-   * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
-   * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a
-   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`); a `contextTokens` that
-   * is not a whole number of tokens its harness takes, or any on a harness with no context window to set (`codex`); a `remoteControl`
-   * that is not true or false, or `true` on a harness with no such flag (any but one brought as `'claude-bg'` or a
-   * `PromiseRunner`); a `priority` that is not a finite number.
-   * A harness brought as a `PromiseRunner` is asked nothing.
+   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd or resumeFrom;
+   * a `cwd` that is not absolute; a `budgetUsd` that is not dollars above 0, or one its harness would not keep
+   * (`claude`, `codex`); a `priority` that is not a finite number. And in its `config`: a key that is no harness
+   * argument, or one filed beside `config` instead; an empty model or effort; a `tools` that is not a list of names; a
+   * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
+   * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
+   * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
+   * on a harness with no context window to set (`codex`); a `remoteControl` that is not true or false, or `true` on a
+   * harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`).
+   * A harness brought as a `PromiseRunner` is asked nothing of its own.
    */
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
@@ -382,19 +333,20 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   const h = harnesses[spec.harness]!;
   // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
   // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
-  if (spec.contextTokens !== undefined && (h === 'claude-bg' || isSpec(h))) {
+  const { contextTokens, remoteControl } = spec.config ?? {};
+  if (contextTokens !== undefined && (h === 'claude-bg' || isSpec(h))) {
     const range = h === 'claude-bg' ? CLAUDE_CONTEXT_TOKENS : h.contextTokens;
     if (!range) {
       const windowed = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return o === 'claude-bg' || (isSpec(o) && o.contextTokens); }).map((name) => `\`${name}\``);
-      return `\`contextTokens: ${spec.contextTokens}\` sets the session's context window, and the \`${spec.harness}\` harness has no such knob: it would run on its own window, whatever the task says. ${windowed.length ? `File the task on ${windowed.join(' or ')}, whose sessions compact past it, or leave \`contextTokens\` off.` : "Leave `contextTokens` off: none of this engine's harnesses sets a session's window."}`;
+      return `\`contextTokens: ${contextTokens}\` sets the session's context window, and the \`${spec.harness}\` harness has no such knob: it would run on its own window, whatever the task says. ${windowed.length ? `File the task on ${windowed.join(' or ')}, whose sessions compact past it, or leave \`contextTokens\` off.` : "Leave `contextTokens` off: none of this engine's harnesses sets a session's window."}`;
     }
-    if (spec.contextTokens < range.least || spec.contextTokens > range.most) {
-      return `\`contextTokens: ${spec.contextTokens}\` is outside the windows the \`${spec.harness}\` harness takes, and it would refuse the session at every spawn. Give a whole number of tokens from ${range.least} to ${range.most}, or leave it out for the harness's own window.`;
+    if (contextTokens < range.least || contextTokens > range.most) {
+      return `\`contextTokens: ${contextTokens}\` is outside the windows the \`${spec.harness}\` harness takes, and it would refuse the session at every spawn. Give a whole number of tokens from ${range.least} to ${range.most}, or leave it out for the harness's own window.`;
     }
   }
   // Only Claude Code's background sessions are bridged. A spec's harness runs a prompt and exits — `claude -p` among them,
   // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
-  if (spec.remoteControl && isSpec(h)) {
+  if (remoteControl && isSpec(h)) {
     const bridged = Object.keys(harnesses).filter((name) => harnesses[name] === 'claude-bg').map((name) => `\`${name}\``);
     return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
@@ -464,7 +416,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // in another — two ceilings for one subscription, each the full size.
     file: async (spec) => {
       const task = { ...spec, harness: spec.harness ?? fallback };
-      const refused = refusalOf(task) ?? harnessRefusalOf(task, harnesses);
+      const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
       return go(file(task));
     },
@@ -535,7 +487,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (!deliver) {
         throw refuse((isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`);
       }
-      const cannot = h === 'claude-bg' ? claudeSayRefuses(state, text) : undefined;
+      const cannot = h === 'claude-bg' ? claudeSayRefuses(state.config ?? {}, text) : undefined;
       if (cannot) throw refuse(cannot);
       // What the record says first, then what the harness says: a settled task is not asked about.
       if (state.settled) throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
@@ -638,6 +590,7 @@ export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said } from './domain.ts';
+export { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

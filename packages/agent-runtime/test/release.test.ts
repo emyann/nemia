@@ -140,7 +140,7 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
     claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, ...(worktree ? { worktree: true } : {}) });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, ...(worktree ? { config: { worktree: true } } : {}) });
       await engine.tick();
       const [row] = claude.rows();
       await sleep(10);
@@ -185,7 +185,7 @@ test('a task that asked for a worktree has its session stopped and never removed
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), worktree: true, closeoutSchema: { type: 'object' } });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { worktree: true }, closeoutSchema: { type: 'object' } });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
@@ -205,7 +205,7 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), ...(worktree ? { worktree: true } : {}) });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), ...(worktree ? { config: { worktree: true } } : {}) });
       await engine.tick();
       const [row] = claude.rows();
       wrote(row!, 10 * 60_000);

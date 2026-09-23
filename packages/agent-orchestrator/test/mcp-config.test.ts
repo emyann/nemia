@@ -160,7 +160,7 @@ test("a --bg task filed in this repository has Playwright's browser_navigate and
   // Shipped defaults: the engine's built-in harnesses, `claude` first. No `mcp` on the task, so the
   // only servers it can have are the ones the checkout's .mcp.json names.
   const engine: Engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'wf-live-mcp-')) });
-  const id = await engine.file({ brief: BRIEF, cwd: REPO, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, effort: 'low' });
+  const id = await engine.file({ brief: BRIEF, cwd: REPO, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low' } });
   let view: TaskView | undefined;
   try {
     const until = Date.now() + 10 * 60_000;

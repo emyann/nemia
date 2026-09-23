@@ -10,8 +10,8 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, type McpServer } from './runner.ts';
-import { mcpRefuses } from './runner-mcp.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
+import { Runner } from './runner.ts';
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
@@ -49,11 +49,9 @@ export type TaskView = {
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
-  brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
-  harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
-  worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[]; allowedTools?: string[];
-  effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; contextTokens?: number;
-  remoteControl?: boolean; priority?: number; id?: string;
+  brief: string; cwd: string; maxAttempts?: number;
+  harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
+  closeoutSchema?: object; budgetUsd?: number; priority?: number; id?: string;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -65,20 +63,15 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
 const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
 
 /**
- * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses —
- * `SendMessage`, `Bash(npm run build)`. A space or a comma outside the parentheses separates two rules on
- * the harness's side, so an entry that has one is not one rule.
- */
-const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
-
-/**
- * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it no harness
- * is asked about.
+ * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it that is the
+ * runtime's own, and no harness's.
  *
  * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN` was
- * journalled as `null` and stopped its task on the first pass. `createEngine().file()` asks this first and then each
- * harness for its own words (`harnessRefusalOf` in `facade.ts`), which this door never learns (open issue 6).
+ * journalled as `null` and stopped its task on the first pass. The harness's arguments under `config` are the adapter's to
+ * check (`argsRefusalOf` in `harness-args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
+ * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade.ts`), which this
+ * door never learns (open issue 6).
  */
 export const refusalOf = (spec: Filing): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
@@ -97,50 +90,31 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
     return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
   }
-  if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
   if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
-  if (spec.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
-  // One name per entry: a comma inside one would split into two names on the way to the harness.
-  if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
-    return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
-  }
-  if (spec.disallowedTools !== undefined && !(Array.isArray(spec.disallowedTools) && spec.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
-    return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
-  }
-  if (spec.allowedTools !== undefined && !(Array.isArray(spec.allowedTools) && spec.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
-    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
-  }
-  const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
-  if (mcp) return mcp;
   if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
     return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
   }
   if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
     return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
   }
-  if (spec.remoteControl !== undefined && typeof spec.remoteControl !== 'boolean') {
-    return `\`remoteControl: ${JSON.stringify(spec.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
-  }
-  if (spec.contextTokens !== undefined && !(typeof spec.contextTokens === 'number' && Number.isSafeInteger(spec.contextTokens) && spec.contextTokens > 0)) {
-    return `\`contextTokens: ${typeof spec.contextTokens === 'number' ? spec.contextTokens : JSON.stringify(spec.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
-  }
   return undefined;
 };
 
 /** File a task. The only write a person makes; everything after is the loop's. */
 export const file = Effect.fn('file')(function* (spec: Filing) {
-  const refused = refusalOf(spec);
+  const runner = yield* Runner;
+  // The shared checks are asked here as well as by `Runner.layer`: `Runner.of` is exported, and a runner built without the
+  // layer — `sdkRunner` was — would otherwise journal a `config` no harness could use. The spec is handed on whole, unopened.
+  const refused = refusalOf(spec) ?? argsRefusalOf(spec) ?? runner.refuses?.(spec);
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
   yield* journal.append(id, {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
-    maxAttempts: spec.maxAttempts ?? 1, model: spec.model, permissionMode: spec.permissionMode,
-    harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
-    resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
-    tools: spec.tools, disallowedTools: spec.disallowedTools, allowedTools: spec.allowedTools, effort: spec.effort, mcp: spec.mcp, budgetUsd: spec.budgetUsd,
-    contextTokens: spec.contextTokens, remoteControl: spec.remoteControl, priority: spec.priority,
+    maxAttempts: spec.maxAttempts ?? 1, harness: spec.harness, config: spec.config,
+    deadlineSeconds: spec.deadlineSeconds, resume: spec.resume, resumeFrom: spec.resumeFrom,
+    closeoutSchema: spec.closeoutSchema, budgetUsd: spec.budgetUsd, priority: spec.priority,
   });
   return id;
 });
@@ -241,11 +215,9 @@ export const step = Effect.fn('step')(function* (
       // made when the attempt was started, possibly by an engine that has since died.
       const attempt = state.attempts.find((a) => a.n === action.attempt);
       const failed = yield* runner.spawn({
-        name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd,
-        model: state.model, permissionMode: state.permissionMode, harness: state.harness,
-        worktree: state.worktree, closeoutSchema: state.closeoutSchema,
-        tools: state.tools, disallowedTools: state.disallowedTools, allowedTools: state.allowedTools, effort: state.effort, mcp: state.mcp,
-        budgetUsd: state.budgetUsd, contextTokens: state.contextTokens, remoteControl: state.remoteControl, resumeFrom: attempt?.resumeFrom,
+        name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd, harness: state.harness,
+        // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's.
+        config: state.config, closeoutSchema: state.closeoutSchema, budgetUsd: state.budgetUsd, resumeFrom: attempt?.resumeFrom,
       }).pipe(
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
@@ -338,7 +310,8 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
     const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
     const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
     if (!session) continue;
-    const released = yield* runner.release(session, { worktree: state.worktree }).pipe(
+    // The task's harness arguments, unopened: the runner reads there whether it cut a worktree it must keep.
+    const released = yield* runner.release(session, state.config ?? {}).pipe(
       Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
     );
     const measured = typeof released === 'object' ? released : session.usage;

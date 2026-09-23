@@ -25,11 +25,12 @@
  * The engine does not change between them — only what is true after a crash does. That is the
  * whole reason this is a seam and not an import.
  */
-import { Effect, Layer } from 'effect';
+import { Effect } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting, Usage } from './domain.ts';
 import { Runner, RunnerError } from './runner.ts';
 import { renderTranscript } from './runner-claude-transcript.ts';
+import type { HarnessArgs } from './harness-args.ts';
 
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: Observed; abort: AbortController; toolCalls: number; usage?: Usage };
@@ -37,15 +38,15 @@ type Live = { sessionId: string; state: Observed; abort: AbortController; toolCa
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
 
-  const pump = (name: string, r: { brief: string; cwd: string; model?: string; permissionMode?: string }, abort: AbortController) =>
+  const pump = (name: string, r: { brief: string; cwd: string; config?: Pick<HarnessArgs, 'model' | 'permissionMode'> }, abort: AbortController) =>
     Effect.promise(async () => {
       const q = query({
         prompt: r.brief,
         options: {
           cwd: r.cwd,
           abortController: abort,
-          ...(r.model ? { model: r.model } : {}),
-          ...(r.permissionMode ? { permissionMode: r.permissionMode as never } : {}),
+          ...(r.config?.model ? { model: r.config.model } : {}),
+          ...(r.config?.permissionMode ? { permissionMode: r.config.permissionMode as never } : {}),
         },
       });
       const set = (patch: Partial<Live>) => {
@@ -88,7 +89,8 @@ export const sdkRunner = () => {
       }
     });
 
-  return Layer.succeed(Runner)(Runner.of({
+  // Through `Runner.layer`, as every runner is: it asks the checks every harness shares of a task's `config` (`argsRefusalOf`).
+  return Runner.layer({
     spawn: (r) =>
       Effect.gen(function* () {
         const abort = new AbortController();
@@ -117,5 +119,5 @@ export const sdkRunner = () => {
         try: () => getSessionMessages(sessionId),
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }).pipe(Effect.map(renderTranscript)),
-  }));
+  });
 };

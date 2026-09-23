@@ -325,7 +325,7 @@ test('watch() keeps its host process alive, even with a store that cannot push',
 
 // ─── the door refuses what the loop cannot run ──────────────────────────────
 
-import { claudeDetached, codex, type Engine, type HarnessSpec, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
+import { claudeDetached, codex, type Engine, type HarnessSpec, type HarnessArgs, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
 
 /** An engine at shipped defaults — the three built-in harnesses — over a store a test can read. */
 const shipped = () => {
@@ -361,14 +361,14 @@ test('file() refuses counts and seconds the loop cannot use — NaN was journall
 
 test("file() refuses a permission mode outside its harness's own words", async () => {
   const { journal, engine } = shipped();
-  await refused(engine, { brief: 'b', cwd: '/r', permissionMode: 'yolo' }, /`permissionMode: yolo` is not a mode Claude Code has/);
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', permissionMode: 'read-only' }, /not a mode Claude Code has/);
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', permissionMode: 'auto' }, /`permissionMode: auto` is not a sandbox Codex has/);
+  await refused(engine, { brief: 'b', cwd: '/r', config: { permissionMode: 'yolo' } }, /`permissionMode: yolo` is not a mode Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', config: { permissionMode: 'read-only' } }, /not a mode Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { permissionMode: 'auto' } }, /`permissionMode: auto` is not a sandbox Codex has/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   // The words each harness does have are filed.
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', permissionMode: 'read-only' });
-  await engine.file({ brief: 'b', cwd: '/r', permissionMode: 'default' });
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { permissionMode: 'read-only' } });
+  await engine.file({ brief: 'b', cwd: '/r', config: { permissionMode: 'default' } });
   assert.equal((await journal.list()).length, 2);
 });
 
@@ -376,7 +376,7 @@ test('file() refuses an empty brief, cwd, model or resumeFrom', async () => {
   const { engine } = shipped();
   await refused(engine, { brief: '  ', cwd: '/r' }, /`brief` is empty/);
   await refused(engine, { brief: 'b', cwd: '' }, /`cwd` is empty/);
-  await refused(engine, { brief: 'b', cwd: '/r', model: '' }, /`model` is empty/);
+  await refused(engine, { brief: 'b', cwd: '/r', config: { model: '' } }, /`model` is empty/);
   await refused(engine, { brief: 'b', cwd: '/r', resumeFrom: '' }, /`resumeFrom` is empty/);
 });
 
@@ -397,35 +397,35 @@ test('a harness brought as a spec is asked its own refusals; one brought as a ru
   const picky: HarnessSpec = {
     name: 'picky',
     command: () => ({ cmd: 'true', args: [] }),
-    refuses: (task) => (task.model === 'huge' ? 'picky runs no huge models' : undefined),
+    refuses: (task) => (task.config?.model === 'huge' ? 'picky runs no huge models' : undefined),
   };
   const engine = createEngine({ journal: memoryJournal(), harnesses: { picky, fake: fakeHarness(new Map()) }, defaultHarness: 'picky' });
-  await refused(engine, { brief: 'b', cwd: '/r', model: 'huge' }, /picky runs no huge models/);
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'fake', permissionMode: 'anything' }));
+  await refused(engine, { brief: 'b', cwd: '/r', config: { model: 'huge' } }, /picky runs no huge models/);
+  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'fake', config: { permissionMode: 'anything' } }));
 });
 
 test('file() refuses an effort its harness does not have — Claude Code would have ignored it', async () => {
   const { journal, engine } = shipped();
-  await refused(engine, { brief: 'b', cwd: '/r', effort: 'extreme' }, /`effort: extreme` is not an effort Claude Code has/);
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', effort: 'extreme' }, /not a reasoning effort Codex has/);
-  await refused(engine, { brief: 'b', cwd: '/r', effort: '' }, /`effort` is empty/);
+  await refused(engine, { brief: 'b', cwd: '/r', config: { effort: 'extreme' } }, /`effort: extreme` is not an effort Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { effort: 'extreme' } }, /not a reasoning effort Codex has/);
+  await refused(engine, { brief: 'b', cwd: '/r', config: { effort: '' } }, /`effort` is empty/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  await engine.file({ brief: 'b', cwd: '/r', effort: 'xhigh' });
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', effort: 'minimal' });
+  await engine.file({ brief: 'b', cwd: '/r', config: { effort: 'xhigh' } });
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { effort: 'minimal' } });
   assert.equal((await journal.list()).length, 2);
 });
 
 test('file() refuses a tool list that is not a list of names, and journals one that is', async () => {
   const { journal, engine } = shipped();
   for (const tools of [['Read,Grep'], [''], [' Read'], 'Read' as unknown as string[]]) {
-    await refused(engine, { brief: 'b', cwd: '/r', tools }, /is not a list of tool names/);
+    await refused(engine, { brief: 'b', cwd: '/r', config: { tools } }, /is not a list of tool names/);
   }
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', tools: ['Read', 'Grep', 'Glob'] });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { tools: ['Read', 'Grep', 'Glob'] } });
   const [filed] = await journal.read(id);
-  assert.deepEqual((filed as { tools?: string[] }).tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
+  assert.deepEqual((filed as { config?: { tools?: string[] } }).config?.tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
 });
 
 test('file() refuses a disallowedTools that is not a list of permission rules, and a deny list on codex, and journals one that is', async () => {
@@ -435,15 +435,15 @@ test('file() refuses a disallowedTools that is not a list of permission rules, a
     ['Bash(npm run build'], ['Bash()'], ['(npm run build)'], ['-p'],
   ];
   for (const disallowedTools of notRules) {
-    await refused(engine, { brief: 'b', cwd: '/r', disallowedTools: disallowedTools as string[] }, /is not a list of permission rules\. Give one rule per entry/);
+    await refused(engine, { brief: 'b', cwd: '/r', config: { disallowedTools: disallowedTools as string[] } }, /is not a list of permission rules\. Give one rule per entry/);
   }
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', disallowedTools: ['SendMessage'] }, /is a deny list, and Codex has no tool list/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { disallowedTools: ['SendMessage'] } }, /is a deny list, and Codex has no tool list/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   const rules = ['SendMessage', 'Bash(npm run build)', 'mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)', `Bash(git commit -m 'wip')`];
-  const id = await engine.file({ brief: 'b', cwd: '/r', disallowedTools: rules });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { disallowedTools: rules } });
   const [filed] = await journal.read(id);
-  assert.deepEqual((filed as { disallowedTools?: string[] }).disallowedTools, rules, 'on the record, for the runner');
+  assert.deepEqual((filed as { config?: { disallowedTools?: string[] } }).config?.disallowedTools, rules, 'on the record, for the runner');
 });
 
 test('file() refuses an allowedTools that is not a list of permission rules, and an allow list on codex, and journals one that is', async () => {
@@ -453,15 +453,15 @@ test('file() refuses an allowedTools that is not a list of permission rules, and
     ['Write(**'], ['Write()'], ['(**)'], ['-p'],
   ];
   for (const allowedTools of notRules) {
-    await refused(engine, { brief: 'b', cwd: '/r', allowedTools: allowedTools as string[] }, /is not a list of permission rules\. Give one rule per entry/);
+    await refused(engine, { brief: 'b', cwd: '/r', config: { allowedTools: allowedTools as string[] } }, /is not a list of permission rules\. Give one rule per entry/);
   }
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', allowedTools: ['Write(**)'] }, /is an allow list, and Codex has no tool list/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { allowedTools: ['Write(**)'] } }, /is an allow list, and Codex has no tool list/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   const rules = ['Write(**)', 'Edit(**)', 'Bash(npm test)', 'mcp__playwright__browser_navigate', `Bash(git commit -m 'wip')`];
-  const id = await engine.file({ brief: 'b', cwd: '/r', allowedTools: rules });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { allowedTools: rules } });
   const [filed] = await journal.read(id);
-  assert.deepEqual((filed as { allowedTools?: string[] }).allowedTools, rules, 'on the record, for the runner');
+  assert.deepEqual((filed as { config?: { allowedTools?: string[] } }).config?.allowedTools, rules, 'on the record, for the runner');
 });
 
 test('file() refuses an mcp map whose entries are not .mcp.json servers, and journals one that is', async () => {
@@ -486,17 +486,17 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
     [{ web: { type: 'http', url: 'https://h/mcp', env: {} } }, /`mcp.web` has `env`, which a server with a `url` does not take/],
     [{ web: { type: 'http', url: 'https://h/mcp', headers: { Authorization: 1 } } }, /`mcp.web.headers` is not a map of strings/],
   ];
-  for (const [mcp, says] of bad) await refused(engine, { brief: 'b', cwd: '/r', mcp: mcp as TaskSpec['mcp'] }, says);
+  for (const [mcp, says] of bad) await refused(engine, { brief: 'b', cwd: '/r', config: { mcp: mcp as HarnessArgs['mcp'] } }, says);
   // Codex's own words: it connects to no SSE server. Claude Code does.
   const sse = { docs: { type: 'sse' as const, url: 'https://h/sse' } };
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', mcp: sse }, /`mcp.docs` is an SSE server, and Codex connects only to stdio and streamable HTTP/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { mcp: sse } }, /`mcp.docs` is an SSE server, and Codex connects only to stdio and streamable HTTP/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', mcp: sse });
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', config: { mcp: sse } });
   const mcp = { browser: { command: 'npx', args: ['-y', '@playwright/mcp'], env: { HEADLESS: '1' } }, docs: { type: 'http' as const, url: 'https://h/mcp' } };
-  const id = await engine.file({ brief: 'b', cwd: '/r', mcp });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { mcp } });
   const [filed] = await journal.read(id);
-  assert.deepEqual((filed as { mcp?: unknown }).mcp, mcp, 'on the record, for the runner');
+  assert.deepEqual((filed as { config?: { mcp?: unknown } }).config?.mcp, mcp, 'on the record, for the runner');
 });
 
 test('file() refuses a budgetUsd that is not dollars above 0, and one on a harness that would keep no cap — and journals one claude-detached keeps', async () => {
@@ -538,48 +538,48 @@ test('file() refuses remoteControl on every harness with no such flag, by name �
   const journal = memoryJournal();
   const engine = createEngine({ journal, harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check } });
   for (const harness of ['codex', 'claude-detached', 'check']) {
-    await refused(engine, { brief: 'b', cwd: '/r', harness, remoteControl: true },
+    await refused(engine, { brief: 'b', cwd: '/r', harness, config: { remoteControl: true } },
       new RegExp(`\`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`remoteControl\` off`));
   }
   for (const remoteControl of ['true', 1, null]) {
-    await refused(engine, { brief: 'b', cwd: '/r', remoteControl: remoteControl as unknown as boolean }, /`remoteControl: .*` is not true or false\. Give true to bridge the session to claude\.ai, or leave it out/);
+    await refused(engine, { brief: 'b', cwd: '/r', config: { remoteControl: remoteControl as unknown as boolean } }, /`remoteControl: .*` is not true or false\. Give true to bridge the session to claude\.ai, or leave it out/);
   }
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', remoteControl: true });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
   const [filed] = await journal.read(id);
-  assert.equal((filed as { remoteControl?: boolean }).remoteControl, true, 'on the record, for the runner');
-  assert.equal((await engine.view(id)).state.remoteControl, true);
+  assert.equal((filed as { config?: { remoteControl?: boolean } }).config?.remoteControl, true, 'on the record, for the runner');
+  assert.equal((await engine.view(id)).state.config?.remoteControl, true);
   for (const harness of ['codex', 'claude-detached', 'check']) {
-    assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness, remoteControl: false }), `false asks ${harness} for nothing`);
+    assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness, config: { remoteControl: false } }), `false asks ${harness} for nothing`);
   }
 
   // Named by what the engine has: no harness brought as 'claude-bg', none to file on.
   const bare = createEngine({ journal: memoryJournal(), harnesses: { codex } });
-  await refused(bare, { brief: 'b', cwd: '/r', remoteControl: true }, /the `codex` harness has no such flag.*Leave `remoteControl` off: none of this engine's harnesses bridges a session/);
+  await refused(bare, { brief: 'b', cwd: '/r', config: { remoteControl: true } }, /the `codex` harness has no such flag.*Leave `remoteControl` off: none of this engine's harnesses bridges a session/);
 });
 
 test('file() refuses a contextTokens that is not a whole number of tokens, one outside what Claude Code takes, and any on codex — and journals one both Claude harnesses take', async () => {
   const { journal, engine } = shipped();
   for (const contextTokens of [0, -200000, 150000.5, Number.NaN, Infinity, '200000' as unknown as number, '200k' as unknown as number]) {
-    await refused(engine, { brief: 'b', cwd: '/r', contextTokens }, /`contextTokens: .*` is not a number of tokens\. Give a whole number of tokens, like 200000/);
+    await refused(engine, { brief: 'b', cwd: '/r', config: { contextTokens } }, /`contextTokens: .*` is not a number of tokens\. Give a whole number of tokens, like 200000/);
   }
   // The CLI refuses these while it parses (2.1.278), so a spawn would fail on every pass: both ends are in, and nothing past them.
   for (const harness of ['claude', 'claude-detached']) {
     for (const contextTokens of [99_999, 1_000_001, 1_000]) {
-      await refused(engine, { brief: 'b', cwd: '/r', harness, contextTokens },
+      await refused(engine, { brief: 'b', cwd: '/r', harness, config: { contextTokens } },
         new RegExp(`\`contextTokens: ${contextTokens}\` is outside the windows the \`${harness}\` harness takes.*from 100000 to 1000000`));
     }
   }
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', contextTokens: 200000 },
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { contextTokens: 200000 } },
     /`contextTokens: 200000` sets the session's context window, and the `codex` harness has no such knob.*File the task on `claude` or `claude-detached`/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   for (const [harness, contextTokens] of [['claude', 200000], ['claude-detached', 100000], ['claude', 1000000]] as const) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', harness, contextTokens });
+    const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { contextTokens } });
     const [filed] = await journal.read(id);
-    assert.equal((filed as { contextTokens?: number }).contextTokens, contextTokens, 'on the record, for the runner');
-    assert.equal((await engine.view(id)).state.contextTokens, contextTokens);
+    assert.equal((filed as { config?: { contextTokens?: number } }).config?.contextTokens, contextTokens, 'on the record, for the runner');
+    assert.equal((await engine.view(id)).state.config?.contextTokens, contextTokens);
   }
 });
 
@@ -588,14 +588,14 @@ test('a HarnessSpec is given a contextTokens only when it declares the windows i
   const windowed: HarnessSpec = { ...bare, name: 'windowed', contextTokens: { least: 8_000, most: 32_000 } };
   const runner: PromiseRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
   const engine = createEngine({ journal: memoryJournal(), harnesses: { bare, windowed, runner } });
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'bare', contextTokens: 16_000 },
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'bare', config: { contextTokens: 16_000 } },
     /the `bare` harness has no such knob: it would run on its own window.*File the task on `windowed`, whose sessions compact past it, or leave `contextTokens` off/);
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'windowed', contextTokens: 64_000 }, /from 8000 to 32000/);
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'windowed', contextTokens: 16_000 }));
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'runner', contextTokens: 5 }), "a runner's own business");
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'windowed', config: { contextTokens: 64_000 } }, /from 8000 to 32000/);
+  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'windowed', config: { contextTokens: 16_000 } }));
+  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'runner', config: { contextTokens: 5 } }), "a runner's own business");
 
   const none = createEngine({ journal: memoryJournal(), harnesses: { codex } });
-  await refused(none, { brief: 'b', cwd: '/r', contextTokens: 200000 }, /Leave `contextTokens` off: none of this engine's harnesses sets a session's window/);
+  await refused(none, { brief: 'b', cwd: '/r', config: { contextTokens: 200000 } }, /Leave `contextTokens` off: none of this engine's harnesses sets a session's window/);
 });
 
 test('a harness brought as a runner is asked nothing of remoteControl, and is handed it on the spawn', async () => {
@@ -604,9 +604,9 @@ test('a harness brought as a runner is asked nothing of remoteControl, and is ha
   const runner = fakeHarness(sessions);
   const engine = createEngine({
     journal: memoryJournal(), defaultHarness: 'mine',
-    harnesses: { mine: { ...runner, spawn: async (r) => { asked.push(r.remoteControl === true); await runner.spawn(r); } } },
+    harnesses: { mine: { ...runner, spawn: async (r) => { asked.push(r.config?.remoteControl === true); await runner.spawn(r); } } },
   });
-  await engine.file({ brief: 'b', cwd: '/r', remoteControl: true });
+  await engine.file({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
   await engine.tick();
   assert.deepEqual(asked, [true], 'its to honour');
 });

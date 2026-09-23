@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
+import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -23,7 +23,7 @@ export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
   'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
   'contextTokens',
-] as const satisfies readonly (keyof TaskSpec)[];
+] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
 const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
@@ -122,11 +122,19 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   }
 
   const worktree = meta.get('worktree');
+  // The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
+  const config: HarnessArgs = Object.fromEntries(Object.entries({
+    model: meta.get('model'),
+    permissionMode: meta.get('permissionMode'),
+    // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
+    worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
+    tools: toolList,
+    effort: meta.get('effort'),
+    contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
+  }).filter(([, value]) => value !== undefined));
   return {
     brief,
     cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
-    model: meta.get('model'),
-    permissionMode: meta.get('permissionMode'),
     harness: meta.get('harness'),
     maxAttempts: maxAttempts !== undefined ? Number(maxAttempts) : 1,
     deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
@@ -135,19 +143,15 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     // attempts of this task. Two different questions that the same English word answers.
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
-    // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
-    worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
-    tools: toolList,
-    effort: meta.get('effort'),
     budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
-    contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
+    ...(Object.keys(config).length ? { config } : {}),
   };
 }
 
 /** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
-export const limitLines = (state: Pick<State, 'budgetUsd' | 'contextTokens'>): string[] => [
+export const limitLines = (state: Pick<State, 'budgetUsd' | 'config'>): string[] => [
   ...(state.budgetUsd !== undefined ? [`budget: $${state.budgetUsd} an attempt`] : []),
-  ...(state.contextTokens !== undefined ? [`context: ${state.contextTokens} tokens a session, compacted past about it`] : []),
+  ...(state.config?.contextTokens !== undefined ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`] : []),
 ];
 
 /** A count for a person: 20400 → 20.4k, 1234567 → 1.2M. */

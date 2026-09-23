@@ -30,6 +30,7 @@ import type { Observed, Sighting, Usage } from './domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './runner-claude-transcript.ts';
 import { worktreeName } from './runner-claude-vocabulary.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
 
@@ -49,35 +50,16 @@ export type SpawnRequest = {
   name: string;
   brief: string;
   cwd: string;
-  model?: string;
-  permissionMode?: string;
   /** Which harness should run it. The composite runner dispatches on this; others ignore it. */
   harness?: string;
+  /** The harness's arguments, as the task was filed with them: this runner's to read, and nobody else's. Absent: none. */
+  config?: HarnessArgs;
   /** A previous session of this harness to continue instead of starting cold. */
   resumeFrom?: string;
-  /** Isolation: true for a harness-named git worktree, a string to name it. */
-  worktree?: string | boolean;
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
-  /** The only tools the session may have, in this harness's names. Absent: the harness's own set. */
-  tools?: string[];
-  /** What the session may not have, in this harness's permission rules, one per entry. Absent or empty: nothing denied. */
-  disallowedTools?: string[];
-  /**
-   * What the session may do without being asked, in this harness's permission rules, one per entry. Absent or empty:
-   * only what its permission mode allows by itself. A deny beats it.
-   */
-  allowedTools?: string[];
-  /** How hard the harness should think, in its own words. */
-  effort?: string;
-  /** MCP servers the session may have, by name, beside its checkout's `.mcp.json`. Absent: only those. */
-  mcp?: Record<string, McpServer>;
   /** The most the session may spend, in dollars. Absent: no cap. */
   budgetUsd?: number;
-  /** The context window the session is given, in tokens: past about it, the harness compacts. Absent: the harness's own. */
-  contextTokens?: number;
-  /** Bridge the session to claude.ai, where it can be seen and driven. Absent or false: not bridged. */
-  remoteControl?: boolean;
 };
 
 /**
@@ -173,11 +155,24 @@ export type RunnerOps = {
    * journals that they were said, and `decide` never reads that.
    */
   readonly say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
+  /**
+   * Why this runner would not take a task, as a sentence that says what to write instead — or `undefined`. Asked by `file`
+   * before anything is journalled, so a task no harness could start is never a promise the loop keeps trying to honour.
+   * Optional: every runner made a `Runner` by `Runner.layer` refuses what no harness could use (`argsRefusalOf`) before
+   * it is asked, so a runner answers for its own vocabulary alone; `file` asks those checks itself too, for a runner built
+   * with `Runner.of` and no layer.
+   */
+  readonly refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
 };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
   /** Any implementation becomes a Layer. This is the only way a runner reaches the engine. */
-  static layer = (ops: RunnerOps) => Layer.succeed(Runner)(Runner.of(ops));
+  static layer = (ops: RunnerOps) => Layer.succeed(Runner)(Runner.of({
+    ...ops,
+    // The harness arguments are the adapter's, so what no adapter could use is refused on the adapter's side of the seam:
+    // here, beneath every runner, and so at the Effect door as at `createEngine().file()`.
+    refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
+  }));
 
   static claude = (options?: ClaudeOptions) => Runner.layer(claudeOps(options));
 
@@ -350,7 +345,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   return ({
     spawn: (r) => Effect.try({
       // Found and written before the CLI runs, so whatever throws here started nothing.
-      try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.mcp)]),
+      try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.config?.mcp)]),
       catch: (cause) => new RunnerError({ verb: 'spawn', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`, refused: true }),
     }).pipe(Effect.flatMap((mcpArgs) => sh('claude', [
       '--bg',
@@ -359,43 +354,43 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // may not use, and `--allowedTools` only pre-approves. VARIADIC — directly before the prompt
       // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
       // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
-      ...(r.tools ? ['--tools', r.tools.join(',')] : []),
+      ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
       // The deny list, the other half of the fence: a tool the session has, or a command it may run, that it
       // must not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny
       // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
       // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
-      ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
+      ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
       // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
       // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
       // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
       // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
       // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
       // lists above are, and a deny still beats it.
-      ...(r.allowedTools?.length ? ['--allowedTools', r.allowedTools.join(',')] : []),
+      ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
       // Remote Control, only when the task asks: the session bridged to claude.ai and listed in its agents view, where it
       // can be driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this
       // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt
       // taken as its name — so it goes here, where the `--permission-mode` that always follows cannot be taken for one.
-      ...(r.remoteControl ? ['--remote-control'] : []),
+      ...(r.config?.remoteControl ? ['--remote-control'] : []),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
       // session that wants to run its own tests stops and waits for a person who is not there.
       // `auto` approves everything with background safety checks, which the docs recommend for
       // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
-      '--permission-mode', r.permissionMode ?? 'auto',
+      '--permission-mode', r.config?.permissionMode ?? 'auto',
       // MCP servers: the ones named here and no others. Without `--strict-mcp-config` a session loads
       // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
       // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
       // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
       // Claude in Chrome is not in any config and survives strict, so `--no-chrome` goes with it.
       ...mcpArgs,
-      ...(r.model ? ['--model', r.model] : []),
-      ...(r.effort ? ['--effort', r.effort] : []),
+      ...(r.config?.model ? ['--model', r.config?.model] : []),
+      ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
       // The context window: past about it, the session compacts its conversation and carries on — on `--bg` too, and it still
       // signs off (measured on 2.1.278, open issue 26). Takes a required value, so it can neither swallow the prompt nor be taken
       // for a `--tools` entry, which the `--permission-mode` above has ended. The same window on every attempt: a resumed
       // copy keeps only the flags it is given, so a continuation given none would run on the model's whole window again.
-      ...(r.contextTokens !== undefined ? ['--autocompact', String(r.contextTokens)] : []),
+      ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
       // `--resume` continues that conversation in the background. The NAME is still ours and
       // still new, so a resumed attempt is a distinct row on the board from the one it continues.
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
@@ -405,7 +400,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // ALWAYS with a name, even when the task did not choose one. `--worktree [name]` takes an
       // OPTIONAL value, so a bare `--worktree` immediately before the prompt eats the prompt as
       // the worktree's name and the session runs with nothing to do. Measured, not theorised.
-      ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
+      ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
       // The closing statement's shape. Claude Code gives the session a StructuredOutput tool for
       // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
       // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.

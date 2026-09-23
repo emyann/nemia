@@ -5,7 +5,7 @@
  * (`runtime-client.ts`).
  */
 import { nameFor, type Engine, type Usage } from './runtime-client.ts';
-import { acceptedLines, answerLines, assess, costLine, decision, deniedWords, gateLines, harnessWaitLine, hasStarted, listing, overBudgetLine, retriesDue, retryLines, roundLines, roundsDue, runCostLines, waitsOf, type BranchStanding, type CheckoutHold, type Decision, type Listing, type Round, type Run, type RunSlot, type SaidTo, type ToDecide, type Wait } from './run.ts';
+import { acceptedLines, answerLines, assess, costLine, decision, deniedWords, gateLines, harnessWaitLine, hasStarted, holdsOf, listing, overBudgetLine, retriesDue, retryLines, roundLines, roundsDue, runCostLines, waitsOf, type BranchStanding, type CheckoutHold, type Decision, type Listing, type Round, type Run, type RunSlot, type SaidTo, type ToDecide, type Wait } from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
 import { answerOf, type Retry } from './retry.ts';
 import { timeline, type Timeline } from './timeline.ts';
@@ -30,7 +30,8 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
   const standings = standingsOf(run);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
-  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views), deniedOf(views));
+  const parent = await parentsOf(e, run);
+  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, parent), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views), deniedOf(views), holdsOf(run, parent));
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
@@ -78,6 +79,11 @@ export async function decide(e: Engine, id: string): Promise<{
   denied: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
   waiting: Wait[];
+  /**
+   * The runs a person holds this run until (`holdsOf`): while the hold stands, what is in flight is all there is to say, and nothing is offered.
+   * None on a run nobody holds.
+   */
+  holding: Wait[];
   /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
   said: Record<string, SaidTo[]>;
   /**
@@ -169,8 +175,10 @@ export async function decide(e: Engine, id: string): Promise<{
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
   // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is
   // offered — each line below that would offer a verb says so itself (`retryLines`, `roundLines`, `answerLines`, `overBudgetLine`, `gateLines`),
-  // so the api's decision, which calls the same functions, says the same.
-  const over = Boolean(run.cancelledAt || run.pruned);
+  // so the api's decision, which calls the same functions, says the same. A held run files nothing while the hold stands, the same way
+  // (`heldRefusal`).
+  const over = Boolean(run.cancelledAt || run.pruned || run.hold);
+  const parent = await parentsOf(e, run);
   return {
     run, decision: d, closeouts, checks,
     retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
@@ -186,7 +194,8 @@ export async function decide(e: Engine, id: string): Promise<{
     accepted: acceptedLines(steps, run),
     waitingOn,
     denied,
-    waiting: waitsOf(run, await parentsOf(e, run)),
+    waiting: waitsOf(run, parent),
+    holding: run.cancelledAt ? [] : holdsOf(run, parent),
     said,
     timeline: timeline(run, everyTry, filed, steps),
     ...(held ? { held } : {}),

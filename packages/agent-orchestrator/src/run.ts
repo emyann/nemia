@@ -161,6 +161,14 @@ type RunBase = {
    */
   pruned?: Pruned;
   /**
+   * That a person holds the run until other runs ship (`wf hold <run> --until <run>…`), and since when — composed on read from a file of
+   * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
+   * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
+   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has shipped, as `--after` reads
+   * shipped (`removeHold`); `wf hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   */
+  hold?: Hold;
+  /**
    * Per step: the task the engine ran, and the workspace and branch it ran in.
    *
    * `taskId` is the step's OWN task, always — `apps/api` reads it. The run's check of the step's work
@@ -173,6 +181,9 @@ type RunBase = {
   steps: Record<string, StepRecord>;
   createdAt: string;
 };
+
+/** A person's hold on a run, as its file says it: when it was put, and the runs it waits on to ship, in the order they were named. */
+export type Hold = { at: string; until: string[] };
 
 /** What `wf prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed. */
 export type Pruned = { at: string; worktrees: Array<{ path: string; bytes: number }> };
@@ -261,6 +272,11 @@ export type Assessment = {
   stoppedOn?: 'awaiting approval' | 'blocked';
   /** What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing. */
   toDecide?: ToDecide;
+  /**
+   * The runs a person holds this one until (`Run.hold`), while the hold stands: the run is `running`, and nothing is due — no step, check,
+   * try or round — nor asked of anyone (`stoppedOn`, `toDecide`). What is in flight runs on. Absent on a run nobody holds.
+   */
+  heldUntil?: string[];
 };
 
 /**
@@ -313,6 +329,8 @@ export function assess(
   // A pruned run is read as it ended, and a person's ask of it is honoured by nobody: its worktrees are gone, so the verbs refuse one and
   // the tick files none (`mayFile`). One written by hand is not a try due, here or anywhere that reads this.
   if (run.pruned) [asks, roundAsks] = [[], []];
+  // A held run files nothing, a person's ask no more than a step, until the hold lifts: an ask written by hand waits on its file for then.
+  if (run.hold) [asks, roundAsks] = [[], []];
 
   const stood =new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
@@ -363,6 +381,10 @@ export function assess(
     : blocked.length || all.some(stopsFollowers) ? 'failed'
     : 'running';
 
+  // A held run is paused, whatever its steps say: nothing is filed, and nothing is asked of a person — a step's question stays on its record,
+  // to be asked once the hold lifts. It is `running`, since it has not stopped: a hold is not a decision about the work, and a run the tick
+  // will pick up again is not finished. `blocked` is kept, as what can never run is a fact about the steps and not a word due.
+  if (run.hold) return { ready: [], check: [], retry: [], round: [], blocked, held: [], status: 'running', heldUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
   const stoppedOn = overall === 'failed' ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own }))) : undefined;
   return { ready, check, retry, round, blocked, held, status: overall, ...(stoppedOn ? { stoppedOn } : {}), ...(decide ? { toDecide: decide } : {}) };
@@ -461,6 +483,8 @@ export function approvalRefusal(
   }
   const pruned = prunedRefusal(run, 'an approval');
   if (pruned) return pruned;
+  const holding = heldRefusal(run, 'an approval');
+  if (holding) return holding;
   if (!hasGate(step, run)) {
     const gates = gatesOf(steps, run);
     return `${name} has no gate: what waits on it is filed once it has ${step.check ? 'passed its check' : 'signed off'}, with nobody's approval, so there is nothing to approve. `
@@ -979,9 +1003,10 @@ export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
 
 /**
  * A run this one waits on, as `wf ls` and `wf decide` name it: its id and, when it may never ship without a person, why — the store has
- * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base.
+ * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `shipped` only on a hold whose
+ * every run has shipped, in the moment before the tick lifts it (`holdsOf`).
  */
-export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[] };
+export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; shipped?: true };
 
 /** Each run this one waits on that has not shipped (`waitingOn`), and why it may never. Pure. */
 export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
@@ -1014,6 +1039,137 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
     : w.cancelledAt ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never ships`
     : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${run.branch}`));
   return `${why.join('; ')} — yours to resolve: wf cancel ${run.id}, or start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`;
+}
+
+/**
+ * The runs a held run waits on to ship (`Run.hold`), as `wf ls` and `wf decide` name them: each that has not shipped, and why it may never
+ * (`waitsOf`'s words). Pure. None for a run nobody holds. While every one has shipped and the tick has not yet lifted the hold, each is
+ * named all the same, marked `shipped`: the run is still held, and says why for the moment it is.
+ */
+export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
+  if (!run.hold) return [];
+  const waits: Wait[] = run.hold.until.filter((id) => !parentOf(id).shipped).map((id) => {
+    const { record, gone } = parentOf(id);
+    if (!record) return { run: id, missing: true };
+    if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
+    return gone?.length ? { run: id, gone } : { run: id };
+  });
+  return waits.length ? waits : run.hold.until.map((id) => ({ run: id, shipped: true as const }));
+}
+
+/** `a` and `b`, or `a, b and c`, of runs. */
+const runList = (ids: readonly string[]): string => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : ids[0] ?? '');
+
+/**
+ * A held run, as `wf ls` and `wf decide` say it: `held until a-1x2y ships`, each run it waits on with why it may never, as `waitWord` names
+ * them. Pure. Never `waiting on you`: a hold is a person's word already given, and nothing is asked of anyone while it stands.
+ */
+export function holdWord(waits: readonly Wait[]): string {
+  if (!waits.length) return 'held, on a hold that names no run';
+  const named = runList(waits.map((w) => `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : ''}`));
+  const one = waits.length === 1;
+  if (waits.every((w) => w.shipped)) return `held until ${named} ${one ? 'ships' : 'ship'} — ${one ? 'it has' : 'they have'} shipped, and the next tick lifts the hold`;
+  return `held until ${named} ${one ? 'ships' : 'ship'}`;
+}
+
+/**
+ * What a held run leaves a person to do, in one line, for `wf decide` and `wf ls`. Pure. Nothing, while each run it waits on may still
+ * ship: the tick lifts the hold when they have, and what the run's steps ask is asked then. For a run that never will without a person —
+ * no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or cancel the run.
+ */
+export function holdAdvice(run: Run, waits: readonly Wait[]): string {
+  const off = `wf hold ${run.id} --off`;
+  if (!waits.length) return `the hold on ${run.id} names no run, so no run's shipping lifts it — yours to lift: ${off}`;
+  if (waits.every((w) => w.shipped)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
+  const never = waits.filter(neverShips);
+  if (!never.length) {
+    const ids = waits.map((w) => w.run);
+    return `nothing of ${run.id} is filed, and nothing is asked of you, until wf decide says ${runList(ids)} ${ids.length > 1 ? 'have' : 'has'} shipped; to go on before then: ${off}`;
+  }
+  const why = never.map((w) => (w.missing ? `the store has no run ${w.run}`
+    : w.cancelledAt ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never ships`
+    : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${run.branch}`));
+  return `${why.join('; ')} — yours to resolve: ${off}, or wf cancel ${run.id}`;
+}
+
+/**
+ * Why `wf hold <run> --until <run>…` will not hold this run, in words that name the fix — or null. Pure: handed the run, each run named
+ * as `parentOf` reads it — its record, whether it has shipped as `wf decide` says it, and a result branch gone — every run in the store,
+ * for the circle, and `finished`: that the run has shipped, or succeeded and waits on nothing but a person's merge.
+ *
+ * Refused, of the run: nothing named; a run cancelled, pruned or finished, of which nothing is left to file, so nothing to hold; a run
+ * already held, since a hold is put once, whole — it is lifted and put again; and a folder run, which ships onto no branch. Of each run
+ * named, what `afterRefusal` refuses of `--after`, for the same reason, a wait for ever: given twice, the run itself, one the store does
+ * not have, a folder run, another repository or another base branch, one that worked on its base (`--no-worktree`), a cancelled run and
+ * one whose result branch is gone. And one already shipped, which there is nothing to wait for. And a circle: a run named that already
+ * waits on this one — through `--after` while it has not started (`gated`), or a hold — however far round, since each would wait on the
+ * other for ever.
+ */
+export function holdRefusal(
+  run: Run,
+  until: readonly string[],
+  parentOf: (runId: string) => Pick<ParentRun, 'record' | 'gone' | 'shipped'>,
+  others: readonly Run[],
+  finished?: 'shipped' | 'succeeded',
+): string | null {
+  const id = run.id;
+  if (!until.length) return `wf hold ${id} needs the runs it waits on to ship: wf hold ${id} --until <run>, once for each. To lift a hold: wf hold ${id} --off.`;
+  if (run.cancelledAt) return `${id} was cancelled at ${run.cancelledAt}: nothing of it is filed again, so there is nothing to hold.`;
+  if (run.pruned) return `${id} was ${prunedWords(run.pruned)}: nothing of it is filed again, so there is nothing to hold.`;
+  if (finished === 'shipped') return `${id} has shipped: nothing of it is left to file, so there is nothing to hold.`;
+  if (finished === 'succeeded') {
+    return `${id} has succeeded: nothing of it is left to file, so there is nothing to hold, and what is left is yours — merge its branch once ${runList([...until])} ${until.length > 1 ? 'have' : 'has'} shipped (wf decide ${id} names it).`;
+  }
+  if (run.hold) {
+    const all = [...new Set([...run.hold.until, ...until])];
+    return `${id} is already ${holdWord(run.hold.until.map((u) => ({ run: u })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — wf hold ${id} --off, then wf hold ${id} ${all.map((u) => `--until ${u}`).join(' ')}.`;
+  }
+  if (run.repo === undefined) {
+    return `${id}'s team works in folders (workspace: folder), and a hold waits for runs to ship onto its git branch, which a folder run has none of. Cancel it (wf cancel ${id}) and start it again once the work it waits on is done.`;
+  }
+  const seen = new Set<string>();
+  for (const u of until) {
+    const drop = `hold it without --until ${u}`;
+    const Drop = `Hold it without --until ${u}`;
+    if (seen.has(u)) return `--until ${u} is given twice, and a run waits on another once. Give each run one --until.`;
+    seen.add(u);
+    if (u === id) return `--until ${u}: that is ${id} itself, and a run that waits on itself to ship never does. Name the runs it waits on.`;
+    const { record, gone, shipped } = parentOf(u);
+    if (!record) return `--until ${u}: the store has no run ${u}. --until takes a run ${id} waits on, by its id — wf ls lists them.`;
+    if (record.repo === undefined) return `--until ${u}: ${u} is a folder run (workspace: folder), which never ships onto a branch, so ${id} would wait for ever. When ${u}'s work is done, there is nothing to hold for: ${drop}.`;
+    if (path.resolve(record.repo) !== path.resolve(run.repo)) {
+      return `--until ${u}: ${u} works on ${record.repo}, and ${id} on ${run.repo}. A run waits for another to ship onto its own base branch, which a run on another repository never does: ${drop}.`;
+    }
+    if (!record.isolate) return `--until ${u}: ${u} worked on ${record.branch} itself (--no-worktree), so it has no result branch to ship, and ${id} would wait for ever. When ${u}'s work is done, ${drop}.`;
+    if (record.branch !== run.branch) return `--until ${u}: ${u} ships onto ${record.branch}, and ${id} onto ${run.branch}, so ${id} would wait on a branch it never meets. ${Drop}.`;
+    if (record.cancelledAt) return `--until ${u}: ${u} was cancelled at ${record.cancelledAt}, and a cancelled run never ships, so ${id} would wait for ever. ${Drop}.`;
+    if (gone?.length) {
+      return `--until ${u}: ${gone.join(', ')} ${gone.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${record.branch}, so ${id} would wait for ever. If ${u}'s work is on ${record.branch}, there is nothing to wait for: ${drop}.`;
+    }
+    if (shipped) return `--until ${u}: ${u} has already shipped onto ${record.branch}, so there is nothing to wait for: ${drop}.`;
+  }
+  // The circle: from each run named, along what each run waits on — `--after` while it has not started, and a hold — back to this one.
+  const byId = new Map(others.map((r) => [r.id, r]));
+  const waitsOn = (r: Run): Array<[string, string]> => [
+    ...(gated(r) ? r.after!.map((a) => [a, `${r.id} --after ${a}`] as [string, string]) : []),
+    ...(r.hold?.until ?? []).map((h) => [h, `${r.id} held until ${h}`] as [string, string]),
+  ];
+  for (const u of until) {
+    const how = new Map<string, string[]>([[u, []]]);
+    const queue = [u];
+    while (queue.length) {
+      const at = queue.shift()!;
+      const r = at === id ? undefined : byId.get(at);
+      for (const [next, edge] of r ? waitsOn(r) : []) {
+        if (how.has(next)) continue;
+        const route = [...how.get(at)!, edge];
+        if (next === id) return `--until ${u}: ${u} already waits on ${id} to ship (${route.join(', ')}), so each would wait on the other for ever. Hold it without --until ${u}.`;
+        how.set(next, route);
+        queue.push(next);
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -1724,6 +1880,8 @@ export function retryRefusal(
   }
   const pruned = prunedRefusal(run, 'a retry');
   if (pruned) return pruned;
+  const holding = heldRefusal(run, 'a retry');
+  if (holding) return holding;
   const next = tryOf(run, name) + 1;
   const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
   const pending = asks.find((a) => a.step === name && a.try === next);
@@ -1883,8 +2041,9 @@ export function retryLines(
   /** What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`, one that did not finish the recheck. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): string[] {
-  // None on a pruned run: every try works in a worktree `wf prune` removed, and `wf retry` refuses it (`prunedRefusal`).
-  if (d.kind !== 'awaiting' || run.pruned) return [];
+  // None on a pruned run: every try works in a worktree `wf prune` removed, and `wf retry` refuses it (`prunedRefusal`). None on a held
+  // run either, whose try is refused while the hold stands (`heldRefusal`) — and whose decision is `running`, which says so already.
+  if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   const lines: string[] = [];
   for (const step of steps) {
     const { status, modes, sendsBack, back, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
@@ -1936,6 +2095,8 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
   const them = d.overBudget.length > 1 ? 'them' : 'it';
   // A pruned run waits on nobody for its budget: the raise it would wait for is a try or a round, and each is refused (`prunedRefusal`).
   if (run.pruned) return `OVER BUDGET: ${why.join(', ')}  — nothing more is filed for ${them}, raised or not, since the run was ${prunedWords(run.pruned)}; nothing after ${them} ran`;
+  // Nor a held one, for now: the raise is refused while the hold stands (`heldRefusal`), and asked for once it lifts.
+  if (run.hold) return `OVER BUDGET: ${why.join(', ')}  — ${heldLater(run.hold, 'the raise')}; nothing after ${them} ran`;
   return `OVER BUDGET, waiting on you: ${why.join(', ')}  — the run files nothing more for ${them} on its own; nothing after ${them} ran`;
 }
 
@@ -1954,8 +2115,9 @@ export function answerLines(
   /** What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too. */
   spendOf: SpendOf = () => undefined,
 ): Record<string, string> {
-  // None on a pruned run, whose try `wf retry` refuses (`prunedRefusal`): its question stays, with nothing to answer it with.
-  if (d.kind !== 'awaiting' || run.pruned) return {};
+  // None on a pruned run, whose try `wf retry` refuses (`prunedRefusal`): its question stays, with nothing to answer it with. Nor on a
+  // held one (`heldRefusal`), whose question is asked again once the hold lifts.
+  if (d.kind !== 'awaiting' || run.pruned || run.hold) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
@@ -1996,7 +2158,11 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
   if (!taskId) return `${name} has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls ${run.id}.`;
   const phase = phaseOf(taskId);
   if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
-    return `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything. Words for the step go into its next try's brief, where it may be tried again (wf decide ${run.id} says): wf retry ${run.id} ${name} --message "<words>".`;
+    const settled = `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything.`;
+    // The try that would carry the words is refused of a pruned run (`prunedRefusal`) and, while it stands, of a held one (`heldRefusal`).
+    if (run.pruned) return `${settled} Nor is it tried again: ${run.id} was ${prunedWords(run.pruned)}.`;
+    if (run.hold) return `${settled} Words for the step go into its next try's brief, and no try is filed while ${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))}: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`;
+    return `${settled} Words for the step go into its next try's brief, where it may be tried again (wf decide ${run.id} says): wf retry ${run.id} ${name} --message "<words>".`;
   }
   return null;
 }
@@ -2184,6 +2350,8 @@ export function roundAsk(
   }
   const pruned = prunedRefusal(run, 'a round');
   if (pruned) return no(pruned);
+  const holding = heldRefusal(run, 'a round');
+  if (holding) return no(holding);
   const loops = steps.filter((s) => s.loop);
   const named = name === undefined ? undefined : steps.find((s) => s.name === name);
   if (name !== undefined && (!named || !run.steps[name])) return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
@@ -2325,6 +2493,8 @@ export function acceptAsk(
   }
   const pruned = prunedRefusal(run, 'an acceptance');
   if (pruned) return no(pruned);
+  const holding = heldRefusal(run, 'an acceptance');
+  if (holding) return no(holding);
   const loops = steps.filter((s) => s.loop);
   const named = name === undefined ? undefined : steps.find((s) => s.name === name);
   if (name !== undefined && (!named || !run.steps[name])) return no(`${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`);
@@ -2386,13 +2556,19 @@ export function roundDueNote(steps: readonly Workflow[], r: Round): string {
  * On a pruned run, where it stands and why there is no more: `wf round` is refused there (`prunedRefusal`), and a note never offers a refused verb.
  */
 const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : `once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
 
 /** A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the round — or, pruned, why there is none. */
 const heldNote = (step: Workflow, run: Run): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : `once more: wf round ${run.id} ${step.name} --budget <amount>`}`;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name} --budget <amount>`}`;
 
 const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
+
+/**
+ * Where a verb would be offered on a held run, what is said instead: `held until a-1x2y ships; its approval is asked once the hold lifts`.
+ * Every verb that would release work is refused while the hold stands (`heldRefusal`), and a note never offers a refused verb.
+ */
+const heldLater = (hold: Hold, what: string): string => `${holdWord(hold.until.map((run) => ({ run })))}; ${what} is asked once the hold lifts`;
 
 /** The steps of a loop over their budget, in words: `implement has cost $4.20 of its $3 budget`. */
 const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>): string =>
@@ -2404,7 +2580,8 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  */
 export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): string[] {
   // None on a pruned run: `wf round` and `wf accept` each file work into a worktree `wf prune` removed, and refuse it (`prunedRefusal`).
-  if (d.kind !== 'awaiting' || run.pruned) return [];
+  // None on a held run, where each is refused while the hold stands (`heldRefusal`).
+  if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   return steps.filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name))).flatMap((looping) => {
     const name = looping.name;
     const over = loopOver(steps, looping, run, spendOf);
@@ -2511,17 +2688,18 @@ export function cancelPlan(
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `wf rm` — or `wf prune`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files under `WF_ROOT`
- * with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId`
+ * Why `wf rm` — or `wf prune` or `wf hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files under `WF_ROOT`
+ * with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`, `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId`
  * mints is taken: lowercase letters, digits and dashes, starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives —
  * names `runs/r-xyz.json` as a run's directory, which is another run's record, and a run with no record of its own is swept of it with
  * nothing asked. `..` or a path would name a directory that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' = 'rm'): string | null {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `wf ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
-  const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.asks)$/.exec(id);
-  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: wf ${verb} ${file[1]}.`;
-  return `${JSON.stringify(id)} is not a run's id, and wf ${verb} removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id wf ls prints, as in wf ${verb} add-a-flag-x1y2.`;
+  const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.asks)$/.exec(id);
+  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: ${command} ${file[1]}.`;
+  const does = verb === 'hold' ? 'wf hold writes its file under WF_ROOT by id' : `wf ${verb} removes what is under WF_ROOT by id`;
+  return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id wf ls prints, as in ${command} add-a-flag-x1y2.`;
 }
 
 /** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
@@ -2548,7 +2726,10 @@ const andList = (items: readonly string[]): string =>
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
  *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
- * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
+ * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever. And
+ *   a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
+ *
+ * A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers then, hold it too.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
  * record from before runs froze their workflow whose folder no longer reads (`stepsOf`): nothing ready can be judged, and nothing needs to
@@ -2559,7 +2740,7 @@ export function forgetRefusal(
   steps: readonly Workflow[] | undefined,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  /** Every other run in the store: whether one waits on this run, and has not started. */
+  /** Every other run in the store: whether one waits on this run, and has not started, or is held until it ships. */
   others: readonly Run[] = [],
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
@@ -2596,8 +2777,11 @@ export function forgetRefusal(
   const unheard: AskName[] = [];
   let waits = false;
   let atGates: string[] = [];
+  // A held run is read as it would stand once the hold lifts: what a pass files then is as much its work as what it files now.
+  const { hold, ...free } = run;
+  const lifts = hold ? `, once the hold lifts — it is ${holdWord(hold.until.map((u) => ({ run: u })))}` : '';
   if (!run.cancelledAt) {
-    const a = steps ? assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf) : undefined;
+    const a = steps ? assess(steps, free, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf) : undefined;
     if (a && steps) {
       waits = gated(run) && a.ready.length > 0;
       if (waits) {
@@ -2620,10 +2804,10 @@ export function forgetRefusal(
         const files = atGates.every((name) => !run.steps[name]?.taskId) ? (one ? 'it is filed' : 'each is filed')
           : atGates.some((name) => !run.steps[name]?.taskId) ? 'each is filed, or what waits on it is'
           : `what waits on ${one ? 'it' : 'them'} is filed`;
-        held.push(`${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`);
+        held.push(`${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`);
       }
     }
-    if (due.length) held.push(`${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
+    if (due.length) held.push(hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
     // A person's word no pass has spent, and none will file as the step stands: what the pass files is named above.
     for (const ask of asks) {
       if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
@@ -2652,6 +2836,15 @@ export function forgetRefusal(
     const one = stranded.length === 1;
     held.push(`${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`);
     fixes.push(`Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`);
+  }
+  // A run held until this one ships is stranded the same way: its hold would name no such run, and nothing would lift it.
+  const holders = others.filter((o) => o.id !== id && !o.cancelledAt && o.hold?.until.includes(id)).map((o) => o.id).sort();
+  if (holders.length) {
+    const one = holders.length === 1;
+    held.push(`${andList(holders)} ${one ? 'is' : 'are'} held until it ships: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`);
+    // A cancelled run never ships, so what is left is the lift.
+    const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `wf hold ${h} --off`).join(', ')}`;
+    fixes.push(run.cancelledAt ? `Lift ${lift}` : `Let ${one ? 'it' : 'them'} go on first, on the pass after wf decide says ${id} has shipped, or lift ${lift}`);
   }
   return held.length ? `${held.join('; ')}. ${fixes.join('. ')}.` : null;
 }
@@ -2861,6 +3054,17 @@ const neverApproved = (pruned: Pruned): string => `not approved, and never can b
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
   return `${run.id} was pruned at ${run.pruned.at}: its worktrees were removed (wf prune), and ${what} would file work into one of them. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
+}
+
+/**
+ * Why a verb that would release work on a held run is refused — or null, for a run nobody holds. Pure. The hold is a person's word that
+ * nothing more of the run is filed until other runs ship (`Run.hold`); an approval, a try, a round or an acceptance each file work, or
+ * release it, and taking one now would be a second word against the first. The question a step asked stays on its record, and is asked
+ * again once the hold lifts; a person who wants to answer it now lifts the hold first, which is the one way the refusal names.
+ */
+export function heldRefusal(run: Run, what: string): string | null {
+  if (!run.hold) return null;
+  return `${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}), and ${what} would release work the hold keeps back. What the step asks stays on its record, and is asked again once the hold lifts; to answer it now, lift the hold first: wf hold ${run.id} --off.`;
 }
 
 /**
@@ -3326,8 +3530,14 @@ export type Listing = {
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
    */
   steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
-  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off or pruned. */
+  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off, pruned or held. */
   waitingOnYou: string[];
+  /**
+   * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `wf ls` says
+   * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off, so
+   * the listing of such a run reads as it did before holds; empty on a hold whose file names no run, which `Run.hold` still says.
+   */
+  holding?: Wait[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
   /** The cap on runs in flight holding this run, and the count it is held at (`heldRuns`): absent unless it holds a run with nothing filed. */
@@ -3404,6 +3614,11 @@ export function listing(
    * reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field of its own (`StepNeeds.denied`).
    */
   deniedOf: (taskId: string) => readonly string[] = () => [],
+  /**
+   * The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out, the runs
+   * the hold names, each taken as one that may still ship.
+   */
+  holds?: readonly Wait[],
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
@@ -3420,8 +3635,8 @@ export function listing(
   };
   // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did. So is a loop going round again.
   // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
-  const due = run.cancelledAt || run.pruned ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
-  const rounds = run.cancelledAt || run.pruned ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
+  const due = run.cancelledAt || run.pruned || run.hold ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
+  const rounds = run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
   // And no step a round due files again reads held on its budget: a person raised the cap for the round (`roundSpans`).
   const refiled = roundSpans(steps, rounds);
   // Nor does an ending step hold its gate while the work it would act on is filed again (`unheld`): it reads as the waiting step it is.
@@ -3547,7 +3762,8 @@ export function listing(
   // a run waits on, and the board reads it there.
   const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings, checkout);
   return {
-    steps: rows, waitingOnYou: run.cancelledAt || run.pruned ? [] : waitingOnYou, waiting,
+    steps: rows, waitingOnYou: run.cancelledAt || run.pruned || run.hold ? [] : waitingOnYou, waiting,
+    ...(run.hold && !run.cancelledAt ? { holding: holds ? [...holds] : run.hold.until.map((id) => ({ run: id })) } : {}),
     ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}), ...(decide ? { toDecide: decide } : {}),
   };
 }
@@ -3633,9 +3849,10 @@ export const harnessWaitLine = (waitingFor: string, session: string | null): str
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
  */
-const gateNote = (run: Pick<Run, 'id' | 'pruned'>, step: string, back: readonly string[]): string =>
-  // Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`).
+const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
+  // Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
   run.pruned ? neverApproved(run.pruned) :
+  run.hold ? heldLater(run.hold, 'its approval') :
   `approve it: wf approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
 
 /**
@@ -3673,21 +3890,24 @@ export const feedPhase = (word: string): string =>
  * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. A step that signed
  * off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for a run `failed` that nothing
  * failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)` beside it as `wf ls` says
- * it, and its note who it waits on you for (`onYouWords`).
+ * it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until (`holdWord`), and nobody is waited on.
  *
  * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
  * moves with every other run's start and end while nothing of this one does.
  */
 export function feedWords(
   l: Listing,
-  run: Pick<Run, 'pruned'>,
+  run: Pick<Run, 'pruned' | 'hold'>,
   { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
   /** How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its word. */
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
-    run: { word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`, ...(onYou.length ? { note: `waiting on you: ${onYou.join(', ')}` } : {}) },
+    run: {
+      word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`,
+      ...(run.hold && status !== 'cancelled' ? { note: holdWord(l.holding ?? []) } : onYou.length ? { note: `waiting on you: ${onYou.join(', ')}` } : {}),
+    },
     steps: l.steps.map((s) => {
       const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
       return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(note ? { note } : {}) };
@@ -4338,6 +4558,11 @@ export function gateLines(
       // Never approved, and now never can be: `wf approve` and the send-back each file work into a worktree `wf prune` removed.
       if (run.pruned) {
         lines[step.name] = neverApproved(run.pruned);
+        continue;
+      }
+      // Not approved yet, and not asked for while the run is held: `wf approve` and the send-back are each refused until it lifts.
+      if (run.hold) {
+        lines[step.name] = `awaiting approval:  ${heldLater(run.hold, 'its approval')}`;
         continue;
       }
       const back = sendBackTo(step, run).map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ');

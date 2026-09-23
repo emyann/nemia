@@ -263,10 +263,14 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   return { ...known, shipped: said.kind === 'shipped' };
 }
 
-/** The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate no longer applies to (`gated`). */
+/**
+ * The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate no longer applies to (`gated`).
+ * And the runs a person holds it until (`Run.hold`), for as long as the hold stands.
+ */
 export async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun> {
   const read = new Map<string, ParentRun>();
-  if (gated(run)) for (const id of new Set(run.after)) read.set(id, await parentOf(e, id));
+  const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
+  for (const id of new Set(ids)) read.set(id, await parentOf(e, id));
   return (id) => read.get(id) ?? { shipped: false };
 }
 

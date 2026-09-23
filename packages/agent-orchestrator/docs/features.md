@@ -2063,6 +2063,42 @@ Left for later:
 - **A cancelled run whose branch is not merged prunes without `--unmerged`**: nothing of it could be tried again anyway, but its branch is
   still the one place its work is.
 
+## Shipped: holding a run that has started — `wf hold`, the orchestrator's half
+
+`--after` is given at `wf start`. Two runs found to collide once both had started had no such word: a person could only cancel one and
+start it again. `wf hold <run> --until <run> [--until <run> ...]` puts the wait on a run in flight, and `wf hold <run> --off` lifts it.
+The owner approved it at the plan's gate, split into three cards: this one is the orchestrator's; the api and the board follow.
+
+What was built:
+
+- **The mark, `runs/<id>.hold`**, `{ at, until }`, is a person's fact composed on read as `hold` (`readRun`), stripped by `rewriteRun`,
+  and removed by `wf rm`. `writeHold` writes it exclusively (`wx`). `removeHold` removes it only if it is still the hold put at `at`, so a
+  lift by the tick never removes a hold a person put again in the meantime.
+- **`assess` pauses a held run**: status `running`, nothing ready, checked, tried or rounded, and the asks dropped as for a pruned run.
+  `blocked` is kept. `mayFile` reads the file before each filing, so a pass that read the run before the hold was put files nothing.
+- **The tick lifts the hold** on the pass that reads every run named as shipped (`parentOf`, as `--after` reads it), and goes on in the
+  same pass. The lift is noted on the run's line.
+- **Every offer checks the hold.** `retryLines`, `answerLines` and `roundLines` offer nothing, and `overBudgetLine`, `gateLines`, `gateNote`,
+  `exhaustedNote` and `heldNote` say the question is asked once the hold lifts (`heldLater`). `listing` waits on nobody and carries
+  `holding`, and the feed says `held until <run> ships`. `heldRefusal` is the one wording of why `wf approve`, `wf retry`, `wf round` and
+  `wf accept` refuse a held run.
+- **`holdRefusal`** refuses, before anything is written: nothing named; a run cancelled, pruned, shipped, succeeded, already held, or a
+  folder run; of each run named, what `afterRefusal` refuses, and a run already shipped; and a circle through `--after` or other holds.
+- **`wf ls` and `wf decide`** say `held until <run> ships` in place of *waiting on you*, and how to go on before then. `forgetRefusal`
+  refuses `wf rm` of a run another is held until, and names the `wf hold … --off` that lets it go.
+
+Where it departs from the plan:
+
+- **A held run is refused a second hold** rather than the two merged. A hold is put once, whole, so what a run waits on is always
+  what one person said at one time; changing it is `--off` and a new hold.
+- **A lift sticks**, as a start after `--after` does: a run named that ships and is reverted does not hold the run again.
+
+Left for later:
+
+- **The api and the board** (the next two cards): the api carries `hold` and `holding` on a run and says the hold where its Decide
+  section would offer a command. The board shows it on the run's card and page, with a way to lift it.
+- **`wf cancel` and `wf say` on a held run** are allowed. Cancelling ends the hold's meaning, and `wf say` files no work.
+
 ## Shipped: two small items from the plan's queue
 
 - **Plan §6 item 28: `unsigned` is the last attempt's word.** `closeoutAsked` already read the last attempt's `reason`, and no test held it

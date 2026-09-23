@@ -1,16 +1,17 @@
 /**
  * What a person asks of a run: call it off (`cancel`), try a step again (`retry`), approve a gate (`approve`), say something to a running
- * session (`say`), go round a loop once more (`round`), and end a loop as it stands (`accept`). Each refuses before anything is written, and
+ * session (`say`), go round a loop once more (`round`), end a loop as it stands (`accept`), and hold a run until others ship (`hold`,
+ * `unhold`). Each refuses before anything is written, and
  * writes a person's own file — never the run's record, which the tick owns — or, for `say`, asks the runtime. A controller, reaching the
  * runtime through the client (`runtime-client.ts`); `cancel` adopts what a pass filed and never wrote down as the tick does (`tick.ts`).
  */
 import fs from 'node:fs';
 import type { Engine } from './runtime-client.ts';
-import { acceptAsk, approvalRefusal, approvedFirst, cancelPlan, retryable, retryRefusal, roundAsk, sayRefusal, type Acceptance, type Approval, type CancelPlan, type RoundAsk, type Run, type Said } from './run.ts';
+import { acceptAsk, approvalRefusal, approvedFirst, assess, cancelPlan, holdRefusal, idRefusal, retryable, retryRefusal, roundAsk, sayRefusal, type Acceptance, type Approval, type CancelPlan, type Hold, type RoundAsk, type Run, type Said } from './run.ts';
 import { tryOf, type RetryAsk, type RetryHow } from './retry.ts';
-import { acceptFile, acceptanceIn, approvalFile, approvalIn, askFile, askIn, lstatOf, markCancelled, readAsks, readRun, roundAskFile, roundAskIn, runFile, stepsOf, writeAsk } from './store.ts';
+import { acceptFile, acceptanceIn, approvalFile, approvalIn, askFile, askIn, holdFile, listRuns, lstatOf, markCancelled, readAsks, readRun, removeHold, roundAskFile, roundAskIn, runFile, stepsOf, writeAsk, writeHold } from './store.ts';
 import { standingsOf } from './branches.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, phaseOfView, spendReader, taskPhases } from './views.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, phaseOfView, spendReader, taskPhases } from './views.ts';
 import { adoptChecks, adoptRounds, adoptTries } from './tick.ts';
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -242,4 +243,67 @@ export async function accept(e: Engine, id: string, stepName?: string, message?:
         : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`);
   }
   return { run, acceptance, file };
+}
+
+/** What `wf hold` did: the run, and the hold that now stands on it. */
+export type Holding = { run: Run; hold: Hold };
+
+/**
+ * Hold a run until other runs ship — `wf hold <run> --until <run>…`: while any of them has not shipped, as `wf decide` says it of that run
+ * (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in flight
+ * runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
+ *
+ * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), a run not there, and what
+ * `holdRefusal` refuses — nothing named, a run cancelled, pruned, shipped or succeeded, a run already held, a folder run; and of each run
+ * named: twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch
+ * gone, already shipped — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`, exclusively: a hold
+ * two people put at once is the first one's, and the second is refused as already held.
+ */
+export async function hold(e: Engine, id: string, until: readonly string[]): Promise<Holding> {
+  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
+  const bad = idRefusal(id, 'hold');
+  if (bad) refuse(bad);
+  // A run named is fixed on its own flag: the command that fixes it keeps the run to hold.
+  for (const named of until) {
+    const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
+    if (badUntil) refuse(`--until ${badUntil}`);
+  }
+  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`);
+  const run = readRun(id);
+  const read = new Map(await Promise.all([...new Set(until)].filter((u) => u !== id).map(async (u) => [u, await parentOf(e, u)] as const)));
+  // Finished: shipped as a run `--after` it reads it, or succeeded with nothing left but a person's merge. Asked only of a run a hold could
+  // still refuse for nothing else.
+  let finished: 'shipped' | 'succeeded' | undefined;
+  if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
+    if ((await parentOf(e, id)).shipped) finished = 'shipped';
+    else {
+      const steps = stepsOf(run);
+      const { views, phaseOf } = await taskPhases(e, run);
+      const { asks, rounds } = readAsks(id);
+      const { status } = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+      if (status === 'succeeded') finished = 'succeeded';
+    }
+  }
+  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, listRuns(), finished);
+  if (refused) refuse(refused);
+  const put = writeHold(id, until);
+  // Someone held it in the moment since the look above: said as the look would have said it.
+  if (!put) return refuse(holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`);
+  return { run: { ...run, hold: put }, hold: put };
+}
+
+/**
+ * Lift a person's hold by hand — `wf hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
+ * asked again. Refused, exit 2: an id that is not a run's, a run not there, and a run nobody holds.
+ */
+export function unhold(id: string): Holding {
+  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
+  const bad = idRefusal(id, 'hold');
+  if (bad) refuse(bad);
+  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.`);
+  const run = readRun(id);
+  if (!run.hold) refuse(`${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`);
+  // The hold read above, and no other: one lifted and put again since is a person's newer word, and stays.
+  if (!removeHold(id, run.hold!.at) && fs.existsSync(holdFile(id))) refuse(`${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`);
+  return { run, hold: run.hold! };
 }

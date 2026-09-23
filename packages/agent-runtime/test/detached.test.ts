@@ -157,6 +157,186 @@ test('logs come back from the worker capture', async () => {
   assert.match(await Effect.runPromise(ops.logs('ae/t6/1')), /hello-from-the-harness/);
 });
 
+// ─── words on a harness's stdin ─────────────────────────────────────────────
+
+/**
+ * A harness that reads its messages on its stdin: each line it reads is appended to `heard` in its cwd; `end` makes it
+ * print its closing line, and `end and linger` the same, after which it runs on for a minute once its stdin ends; its
+ * stdin ended, it writes `EOF` and exits.
+ */
+const listener = (dir: string): HarnessSpec => {
+  const script = path.join(dir, 'listener.cjs');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+let got = '', linger = false;
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (d) => {
+  got += d;
+  for (let nl = got.indexOf('\\n'); nl !== -1; nl = got.indexOf('\\n')) {
+    const line = got.slice(0, nl);
+    got = got.slice(nl + 1);
+    fs.appendFileSync('heard', line + '\\n');
+    const said = JSON.parse(line).said;
+    if (said === 'end' || said === 'end and linger') {
+      linger = said === 'end and linger';
+      process.stdout.write(JSON.stringify({ n: 1, kind: 'end' }) + '\\n');
+    }
+  }
+});
+process.stdin.on('end', () => { fs.appendFileSync('heard', 'EOF\\n'); setTimeout(() => process.exit(0), linger ? 60_000 : 0); });
+`);
+  return {
+    name: 'in',
+    command: () => ({ cmd: process.execPath, args: [script] }),
+    input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
+  };
+};
+
+const heardIn = (cwd: string) => {
+  try { return fs.readFileSync(path.join(cwd, 'heard'), 'utf8').split('\n').filter(Boolean).map((l) => (l === 'EOF' ? l : JSON.parse(l).said as string)); } catch { return []; }
+};
+/** Until `ok` holds, under a bound of seconds. */
+const until = async (ok: () => boolean, what: string) => {
+  for (const bound = performance.now() + 15_000; !ok();) {
+    if (performance.now() > bound) assert.fail(`never ${what}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+};
+const runOf = (dir: string, name: string) => JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'in', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`), 'utf8')) as { state: string; inputAt?: number; inputClosed?: true; input?: { from: number } };
+const inboxOf = (dir: string, name: string) => path.join(dir, 'runs', 'in', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.inbox.jsonl`);
+const say = (ops: ReturnType<typeof detachedOps>, name: string, text: string) => Effect.runPromise(ops.say!({ name, sessionId: name }, text));
+const sayRefused = async (ops: ReturnType<typeof detachedOps>, name: string, text: string, pattern: RegExp) => {
+  const e = await Effect.runPromise(Effect.flip(ops.say!({ name, sessionId: name }, text)));
+  assert.match(e.message, pattern);
+};
+const stopped = async (ops: ReturnType<typeof detachedOps>, name: string) => {
+  await Effect.runPromise(ops.stop(name));
+  await settle(ops, name, 'stopped');
+};
+
+test("a harness that reads its stdin is given its brief's line first, then each word said, in order — and a line half appended waits for its end", async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/i1/1', brief: 'the brief', cwd: dir }));
+  await until(() => heardIn(dir).length === 1, 'the brief read');
+  await say(ops, 'ae/i1/1', 'first');
+  await say(ops, 'ae/i1/1', 'second');
+  await until(() => heardIn(dir).length === 3, 'the words read');
+  assert.deepEqual(heardIn(dir), ['the brief', 'first', 'second']);
+  assert.equal(runOf(dir, 'ae/i1/1').inputAt, fs.statSync(inboxOf(dir, 'ae/i1/1')).size, 'how far it has written on, on the run file');
+
+  // Half a line, as a writer caught mid-append leaves it: never written on as a line of its own. Waiting longer than the
+  // worker's look at the inbox can only let this pass wrongly under load, never fail it.
+  fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
+  await new Promise((r) => setTimeout(r, 1_200));
+  fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
+  await until(() => heardIn(dir).length === 4, 'the line once whole');
+  assert.equal(heardIn(dir)[3], 'parted', 'written on whole, once');
+  await stopped(ops, 'ae/i1/1');
+});
+
+test('the closing line closes its input: said on the run file, its stdin ended, and nothing appended after it written on — nor taken by say', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/i2/1', brief: 'b', cwd: dir }));
+  await until(() => heardIn(dir).length === 1, 'the brief read');
+  await say(ops, 'ae/i2/1', 'end and linger');
+  await until(() => heardIn(dir).includes('EOF'), 'its stdin ended at its closing line');
+  const run = runOf(dir, 'ae/i2/1');
+  assert.equal(run.inputClosed, true);
+  assert.equal(run.state, 'working', 'still running: it ends when it likes');
+
+  await sayRefused(ops, 'ae/i2/1', 'more', /^in: `ae\/i2\/1` has given its result and reads no more words/);
+  const size = fs.statSync(inboxOf(dir, 'ae/i2/1')).size;
+  // Appended by hand past the refusal: the worker has stopped looking.
+  fs.appendFileSync(inboxOf(dir, 'ae/i2/1'), '{"said":"behind its back"}\n');
+  await new Promise((r) => setTimeout(r, 1_200));
+  assert.deepEqual(heardIn(dir), ['b', 'end and linger', 'EOF'], 'nothing written on after the close');
+  assert.equal(runOf(dir, 'ae/i2/1').inputAt, size, 'nor counted as written');
+  await stopped(ops, 'ae/i2/1');
+});
+
+test('a harness closing its input on its own words ends its run: done, its stdin ended by the worker', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/i3/1', brief: 'end', cwd: dir }));
+  await settle(ops, 'ae/i3/1', 'done');
+  assert.deepEqual(heardIn(dir), ['end', 'EOF']);
+  await sayRefused(ops, 'ae/i3/1', 'late', /has given its result and reads no more words/);
+});
+
+test('a worker started again on its run file writes no word twice: it goes on from where the one before had written on', async () => {
+  const dir = root();
+  const first = path.join(dir, 'first'); const again = path.join(dir, 'again');
+  fs.mkdirSync(first); fs.mkdirSync(again);
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/i4/1', brief: 'b', cwd: first }));
+  await until(() => heardIn(first).length === 1, 'the brief read');
+  await say(ops, 'ae/i4/1', 'one');
+  await until(() => heardIn(first).length === 2, 'one read');
+  await stopped(ops, 'ae/i4/1');
+
+  // The same run file, its worker started again by hand, somewhere else to hear it.
+  const file = path.join(dir, 'runs', 'in', 'ae_i4_1.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), cwd: again }));
+  const worker = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'bin', 'ae-worker.ts');
+  execFileSync(process.execPath, ['-e', `require('node:child_process').spawn(process.execPath, [${JSON.stringify(worker)}, ${JSON.stringify(file)}], { detached: true, stdio: 'ignore' }).unref()`]);
+  await until(() => heardIn(again).length === 1, 'the brief read again');
+  assert.equal(runOf(dir, 'ae/i4/1').inputClosed, undefined);
+  await say(ops, 'ae/i4/1', 'two');
+  await until(() => heardIn(again).length === 2, 'two read');
+  assert.deepEqual(heardIn(again), ['b', 'two'], "the words the one before wrote on are not written again");
+  await stopped(ops, 'ae/i4/1');
+});
+
+test('a run spawned again under the name starts past what was said to the one before it', async () => {
+  const dir = root();
+  const first = path.join(dir, 'first'); const again = path.join(dir, 'again');
+  fs.mkdirSync(first); fs.mkdirSync(again);
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/i5/1', brief: 'b', cwd: first }));
+  await until(() => heardIn(first).length === 1, 'the brief read');
+  await say(ops, 'ae/i5/1', 'one');
+  await until(() => heardIn(first).length === 2, 'one read');
+  await stopped(ops, 'ae/i5/1');
+  // Said while nothing ran: refused, so there is nothing appended for the next run to read.
+  await sayRefused(ops, 'ae/i5/1', 'between', /is `stopped`, not running/);
+
+  await Effect.runPromise(ops.spawn({ name: 'ae/i5/1', brief: 'b2', cwd: again }));
+  assert.equal(runOf(dir, 'ae/i5/1').input?.from, fs.statSync(inboxOf(dir, 'ae/i5/1')).size, 'from the end of the inbox as it was');
+  await until(() => heardIn(again).length === 1, 'the brief read');
+  await say(ops, 'ae/i5/1', 'two');
+  await until(() => heardIn(again).length === 2, 'two read');
+  assert.deepEqual(heardIn(again), ['b2', 'two']);
+  await stopped(ops, 'ae/i5/1');
+});
+
+test('say is refused, with nothing appended, where no worker would write the words on', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  assert.equal(detachedOps(sh('true'), dir).say, undefined, 'a harness that reads nothing on its stdin has no say');
+
+  await sayRefused(ops, 'ae/i6/1', 'hello', /^in: no session `ae\/i6\/1` is running to hear anything: there is no run of it/);
+  const runs = path.join(dir, 'runs', 'in');
+  fs.mkdirSync(runs, { recursive: true });
+  // A run started before its harness took words: working, beating, and nothing on it to write words on with.
+  fs.writeFileSync(path.join(runs, 'ae_i6_1.json'), JSON.stringify({ name: 'ae/i6/1', state: 'working', pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString() }));
+  await sayRefused(ops, 'ae/i6/1', 'hello', /was started with no way in/);
+  // A run file another name folds onto is not the run asked for.
+  await sayRefused(ops, 'ae-i6/1', 'hello', /there is no run of it/);
+  // A run whose worker stopped beating is not working.
+  fs.writeFileSync(path.join(runs, 'ae_i6_1.json'), JSON.stringify({ name: 'ae/i6/1', state: 'working', pid: 999999, logFile: '/dev/null', heartbeatAt: new Date(Date.now() - STALE_MS - 5_000).toISOString(), input: { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } } }));
+  await sayRefused(ops, 'ae/i6/1', 'hello', /is `failed`, not running/);
+
+  // A line break the harness's line keeps would reach it as two lines.
+  const raw = detachedOps({ ...listener(dir), input: { line: (t) => t, closesOn: { key: 'kind', value: 'end' } } }, dir);
+  fs.writeFileSync(path.join(runs, 'ae_i6_1.json'), JSON.stringify({ name: 'ae/i6/1', state: 'working', pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString(), input: { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } } }));
+  const e = await Effect.runPromise(Effect.flip(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one\ntwo')));
+  assert.match(e.message, /a line break in it/);
+  await Effect.runPromise(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one line'));
+  assert.equal(fs.readFileSync(inboxOf(dir, 'ae/i6/1'), 'utf8'), 'one line\n', 'only the words that make one line were appended');
+});
+
 // ─── the composite ──────────────────────────────────────────────────────────
 
 test('the composite sends each task to the harness it asked for', async () => {

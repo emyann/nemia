@@ -31,7 +31,7 @@ export default {
 
     // The banner's one line, in wf ls's words, linked to the step's section.
     const banner = page.locator('section[aria-label="Waiting on you"]');
-    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget — wf decide ${id}`;
+    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${id}`;
     await expectVisible(banner.locator(':scope > p', { hasText: line }), `the banner says ${line}`);
     await expectCount(banner.locator(':scope > p'), 1, 'in its one line');
     await expectCount(banner.locator(`a[data-approve="${gated}"][href="#step-${gated}"]`), 1, `approve ${gated} links to the step's section`);

@@ -28,7 +28,7 @@ export default {
     await expectVisible(palette.locator('dd [data-read]', { hasText: COSTLY.read.palette.counts }), `${COSTLY.asks.step}'s section says what its session read (${COSTLY.read.palette.counts})`);
     await expectVisible(palette.locator('[data-peak="large"]', { hasText: COSTLY.read.palette.peak }), `and marks its peak, past 200k with no cap`);
     // Whole: implement and review did their work, and are held on implement's budget alone — the reason has to be among those the banner gives.
-    const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
+    const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
     await expectVisible(page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }), `the banner says every step past its budget waits on you, and why: ${reasons}`);
     await expectVisible(
       page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${askingStep.step}"]`, { hasText: `${askingStep.step} asks: ${askingStep.needs}` }),

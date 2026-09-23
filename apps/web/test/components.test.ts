@@ -1238,6 +1238,18 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.doesNotMatch(html, /data-refused/);
 });
 
+test("a step `denials: fail` stopped is offered Try again with a new session first, as `wf decide` offers it, and its row names the calls it was denied", () => {
+  const html = offersMarkup([{ step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' }, { step: 'bare', kind: 'denied', calls: null }]);
+  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
+  const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]!).join(' ');
+  assert.equal(said('notes'), "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allow: is frozen, so a try is denied the same again: a new session is told to do without it");
+  assert.equal(said('bare'), "bare signed off having been denied a call, and says denials: fail. This run's allow: is frozen, so a try is denied the same again: a new session is told to do without it");
+  const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  assert.deepEqual(radios, [['fresh', true], ['nudge', false]], 'a new session first, and no recheck: no check of it ran');
+  assert.match(rows.get('notes')!, /<form aria-label="Try notes again"/);
+  assert.match(rows.get('notes')!, /<button type="submit"[^>]*>Try again<\/button>/);
+});
+
 test('the Decide section puts the answers first, before what there is to decide, and its commands still only copy', () => {
   const decision = {
     touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
@@ -1380,7 +1392,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
   const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
   const both = bannerMarkup({ ...run, steps: [run.steps[0]!, theme] });
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
-  assert.equal(textsOf(line).join(''), `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —wf decide r-1`);
+  assert.equal(textsOf(line).join(''), `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1`);
   assert.match(line, /<strong><a href="#step-review" data-approve="review" class="underline underline-offset-2">approve review<\/a>, theme<\/strong>/);
   // The need is the banner's line: no question to list under it, and nothing to press in the banner.
   assert.doesNotMatch(both, /<li |<form|<button/);
@@ -1491,7 +1503,7 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
   assert.match(both, /^<section aria-label="Waiting on you"/);
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
-  assert.equal(textsOf(line).join(''), 'Waiting on you:theme— signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —wf decide r-1');
+  assert.equal(textsOf(line).join(''), 'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1');
 });
 
 test("the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off", async () => {

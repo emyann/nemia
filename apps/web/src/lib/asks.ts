@@ -107,6 +107,8 @@ export const stepAnchor = (step: string): string => `step-${step}`;
  *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
+ *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as `wf decide` offers it —
+ *              the run's `allow:` is frozen, so a try is denied the same call again. `calls` is the line naming them (`StepNeeds.denied`)
  *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
  *              that did not finish past it. With its try — `wf retry --budget`, a nudge or a new session, and for a step that signed off
  *              blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with its loop's
@@ -118,6 +120,7 @@ export const stepAnchor = (step: string): string => `step-${step}`;
 export type Offer =
   | { step: string; kind: 'answer'; needs: string | null }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
+  | { step: string; kind: 'denied'; calls: string | null }
   | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<RunDetail['steps'][number]['raise']>)
   | { step: string; kind: 'continue' }
   | { step: string; kind: 'asked'; try: number; note: string | null };
@@ -146,6 +149,7 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     if (state === 'blocked') return [{ step: step.name, kind: 'answer', needs: step.needs }];
     if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
     if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];
+    if (state === 'denied') return [{ step: step.name, kind: 'denied', calls: step.denied?.words ?? null }];
     return [];
   });
 }

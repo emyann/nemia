@@ -1,8 +1,8 @@
 # Features to build
 
-The features agent-workflows is still missing, in the order I would take them. Each says what exists
+The features agent-orchestrator is still missing, in the order I would take them. Each says what exists
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
-questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
+questions live in [agent-runtime/docs/open-issues.md](../../agent-runtime/docs/open-issues.md).
 
 State as of 2026-09-17: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
@@ -99,7 +99,7 @@ What it leaves:
   `runs/<id>/artifacts/` and a list in the step inspector (plan, *The `ui/` workflow*).
 - **The api does not tell an unfiled step its directory.** `composeBrief` takes the directory as a fifth
   argument, and the api's "what it would be told now" does not pass it yet. It is one line in `toldOf`.
-  A worktree the run cuts now resolves its own `agent-workflows`, so the app change and the package
+  A worktree the run cuts now resolves its own `agent-orchestrator`, so the app change and the package
   change can land on one branch. A worktree made by hand still links main's tree.
 - **No clean-up and no size cap.** Screenshots accumulate per run under `WF_ROOT`, as check stderr files
   do. `wf rm`, when it comes, removes `runs/<id>/` whole.
@@ -285,7 +285,7 @@ and each round, as `tools:` does.
   names `permissionMode`. A quote inside the parentheses is legal, `Bash(git commit -m 'wip')`, so unlike `tools:` the
   comma check does not look in quotes: `tools:`'s check refused such a rule whenever another entry followed it. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
   refuses one that denies anything rather than drop it.
-- **Measured on `claude --bg`, the harness the reviewers run on** (`agent-engine/test/live.test.ts`, `AE_LIVE=1`,
+- **Measured on `claude --bg`, the harness the reviewers run on** (`agent-runtime/test/live.test.ts`, `AE_LIVE=1`,
   Claude Code 2.1.270). Two sessions in `dontAsk` with `tools: Bash`, each in a checkout whose settings allow
   `npm run build` and `npm run e2e`: the control ran both, and the one filed with `disallowedTools` naming them ran
   neither, refused by the deny's own message. By hand on `claude -p`, the implement list took `SendMessage`,
@@ -358,7 +358,7 @@ What it leaves:
   folders run review on Claude. But Bash can also write. And the `auto` classifier that refused `node --test`
   (plan §4b) is not a tool list, so whether it lets a tool-fenced reviewer's `npm test` through is unmeasured.
 - **The engine's lists are not exported from its root.** The vocabulary test reads them from the engine modules
-  beside the root the package resolves. One export line in `agent-engine/src/facade.ts` would let it import
+  beside the root the package resolves. One export line in `agent-runtime/src/facade.ts` would let it import
   them by name.
 - **The api still carries its copies.** `apps/api/src/app.ts` has `phaseOf`, `askedOf` and `verdictOf`, and
   its test leaves a lost task out of the words it holds to `list`'s. Both go when the api swaps to these
@@ -670,8 +670,8 @@ What was measured:
     nothing.
   - Every `wf start` refusal, through `start` and through the CLI, leaves the store's file count unchanged.
     `--after` twice with different runs is written in order, and a run without it has no `after` key.
-- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 313 tests, 11 of them new: 312
-  passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-engine ran 239 (235 passed,
+- `npm test && npm run typecheck` from the root exited 0. agent-orchestrator ran 313 tests, 11 of them new: 312
+  passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-runtime ran 239 (235 passed,
   4 live tests skipped), api 89 and web 116, all passing.
 - The CLI itself, in a throwaway `WF_ROOT` over a throwaway repository, with the parent's branch recorded
   and committed to by hand. It covers `wf start --after=<runId>` with `--workflows=` and `--repo=`, `wf ls`,
@@ -812,8 +812,8 @@ What was measured:
     path, why and `rm`, and leaves the file as it was. Once the file is deleted, the ask is written and honoured. `[]`
     at `round-review-2` on a loop out of rounds is refused by `round()` the same way.
 - `apps/api`'s decision and asks tests pass against these changes, and `apps/api` typechecks unchanged.
-- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 323 tests, 6 of them new: 322 passed,
-  and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-engine ran 239 (235 passed, 4 live tests
+- `npm test && npm run typecheck` from the root exited 0. agent-orchestrator ran 323 tests, 6 of them new: 322 passed,
+  and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-runtime ran 239 (235 passed, 4 live tests
   skipped), api 98 and web 126, all passing. The log is `root-check.txt` in the step's artifacts.
 - No real session has been blocked and then tried again: the refresh race cannot be reproduced on demand. So the
   stop and the filing are measured on the fake board only, with a view that carries `stopRequested` once a stop is
@@ -928,13 +928,13 @@ What was measured:
   - Two parents a person merged after their steps failed, one with no closeout and one whose closeout does not parse:
     the child's roots are filed, and each section says why nothing can be given.
 - Each of the three code commits was typechecked and tested on its own tree: 332, 337 and then 340 tests in
-  agent-workflows, 17 of them new, all passing but the live browser test, which is skipped without `AE_LIVE=1`.
+  agent-orchestrator, 17 of them new, all passing but the live browser test, which is skipped without `AE_LIVE=1`.
 - The CLI itself, in a throwaway `WF_ROOT` over a throwaway repository with a `workflows/dev`. `wf plan` refused
   `--after`, a cycle of three and a misspelt `workflow:`, with no run written. It then started the diamond and printed
   its four lines, and `wf ls` read D as waiting on B and C. Kept as `wf-plan.txt` in the step's artifacts. No tick ran
   there, so no real session was filed, and no real child has been handed a real parent's closeout.
-- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 340 tests, 17 of them new: 339 passed,
-  and one was skipped, the live browser test. agent-engine ran 239 (235 passed, 4 live tests skipped), api 98 and web
+- `npm test && npm run typecheck` from the root exited 0. agent-orchestrator ran 340 tests, 17 of them new: 339 passed,
+  and one was skipped, the live browser test. agent-runtime ran 239 (235 passed, 4 live tests skipped), api 98 and web
   126, all passing. The log is `root-check.txt` in the step's artifacts.
 
 What it leaves:
@@ -983,7 +983,7 @@ What was measured:
     package's own `docs/`. The screen's last line names `packages/**`, once per branch.
 - Each guard was broken on purpose and the tests rerun: leaving `./` in place fails the first test, and turning a `**`
   glob into a `docs/` glob fails the second.
-- agent-workflows: 351 tests, 350 passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. Typecheck clean.
+- agent-orchestrator: 351 tests, 350 passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. Typecheck clean.
 
 What it leaves:
 
@@ -1037,8 +1037,8 @@ What was measured:
 - The first version broke ties by name, and the root suite failed one apps/api test, *the api's words, and who it says is
   waited on, are `list`'s*. Its fixture `r-20` froze seven roots and then `ship`, out of name order. The api lists them as
   frozen, and `list` had sorted them. Ties now go by the order given, and apps/ is unchanged.
-- agent-workflows: 356 tests, 355 passed, and one was skipped, the live browser test. Typecheck clean.
-- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 356 (355 passed, 1 skipped), api 114 and web 158, all passing.
+- agent-orchestrator: 356 tests, 355 passed, and one was skipped, the live browser test. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-runtime ran 267 (262 passed, 5 live tests skipped), agent-orchestrator 356 (355 passed, 1 skipped), api 114 and web 158, all passing.
 
 What it leaves:
 
@@ -1092,8 +1092,8 @@ What was measured:
     `--input=`, `--input` followed by a flag, a directory, `--inputs`, and `wf plan --input`.
 - Each guard was broken on purpose and the tests rerun: `inputRefusal` refusing nothing fails 2 tests, `composeBrief` ignoring
   inputs fails 2, `--input` taken only once fails 1, and `wf plan` without its own refusal of `--input` fails 1.
-- agent-workflows: 361 tests, 360 passed, 1 skipped. Typecheck clean.
-- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 361 (360 passed, 1 skipped), api 114 and web 158, all passing.
+- agent-orchestrator: 361 tests, 360 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-runtime ran 267 (262 passed, 5 live tests skipped), agent-orchestrator 361 (360 passed, 1 skipped), api 114 and web 158, all passing.
 
 What it leaves:
 
@@ -1174,10 +1174,10 @@ What was measured:
 - Round 2's guards, each broken on purpose: round 1's rule back fails the new legacy test; passing over a refused copy that is on
   the branch fails the link test; a link on the way to a copy, or in its place, written through each fail the link test; copying
   on every pass fails the collection test.
-- After round 2, `npm test && npm run typecheck` from the root exited 0: agent-engine 267 (262 passed, 5 live tests skipped),
-  agent-workflows 369 (368 passed, 1 skipped), api 114 and web 158, all passing. The log is `root-check-round2.txt` in the step's artifacts.
-- agent-workflows: 364 tests, 363 passed, 1 skipped. Typecheck clean.
-- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 364 (363 passed, 1 skipped), api 114 and web 158, all passing.
+- After round 2, `npm test && npm run typecheck` from the root exited 0: agent-runtime 267 (262 passed, 5 live tests skipped),
+  agent-orchestrator 369 (368 passed, 1 skipped), api 114 and web 158, all passing. The log is `root-check-round2.txt` in the step's artifacts.
+- agent-orchestrator: 364 tests, 363 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-runtime ran 267 (262 passed, 5 live tests skipped), agent-orchestrator 364 (363 passed, 1 skipped), api 114 and web 158, all passing.
 
 What it leaves:
 
@@ -1232,8 +1232,8 @@ What was measured:
   - the old rule, due only while the harness says blocked, fails 3 tests;
   - the note always saying `blocked` fails 3;
   - `wf ls` reading an unknown task as running fails 1.
-- agent-workflows: 366 tests, 365 passed, 1 skipped. Typecheck clean.
-- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 366 (365 passed, 1 skipped), api 114 and web 158, all passing.
+- agent-orchestrator: 366 tests, 365 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-runtime ran 267 (262 passed, 5 live tests skipped), agent-orchestrator 366 (365 passed, 1 skipped), api 114 and web 158, all passing.
 
 What it leaves:
 
@@ -1284,7 +1284,7 @@ What was measured:
   - `wf start` taking a card's whole text fails 1;
   - ignoring the card's `workflow:` fails 1;
   - printing the paths bare fails 1.
-- agent-workflows: 368 tests, 367 passed, 1 skipped. Typecheck clean.
+- agent-orchestrator: 368 tests, 367 passed, 1 skipped. Typecheck clean.
 
 What it leaves:
 
@@ -1296,7 +1296,7 @@ What it leaves:
 
 ## Shipped: quiet without a closeout is `unsigned` again
 
-From agent-engine's open issues, *Quiet without a closeout* (bug 1, fixed by E7). The engine used to settle a session that went
+From agent-runtime's open issues, *Quiet without a closeout* (bug 1, fixed by E7). The engine used to settle a session that went
 quiet `succeeded`, closeout or not, and `stepStatus` read one that gave none as `unsigned`. Since E7, a task with a closeout schema
 whose session goes quiet without its closeout ends that attempt `failed` with reason `unsigned`, is nudged if it has attempts left,
 and settles `failed`. `stepStatus` returned a failed task's phase before it looked at the closeout, so the same step read `failed`,
@@ -1335,7 +1335,7 @@ What was measured:
   - `stepStatus` ignoring the `unsigned` answer fails 2 tests;
   - `closeoutAsked` never giving it fails 1;
   - a stopped task read as `unsigned` too fails 1.
-- `npm test && npm run typecheck` from the root exited 0: agent-engine 284 (278 passed, 6 skipped), agent-workflows 371 (370
+- `npm test && npm run typecheck` from the root exited 0: agent-runtime 284 (278 passed, 6 skipped), agent-orchestrator 371 (370
   passed, 1 skipped), api 114 and web 158, all passing. Typecheck clean in all four.
 
 What it leaves:
@@ -1343,7 +1343,7 @@ What it leaves:
 - **A step's line does not say which way it went unsigned.** `wf ls` and `wf decide` say `unsigned` for a session settled
   `succeeded` with nothing said and for one that went quiet and settled `failed`. The engine's note on the task says which
   (`1 attempt(s), none succeeded: the last ended without the closing statement it was asked for`; the note read *went quiet* until 2026-09-19), and nothing here prints it.
-- **At defaults the engine's nudge is not spent on a step.** agent-workflows files one attempt unless a step declares
+- **At defaults the engine's nudge is not spent on a step.** agent-orchestrator files one attempt unless a step declares
   `maxAttempts`, so a quiet session's task settles `failed` at once, and a person's `wf retry --nudge` is the nudge.
   (Taken up by P0.5 below: the run nudges it once a round itself.)
 
@@ -1352,7 +1352,7 @@ What it leaves:
 Plan §6 item 29, the workflow half; E8 was the engine's. The old hkb had a budget per worker and a cost per piece of work, and
 `wf decide` said `cost not measured` on every step. E8 made the engine read what a session cost from its harness (`usage.costUsd`,
 `apiMs`, `toolMs`) and take `budgetUsd` on a task. This carries a budget from the folder to the task, and shows the cost where a person
-decides. Read from this workspace, where E8 had merged (`1944644`): agent-engine's README (*What a session may spend*, *What an attempt
+decides. Read from this workspace, where E8 had merged (`1944644`): agent-runtime's README (*What a session may spend*, *What an attempt
 consumed*), `src/domain.ts`, and its open issues 17 and 18.
 
 What was built:
@@ -1454,7 +1454,7 @@ What was measured:
   - round 3's guards: `decision` naming a step past its budget by its masked status, 4 failing; the offer without why it stopped, 4;
     the cost dropped beside every over-budget word, 1; the OVER BUDGET line losing a looping step's reason, 1; `wf decide` printing
     no OVER BUDGET line, 1.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 406 (405 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-runtime 307 (299 passed, 8 skipped), agent-orchestrator 406 (405 passed,
   1 skipped), api 129 and web 164. Typecheck was clean in all four.
 
 What it leaves:
@@ -1466,7 +1466,7 @@ What it leaves:
   handed where `closeoutAsked(views)` already goes, plus a field. That is the next apps run. The api's tests pin `usedLines`' words
   (`$0.004`, and a used line with no times), so the format keeps three figures under a cent and says nothing of time nobody measured.
 - **A `claude` step is capped between tries, not during one.** Until Claude Code writes what a running `--bg` session has spent
-  (agent-engine's open issue 17), a step can overrun its budget by one try, and one long try is not bounded at all.
+  (agent-runtime's open issue 17), a step can overrun its budget by one try, and one long try is not bounded at all.
 - **A cost lands after its session ends** — for a `claude` session, once the engine has let it go. A `wf retry` of a step whose last
   try ended moments earlier can be filed before that cost is on the view, without the `--budget` it would have needed. That try is
   the overrun.
@@ -1578,7 +1578,7 @@ What was measured:
     resolved as a path: 2; the filing `after:` refusal naming the given path: 2.
 - The verbs were run by hand in a scratch `WF_ROOT` on this repository: add twice, list, a start refused for no workflow, a start with
   `--brief`, the list after, `rm` of a name with no card, and `wf decide`'s head. The README shows that output.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 427 (426 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-runtime 307 (299 passed, 8 skipped), agent-orchestrator 427 (426 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:
@@ -1597,7 +1597,7 @@ What it leaves:
 - **The board had no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gave the api its routes and the board its page: *The board
   half*, below.
 
-The exports that run should call, from `agent-workflows` (`src/runner.ts`) unless noted:
+The exports that run should call, from `agent-orchestrator` (`src/runner.ts`) unless noted:
 
 - `readInbox(): InboxListing[]` lists the inbox, `started as` included.
 - `addToInbox({ text, from?, dir?, workflow?, repo? }): { card: InboxCard; file: string }` files a card. `repo` must be absolute, and
@@ -1610,7 +1610,7 @@ The exports that run should call, from `agent-workflows` (`src/runner.ts`) unles
 - `inboxNameRefusal(name)` refuses a name in the route before anything is read.
 - `inboxDir()`, `workflowAt`, `fromNote(run)` for the run page, `INBOX_KEYS`, `parseInboxCard`, and the types `InboxCard`, `InboxListing`, `InboxStart`,
   `InboxStarted` and `InboxDropped`.
-- From `agent-workflows/run`: `Run.from`, `{ inbox: string }` or absent.
+- From `agent-orchestrator/run`: `Run.from`, `{ inbox: string }` or absent.
 - Refusals in the card's or the start's words throw with `exitCode` 2. `start()`'s own refusals, for `--after` and `--input`, do too. A git
   failure has none.
 
@@ -1703,8 +1703,8 @@ What was measured:
     box's workflow option cut short, and a rule drawn twice in a card's start form. Both were fixed and photographed again. Then, in a browser
     on a scratch store: a filing refused for a relative repository, and a card filed with `wf inbox add` and started with another workflow,
     which opened its run and left the inbox.
-- From the root, `npx turbo run test --force && npm run typecheck && npm run build && npm run e2e` exited 0: agent-engine 307 (299 passed,
-  8 skipped), agent-workflows 427 (426 passed, 1 skipped), api 150 and web 180. After round 2, the same: api 152, the rest unchanged.
+- From the root, `npx turbo run test --force && npm run typecheck && npm run build && npm run e2e` exited 0: agent-runtime 307 (299 passed,
+  8 skipped), agent-orchestrator 427 (426 passed, 1 skipped), api 150 and web 180. After round 2, the same: api 152, the rest unchanged.
 
 What it leaves:
 
@@ -1847,7 +1847,7 @@ What was measured:
   check logs sparing only longer ids, 2; a hand-off and collection with no record, 1.
 - On a copy of this machine's `node_modules` (684 MB, 27,488 files) in a throwaway `WF_ROOT`: `wf rm` refused the running run in 2 ms, and
   once its step failed, forgot it in 550 ms, committing the file left in the worktree and leaving git's list with the repository alone.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 433 (432 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-runtime 307 (299 passed, 8 skipped), agent-orchestrator 433 (432 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:
@@ -2334,8 +2334,8 @@ What was measured:
     and, with an inspector open beside the lane, the floor's hint drawn over its buttons. Both were fixed and photographed again. Then, in a
     browser on a scratch store with three cards queued and no runs, at 390 and 1280 pixels wide: the lane as a row above the floor, and an
     empty floor's copy said nothing of the queue, which was fixed.
-- From the root, `npx turbo run test --force && npm run typecheck && npm run build` exited 0: agent-engine 313 (305 passed, 8 skipped),
-  agent-workflows 490 (489 passed, 1 skipped), api 175 and web 210. `npm run e2e` ran four times on this branch. Three passed in both themes.
+- From the root, `npx turbo run test --force && npm run typecheck && npm run build` exited 0: agent-runtime 313 (305 passed, 8 skipped),
+  agent-orchestrator 490 (489 passed, 1 skipped), api 175 and web 210. `npm run e2e` ran four times on this branch. Three passed in both themes.
   One failed on the `say` page in the light theme, which this work does not touch: the watch saw `GET …/steps/draft/transcript/stream?after=…
   — net::ERR_ABORTED`, a request of the session stream's aborted. It passed on the run straight after.
 - In round 2, the same failure again, two runs in five, so not left as a flake. The cause was on main: the api writes a stream's `settled`
@@ -2447,9 +2447,9 @@ What was built:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: agent-engine 313 (305 passed, 8 skipped), agent-workflows 458 (457 passed, 1 skipped), api 161
+- From the root, `npx turbo run test --force`: agent-runtime 313 (305 passed, 8 skipped), agent-orchestrator 458 (457 passed, 1 skipped), api 161
   and web 201, from 313, 455, 156 and 189. `npm run typecheck` clean in all four.
-- New tests. agent-workflows: each table's keys in order with one line each, the count lines as `countOf` refuses in, and the check
+- New tests. agent-orchestrator: each table's keys in order with one line each, the count lines as `countOf` refuses in, and the check
   refusing a key missing, out of order, extra, empty or on two lines. web: `languageOf`, `fencedCode` and `labelFootnotes`; `Markdown`
   rendered to markup for GFM, links, fences, and two texts' footnotes on one page; raw HTML inline and as a block (`<b>`, `<img onerror>`,
   `<script>`, `<div onclick>`, `<a>`) shown as text, `javascript:`, `vbscript:` and `data:` links refused, and an image never an `<img>`;
@@ -2545,8 +2545,8 @@ What was built, four commits:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: agent-workflows 520 (519 passed, 1 skipped) after round 3, from 490; api 166 and web 203, unchanged;
-  agent-engine 313 (305 passed, 8 skipped), unchanged. `npm run typecheck` clean in all four.
+- From the root, `npx turbo run test --force`: agent-orchestrator 520 (519 passed, 1 skipped) after round 3, from 490; api 166 and web 203, unchanged;
+  agent-runtime 313 (305 passed, 8 skipped), unchanged. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `gate: true` read, and `false`, other words, no value and twice refused. `inbox.test.ts`: a card's
   `gate:` through the listing, its line, `queuedText` and `ideaCard`; a list, `true`, no value and twice refused. `run.test.ts`: the
   hold over three passes, whatever the closeout; no approval but the try's own opens it; check first; the round not held; `wf ls`'s
@@ -2584,12 +2584,12 @@ What it leaves:
 
 What the board's run should call:
 
-- **`approve(e, runId, step, message?)`** from `agent-workflows` (runner.ts): resolves `{ run, approval: { step, try, at, message? },
+- **`approve(e, runId, step, message?)`** from `agent-orchestrator` (runner.ts): resolves `{ run, approval: { step, try, at, message? },
   file }`, or rejects with `exitCode: 2` and the refusal's words — `no such run: <id>. …`, and every `approvalRefusal` sentence: a step
   the run does not have, a cancelled run, `<step> has no gate: …`, `<step> has not signed off yet: …` (and its siblings, one per status),
   `try <n> of <step> is already approved, at …`, `try <n+1> of <step> is already asked for …`, `--message is empty, …`. A rejection
   without `exitCode` is not a refusal. Ask `approvalRefusal(steps, run, step, message, phaseOf, closeoutOf, askedCloseout, verdictOf,
-  asks, spendOf)` from `agent-workflows/run` to grey the button out, with the same words.
+  asks, spendOf)` from `agent-orchestrator/run` to grey the button out, with the same words.
 - **Send back** is `retry(e, runId, step, { mode: 'nudge', message })`, as the answer box already calls it; without a message it is
   refused for a step at its gate.
 - **A record carries** `gates?: string[]` (start-time gates; a step's own `gate: true` is on `run.workflow`), and, as read by `readRun`
@@ -2641,8 +2641,8 @@ What was built:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: api 173, from 166; web 212, from 203; agent-workflows 520 (519 passed, 1 skipped) and
-  agent-engine 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
+- From the root, `npx turbo run test --force`: api 173, from 166; web 212, from 203; agent-orchestrator 520 (519 passed, 1 skipped) and
+  agent-runtime 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
 - `apps/api/test/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
   - the detail's `gates` and every step's `gate`, including a gated step not signed off;
   - `approve` and `onYou` on both endpoints, compared with `onYouWords` over `list`, and none on a run called off;
@@ -2727,8 +2727,8 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
 - **Left to `wf start`, as for a folder written by hand:** what start refuses beyond the parser, which is a step named for another
   step's check or try, and `remote: true` on a harness other than `claude`. A write changes no run, since each run froze its folder at
   `wf start`.
-- **What the board's run should call.** From `agent-workflows`: `writeWorkflow(dir, steps, readme?, { anywhere? })` and its result
-  type, `WorkflowWritten`. From `agent-workflows/workflow`: `type StepDraft` (a `Workflow` whose `output` may be only `{ file }`),
+- **What the board's run should call.** From `agent-orchestrator`: `writeWorkflow(dir, steps, readme?, { anywhere? })` and its result
+  type, `WorkflowWritten`. From `agent-orchestrator/workflow`: `type StepDraft` (a `Workflow` whose `output` may be only `{ file }`),
   `renderStep` (a step's file, to preview), `stepNameRefusal` (a name refused while it is typed), `parseFolder` (a folder checked
   before Save, with the api's own `read`), and `WorkflowError`, whose `message` is the sentence for a 422. One trap: the api's
   `WorkflowStepSpec` has no `remote`, `budget`, `gate` or body today. A draft built from the listing alone would drop
@@ -2820,7 +2820,7 @@ What was built:
 
 What was measured:
 
-- From the root, `npx turbo run test --force` before the change: api 173, web 212, agent-workflows 543 (1 skipped), agent-engine 326
+- From the root, `npx turbo run test --force` before the change: api 173, web 212, agent-orchestrator 543 (1 skipped), agent-runtime 326
   (9 skipped). After it: api 186, web 223; after round 2, api 190 and web 225; the packages unchanged. `npm run typecheck` and `npm run build` clean.
 - `apps/api/test/builder.test.ts`, new, 13 tests, over a scratch store and repository:
   - the key form held to the parser;
@@ -3050,8 +3050,8 @@ What was built, four commits:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-workflows 575
-  (574 passed, 1 skipped), from 548; api 200, web 243 and agent-engine 326 (317 passed, 9 skipped) unchanged — the two api tests that
+- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-orchestrator 575
+  (574 passed, 1 skipped), from 548; api 200, web 243 and agent-runtime 326 (317 passed, 9 skipped) unchanged — the two api tests that
   changed are the rows below, and no api test was added. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `workspace: main` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
   it refused, either order; a step anything waits on, and one beside another ending, refused at load; the key rendered back in
@@ -3080,8 +3080,8 @@ What was measured:
   the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
   three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts
   contract, and reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in the window between a send-back and the pass that files it,
-  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 588 (587 passed, 1 skipped),
-  from 575; api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
+  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-orchestrator 588 (587 passed, 1 skipped),
+  from 575; api 202, web 248 and agent-runtime 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
 - From its second round, four findings: a try of an ending step is held by the checkout as its first filing is — `ship.test.ts` sends back a
   ship that ended blocked while another run's is merging, and holds it for two passes, with nothing merged, `wf ls` saying it beside the try
   and `wf decide` saying it on the screen of a run that is not running; a cancelled run holds the checkout until the engine has settled its
@@ -3149,7 +3149,7 @@ What the board does with it, an item a commit — §8's apps half, the run after
   gives a card every row it reaches, since a card is drawn up to a cell tall.
 
 What the board half measured, counted as this file counts them — tests, then passed and skipped: api 210 (from 202), web 259 (from 243),
-agent-workflows 575 (574 passed, 1 skipped) and agent-engine 340 (331 passed, 9 skipped) unchanged, no package having been touched.
+agent-orchestrator 575 (574 passed, 1 skipped) and agent-runtime 340 (331 passed, 9 skipped) unchanged, no package having been touched.
 `npm run typecheck`, `npm run build` and `npm run e2e` clean, the e2e's pictures read in both themes. New tests: `to-decide.test.ts` in the
 api, on a real repository with every `git` it runs counted — both kinds on the list and on the detail, the `said` that ends with its own
 `command`, the branch merged by hand, the approved ending with nothing left to decide, and no `git` asked of a run still going, one called
@@ -3287,8 +3287,8 @@ What was measured:
   — blocked, answered, blocked again, five times over, each try resuming the session before it and carrying `## Your answer` — and
   probed by hand to twelve, which files the twelfth as it files the second. What a step with `output:` would hit is not a cap but its
   own schema: it would have to declare its fields on every one of those sign-offs. The supervisor declares none.
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 587 (586 passed, 1 skipped), from
-  575. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-orchestrator 587 (586 passed, 1 skipped), from
+  575. api 202, web 248 and agent-runtime 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
   pinned `spec()` fixtures in the api's tests each gained a `slot: null` row, which is the fourth and fifth obligation a new key has
   outside the package beside CLAUDE.md's three. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `slot: none` read, and another word, no value and the line twice refused; the key refused at load on
@@ -3334,12 +3334,12 @@ What it leaves:
 - **A screen of a long-lived run still reads every try.** `wf decide` prints what the run cost and its timeline over all of them, and
   the api reads the whole engine board for the Factory, so at five hundred answers those are five hundred reads — of a person's
   command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
-  The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-engine's open issues).
+  The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-runtime's open issues).
   The tick, which is what runs every four seconds, no longer pays it.
 
 ## Shipped: four leftovers from the reviews
 
-Four things earlier rounds found and left, one commit each, in `packages/agent-workflows` only. Nothing in `apps/`: where a fix makes an
+Four things earlier rounds found and left, one commit each, in `packages/agent-orchestrator` only. Nothing in `apps/`: where a fix makes an
 app's own workaround redundant, the workaround stays, and the bullet says so.
 
 - **`wf inbox queue` keeps the card file's time.** `queueInInbox` writes a card whole, through a hidden file renamed over it, so a pass never
@@ -3385,9 +3385,9 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   refusal, in its words, for a link a step would be written through, for a link whose step is gone, and for a linked README with a README
   given, each with what the link points at untouched — and, beside them, that a linked README with no README given is nothing the write
   touches. Writing before removing fails the first; the refusal dropped fails the third.
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 593 (591 passed, 2 skipped), from 587 —
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-orchestrator 593 (591 passed, 2 skipped), from 587 —
   five new tests, one of them the case rename, which skips where the filesystem tells `implement.md` from `Implement.md` apart, and one
-  changed test, the `wf up` silence. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package
+  changed test, the `wf up` silence. api 202, web 248 and agent-runtime 340 (331 passed, 9 skipped) unchanged: nothing outside the package
   changed. `npm run typecheck` clean in all four.
 
 What it leaves:
@@ -3402,7 +3402,7 @@ What it leaves:
 
 ## Shipped: five leftovers from the reviews of the supervisor and of the ending's checkout hold
 
-Five things the reviews of §9's package half and of the checkout hold found and left, one commit each, in `packages/agent-workflows` and
+Five things the reviews of §9's package half and of the checkout hold found and left, one commit each, in `packages/agent-orchestrator` and
 `workflows/supervisor/` only. Nothing in `apps/` and nothing in the engine: where the board would show a fix differently, the bullet says so.
 
 - **A step in the checkout is not told a sha frozen at `wf start`.** The brief of a `workspace: main` step whose run cut no branch ended "The
@@ -3460,10 +3460,10 @@ Five things the reviews of §9's package half and of the checkout hold found and
 - **What the board cannot show yet, and an open question**, in the two sections above: a supervisor waiting for its person draws as a
   failed run (the supervisor's *What it leaves*); a held ending draws as plain `waiting`, since the board passes no checkout; and a merge
   conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*).
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 613 (611 passed, 2 skipped), from 606 —
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-orchestrator 613 (611 passed, 2 skipped), from 606 —
   seven new tests, and four that changed: the supervisor's shape, whose `disallow:` grew; the brief of a step in the checkout whose run cut
   no branch, which now refuses the claim too; two endings for one checkout, which asserts the run held back is in flight; and §8's pinned
-  "never shipped at an ending's gate, whatever git says", restated with its one exception (round 2). api 202, web 248 and agent-engine 340
+  "never shipped at an ending's gate, whatever git says", restated with its one exception (round 2). api 202, web 248 and agent-runtime 340
   (331 passed, 9 skipped) unchanged: nothing outside the package changed, though the api's `decision` call now reads a hand-merged ending's
   run as shipped, as `wf decide` does. `npm run typecheck` clean in all four.
 
@@ -3514,9 +3514,9 @@ invalidates everything after it.
   and pays one cold resume, once; nothing is migrated, and every continuation after it is warm.
 - The board is unchanged: the api reads a closeout's `replies` off the closeout itself, so a round-1 closeout shows `replies: []` where it
   showed none. The one api test seed that signed a round-3 target off with `replies: []` now gives one reply.
-- From the root, `npx turbo run test --force`: agent-workflows 624 (622 passed, 2 skipped), from 613 — eleven new tests (three in
+- From the root, `npx turbo run test --force`: agent-orchestrator 624 (622 passed, 2 skipped), from 613 — eleven new tests (three in
   `run.test.ts`, eight in `session-cache.test.ts`) and two changed: round 1's schema, and the load refusal of a target that declares
-  `replies`, whose words no longer say "from round 2". api 210, web 259 and agent-engine 340 (331 passed,
+  `replies`, whose words no longer say "from round 2". api 210, web 259 and agent-runtime 340 (331 passed,
   9 skipped) unchanged in count. `npm run typecheck` clean in all four.
 
 ## Shipped: an agent is written once — `agents/` and `agent:`
@@ -3686,10 +3686,10 @@ What it leaves:
 
 - **The paths are a list in a line.** A new app the e2e reads, or a new root file the build reads, is added to that line by hand.
 - **A change to the packages only is not built or visited, though the e2e reads them.** The api takes the board's words from
-  agent-workflows (`toDecideWords`, `waitWord`, `timeline`, `listing`), and `apps/web/test/e2e/run.ts` runs `bin/wf.ts decide` itself and
-  checks what it prints: a `dev` run that rewords one of those in `packages/agent-workflows/src` passes its check and breaks the e2e on
+  agent-orchestrator (`toDecideWords`, `waitWord`, `timeline`, `listing`), and `apps/web/test/e2e/run.ts` runs `bin/wf.ts decide` itself and
+  checks what it prints: a `dev` run that rewords one of those in `packages/agent-orchestrator/src` passes its check and breaks the e2e on
   main. Leaving `packages/` out was the ask's choice (§6, P0.6: the packages' sources reach no browser); adding
-  `packages/agent-workflows/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
+  `packages/agent-orchestrator/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
   e2e on most package runs.
 ## Shipped: every run of an agent ends in its statement or the reason it has none (P0.5)
 
@@ -3803,7 +3803,7 @@ What a run-level guard ("do not start a run above 90%") would need — out of sc
 
 ## Shipped: the judge package (P5, first slice)
 
-P5 of `docs/pivot-2026-09-18.md`, its first slice: `packages/agent-judge`, a new package. Nothing in `packages/agent-workflows` or `apps/`
+P5 of `docs/pivot-2026-09-18.md`, its first slice: `packages/agent-judge`, a new package. Nothing in `packages/agent-orchestrator` or `apps/`
 changed but this file. It asks TypeSafe's Jev (`jev-1.13.0`) a typed question once, and records what came of it. Its README
 is the account.
 
@@ -3829,7 +3829,7 @@ is the account.
 
 The first slice of P2 in `docs/pivot-2026-09-18.md`, "a workspace is a choice". The owner's word at the plan gate: `workspace:
 folder`, the first of a family of kinds; the record freezes `place: { kind: 'folder' }`; a record without `place` is a git run, and
-the git words are not renamed. No change to `packages/agent-engine`: a task's `cwd` was all a folder needed.
+the git words are not renamed. No change to `packages/agent-runtime`: a task's `cwd` was all a folder needed.
 
 - **The word** (`workflow.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
 - **The run** (`run.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
@@ -4123,7 +4123,7 @@ auto-registration with Remote Control fits.
   the spawn. A knob on the workload as a field carried on the task, never a default: Remote Control lets the session be
   driven from claude.ai or a phone, not only seen. Refused on a harness that has no such flag. A live measurement that a
   spawned worker lands in the agents view.
-- agent-workflows: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
+- agent-orchestrator: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
   supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
   is told and what it may do is its own design; nothing here decides it.
 - Board: the run page says a step's session is reachable from the phone when it is.
@@ -4224,7 +4224,7 @@ that fills when someone answers, and a step whose body nobody writes. The handof
   plan that reads one way should start implement at once. Keep the folders as they are and let the card or the start
   say `--gate plan`; a `dev-gated` folder is not needed.
 
-One agent-workflows run (the key, the record field, `assess`, the verb, the brief section, README, tests that refuse:
+One agent-orchestrator run (the key, the record field, `assess`, the verb, the brief section, README, tests that refuse:
 a gated step's dependents never filed without the file, an approval for the wrong step refused, a send-back spending
 the approval) — about $40; then one apps run (the button, the card's need, the e2e) — about $30.
 
@@ -4299,7 +4299,7 @@ run page), never a result nobody has decided. Nothing counts results to decide.
 - **`--after` is unchanged:** a child starts when its parent is shipped as git sees it (the branch on the base, or nothing
   to commit), which a run's `ship.md` makes true when it merges, and a research run makes true by succeeding.
 
-One agent-workflows run (`workspace: main`; *to decide* in `assess`, `listing` and the vocabulary; `wf decide`'s facts;
+One agent-orchestrator run (`workspace: main`; *to decide* in `assess`, `listing` and the vocabulary; `wf decide`'s facts;
 `ship.md` on the four `dev*` folders, gated; tests that refuse: a check on a main-workspace step, a main workspace on a step
 that is not last, a to-decide run that never reads shipped, an approved ending that runs and a sent-back one that does not),
 then one apps run (the counts, the group, the banner; the run page's gate panel showing the diff and the artifacts beside the
@@ -4359,10 +4359,10 @@ it asks and what it gets wrong.
 
 ## Engine-side work
 
-Not agent-workflows features, listed so nothing is lost:
+Not agent-orchestrator features, listed so nothing is lost:
 
-- waking the tick loop on harness registry changes instead of a timer (agent-engine README);
-- the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
+- waking the tick loop on harness registry changes instead of a timer (agent-runtime README);
+- the hkb migration ([agent-runtime/docs/hkb-migration.md](../../agent-runtime/docs/hkb-migration.md));
 - ~~a task field for Remote Control~~ *done, engine `92d6783`: `remoteControl: true` on the task; and in the workflow layer, `remote: true`
   on a step, carried on every filing of its session and refused at start on a harness the engine refuses it for* (§2 above);
 - ~~a `blocked` session holding a concurrency slot~~ *done, engine `912d537`*: count `working` only toward the ceiling and keep the wider
@@ -4384,5 +4384,5 @@ Not agent-workflows features, listed so nothing is lost:
   admission and nowhere else, higher first and filing order within — a knob on the workload, carried on the task, so the
   workflow layer can give a run in flight its momentum by filing every step after its first above a new run's first
   (Kubernetes: a pod's `priorityClassName`). Tests: two pending tasks, the later-filed one alphabetically first, the
-  earlier admitted; a higher priority admitted before an older lower one. agent-workflows then: `priority` on every
+  earlier admitted; a higher priority admitted before an older lower one. agent-orchestrator then: `priority` on every
   filing after a run's first step, and the run cap (§3) unchanged.

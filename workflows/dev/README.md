@@ -16,7 +16,7 @@ is the root's `package.json`, `package-lock.json` or `turbo.json`. A change only
 the workflows runs neither, and the check's log says so; the packages' sources reach no browser, and their
 own tests judge them. When git cannot say — a shallow clone, a base it does not have — the check fails with
 words rather than skipping the build. The condition is written in the `check:` line itself, not in a script
-the step could edit, and `packages/agent-workflows/test/web-check.test.ts` runs it against real repositories. `review` runs on Claude (opus), fenced by machinery rather than
+the step could edit, and `packages/agent-orchestrator/test/web-check.test.ts` runs it against real repositories. `review` runs on Claude (opus), fenced by machinery rather than
 by its brief: `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it
 has no tool that writes and a command `.claude/settings.json` does not allow is denied without a prompt.
 The settings allow `npm run build` and `npm run e2e` for implement's sake, and both write into the
@@ -42,7 +42,7 @@ merged tree, and with neither a base nor a merge in progress it fails loudly.
 Each step names who does it — `implementer`, `reviewer`, `shipper`, in `workflows/agents/` — and keeps only its
 wiring: the keys above that are a role's (harness, model, tools, denies, the schema) are the agent's, and the step
 files say `after`, `check`, `loop`, `budget`, `workspace` and `gate`. The reviewer is the package's
-(`packages/agent-workflows/workflows/review.md`) moved onto Claude, with the paragraph saying which commands it may run;
+(`packages/agent-orchestrator/workflows/review.md`) moved onto Claude, with the paragraph saying which commands it may run;
 `review.schema.json` is the package's, beside the reviewer in `agents/`.
 
 ```bash

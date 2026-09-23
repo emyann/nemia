@@ -1,7 +1,7 @@
 # wf — workflows of agent steps
 
 A workflow is **a folder of markdown files**. One file is one step. It runs on
-[`agent-engine`](../agent-engine), and it is the proof that the engine's boundary is real: this
+[`agent-runtime`](../agent-runtime), and it is the proof that the engine's boundary is real: this
 package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing else.
 
 ```bash
@@ -364,7 +364,7 @@ continues another's session (`resume:`) is filed with that session's window — 
 and one with another is refused at load (`sessionContext`). Claude Code's resumed copy of a session keeps only the flags it
 is given, so a continuation filed with none would run on the model's whole window again; the window is not part of the
 cached prompt, so keeping it costs nothing there (`test/session-cache.test.ts` walks the chain). A window small enough that one turn's reads refill
-it stops the session: Claude Code says the autocompact is thrashing, and the session waits, `blocked` (agent-engine's open
+it stops the session: Claude Code says the autocompact is thrashing, and the session waits, `blocked` (agent-runtime's open
 issue 26, measured on a 100k window with 22k-token reads).
 
 ### What a step may not have: `disallow:`
@@ -404,7 +404,7 @@ reviewer from those is the allow narrowed in `.claude/settings.json`, which this
 then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev-planned's plan brief.
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
-are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
+are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
 `CODEX_EFFORTS`. They are copies because only `runner.ts` may import the engine, and the engine refuses a
 word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
 lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
@@ -420,7 +420,7 @@ Implement what was asked, in this repository.
 ```
 
 `remote: true` is carried on every filing of the step — the first, each try and each round — as the engine's `remoteControl: true`, so
-Claude Code's `--bg` session is started with `--remote-control` and listed in the web's agents view (agent-engine's README, *Reachable
+Claude Code's `--bg` session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
 from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
 phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
 bridged, and a step's check never is.
@@ -447,12 +447,12 @@ Refused at load, naming the fix: `0`, a negative, a word, an amount written with
 an empty value; and any `budget:` on codex, in the engine's words — `codex exec` has no spend cap, and reports no cost to cap. It is
 frozen on the run with every other key.
 
-The cost is the engine's: what the harness priced each attempt at, read once the attempt has ended (agent-engine's README, *What an
+The cost is the engine's: what the harness priced each attempt at, read once the attempt has ended (agent-runtime's README, *What an
 attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude` | nothing. A `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-engine's open issues 17 and 18), so **a `claude` step is never stopped mid-flight by its budget, and can overrun it by one try** | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude` | nothing. A `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18), so **a `claude` step is never stopped mid-flight by its budget, and can overrun it by one try** | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `claude-detached` | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | as on `claude` |
 | `codex` | refused at load | — |
 
@@ -1026,7 +1026,7 @@ whether a refusal is the agent's to answer or a person's is left to each workflo
 A step steered mid-flight by a message to its session left nothing on its run, so its reviewer could not tell a scope a
 person widened from a step overstepping (plan §4b). `wf say <run> <step> "<words>"` hands the words to the step's running
 session through the engine's `say`, which journals them on the step's task as a `said` entry — `at`, `attempt`, `text`
-(agent-engine's README, *Telling a running session something*). That journal is the record. The verb writes nothing of
+(agent-runtime's README, *Telling a running session something*). That journal is the record. The verb writes nothing of
 its own, and everything below reads the words back off the engine's view of the task.
 
 - **Which session.** The step's current try's task, as `wf retry` finds it (`run.steps[step].taskId`). The words are
@@ -1040,7 +1040,7 @@ its own, and everything below reads the words back off the engine's view of the 
 - **`wf decide`** prints each thing said under the step, before its closeout — `said to try 1, at <time>:`, then the
   words in a fence, as data — for every try of the step, so the person who ships the work reads what the step was told.
 - **A try that continues the session is handed them again.** Taken is not read: a session blocked on a permission
-  prompt keeps the words queued, and loses them when it is stopped and continued (agent-engine's open issue 16). So a
+  prompt keeps the words queued, and loses them when it is stopped and continued (agent-runtime's open issue 16). So a
   try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
@@ -1233,7 +1233,7 @@ names neither does not fit the closeout the step is filed with. `again: true` se
 again, at most `rounds: 3`, as in `workflows/`.
 
 ```bash
-wf start "Give the Factory a legend" --workflows packages/agent-workflows/workflows/ui
+wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/workflows/ui
 ```
 
 **Looking is a skill, not a step.** `.claude/skills/look/SKILL.md`, in this repository, says how any step
@@ -2309,6 +2309,11 @@ holding a concurrency slot forever.
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
+
+The store keeps the package's former name on purpose. The package became `agent-orchestrator` on 2026-09-23 and the
+store did not follow: every run record, the inbox, the feed and its cursors, the daemon's lease in `daemon.json` and the
+engine's board under `engine/` are read at this path, and a new default would orphan them all. `WF_ROOT` keeps its name
+for the same reason, and so does the `wf` command.
 
 | path | |
 |---|---|

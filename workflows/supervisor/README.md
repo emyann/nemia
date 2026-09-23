@@ -10,7 +10,7 @@ supervise        (one step, and it does not end)
 
 `supervise` runs on Claude (opus) in the repository's own checkout (`workspace: main`), not in a worktree:
 what it reads is the store and the runs' own branches, and the little it writes is bookkeeping — a trap in
-`CLAUDE.md`, a section in `packages/agent-workflows/docs/features.md`. It carries implement's denies and no
+`CLAUDE.md`, a section in `packages/agent-orchestrator/docs/features.md`. It carries implement's denies and no
 `check:`: there is nothing to verify, because it produces nothing but questions and approvals.
 
 **Its `disallow:` denies git by name.** "Never type git for a run" is a sentence in `supervise.md`, and prose
@@ -57,7 +57,7 @@ ends: every answer continues it, and it grows for as long as it lives. Past abou
 has read and carries on — and every answer continues it on the same window. A turn whose reads refill the window within
 three turns of a compaction, three times in a row, trips Claude Code's guard instead: the step reads `blocked`, and
 `wf logs <run> supervise` ends on *"Autocompact is thrashing: the context refilled to the limit within 3 turns of the
-previous compact…"* (agent-engine's open issue 26 measured it at 100k with 22k-token reads; at 200k the same reads
+previous compact…"* (agent-runtime's open issue 26 measured it at 100k with 22k-token reads; at 200k the same reads
 compacted and signed off). Answer it with `wf retry <run> supervise --message "Read in smaller chunks."` and it carries
 on, or change the window: a run keeps the window it froze at `wf start`, so raise `context:` in `supervise.md` (up to
 `1000k`), `wf cancel <run>`, and start a fresh supervisor — which starts with an empty context too.

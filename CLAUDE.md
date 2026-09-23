@@ -1,10 +1,15 @@
 # hkb-v2 — contributor guide
 
-Two packages and two apps. `packages/agent-engine` runs one agent session to completion, durably
-(the `ae` CLI; `src/domain.ts` is the whole judgement). `packages/agent-workflows` sequences engine
+Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably
+(the `ae` CLI; `src/domain.ts` is the whole judgement). `packages/agent-orchestrator` sequences engine
 tasks into runs of steps — a folder of markdown is a workflow (the `wf` CLI). `apps/api` puts the
 workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list, never up. Read
 `README.md` and each package's README for the model before changing behaviour.
+
+The packages are named for their layers: a runtime keeps one agent session alive to completion, and an orchestrator
+turns declared work into its tasks, watches them and reconciles. They were `agent-engine` and `agent-workflows` until renamed on 2026-09-23.
+What people type and what is on disk kept its name on purpose: the `wf` and `ae` commands, `~/.agent-workflows` (`WF_ROOT`)
+and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record there.
 
 Beside them, and optional: `packages/agent-judge` asks TypeSafe's Jev a typed question once and records the
 answer (the `judge` CLI; Effect inside, plain Promises out). It imports nothing from the workspace and nothing
@@ -15,7 +20,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
   (181 engine · 169 workflows · 21 api · 33 web at 2026-09-13). Runs from a package directory
-  too. Not bare `node --test` from the root: `agent-engine/test/facade.test.ts` is cwd-relative.
+  too. Not bare `node --test` from the root: `agent-runtime/test/facade.test.ts` is cwd-relative.
   It runs the packages in parallel. Until 2026-09-14 it ran them one at a time: the api's tests asked the machine's
   live `claude agents` registry and died under contention (plan §4b). Every api test file now imports
   `apps/api/test/harness.ts` first — a fake `claude` first on PATH, the harness the api's engine runs — and
@@ -26,10 +31,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite
   pass by weakening a test is a finding to report, not a fix.
 - **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)
-  though three tests pin those folders: the round trip in `agent-workflows/test/workflow.test.ts`, the package's `ui`
+  though three tests pin those folders: the round trip in `agent-orchestrator/test/workflow.test.ts`, the package's `ui`
   copy, file for file, and the api's picture of `dev` and `dev-build` (`apps/api/test/workflows.test.ts`). After touching
   `workflows/`, run `npx turbo run test --force`, and copy a `workflows/ui` change into
-  `packages/agent-workflows/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
+  `packages/agent-orchestrator/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
@@ -202,7 +207,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A test of a timer waits for the ticks it counts, never for a length of time.** "start() ticks on a timer" slept 200 ms
   and wanted two ticks at 20 ms; a process the scheduler parks for those 200 ms wakes with the interval and the sleep both
   due, sees one tick, and fails — two full checks in four at a load of 20, and on demand by freezing the test with `SIGSTOP`
-  as its loop starts. Wait for the Nth tick under a bound of seconds (`ticksUntil` in `agent-engine/test/facade.test.ts`); a
+  as its loop starts. Wait for the Nth tick under a bound of seconds (`ticksUntil` in `agent-runtime/test/facade.test.ts`); a
   wait *after* `stop()` is safe at any length over the interval, since an interval that survived comes due first. And a tick
   faster than its interval proves no overlap guard: the old test passed with `start()`'s guard deleted. Run a mutant of a
   loop under `timeout`: one whose `stop()` no longer clears its interval holds `node --test` open for ever (learned by the
@@ -232,7 +237,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   would let through refuses the state the deletion makes — the wording is not the guard (learned by the run that let a person
   accept a loop out of rounds, round 2).
 - **The engine's phase is free text that four places compare exactly.** `needs-human` is matched character for character by
-  `harnessBlocked` (`agent-workflows/src/runner.ts`), by `needsOf` in `apps/api/src/judged.ts`, by `stepState` in
+  `harnessBlocked` (`agent-orchestrator/src/runner.ts`), by `needsOf` in `apps/api/src/judged.ts`, by `stepState` in
   `apps/web/src/lib/status.ts` — the chip — and twice inside `listing` (`run.ts`). So a word added to what a person reads goes
   *beside* the phase, never into it: `listing` takes what the harness waits for as its own parameter (`waitingOf`) and decorates
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
@@ -248,15 +253,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   under a chip that already said `needs-human`. The node says the wait alone (`needNodeText` in `apps/web/src/lib/asks.ts`), the whole
   sentence stays in its `title` and on the run's page, and the e2e proves it is read whole with `expectUncut` rather than assuming the
   width fits: a screenshot of a cut line looks like a line (learned by the same run, round 2).
-- **A name moved out of an engine file is imported from it by URL, too.** `agent-workflows/test/vocabulary.test.ts` reads the
-  engine's lists with `await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-engine')))`, beside the
+- **A name moved out of an engine file is imported from it by URL, too.** `agent-orchestrator/test/vocabulary.test.ts` reads the
+  engine's lists with `await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-runtime')))`, beside the
   package's root, so a grep for `from '…/runner.ts'` misses it and only the other package's suite fails, reading `undefined`. Before
   moving an export between the engine's files, grep the workspace for the file's bare name (learned by the run that split the
   engine's `runner.ts`).
-- **A name moved out of `run.ts` leaves the `agent-workflows/run` subpath, and the api's tests read that subpath by `await import`.**
-  `const { messageRefusal } = await import('agent-workflows/run')` in `apps/api/test/asks.test.ts` is no `import … from` line, so a
-  scan of static imports misses it, and no typecheck sees it: neither agent-workflows' nor the api's `tsconfig.json` includes `test/`.
-  Only the api's suite fails. Before moving a name out of `run.ts`, grep the workspace for `agent-workflows/run'`, and re-export from
+- **A name moved out of `run.ts` leaves the `agent-orchestrator/run` subpath, and the api's tests read that subpath by `await import`.**
+  `const { messageRefusal } = await import('agent-orchestrator/run')` in `apps/api/test/asks.test.ts` is no `import … from` line, so a
+  scan of static imports misses it, and no typecheck sees it: neither agent-orchestrator's nor the api's `tsconfig.json` includes `test/`.
+  Only the api's suite fails. Before moving a name out of `run.ts`, grep the workspace for `agent-orchestrator/run'`, and re-export from
   `run.ts` what the api reads there, from a module beneath it, so no cycle (learned by the run that moved *trying again* into `retry.ts`).
 - **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
   TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
@@ -288,7 +293,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`execFileSync` with no `stdio` writes the child's stderr on yours.** It captures stderr for the error's message *and*
   copies it to `process.stderr`, so a command that fails on every pass of a loop prints git's words on every pass, beside
   the line the loop says itself. Pass `stdio: ['ignore', 'pipe', 'pipe']`: the error's message keeps them (`git` in
-  `agent-workflows/src/worktree.ts`, learned by the run that took up the queue's leftovers).
+  `agent-orchestrator/src/worktree.ts`, learned by the run that took up the queue's leftovers).
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every read and write follows it.** So code that writes each
   file it lists and removes the rest writes *through* a link — into whatever it points at, outside the folder — and leaves
   it behind when it should have removed it, with nothing said either way. Where a folder's files are meant to be its own,
@@ -375,13 +380,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 ## Rules the code keeps
 
 - **The engine is finished.** It runs one workload on one harness; anything that knows about a
-  second workload is the upper layer. `decide` (`agent-engine/src/domain.ts`) is pure and stays a
-  screen long; `agent-engine/src/index.ts` is the export list and the boundary — `decide` is
+  second workload is the upper layer. `decide` (`agent-runtime/src/domain.ts`) is pure and stays a
+  screen long; `agent-runtime/src/index.ts` is the export list and the boundary — `decide` is
   not exported, on purpose. A knob on the workload is a field carried on the task and read by a
   runner, never a callback into `decide`.
 - **No `if` in `engine.ts` that belongs in `decide`.** Effectful code applies one decision; the
   judgement lives in the pure function.
-- **In agent-workflows, `assess` is pure and `runner.ts` is the only file that imports the
+- **In agent-orchestrator, `assess` is pure and `runner.ts` is the only file that imports the
   engine.** `run.ts` reads no disk and calls no engine. `cli.ts` parses, calls, prints. The I/O that never names the
   engine sits beneath `runner.ts` — `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
   `artifacts.ts`, `authoring.ts`, `inbox-store.ts` — importing neither the engine nor `runner.ts`, which re-exports them;
@@ -393,7 +398,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   get their own files, composed on read. Two writers doing read-modify-write lose updates — and did.
 - **A check that did not finish is not a refusal.** The engine settles a check killed at its
   deadline as `failed` with no exit code, and one the harness stopped as `stopped`; only a
-  numeric exit is a verdict on the work (`refusedCheck` in `agent-workflows/src/run.ts`).
+  numeric exit is a verdict on the work (`refusedCheck` in `agent-orchestrator/src/run.ts`).
   `retries:` spends nothing on it and `wf decide` offers `wf retry <run> <step> --recheck` — use
   that, never a hand edit of the engine's journal or the run record.
 - **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run
@@ -428,10 +433,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 ## Where things are
 
 - `docs/eval-2026-09-12/REPORT.md` — the evaluation against the four points of *how to hold the
-  bar on production agent code*: gaps with `file:line`, the shape agent-workflows should take.
+  bar on production agent code*: gaps with `file:line`, the shape agent-orchestrator should take.
 - `docs/plan-hold-the-bar.md` — the handoff plan: packages, owners, definitions of done.
-- `packages/agent-engine/docs/open-issues.md` — what is still wrong or half-verified.
-- `packages/agent-workflows/docs/features.md` — what is still to build, in order.
+- `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
+- `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.
 - `.claude/skills/` — the repository's skills, which every step whose tools include `Skill` can use: `look` (ours)
   and `shadcn` (third-party, installed with `npx skills add shadcn/ui --agent claude-code --copy`, pinned by hash in

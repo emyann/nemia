@@ -123,7 +123,7 @@ Effect is how this engine is written, not how it is used. The default entry poin
 in any signature**:
 
 ```ts
-import { createEngine, codex } from 'agent-engine'
+import { createEngine, codex } from 'agent-runtime'
 
 const engine = createEngine({ harnesses: { claude: 'claude-bg', codex } })
 
@@ -157,7 +157,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
 not be enough for anyone. `grep "from 'effect'" src/cli.ts` returns nothing, and a test says so.
 
-The Effect API is still there under `agent-engine/effect` — `Layer` composition, typed error
+The Effect API is still there under `agent-runtime/effect` — `Layer` composition, typed error
 channels, the lot. Keep your `effect` version aligned with this package's if you use it: Context
 tags are identity-based, and two copies in one tree do not see each other's services. A consumer
 who never imports Effect can never have that problem.
@@ -454,7 +454,7 @@ workload, declared on the workload.
 |---|---|
 | `claude` | `--remote-control`, on every attempt |
 | `claude-detached` | refused at `file()`: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
-| `codex`, and any other `HarnessSpec` — agent-workflows' `check` | refused at `file()`, naming the harness and the one to file on |
+| `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
 | a `PromiseRunner` | asked nothing: handed `remoteControl` on the spawn, to honour or not |
 
 **Measured before it was built** (2026-09-16, Claude Code 2.1.273, three throwaway haiku sessions): a `claude --bg`
@@ -710,7 +710,7 @@ reason `budget` — and its task settled `succeeded`, past the rule that a spent
 record here; the contract test found it. `test/decide.test.ts`'s CONTRACT walks every sighting, with and without a
 schema, a statement, a spent budget and a cut, to its settle, and fails on either.
 
-A check (agent-workflows' `check:`) keeps its verdict in its exit code, not a statement: one cut at its deadline is
+A check (agent-orchestrator's `check:`) keeps its verdict in its exit code, not a statement: one cut at its deadline is
 `deadline`, and its exit code, if its process left one, says how it died, not what it found.
 
 ### The workload's own word
@@ -1119,7 +1119,7 @@ in the same long-lived process that spawned the sessions, because they die with 
 
 ```ts
 import { Effect, Layer } from 'effect'
-import { Journal, sdkRunner, file, tick } from 'agent-engine/effect'
+import { Journal, sdkRunner, file, tick } from 'agent-runtime/effect'
 
 const board = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), sdkRunner())
 await Effect.runPromise(file({ brief, cwd }).pipe(Effect.provide(board)))
@@ -1262,7 +1262,7 @@ watches for its `settled` event, and files the next one — it never reads a tas
 learns what `decide` is:
 
 ```ts
-import { createEngine } from 'agent-engine'
+import { createEngine } from 'agent-runtime'
 
 const engine = createEngine()
 const { entries, cursor } = await engine.feed(lastCursor)
@@ -1276,14 +1276,17 @@ for (const { taskId, event } of entries) {
 The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that was away for a
 week replays rather than being told to start over.
 
-`AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster.
+`AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster. With it unset the board is
+`~/.agent-engine`, which keeps the package's former name on purpose: the package became `agent-runtime` on 2026-09-23,
+and a new default would orphan every task's journal and the feed already there. `AE_ROOT` and the `ae` command kept
+their names too.
 `AE_MAX_CONCURRENT` (default 3) is how many sessions may be at work at once in **each pool** — the
 ceiling is per pool because your rate limits are, and a rate limit is a subscription's, however many harnesses
 run on it. A harness declares the pool it is counted in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and
 is a pool of its own, under its own name, when it declares none. `claude` and `claude-detached` both run Claude
 Code on one subscription, so the engine counts both in `claude`'s pool without being told: a ceiling of 2 is
 two Claude Code sessions, not four. `codex` keeps its own, and so does a harness you add, such as
-agent-workflows' `check`, unless it names another. Only a session at work is counted: a `blocked` one is
+agent-orchestrator's `check`, unless it names another. Only a session at work is counted: a `blocked` one is
 not. A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the
 ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
 blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for
@@ -1338,7 +1341,7 @@ whether this core is the right size.
 
 **Watch instead of poll.** `ae up` ticks on a timer. The harness's registry changing is the hint
 that skips the wait; the tick stays as the fallback that makes missing one free. Worktrees and
-sequencing, once listed here, are done — sequencing as `agent-workflows`, a consumer of this engine.
+sequencing, once listed here, are done — sequencing as `agent-orchestrator`, a consumer of this engine.
 Everything else that is still wrong or only half-verified is in `docs/open-issues.md`.
 
 Anything that makes `decide` longer than a screen is a second kind wearing a disguise.

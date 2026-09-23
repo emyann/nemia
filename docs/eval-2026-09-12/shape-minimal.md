@@ -1,5 +1,7 @@
 # Shape: minimal and content-first
 
+> The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
+
 What `packages/agent-workflows` should look like if the four points are covered with the smallest set
 of additions and everything else is pushed into content or above the package. Paths are relative to
 `/home/yrnd1/projects/hkb-v2`; the code was read, not the maps, for every claim below. Baseline: `npm test`

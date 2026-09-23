@@ -5,7 +5,7 @@ session learned is in the two READMEs; this analysis is not, and rebuilding it m
 ~2,000 lines of `src/controller.ts`. Hence the file.
 
 Nothing here is committed to. hkb may never be migrated, and that is a legitimate outcome —
-`agent-engine` + `agent-workflows` is already a plausible hkb-v2 core built from scratch.
+`agent-runtime` + `agent-orchestrator` is already a plausible hkb-v2 core built from scratch.
 
 ## What hkb looks like today
 
@@ -64,7 +64,7 @@ That relocation is the decomposition hkb needs anyway.
 
 **Phase 1 — plumbing only (½ day, risk ≈ 0).**
 Keep hkb at the repo root; add `engine/` beside `src/` with `"workspaces": ["engine"]` and
-`"agent-engine": "*"`. Do **not** move hkb into `packages/hkb/` — that touches `paths.ts`, the
+`"agent-runtime": "*"`. Do **not** move hkb into `packages/hkb/` — that touches `paths.ts`, the
 prisma config, `bin`, `files`, the smoke test and CI for no benefit yet.
 
 *Verified*: Node runs the engine's `.ts` through the workspace symlink, because the realpath is
@@ -92,7 +92,7 @@ the engine, and the import arrow points one way.
 
 ```ts
 // hkb: src/engine-journal.ts
-import { Journal, JournalError, type Event, type JournalOps } from 'agent-engine/effect'
+import { Journal, JournalError, type Event, type JournalOps } from 'agent-runtime/effect'
 import { openBoard } from './db.ts'
 
 export const prismaJournal = (boardId: number): JournalOps => { /* four methods */ }
@@ -128,6 +128,6 @@ Three details that make it fit:
 
 ## The advice that came with all of this
 
-Run your own real work through `agent-engine` + `agent-workflows` for a week first. The answer to
+Run your own real work through `agent-runtime` + `agent-orchestrator` for a week first. The answer to
 "replace hkb's core, or make hkb a consumer, or neither" will be obvious by then, and waiting
 costs nothing.

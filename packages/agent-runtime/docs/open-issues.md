@@ -1,25 +1,25 @@
-# Open issues: agent-engine and agent-workflows
+# Open issues: agent-runtime and agent-orchestrator
 
 What is still wrong, what is only half-verified, and what is waiting on a decision — written down so
 it can be picked up later without reconstructing it from commit history. The last section is a
 record of what was fixed, with commits, so the open items have their context. A fixed item leaves
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
-State as of 2026-09-16: agent-engine after the hold-the-bar engine work (repository
+State as of 2026-09-16: agent-runtime after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
 record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
-admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-workflows
+admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
 `0e7b02a`.
 
 ## Bugs
 
 ### 2. `advance` hands off only steps that succeeded
 
-**Where.** `agent-workflows/src/runner.ts:318` commits a finished step's leftover work only when its
+**Where.** `agent-orchestrator/src/runner.ts:318` commits a finished step's leftover work only when its
 engine task succeeded.
 
 **Effect.** A step that fails or is stopped keeps anything it did not commit only in its worktree
@@ -43,7 +43,7 @@ need that work somewhere else first. A session whose task a person or a deadline
 
 ### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
 
-`agent-engine/src/runner-detached-output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`agent-runtime/src/runner-detached-output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
 prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
 is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
@@ -60,8 +60,8 @@ that must not spend past one.
 
 ### 6. The Effect door's `file` refuses no harness's words
 
-**Where.** `file` in `agent-engine/src/engine.ts` refuses what the task says of itself; the refusals in a harness's
-words live in `createEngine().file()` (`harnessRefusalOf` in `agent-engine/src/facade.ts`), because that is where the
+**Where.** `file` in `agent-runtime/src/engine.ts` refuses what the task says of itself; the refusals in a harness's
+words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
@@ -88,7 +88,7 @@ falls back today; and the refusals that name another harness — *file the task 
 the bridged harnesses listed by name — need the whole map of harness configs, which only `createEngine` holds, where
 the composite sees opaque ops. A value passed to `file` instead would be opt-in: it repeats what the consumer's runner
 layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
-workspace files through the Effect door (agent-workflows and the api use `createEngine`).
+workspace files through the Effect door (agent-orchestrator and the api use `createEngine`).
 
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
@@ -133,12 +133,12 @@ has no Codex servers configured.
 `transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
-(`claudeResultOutput` in `agent-engine/src/runner-detached-output.ts`). Low priority, like issue 4: this
+(`claudeResultOutput` in `agent-runtime/src/runner-detached-output.ts`). Low priority, like issue 4: this
 harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
 
 ### 12. `said` means the words were handed to the inbox, not that the session read them
 
-**Where.** `claudeOps.say` in `agent-engine/src/runner.ts`: a line posted to the session's inbox socket, which
+**Where.** `claudeOps.say` in `agent-runtime/src/runner.ts`: a line posted to the session's inbox socket, which
 writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
 
 **Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
@@ -229,7 +229,7 @@ busy, but Claude Code writes none until the process exits (issue 18): a session 
 sees a cost while the session runs, and sees one only after the engine has let it go.
 
 **Effect.** `file()` refuses `budgetUsd` on `claude` (engine `26020c1`), so nothing bounds what a `--bg` session spends — and
-`claude` is the harness agent-workflows runs its steps on. A task can have a cap only on `claude-detached`, which gives up
+`claude` is the harness agent-orchestrator runs its steps on. A task can have a cap only on `claude-detached`, which gives up
 what `-p` lacks: `say`, and following the conversation while it runs (issue 11).
 
 **Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
@@ -259,7 +259,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 ### 19. A `blocked` session holds no slot, on reasoning rather than a measurement
 
 **What changed** (2026-09-16). The ceiling counts the sessions a pass observes `working`, and a `blocked` one is not
-counted (`AT_WORK` in `agent-engine/src/engine.ts`). It used to count `LIVE` — `working` and `blocked` — so a session
+counted (`AT_WORK` in `agent-runtime/src/engine.ts`). It used to count `LIVE` — `working` and `blocked` — so a session
 waiting on a permission prompt kept the tasks behind it queued for as long as nobody answered, and only its deadline
 freed the slot. `LIVE` still says what the engine waits on: `decide` reads a blocked session as running, and a closing
 statement ends a blocked attempt as it ends a working one (`closedOut`).
@@ -279,11 +279,11 @@ session working again fills the slot another's end freed, and blocking again giv
 
 **What changed** (2026-09-16). The ceiling is counted per pool, not per harness. A harness declares the pool it is counted
 in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and is a pool of its own, under the name it is configured under, when
-it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-engine/src/runner-claude-vocabulary.ts`), and so is the
-engine's `claudeDetached`, which names that pool, so no caller has to: agent-workflows passes the engine's harnesses and a
+it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-runtime/src/runner-claude-vocabulary.ts`), and so is the
+engine's `claudeDetached`, which names that pool, so no caller has to: agent-orchestrator passes the engine's harnesses and a
 `check`, and names none. Before, both ran Claude Code on one subscription and were counted apart, so a ceiling of 2 let
 four Claude Code sessions run. `test/pool.test.ts`, with fake `claude` and `codex`, at `createEngine()`'s own harnesses and
-at agent-workflows' map: a `claude-detached` session counts against `claude`'s ceiling, and `codex` and a `check` keep
+at agent-orchestrator's map: a `claude-detached` session counts against `claude`'s ceiling, and `codex` and a `check` keep
 their own. From 2026-09-17 it also configures that runner under another name — `{ cc: 'claude-bg', 'claude-detached':
 claudeDetached }` — because at the engine's own harnesses the runner is configured as `claude` and its pool is `claude`,
 so no test there could tell `poolsOf`'s mapping from a harness falling back to its own name; with the mapping taken out,
@@ -292,7 +292,7 @@ the new test runs two Claude Code sessions at a ceiling of one and fails.
 **What is left.**
 
 - **One number for every pool.** `maxConcurrent` holds Claude Code's pool, Codex's and a `check`'s to the same count,
-  though a `check` is a shell command under no rate limit: agent-workflows' suites queue behind the number its sessions
+  though a `check` is a shell command under no rate limit: agent-orchestrator's suites queue behind the number its sessions
   do. A number per pool would be a map where the number is; nothing has asked for one.
 - **A pool is declared, never discovered.** A `PromiseRunner`, or an Effect-door `sdkRunner`, that drives Claude Code is a
   pool of its own unless it says `claude`.
@@ -305,7 +305,7 @@ the new test runs two Claude Code sessions at a ceiling of one and fails.
 ### 21. A free slot goes to the oldest filing, and the filer's clock says which that is
 
 **What changed** (2026-09-16). A pass walks the board in filing order — the `at` of each task's `filed` entry, oldest first,
-and the ids' order only between two filed at the same instant (`admissionOrder` in `agent-engine/src/engine.ts`; `State`
+and the ids' order only between two filed at the same instant (`admissionOrder` in `agent-runtime/src/engine.ts`; `State`
 carries `filedAt`, and `decide` never reads it). It walked `journal.list`'s order, the ids sorted, so which of two waiting
 tasks took a free slot was the alphabet of their ids. `test/engine.test.ts` makes a later filing that sorts first wait behind an
 earlier one, drains three tasks at a ceiling of one in filing order, and breaks a tie by id; `test/facade.test.ts` does
@@ -319,7 +319,7 @@ rule's. It now runs twice, over a store that lists sorted and one that lists in 
 **What is left.**
 
 - **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,
-  so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-workflows `docs/features.md`,
+  so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-orchestrator `docs/features.md`,
   Engine-side work): a card's run filed at 23:53:07Z took the slot a lane's implement released at 23:53:18Z, and that
   lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same:
   a `priority` the upper layer files is what keeps the slot with the run (issue 22).
@@ -335,7 +335,7 @@ rule's. It now runs twice, over a store that lists sorted and one that lists in 
 
 **What changed** (2026-09-16). `priority` is a number on the filing, 0 when absent, carried on the `filed` event and
 `State`. A pass orders the board by it before filing order: higher first, the oldest filing within one, the id between
-equal times (`admissionOrder` in `agent-engine/src/engine.ts`). Nothing else reads it: no runner is told it (`SpawnRequest`
+equal times (`admissionOrder` in `agent-runtime/src/engine.ts`). Nothing else reads it: no runner is told it (`SpawnRequest`
 has no such field), and `decide` does not — `test/engine.test.ts` reads `decide`'s body for `.priority` and `.filedAt`, and
 failed with a read planted there. `createEngine().file()` refuses one that is not a finite number (`NaN`, `Infinity`,
 `"high"`, `null`) on every harness, naming the fix, and `ae ls` prints `priority N` beside a task filed with one.
@@ -347,8 +347,8 @@ priority, then filing, a negative one last; `test/facade.test.ts`: every refusal
 - **No preemption.** A higher priority waits for a slot like any task: a running session is never stopped for one.
   Kubernetes' scheduler preempts; this does not, and nothing has asked it to.
 - **No aging.** A steady stream of higher-priority work keeps a lower one waiting for as long as the stream lasts.
-- **agent-workflows files none yet.** The run's momentum — every filing after a run's first step above a new run's
-  first — is the upper layer's, and a run of its own (agent-workflows `docs/features.md`, Engine-side work).
+- **agent-orchestrator files none yet.** The run's momentum — every filing after a run's first step above a new run's
+  first — is the upper layer's, and a run of its own (agent-orchestrator `docs/features.md`, Engine-side work).
 - **Not a brief key.** `ae start` cannot file one; a task filed through the API shows it in `ae ls` all the same.
 - **A journal from before the refusal.** Both doors refuse a `priority` that is not a finite number (issue 6). One a
   journal already holds — written before, or by hand; a file journal writes `NaN` back as `null` — is read as 0 when the
@@ -357,10 +357,10 @@ priority, then filing, a negative one last; `test/facade.test.ts`: every refusal
 ### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
-(`claudeOps` in `agent-engine/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
-2.1.273 (agent-workflows `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
+(`claudeOps` in `agent-runtime/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
+2.1.273 (agent-orchestrator `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
 an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
-that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-workflows' `check` — naming the
+that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-orchestrator's `check` — naming the
 harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and asked nothing. `test/completion.test.ts`:
 the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
 retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
@@ -379,7 +379,7 @@ retry, and never for a task without it; `test/engine.test.ts`: carried to every 
   drops a released session at once was not looked at.
 - **The Effect door refuses no harness's words** (issue 6): it refuses a `remoteControl` that is not true or false, and a
   `remoteControl: true` that reaches `codex` or `claude-detached` through it is dropped without a word.
-- **Not a brief key**, and agent-workflows files none yet: a step key (`remote:`, features.md §2) is a run of its own.
+- **Not a brief key**, and agent-orchestrator files none yet: a step key (`remote:`, features.md §2) is a run of its own.
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
   fails the day the control is bridged without it, or the flagged session is not.
@@ -399,7 +399,7 @@ review — the run waits for a person to notice, and the closeout on the transcr
 not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
 
 **Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
-own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-engine/src/runner.ts`;
+own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/runner.ts`;
 `lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
 session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
 an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
@@ -452,7 +452,7 @@ for a long implement: the model summarises and stops.
 **Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
 and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
 Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
-cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-engine/src/domain.ts`). The words are the
+cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/domain.ts`). The words are the
 fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
@@ -638,7 +638,7 @@ under the engine.
 - **Resuming a Codex task** (`f63dc55`). The argument order is checked against Codex's own parser; no
   workflow has resumed a Codex step, so whether exec-level `-C` and `-s` apply to the resumed session
   is unknown.
-- **Discarding a statement inherited on resume** (`closedOut` in `agent-engine/src/engine.ts`). In the
+- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/engine.ts`). In the
   one live resumed step, the session was busy for as long as only its parent's `StructuredOutput` call
   existed, so the busy rule alone explains why it did not settle early.
 - **A resumed attempt's own closeout and usage** (engine `00e301b`). A fake `claude` that keeps a
@@ -746,7 +746,7 @@ the transcript reaches 29 responses and 93 tool calls at 22:53:25.947Z, and the 
 22:53:20Z a background task's notification was queued; at 22:53:25.98Z a turn's last tool result was
 written and the queue drained into a silent turn. A registry that listed the session final between
 those two turns explains the pin. No `ended` was written then, so no tick saw that state. But `wf up`
-calls `engine.view` several times a pass (`agent-workflows/src/runner.ts`), and each `view` observes,
+calls `engine.view` several times a pass (`agent-orchestrator/src/runner.ts`), and each `view` observes,
 and so pinned, without stepping. The login-refresh block and the Remote Control bridge ended at
 22:47:40Z, when the cross-session message arrived, and nothing after that needs them. What
 `claude agents` listed at 22:53:2x was not recorded: this is the reading the evidence allows, not a
@@ -786,10 +786,10 @@ says so. Quiet is counted from the later of the last write and the session's own
 transcript does not end as it begins. `decide` grew by a dozen lines and reads no tools, usage or exit codes (the source
 test holds).
 
-**What it changes in agent-workflows, left to that package.** This fix stayed in the engine. agent-workflows files one
+**What it changes in agent-orchestrator, left to that package.** This fix stayed in the engine. agent-orchestrator files one
 attempt unless a step says otherwise, so a step that goes quiet without its closeout now reads `failed` where it read
 `unsigned`. Both are final, and `wf decide` offers a nudge and a fresh try for either. They are not the same status,
-though, and four things change with the word (`agent-workflows/src/run.ts` as of `08bef91`, found in review):
+though, and four things change with the word (`agent-orchestrator/src/run.ts` as of `08bef91`, found in review):
 
 - the run's outcome is `failed`, not `blocked`: a failed step outranks an unsigned one (`run.ts:1625`);
 - the step drops out of `wf ls`'s "waiting on you", which names `unsigned` and not `failed` (`run.ts:1726`);
@@ -798,7 +798,7 @@ though, and four things change with the word (`agent-workflows/src/run.ts` as of
 - the `stepStatus` comment that says the engine settles such a session `succeeded` (`run.ts:345`) is no longer true.
 
 The engine records the difference: the attempt's `reason` is `unsigned`. If `stepStatus` read a failed task whose last
-attempt ended `unsigned` as `unsigned`, all four would stay as they were. → agent-workflows, small; the plan's queue
+attempt ended `unsigned` as `unsigned`, all four would stay as they were. → agent-orchestrator, small; the plan's queue
 should carry it.
 
 **Not measured.** How Claude Code itself ends a `--bg` session whose turn ends without the call. 2.1.271's bundle has a
@@ -815,9 +815,9 @@ machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `re
 `the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
 as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
 listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
-it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-workflows', not the
-engine's: the run continues an unsigned session once a round (`signoff`, agent-workflows' features.md, P0.5), and the engine's
-own allowance stays `maxAttempts`, which agent-workflows leaves at 1.
+it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
+engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
+own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
 
 **Ends that carried neither statement nor reason, closed (2026-09-19, P0.5).** Every ended attempt now carries the agent's
 statement or the machine's reason (README, *Every ended attempt carries its statement or the reason it has none*). Measured
@@ -828,5 +828,5 @@ been one, dropped. A deadline did the same (none on the record). `decide` now en
 untouched. The contract test in `test/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
 settle; it found a third: an attempt cut at its budget and listed `done` (or quiet) was recorded `done`, reason `budget`,
 and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
-Each of the three fails the contract test when reverted. agent-workflows reads a check ended `deadline` or `operator` as
+Each of the three fails the contract test when reverted. agent-orchestrator reads a check ended `deadline` or `operator` as
 `unfinished` whatever exit code its end carries, as it read one left open.

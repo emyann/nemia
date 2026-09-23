@@ -306,6 +306,13 @@ alone, so the judge's numbers have something to beat.
 A part counts where it is named as itself: `workflows/` is the repository's own folder, not the tail
 of `packages/agent-orchestrator/src/run.ts`, which briefs write constantly.
 
+The two packages were renamed on 2026-09-23, and the briefs already in a store name their folders as they were. `FORMERLY`
+(`src/rival.ts`) still counts a brief that names a part by its former folder as naming that part, so a brief scored again counts the
+parts it counted before. The judge has no such alias: the question's state holds `REPOSITORY` (`src/card.ts`), whose keys are the
+folders, so renaming them on 2026-09-23 re-keyed every question, and an answer recorded before that date is not read again — the next
+run with a key asks afresh. A line of this package that spells a former name carries `renamed on 2026-09-23`, or
+`packages/agent-orchestrator/test/names.test.ts` refuses it.
+
 Two things were tuned, once, on the runs it is scored on, and nothing else was. `apps/web` alone
 scored better on precision than the two paths together (0.74 against 0.71, both at recall 1.00) and
 was not taken, because the question the judge is asked names both. And the two halves of the plan

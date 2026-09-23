@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { nextVisit, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { besideCard, cardOf, cardsOf, dragBy, edgeOf, expectClearOfEachOther, expectClearOfPanels, onTheFloor, placeOf, said, samePlace, showFinished } from '../canvas.ts';
-import { expectApart, expectBetween, expectCount, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
+import { expectApart, expectBetween, expectCount, expectInside, expectLeftOf, expectMovedAlone, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, FOLDER, GATED, HELD, LOOPING, NEIGHBOUR, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -131,31 +131,32 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-diamond-${await themeOf(page)}.png`), fullPage: true });
 
-    // A card dragged takes along the cards that wait on it, directly or through others — what the edges put to its right — and
-    // leaves what it waits on, and the rest of the floor. The diamond's top takes both sides and the bottom, up and to the right.
-    await expectMovedWith(cardsOf(page, shipped.id, running.id, bottom.id), cardOf(page, top.id),
+    // Each card moves alone, as in a modeller: a card dragged moves that card, and nothing else on the floor — not the cards that wait on
+    // it, which the edges put to its right, nor the ones it waits on. The edges between them stretch, and pull nothing. The diamond's top,
+    // dragged up and to the right, leaves both sides and the bottom where they are.
+    const everyOther = (...ids: string[]) => page.locator(`.react-flow__node[data-id]:not([data-id*="/"])${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
+    await expectMovedAlone(cardOf(page, top.id),
       () => dragBy(page, cardOf(page, top.id).locator('time'), { x: 40, y: -40 }, `the card of ${top.id}`),
-      `${top.id} dragged takes ${shipped.id}, ${running.id} and ${bottom.id}, which wait on it, along — and the cards beside the diamond stay`,
-      cardsOf(page, NEIGHBOUR.id, HELD.id));
-    await expectDiamond(page, 'dragged by its top');
-    // A side takes the bottom, which waits on it, and leaves the top, which it waits on, and the other side.
-    await expectMovedWith(cardOf(page, bottom.id), cardOf(page, running.id),
+      `${top.id} dragged moves alone — ${shipped.id}, ${running.id} and ${bottom.id}, which wait on it, stay, and so does every other card`,
+      everyOther(top.id));
+    // A side leaves the bottom, which waits on it, the top, which it waits on, and the other side.
+    await expectMovedAlone(cardOf(page, running.id),
       () => dragBy(page, cardOf(page, running.id).locator('time'), { x: 60, y: 30 }, `the card of ${running.id}`),
-      `${running.id} dragged takes ${bottom.id}, which waits on it, along — and ${top.id}, which it waits on, and ${shipped.id} stay`,
-      cardsOf(page, top.id, shipped.id, NEIGHBOUR.id, HELD.id));
-    await expectDiamond(page, 'with one side dragged');
+      `${running.id} dragged moves alone — ${bottom.id}, which waits on it, stays, and so do ${top.id}, which it waits on, and ${shipped.id}`,
+      everyOther(running.id));
+    await expectCount(page.locator('.react-flow__edge[data-id^="after:"]'), 4, "the diamond's four edges are still drawn: they stretch to the cards where they now are");
     await expectCount(page.locator('.react-flow__node[data-id*="/"]'), 0, 'a drop is not a click: no card opened');
-    // Photographed with the whole floor in view: the two drags carry the bottom past the screen's edge.
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-cards-dragged-${await themeOf(page)}.png`), fullPage: true });
-    // Kept in this browser, the cards taken along as the card dragged: the next visit finds the bottom where it was put down.
-    const putDown = await placeOf(cardOf(page, bottom.id));
+    // Kept in this browser: the next visit finds the side where it was put down, and the bottom where it was before either drag.
+    const [putDown, leftBe] = [await placeOf(cardOf(page, running.id)), await placeOf(cardOf(page, bottom.id))];
     await nextVisit(page, async (again) => {
-      await expectVisible(cardOf(again, bottom.id), `${bottom.id} is on the floor on the next visit`);
+      await expectVisible(cardOf(again, running.id), `${running.id} is on the floor on the next visit`);
       await settled(again);
-      const kept = await placeOf(cardOf(again, bottom.id));
-      if (!samePlace(kept, putDown)) throw new Refused(`the next visit finds ${bottom.id} where its side's drag put it down, ${said(putDown)} — it is at ${said(kept)}`);
+      const [kept, stayed] = [await placeOf(cardOf(again, running.id)), await placeOf(cardOf(again, bottom.id))];
+      if (!samePlace(kept, putDown)) throw new Refused(`the next visit finds ${running.id} where its drag put it down, ${said(putDown)} — it is at ${said(kept)}`);
+      if (!samePlace(stayed, leftBe)) throw new Refused(`the next visit finds ${bottom.id} where no drag moved it, ${said(leftBe)} — it is at ${said(stayed)}`);
     });
 
     // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight. Its followers read `waiting`, and
@@ -312,8 +313,8 @@ export default {
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(steps, FAKE.steps.length, "the card's chevron unfolds it again");
 
-    // Dragged, the card takes its steps with it. Dropped on the other run's card, it stays where it landed,
-    // and the card under it moves aside on the drop — not on whatever changes the floor next.
+    // Dragged, the card takes its steps with it, its children, and no other card. Dropped on the other run's card, it stays where it
+    // landed, and so does the card under it: a drop moves nothing aside, and two cards a person stacked stay stacked.
     await settled(page);
     const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
     if (!from || !onto || !grip) throw new Refused("the cards to drag and drop onto — one of them is not on the page");
@@ -323,26 +324,29 @@ export default {
       await page.mouse.down();
       await page.mouse.move(x + onto.x - from.x, y + onto.y - from.y, { steps: 12 });
       await page.mouse.up();
-    }, "the open run's steps move with its card when it is dragged");
+    }, "the open run's steps move with its card when it is dragged, and no other card moves", page.locator(`.react-flow__node[data-id]:not([data-id^="${FAKE.id}"])`));
     await expectCount(steps, FAKE.steps.length, 'a drop is not a click: the run is still open');
-    await expectApart(beside, run, 'the card the open run was dropped on moves out from under it');
-
-    // A step is draggable too. Dragged, it takes along the steps that wait on it — the graph to its right — and leaves the
-    // steps it waits on, the other lane and the card where they are: implement's drag moves review and respond, and not
-    // tokens, theme or the card.
     await settled(page);
-    const laidOut = await besideCard(step(FAKE.drag.along[0]), card);
-    const along = page.locator(FAKE.drag.along.map((name) => `.react-flow__node[data-id="${FAKE.id}/${name}"]`).join(', '));
-    const staying = page.locator([`.react-flow__node[data-id="${FAKE.id}"]`, ...FAKE.drag.stays.map((name) => `.react-flow__node[data-id="${FAKE.id}/${name}"]`)].join(', '));
-    // Half a column right and two rows down, in the layering's units (150 each): its lane lands clear under the other, and the
-    // run's cells grow by a row, over whatever card is beneath.
-    await expectMovedWith(along, step(FAKE.blocked), () => dragBy(page, step(FAKE.blocked).getByTitle(FAKE.blocked), { x: 75, y: 300 }, `the step ${FAKE.blocked}`),
-      `${FAKE.blocked} dragged takes ${FAKE.drag.along.join(' and ')}, which wait on it, along — and ${FAKE.drag.stays.join(', ')} and the card stay`, staying);
+    await expectVisible(beside, 'the card the open run was dropped on is still on the floor, under it');
+
+    // A step is draggable too, and moves alone: implement's drag leaves review and respond, which wait on it — the graph to its
+    // right — the other lane, its card, and every other card on the floor where they are. The edges into and out of it stretch.
+    await settled(page);
+    const laidOut = await besideCard(step(FAKE.blocked), card);
+    const staying = page.locator([
+      `.react-flow__node[data-id]:not([data-id^="${FAKE.id}"])`,
+      `.react-flow__node[data-id="${FAKE.id}"]`,
+      ...[...FAKE.drag.waiting, ...FAKE.drag.lane].map((name) => `.react-flow__node[data-id="${FAKE.id}/${name}"]`),
+    ].join(', '));
+    // Half a column right and two rows down, in the layering's units (150 each): it lands clear under the other lane.
+    await expectMovedAlone(step(FAKE.blocked), () => dragBy(page, step(FAKE.blocked).getByTitle(FAKE.blocked), { x: 75, y: 300 }, `the step ${FAKE.blocked}`),
+      `${FAKE.blocked} dragged moves alone — ${FAKE.drag.waiting.join(' and ')}, which wait on it, stay, and so do ${FAKE.drag.lane.join(', ')}, the card and every other card`, staying);
     await expectCount(page.locator('aside[aria-label^="Step "]'), 0, 'a drop is not a click: no inspector opens');
-    const droppedAt = await besideCard(step(FAKE.drag.along[0]), card);
-    if (samePlace(droppedAt, laidOut)) throw new Refused(`${FAKE.drag.along[0]} is dragged from where the layering put it — still at ${said(laidOut)} beside its card`);
-    // Dropped, the run claims the cells its steps now reach, and a card under them moves aside — on the drop, as for a card dragged.
-    await expectApart(page.locator(`.react-flow__node[data-id]:not([data-id^="${FAKE.id}"])`), run, 'no card is left under the steps where they were dropped: the run claims the cells they reach');
+    const droppedAt = await besideCard(step(FAKE.blocked), card);
+    if (samePlace(droppedAt, laidOut)) throw new Refused(`${FAKE.blocked} is dragged from where the layering put it — still at ${said(laidOut)} beside its card`);
+    for (const name of FAKE.drag.waiting) {
+      await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/${FAKE.blocked}->${name}"]`), 1, `the edge from ${FAKE.blocked} into ${name} is still drawn, stretched`);
+    }
     // Photographed with the whole floor in view: what a person sees once they have arranged a run's steps.
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
@@ -353,8 +357,8 @@ export default {
       await showFinished(again);
       await expectCount(next.steps, FAKE.steps.length, 'the run is open on the next visit');
       await settled(again);
-      const kept = await besideCard(next.step(FAKE.drag.along[0]), next.card);
-      if (!samePlace(kept, droppedAt)) throw new Refused(`the next visit finds ${FAKE.drag.along[0]} where it was dropped, ${said(droppedAt)} beside its card — it is at ${said(kept)}`);
+      const kept = await besideCard(next.step(FAKE.blocked), next.card);
+      if (!samePlace(kept, droppedAt)) throw new Refused(`the next visit finds ${FAKE.blocked} where it was dropped, ${said(droppedAt)} beside its card — it is at ${said(kept)}`);
     });
 
     // Reset layout closes every run as it lays the floor out again, here and on the next visit.
@@ -375,8 +379,8 @@ export default {
     await expectApart(beside, run, 'the card beside it moves aside again');
     // Reset layout put the steps back where the layering does, and forgot the drag with the arrangement.
     await settled(page);
-    const afterReset = await besideCard(step(FAKE.drag.along[0]), card);
-    if (!samePlace(afterReset, laidOut)) throw new Refused(`after Reset layout ${FAKE.drag.along[0]} is back where the layering put it, ${said(laidOut)} beside its card — it is at ${said(afterReset)}`);
+    const afterReset = await besideCard(step(FAKE.blocked), card);
+    if (!samePlace(afterReset, laidOut)) throw new Refused(`after Reset layout ${FAKE.blocked} is back where the layering put it, ${said(laidOut)} beside its card — it is at ${said(afterReset)}`);
     await step('review').click();
     const inspector = page.locator('aside[aria-label="Step review"]');
     await expectVisible(inspector, 'the step inspector opens on a click on review');

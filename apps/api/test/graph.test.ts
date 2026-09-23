@@ -2,7 +2,7 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from 'agent-orchestrator/workflow';
-import { graphOf } from '../src/graph.ts';
+import { graphOf, runGraph } from '../src/graph.ts';
 
 /** Steps as `wf start` freezes them: parsed and validated, so the graph is read off what the run is judged by. */
 const workflow = (files: Record<string, string>, schemas: Record<string, string> = {}): Workflow[] => {
@@ -77,4 +77,14 @@ test('an edge naming a step not in the graph is not drawn, and does not make its
     { name: 'self', after: ['self'] },
   ]), { roots: ['review', 'self'], edges: [] });
   assert.deepEqual(graphOf([]), { roots: [], edges: [] });
+});
+
+test("a run's graph: the judged steps' edges, and a root for each step the run shows that they do not have, in the run's order", () => {
+  const steps = workflow({ implement: 'Implement it.\n', review: '---\nafter: implement\n---\nReview it.\n' });
+  assert.deepEqual(runGraph(steps, ['implement', 'review', 'docs']), {
+    roots: ['implement', 'docs'],
+    edges: [{ from: 'implement', to: 'review', kind: 'after' }],
+  });
+  // A name the steps have adds nothing: the run's order of them is not the graph's.
+  assert.deepEqual(runGraph(steps, ['review', 'implement']), graphOf(steps));
 });

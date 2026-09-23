@@ -3,7 +3,7 @@ import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVe
 import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-orchestrator/run';
 import { loopSpan, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
-import { graphOf, type RunGraph } from './graph.ts';
+import { type RunGraph, runGraph } from './graph.ts';
 import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
 import { bare, e, everyView, filedTimes, judgedSteps, seenBy, stepNames, type TaskView, type Views, workflowsOf, workFolderOf } from './store.ts';
@@ -172,7 +172,7 @@ export type RunDetail = {
   warning: string | null;
   /**
    * The steps as a graph, from the workflow the run is judged by (`judgedSteps`), for every client to draw the same:
-   * `graphOf`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
+   * `runGraph`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
    */
   graph: RunGraph;
   /** The recorded steps in the order the run started with them, then — on a record from before runs froze their workflow — any the folder has gained. */
@@ -464,8 +464,8 @@ export async function detail(run: Run): Promise<RunDetail> {
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
-    graph: graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)]),
+    // The steps `judge` words: the judged workflow, then a root for each one the page shows beside it.
+    graph: runGraph(steps, names),
     steps: await Promise.all(names.map(async (name) => {
       const step = source?.find((s) => s.name === name);
       const taskId = run.steps[name]?.taskId ?? null;

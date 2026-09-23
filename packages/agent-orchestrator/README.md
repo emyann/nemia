@@ -19,6 +19,7 @@ wf up
 wf ls
 wf watch             # what the tick judges, a line each time it changes: a gate reached, a run done
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
+wf hold r-xyz --until r-abc   # started too soon: file nothing more of it until r-abc has shipped
 wf prune            # the worktrees of runs that are over, with the space each frees; --yes removes them
 wf rm r-xyz          # it is over: its worktrees, record and files go; its branches stay
 wf decide r-xyz      # what it produced, and the choice it leaves you
@@ -1768,6 +1769,49 @@ A record written before `after` existed waits on nothing.
 
 A run that waited is told what its parents concluded, under `## From run <id>` (*What one step knows of another*,
 above). To start a whole graph of runs at once, write it as a folder of cards: `wf plan`, below.
+
+## Holding a run that has started: `wf hold`
+
+```bash
+wf hold b-3z4w --until a-1x2y                  # nothing more of b-3z4w is filed until a-1x2y ships
+wf hold d-7t8s --until b-3z4w --until c-5v6u   # once for each run to wait on
+wf hold b-3z4w --off                           # changed your mind: it goes on at the next tick
+```
+
+`--after` is given at `wf start`. `wf hold` is the same wait, put on a run that has already started: two runs
+turned out to touch the same code, and the second should go on only from a main that has the first. The run
+is paused, not stopped. What is in flight finishes, and the tick files nothing new: no step, no check, no
+try, no round. It lifts the hold on the pass that reads every run named as **shipped**, as `--after` reads
+it, and goes on in that same pass. Like a start after `--after`, a lift sticks: a run reverted after it
+shipped does not hold the run again.
+
+While the hold stands, nothing is asked of anyone. A step that signed off blocked, waits at its gate, or
+ran out of rounds or budget keeps its question on its record, and the question is asked again once the
+hold lifts. So `wf ls` says `→ held until a-1x2y ships` where it would say `→ waiting on you`, and a step's note
+says `held until a-1x2y ships; its approval is asked once the hold lifts` where it would offer `wf approve`.
+`wf decide` says the hold, what is still running, and how to go on before the hold lifts:
+`wf hold <run> --off`. `wf approve`, `wf retry`, `wf round` and `wf accept` refuse a held run and name that
+command, and a pass files nothing on an ask written by hand while the hold stands. A run named that will
+never ship without a person (`(cancelled)`, `(no such run)`, `(<branch> gone)`) is said beside the hold,
+with the two ways out: lift the hold, or `wf cancel` the run.
+
+The hold is a person's fact in a file of its own, `runs/<id>.hold`, beside the record, as `.cancelled`
+is. `wf hold` writes it, the tick removes it when it lifts the hold (only the hold it read: one put again
+since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
+is held until says so and names the `wf hold … --off` that lets it go.
+
+`wf hold` refuses the following before anything is written, and names the fix for each:
+
+- no `--until`, `--until` and `--off` together, a flag it does not take, or `--until` with no run
+- a run the store does not have, and `--off` of a run nobody holds
+- a run cancelled, pruned, shipped, or succeeded with only a person's merge left: nothing is left to file
+- a run already held. A hold is put once, whole: `--off`, then hold it again with every run it waits on
+- a folder run, which ships nothing git could see merged
+- of each run named, what `--after` refuses: given twice, the run itself, a run the store does not have, a
+  folder run, another repository or base branch, a run started `--no-worktree`, a cancelled run, and one
+  whose result branch is gone. Also a run that has already shipped, since there is nothing to wait for
+- a circle: a run named that already waits on this one, through `--after` while it has not started or
+  through a hold, however far round. Each would wait on the other for ever
 
 ## A plan as a folder of cards: `wf plan`
 

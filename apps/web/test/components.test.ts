@@ -1718,6 +1718,13 @@ test("a step's node says what its tries cost, of its cap where it has one — re
   assert.equal(costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, null))))?.[3], '$1.20', 'no cap: what its tries cost');
   assert.equal(costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3], 'budget $3', 'a cap, and nothing measured yet: the cap alone, never $0');
   assert.doesNotMatch(nodeMarkup(pricedRun('verified ✓', priced(null, null))), /data-cost/, 'nothing measured and no cap: no cost row');
+
+  // A job its harness ended a little past its cap, which finished: red, and nothing waits on a raise — said of a job, not of a --bg session.
+  const past = nodeMarkup(pricedRun('verified ✓', priced(3.02, 3, true)));
+  assert.equal(costOf(past)?.[1], 'over');
+  assert.match(past, /<p data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/);
+  assert.doesNotMatch(past, /--bg/);
+  assert.equal(gateDrawn(past), false, 'a finished step past its cap holds nothing');
 });
 
 test('REFUSED: a step past its budget is no gate where the api does not say it waits on you, nor on a run called off', () => {

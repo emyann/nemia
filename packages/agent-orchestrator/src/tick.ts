@@ -623,8 +623,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       },
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
-      // What is left of the cap for this session, where its harness keeps one: `claude-detached`. A step on a later round has spent some of it.
-      // On `claude` the run holds the cap between tries.
+      // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
+      // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
+      // budget beside it.
       budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
       // None on a run's first steps, and `MOMENTUM` on a step after another: a run in flight goes before a newer run's first step.
       priority: priorityOf(step),

@@ -42,7 +42,7 @@ export function StepNode({
   // What its tries have cost, of its cap where it has one: red once they have cost it or more.
   const cost = costText(step);
   const over = pastBudget(step);
-  // Held on its budget only when its word says so: past the cap alone, a finished step holds nothing (a --bg session is not stopped at its cap).
+  // Held on its budget only when its word says so: past the cap alone, a finished step holds nothing (a job is ended at its cap by its harness, a little past it where a call was under way — agent-runtime's M9).
   const held = state === 'over-budget' || state === 'budget-exhausted';
 
   return (
@@ -92,7 +92,7 @@ export function StepNode({
       {cost && (
         <p
           data-cost={over ? 'over' : 'within'}
-          title={step.budget ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — a --bg session is not stopped at its cap, and this step finished; nothing waits on a raise') : ''}` : 'What its tries have cost'}
+          title={step.budget ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}` : 'What its tries have cost'}
           className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-red-700 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400'}`}
         >
           <span className="font-sans font-normal">cost </span>

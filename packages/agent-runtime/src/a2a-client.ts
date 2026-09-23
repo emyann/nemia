@@ -2,10 +2,9 @@
  * The engine's side of the A2A seam: a harness's `RunnerOps`, rebuilt as calls through the SDK's `Client` to that
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
- * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs` and `release`, which A2A
- * has no call for, through the runtime extension's methods on the same transport. Two reach the driver directly:
- * `transcript`, until part 4 makes it `SubscribeToTask`, and `refuses`, which is no call to a session but the harness
- * judging a task before any is filed. Nothing the engine reads changes: a harness's words come back as the same
+ * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release` and the
+ * transcript, which A2A has no call for, through the runtime extension's methods on the same transport. One reaches the
+ * driver directly: `refuses`, which is no call to a session but the harness judging a task before any is filed. Nothing the engine reads changes: a harness's words come back as the same
  * `RunnerError`, `refused` where the harness vouched nothing started, and a driver's defect as the defect it is.
  */
 import { Effect, Layer } from 'effect';
@@ -22,9 +21,9 @@ import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
-  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods,
+  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods, type TranscriptRequest,
 } from './a2a-handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './a2a-map.ts';
 
@@ -103,6 +102,10 @@ export class InProcessTransport implements Transport {
   releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
     return this.handler.releaseSession(params, new ServerCallContext());
   }
+
+  sessionTranscript(params: TranscriptRequest): Promise<Transcript | null> {
+    return this.handler.sessionTranscript(params, new ServerCallContext());
+  }
 }
 
 /** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
@@ -134,15 +137,25 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
   );
 
 /**
+ * What the seam offers the engine: a harness's verbs, and beside them the transcript asked by the session's name
+ * (`transcriptOf`) rather than by an id the caller would have had to find first; `null` when no session goes by the name
+ * yet. `transcript`, by id, stays too, through the seam: it is `Runner`'s verb, and `a2aRunner` hands the Effect door
+ * these ops as a `RunnerOps`, where a verb left off reads as a harness that keeps no conversation.
+ */
+export type SeamOps = RunnerOps & {
+  readonly transcriptOf?: (name: string, after?: TranscriptCursor) => Effect.Effect<Transcript | null, RunnerError>;
+};
+
+/**
  * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
  * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
  * lists every page. `stop` cancels the session by name, read off the last listing, since the engine stops by session id;
  * a session no listing has is not stopped blindly but refused in words, where a driver was handed the id to make of what
  * it would. The engine stops only a session the pass has just seen live, so it never asks for that. `say` is a follow-up
- * message on the session's Task. `find`, `logs` and `release` are the extension's methods. A verb is offered as the card
+ * message on the session's Task. `find`, `logs`, `release`, `transcript` and `transcriptOf` are the extension's methods. A verb is offered as the card
  * says — the verbs the harness's driver lacks are left off it — so the engine reads the same absences it read before.
  */
-export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): RunnerOps => {
+export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
   const { card, transport, client } = seamOf(harness, ops, events);
   const offered = extensionOf(card);
   let names = new Map<string, string>();
@@ -214,13 +227,21 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
     })).pipe(Effect.asVoid);
 
+  const transcriptOf = (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
+    call('transcript', () => transport.sessionTranscript({ name, after }));
+
+  // By id, a read always answers: the handler returns null only for a name it could not find a session under.
+  const transcript = (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
+    call('transcript', () => transport.sessionTranscript({ sessionId, after }))
+      .pipe(Effect.flatMap((read) => read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`))));
+
   return {
     spawn, observe, stop, logs,
     ...(offered.methods.includes('findSession') ? { find } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
+    ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.say ? { say } : {}),
-    // Direct by design: `transcript` until part 4, `refuses` for good (see the header).
-    ...(ops.transcript ? { transcript: ops.transcript } : {}),
+    // Direct by design, and for good: `refuses` is no call to a session (see the header).
     ...(ops.refuses ? { refuses: ops.refuses } : {}),
   };
 };

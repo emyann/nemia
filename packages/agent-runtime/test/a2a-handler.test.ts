@@ -14,7 +14,7 @@ import {
   ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, RequestMalformedError, TaskNotCancelableError,
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
-import { HarnessFailed, HarnessHandler, OPEN_LISTINGS } from '../src/a2a-handler.ts';
+import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
@@ -23,9 +23,13 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `say` — unless `bare`, which leaves it the four every driver has.
+ * driver may have — `find`, `release`, `say`, `transcript` — unless `bare`, which leaves it the four every driver has;
+ * `noFind` takes `find` alone away.
  */
-const harness = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: string; sayFails?: string; bare?: boolean } = {}) => {
+const harness = (o: {
+  spawnFails?: unknown; stopFails?: string; observeFails?: string; sayFails?: string; findFails?: unknown; transcriptFails?: unknown;
+  bare?: boolean; noFind?: boolean;
+} = {}) => {
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, unknown]> = [];
   const journal = new Map<string, Event[]>();
@@ -52,12 +56,15 @@ const harness = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: s
       asked.push(['logs', id]);
       return Effect.succeed(`logs of ${id}`);
     }),
-    ...(o.bare ? {} : {
+    ...(o.bare || o.noFind ? {} : {
       find: (name: string) => Effect.suspend(() => {
         asked.push(['find', name]);
+        if (o.findFails) return Effect.die(o.findFails);
         const s = sessions.get(name);
         return Effect.succeed(s ? { sessionId: s.sessionId } : undefined);
       }),
+    }),
+    ...(o.bare ? {} : {
       release: (session: Sighting, task: { worktree?: string | boolean }) => Effect.suspend(() => {
         asked.push(['release', [session, task]]);
         return Effect.succeed(session.state === 'done' ? { turns: 3, costUsd: 0.25 } : undefined);
@@ -65,6 +72,15 @@ const harness = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: s
       say: (session: { name: string; sessionId: string }, text: string) => Effect.suspend(() => {
         asked.push(['say', [session, text]]);
         return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
+      }),
+      transcript: (sessionId: string, after?: string) => Effect.suspend(() => {
+        asked.push(['transcript', [sessionId, after]]);
+        if (o.transcriptFails instanceof RunnerError) return Effect.fail(o.transcriptFails);
+        if (o.transcriptFails) return Effect.die(o.transcriptFails);
+        return Effect.succeed({
+          events: [{ id: 'e-1', at: '2026-09-23T10:00:00.000Z', role: 'assistant' as const, kind: 'text' as const, text: `said in ${sessionId}` }],
+          cursor: `${sessionId}@${after ?? 0}+1`,
+        });
       }),
     }),
   };
@@ -199,6 +215,20 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'), { bare: true }],
   ['a release of no session', (h) => h.handler.releaseSession({ session: undefined as unknown as Sighting, task: {} }, ctx),
     refusedWith(RequestMalformedError, 'the request names no session: send the session as the last listing saw it.')],
+  ['a transcript on a harness that keeps none', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx); },
+    refusedWith(UnsupportedOperationError, "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs)."), { bare: true }],
+  ['a transcript for a name that is not a session name', (h) => { h.sessions.set('fake-1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'fake-1' }, ctx); },
+    refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
+  ['a transcript for no name at all', (h) => h.handler.sessionTranscript({ name: undefined as unknown as string }, ctx),
+    refusedWith(RequestMalformedError, '`undefined` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
+  ['a transcript by an empty id', (h) => h.handler.sessionTranscript({ sessionId: '' }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
+  ['a transcript by an id that is no string', (h) => h.handler.sessionTranscript({ sessionId: 7 as unknown as string }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
+  ['a transcript that names its session twice', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'ae/t-1/1', sessionId: 's-1' } as unknown as TranscriptRequest, ctx); },
+    refusedWith(RequestMalformedError, 'the request names the session twice, by `name` and by `sessionId`: send one.')],
+  ['a transcript by id on a harness that keeps none', (h) => h.handler.sessionTranscript({ sessionId: 's-1' }, ctx),
+    refusedWith(UnsupportedOperationError, "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs)."), { bare: true }],
 ];
 
 for (const [what, ask, says, setup] of REFUSALS) {
@@ -382,7 +412,7 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
   const { extensions, ...rest } = card.capabilities!;
   assert.deepEqual(rest, { streaming: false, pushNotifications: false, extendedAgentCard: false });
   assert.deepEqual(extensions.map((e) => [e.uri, e.required, e.params]), [
-    [RUNTIME_EXTENSION, false, { methods: ['findSession', 'sessionLogs', 'releaseSession'], say: true }],
+    [RUNTIME_EXTENSION, false, { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript'], say: true }],
   ]);
   assert.deepEqual([card.defaultInputModes, card.defaultOutputModes], [['text/plain'], ['text/plain']]);
 });
@@ -427,4 +457,97 @@ test('the extension answers as the driver does: a session found or none, its log
     ['find', 'ae/t-1/1'], ['find', 'ae/t-1/2'], ['logs', 's-1'],
     ['release', [done, { worktree: true }]], ['release', [{ sessionId: 's-2', state: 'stopped' }, {}]],
   ], 'each asked once, and no listing made for any');
+});
+
+const at = '2026-09-23T10:00:00.000Z';
+const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r', maxAttempts: 4 };
+
+test("a transcript is read by the id the journal ended its attempt with, and no registry is asked, whatever it lists now", async () => {
+  const h = harness();
+  h.journal.set('t-1', [
+    filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'done', reason: 'harness', nativeId: 's-old' },
+  ]);
+  // The harness lists another session under the name now: the record's id is read, not the listing's.
+  h.sessions.set('ae/t-1/1', { sessionId: 's-new', state: 'working' });
+  const read = await h.handler.sessionTranscript({ name: 'ae/t-1/1', after: 'c-7' }, ctx);
+  assert.deepEqual(read?.cursor, 's-old@c-7+1');
+  assert.deepEqual(h.asked, [['transcript', ['s-old', 'c-7']]], 'no find, no listing');
+
+  // A task settled with its attempt open carries the session's id too.
+  h.journal.set('t-2', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'settled', at, outcome: 'failed', nativeId: 's-left' }]);
+  h.sessions.set('ae/t-2/1', { sessionId: 's-other', state: 'working' });
+  assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-2/1' }, ctx))?.cursor, 's-left@0+1');
+  assert.deepEqual(h.asked.slice(1), [['transcript', ['s-left', undefined]]]);
+});
+
+test('a transcript of an attempt in flight: found by name when the harness can find, with no listing; observed when it cannot', async () => {
+  const flight: Event[] = [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }];
+  const finds = harness();
+  finds.journal.set('t-1', flight);
+  finds.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  assert.equal((await finds.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+  assert.deepEqual(finds.asked, [['find', 'ae/t-1/1'], ['transcript', ['s-1', undefined]]]);
+
+  const lists = harness({ noFind: true });
+  lists.journal.set('t-1', flight);
+  lists.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'blocked' });
+  assert.equal((await lists.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+  assert.deepEqual(lists.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
+});
+
+test('a transcript whose session its harness cannot name this time is none, and the harness is not asked to read one', async () => {
+  const flight: Event[] = [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }];
+  // Not registered yet: found as none, then listed as none.
+  const early = harness();
+  early.journal.set('t-1', flight);
+  assert.equal(await early.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
+  assert.deepEqual(early.asked, [['find', 'ae/t-1/1'], ['observe', undefined]]);
+
+  // A find that fails is nothing found; a listing that fails is nothing listed. Neither is the caller's error.
+  const broken = harness({ findFails: new TypeError('the registry file is torn'), observeFails: 'fake ls: exit 3' });
+  broken.journal.set('t-1', flight);
+  broken.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  assert.equal(await broken.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
+  assert.deepEqual(broken.asked, [['find', 'ae/t-1/1'], ['observe', undefined]]);
+
+  // A find that fails, and a listing that names it: read.
+  const listed = harness({ findFails: new RunnerError({ verb: 'find', message: 'fake: no registration file' }) });
+  listed.journal.set('t-1', flight);
+  listed.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  assert.equal((await listed.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+});
+
+test('a transcript of an ended attempt with no id on the record, or of a name no attempt is journalled under yet, is observed', async () => {
+  const h = harness();
+  // Ended before `ended` carried an id: no find, which reads only what is in flight — the listing.
+  h.journal.set('t-1', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness' }]);
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done' });
+  assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+  assert.deepEqual(h.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
+
+  // A session is listed before its spawn is written: a name with no attempt on the record is asked of the harness.
+  h.sessions.set('ae/t-9/1', { sessionId: 's-9', state: 'working' });
+  assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-9/1' }, ctx))?.cursor, 's-9@0+1');
+  assert.deepEqual(h.asked.slice(2), [['find', 'ae/t-9/1'], ['transcript', ['s-9', undefined]]]);
+});
+
+test('a transcript by id is read as asked: no journal, no find, no listing, whatever the harness lists', async () => {
+  const h = harness();
+  h.journal.set('t-1', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'settled', at, outcome: 'failed', nativeId: 's-left' }]);
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  assert.equal((await h.handler.sessionTranscript({ sessionId: 's-9', after: 'c-3' }, ctx))?.cursor, 's-9@c-3+1');
+  assert.deepEqual(h.asked, [['transcript', ['s-9', 'c-3']]]);
+});
+
+test("a transcript the harness could not read throws its words, unchanged; a driver's defect is let through as it is", async () => {
+  const words = harness({ transcriptFails: new RunnerError({ verb: 'transcript', message: 'fake: transcript s-1 unreadable (EACCES)' }) });
+  words.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  await assert.rejects(words.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
+    refusedWith(HarnessFailed, 'fake: transcript s-1 unreadable (EACCES)'));
+  const boom = new TypeError('the reader fell over');
+  const defect = harness({ transcriptFails: boom });
+  defect.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+  await assert.rejects(defect.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), (e) => e === boom);
 });

@@ -19,7 +19,7 @@
  * grows. A read stops at the last newline, so it never passes a line half written. Unlike the engine's, a cursor that is not at the start
  * of a line, or is past the end, is refused by name (`feedCursorRefusal`): read on from there and every line after it would be misread.
  *
- * It imports no engine: `runner.ts` calls it and hands the rest of the package what it needs.
+ * It imports no engine: `feed-store.ts` calls it over the store's file, and `runner.ts` hands the rest of the package what it needs.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -684,7 +684,7 @@ filed, it fills in the rest:
   third-party package links to the main checkout's, one inode and no install. `.bin` and each `@scope`
   are directories of the worktree's own, so installing into the worktree never writes main's tree, and a
   workspace package's bin runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
-  `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/runner.ts`
+  `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/worktree.ts`
   does the work.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's
   `package-lock.json` names, the run looks at what is on disk at that path in the main checkout's
@@ -2296,7 +2296,11 @@ holding a concurrency slot forever.
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`), a workflow folder written from its steps (`writeWorkflow`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/store.ts` | the run store under `WF_ROOT`: a run's record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
+| `src/daemon-store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`) and `daemon.json` read, judged by `src/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
+| `src/feed-store.ts` | the feed over the store's `feed.jsonl`, with this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`) |
+| `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
+| `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`), a workflow folder written from its steps (`writeWorkflow`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/feed.ts` | the feed of what the tick judged: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges` — pure), the cursor and its refusal, and the file read, appended to and followed (`readFeedFile`, `recordFeedFile`, `watchFeedFile`); no engine |
 | `src/cli.ts` | the verbs |
 
@@ -2318,4 +2322,6 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 
 `assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
 and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
-split as the engine, one layer up.
+split as the engine, one layer up. `store.ts`, `daemon-store.ts`, `feed-store.ts` and `worktree.ts` sit
+beneath `runner.ts`, which re-exports them: none imports the engine or `runner.ts`, none but `store.ts` is
+imported by another, and no pure file imports any of them — the same test refuses each.

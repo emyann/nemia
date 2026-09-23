@@ -409,13 +409,23 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   untyped `...(worktree ? { worktree: true } : {})` in its own tests was found at all.
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
-  third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the
-  worktree's directory, never main's. When the worktree's `package-lock.json` differs from what main
+  third-party packages are the main checkout's, hardlinked file by file into directories of the
+  worktree's (about half a second, no data copied), and `npm install` in a worktree writes the
+  worktree's directory, never main's. With the store on another filesystem a hardlink fails, the
+  packages are linked to main's instead, and the run's notes say so. When the worktree's `package-lock.json` differs from what main
   has on disk, the run does `npm ci` there instead — about a minute, and the brief says so. Two habits
   keep that minute rare: a step that adds a dependency commits the lockfile (`npm install
   --package-lock-only` is enough; the next step's worktree installs it), and after merging such a
   branch, `npm install` on main before the next run, or every worktree cut from it pays the minute
   (main's lockfile ahead of its tree counts as a difference). (U1 hit the linked tree; W2 replaced it.)
+- **Claude Code allows a path through a symlink only when the link and its target both match.** A worktree's `node_modules`
+  linked each third-party package to main's, so in a `dontAsk` job a `Read`, a `Grep` or an `ls` of `node_modules/hono` was a read
+  outside the working directory, denied with no prompt, and recorded on the `denied:` line (part 5's plan and review). They are
+  hardlinked now: every path is inside the worktree (`hardlinkTree` in `agent-orchestrator/src/worktree.ts`, proven live in
+  `features.md`). A link out of a step's folder is a read out of it, whatever the link says. And `du` counts a hardlinked file
+  once per invocation, at the first path it meets it under, so `du <worktree>` alone counts main's whole tree: measure a worktree
+  beside main's `node_modules` in one `du` (`diskBytes` in `forget.ts`), or with `df` (learned by the run that hardlinked the
+  worktree's packages).
 - **An optional verb renamed on the way through a seam is dropped by every door that takes the old type.** Part 4 of the thin
   runtime gave the seam `transcriptOf` (by name) in place of `transcript` (by id), typed `Omit<RunnerOps, 'transcript'> & …`,
   and `a2aRunner` passed that to `Runner.layer(ops: RunnerOps)`: an optional key absent and an extra key present both type-check,

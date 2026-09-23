@@ -36,9 +36,9 @@ const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' }, summ
 /**
  * What the fake `codex` is told, per session, in `fake.json` in its working directory: wait for `gate` (a file in the same
  * directory) before it prints its thread; write prose rather than JSON to `-o`; start a `sleep` of its own and write its pid;
- * stay up `sleepMs` after its last line. It writes each argv it is run with to `argv.jsonl` and its own pid to `pid`.
+ * stay up `sleepMs` after its last line, or until the file `exitOn` exists. It writes each argv it is run with to `argv.jsonl` and its own pid to `pid`.
  */
-type Fake = { gate?: string; prose?: boolean; grandchild?: boolean; sleepMs?: number };
+type Fake = { gate?: string; prose?: boolean; grandchild?: boolean; sleepMs?: number; exitOn?: string };
 
 const FAKE = `
 const fs = require('node:fs');
@@ -59,7 +59,8 @@ const go = () => {
   said({ type: 'turn.started' });
   if (out !== -1) fs.writeFileSync(args[out + 1], o.prose ? 'turn ' + calls + ', in prose' : JSON.stringify({ outcome: 'done', summary: 'turn ' + calls }));
   said({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 2 } });
-  setTimeout(() => process.exit(0), o.sleepMs ?? 0);
+  const exit = () => (o.exitOn && !fs.existsSync(o.exitOn) ? setTimeout(exit, 20) : process.exit(0));
+  setTimeout(exit, o.sleepMs ?? 0);
 };
 const wait = () => (o.gate && !fs.existsSync(o.gate) ? setTimeout(wait, 20) : go());
 wait();
@@ -203,9 +204,15 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
   const phase = async (want: string) => { await engine.tick(); return (await engine.view(id)).phase === want; };
 
+  // Codex has written its answer and not yet exited. The engine ends a signed attempt on its statement (`closedOut`), so the
+  // task already waits; the harness still lists the session, and its Task says so until the worker writes `done`.
+  fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ exitOn: 'exit1' } satisfies Fake));
   await until(() => phase('input-required'), 'turn 0 signed and waiting');
+  assert.equal((await get(client, nameFor(id, 1))).status!.state, TaskState.TASK_STATE_WORKING,
+    'while Codex is still exiting, its Task is the harness\'s word: working (open issue 31)');
+  fs.writeFileSync(path.join(cwd, 'exit1'), '');
+  await until(() => stateIs(client, nameFor(id, 1), TaskState.TASK_STATE_INPUT_REQUIRED), 'the signed attempt of a held task waits on a person, once Codex has exited');
   const first = await get(client, nameFor(id, 1));
-  assert.equal(first.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'the signed attempt of a held task waits on a person');
   assert.equal(first.contextId, THREAD);
   assert.deepEqual(closeoutOf(first), { outcome: 'done', summary: 'turn 1' }, 'its closing statement still its Artifact');
   assert.deepEqual((await list(client)).tasks.map((t) => [t.id, t.status!.state]), [[nameFor(id, 1), TaskState.TASK_STATE_COMPLETED]],
@@ -224,8 +231,8 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   fs.writeFileSync(path.join(cwd, 'go2'), '');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
   assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
+  await until(() => stateIs(client, nameFor(id, 2), TaskState.TASK_STATE_INPUT_REQUIRED), 'turn 1 waits on a person once Codex has exited');
   const second = await get(client, nameFor(id, 2));
-  assert.equal(second.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
   assert.equal(second.contextId, first.contextId, 'one context across both turns');
   assert.deepEqual(closeoutOf(second), { outcome: 'done', summary: 'turn 2' });
   assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id), [nameFor(id, 1), nameFor(id, 2)]);

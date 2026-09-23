@@ -657,7 +657,11 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   and a `--bg` session, each `dontAsk` with `tools: ['Bash']`, in a checkout inside this package whose settings allow
   `Bash(npm run build)` alone, told to run `npm run build` and then `npm run e2e`: both ran the build, neither ran the e2e,
   both closed saying `npm run e2e` was denied, and the job's attempt carries the one denial, `Bash(npm)` (a denial names a
-  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails.
+  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails. But
+  `build` is a name a person's own `~/.claude/settings.json` may allow, and that allow alone would run it with no project
+  settings read (this machine's lists no `npm run`, so the first reading stands). So M11 names its two scripts afresh on
+  every run (`m11-allowed-<nonce>`, `m11-unlisted-<nonce>`), on no list but the checkout's; measured again so, on 2.1.280,
+  the same day: the same result, the allowed one ran in both and the unlisted one was denied in both.
 
 What a job gives up, or what is not done:
 

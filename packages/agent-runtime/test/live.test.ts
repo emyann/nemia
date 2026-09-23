@@ -863,10 +863,26 @@ test('M8, M9, M10: a job reading its brief from stream-json on its stdin keeps i
  * repository's `.claude/settings.json` alone: a job that read no project settings would be denied every command they run.
  */
 
-/** A checkout whose settings allow `npm run build` alone; `npm run e2e` is in its package.json and on no list. */
-const buildOnlyCheckout = (label: string) => {
+/**
+ * M11's two commands, named afresh on every run: `build` and `e2e` are names a person's own `~/.claude/settings.json`, or a
+ * machine's managed settings, may well allow — this repository's does — and an allow from there would run the command with no
+ * project settings read at all. A name made up on the spot is on no list but the one the checkout writes.
+ */
+const M11_NONCE = randomUUID().slice(0, 8);
+const M11_ALLOWED = `m11-allowed-${M11_NONCE}`;
+const M11_UNLISTED = `m11-unlisted-${M11_NONCE}`;
+const M11_WRITTEN = ['ALLOWED', 'UNLISTED'];
+const M11_BRIEF = [
+  `Run these two commands with your Bash tool, one call each, in this order: \`npm run ${M11_ALLOWED}\`, then \`npm run ${M11_UNLISTED}\`.`,
+  'Write each exactly as given, adding nothing to it, and run nothing else. If one is denied, do not look for another way to run it.',
+  'Then give your closing statement: in denied, each of the two commands that was denied, or an empty list.',
+].join(' ');
+
+/** A checkout whose settings allow `npm run <M11_ALLOWED>` alone; `npm run <M11_UNLISTED>` is in its package.json and on no list. */
+const oneAllowedCheckout = (label: string) => {
   const dir = allowingCheckout(label);
-  fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm run build)'] } }));
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'probe', private: true, scripts: { [M11_ALLOWED]: 'touch ALLOWED', [M11_UNLISTED]: 'touch UNLISTED' } }));
+  fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: [`Bash(npm run ${M11_ALLOWED})`] } }));
   return dir;
 };
 
@@ -877,10 +893,11 @@ test('M11: a job in dontAsk honours the checkout\'s settings as a --bg session d
   const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
   t.diagnostic(`claude --version: ${version}`);
   const engine = createEngine({ root: tmp('m11-board') });
-  const job = buildOnlyCheckout('m11-job');
-  const bg = buildOnlyCheckout('m11-bg');
+  const job = oneAllowedCheckout('m11-job');
+  const bg = oneAllowedCheckout('m11-bg');
+  t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
   // The planner's and the reviewer's fence: dontAsk, nothing allowed on the task, the checkout's settings the only list.
-  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] } };
+  const common = { brief: M11_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] } };
   try {
     const ids = {
       job: await engine.file({ ...common, cwd: job }),
@@ -889,17 +906,17 @@ test('M11: a job in dontAsk honours the checkout\'s settings as a --bg session d
     await settleThenCheck(engine, ids, (views) => {
       const last = (k: string) => views[k]?.state.attempts.at(-1);
       for (const k of ['job', 'bg']) {
-        t.diagnostic(`${k}: ${views[k]?.state.settled}, exit ${last(k)?.exitCode}, said ${JSON.stringify(last(k)?.closeout)}, denied ${JSON.stringify(last(k)?.denials)}, wrote ${WRITTEN.filter((f) => fs.existsSync(path.join(k === 'job' ? job : bg, f)))}`);
+        t.diagnostic(`${k}: ${views[k]?.state.settled}, exit ${last(k)?.exitCode}, said ${JSON.stringify(last(k)?.closeout)}, denied ${JSON.stringify(last(k)?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(k === 'job' ? job : bg, f)))}`);
       }
       // The control: a background session there honours the settings, or nothing below is about a job.
       assert.equal(views.bg?.state.settled, 'succeeded', `the background session settled: ${views.bg?.phase}`);
-      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(bg, f))), ['BUILT'],
+      assert.deepEqual(M11_WRITTEN.filter((f) => fs.existsSync(path.join(bg, f))), ['ALLOWED'],
         'control: the background session ran the allowed command and not the unlisted one — refused, run this from a checkout Claude Code trusts');
 
       assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
       assert.equal(typeof last('job')?.exitCode, 'number', 'it ran as a job: a process that exited');
-      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(job, f))), ['BUILT'], 'the job ran the command its settings allow, and not the one they do not list');
-      // A denial names a command by its first word (`denialOf`), so the two are told apart by count: build ran, one was denied.
+      assert.deepEqual(M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f))), ['ALLOWED'], 'the job ran the command its settings allow, and not the one they do not list');
+      // A denial names a command by its first word (`denialOf`), so the two are told apart by count: the allowed one ran, one was denied.
       assert.deepEqual(last('job')?.denials, [{ tool: 'Bash', what: 'npm' }], 'and its attempt records one denial, the unlisted command: the allowed one ran');
     });
   } finally {

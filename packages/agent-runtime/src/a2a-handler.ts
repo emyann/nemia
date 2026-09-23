@@ -11,9 +11,11 @@
  *
  * `sendMessage` is a spawn when the message carries the runtime's extension, and otherwise words said to a running
  * session (`say`); `listTasks` is an observe, `getTask` one session's view, `cancelTask` a stop. What A2A has no call
- * for — a session found by name, its logs, a session let go of — are the extension's methods (`SessionMethods`), each
- * keyed as the driver keys it. What the runtime has no use for — streaming, push notifications, an extended card — is
- * refused in the SDK's own errors, never taken and ignored.
+ * for — a session found by name, its logs, a session let go of, its conversation read from a cursor — are the
+ * extension's methods (`SessionMethods`). What the runtime has no use for — streaming, push notifications, an extended
+ * card — is refused in the SDK's own errors, never taken and ignored. A transcript is not a stream: `SubscribeToTask`
+ * is refused on a Task in a terminal state, and a finished session's conversation is still read, and its first event
+ * is the Task as it stands, a listing of the harness on every read (`sessionTranscript`).
  */
 import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
@@ -30,7 +32,7 @@ import {
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import { fold, type Event, type Sighting, type Usage } from './domain.ts';
-import { RunnerError, type RunnerOps } from './runner.ts';
+import { RunnerError, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   canceledTask, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION, spawnOf,
   startedTask, taskOfAttempt, taskOfSighting, type SessionMethod,
@@ -73,7 +75,10 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
       uri: RUNTIME_EXTENSION, required: false,
       description: 'A spawn is a message marked with this extension: it starts a session under the name its taskId gives. The methods listed answer what A2A has no call for.',
       params: {
-        methods: [...(ops.find ? ['findSession' as const] : []), 'sessionLogs' as const, ...(ops.release ? ['releaseSession' as const] : [])],
+        methods: [
+          ...(ops.find ? ['findSession' as const] : []), 'sessionLogs' as const, ...(ops.release ? ['releaseSession' as const] : []),
+          ...(ops.transcript ? ['sessionTranscript' as const] : []),
+        ],
         say: ops.say !== undefined,
       } satisfies RuntimeExtensionParams,
     }],
@@ -83,8 +88,8 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
 });
 
 /**
- * The runtime extension's methods, beside A2A's. Each keeps the driver's own key: a name, a session id, the session as the
- * pass's listing saw it. A harness without the verb refuses it in A2A's `UnsupportedOperationError`, and its card does not
+ * The runtime extension's methods, beside A2A's. Each keeps the driver's own key — a name, a session id, the session as
+ * the pass's listing saw it — but the transcript, which is asked by name and finds the session's id itself. A harness without the verb refuses it in A2A's `UnsupportedOperationError`, and its card does not
  * list it.
  */
 export interface SessionMethods {
@@ -94,6 +99,11 @@ export interface SessionMethods {
   sessionLogs(params: { sessionId: string }, context: ServerCallContext): Promise<{ logs: string }>;
   /** Let go of a session whose end is on the record; what it consumed, when the harness reads that only as it exits. */
   releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }, context: ServerCallContext): Promise<{ usage: Usage | null }>;
+  /**
+   * A session's conversation from `after` on, and the cursor to ask again with; `null` when no session goes by the name
+   * yet. Asked by name, so the id is found here: the one the journal ended the attempt with, else the harness's.
+   */
+  sessionTranscript(params: { name: string; after?: TranscriptCursor }, context: ServerCallContext): Promise<Transcript | null>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -279,6 +289,32 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     }
     const used = await this.run(this.ops.release(params.session, params.task ?? {}));
     return { usage: used || null };
+  }
+
+  /**
+   * A session's conversation, by its name. Answered once, never streamed, and nothing is kept: the session's id is found
+   * afresh on every read. An attempt that has ended — or whose task settled with it open — has its session's id on the
+   * record, and no registry is asked. Otherwise, and for a name no attempt is journalled under yet, since a session is
+   * listed before its spawn is written, it is found by name when the harness can `find` one in flight, and observed when
+   * it cannot or finds none. A registry that cannot be read this time is nothing observed, and a `find` that fails is
+   * nothing found: a caller polls again, as it would a session not registered yet. The read itself answers in the
+   * harness's words.
+   */
+  async sessionTranscript(params: { name: string; after?: TranscriptCursor }, _context: ServerCallContext): Promise<Transcript | null> {
+    if (!this.ops.transcript) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).`);
+    }
+    const parts = typeof params.name === 'string' ? nameParts(params.name) : undefined;
+    if (!parts) throw new RequestMalformedError(`\`${params.name}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`);
+    const attempt = fold(parts.taskId, await this.events(parts.taskId)).attempts.find((a) => a.n === parts.n);
+    const inFlight = attempt === undefined || attempt.ended === null;
+    const found = !attempt?.nativeId && inFlight && this.ops.find
+      ? await this.run(this.ops.find(params.name)).catch(() => undefined)
+      : undefined;
+    const sessionId = attempt?.nativeId ?? found?.sessionId
+      ?? (await this.run(this.ops.observe).catch(() => new Map<string, Sighting>())).get(params.name)?.sessionId;
+    if (!sessionId) return null;
+    return this.run(this.ops.transcript(sessionId, params.after));
   }
 
   async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext): Promise<TaskPushNotificationConfig> {

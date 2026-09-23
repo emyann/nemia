@@ -33,10 +33,12 @@ export const nameParts = (name: string): { taskId: string; n: number } | undefin
 export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
 
 /**
- * The extension's methods, beside A2A's: a session found by name, a session's logs, a session let go of. Each keeps the
- * driver's own key — a name, a session id, the sighting — since none of them is a Task's to answer.
+ * The extension's methods, beside A2A's: a session found by name, a session's logs, a session let go of, a session's
+ * conversation read from a cursor. Each keeps its own key — a name, a session id, the sighting — since none of them is
+ * a Task's to answer: a transcript is a history read with a cursor, of a session that may have ended, where A2A's
+ * `SubscribeToTask` is a live stream refused on a Task in a terminal state.
  */
-export const SESSION_METHODS = ['findSession', 'sessionLogs', 'releaseSession'] as const;
+export const SESSION_METHODS = ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript'] as const;
 export type SessionMethod = (typeof SESSION_METHODS)[number];
 
 const STATES: Record<Observed, TaskState> = {

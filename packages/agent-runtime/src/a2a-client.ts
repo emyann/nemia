@@ -22,7 +22,7 @@ import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods,
 } from './a2a-handler.ts';
@@ -102,6 +102,10 @@ export class InProcessTransport implements Transport {
 
   releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
     return this.handler.releaseSession(params, new ServerCallContext());
+  }
+
+  sessionTranscript(params: { name: string; after?: TranscriptCursor }): Promise<Transcript | null> {
+    return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 }
 

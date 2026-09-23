@@ -856,3 +856,53 @@ test('M8, M9, M10: a job reading its brief from stream-json on its stdin keeps i
   assert.equal(m10s.exit, m10p.exit, 'M10: the streamed job exits as the prompted one did');
   assert.equal(fs.existsSync(path.join(probe, 'outside-m10-streamed', 'x.txt')), false, 'M10: nothing was written outside its folder');
 });
+
+/*
+ * Stage 2 part 2: before the orchestrator filed every Claude Code step as a job, a job's fence was measured against a
+ * background session's. The planner and the reviewers run `dontAsk` with no `allow:` of their own, fenced by this
+ * repository's `.claude/settings.json` alone: a job that read no project settings would be denied every command they run.
+ */
+
+/** A checkout whose settings allow `npm run build` alone; `npm run e2e` is in its package.json and on no list. */
+const buildOnlyCheckout = (label: string) => {
+  const dir = allowingCheckout(label);
+  fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm run build)'] } }));
+  return dir;
+};
+
+test('M11: a job in dontAsk honours the checkout\'s settings as a --bg session does — the allowed command runs, the unlisted one is denied, and the job records the denial', {
+  skip,
+  timeout: 15 * 60_000,
+}, async (t) => {
+  const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
+  t.diagnostic(`claude --version: ${version}`);
+  const engine = createEngine({ root: tmp('m11-board') });
+  const job = buildOnlyCheckout('m11-job');
+  const bg = buildOnlyCheckout('m11-bg');
+  // The planner's and the reviewer's fence: dontAsk, nothing allowed on the task, the checkout's settings the only list.
+  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] } };
+  try {
+    const ids = {
+      job: await engine.file({ ...common, cwd: job }),
+      bg: await engine.file({ ...common, cwd: bg, config: { ...common.config, background: true } }),
+    };
+    await settleThenCheck(engine, ids, (views) => {
+      const last = (k: string) => views[k]?.state.attempts.at(-1);
+      for (const k of ['job', 'bg']) {
+        t.diagnostic(`${k}: ${views[k]?.state.settled}, exit ${last(k)?.exitCode}, said ${JSON.stringify(last(k)?.closeout)}, denied ${JSON.stringify(last(k)?.denials)}, wrote ${WRITTEN.filter((f) => fs.existsSync(path.join(k === 'job' ? job : bg, f)))}`);
+      }
+      // The control: a background session there honours the settings, or nothing below is about a job.
+      assert.equal(views.bg?.state.settled, 'succeeded', `the background session settled: ${views.bg?.phase}`);
+      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(bg, f))), ['BUILT'],
+        'control: the background session ran the allowed command and not the unlisted one — refused, run this from a checkout Claude Code trusts');
+
+      assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
+      assert.equal(typeof last('job')?.exitCode, 'number', 'it ran as a job: a process that exited');
+      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(job, f))), ['BUILT'], 'the job ran the command its settings allow, and not the one they do not list');
+      // A denial names a command by its first word (`denialOf`), so the two are told apart by count: build ran, one was denied.
+      assert.deepEqual(last('job')?.denials, [{ tool: 'Bash', what: 'npm' }], 'and its attempt records one denial, the unlisted command: the allowed one ran');
+    });
+  } finally {
+    for (const dir of [job, bg]) fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

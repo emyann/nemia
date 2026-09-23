@@ -605,7 +605,7 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
 `config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M10).
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M11).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -648,6 +648,13 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   five seconds after it in each streamed pair — and exits once its stdin ends, so the worker ends it. The result line's
   `type` is printed near its end, not first (`{"duration_api_ms":…`, both ways), so the worker parses each line for its
   `type` rather than matching its start.
+- **M11: a job in `dontAsk` is fenced by its checkout's settings as a `--bg` session is.** Asked at stage 2 part 2's plan
+  gate, before the orchestrator filed its steps as jobs, since the planner and the reviewers run `dontAsk` with no allow rule
+  of their own and this repository's `.claude/settings.json` as their only list. Under the engine, on 2.1.280, haiku, a job
+  and a `--bg` session, each `dontAsk` with `tools: ['Bash']`, in a checkout inside this package whose settings allow
+  `Bash(npm run build)` alone, told to run `npm run build` and then `npm run e2e`: both ran the build, neither ran the e2e,
+  both closed saying `npm run e2e` was denied, and the job's attempt carries the one denial, `Bash(npm)` (a denial names a
+  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails.
 
 What a job gives up, or what is not done:
 
@@ -760,6 +767,10 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   job at $0.0434 and the job resumed from it charged $0.0033; a resume capped at $0.02 under its session's $0.0467
   finished at $0.0032. M7: a resume of a denied job carried none of its parent's denials, at $0.0041. The $0.01 budget
   test, on `claude-detached`, whose arguments part 2a rebuilt: `failed`, reason `budget`, $0.0184, no attempt 2.
+- **A job fenced by its checkout's settings** (issue 28's M11, thin runtime stage 2 part 2). `test/live.test.ts` on Claude Code
+  2.1.280, 2026-09-23, haiku, twice by the implementing step: the job exited 0, wrote `BUILT` and not `E2E`, and recorded
+  `[{"tool":"Bash","what":"npm"}]`; the `--bg` control wrote `BUILT` and not `E2E`, and records no denials (issue 28). The
+  first run failed only on the test's own assertion, which looked for the whole command in a denial that keeps its first word.
 
 ## Verified by tests, not by a live run
 

@@ -130,6 +130,17 @@ export type Workflow = {
    */
   allow?: string[];
   /**
+   * `denials: fail`: a try whose session the harness denied a call is not passed on. It signs off as ever, and the step reads `denied` —
+   * nothing after it is filed, no check is run on work done without the tool, and it waits on a person — rather than going on with the
+   * `denied: …` note beside its word. `retries:` never spends a try on it: `allow:` is frozen on the run at `wf start`, so a try the run
+   * filed on its own would be denied the same call again. A person tries it again with `wf retry` (a new session, told what it was denied,
+   * to do without it), or adds the rule the offer names to the folder's `allow:` and starts a new run. Absent: denials are recorded and
+   * said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallow:` make on purpose included.
+   * Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside `background: true`,
+   * whose `claude --bg` session records none either (agent-runtime's open issue 28).
+   */
+  denials?: 'fail';
+  /**
    * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
    * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
@@ -241,7 +252,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'denials', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -273,6 +284,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
   allow: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
+  denials: "`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only",
   background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
   remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
@@ -455,6 +467,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     tools: toolsOf(name, meta.tools, harness),
     disallow: rulesOf(name, 'disallow', meta.disallow, harness),
     allow: rulesOf(name, 'allow', meta.allow, harness),
+    denials: denialsOf(name, meta.denials, harness, background),
     background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
@@ -956,6 +969,57 @@ function workspaceOf(step: string, workspace: string | undefined, check: string 
     refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`);
   }
   return 'main';
+}
+
+/** The words `denials:` takes. One: a denied try fails its step's hand-off; without the line, denials are said and decide nothing. */
+export const DENIALS: readonly string[] = ['fail'];
+
+/**
+ * `denials:` as written: `fail`, or refused — and refused where the run would never read a denial, rather than accepted and never met: on
+ * codex, whose `codex exec` records none, and beside `background: true`, whose `claude --bg` session records none (agent-runtime's open
+ * issue 28). Only a job, `claude -p` on `claude` or `claude-detached`, says what it was denied.
+ */
+function denialsOf(step: string, denials: string | undefined, harness: string | undefined, background: boolean | undefined): 'fail' | undefined {
+  if (denials === undefined) return undefined;
+  if (denials !== 'fail') {
+    refuse(`${step}: \`denials: ${denials}\` is not \`fail\`. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing. Write \`denials: fail\`, or delete the line.`);
+  }
+  if ((harness ?? DEFAULT_HARNESS) === 'codex') {
+    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`);
+  }
+  if (background) {
+    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job (\`claude -p\`), which records each call it was denied, or delete \`denials: fail\`.`);
+  }
+  return 'fail';
+}
+
+/** The file-editing tools whose calls a permission rule names by `Edit(…)`: Claude Code matches a file write against `Edit` rules alone. */
+const EDITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+
+/** The tools whose calls a permission rule names by a path, as `denialOf` in agent-runtime names the call by the path it was given. */
+const PATH_TOOLS = ['Read', ...EDITING_TOOLS];
+
+/**
+ * The rule that would allow a denied call, in `allow:`'s words, from the call as the runtime words it (`denialText`: `Bash(pytest)`,
+ * `Write(/abs/notes.md)`, `SendMessage`). Pure. Claude Code's rules, which `allow:` is written in (`fileRuleRefusal`):
+ *
+ *   - a file-editing call is `Edit(…)`, whatever tool made it: Write, MultiEdit and NotebookEdit are matched against `Edit` rules alone,
+ *     and `allow:` refuses a path rule on any of them;
+ *   - an absolute path takes a second `/` (`Edit(//abs/notes.md)`): one `/` reads as a path from the settings' folder, not the root;
+ *   - a command is `Bash(<its first word>:*)`, since its first word is all the runtime keeps of it (`Bash(pytest)`), and a rule without
+ *     `:*` allows that bare word and no command that goes on past it;
+ *   - any other call is as it was denied: `Skill(look)`, `SendMessage`.
+ *
+ * What a person adds to a folder's `allow:` for a new run; nothing here widens the run that was denied, whose `allow:` is frozen.
+ */
+export function allowRuleOf(denied: string): string {
+  const call = /^([^()]+)\((.*)\)$/s.exec(denied);
+  if (!call) return denied;
+  const [, tool, what] = call as unknown as [string, string, string];
+  if (tool === 'Bash') return `Bash(${what}:*)`;
+  if (!PATH_TOOLS.includes(tool)) return denied;
+  const path = what.startsWith('/') && !what.startsWith('//') ? `/${what}` : what;
+  return `${EDITING_TOOLS.includes(tool) ? 'Edit' : tool}(${path})`;
 }
 
 /** The words `slot:` takes. One: a run is counted against the cap on runs in flight, or it is one that watches the counted ones. */

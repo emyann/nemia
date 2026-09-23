@@ -11,7 +11,7 @@ import { loadWorkflows, workflowDescription, workflowFolder } from '../src/workf
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/workflow-store.ts';
-import { HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
+import { allowRuleOf, DENIALS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -336,7 +336,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   // Claude Code's alone and keeps no `budget:`: read below too.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**), Bash(npm test)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**), Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -360,6 +360,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(w.remote, true);
   assert.deepEqual([w.effort, w.tools, w.disallow, w.allow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
   assert.equal(w.context, 150000);
+  assert.equal(w.denials, 'fail');
 });
 
 /** A table of one line of meaning per key, as the board lays a file's keys out: why `meanings` is not one, or null. */
@@ -389,7 +390,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, denials, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -1016,6 +1017,46 @@ test('`background: true` runs a claude step as a background session, `background
     refusedWith(/^supervise: `budget: 2` is a spend cap, and `background: true` runs the step as a background session: a `claude --bg` session does not keep one: .*\. Delete `background: true` to run the step as a job \(`claude -p`\), which ends its session at the cap, or delete the budget line\.$/));
 });
 
+test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a step without the line has none; REFUSED at load: another word, no value, the line twice, on codex, and beside `background: true` — where no denial is ever read', () => {
+  assert.equal(fm('review', 'denials: fail').denials, 'fail', 'at shipped defaults: harness claude, a job');
+  assert.equal(fm('review', 'harness: claude-detached\ndenials: fail').denials, 'fail');
+  assert.equal(fm('review', 'background: false\ndenials: fail').denials, 'fail', 'a job says what it was denied');
+  assert.equal(fm('review', '').denials, undefined);
+  assert.deepEqual(DENIALS, ['fail']);
+  for (const word of ['true', 'stop', 'Fail', 'record']) {
+    assert.throws(() => fm('review', `denials: ${word}`),
+      refusedWith(new RegExp(`^review: \`denials: ${word}\` is not \`fail\`\. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing\. Write \`denials: fail\`, or delete the line\.$`)), word);
+  }
+  assert.throws(() => fm('review', 'denials:'), refusedWith(/^review: `denials` has no value|^review: `denials: ` is not `fail`/));
+  assert.throws(() => fm('review', 'denials: fail\ndenials: fail'), refusedWith(/^review: `denials` is set twice/));
+  assert.throws(() => fm('review', 'harness: codex\ndenials: fail'),
+    refusedWith(/^review: `denials: fail` stops the step on a call the harness denied, and `codex exec` records none: .* Run the step on claude — delete `harness: codex` — or delete `denials: fail`\.$/));
+  assert.throws(() => fm('supervise', 'background: true\ndenials: fail'),
+    refusedWith(/^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job \(`claude -p`\), which records each call it was denied, or delete `denials: fail`\.$/));
+  // Written back after `allow`, before `background`, and read back as the step.
+  const step = fm('review', 'denials: fail\nallow: Edit(**)');
+  assert.equal(renderStep(step), ['---', 'allow: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'));
+  assert.deepEqual(parseWorkflow('review', renderStep(step)), step);
+});
+
+test('`allowRuleOf`: the rule a folder\'s `allow:` takes for a call the harness denied — a file edit by any tool as `Edit(…)`, an absolute path from the root, a command by its first word and whatever follows it; any other call as it was denied', () => {
+  assert.equal(allowRuleOf('Write(/tmp/w/notes.md)'), 'Edit(//tmp/w/notes.md)');
+  assert.equal(allowRuleOf('MultiEdit(/tmp/w/a.ts)'), 'Edit(//tmp/w/a.ts)');
+  assert.equal(allowRuleOf('NotebookEdit(/tmp/w/n.ipynb)'), 'Edit(//tmp/w/n.ipynb)');
+  assert.equal(allowRuleOf('Edit(src/a.ts)'), 'Edit(src/a.ts)', 'a relative path is the session\'s own directory\'s, as written');
+  assert.equal(allowRuleOf('Write(//tmp/x)'), 'Edit(//tmp/x)', 'a path already from the root keeps its two slashes');
+  assert.equal(allowRuleOf('Read(/home/me/.ssh/config)'), 'Read(//home/me/.ssh/config)');
+  assert.equal(allowRuleOf('Bash(pytest)'), 'Bash(pytest:*)');
+  assert.equal(allowRuleOf('Skill(look)'), 'Skill(look)');
+  assert.equal(allowRuleOf('SendMessage'), 'SendMessage');
+  assert.equal(allowRuleOf('mcp__playwright__browser_click'), 'mcp__playwright__browser_click');
+  assert.equal(allowRuleOf('Write(/tmp/a (copy).md)'), 'Edit(//tmp/a (copy).md)', 'a path with brackets in it is the path');
+  // Every rule it words for a file edit is one `allow:` takes: `fileRuleRefusal` refuses a path rule on any other file-editing tool.
+  for (const denied of ['Write(/tmp/w/notes.md)', 'MultiEdit(src/a.ts)', 'NotebookEdit(n.ipynb)', 'Bash(pytest)']) {
+    assert.doesNotThrow(() => fm('review', `allow: ${allowRuleOf(denied)}`), denied);
+  }
+});
+
 test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {
   assert.equal(fm('supervise', 'slot: none').slot, 'none');
   assert.equal(fm('implement', 'check: npm test').slot, undefined, 'counted unless it says otherwise');
@@ -1195,7 +1236,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   // `agent:` renders in test/agents.test.ts, which has agents to resolve it with, and `background:`, which keeps no `budget:`, below.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**),Bash(npm test)', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
+    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**),Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
@@ -1214,6 +1255,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'tools: Read, Grep, Glob, Bash',
     'disallow: Bash(npm run build), SendMessage',
     'allow: Edit(**), Bash(npm test)',
+    'denials: fail',
     'remote: true',
     'deadlineSeconds: 900',
     'maxAttempts: 2',

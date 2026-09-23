@@ -1,5 +1,5 @@
 import { sidebar } from '../board.ts';
-import { expectCount, expectDrawn, expectInside, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -29,6 +29,14 @@ export default {
     await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`), `${FAKE.refused}'s refused check is a red chip on the run's graph`);
     await expectVisible(page.locator('section[aria-label="Check"]').getByText(FAKE.said), `the run's page shows how ${FAKE.refused}'s check's output ended`);
     await expectCount(graph.locator('.react-flow__edge animateMotion'), 0, `no dot travels the run's edges: nothing moves into ${FAKE.refused}, whose check refused`);
+    // What the harness denied its job: how many on its node, read whole, with which on hover, and each call on its section.
+    const denied = graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-denied][title="${FAKE.denied.words}"]`, { hasText: FAKE.denied.node });
+    await expectVisible(denied, `${FAKE.refused}'s node says its job was ${FAKE.denied.node}, and which on hover`);
+    await expectUncut(denied, 'and says it whole: the line is the node\'s width');
+    await expectCount(graph.locator('[data-denied]'), 1, `no other step was denied a call, and no other node says so`);
+    const calls = FAKE.denied.denials.map((d) => `${d.tool}(${d.what})`).join(', ');
+    await expectVisible(page.locator(`#step-${FAKE.refused} [data-fact="denied"] [data-denied]`, { hasText: calls }), `${FAKE.refused}'s section names each call denied (${calls})`);
+    await expectCount(page.locator('[data-fact="denied"]'), 1, 'and no other section has a denied row');
 
     // What `wf decide` shows, between the banner and the canvas, read out of the run's real repository.
     await expectVisible(

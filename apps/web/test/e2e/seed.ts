@@ -44,6 +44,12 @@ export const FAKE = {
   check: 'npm run e2e',
   /** A line near the end of that check's output. */
   said: 'not ok 7 - the Factory hides a finished run',
+  /** What the harness denied `theme`'s job, as the engine recorded it on the attempt's end, and as the package words it. */
+  denied: {
+    denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'npx playwright test' }],
+    words: 'denied: Skill(look), Bash(npx playwright test)',
+    node: 'denied 2 calls',
+  },
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
@@ -1154,14 +1160,15 @@ export function seed(root: string, now = Date.now()): void {
 
   /**
    * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
-   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one.
+   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one;
+   * `denials`, the calls its harness denied the job.
    */
-  const signedOff = (task: string, harness: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
+  const signedOff = (task: string, harness: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object, denials?: readonly object[]): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
       { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1, harness },
       { kind: 'starting', at: ago(began - 1), attempt: 1 },
       { kind: 'spawned', at: ago(began - 1), attempt: 1 },
-      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}), ...(denials ? { denials } : {}) },
       { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
     ]));
 
@@ -1181,7 +1188,7 @@ export function seed(root: string, now = Date.now()): void {
   signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
     turns: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350,
   });
-  signedOff(`${id}-theme`, 'claude', lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
+  signedOff(`${id}-theme`, 'claude', lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] }, undefined, undefined, FAKE.denied.denials);
 
   // theme's check, as the run files one on the check harness: its process exited 1, and the engine wrote the
   // code down with the end of the attempt.

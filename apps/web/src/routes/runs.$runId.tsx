@@ -152,6 +152,11 @@ function Pruned({ pruned: { at, worktrees } }: { pruned: NonNullable<RunDetail['
   );
 }
 
+/** What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`. */
+const deniedRow = (calls: readonly string[]): ReactNode => (
+  <span data-denied className="font-mono text-xs text-red-700 dark:text-red-400">{calls.join(', ')}</span>
+);
+
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
   const runId = run.id;
   const { spec, closeout, gate } = step;
@@ -202,6 +207,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
           // Its gate, where it has one: a person's word files what follows it — or, for the step that ends the run, the step itself.
           ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
+          // What the harness denied its current try, every call as a permission rule names it: what its work may be short of.
+          ...(step.denied ? ([['denied', deniedRow(step.denied.calls)]] satisfies Array<[string, ReactNode]>) : []),
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],

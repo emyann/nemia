@@ -155,6 +155,8 @@ export type RunDetail = {
     /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
     waitingFor: StepNeeds['waitingFor'];
     approve: string | null;
+    /** As on `RunSummary`: what the harness denied its current try, the calls and the line that names them. */
+    denied: StepNeeds['denied'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
     /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */

@@ -1,6 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
-import { needNodeText, needOf, needText, type Need } from '../lib/asks';
+import { deniedNodeText, needNodeText, needOf, needText, type Need } from '../lib/asks';
 import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { contextText } from '../lib/builder';
@@ -127,6 +127,17 @@ export function StepNode({
           className="truncate border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
         >
           {needNodeText(need)}
+        </p>
+      )}
+      {/* What the harness denied its current try: a job carries on past a denied call, so its work may be short of it and nothing else
+          on the node says so. How many, on a line that fits; which, in the package's words, on hover and on the step's section. */}
+      {step.denied && (
+        <p
+          data-denied
+          title={step.denied.words}
+          className="truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] text-red-700 dark:border-neutral-800 dark:text-red-400"
+        >
+          {deniedNodeText(step.denied.calls)}
         </p>
       )}
 

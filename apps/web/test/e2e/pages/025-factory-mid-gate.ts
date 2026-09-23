@@ -29,7 +29,7 @@ export default {
     await expectVisible(card, `a run held at ${gated}'s gate, in the middle of the run, is on the default floor: it waits on a person (${id})`);
     await expectVisible(card.getByText('waiting on you', { exact: true }), 'and says it waits on you');
     await expectVisible(card.locator(`[data-gate-line="${gated}"]`, { hasText: `approve what ${gated} handed on, or send it back` }), `and what approving ${gated} does`);
-    await expectVisible(card.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), `and ${gated}'s chip, awaiting approval`);
+    await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="awaiting-approval"][title^="${gated}: awaiting approval"]`), `and ${gated}'s pill on its rail, awaiting approval`);
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), fullPage: true });
 

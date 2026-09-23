@@ -1,13 +1,13 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { pace } from './feed.ts';
 
-/** Mirrors `RunStatus` in apps/api/src/app.ts: where `assess` puts the run. */
+/** Mirrors `RunStatus` in apps/api/src/judged.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 /** Mirrors `PlaceKind` in agent-workflows' run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
 
-/** Mirrors `RunSummary` in apps/api/src/app.ts. */
+/** Mirrors `RunSummary` in apps/api/src/runs.ts. */
 export type RunSummary = {
   id: string;
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
@@ -54,7 +54,7 @@ export type RunSummary = {
 };
 
 /**
- * Mirrors `RunToDecide` in apps/api/src/app.ts: what a person has to decide about a run's result, the fifth reason a run waits on one —
+ * Mirrors `RunToDecide` in apps/api/src/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on one —
  * `approve`, the gate on its last step, with `step` and `says`, what that step would do in the folder's own words (null for a gated step
  * that has signed off, whose closeout is what to read); or `git`, result branches ahead of the base that nothing in the workflow merges.
  *
@@ -69,19 +69,19 @@ export type RunToDecide =
   | { kind: 'git'; branches: string[]; said: string; command: string };
 
 /**
- * Mirrors `Spent` in apps/api/src/app.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended with a cost on
+ * Mirrors `Spent` in apps/api/src/judged.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended with a cost on
  * them, how many did and how many ended with none — and `said`, its word for it: `$4.20`, or `≥$4.20` where an ended attempt has no cost on it.
  */
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
 
 /**
- * Mirrors `StepBudget` in apps/api/src/app.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to — as its
+ * Mirrors `StepBudget` in apps/api/src/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to — as its
  * author writes one (`said`, `$3`), what its tries have cost of it (`of`, `$4.25 of $3`, null until measured), and whether that is the cap or more.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
 /**
- * Mirrors `StepRaise` in apps/api/src/app.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its loop's round
+ * Mirrors `StepRaise` in apps/api/src/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its loop's round
  * (`round`) — and what the budget has to be more than, as the package refuses less. For a try, the ways the package takes it (`modes`,
  * `recheck` among them where a check did not pass, needing no raise) and how the step ended on its own work, its budget aside (`own`, the
  * package's word: `blocked`, `unsigned`, `failed (check)` …), which its word — `over budget` — no longer says. For a round, none, and null.
@@ -89,7 +89,7 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
 
 /**
- * Mirrors `RunWaiting` in apps/api/src/app.ts: what a run started `--after` still waits on, in the package's words. `runs` are each run
+ * Mirrors `RunWaiting` in apps/api/src/judged.ts: what a run started `--after` still waits on, in the package's words. `runs` are each run
  * not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what `wf ls` prints on its roots —
  * `waiting on a-1x2y (cancelled)` — and `advice` the line `wf decide` prints under it; `onYou` whether a person has to act.
  */
@@ -101,7 +101,7 @@ export type RunWaiting = {
 };
 
 /**
- * Mirrors `StepNeeds` in apps/api/src/app.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
+ * Mirrors `StepNeeds` in apps/api/src/judged.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
  * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`: what that harness
  * says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null where the harness said
  * nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a run's detail alone
@@ -110,11 +110,11 @@ export type RunWaiting = {
  */
 export type StepNeeds = { needs: string | null; blockedByHarness: boolean; waitingFor: { words: string; advice: string } | null; approve: string | null };
 
-/** Mirrors `StepApproval` in apps/api/src/app.ts: a person's approval of the try a gated step is on — when, and the words given with it. */
+/** Mirrors `StepApproval` in apps/api/src/detail.ts: a person's approval of the try a gated step is on — when, and the words given with it. */
 export type StepApproval = { try: number; at: string; message: string | null };
 
 /**
- * Mirrors `StepGate` in apps/api/src/app.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval` — and
+ * Mirrors `StepGate` in apps/api/src/detail.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval` — and
  * `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
@@ -123,7 +123,7 @@ export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 export type StepAcceptance = { try: number; at: string; message: string };
 
 /**
- * Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
+ * Mirrors `StepAsked` in apps/api/src/detail.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
  * where `stopFirst`, because the harness blocked it.
  */
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
@@ -134,7 +134,7 @@ export type Said = { at: string; attempt: number; text: string };
 /** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
-/** Mirrors `StepSpec` in apps/api/src/app.ts. */
+/** Mirrors `StepSpec` in apps/api/src/detail.ts. */
 export type StepSpec = {
   harness: string | null;
   model: string | null;
@@ -167,7 +167,7 @@ export type GraphEdge =
 export type RunGraph = { roots: string[]; edges: GraphEdge[] };
 
 /**
- * Mirrors `StepFiled` in apps/api/src/app.ts: what the engine filed a step's current try with. `maxAttempts` is always on the
+ * Mirrors `StepFiled` in apps/api/src/detail.ts: what the engine filed a step's current try with. `maxAttempts` is always on the
  * record; any other field is null where the task was filed without it — no deadline, which is no limit, and the harness's own
  * model, effort and tools. `askedModel` is the model a person's `wf retry --model` asked this try for; `runsIn` the permission
  * mode the session runs in, as its harness decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a
@@ -192,11 +192,11 @@ export type StepFiled = {
  */
 export type StepArtifact = { path: string } | { path: string; name: string; url: string; kind: 'image' | 'text' | 'other'; size: number };
 
-/** Mirrors `StepReply` in apps/api/src/app.ts: a loop's target's answer to one finding. */
+/** Mirrors `StepReply` in apps/api/src/tries.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
 /**
- * Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`;
+ * Mirrors `StepCloseout` in apps/api/src/tries.ts: with what it gave of its declared output, what it did not, and its `replies`;
  * each declared field's JSON Schema off the workflow the run froze, and the statement as the engine recorded it (`raw`).
  */
 export type StepCloseout = {
@@ -212,7 +212,7 @@ export type StepCloseout = {
 };
 
 /**
- * Mirrors `StepCheck` in apps/api/src/app.ts: the command a step is judged by, from the workflow the run
+ * Mirrors `StepCheck` in apps/api/src/logs.ts: the command a step is judged by, from the workflow the run
  * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once its check refused, the
  * exit in `wf ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
  */
@@ -223,11 +223,11 @@ export type StepCheck = {
   refused: { exit: string; stdout: StepLog | null; stderr: StepLog; unreadable: string | null } | null;
 };
 
-/** Mirrors `StepUnreadable` in apps/api/src/app.ts: a closing statement the api could not read, its words for why, and the statement as it came. */
+/** Mirrors `StepUnreadable` in apps/api/src/tries.ts: a closing statement the api could not read, its words for why, and the statement as it came. */
 export type StepUnreadable = { error: string; raw: unknown };
 
 /**
- * Mirrors `StepTry` in apps/api/src/app.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
+ * Mirrors `StepTry` in apps/api/src/tries.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
  * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
@@ -248,7 +248,7 @@ export type StepTry = {
   answer: string | null;
 };
 
-/** Mirrors `RunDetail` in apps/api/src/app.ts. */
+/** Mirrors `RunDetail` in apps/api/src/detail.ts. */
 export type RunDetail = {
   id: string;
   brief: string;
@@ -369,13 +369,13 @@ export type TaskSpan = {
 };
 
 /**
- * Mirrors `StepTimelineTry` in apps/api/src/app.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
+ * Mirrors `StepTimelineTry` in apps/api/src/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
  * is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in `wf decide`'s words.
  */
 export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
 
 /**
- * Mirrors `StepTimelineTotal` in apps/api/src/app.ts — `TimelineTotal` in agent-workflows' timeline.ts, with its cost: a round of a loop — `loop` its
+ * Mirrors `StepTimelineTotal` in apps/api/src/detail.ts — `TimelineTotal` in agent-workflows' timeline.ts, with its cost: a round of a loop — `loop` its
  * looping step, counting the steps that round files again — or the run's, every step's (`loop` and `round` null); sums over its tasks, and its
  * wall, in words; and what the sessions in it cost, null where none was measured.
  */
@@ -393,7 +393,7 @@ export type TimelineTotal = {
   cost: Spent | null;
 };
 
-/** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
+/** Mirrors `Usage` in apps/api/src/usage.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
   turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number;
   cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number; peakContextTokens?: number; firstContextTokens?: number; firstCacheWriteTokens?: number; compactions?: number; rebuiltCaches?: number;
@@ -403,7 +403,7 @@ export type Usage = {
 export type PeakMark = 'cap' | 'large' | null;
 
 /**
- * Mirrors `StepUsed` in apps/api/src/app.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where nobody
+ * Mirrors `StepUsed` in apps/api/src/usage.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where nobody
  * counted — and the engine's cost, api time and tool time off it, each null where nobody measured it. `read` is what the sessions read, by
  * price, in `wf decide`'s words (`read 21.4M · wrote 412k · peak 167k`), null where nothing measured it; `peak` where its peak stands; and
  * `rebuilt` how many resumed sessions wrote their context to the cache again.
@@ -413,7 +413,7 @@ export type StepUsed = {
   read: string | null; peak: PeakMark; rebuilt: number;
 };
 
-/** Mirrors `RunRead` in apps/api/src/app.ts: what a run's sessions read, by price, in words, where its peak stands, and how many rebuilt their cache. */
+/** Mirrors `RunRead` in apps/api/src/usage.ts: what a run's sessions read, by price, in words, where its peak stands, and how many rebuilt their cache. */
 export type RunRead = { said: string; peak: PeakMark; rebuilt: number };
 
 /** Mirrors `Change` in agent-workflows' radius.ts: a file a branch changed. A binary file has null counts, never 0. */
@@ -425,23 +425,23 @@ export type Group = { name: string; files: number; added: number; removed: numbe
 /** Mirrors `Radius` in agent-workflows' radius.ts: what a branch touched, and among it what an agent reads and what decides a check. */
 export type Radius = { changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[]; lessons: Change[] };
 
-/** Mirrors `Touched` in apps/api/src/app.ts: a branch, and its radius or why git could not read it. */
+/** Mirrors `Touched` in apps/api/src/decision.ts: a branch, and its radius or why git could not read it. */
 export type Touched = { branch: string; radius: Radius | { error: string } };
 
-/** Mirrors `DiffFile` in apps/api/src/app.ts: one file's unified diff, cut to the api's cap, and how many lines were cut. */
+/** Mirrors `DiffFile` in apps/api/src/decision.ts: one file's unified diff, cut to the api's cap, and how many lines were cut. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
 
-/** Mirrors `SensitiveDiff` in apps/api/src/app.ts. */
+/** Mirrors `SensitiveDiff` in apps/api/src/decision.ts. */
 export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
 
-/** Mirrors `Lesson` in apps/api/src/app.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
+/** Mirrors `Lesson` in apps/api/src/decision.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
-/** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints. The board runs one of them itself, `accept` (`acceptLoop`). */
+/** Mirrors `DecideCommand` in apps/api/src/decision.ts: a command `wf decide` prints. The board runs one of them itself, `accept` (`acceptLoop`). */
 export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
- * Mirrors `Standing` in apps/api/src/app.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
+ * Mirrors `Standing` in apps/api/src/decision.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
  * by N commits, or gone — with the fact in the package's words and how much it changed, as `wf decide` prints beside the branch (git's
  * `--shortstat`); `stat` is null where git said nothing of it.
  */
@@ -449,12 +449,12 @@ export type Standing = ({ branch: string; where: 'on' } | { branch: string; wher
   & { said: string; stat: string | null; merge: StandingMerge | null };
 
 /**
- * Mirrors `StandingMerge` in apps/api/src/app.ts: whether a branch ahead of the base still merges onto it as the base is now, as git's
+ * Mirrors `StandingMerge` in apps/api/src/decision.ts: whether a branch ahead of the base still merges onto it as the base is now, as git's
  * `merge-tree` answers it — clean, the files it conflicts in, or why git could not say — and that in words. Null for a branch not ahead.
  */
 export type StandingMerge = ({ clean: true } | { clean: false; conflicts: string[] } | { error: string }) & { said: string };
 
-/** Mirrors `Decidable` in apps/api/src/app.ts. */
+/** Mirrors `Decidable` in apps/api/src/decision.ts. */
 export type Decidable = {
   /** Where each result branch stands, and how much it changed: the facts under the run's result, as `wf decide` prints them. */
   standings: Standing[];
@@ -471,7 +471,7 @@ export type Decidable = {
 };
 
 /**
- * Mirrors `RunDecision` in apps/api/src/app.ts: `waiting` for a run whose roots wait on runs not shipped, `running` while nobody is
+ * Mirrors `RunDecision` in apps/api/src/decision.ts: `waiting` for a run whose roots wait on runs not shipped, `running` while nobody is
  * waited on, `nothing` for a run called off or shipped.
  */
 export type RunDecision = { waiting: RunWaiting } | { running: true } | { nothing: string } | Decidable;
@@ -493,7 +493,7 @@ export const decisionQuery = (id: string, stamp: string) =>
   });
 
 /**
- * Mirrors `StepAttempts` in apps/api/src/app.ts. `endedAt` is when the latest attempt ended — the
+ * Mirrors `StepAttempts` in apps/api/src/tries.ts. `endedAt` is when the latest attempt ended — the
  * engine's `Attempt.endedAt` — and null while it runs or on a record from before the engine kept it.
  */
 export type StepAttempts = {
@@ -501,7 +501,7 @@ export type StepAttempts = {
   latest: { startedAt: string; ended: string | null; endedAt: string | null; reason: string | null } | null;
 };
 
-/** Mirrors `StepLog` in apps/api/src/app.ts. */
+/** Mirrors `StepLog` in apps/api/src/logs.ts. */
 export type StepLog = { lines: string[]; truncated: boolean };
 
 /**
@@ -518,7 +518,7 @@ export type TranscriptEvent = {
   result?: { text: string; isError: boolean };
 };
 
-/** Mirrors `StepTranscript` in apps/api/src/app.ts: the events from a cursor, the cursor to ask again from, and whether more may come. */
+/** Mirrors `StepTranscript` in apps/api/src/steps.ts: the events from a cursor, the cursor to ask again from, and whether more may come. */
 export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean };
 
 /** Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events. */
@@ -1105,7 +1105,7 @@ export async function queueCard(name: string, { off = false }: { off?: boolean }
 }
 
 /**
- * Mirrors `Ceilings` in apps/api/src/app.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before any pass wrote it),
+ * Mirrors `Ceilings` in apps/api/src/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before any pass wrote it),
  * the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none — and the runs it holds.
  */
 export type Ceilings = {

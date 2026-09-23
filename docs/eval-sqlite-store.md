@@ -32,7 +32,7 @@ screenshot is a PNG a person opens. Neither goes into SQLite in any design worth
 
 - `wf ls` over 107 runs: 1.3 s, most of it Node starting. One `wf tick`: 1.4 s, the same. The daemon passes every 4 s.
 - The feed is read from a cursor, not from the start (`JournalOps.feed`, `agent-engine/src/journal.ts:46-56`), and the
-  api keeps its place (`app.ts:1133`).
+  api keeps its place (`filings` in `apps/api/src/store.ts`).
 - Nothing in `open-issues.md` or `features.md` is a store problem: no lost write, corruption or slow read has been
   reported since one writer per file became a rule.
 

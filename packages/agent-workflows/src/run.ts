@@ -25,7 +25,7 @@ import { answerOf, dueNote, messageRefusal, modeWord, retriesSpent, signoffsSpen
 // apps/api reads these two from the `agent-workflows/run` subpath. closeout.ts imports nothing from here, so this is no cycle; its other names
 // are read from closeout.ts, as the timeline's are from timeline.ts.
 export { declaredOutput, parseCloseout } from './closeout.ts';
-// And these three, which apps/api reads from the subpath too (answerOf and EarlierTry in app.ts, messageRefusal in test/asks.test.ts), as
+// And these three, which apps/api reads from the subpath too (answerOf and EarlierTry in tries.ts, messageRefusal in test/asks.test.ts), as
 // retry.ts's other names are read from retry.ts.
 // retry.ts imports only types from here, so this is no cycle either.
 export { answerOf, messageRefusal, type EarlierTry } from './retry.ts';

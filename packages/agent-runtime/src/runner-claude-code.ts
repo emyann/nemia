@@ -50,14 +50,14 @@ export const claudeJob: HarnessSpec = {
 };
 
 /** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
-const isJob = (sessionId: string) => nameParts(sessionId) !== undefined;
+export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
 
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const job = detachedOps(claudeJob, root);
   const findJob = detachedFind(claudeJob, root);
   const bg = claudeOps({ ...options, root });
-  const of = (sessionId: string) => (isJob(sessionId) ? job : bg);
+  const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
   // One mode's registry unreadable must not blind the engine to the other's sessions, as for the composite's harnesses.
   const seen = (ops: RunnerOps) => ops.observe.pipe(Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())));
@@ -78,13 +78,13 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     logs: (sessionId) => of(sessionId).logs(sessionId),
 
     // A job's run file is its record, as `logs` reads it: there is nothing to let go of.
-    release: (session, task) => (isJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
+    release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
 
     // A job read by its name while it runs; by Claude Code's id — an ended job's, or a background session's — the same
     // transcript file either way, which the background reader finds by that id.
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
 
-    say: (session, text) => isJob(session.sessionId)
+    say: (session, text) => isClaudeJob(session.sessionId)
       ? Effect.fail(new RunnerError({ verb: 'say', message: `claude: ${claudeJob.noChannel}` }))
       : bg.say!(session, text),
   };

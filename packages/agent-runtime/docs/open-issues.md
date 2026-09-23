@@ -646,8 +646,8 @@ What a job gives up, or what is not done:
   not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
   `denials`.
 - **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
-  observed, stopped, released and settled by its id's shape, but `say` refuses it as a job. A person says the words to the
-  attempt that continues it, filed with `background: true`.
+  observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
+  running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
 - **A job resumed from a `--bg` session records no cost** (issue 4).
 
 ## Verified live, once

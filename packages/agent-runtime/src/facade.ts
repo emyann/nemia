@@ -21,7 +21,7 @@ import {
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
-import { claudeCodeOps, claudeJob } from './runner-claude-code.ts';
+import { claudeCodeOps, claudeJob, isClaudeJob } from './runner-claude-code.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { codex } from './runner-codex.ts';
@@ -411,8 +411,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const runner = runners[harness]!;
       const h = harnesses[harness]!;
       const deliver = runner.say;
-      // A job takes its brief and nothing after it; only a background session has an inbox.
-      if (h === 'claude' && !state.config?.background) throw refuse(claudeJob.noChannel!);
+      const last = state.attempts.at(-1);
+      // A job takes its brief and nothing after it; only a background session has an inbox. The mode is the running
+      // session's, known by its id's shape as the runner knows it (below): a task filed on `claude` before jobs were its
+      // default runs `--bg` with no `background` in its config. With nothing running, the config says what it will be.
+      const running = !state.settled && !state.stopRequested && last !== undefined && last.ended === null;
+      if (h === 'claude' && !state.config?.background && !running) throw refuse(claudeJob.noChannel!);
       if (!deliver) {
         throw refuse((isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`);
       }
@@ -421,7 +425,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // What the record says first, then what the harness says: a settled task is not asked about.
       if (state.settled) throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
       if (state.stopRequested) throw refuse(`\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}`);
-      const last = state.attempts.at(-1);
       if (!last) throw refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything. Ask again once \`ae ls\` shows it running.`);
       if (last.ended !== null) throw refuse(`\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`. ${resume}`);
       const name = nameFor(taskId, last.n);
@@ -437,6 +440,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
         if (registered) throw new Error(`say: the \`${harness}\` registry could not be read, or did not list ${name}, which Claude Code has registered. Nothing was said; ask again.`);
       }
       if (!sighting) throw refuse(`\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`);
+      if (h === 'claude' && isClaudeJob(sighting.sessionId)) throw refuse(claudeJob.noChannel!);
       // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
       // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
       // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue

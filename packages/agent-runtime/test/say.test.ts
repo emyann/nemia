@@ -33,7 +33,8 @@ type Row = { name: string; sessionId: string; state: string; status: string; sta
 
 /**
  * A fake `claude`. `agents` prints its rows, each with a `pid`, busy, as a session at work is listed; `--bg --name <n>`
- * adds one; `stop` and `rm` do what they do. While `<bin>/agents-fails` exists, `agents` fails.
+ * adds one; `stop` and `rm` do what they do; `-p`, a job, works for ten seconds and prints nothing. While
+ * `<bin>/agents-fails` exists, `agents` fails.
  */
 const fakeClaude = () => {
   const bin = tmp('bin');
@@ -56,6 +57,7 @@ if (args[0] === 'stop' || args[0] === 'rm') {
   save();
   process.exit(0);
 }
+if (args[0] === '-p') setTimeout(() => {}, 10_000);
 if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now(), cwd: process.cwd(), pid: 900000 + rows.length });
   save();
@@ -186,6 +188,24 @@ test('a session its harness lists blocked is running, and its inbox is handed th
   await box.close();
 });
 
+test("a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words", async () => {
+  const root = tmp('board');
+  const engine = createEngine({ root });
+  const { id, box } = await running(engine);
+  // Its filing as it was written then: the same session, the config saying nothing of a mode.
+  const journal = path.join(root, 'tasks', `${id}.jsonl`);
+  const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
+  const event = JSON.parse(filed!);
+  delete event.config.background;
+  fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
+  assert.equal((await engine.view(id)).state.config?.background, undefined, 'the record names no mode');
+
+  await engine.say(id, 'and the web app');
+  assert.equal(box.lines.length, 1, 'the words reached its inbox');
+  assert.equal((await engine.view(id)).state.said.length, 1);
+  await box.close();
+});
+
 // ─── refusals: exit 2, nothing sent, nothing journalled ─────────────────────
 
 test('refused: empty words, and words that are only whitespace', async () => {
@@ -225,6 +245,17 @@ test("refused: words longer than Claude Code's inbox reads", async () => {
   const { id, box } = await running(engine);
   await refused(engine, id, 'x'.repeat(CLAUDE_INBOX_LINE_MAX), /inbox drops a line over 1048576/, box);
   await box.close();
+});
+
+test('refused: a job that is running — listed working under its name, it takes no words — in words that name the mode that does', async () => {
+  const engine = createEngine({ root: tmp('board') });
+  const id = await engine.file({ brief: 'do the work', cwd: work });
+  await engine.tick();
+  const seen = await engine.view(id);
+  assert.equal(seen.state.attempts.at(-1)?.ended, null, 'its attempt is running');
+  await refused(engine, id, 'hello', /^say: A job \(`claude -p`\) is given its brief and takes no words while it runs\. File the task with `config\.background: true`/);
+  await engine.stop(id);
+  await engine.tick();
 });
 
 test('refused: a task that has not started an attempt', async () => {

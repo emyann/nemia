@@ -255,7 +255,7 @@ orchestrator's calls to the runtime change.
    Claude Code adapter** — `claude` runs a task as a job, `claude -p --output-format stream-json --verbose
    --permission-prompts none` in the detached worker, and as `claude --bg` only when the task says `config.background:
    true`, a harness argument like the others; one harness, two modes, each verb routed by the session id's shape
-   (`src/runner-claude-code.ts`), so a `--bg` session journalled on `claude` before is still observed, stopped and settled.
+   (`src/runner-claude-code.ts`), so a `--bg` session journalled on `claude` before is still observed, stopped, settled and said to.
    `say` and `remoteControl` on a job are refused in words that name `background: true`, a budget beside it is refused as
    `--bg` keeps none, and `background` on any other harness is refused. What a job was denied is on its attempt
    (`denials`) and on `ae show`, and `decide` never reads it. The orchestrator stays on `claude-bg` until part 2. Done, on

@@ -535,17 +535,34 @@ agent step `context: 200k` on the strength of the unattended run above; a step t
 to widen it. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
 under the engine.
 
-### 27. The A2A seam carries every call to a session but its transcript
+### 27. The A2A seam carries every call to a session, the transcript as an extension method
 
 Since thin runtime stage 1 part 2 (2026-09-23), `createEngine` puts every harness behind an A2A agent of its own
 (`src/a2a-handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a-client.ts`):
 `spawn` is a message, `observe` a listing, `stop` a cancel. Since part 3 (the same day), `say` is a follow-up message on
 the session's Task, and `find`, `logs` and `release` are the runtime extension's methods (`findSession`, `sessionLogs`,
-`releaseSession`), offered as the harness's card lists them. What is still direct, and what the seam does not do:
+`releaseSession`), offered as the harness's card lists them. Since part 4 (the same day), a transcript is read by the
+session's name through the extension's `sessionTranscript`. What is still direct, and what the seam does not do:
 
-- **`transcript` and `refuses` reach the driver directly.** `transcript` until part 4 makes it A2A's `SubscribeToTask`;
-  `refuses` for good, since it judges a task before any session exists and is no call to one. `test/driver-calls.test.ts`
-  refuses any other driver call made with no A2A call in flight.
+- **`refuses` alone reaches the driver directly**, for good: it judges a task before any session exists and is no call
+  to one. `test/driver-calls.test.ts` exempts it alone, refuses any other driver call made with no A2A call in flight, and
+  names a transcript read directly as part 3 read it.
+- **A transcript is an extension method, not A2A's `SubscribeToTask`.** It is a history read from a cursor, and most reads
+  are of a session that has ended — a run's detail, long after. A2A 1.0 refuses a subscription to a Task in a terminal
+  state (`UnsupportedOperationError`, and the SDK's `DefaultRequestHandler.resubscribe` throws it), and a subscription's
+  first event is the Task, which this agent answers with a listing: a cost on every read that the read never needed.
+  `GetTask`'s `history` has no cursor either (`historyLength` is the last N). A cursor was not the blocker: the SDK does
+  carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` waits for a consumer
+  that reads a live stream — stage 2's `-p` job, or the board following a session as it speaks — and then streams what
+  `sessionTranscript` reads, beside it, not instead.
+- **The agent finds the session's id as the facade did**, in the same order: the attempt's `nativeId` off the journal, then
+  `find` for an attempt in flight (a failure counts as none), then a listing. A name with no attempt journalled yet is asked
+  of the harness, not refused: a session is listed before its `spawned` is written. The facade no longer asks the harness
+  for a task with no attempt at all, and the journal is read twice per transcript — once by the facade, for its refusals,
+  once by the agent, which holds nothing. The cost in listings is otherwise unchanged: one `claude agents` per read of an
+  attempt in flight only on a harness with no `find`.
+- **No subscription is held.** `sessionTranscript` is one request and one answer; the agent keeps no cursor, no listener
+  and no context between calls, so a long-lived `wf up` accumulates nothing by reading transcripts.
 - **A spawn is marked, and a message without the mark is not a spawn.** A2A reads a message that names a `taskId` as a
   follow-up on that Task, and a spawn names a Task that does not exist yet. So a spawn carries the runtime's extension,
   `urn:agent-runtime:session:v1`, and the agent reads a message without it as words for a running session: a plain A2A

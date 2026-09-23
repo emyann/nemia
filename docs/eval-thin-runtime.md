@@ -241,8 +241,12 @@ orchestrator's calls to the runtime change.
    (`urn:agent-runtime:session:v1`), which the harness's card lists as its driver answers them, and a spawn carries the
    same extension as its mark, since a plain message naming a Task continues it. `refuses` stays direct by design: it
    judges a task before any session exists. `test/driver-calls.test.ts` refuses any other driver call made with no A2A
-   call in flight (open issue 27). **(4) `transcript` as `SubscribeToTask`**, the one call still direct, and the first
-   the agent streams.
+   call in flight (open issue 27). **(4) the transcript through the seam.** Carded as `SubscribeToTask`, and done, on the
+   same day, as the extension's `sessionTranscript` instead, by the session's name, with the plan's challenge approved at its
+   gate: a transcript is a history read from a cursor, mostly of a session that has ended, and A2A 1.0 refuses a
+   subscription to a Task in a terminal state and opens every one with the Task, a listing here. The agent finds the
+   session's id as the facade did and holds nothing between calls; `refuses` is the one verb left direct.
+   `SubscribeToTask` waits for a consumer of a live stream (stage 2, or the board following a session as it speaks).
 2. **The Claude Code adapter runs a step as a job:** `-p` by default, a gate as `TASK_STATE_INPUT_REQUIRED`, denials loud, `auto`
    by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's

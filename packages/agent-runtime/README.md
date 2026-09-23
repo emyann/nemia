@@ -234,7 +234,7 @@ Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `create
 whose `contextId` is the task; a spawn is a user Message marked with the runtime's extension
 (`urn:agent-runtime:session:v1`), the brief its one text part and the rest of the request — `config` whole and unopened —
 its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the session's Task. What A2A
-has no call for is the extension's methods: `findSession`, `sessionLogs` and `releaseSession`. The harness's card lists
+has no call for is the extension's methods: `findSession`, `sessionLogs`, `releaseSession` and `sessionTranscript`. The harness's card lists
 the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
 What a harness says comes back in
 the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
@@ -246,8 +246,12 @@ go is answered from the journal (`test/restart.test.ts`). It is not the SDK's `D
 would be a second record beside the journal. Streaming, push notifications and an extended card are refused in the SDK's
 own errors, never taken and ignored.
 
-Two verbs still reach the driver directly: `transcript`, until it becomes a `SubscribeToTask`, and `refuses`, which judges
-a task before any session exists and so is no call to one. A test refuses any other driver call made with no A2A call in
+One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
+one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
+facade did — the journal's, then `find` for an attempt in flight, then a listing. It is not A2A's `SubscribeToTask`: a
+transcript is a history read from a cursor, of a session that has often ended, and A2A refuses a subscription to a Task in
+a terminal state, and opens every one with the Task, which here is a listing. The call answers once and holds nothing, so no
+subscription outlives it. A test refuses any other driver call made with no A2A call in
 flight (`test/driver-calls.test.ts`). A runner an Effect program provides with `Runner.layer` is direct too;
 `a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts` import the SDK, and neither entry exports a name of
 its (`test/a2a-boundary.test.ts`).

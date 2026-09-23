@@ -84,9 +84,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   in dark, so a page that writes to the store takes its write back before it ends. It lets one failure pass: a
   `net::ERR_ABORTED` on `/api/feed/stream` opened before the page itself navigated or reloaded (`watch` in `checks.ts`);
   the board closing that stream mid-page still counts.
-- **The engine's `transcript` of an attempt still in flight observes its harness** — one `claude agents`
-  call per read, since the session's id is on no record yet. Read it on a run's detail, never on the list
-  the Factory polls (learned by the run that put a blocked session's last line on the board).
+- **The engine's `transcript` of an attempt still in flight asks its harness** for the session's id, which is on no record
+  yet: `find` where the harness has one (claude's reads the registration file, about 2 ms), and one `claude agents` call per
+  read where it has none or finds nothing. Since the transcript crossed the A2A seam (`sessionTranscript`) the journal is read
+  twice per read too, and a task with no attempt asks nothing. Read it on a run's detail, never on the list the Factory polls
+  (learned by the run that put a blocked session's last line on the board; the cost said again by the run that read the
+  transcript through the seam).
 - **Playwright's `dragTo` onto a React Flow handle waits for ever.** A handle a connection cannot start from has `pointer-events: none`
   until a drag is under way, so `dragTo`'s check of what the pointer would hit finds the node over the handle. Drag with `page.mouse`
   (down, move in steps, up), and keep both ends in the frame: a drag that starts off a handle pans the pane (`drawEdge` in

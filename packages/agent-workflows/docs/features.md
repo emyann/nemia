@@ -2086,7 +2086,7 @@ and a card marked to start on its own is started by the tick when a run slot is 
 
 What was built, the cap:
 
-- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in runner.ts), unset or 0 for no cap, today's behaviour. Anything but a
+- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in daemon-store.ts), unset or 0 for no cap, today's behaviour. Anything but a
   whole count is refused by name, exit 2 (`runCapOf`), by `wf up`, `wf tick` and `wf ls`: read as no cap, a typo would lift the cap.
 - **A pure admission gate beside `runReady`.** `slotNeed` says what a run asks of the cap: in flight — a step's or a check's task filed and
   not settled, or a started run nobody called off that the pass files something of — and whether it wants a slot: nothing filed, not called
@@ -2497,7 +2497,7 @@ What it leaves:
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
 `POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate`, `atGate`,
-`approvalRefusal` and `approvedSection` in `run.ts`, `approve` and `readApprovals` in `runner.ts`.
+`approvalRefusal` and `approvedSection` in `run.ts`, `approve` in `runner.ts`, `readApprovals` in `store.ts`.
 
 What was built, four commits:
 
@@ -3350,7 +3350,7 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
   Tested on the store (`test/queue-store.test.ts`): a card filed at 08:00, queued and taken back through `wf inbox queue` and its `--off`,
   keeps 08:00 across both writes, while `wf inbox add` still writes a card at the time it is filed. Without the two lines, the test fails.
-- **Git's stderr is no longer the daemon's.** `runner.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
+- **Git's stderr is no longer the daemon's.** `worktree.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
   *and* writes it to this process's own. A queued card whose `repo:` is a directory with no git in it is tried on every pass — that is the
   rule, since a failure is no verdict on the card — so `wf up` printed git's `fatal: not a git repository` every four seconds, beside the one
   line it says about the card. The helper now passes `['ignore', 'pipe', 'pipe']`, which changes nothing else: the words are still on the

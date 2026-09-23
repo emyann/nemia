@@ -283,7 +283,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`execFileSync` with no `stdio` writes the child's stderr on yours.** It captures stderr for the error's message *and*
   copies it to `process.stderr`, so a command that fails on every pass of a loop prints git's words on every pass, beside
   the line the loop says itself. Pass `stdio: ['ignore', 'pipe', 'pipe']`: the error's message keeps them (`git` in
-  `agent-workflows/src/runner.ts`, learned by the run that took up the queue's leftovers).
+  `agent-workflows/src/worktree.ts`, learned by the run that took up the queue's leftovers).
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every read and write follows it.** So code that writes each
   file it lists and removes the rest writes *through* a link — into whatever it points at, outside the folder — and leaves
   it behind when it should have removed it, with nothing said either way. Where a folder's files are meant to be its own,
@@ -377,7 +377,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **No `if` in `engine.ts` that belongs in `decide`.** Effectful code applies one decision; the
   judgement lives in the pure function.
 - **In agent-workflows, `assess` is pure and `runner.ts` is the only file that imports the
-  engine.** `run.ts` reads no disk and calls no engine. `cli.ts` parses, calls, prints.
+  engine.** `run.ts` reads no disk and calls no engine. `cli.ts` parses, calls, prints. The I/O that never names the
+  engine sits beneath `runner.ts` — `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts` — importing neither
+  the engine nor `runner.ts`, which re-exports them; none but `store.ts` is imported by another, and no pure file imports
+  any of them (`test/boundary.test.ts`). A new such file joins that test's `BENEATH`.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes.
   A guard that only fires on a transition is wrong after a restart.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask)

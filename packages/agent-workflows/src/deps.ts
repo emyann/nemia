@@ -2,7 +2,7 @@
  * What a fresh worktree needs that git did not give it — the pure half.
  *
  * A worktree holds tracked files only. Two things fill the rest in, both decided here from names and
- * applied by `runner.ts`, which reads the disk this file never touches:
+ * applied by `worktree.ts`, which reads the disk this file never touches:
  *
  * - **`node_modules`, per worktree.** It used to be one link to the main checkout's whole tree, and
  *   npm workspaces are links whose real path is the main checkout — so a worktree's apps imported
@@ -32,7 +32,7 @@ export type DepsListing = {
 /** One thing to make in the worktree: a directory of its own, or a link. A link's target is written as given. */
 export type DepsAction = { kind: 'dir'; path: string } | { kind: 'link'; path: string; target: string };
 
-/** What a worktree's `node_modules` turned out to be. `runner.ts`'s `provisionDeps` returns it. */
+/** What a worktree's `node_modules` turned out to be. `worktree.ts`'s `provisionDeps` returns it. */
 export type Provisioned =
   /** Made from `depsPlan`: `made` is how many entries this call added, so 0 on a second call. */
   | { tree: 'linked'; made: number }

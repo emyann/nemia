@@ -2,8 +2,8 @@
  * Where a run's steps work, for a run that is not a git run: the kinds of workspace a team can say beside git's (`place` on the run
  * record). One so far, `folder` (`workspace: folder`), and nothing here reads git, the network, or the engine.
  *
- * A git run's steps work in worktrees of its repository, and every word about them — cut, merge, hand-off commit, branch, standing,
- * forget — stays in runner.ts, where the shipped folders' runs are pinned (`git-before-after.test.ts`). A folder run is the other kind,
+ * A git run's steps work in worktrees of its repository, and every word about them — cut, merge and hand-off commit in worktree.ts;
+ * branch, standing and forget in runner.ts — stays in those two, where the shipped folders' runs are pinned (`git-before-after.test.ts`). A folder run is the other kind,
  * whole: what `advance` makes for a step, what it does when the step is finished, and where it all lives, which is under the run's own
  * directory in the store, so `wf rm` forgets it with the record and runs no git.
  */
@@ -26,7 +26,7 @@ export type Place = {
 export const workRoot = (runs: string, id: string): string => path.join(runs, id, 'work');
 
 /**
- * Where `wf start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which runner.ts's `inputsDir` reads. Here
+ * Where `wf start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which store.ts's `inputsDir` reads. Here
  * because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts apart.
  */
 export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');

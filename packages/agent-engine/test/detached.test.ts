@@ -10,7 +10,9 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { claudeResultOutput, detachedOps, STALE_MS, trustedProjects, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedOps, STALE_MS, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { claudeResultOutput } from '../src/runner-detached-output.ts';
+import { trustedProjects } from '../src/runner-codex.ts';
 import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
@@ -171,7 +173,7 @@ test('the composite sends a release only to the harness that reported the sessio
 // ─── isolation: the flag shapes differ per harness, which is what a spec is for ──
 
 test('a worktree is always NAMED for Claude — a bare --worktree would eat the prompt', async () => {
-  const { claudeDetached } = await import('../src/runner-detached.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const args = claudeDetached.command({ name: 'ae/t-abc/2', brief: 'the prompt', cwd: '/r', worktree: true }).args;
   const i = args.indexOf('--worktree');
   assert.notEqual(i, -1);
@@ -180,13 +182,13 @@ test('a worktree is always NAMED for Claude — a bare --worktree would eat the 
 });
 
 test('a task may name its own worktree', async () => {
-  const { claudeDetached } = await import('../src/runner-detached.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const args = claudeDetached.command({ name: 'ae/t-abc/2', brief: 'b', cwd: '/r', worktree: 'my-branch' }).args;
   assert.equal(args[args.indexOf('--worktree') + 1], 'my-branch');
 });
 
 test("codex's worktree flag takes no value, so the prompt still follows it safely", async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const args = codex.command({ name: 'ae/t-abc/1', brief: 'the prompt', cwd: '/r', worktree: true }).args;
   assert.equal(args[args.indexOf('--worktree') + 1], 'the prompt', 'the prompt, not a name');
   assert.equal(args.at(-1), 'the prompt');
@@ -195,7 +197,7 @@ test("codex's worktree flag takes no value, so the prompt still follows it safel
 test('the default permission mode is `auto` — a fleet cannot wait for a person', async () => {
   // `acceptEdits` looks safer and is worse here: it approves edits but not `npm test`, so an
   // unattended session blocks the moment it wants to run its own tests.
-  const { claudeDetached } = await import('../src/runner-detached.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const args = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
   assert.equal(args[args.indexOf('--permission-mode') + 1], 'auto');
 
@@ -204,7 +206,7 @@ test('the default permission mode is `auto` — a fleet cannot wait for a person
 });
 
 test('codex runs read-only when the task says read-only — never widened to workspace-write', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const sandbox = (permissionMode?: string) => {
     const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', permissionMode }).args;
     return args[args.indexOf('-s') + 1];
@@ -218,7 +220,8 @@ test('codex runs read-only when the task says read-only — never widened to wor
 });
 
 test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const task = (permissionMode: string) => ({ brief: 'b', cwd: '/r', permissionMode });
   assert.match(codex.refuses!(task('acceptEdits')) ?? '', /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/);
   assert.match(claudeDetached.refuses!(task('read-only')) ?? '', /not a mode Claude Code has/);
@@ -229,7 +232,7 @@ test("codex refuses a permission mode that is not one of its sandboxes; Claude's
 // ─── the closing statement ──────────────────────────────────────────────────
 
 test('codex is given the schema and an output file, and the prompt still comes last', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const args = codex.command(
     { name: 'ae/t/1', brief: 'the prompt', cwd: '/r', closeoutSchema: {} },
     { closeoutSchemaFile: '/board/s.schema.json', closeoutFile: '/board/s.closeout.json' },
@@ -272,7 +275,7 @@ test('a re-spawn of the same attempt does not find the last answer waiting for i
 test('a resumed codex task puts every flag before `resume`, then the id, then the prompt', async () => {
   // `codex exec resume <id> -C … -s …` fails to parse: the subcommand takes only `[SESSION_ID]
   // [PROMPT]`. Verified against 0.154.0. The spec emitted exactly that shape until this test.
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const args = codex.command(
     { name: 'ae/t/2', brief: 'answer the review', cwd: '/wt', resumeFrom: 'abc-123', worktree: true, closeoutSchema: {} },
     { closeoutSchemaFile: '/b/s.json', closeoutFile: '/b/o.json' },
@@ -315,7 +318,7 @@ const inCodexHome = <T>(home: string, f: () => T): T => {
 };
 
 test('a worktree of a repository you trust in Codex is trusted for the run, repository included', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const { repo, wt, home } = repoWithWorktree(true);
   const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
   assert.deepEqual(io.trustedDirs, [repo, wt]);
@@ -323,20 +326,20 @@ test('a worktree of a repository you trust in Codex is trusted for the run, repo
 
 test('a repository you never trusted gets no trust from the engine', async () => {
   // Trusting it would also load whatever Codex settings it ships. Not the engine's call.
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const { wt, home } = repoWithWorktree(false);
   const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
   assert.equal(io.trustedDirs, undefined);
 });
 
 test('outside a repository there is nothing to extend', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-plain-'));
   assert.deepEqual(codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: plain }), {});
 });
 
 test('trust reaches codex as config overrides, every one before `resume`', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const args = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', resumeFrom: 'abc' }, { trustedDirs: ['/repo', '/wt'] }).args;
   const overrides = args.flatMap((a, i) => (a === '-c' ? [args[i + 1]] : []));
   assert.deepEqual(overrides, ['projects."/repo".trust_level="trusted"', 'projects."/wt".trust_level="trusted"']);
@@ -359,7 +362,8 @@ test("the runner merges what a spec prepares into what its command is given", as
 // ─── the fence and the effort, per harness ──────────────────────────────────
 
 test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const c = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
   assert.equal(c.some((a) => a.startsWith('model_reasoning_effort')), false);
   assert.equal(c[c.indexOf('-s') + 1], 'workspace-write');
@@ -370,7 +374,7 @@ test('at shipped defaults neither detached harness is given a tool list or an ef
 });
 
 test('codex runs read-only when its tools have none of Bash, Write or Edit — whatever sandbox it named', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   const sandbox = (r: { tools?: string[]; permissionMode?: string }) => {
     const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', ...r }).args;
     return args[args.indexOf('-s') + 1];
@@ -383,7 +387,8 @@ test('codex runs read-only when its tools have none of Bash, Write or Edit — w
 });
 
 test('effort reaches codex as a config override before `resume`, and claude-detached as --effort', async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const c = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', effort: 'high', resumeFrom: 'abc' }).args;
   const i = c.indexOf('model_reasoning_effort="high"');
   assert.ok(i > 0 && c[i - 1] === '-c', '-c model_reasoning_effort="high"');
@@ -397,7 +402,8 @@ test('effort reaches codex as a config override before `resume`, and claude-deta
 });
 
 test('an effort a harness does not have is refused by that harness, in its own words', async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const task = (effort: string) => ({ brief: 'b', cwd: '/r', effort });
   assert.match(codex.refuses!(task('extreme')) ?? '', /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/);
   // Claude Code would only warn and run at its default, so the engine refuses what the CLI ignores.
@@ -479,7 +485,7 @@ const SESSION = '5e551011-0000-4000-8000-000000000001';
 const resultLine = (o: object) => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
 
 test('claude-detached is asked for JSON, and for the schema as --json-schema when the task gives one', async () => {
-  const { claudeDetached } = await import('../src/runner-detached.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const schema = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
   const args = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', closeoutSchema: schema, resumeFrom: 'abc', worktree: true }).args;
   assert.deepEqual(args.slice(0, 2), ['-p', 'the prompt'], "the prompt is -p's own value");
@@ -508,7 +514,8 @@ test("claude -p's answer is its result object's structured_output, and nothing e
 });
 
 test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex, which has no spend cap — in its own words', async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', budgetUsd: 0.25, resumeFrom: 'abc' }).args;
   assert.equal(d[d.indexOf('--max-budget-usd') + 1], '0.25');
   assert.equal(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args.includes('--max-budget-usd'), false, 'no budget, no flag');
@@ -520,7 +527,8 @@ test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex
 });
 
 test('a context window reaches claude -p as --autocompact, which it keeps — and codex declares none, so file() refuses one there', async () => {
-  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', contextTokens: 150000, tools: ['Read'], resumeFrom: 'abc' }).args;
   assert.equal(d[d.indexOf('--autocompact') + 1], '150000');
   assert.ok(d.indexOf('--autocompact') > d.indexOf('--permission-mode'), 'past the variadic lists');
@@ -693,7 +701,7 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
 });
 
 test('REFUSED: a deny list on codex, which has no tool list to take from — in its own words, naming the sandbox', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   assert.match(codex.refuses!({ brief: 'b', cwd: '/r', disallowedTools: ['Bash(git push)'] }) ?? '', /is a deny list, and Codex has no tool list to take from.*`permissionMode`/);
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r', disallowedTools: [] }), undefined, 'an empty list denies nothing');
   const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', disallowedTools: ['SendMessage'] }).args;
@@ -701,7 +709,7 @@ test('REFUSED: a deny list on codex, which has no tool list to take from — in 
 });
 
 test('REFUSED: an allow list on codex, for the same reason and in the same shape — one shell, fenced by its sandbox', async () => {
-  const { codex } = await import('../src/runner-detached.ts');
+  const { codex } = await import('../src/runner-codex.ts');
   assert.match(codex.refuses!({ brief: 'b', cwd: '/r', allowedTools: ['Write(**)'] }) ?? '', /is an allow list, and Codex has no tool list to allow from.*`permissionMode`/);
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r', allowedTools: [] }), undefined, 'an empty list allows nothing extra');
   const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', allowedTools: ['Write(**)'] }).args;

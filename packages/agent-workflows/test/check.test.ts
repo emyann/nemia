@@ -12,7 +12,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine } from 'agent-engine';
 // The engine beside this package in THIS tree, by path — see the read-only test at the end.
-import { codex } from '../../agent-engine/src/runner-detached.ts';
+import { codex } from '../../agent-engine/src/runner-codex.ts';
 import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow.ts';
 

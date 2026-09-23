@@ -1,7 +1,7 @@
 /**
  * The one transcript reader behind every harness's `transcript`: a JSONL file read from a cursor, whole lines
  * only, and the cursor to ask again with. What a line means is the harness's — Claude Code's lines are read in
- * `runner-claude-transcript.ts`, Codex's rollout in `runner-detached.ts`.
+ * `runner-claude-transcript.ts`, Codex's rollout in `runner-codex-transcript.ts`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

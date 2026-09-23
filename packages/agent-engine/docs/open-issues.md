@@ -43,7 +43,7 @@ need that work somewhere else first. A session whose task a person or a deadline
 
 ### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
 
-`agent-engine/src/runner-detached.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`agent-engine/src/runner-detached-output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
 prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
 is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
@@ -133,7 +133,7 @@ has no Codex servers configured.
 `transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
-(`claudeResultOutput` in `agent-engine/src/runner-detached.ts`). Low priority, like issue 4: this
+(`claudeResultOutput` in `agent-engine/src/runner-detached-output.ts`). Low priority, like issue 4: this
 harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
 
 ### 12. `said` means the words were handed to the inbox, not that the session read them

@@ -21,7 +21,9 @@ import {
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses } from './runner-claude-vocabulary.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
-import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
+import { detachedOps, type HarnessSpec } from './runner-detached.ts';
+import { codex } from './runner-codex.ts';
+import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, refusalOf, requestStop, tick, view, type TaskView } from './engine.ts';
 
@@ -628,7 +630,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
 }
 
 // ─── the vocabulary, all plain data ─────────────────────────────────────────
-export { codex, claudeDetached } from './runner-detached.ts';
+export { codex } from './runner-codex.ts';
+export { claudeDetached } from './runner-claude-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said } from './domain.ts';

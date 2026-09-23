@@ -1195,8 +1195,12 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-claude-transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/runner-claude-vocabulary.ts` | Claude Code's modes, efforts, context windows and pool, and what it refuses to be asked for |
 | `src/runner-claude-inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
-| `src/runner-mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them |
-| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
+| `src/runner-mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
+| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
+| `src/runner-codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
+| `src/runner-codex-transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
+| `src/runner-detached-output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
+| `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |

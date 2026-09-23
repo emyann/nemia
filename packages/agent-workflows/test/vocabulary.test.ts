@@ -17,7 +17,7 @@ const root = import.meta.resolve('agent-engine');
 const runner = await import(new URL('./runner-claude-vocabulary.ts', root).href) as {
   CLAUDE_PERMISSION_MODES: readonly string[]; CLAUDE_EFFORTS: readonly string[]; CLAUDE_CONTEXT_TOKENS: { least: number; most: number };
 };
-const detached = await import(new URL('./runner-detached.ts', root).href) as {
+const detached = { ...await import(new URL('./runner-codex.ts', root).href), ...await import(new URL('./runner-claude-detached.ts', root).href) } as {
   CODEX_SANDBOXES: readonly string[]; CODEX_EFFORTS: readonly string[]; codex: unknown; claudeDetached: unknown;
 };
 const { CLAUDE_PERMISSION_MODES, CLAUDE_EFFORTS } = runner;

@@ -1,10 +1,11 @@
 /**
  * A task's MCP servers, as Claude Code is handed them: what the engine refuses of a task's `mcp`, the checkout's own
- * `.mcp.json`, the task's config written to a file, and the flags that load those and nothing else.
+ * `.mcp.json`, the task's config written to a file, and the flags that load those and nothing else. And as Codex is
+ * handed them: the server names an operator's Codex config already has, and a task's servers as its `mcp_servers` table.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { SpawnRequest } from './runner.ts';
+import type { McpServer, SpawnRequest } from './runner.ts';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
@@ -89,3 +90,34 @@ export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): strin
   const named = configs.filter((c): c is string => c !== undefined);
   return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config', '--no-chrome'];
 };
+
+/**
+ * The MCP server names a Codex config gives, as `codex mcp add` writes them: `[mcp_servers.<name>]`
+ * tables and the tables under them. Not TOML in general — an inline `mcp_servers = {…}` is not read —
+ * so a name it misses meets Codex's own merge, which is where a task stood before this was read.
+ */
+export const codexMcpServerNames = (toml: string): Set<string> => {
+  const names = new Set<string>();
+  for (const raw of toml.split('\n')) {
+    const table = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim());
+    if (table) names.add(table[1] ?? table[2]!);
+  }
+  return names;
+};
+
+/** A TOML basic string. JSON's escapes are TOML's; TOML also wants DEL escaped. */
+const tomlString = (s: string) => JSON.stringify(s).replace(/\x7f/g, '\\u007f');
+const tomlTable = (entries: ReadonlyArray<readonly [string, string | undefined]>) =>
+  `{${entries.flatMap(([k, v]) => (v === undefined ? [] : [`${tomlString(k)}=${v}`])).join(',')}}`;
+const tomlStrings = (m: Record<string, string> | undefined) =>
+  m === undefined ? undefined : tomlTable(Object.entries(m).map(([k, v]) => [k, tomlString(v)] as const));
+
+/**
+ * A task's `mcp` as Codex's `mcp_servers` table, inline: `command`, `args`, `env`, or `url` with its
+ * headers as `http_headers`. One value with every name quoted, because a dotted `-c` key is split on
+ * every dot, quotes or none ("invalid transport in `mcp_servers."a`", 0.154.0).
+ */
+export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
+  tomlTable(Object.entries(mcp).map(([name, s]) => [name, 'command' in s
+    ? tomlTable([['command', tomlString(s.command)], ['args', s.args && `[${s.args.map((a) => tomlString(a)).join(',')}]`], ['env', tomlStrings(s.env)]])
+    : tomlTable([['url', tomlString(s.url)], ['http_headers', tomlStrings(s.headers)]])] as const));

@@ -63,6 +63,8 @@ const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs, unknown>
   [{ priority: Infinity }, /^`priority: Infinity` is not a number\./],
   [{ priority: 'high' }, /^`priority: "high"` is not a number\./],
   [{ config: { remoteControl: 'true' } }, /^`remoteControl: "true"` is not true or false\./],
+  [{ config: { background: 'yes' } }, /^`background: "yes"` is not true or false\. Give true to run the session as `claude --bg`, or leave it out to run it as a job\.$/],
+  [{ config: { background: 1 } }, /^`background: 1` is not true or false\./],
   [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
   [{ config: { contextTokens: 150000.5 } }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
   [{ config: { contextTokens: '200k' } }, /^`contextTokens: "200k"` is not a number of tokens\./],
@@ -103,7 +105,7 @@ test('the Effect door journals a filing that refuses nothing, with every checked
     ...ok, maxAttempts: 2, deadlineSeconds: 60, resume: 'always', resumeFrom: 's-1', budgetUsd: 0.25, priority: -1,
     config: {
       model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
-      allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, contextTokens: 200000,
+      allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, background: false, contextTokens: 200000,
     },
   };
   const id = await effect.run(file(full));

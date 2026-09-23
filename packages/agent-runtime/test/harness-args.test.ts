@@ -24,16 +24,16 @@ type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
 const refusedBy = (ops: RunnerOps, t: Asked) =>
   Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(Runner.layer(ops))));
 
-test('HARNESS_ARGS is the ten arguments a harness takes', () => {
+test('HARNESS_ARGS is the eleven arguments a harness takes', () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'allowedTools', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
+    'allowedTools', 'background', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
   ]);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the ten', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the eleven', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus', permissionMode: 'auto', effort: 'high', tools: ['Read'], allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
-    mcp: {}, contextTokens: 200000, remoteControl: false, worktree: true,
+    mcp: {}, contextTokens: 200000, remoteControl: false, background: true, worktree: true,
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);

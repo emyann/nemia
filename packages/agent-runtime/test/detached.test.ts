@@ -10,6 +10,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/runner-detached-output.ts';
 import { trustedProjects } from '../src/runner-codex.ts';
@@ -80,6 +81,53 @@ test('stop reaches the detached worker, which kills the harness and says so', as
     await new Promise((r) => setTimeout(r, 200));
   }
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state, 'stopped');
+});
+
+test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', async () => {
+  // The worker is frozen right after its first write — the pid on disk, nothing after it run yet — and stopped
+  // while frozen, so the stop waits for it to go on. The engine's re-issued stop can land in that moment under
+  // load; a worker that hears SIGTERM only later dies of it, and its harness runs on under a run file that says
+  // `working` until the lease calls it dead.
+  const dir = root();
+  const hook = path.join(dir, 'freeze-after-publish.mjs');
+  fs.writeFileSync(hook, [
+    "import fs from 'node:fs';",
+    "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
+    '  const rename = fs.renameSync;',
+    "  fs.renameSync = (...a) => { fs.renameSync = rename; rename(...a); process.kill(process.pid, 'SIGSTOP'); };",
+    '}',
+  ].join('\n'));
+  const ops = detachedOps(sh('sleep 30'), dir);
+  const was = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
+  try { await Effect.runPromise(ops.spawn(req('ae/t4/2', dir))); } finally {
+    if (was === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = was;
+  }
+
+  const runFile = path.join(dir, 'runs', 'sh', 'ae_t4_2.json');
+  const pidOf = () => { try { return (JSON.parse(fs.readFileSync(runFile, 'utf8')) as { pid: number }).pid; } catch { return 0; } };
+  const frozen = (pid: number) => { try { return execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('T'); } catch { return false; } };
+  /** Wait until `ok` holds, under a bound of seconds: for what it counts, never a length of time. */
+  const until = async (ok: () => boolean, what: string) => {
+    for (const bound = performance.now() + 10_000; !ok();) {
+      if (performance.now() > bound) assert.fail(`${what}, in 10s`);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  };
+  let pid = 0;
+  let heard = false;
+  try {
+    await until(() => (pid = pidOf()) > 0, 'the worker publishes its pid');
+    // Continued before it has frozen, it would freeze for good: wait to see it stopped.
+    await until(() => frozen(pid), 'the worker freezes after its first write');
+    await Effect.runPromise(ops.stop('ae/t4/2'));
+    process.kill(pid, 'SIGCONT');
+    await settle(ops, 'ae/t4/2', 'stopped');
+    heard = true;
+  } finally {
+    // Only a worker that did not hear the stop is still there to take away.
+    if (pid > 0 && !heard) for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
+  }
 });
 
 test('THE LEASE: a run file whose heartbeat stopped is reported dead, not running', async () => {

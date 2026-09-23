@@ -33,6 +33,17 @@ const write = (patch: Partial<typeof status> = {}) => {
   fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));
   fs.renameSync(`${runFile}.tmp`, runFile);
 };
+// Heard before the pid is published: a stop is sent to the pid on disk, and a worker that met SIGTERM before
+// it had a handler would die of it, leaving its harness running under a run file that says `working` until the
+// lease calls it dead. Node runs a signal handler on the event loop, never inside this synchronous start, so
+// `child` below is set by the time one runs.
+let stopping = false;
+const killGroup = () => {
+  try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
+};
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sig, () => { stopping = true; killGroup(); });
+}
 write();
 
 // `detached` here is not about outliving anything — it gives the harness its own PROCESS GROUP,
@@ -58,14 +69,6 @@ child.stderr.on('data', scan);
 
 const beat = setInterval(() => write(), 5_000);
 beat.unref?.();
-
-let stopping = false;
-const killGroup = () => {
-  try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
-};
-for (const sig of ['SIGTERM', 'SIGINT'] as const) {
-  process.on(sig, () => { stopping = true; killGroup(); });
-}
 
 /**
  * How long, after the harness exits, its output may still be arriving. `exit` can come before its

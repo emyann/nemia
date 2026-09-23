@@ -158,7 +158,7 @@ workflow folder works too, looked at first. The board lists them, and the folder
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
 
 A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
-in runner.ts. Each step is rendered by `renderStep` (workflow.ts), which is the parser run backwards: the keys the step sets, in
+in authoring.ts. Each step is rendered by `renderStep` (workflow.ts), which is the parser run backwards: the keys the step sets, in
 the order listed below, each written as the parser reads it (a list as `a, b`, a count as its number, `output:` as the file it
 names), then the body. Before a byte is written, the folder as it would be is parsed in memory by `parseFolder`, the same reading
 `loadWorkflows` uses, with the schemas read from the folder as they are. So anything the parser would refuse is refused first, in
@@ -2296,11 +2296,15 @@ holding a concurrency slot forever.
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/store.ts` | the run store under `WF_ROOT`: a run's record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
+| `src/store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/daemon-store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`) and `daemon.json` read, judged by `src/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
 | `src/feed-store.ts` | the feed over the store's `feed.jsonl`, with this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`) |
 | `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
-| `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`), a workflow folder written from its steps (`writeWorkflow`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
+| `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
+| `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
+| `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
+| `src/runner.ts` | the I/O that knows the engine, and the package's root: the engine, a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), an inbox card started (`startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/feed.ts` | the feed of what the tick judged: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges` — pure), the cursor and its refusal, and the file read, appended to and followed (`readFeedFile`, `recordFeedFile`, `watchFeedFile`); no engine |
 | `src/cli.ts` | the verbs |
 
@@ -2322,6 +2326,8 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 
 `assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
 and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
-split as the engine, one layer up. `store.ts`, `daemon-store.ts`, `feed-store.ts` and `worktree.ts` sit
-beneath `runner.ts`, which re-exports them: none imports the engine or `runner.ts`, none but `store.ts` is
-imported by another, and no pure file imports any of them — the same test refuses each.
+split as the engine, one layer up. `store.ts`, `daemon-store.ts`, `feed-store.ts`, `worktree.ts`, `branches.ts`,
+`artifacts.ts`, `authoring.ts` and `inbox-store.ts` sit beneath `runner.ts`, which re-exports them: none imports the
+engine or `runner.ts`, none but `store.ts` and `worktree.ts` (whose `git` the branch and artifact readers use) is
+imported by another, `worktree.ts` imports only `store.ts` of them and `store.ts` none, and no pure file imports any
+of them — the same test refuses each.

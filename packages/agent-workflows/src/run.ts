@@ -141,7 +141,7 @@ type RunBase = {
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
+   * (`isShipped` in branches.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
    * records from before there were tips.
    */
   tips?: Record<string, string>;
@@ -295,7 +295,7 @@ export function assess(
   /** What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, nothing is known spent, and no step is over. */
   spendOf: SpendOf = () => undefined,
   /**
-   * Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in runner.ts): what says a run
+   * Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts): what says a run
    * whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
    */
   standings: readonly BranchStanding[] = [],
@@ -446,7 +446,7 @@ export function approvalRefusal(
   asks: readonly RetryAsk[] = [],
   spendOf: SpendOf = () => undefined,
   /**
-   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in runner.ts): an ending whose result git
+   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an ending whose result git
    * already has has nothing to merge (`resultOnBase`). Left out, git is not asked, and the gate alone speaks.
    */
   standings: readonly BranchStanding[] = [],
@@ -717,7 +717,7 @@ export const checkoutLine = (step: string, hold: CheckoutHold): string =>
   `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
- * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in runner.ts):
+ * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in branches.ts):
  * `on` it — merged, or with nothing committed past the run's base — `ahead` of it by N commits, or `gone`, a branch git no longer has and
  * no recorded tip puts on the base.
  */
@@ -1024,7 +1024,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  * never ship onto this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
  * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `wf decide` never calls shipped, whatever git says of its
  * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. Handed only what
- * the record and git say (`parentRecord` in runner.ts): nothing here needs the engine. The run itself cannot be named: it has no id yet.
+ * the record and git say (`parentRecord` in branches.ts): nothing here needs the engine. The run itself cannot be named: it has no id yet.
  */
 export function afterRefusal(
   after: readonly string[],
@@ -2567,7 +2567,7 @@ export function forgetRefusal(
   /** Where an ask's file is, for the command that takes it back. */
   askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
   /**
-   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in runner.ts): an ending whose result git
+   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an ending whose result git
    * already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
    */
   standings: readonly BranchStanding[] = [],
@@ -3030,7 +3030,7 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  *
  * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
- * the directory at hand-off, before the check (`collectArtifacts` in runner.ts), so such a step hands it over too.
+ * the directory at hand-off, before the check (`collectArtifacts` in artifacts.ts), so such a step hands it over too.
  *
  * `inMain` for a step that works in the repository's own checkout (`workspace: main`): there the second way is
  * false and does harm. The run hands nothing off in a person's checkout (`handOffDue`), so nothing is collected
@@ -3083,7 +3083,7 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
  *
  *   workspace  a path from the workspace root — collected from the workspace into the step's files directory
- *              when the step hands off (`collectArtifacts` in runner.ts), and read from there
+ *              when the step hands off (`collectArtifacts` in artifacts.ts), and read from there
  *   files      an absolute path inside the step's files directory — on disk, where the run keeps it
  *   escapes    a path from the workspace root that climbs out of it, `../notes.md` — refused, and never read
  *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
@@ -3106,7 +3106,7 @@ export function artifactPlace(file: string, dir: string): ArtifactPlace {
 export type ArtifactFile = { path: string; bytes: number };
 
 /**
- * A declared artifact the run does not have, and why (`missingArtifacts` in runner.ts):
+ * A declared artifact the run does not have, and why (`missingArtifacts` in artifacts.ts):
  *
  *   not there      a path from the workspace root with nothing at it, nor on the branch
  *   directory      a path from the workspace root that is a directory: not collected, since a step names each file
@@ -3196,7 +3196,7 @@ export type Decision =
     };
 
 /**
- * Whether a result branch is on the run's base branch, as git says it (`isShipped` in runner.ts):
+ * Whether a result branch is on the run's base branch, as git says it (`isShipped` in branches.ts):
  *
  *   false        it is not
  *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut
@@ -3381,7 +3381,7 @@ export function listing(
   spendOf: SpendOf = () => undefined,
   /** The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be. */
   slot?: RunSlot,
-  /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in runner.ts): what says a finished run is one nobody has decided. */
+  /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts): what says a finished run is one nobody has decided. */
   standings: readonly BranchStanding[] = [],
   /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run's ending says where `waiting` would be. */
   checkout?: CheckoutHold,

@@ -73,12 +73,13 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
+      // Held before the page loads, so every read of the run it makes is the held one — the reads the feed's replay asks for as it opens too.
+      const detailPath = `/api/runs/${id}`;
+      const read = await (await refused.request.get(new URL(detailPath, page.url()).href)).text();
+      await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
       await expectVisible(approveOf(refused), 'Approve, on a page of its own');
-      const detailPath = `/api/runs/${id}`;
-      const read = await (await refused.request.get(new URL(detailPath, refused.url()).href)).text();
-      await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
       const { gates: _gates, ...ungated } = JSON.parse(seededRecord) as { gates?: string[] };
       fs.writeFileSync(recordFile, JSON.stringify(ungated, null, 2));
       await wordsOf(refused).fill(GATED.words);

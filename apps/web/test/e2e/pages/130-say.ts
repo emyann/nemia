@@ -85,11 +85,13 @@ export default {
       const refused = await page.context().newPage();
       try {
         const { problems } = watch(refused);
+        // Held before the page loads, so every read of the run it makes is the held one: the feed's stream replays the whole feed as it
+        // opens, and reads the run again on it, which a route installed after the load could miss, to be answered once the session ended.
+        const detailPath = `/api/runs/${SAYING.run}`;
+        const read = await (await refused.request.get(new URL(detailPath, page.url()).href)).text();
+        await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
         await refused.goto(page.url(), { waitUntil: 'load' });
         await expectVisible(boxOf(refused, 'open'), 'the prompt box, open, on a page of its own');
-        const detailPath = `/api/runs/${SAYING.run}`;
-        const read = await (await refused.request.get(new URL(detailPath, refused.url()).href)).text();
-        await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
         const end = new Date().toISOString();
         fs.appendFileSync(journal, [
           { kind: 'ended', at: end, attempt: 1, sessionId: `ae/${SAYING.run}-${SAYING.step}/1`, nativeId: SAYING.sessionId, observed: 'done', reason: 'harness' },

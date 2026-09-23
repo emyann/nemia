@@ -21,6 +21,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useFeed } from '@/lib/useFeed';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Root,
@@ -31,6 +32,8 @@ function Root() {
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
   const section = NAV.find((item) => item.active(path))?.label;
   const router = useRouter();
+  // The workflow feed, followed once for the whole page: what moves on it is read again at once, and the polls slow while it is open.
+  const feed = useFeed();
 
   return (
     // React Aria's links navigate through this. Enter on a link makes the browser click it on keydown, and React Aria does not prevent that
@@ -41,7 +44,7 @@ function Root() {
         <AppSidebar path={path} />
         <SidebarInset className="min-w-0">
           {/* `h-12`: the Factory takes the height below it. */}
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3" data-feed={feed}>
             <SidebarTrigger />
             {section && <span className="text-sm font-medium">{section}</span>}
           </header>

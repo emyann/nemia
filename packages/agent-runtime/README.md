@@ -227,6 +227,25 @@ Exit 0 is success, anything else is failure. That is all a generic harness has t
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
 
+### Beneath the harnesses: an A2A seam
+
+Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `createEngine` reaches it through the
+`@a2a-js/sdk` client, in this process, with no HTTP between them. A session is an A2A Task named for it, `ae/<task>/<n>`,
+whose `contextId` is the task; a spawn is a user Message, the brief its one text part and the rest of the request —
+`config` whole and unopened — its metadata; `observe` is a listing, and `stop` a cancel. What a harness says comes back in
+the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
+`SUBMITTED` and waits out the grace window, as before.
+
+The agent (`src/a2a-handler.ts`) holds nothing. Every answer is read afresh off the harness and the journal, so a runtime
+restarted mid-session answers for a session it never started, before its first tick, and an attempt the harness has let
+go is answered from the journal (`test/restart.test.ts`). It is not the SDK's `DefaultRequestHandler`, whose task store
+would be a second record beside the journal. Streaming, push notifications and an extended card are refused in the SDK's
+own errors, never taken and ignored.
+
+`logs`, `find`, `release`, `transcript`, `say` and `refuses` still reach the driver directly, and so does a runner an
+Effect program provides with `Runner.layer`; `a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts`
+import the SDK, and neither entry exports a name of its (`test/a2a-boundary.test.ts`).
+
 ## What a task may say, and what is refused
 
 A brief is markdown: `key: value` frontmatter, one line per key, and the body is the prompt. `#`
@@ -1219,6 +1238,9 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
+| `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message with `config` in its metadata, a sighting or a journalled attempt a Task |
+| `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, holding nothing — every answer read afresh off the harness and the journal |
+| `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's `spawn`, `observe` and `stop` as calls through the SDK's `Client` |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
@@ -1241,6 +1263,11 @@ selector, and it is why no attempt can ever run twice.
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
+| `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
+| `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |
+| `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
+| `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |
+| `test/journal-words.test.ts` | the journal's words for four runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |

@@ -228,7 +228,16 @@ orchestrator's calls to the runtime change.
    `Runner.layer`) in the same words; a journal written before is read in today's shape (`upgrade` in `Journal.layer`) and
    never rewritten; `test/core-reads.test.ts` refuses a read of one in `domain.ts` or `engine.ts`. Done, on the same day.
    **(2) the A2A seam** — `@a2a-js/sdk` in process, the drivers as adapters behind it, `config` in a message's metadata.
-   **(3) the rest of the calls through the client.**
+   Done, on the same day: `@a2a-js/sdk` pinned at 1.2.0; each harness an `A2ARequestHandler` of its own
+   (`src/a2a-handler.ts`) reached through the SDK's `Client` over an in-process transport (`src/a2a-client.ts`) — a spawn
+   is a user message, an observe a listing, a stop a cancel — with the mappings pure in `src/a2a-map.ts`; `engine.ts`,
+   `domain.ts` and the journal's words unchanged (`test/journal-words.test.ts`, written first). Not the SDK's
+   `DefaultRequestHandler`: it runs an executor against a `TaskStore` it writes, a second record beside the journal. This
+   handler holds nothing — every answer is read off the harness and the journal — so a restarted runtime answers for a
+   session it never started before its first tick (`test/restart.test.ts`). Only `src/a2a-*.ts` import the SDK
+   (`test/a2a-boundary.test.ts`). The Effect door takes the seam through `a2aRunner`, beside `Runner` as `sdkRunner` is.
+   **(3) the rest of the calls through the client:** logs, transcript, release, `say` and `find`, still direct (open
+   issue 27).
 2. **The Claude Code adapter runs a step as a job:** `-p` by default, a gate as `TASK_STATE_INPUT_REQUIRED`, denials loud, `auto`
    by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's

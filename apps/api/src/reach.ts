@@ -7,6 +7,8 @@
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
  * enable, whatever its tools; the settings' deny rules and its own `disallow:`; the settings' ask rules; Claude Code's read-only commands, which
  * ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what the settings allow of what asks.
+ * What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that says `background: true`), which asks
+ * nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
  * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions, read 2026-09-14, and for ask
  * rules 2026-09-16): deny, then ask, then allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask
  * rule every allow it matches, which asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included,
@@ -20,6 +22,22 @@ import { listWorkflows, type WorkflowListing, type WorkflowSource, type Workflow
 
 /** The harnesses that are Claude Code, as the engine names them: its jobs and background sessions (`claude`), and `claude -p` detached. */
 const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
+
+/**
+ * The modes a job was measured in, each denying what would ask and carrying on (agent-runtime's open issue 28, M1, Claude Code 2.1.280) —
+ * none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job in it.
+ */
+const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
+
+/**
+ * Why what asks is denied without a prompt on a Claude Code step: `dontAsk`, which denies it in any session; or it runs as a job, which has no
+ * one to ask — every `claude` step but a background session (`background: true`), and every `claude-detached` one. Null where it prompts.
+ */
+export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode' | 'background'>): 'dontAsk' | 'a job' | null => {
+  if (spec.permissionMode === 'dontAsk') return 'dontAsk';
+  const job = harness === 'claude-detached' || (harness === 'claude' && spec.background !== true);
+  return job && JOB_MEASURED.has(spec.permissionMode) ? 'a job' : null;
+};
 
 /** Where a step's own deny rules are read from. */
 export const DISALLOW = 'disallow:';
@@ -35,10 +53,12 @@ export type ReachedMcpTool = { name: string; denied: DeniedRule | null; asks: De
 
 /**
  * What the settings' allow rules give a step. `rules` are those that stand: none a deny takes back (`takenBack`, with the deny), none an ask rule
- * takes back (`asked`, with the ask rule: it asks, and in `dontAsk` is denied), and none of a tool the step does not have (`unused`) — known only
+ * takes back (`asked`, with the ask rule: it asks, and where `askDenier` names why, is denied), and none of a tool the step does not have (`unused`) — known only
  * for a step whose `tools:` names its set. `bash` are the Bash rules that stand, each with its command as the rule writes it, the narrower deny
  * rules that still refuse some of what it allows (`except`) and the narrower ask rules that still make some of it ask (`asks`); none for a step
  * with no Bash, which `why` says. `dontAsk` is whether the step runs in it, where anything that asks and no rule allows is denied without a prompt.
+ * `askDenier` is why what an ask rule makes ask is denied without a prompt instead — `dontAsk`, or `a job`, which asks nobody — and null where it
+ * prompts: a background session in another mode, or a job in a mode not measured.
  */
 export type AllowedFor = {
   rules: string[];
@@ -52,14 +72,15 @@ export type AllowedFor = {
    */
   exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
   dontAsk: boolean;
+  askDenier: 'dontAsk' | 'a job' | null;
   why: string | null;
 };
 
 /**
  * One of Claude Code's read-only commands as it reaches a step with Bash: whether it was measured running without a rule, or only documented so
  * (`READ_ONLY_COMMANDS`); the ask rule that makes all of it ask, when no deny refuses it — `Bash`, or a Bash rule covering `<command> *` — which
- * beats the harness's own leave as it beats an allow; and the rule that refuses all of it: a deny so covering it, or on a `dontAsk` step that ask
- * rule, since `dontAsk` denies what asks.
+ * beats the harness's own leave as it beats an allow; and the rule that refuses all of it: a deny so covering it, or that ask rule on a step
+ * that denies what asks (`askDenierOf`).
  */
 export type ReadOnlyCommand = { command: string; measured: boolean; denied: DeniedRule | null; asks: DeniedRule | null };
 
@@ -184,6 +205,7 @@ export function reachOf(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'den
 function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>, workflow: WorkflowListing, step: string, spec: WorkflowStepSpec): StepReach {
   const harness = spec.harness ?? Object.keys(HARNESSES)[0]!;
   const dontAsk = spec.permissionMode === 'dontAsk';
+  const askDenier = CLAUDE_CODE.has(harness) ? askDenierOf(harness, spec) : null;
   const reach = {
     workflow: workflow.name, from: workflow.from, step, harness,
     fence: { tools: spec.tools, disallow: spec.disallow, allow: spec.allow, permissionMode: spec.permissionMode, effort: spec.effort, mcp: null },
@@ -191,7 +213,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   if (!CLAUDE_CODE.has(harness)) {
     return {
       ...reach, claudeCode: false, tools: null, skills: null, mcp: null, denied: [], asked: [], readOnly: null,
-      allowed: { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
+      allowed: { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, askDenier, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
     };
   }
 
@@ -230,7 +252,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
       };
 
   // Deny, then ask, then allow: an allow stands only where no deny, and no ask rule, matches the whole of it.
-  const allowed: AllowedFor = { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, why: null };
+  const allowed: AllowedFor = { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, askDenier, why: null };
   for (const { rule } of capabilities.allowed) {
     const by = takenBackBy(rule, denied);
     const asks = by ? undefined : takenBackBy(rule, asked);
@@ -258,8 +280,8 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
       : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
   }
 
-  // What asks for no rule: each read-only command, unless a Bash deny covers all of it, or an ask rule does — which makes it ask, and in dontAsk
-  // denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole makes every command ask. `git`'s read-only forms are
+  // What asks for no rule: each read-only command, unless a Bash deny covers all of it, or an ask rule does — which makes it ask, and on a step
+  // that denies what asks (in dontAsk, or a job) denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole makes every command ask. `git`'s read-only forms are
   // not listed, so only a rule of every `git` command is known to take them.
   const covering = (rules: readonly DeniedRule[], command: string) => rules.find((d) => {
     const r = ruleOf(d.rule);
@@ -271,7 +293,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   ].map(({ command, measured }) => {
     const by = covering(denied, command);
     const asks = by ? null : covering(asked, command);
-    return { command, measured, denied: by ?? (dontAsk ? asks : null), asks };
+    return { command, measured, denied: by ?? (askDenier ? asks : null), asks };
   });
 
   const mcp = capabilities.mcp.filter((server) => server.enabled).map((server) => ({

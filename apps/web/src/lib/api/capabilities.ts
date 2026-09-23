@@ -72,7 +72,7 @@ export type StepReach = {
   /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */
   mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; asks: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
   denied: Rule[];
-  /** The settings' ask rules: what asks whatever an allow says, and in dontAsk is denied. None off Claude Code. */
+  /** The settings' ask rules: what asks whatever an allow says, and in dontAsk, or on a job, is denied. None off Claude Code. */
   asked: Rule[];
   /**
    * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does not have;
@@ -88,11 +88,13 @@ export type StepReach = {
     /** Every standing rule a narrower deny still refuses part of, or a narrower ask rule makes part of ask — a Bash command, one tool of a server. */
     exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
     dontAsk: boolean;
+    /** Why what an ask rule makes ask is denied without a prompt: `dontAsk`, or `a job`, which asks nobody. Null where it prompts. */
+    askDenier: 'dontAsk' | 'a job' | null;
     why: string | null;
   };
   /**
    * Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny refuses
-   * it; and the rule that refuses it — a deny, or in dontAsk that ask rule. None without Bash, null off Claude Code.
+   * it; and the rule that refuses it — a deny, or that ask rule where `askDenier` says what asks is denied. None without Bash, null off Claude Code.
    */
   readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
 };

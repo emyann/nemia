@@ -91,7 +91,12 @@ export default {
     await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
     await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
     await expectVisible(implement.locator('[data-read-only="grep"]:not([data-documented])'), 'implement, in no mode, runs the read-only commands without a rule too (grep)');
-    await expectVisible(implement.locator(`[data-read-only="cat"][data-asks="${ask}"]:not([data-denied])`), `and cat asks there (${ask}), which no mode but dontAsk denies`);
+    // Implement is a job, which asks nobody in any mode: what an ask rule makes ask is denied there too, and the page said it would ask.
+    await expectVisible(implement.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`), `and cat, which the settings make ask (${ask}), is denied on a job`);
+    await expectVisible(
+      implement.locator('[data-read-only-taken]', { hasText: `cat asks, by ${ask} (.claude/settings.json), which a job denies` }),
+      'implement says why cat is struck: it is a job',
+    );
     const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
     await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
     await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only], [data-ask-rule]'), 0, 'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read');

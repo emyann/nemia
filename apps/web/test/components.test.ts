@@ -1891,9 +1891,9 @@ const READ_ONLY: ReadOnlyCommands = {
   harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15', source: "B9's last review", measured: ['cat', 'grep'], documented: ['find', 'git'],
   docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
 };
-/** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not. */
-const allowedTo = (dontAsk: boolean): StepReach['allowed'] => ({
-  rules: ['Bash(npm test)'], takenBack: [], asked: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }], exceptions: [], dontAsk, why: null,
+/** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not — and what denies what asks there: dontAsk, a job, or nothing. */
+const allowedTo = (dontAsk: boolean, askDenier: StepReach['allowed']['askDenier'] = dontAsk ? 'dontAsk' : null): StepReach['allowed'] => ({
+  rules: ['Bash(npm test)'], takenBack: [], asked: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }], exceptions: [], dontAsk, askDenier, why: null,
 });
 /** The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api gives as the rule that denies it too. */
 const readOnlyReach = (denied: Record<string, string> = {}, asks: Record<string, string> = {}, dontAsk = false): NonNullable<StepReach['readOnly']> => [
@@ -1948,7 +1948,15 @@ test('REFUSED: a read-only command an ask rule covers is drawn asking, with the 
   assert.match(html, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave, and dontAsk denies what asks" class="[^"]*line-through/);
   assert.ok(textsOf(html).includes('cat asks, by Bash(cat:*) (.claude/settings.json), which dontAsk denies.'), textsOf(html).join(' | '));
 
-  // Outside dontAsk it asks: not struck, and not drawn as running.
+  // On a job, which asks nobody in any mode, it is struck too, and the words name the job rather than a mode.
+  const job = allowedMarkup(allowedTo(false, 'a job'), readOnlyReach({}, { cat: 'Bash(cat:*)' }, true));
+  assert.deepEqual(readOnlyChips(job), ['cat:Bash(cat:*):asks Bash(cat:*)', 'grep', 'find:documented', 'git:documented']);
+  assert.match(job, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="[^"]*, and a job denies what asks" class="[^"]*line-through/);
+  assert.ok(textsOf(job).includes('cat asks, by Bash(cat:*) (.claude/settings.json), which a job denies.'), textsOf(job).join(' | '));
+  const jobNone = allowedMarkup({ ...allowedTo(false, 'a job'), rules: [], bash: [] }, readOnlyReach());
+  assert.ok(textsOf(jobNone).some((t) => t.endsWith('and what would still ask is denied: a job asks nobody.')), textsOf(jobNone).join(' | '));
+
+  // On a background session, outside dontAsk, it asks: not struck, and not drawn as running.
   const asking = allowedMarkup(allowedTo(false), readOnlyReach({ find: 'Bash(find:*)' }, { cat: 'Bash(cat:*)', git: 'Bash(git:*)' }));
   assert.deepEqual(readOnlyChips(asking), ['cat:asks Bash(cat:*)', 'grep', 'find:documented:Bash(find:*)', 'git:documented:asks Bash(git:*)']);
   assert.match(asking, /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-amber-50/);
@@ -1983,6 +1991,11 @@ test('REFUSED: an allow an ask rule takes back is drawn apart, with the rule —
   assert.doesNotMatch(shut, /data-bash="git diff/, 'not drawn among what it may run');
   assert.match(shut, /data-asks="npx turbo run test:\*"[^>]*>and asks for Bash\(npx turbo run test build\), which dontAsk denies</);
   assert.doesNotMatch(shut, /data-asks="npm test"/);
+
+  const job = allowedMarkup({ ...allowed(false), askDenier: 'a job' }, readOnlyReach());
+  assert.ok(textsOf(job).includes('Taken back by an ask rule, which beats an allow, and a job denies what asks:'), textsOf(job).join(' | '));
+  assert.match(job, /<code data-asked="Bash\(git diff:\*\)"[^>]*class="[^"]*line-through/);
+  assert.match(job, /data-asks="Bash\(npx turbo run test:\*\)"[^>]*>and asks for Bash\(npx turbo run test build\), which a job denies</);
 
   const open = allowedMarkup(allowed(false), readOnlyReach());
   assert.ok(textsOf(open).includes('Taken back by an ask rule, which beats an allow: these ask.'), textsOf(open).join(' | '));

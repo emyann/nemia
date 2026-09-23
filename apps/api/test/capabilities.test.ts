@@ -9,7 +9,7 @@ import path from 'node:path';
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
 const { app } = await import('../src/app.ts');
 const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } = await import('../src/capabilities.ts');
-const { DISALLOW, bashCovers } = await import('../src/reach.ts');
+const { DISALLOW, askDenierOf, bashCovers } = await import('../src/reach.ts');
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts');
 
@@ -451,6 +451,7 @@ test('REFUSED: `disallow` takes away — a tool, one of a family, a server\'s to
     bash: [bashRule('Bash(npm test)'), bashRule('Bash(git diff:*)')],
     exceptions: [],
     dontAsk: false,
+    askDenier: 'a job',
     why: null,
   });
   assert.deepEqual(implement.denied.slice(2).map((d: { rule: string }) => d.rule), ['SendMessage', 'CronCreate', 'mcp__fixture__echo', 'Bash(npm run build)']);
@@ -470,6 +471,7 @@ test('a `dontAsk` step under the settings shows what Bash commands are allowed �
     bash: [bashRule('Bash(npm test)'), bashRule('Bash(git diff:*)'), bashRule('Bash(npm run build)')],
     exceptions: [],
     dontAsk: true,
+    askDenier: 'dontAsk',
     why: null,
   });
   assert.deepEqual(review.mcp[0].tools, [{ name: 'echo', denied: null, asks: null, allowed: false }, { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, asks: null, allowed: false }]);
@@ -538,7 +540,7 @@ test('REFUSED: a `dontAsk` step without Bash runs no command, whatever the setti
   });
   const { 'dev/reader': reader, 'dev/denied': denied } = await stepsOf(repo);
   assert.deepEqual(reader.allowed, {
-    rules: ['Read'], takenBack: [], asked: [], unused: ['Bash(npm test)', 'Bash(git diff:*)'], bash: [], exceptions: [], dontAsk: true,
+    rules: ['Read'], takenBack: [], asked: [], unused: ['Bash(npm test)', 'Bash(git diff:*)'], bash: [], exceptions: [], dontAsk: true, askDenier: 'dontAsk',
     why: 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.',
   });
   assert.ok(!denied.tools.names.includes('Bash'), 'the measured set, less the Bash its disallow: names whole');
@@ -551,7 +553,7 @@ test('a Codex step shows its fence, and nothing it was not measured to get or do
   const { 'codexed/plan': plan } = await stepsOf(stepsRepo());
   assert.deepEqual([plan.harness, plan.claudeCode, plan.tools, plan.skills, plan.mcp, plan.denied, plan.asked], ['codex', false, null, null, null, [], []]);
   assert.deepEqual(plan.fence, { tools: null, disallow: [], allow: [], permissionMode: null, effort: null, mcp: null });
-  assert.deepEqual(plan.allowed, { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk: false, why: 'codex reads no .claude/settings.json, so none of its rules is claimed for this step.' });
+  assert.deepEqual(plan.allowed, { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk: false, askDenier: null, why: 'codex reads no .claude/settings.json, so none of its rules is claimed for this step.' });
 });
 
 test('a workflow the loader refuses has no step on the page, and a repository with a workflow and nothing else still says what its step gets', async () => {
@@ -562,7 +564,7 @@ test('a workflow the loader refuses has no step on the page, and a repository wi
   const steps = await stepsOf(repo);
   assert.deepEqual(Object.keys(steps), ['lone/implement']);
   // No harness named: the engine's first, Claude Code. No settings: nothing denied or allowed; no `.mcp.json`: no server.
-  assert.deepEqual([steps['lone/implement'].harness, steps['lone/implement'].tools.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed], ['claude', 'measured', [], { rules: [], bash: [], dontAsk: false, ...nothingElse }]);
+  assert.deepEqual([steps['lone/implement'].harness, steps['lone/implement'].tools.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed], ['claude', 'measured', [], { rules: [], bash: [], dontAsk: false, askDenier: 'a job', ...nothingElse }]);
 });
 
 test('REFUSED: a deny of a whole MCP server takes back an allow of one of its tools, or of all of them — as its tools row reads the deny — and a deny of one tool is an exception to an allow of the server', async () => {
@@ -645,22 +647,30 @@ test('the ask list is permissions.ask in .claude/settings.json, in its order —
   assert.deepEqual(broken.warnings, ['permissions.ask in .claude/settings.json is not a list of strings, so it is read as empty. Make it one: `["…"]`.']);
 });
 
-/** A checkout whose settings may ask: review in dontAsk with Bash, implement in no mode with Bash. */
+/**
+ * A checkout whose settings may ask: review in dontAsk with Bash, implement in no mode with Bash — a job, as every step is but one that says
+ * `background: true` — and watch, a background session in no mode with Bash, the one of the three a call that asks is put to a person on.
+ */
 const askingRepo = (permissions: object) => repoWith({
   '.claude/settings.json': { permissions },
   'workflows/dev/review.md': '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\n---\nReview it.\n',
   'workflows/dev/implement.md': '---\nharness: claude\ntools: Read, Bash\n---\nImplement it.\n',
+  'workflows/dev/watch.md': '---\nharness: claude\ntools: Read, Bash\nbackground: true\n---\nWatch it.\n',
 });
 
-test("REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step, asking on another — and a deny over it is still the deny", async () => {
+test("REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job, asking on a background session — and a deny over it is still the deny", async () => {
   const cat = { rule: 'Bash(cat:*)', source: SETTINGS };
-  const { 'dev/review': review, 'dev/implement': implement } = await stepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
+  const { 'dev/review': review, 'dev/implement': implement, 'dev/watch': watch } = await stepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
   const of = (step: { readOnly: Array<{ command: string }> }, command: string) => step.readOnly.find((c) => c.command === command);
   // The finding: the page showed cat solid under "do not ask" on a dontAsk step, whose cat is denied.
   assert.deepEqual(of(review, 'cat'), { command: 'cat', measured: true, denied: cat, asks: cat });
-  assert.deepEqual(of(implement, 'cat'), { command: 'cat', measured: true, denied: null, asks: cat });
+  // And said a job's cat asks, where a job asks nobody: `claude -p` denies what would ask and carries on (M1).
+  assert.deepEqual(of(implement, 'cat'), { command: 'cat', measured: true, denied: cat, asks: cat });
+  assert.deepEqual([review.allowed.askDenier, implement.allowed.askDenier, watch.allowed.askDenier], ['dontAsk', 'a job', null]);
+  // A background session in no mode asks a person: there it asks, and is not denied.
+  assert.deepEqual(of(watch, 'cat'), { command: 'cat', measured: true, denied: null, asks: cat });
   assert.deepEqual(review.asked, [cat]);
-  for (const step of [review, implement]) {
+  for (const step of [review, implement, watch]) {
     assert.deepEqual(step.readOnly.filter((c: { command: string }) => c.command !== 'cat'), readOnlyAll().filter((c) => c.command !== 'cat'), 'no other command asks');
   }
 
@@ -677,6 +687,24 @@ test("REFUSED: an ask rule that covers a read-only command makes it ask — deni
   const mixed = (await stepsOf(askingRepo({ ask: ['Bash(head -c *)', 'Bash(git:*)'], deny: ['Bash(git:*)'] })))['dev/review'];
   assert.deepEqual(of(mixed, 'head'), { command: 'head', measured: true, denied: null, asks: null });
   assert.deepEqual(of(mixed, 'git'), { command: 'git', measured: false, denied: { rule: 'Bash(git:*)', source: SETTINGS }, asks: null });
+});
+
+test('what asks is denied without a prompt in dontAsk, and on a job in each mode a job was measured in; it prompts on a background session in another mode, and a job in bypassPermissions is claimed neither way', () => {
+  const cases: Array<[harness: string, permissionMode: string | null, background: boolean | null, denier: string | null]> = [
+    ['claude', 'dontAsk', true, 'dontAsk'],
+    ['claude', 'dontAsk', null, 'dontAsk'],
+    ['claude', null, null, 'a job'],
+    ['claude', 'auto', false, 'a job'],
+    ['claude', 'default', null, 'a job'],
+    ['claude', 'acceptEdits', null, 'a job'],
+    ['claude-detached', 'auto', null, 'a job'],
+    ['claude', 'auto', true, null],
+    ['claude', null, true, null],
+    ['claude', 'bypassPermissions', null, null],
+  ];
+  for (const [harness, permissionMode, background, denier] of cases) {
+    assert.equal(askDenierOf(harness, { permissionMode, background }), denier, `${harness} ${permissionMode} background: ${background}`);
+  }
 });
 
 test('REFUSED: an ask rule takes back every allow it matches the whole of, as a deny does, and a narrower one is an exception — the allow asks there, and in dontAsk runs no more — while a deny comes first', async () => {

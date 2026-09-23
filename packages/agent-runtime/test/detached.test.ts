@@ -848,3 +848,76 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
     if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prev.CODEX_HOME;
   }
 });
+
+// ─── A resume's printed totals carry its parent's ───────────────────────────
+
+test("a resumed run of a spec whose totals carry the parent's reports its own cost and API time — the parent's taken off, the last run before it under that id", async () => {
+  // M2's totals, as 2.1.280 printed them: a session, its resume, and a resume of that, all under one id.
+  const dir = root();
+  const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
+  const ops = detachedOps(spec, dir);
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const t0 = Date.parse('2026-09-23T12:00:00Z');
+  const write = (name: string, at: number, patch: object, result: object) => {
+    const file = name.replace(/\//g, '_');
+    fs.writeFileSync(path.join(runs, `${file}.json`), JSON.stringify({
+      name, state: 'done', exitCode: 0, pid: 999999, logFile: '/dev/null', nativeId: SESSION,
+      startedAt: new Date(at).toISOString(), heartbeatAt: new Date(at).toISOString(), ...patch,
+    }));
+    fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
+  };
+  const tokens = { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 };
+  // Written latest first, so an order read off the directory proves nothing.
+  write('ae/r/3', t0 + 2_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0284121, duration_api_ms: 8132, usage: tokens });
+  write('ae/r/2', t0 + 1_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0257381, duration_api_ms: 7142, usage: tokens });
+  write('ae/r/1', t0, {}, { total_cost_usd: 0.0209649, duration_api_ms: 6069, usage: tokens });
+  const seen = await Effect.runPromise(ops.observe);
+  const near = (got: number | undefined, want: number) => assert.ok(got !== undefined && Math.abs(got - want) < 1e-9, `${got} is not ${want}`);
+  assert.equal(seen.get('ae/r/1')?.usage?.costUsd, 0.0209649, 'a run that resumed nothing is its own total');
+  near(seen.get('ae/r/2')?.usage?.costUsd, 0.0047732);
+  near(seen.get('ae/r/3')?.usage?.costUsd, 0.002674);
+  assert.equal(seen.get('ae/r/2')?.usage?.apiMs, 1073);
+  assert.equal(seen.get('ae/r/3')?.usage?.apiMs, 990);
+  assert.equal(seen.get('ae/r/2')?.usage?.inputTokens, 10, "tokens are the process's own already, and kept as printed");
+});
+
+test("a resume whose parent is not a run of this spec, or printed no total, carries no cost — never its parent's too", async () => {
+  const dir = root();
+  const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
+  const ops = detachedOps(spec, dir);
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const write = (name: string, patch: object, result: object) => {
+    const file = name.replace(/\//g, '_');
+    fs.writeFileSync(path.join(runs, `${file}.json`), JSON.stringify({
+      name, state: 'done', exitCode: 0, pid: 999999, logFile: '/dev/null',
+      startedAt: '2026-09-23T12:00:01Z', heartbeatAt: '2026-09-23T12:00:01Z', ...patch,
+    }));
+    fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
+  };
+  const OTHER = '11111111-2222-3333-4444-555555555555';
+  // Resumed from a session no run of this spec started — a `claude --bg` one, say.
+  write('ae/u/2', { nativeId: OTHER, resumeFrom: OTHER }, { total_cost_usd: 0.03, duration_api_ms: 7000, usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 } });
+  // Resumed from a run that printed nothing it cost.
+  write('ae/v/1', { nativeId: SESSION, startedAt: '2026-09-23T12:00:00Z' }, { usage: { input_tokens: 1, output_tokens: 1 } });
+  write('ae/v/2', { nativeId: SESSION, resumeFrom: SESSION }, { total_cost_usd: 0.03, duration_api_ms: 7000 });
+  const seen = await Effect.runPromise(ops.observe);
+  assert.deepEqual(seen.get('ae/u/2')?.usage, { inputTokens: 10, uncachedTokens: 10, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 5 }, 'no parent: no cost and no API time, the tokens kept');
+  assert.equal(seen.get('ae/v/2')?.usage, undefined, 'a parent with no total: nothing left to say');
+
+  // A spec whose harness prints its own totals keeps them, resumed or not.
+  const plain = detachedOps({ ...spec, resumeCostCarried: undefined }, dir);
+  assert.equal((await Effect.runPromise(plain.observe)).get('ae/u/2')?.usage?.costUsd, 0.03);
+});
+
+test("the id a run resumed is kept on its run file only by a spec whose totals carry the parent's", async () => {
+  const dir = root();
+  const read = (spec: HarnessSpec, name: string) => {
+    const ops = detachedOps(spec, dir);
+    return Effect.runPromise(ops.spawn({ ...req(name, dir), resumeFrom: SESSION }))
+      .then(() => JSON.parse(fs.readFileSync(path.join(dir, 'runs', spec.name, `${name.replace(/\//g, '_')}.json`), 'utf8')));
+  };
+  assert.equal((await read({ ...sh('true'), resumeCostCarried: true }, 'ae/w/1')).resumeFrom, SESSION);
+  assert.equal('resumeFrom' in (await read({ ...sh('true'), name: 'other' }, 'ae/w/2')), false);
+});

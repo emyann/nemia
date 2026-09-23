@@ -16,8 +16,8 @@ import { file, requestStop, tick } from '../src/engine.ts';
 import { Journal } from '../src/journal.ts';
 import { HarnessHandler } from '../src/a2a-handler.ts';
 import {
-  failedSpawnTask, followUpOf, followUpRefusal, followUpText, messageOf, messageRefusal, nameParts, RUNTIME_EXTENSION, observedOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt,
-  taskOfSighting, wordsOf,
+  closeoutArtifact, closeoutOf, contextRefusal, failedSpawnTask, followUpOf, followUpRefusal, followUpText, messageOf, messageRefusal, nameParts,
+  RUNTIME_EXTENSION, observedOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt, taskOfSighting, wordsOf,
 } from '../src/a2a-map.ts';
 import type { Attempt, Observed, Sighting } from '../src/domain.ts';
 import { Runner, RunnerError, testOps, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
@@ -66,14 +66,47 @@ const full: Sighting = {
 test('a sighting rides whole in its Task, and survives a transport that serialises', () => {
   const t = taskOfSighting('ae/t-1/3', full);
   assert.equal(t.id, 'ae/t-1/3');
-  assert.equal(t.contextId, 't-1');
+  assert.equal(t.contextId, 'native-7', "its context is the harness's id for the conversation");
   assert.equal(t.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
   assert.deepEqual(sightingOf(t), full);
+  assert.deepEqual(t.artifacts, [closeoutArtifact(full.closeout!.payload, full.closeout!.at)], 'what it closed with is its Artifact');
+  assert.deepEqual(closeoutOf(overTheWire(t)), full.closeout!.payload);
   assert.deepEqual(overTheWire(t.metadata), t.metadata, 'nothing in a sighting changes shape as JSON');
   assert.deepEqual(sightingOf({ ...t, metadata: overTheWire(t.metadata) }), full);
   for (const state of ['working', 'done', 'failed', 'stopped'] as const) {
-    assert.deepEqual(sightingOf(taskOfSighting('ae/t-1/3', { sessionId: 's', state })), { sessionId: 's', state });
+    const bare = taskOfSighting('ae/t-1/3', { sessionId: 's', state });
+    assert.deepEqual(sightingOf(bare), { sessionId: 's', state });
+    assert.deepEqual([bare.contextId, bare.artifacts], ['', []], 'no id seen yet is no context, and no closeout no Artifact');
   }
+});
+
+test("attempts that continued one conversation share a context: the harness's id, not the runtime's task", () => {
+  // A job resumed keeps its session's id (M12): two attempts, one context; another task's session another.
+  const first = taskOfSighting('ae/t-1/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-a' });
+  const again = taskOfSighting('ae/t-1/2', { sessionId: 'job-2', state: 'working', nativeId: 'conv-a' });
+  const other = taskOfSighting('ae/t-1/3', { sessionId: 'job-3', state: 'working', nativeId: 'conv-b' });
+  assert.deepEqual([first.contextId, again.contextId, other.contextId], ['conv-a', 'conv-a', 'conv-b']);
+});
+
+test('a closeout is an Artifact of one part: data for a value, text/plain for prose, its time in metadata when known', () => {
+  const said = { outcome: 'done', notes: ['a', 'b'] };
+  assert.deepEqual(closeoutArtifact(said, 1790000000000), {
+    artifactId: 'closeout', name: 'closeout', description: '',
+    parts: [{ content: { $case: 'data', value: said }, metadata: undefined, filename: '', mediaType: '' }],
+    metadata: { at: 1790000000000 }, extensions: [],
+  });
+  assert.deepEqual(closeoutArtifact('Done: the tests pass.').parts, [
+    { content: { $case: 'text', value: 'Done: the tests pass.' }, metadata: undefined, filename: '', mediaType: 'text/plain' },
+  ]);
+  assert.equal(closeoutArtifact('x').metadata, undefined, 'no time given, none said');
+  // Any JSON value a data part carries, and back as it went, over the wire.
+  for (const payload of [said, 'prose', 7, ['a', 1], true, null, '']) {
+    const t = taskOfAttempt('ae/t-1/1', { ...ended, closeout: payload }, 'm');
+    assert.equal(t.artifacts.length, 1, JSON.stringify(payload));
+    assert.deepEqual(closeoutOf(overTheWire(t)), payload, JSON.stringify(payload));
+  }
+  assert.deepEqual(taskOfAttempt('ae/t-1/1', ended, 'm').artifacts, [], 'an attempt that said nothing has no Artifact');
+  assert.equal(closeoutOf(taskOfAttempt('ae/t-1/1', ended, 'm')), undefined);
 });
 
 test('a Task whose state is not its sighting\'s carries no sighting', () => {
@@ -82,19 +115,25 @@ test('a Task whose state is not its sighting\'s carries no sighting', () => {
   assert.equal(sightingOf(startedTask('ae/t-1/3', messageOf({ name: 'ae/t-1/3', brief: 'b', cwd: '/r' }, 'm'))), undefined);
 });
 
+/** An attempt that ended done, signed by nothing, its session's id recorded. */
+const ended: Attempt = {
+  n: 1, startedAt: '2026-09-23T10:00:00.000Z', spawnedAt: '2026-09-23T10:00:01.000Z', ended: 'done', endedAt: '2026-09-23T10:05:00.000Z',
+  reason: 'harness', nativeId: 'conv-a', usage: null, exitCode: 0,
+};
+
 const request: SpawnRequest = {
   name: 'ae/t-1/2', brief: 'write the words down\n\nand then stop.', cwd: '/repo', harness: 'fake',
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'], mcp: { web: { command: 'npx', args: ['web'] } } },
   resumeFrom: 'native-1', closeoutSchema: { type: 'object', required: ['outcome'] }, budgetUsd: 2.5,
 };
 
-test('a spawn is a user Message: the name its task, the brief its one text part, the rest its metadata', () => {
+test('a spawn is a user Message: the name its task, the brief its one text part, the session it continues its context, the rest its metadata', () => {
   const m = messageOf(request, 'm-1');
   assert.deepEqual(m, {
-    messageId: 'm-1', contextId: 't-1', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
+    messageId: 'm-1', contextId: 'native-1', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
     parts: [{ content: { $case: 'text', value: 'write the words down\n\nand then stop.' }, metadata: undefined, filename: '', mediaType: '' }],
     metadata: {
-      cwd: '/repo', harness: 'fake', config: request.config, resumeFrom: 'native-1', closeoutSchema: request.closeoutSchema, budgetUsd: 2.5,
+      cwd: '/repo', harness: 'fake', config: request.config, closeoutSchema: request.closeoutSchema, budgetUsd: 2.5,
     },
     extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
   });
@@ -107,7 +146,7 @@ test('a spawn is a user Message: the name its task, the brief its one text part,
 test('words said to a session are a user Message on its Task: one text part, no mark, nothing else', () => {
   const m = followUpOf('ae/t-1/2', 'look again\n\nat the tests', 'm-2');
   assert.deepEqual(m, {
-    messageId: 'm-2', contextId: 't-1', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
+    messageId: 'm-2', contextId: '', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
     parts: [{ content: { $case: 'text', value: 'look again\n\nat the tests' }, metadata: undefined, filename: '', mediaType: '' }],
     metadata: undefined, extensions: [], referenceTaskIds: [],
   });
@@ -121,6 +160,7 @@ test('words said to a session are a user Message on its Task: one text part, no 
 test('a spawn with its optional keys unset comes back with every key, as the engine asks for one', () => {
   const m = messageOf({ name: 'ae/t-1/1', brief: 'b', cwd: '/r' }, 'm-2');
   assert.deepEqual(m.metadata, { cwd: '/r' }, 'no undefined in metadata');
+  assert.equal(m.contextId, '', 'a spawn that starts cold continues no context');
   assert.deepEqual(spawnOf(overTheWire(m)), {
     name: 'ae/t-1/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined, budgetUsd: undefined,
     resumeFrom: undefined,
@@ -164,6 +204,27 @@ test('an attempt the harness no longer lists is answered from the journal', () =
     assert.deepEqual(overTheWire(t.metadata), t.metadata);
   }
   assert.equal(wordsOf(taskOfAttempt('ae/t-1/1', { ...attempt, ...cases[2]![0] }, 'm')), 'fake: no binary');
+  assert.equal(taskOfAttempt('ae/t-1/1', attempt, 'm').contextId, '', 'no id recorded is no context');
+  assert.equal(taskOfAttempt('ae/t-1/1', ended, 'm').contextId, 'conv-a');
+});
+
+test('an attempt that signed while its task waits on a person is INPUT_REQUIRED, its closeout still its Artifact; only a done one is', () => {
+  const signed = { ...ended, closeout: { outcome: 'done' } };
+  const waiting = taskOfAttempt('ae/t-1/1', signed, 'm', true);
+  assert.equal(waiting.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
+  assert.deepEqual(closeoutOf(waiting), { outcome: 'done' });
+  assert.equal(taskOfAttempt('ae/t-1/1', signed, 'm').status!.state, TaskState.TASK_STATE_COMPLETED);
+  assert.equal(taskOfAttempt('ae/t-1/1', { ...signed, ended: 'failed' }, 'm', true).status!.state, TaskState.TASK_STATE_FAILED);
+});
+
+test("REFUSED: words sent in a context that is not their session's", () => {
+  const s: Sighting = { sessionId: 's-1', state: 'working', nativeId: 'conv-a' };
+  assert.equal(contextRefusal('ae/t-1/1', '', s), undefined);
+  assert.equal(contextRefusal('ae/t-1/1', 'conv-a', s), undefined);
+  assert.equal(contextRefusal('ae/t-1/1', 'conv-b', s),
+    "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.");
+  assert.equal(contextRefusal('ae/t-1/1', 't-1', { sessionId: 's-1', state: 'working' }),
+    "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.");
 });
 
 // ─── through the client ─────────────────────────────────────────────────────

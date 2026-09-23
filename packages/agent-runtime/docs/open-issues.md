@@ -556,7 +556,9 @@ Since thin runtime stage 1 part 2 (2026-09-23), `createEngine` puts every harnes
 `spawn` is a message, `observe` a listing, `stop` a cancel. Since part 3 (the same day), `say` is a follow-up message on
 the session's Task, and `find`, `logs` and `release` are the runtime extension's methods (`findSession`, `sessionLogs`,
 `releaseSession`), offered as the harness's card lists them. Since part 4 (the same day), a transcript is read by the
-session's name through the extension's `sessionTranscript`. What is still direct, and what the seam does not do:
+session's name through the extension's `sessionTranscript`. Since stage 2 part 5 (the same day), a Task is in A2A's shape:
+its `contextId` the harness's id for the conversation, a spawn's the session it continues, its closeout its one Artifact,
+and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still direct, and what the seam does not do:
 
 - **`refuses` alone reaches the driver directly**, for good: it judges a task before any session exists and is no call
   to one. `test/driver-calls.test.ts` exempts it alone, refuses any other driver call made with no A2A call in flight, and
@@ -567,8 +569,28 @@ session's name through the extension's `sessionTranscript`. What is still direct
   first event is the Task, which this agent answers with a listing: a cost on every read that the read never needed.
   `GetTask`'s `history` has no cursor either (`historyLength` is the last N). A cursor was not the blocker: the SDK does
   carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` waits for a consumer
-  that reads a live stream — stage 2's `-p` job, or the board following a session as it speaks — and then streams what
-  `sessionTranscript` reads, beside it, not instead.
+  that reads a live stream, and then streams what `sessionTranscript` reads, beside it, not instead. **Asked again at stage 2
+  part 5, and still none:** the `-p` job's `stream-json` lines are read by its worker, not by any A2A caller, and the board
+  follows a session by polling the api, which reads the facade's `transcript`, never the seam's Tasks. A stream would cost
+  what CLAUDE.md's transcript rule says a read costs — for an attempt in flight, a `find` or one `claude agents` call, and
+  two journal reads — on every event it forwarded, plus a listing to open it, and a subscription held for each follower.
+  The owner kept it refused at the plan gate; `sendMessageStream` and `resubscribe` stay `UnsupportedOperationError`.
+- **A Task's context is the conversation, not the runtime's task.** Its `contextId` is the sighting's `nativeId`, or the
+  attempt's off the journal, and empty while none is known — a job's until its first `stream-json` line. So a listing by
+  context is every attempt that continued one conversation: a job keeps its id on `-p --resume` (M12), a `claude --bg`
+  resume does not (issue 16), and a retry started cold is a new context. A spawn carries the session it continues as its
+  message's `contextId`, which is `resumeFrom` to the harness; a follow-up sends none or its session's, and any other is
+  refused in words that name the one to send.
+- **The closeout is the Task's one Artifact, `closeout`**: one `data` part, or `text/plain` for a string (Codex's prose),
+  and the time it was given in the Artifact's metadata when the sighting had it — a resumed session can carry its parent's
+  statement, and the time is how a reader tells. A listing leaves artifacts out unless `includeArtifacts` asks, A2A's
+  default; the engine's `observe` lists without them and reads the sighting, unchanged. **The files a step collected are
+  not Artifacts here**: they are the orchestrator's, for its own Task (stage 6).
+- **`getTask` and `listTasks` differ on a held task that waits.** `getTask` reads the journal for a session listed `done`,
+  or listed not at all, and answers `INPUT_REQUIRED` for the attempt that signed while `waitsForInput` holds; the listing
+  says `COMPLETED`, the harness's word, since the engine's `observe` reads it and `sightingOf` needs the Task's state to be
+  the sighting's. One journal read per `getTask` of a finished session; the engine never calls `getTask`. A Task is still
+  one attempt: a held task's turns are Tasks of their own, sharing a context.
 - **The agent finds the session's id as the facade did**, in the same order: the attempt's `nativeId` off the journal, then
   `find` for an attempt in flight (a failure counts as none), then a listing. A name with no attempt journalled yet is asked
   of the harness, not refused: a session is listed before its `spawned` is written. The facade no longer asks the harness

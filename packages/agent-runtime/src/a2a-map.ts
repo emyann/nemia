@@ -1,10 +1,14 @@
 /**
  * The runtime's words in A2A's, and back: pure, so every mapping the seam makes is one function a test can round-trip.
  *
- * A session is an A2A Task whose id is the session's name, `ae/<task>/<n>`, and whose `contextId` is the runtime's task
- * id, so every attempt of one task, resumes included, shares one context. A spawn is a user Message: the brief its one
- * text part, and the rest of the request in its metadata, `config` whole and never opened. What a harness sees of a
- * session — the `Sighting` — rides whole in the Task's metadata, and its state is also the Task's, mapped below.
+ * A session is an A2A Task whose id is the session's name, `ae/<task>/<n>`, and whose `contextId` is the harness's own id
+ * for the conversation, its `nativeId` — what `--resume` takes — or the empty string until something has seen it. So
+ * attempts that continued one conversation share a context where the harness keeps its id on a resume (a Claude Code job,
+ * a Codex thread), and a `claude --bg` resume, which starts under a new id, is a context of its own. A spawn is a user
+ * Message: the brief its one text part, the session it continues its `contextId` — A2A's meaning for a message sent in a
+ * context, that it continues it — and the rest of the request in its metadata, `config` whole and never opened. What a
+ * harness sees of a session — the `Sighting` — rides whole in the Task's metadata, and its state is also the Task's,
+ * mapped below. What the workload said when it finished is the Task's one Artifact, `closeout`.
  *
  * A spawn is marked with the runtime's extension, `RUNTIME_EXTENSION`: it names a Task that does not exist yet, which a
  * plain A2A message may not (a message with a `taskId` continues that task). A message without the mark is plain A2A —
@@ -13,7 +17,7 @@
  * Nothing here is stored. A Task is built from a sighting or from the journal each time it is asked for
  * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
  */
-import { Role, TaskState, type Message, type Part, type Task } from '@a2a-js/sdk';
+import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
 import { nameFor, type Attempt, type Observed, type Sighting } from './domain.ts';
 import type { SpawnRequest } from './runner.ts';
 
@@ -63,41 +67,57 @@ const clean = (o: Record<string, unknown>): Record<string, unknown> =>
 const textPart = (text: string): Part => ({ content: { $case: 'text', value: text }, metadata: undefined, filename: '', mediaType: '' });
 
 /** A message the agent says about a task: the words a harness gave, carried in `status.message`. */
-const agentSays = (messageId: string, name: string, text: string): Message => ({
-  messageId, contextId: nameParts(name)?.taskId ?? '', taskId: name, role: Role.ROLE_AGENT,
+const agentSays = (messageId: string, name: string, contextId: string, text: string): Message => ({
+  messageId, contextId, taskId: name, role: Role.ROLE_AGENT,
   parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
 });
 
-/** A spawn, as the user Message that asks for it. The name is the Task's id; `config` travels whole, unopened. */
+/**
+ * A spawn, as the user Message that asks for it. The name is the Task's id; the session it continues, `resumeFrom`, its
+ * `contextId`, empty for a spawn that starts cold; `config` travels whole, unopened.
+ */
 export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
-  messageId, contextId: nameParts(r.name)?.taskId ?? '', taskId: r.name, role: Role.ROLE_USER,
+  messageId, contextId: r.resumeFrom ?? '', taskId: r.name, role: Role.ROLE_USER,
   parts: [textPart(r.brief)],
   metadata: clean({
-    cwd: r.cwd, harness: r.harness, config: r.config, resumeFrom: r.resumeFrom, closeoutSchema: r.closeoutSchema, budgetUsd: r.budgetUsd,
+    cwd: r.cwd, harness: r.harness, config: r.config, closeoutSchema: r.closeoutSchema, budgetUsd: r.budgetUsd,
   }),
   extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
 });
 
-/** Words said to a running session, as A2A's follow-up: a user Message on the session's Task, one text part, no mark. */
+/**
+ * Words said to a running session, as A2A's follow-up: a user Message on the session's Task, one text part, no mark, and
+ * no context, which the Task already has.
+ */
 export const followUpOf = (name: string, text: string, messageId: string): Message => ({
-  messageId, contextId: nameParts(name)?.taskId ?? '', taskId: name, role: Role.ROLE_USER,
+  messageId, contextId: '', taskId: name, role: Role.ROLE_USER,
   parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
 });
 
-/** Why a message's taskId is not a session's, in words — or `undefined`. Asked of a spawn and of a follow-up alike. */
-const sessionRefusal = (taskId: string, contextId: string): string | undefined => {
-  const parts = nameParts(taskId);
-  if (!parts) return `\`${taskId}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`;
-  if (contextId && contextId !== parts.taskId) {
-    return `the message's contextId \`${contextId}\` is not the task its name carries, \`${parts.taskId}\`: send that, or none.`;
-  }
-  return undefined;
+/**
+ * Why a message's taskId is not a session's, in words — or `undefined`. Asked of a spawn and of a follow-up alike. A
+ * spawn's `contextId` is the session it continues, any the harness took; a follow-up's is judged against the session
+ * the harness lists (`contextRefusal`), which only the handler has.
+ */
+const sessionRefusal = (taskId: string): string | undefined =>
+  nameParts(taskId) ? undefined : `\`${taskId}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`;
+
+/**
+ * Why words sent in `contextId` are not for the session `name` the harness lists as `s`, in words — or `undefined`. A
+ * follow-up sends no context, or the session's own: A2A reads a context as the conversation a message belongs to, and
+ * words for another conversation are not this session's to hear.
+ */
+export const contextRefusal = (name: string, contextId: string, s: Sighting): string | undefined => {
+  if (!contextId || contextId === s.nativeId) return undefined;
+  return s.nativeId
+    ? `the message's contextId \`${contextId}\` is not the context of session \`${name}\`, \`${s.nativeId}\`: send that, or none.`
+    : `the message's contextId \`${contextId}\` is not the context of session \`${name}\`, which has none known yet: send none.`;
 };
 
 /** Why a message cannot be read as a spawn, in words — or `undefined`. What `spawnOf` reads, it has checked here. */
 export const messageRefusal = (m: Message): string | undefined => {
   if (!m.taskId) return 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.';
-  const named = sessionRefusal(m.taskId, m.contextId);
+  const named = sessionRefusal(m.taskId);
   if (named) return named;
   if (m.role !== Role.ROLE_USER) return 'a spawn is a message from the user: its role is ROLE_USER.';
   if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
@@ -115,7 +135,7 @@ export const followUpRefusal = (m: Message): string | undefined => {
   if (!m.taskId) {
     return `a message with no taskId asks for a new task, and a session is started only by a spawn, marked \`${RUNTIME_EXTENSION}\`: to speak to a running session, send its name, \`ae/<task>/<n>\`, as the taskId.`;
   }
-  const named = sessionRefusal(m.taskId, m.contextId);
+  const named = sessionRefusal(m.taskId);
   if (named) return named;
   if (m.role !== Role.ROLE_USER) return 'words said to a session are a message from the user: its role is ROLE_USER.';
   if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
@@ -137,18 +157,47 @@ export const spawnOf = (m: Message): SpawnRequest => {
   const brief = m.parts[0]!.content as { $case: 'text'; value: string };
   return {
     name: m.taskId, brief: brief.value, cwd: md.cwd, harness: md.harness,
-    config: md.config, closeoutSchema: md.closeoutSchema, budgetUsd: md.budgetUsd, resumeFrom: md.resumeFrom,
+    config: md.config, closeoutSchema: md.closeoutSchema, budgetUsd: md.budgetUsd, resumeFrom: m.contextId || undefined,
   };
 };
 
-const task = (name: string, state: TaskState, fill: { message?: Message; history?: Message[]; metadata?: Record<string, unknown> } = {}): Task => ({
-  id: name, contextId: nameParts(name)?.taskId ?? '',
-  status: { state, message: fill.message, timestamp: undefined },
-  artifacts: [], history: fill.history ?? [], metadata: fill.metadata,
+/**
+ * What the workload said when it finished, as the Task's Artifact: named `closeout`, one part — the payload as `data`, or
+ * as `text/plain` when it is a string, as Codex's prose arrives — and, when the harness said when it was given, `at`
+ * (milliseconds) in its metadata. A resumed session can carry its parent's statement; `at` is how a reader tells.
+ */
+export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
+  artifactId: 'closeout', name: 'closeout', description: '',
+  parts: [typeof payload === 'string'
+    ? { content: { $case: 'text', value: payload }, metadata: undefined, filename: '', mediaType: 'text/plain' }
+    : { content: { $case: 'data', value: payload }, metadata: undefined, filename: '', mediaType: '' }],
+  metadata: at === undefined ? undefined : { at }, extensions: [],
 });
 
-/** A session the harness sees, as a Task: its state mapped, and the whole sighting in `metadata.sighting`. */
-export const taskOfSighting = (name: string, s: Sighting): Task => task(name, stateOf(s.state), { metadata: { sighting: s } });
+/** What a closeout Artifact carries, or `undefined` for a Task with none. The payload as it was given, string or not. */
+export const closeoutOf = (t: Task): unknown => {
+  const content = t.artifacts.find((a) => a.artifactId === 'closeout')?.parts[0]?.content;
+  return content?.$case === 'text' || content?.$case === 'data' ? content.value : undefined;
+};
+
+type Fill = { message?: Message; history?: Message[]; metadata?: Record<string, unknown>; artifacts?: Artifact[] };
+
+const task = (name: string, contextId: string, state: TaskState, fill: Fill = {}): Task => ({
+  id: name, contextId,
+  status: { state, message: fill.message, timestamp: undefined },
+  artifacts: fill.artifacts ?? [], history: fill.history ?? [], metadata: fill.metadata,
+});
+
+/**
+ * A session the harness sees, as a Task: its state mapped, its context the harness's id for it, what it closed with its
+ * Artifact, and the whole sighting in `metadata.sighting`. `state` is for the one Task whose state is not its sighting's —
+ * a signed session its task holds open for a person (`INPUT_REQUIRED`) — which then carries no sighting `sightingOf` reads.
+ */
+export const taskOfSighting = (name: string, s: Sighting, state = stateOf(s.state)): Task =>
+  task(name, s.nativeId ?? '', state, {
+    metadata: { sighting: s },
+    ...(s.closeout ? { artifacts: [closeoutArtifact(s.closeout.payload, s.closeout.at)] } : {}),
+  });
 
 /** What a harness saw of a session, off a Task `taskOfSighting` built — or `undefined` for a Task that carries none. */
 export const sightingOf = (t: Task): Sighting | undefined => {
@@ -156,8 +205,8 @@ export const sightingOf = (t: Task): Sighting | undefined => {
   return s && observedOf(t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED) === s.state ? s : undefined;
 };
 
-/** A spawn the harness took: working, with the message that asked for it. */
-export const startedTask = (name: string, asked: Message): Task => task(name, TaskState.TASK_STATE_WORKING, { history: [asked] });
+/** A spawn the harness took: working, with the message that asked for it, in no context known until the harness lists it. */
+export const startedTask = (name: string, asked: Message): Task => task(name, '', TaskState.TASK_STATE_WORKING, { history: [asked] });
 
 /**
  * A spawn that failed, in the harness's words. `REJECTED` when the harness vouched nothing started — final, as the engine
@@ -165,10 +214,10 @@ export const startedTask = (name: string, asked: Message): Task => task(name, Ta
  * this one may yet be adopted in the grace window.
  */
 export const failedSpawnTask = (name: string, asked: Message, words: string, refused: boolean, messageId: string): Task =>
-  task(name, refused ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_SUBMITTED, { message: agentSays(messageId, name, words), history: [asked] });
+  task(name, '', refused ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_SUBMITTED, { message: agentSays(messageId, name, '', words), history: [asked] });
 
-/** A session stopped, as A2A answers a cancel. */
-export const canceledTask = (name: string): Task => task(name, TaskState.TASK_STATE_CANCELED);
+/** A session stopped, as A2A answers a cancel, in the context the harness listed it under. */
+export const canceledTask = (name: string, s: Sighting): Task => task(name, s.nativeId ?? '', TaskState.TASK_STATE_CANCELED);
 
 /** The words of a Task's status message, or `undefined` when it has none. */
 export const wordsOf = (t: Task): string | undefined => {
@@ -178,17 +227,20 @@ export const wordsOf = (t: Task): string | undefined => {
 
 /**
  * An attempt the harness no longer lists, as the journal records it: open → `SUBMITTED`; ended `unstartable` →
- * `REJECTED`; ended done → `COMPLETED`, stopped → `CANCELED`, anything else → `FAILED`. The reason and the rest of the
- * attempt ride in `metadata.attempt`, and a refusal's words in `status.message`.
+ * `REJECTED`; ended done → `COMPLETED`, or `INPUT_REQUIRED` when its task is held open waiting on a person (`waiting`),
+ * stopped → `CANCELED`, anything else → `FAILED`. Its context is the id the attempt was recorded with, what it closed with
+ * its Artifact; the reason and the rest of the attempt ride in `metadata.attempt`, and a refusal's words in `status.message`.
  */
-export const taskOfAttempt = (name: string, a: Attempt, messageId: string): Task => {
+export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiting = false): Task => {
   const state = a.ended === null ? TaskState.TASK_STATE_SUBMITTED
     : a.reason === 'unstartable' ? TaskState.TASK_STATE_REJECTED
-    : a.ended === 'done' ? TaskState.TASK_STATE_COMPLETED
+    : a.ended === 'done' ? (waiting ? TaskState.TASK_STATE_INPUT_REQUIRED : TaskState.TASK_STATE_COMPLETED)
     : a.ended === 'stopped' ? TaskState.TASK_STATE_CANCELED
     : TaskState.TASK_STATE_FAILED;
-  return task(name, state, {
-    ...(a.error ? { message: agentSays(messageId, name, a.error) } : {}),
+  const contextId = a.nativeId ?? '';
+  return task(name, contextId, state, {
+    ...(a.error ? { message: agentSays(messageId, name, contextId, a.error) } : {}),
+    ...(a.closeout !== undefined ? { artifacts: [closeoutArtifact(a.closeout)] } : {}),
     metadata: { attempt: clean(a) },
   });
 };

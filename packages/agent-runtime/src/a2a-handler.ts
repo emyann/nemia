@@ -31,11 +31,11 @@ import {
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import { fold, type Event, type Sighting, type Usage } from './domain.ts';
+import { fold, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
-  canceledTask, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION, spawnOf,
-  startedTask, taskOfAttempt, taskOfSighting, type SessionMethod,
+  canceledTask, contextRefusal, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION,
+  spawnOf, startedTask, taskOfAttempt, taskOfSighting, type SessionMethod,
 } from './a2a-map.ts';
 
 /**
@@ -173,7 +173,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * Words said to a running session: A2A's follow-up, a message on the session's Task. Taken while the session runs —
    * working, or waiting on a person (`INPUT_REQUIRED`) — as the harness's inbox takes them either way; a session that has
    * ended takes no more, as A2A refuses a message to a Task in a terminal state. The harness is listed afresh for the
-   * session's id: the handler holds no listing of its own. Answered with the session as that listing saw it.
+   * session's id: the handler holds no listing of its own, and the message's context, when it sends one, must be that
+   * session's. Answered with the session as that listing saw it.
    */
   private async follow(m: Message): Promise<Task> {
     const refused = followUpRefusal(m);
@@ -183,6 +184,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     }
     const seen = (await this.run(this.ops.observe)).get(m.taskId);
     if (!seen) throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
+    const elsewhere = contextRefusal(m.taskId, m.contextId, seen);
+    if (elsewhere) throw new RequestMalformedError(elsewhere);
     if (seen.state !== 'working' && seen.state !== 'blocked') {
       throw new UnsupportedOperationError(`session \`${m.taskId}\` has ended (${seen.state}): it takes no more words.`);
     }
@@ -196,15 +199,21 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
 
   /**
    * One session: as the harness sees it, or, when it lists no such session, as the journal records the attempt — open,
-   * or how it ended. Neither knows it: `TaskNotFoundError`.
+   * or how it ended. Neither knows it: `TaskNotFoundError`. A session that signed and whose task is held open for a person
+   * is `INPUT_REQUIRED`, whether its harness still lists it `done` — a Claude Code job, never let go — or has let it go:
+   * the journal is read for that, once, for a session listed `done` or listed not at all. `listTasks` still says
+   * `COMPLETED` of it, the harness's word, which is what `observe` reads.
    */
   async getTask(params: GetTaskRequest, _context: ServerCallContext): Promise<Task> {
     const seen = (await this.run(this.ops.observe)).get(params.id);
-    if (seen) return taskOfSighting(params.id, seen);
     const parts = nameParts(params.id);
-    const attempt = parts && fold(parts.taskId, await this.events(parts.taskId)).attempts.find((a) => a.n === parts.n);
+    if (seen && (seen.state !== 'done' || !parts)) return taskOfSighting(params.id, seen);
+    const state = parts && fold(parts.taskId, await this.events(parts.taskId));
+    const attempt = parts && state?.attempts.find((a) => a.n === parts.n);
+    const waiting = state !== undefined && waitsForInput(state) && state.attempts.at(-1) === attempt;
+    if (seen) return waiting ? taskOfSighting(params.id, seen, TaskState.TASK_STATE_INPUT_REQUIRED) : taskOfSighting(params.id, seen);
     if (!attempt) throw new TaskNotFoundError(`no session \`${params.id}\`: the \`${this.harness}\` harness lists none, and no attempt was journalled under it.`);
-    return taskOfAttempt(params.id, attempt, randomUUID());
+    return taskOfAttempt(params.id, attempt, randomUUID(), waiting);
   }
 
   /**
@@ -218,13 +227,14 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new TaskNotCancelableError(`session \`${params.id}\` has ended (${seen.state}): there is nothing to stop.`);
     }
     if (seen.state !== 'stopped') await this.run(this.ops.stop(seen.sessionId));
-    return canceledTask(params.id);
+    return canceledTask(params.id, seen);
   }
 
   /**
-   * Every session the harness lists, by name, filtered by `contextId` and `status`. The first page observes once; the
-   * pages after it are served from that listing by its token, `<listing>:<offset>`, whatever other listings were made
-   * since. A token of a listing whose last page was served, or that was dropped, is refused rather than served a list
+   * Every session the harness lists, by name, filtered by `contextId` — the harness's id for the conversation, so every
+   * attempt that continued one — and `status`, with what each closed with only when `includeArtifacts` asks for it, as
+   * A2A's default leaves it out. The first page observes once; the pages after it are served from that listing by its
+   * token, `<listing>:<offset>`, whatever other listings were made since. A token of a listing whose last page was served, or that was dropped, is refused rather than served a list
    * that moved under it.
    */
   async listTasks(params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
@@ -258,7 +268,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       snap = current;
       offset = Number(m[2]);
     }
-    const tasks = snap.tasks.slice(offset, offset + size);
+    const tasks = snap.tasks.slice(offset, offset + size).map((t) => (params.includeArtifacts ? t : { ...t, artifacts: [] }));
     const next = offset + size < snap.tasks.length ? `${snap.id}:${offset + size}` : '';
     if (next) {
       this.open.set(snap.id, snap);

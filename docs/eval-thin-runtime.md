@@ -316,6 +316,18 @@ orchestrator's calls to the runtime change.
    orchestrator filing a gate or a blocked sign-off as a held task and answering it (4b) — `wf ls`, the api and the board
    learn `input-required` beside `needs-human`, never in it — and a step's tries and rounds as attempts of one task (4c, or
    folded into part 5).
+
+   **Part 5a done, the same day: a Task in A2A's shape.** A Task's `contextId` is the harness's id for the conversation —
+   the sighting's or the attempt's `nativeId`, empty until one is seen — so attempts that continued one conversation list
+   under one context, and a spawn sends the session it continues as its message's `contextId` rather than `resumeFrom` in
+   metadata; a follow-up in another context is refused. The closeout is the Task's one Artifact, `closeout` (a `data` part,
+   `text/plain` for prose), carried by a listing only when `includeArtifacts` asks. `getTask` says `INPUT_REQUIRED` of the
+   signed attempt of a task held open — reading the journal for a session its harness lists `done`, since a job is never
+   let go — while a listing keeps the harness's `COMPLETED`, which `observe` reads. `engine.ts`, `domain.ts`, the facade
+   and the journal's words unchanged. **Deferred by the owner at the gate:** the stream — `SubscribeToTask` has no live
+   consumer yet, the api polling the facade, and would pay a transcript read per event (open issue 27); the collected
+   files as Artifacts, which are the orchestrator's Task's, stage 6; and one A2A Task per runtime task rather than per
+   attempt.
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

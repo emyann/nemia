@@ -421,6 +421,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
       const reads = (name: string): Closeout | undefined =>
         (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
+      const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
       await e.file({
         id: taskId,
         brief: composeBrief(step, run, steps, reads, files, undefined, {
@@ -430,7 +431,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
           // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
           // A gated step that signed off was sent back from its gate.
-          status: triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
+          status: tried, ...(refusal ? { refusal } : {}),
+          // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allow:` denies again.
+          ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
           // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
           ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
         }, undefined, undefined, inputsDir(run)),

@@ -134,6 +134,7 @@ what, who may drive it, for how long and for how much. Everything else the agent
   output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
   it on the run's word) · budget exhausted (its harness ended its session at its budget:)
+  · denied (its harness denied its try a call, and the step says denials: fail: nothing after it is filed)
   · awaiting approval (at its gate: nothing after it is filed until wf approve — and, on an ending step
   that runs in the repository's checkout, nothing of it at all until then).
 
@@ -1033,6 +1034,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      // A call denied is a person's to weigh: whether the work stands without it, or the folder's allow: grows for a new run.
+      if (decision.denied.length) console.log(`  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`);
       // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
       // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
       const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);

@@ -2454,6 +2454,40 @@ test("a step whose job was denied a call says so — on `wf ls` beside its line 
   assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
 });
 
+test("a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `wf decide` names the rule for `allow:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on", async (t) => {
+  const run = started(folder('denials: fail'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.denials.set(taskId, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
+  b.settle(taskId, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(b.filings, [taskId], 'nothing after it is filed, however many passes');
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const printedBy = async (...args: string[]) => { printed.length = 0; await main(args, b.e); return printed.join('\n'); };
+
+  const listed = await list(b.e, readRun(run.id));
+  assert.deepEqual([listed.steps[0]!.status, listed.steps[0]!.note, listed.waitingOnYou], ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']]);
+  const decided = await printedBy('decide', run.id);
+  assert.match(decided, /\n {2}DENIED, waiting on you: implement {2}— its harness denied its try a call/);
+  assert.match(decided, new RegExp(`add Edit\\(//tmp/w/notes\\.md\\) to the folder's allow:, .* told to do without it: {2}wf retry ${run.id} implement --fresh {2}\\(`));
+
+  await main(['retry', run.id, 'implement', '--fresh'], b.e);
+  await advance(b.e, readRun(run.id));
+  const again = b.filings.at(-1)!;
+  assert.notEqual(again, taskId, 'a new task for try 2');
+  const brief = (b.tasks.get(again)!.spec as { brief: string }).brief;
+  assert.match(brief, /## What your session was denied\n\n```text\nWrite\(\/tmp\/w\/notes\.md\)\n```/);
+  assert.match(brief, /the same call will be denied again/);
+
+  b.settle(again, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  assert.equal(b.filings.at(-1), `${run.id}-review`, 'denied nothing, it hands on');
+});
+
 test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {
   const run = started(folder());
   const b = board();

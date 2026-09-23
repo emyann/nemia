@@ -113,9 +113,12 @@ export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: strin
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
- * print beside it. Exported, log-free, for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
+ * print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free, for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
  */
-export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (taskId) => taskSpend(views.get(taskId));
+export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (taskId) => {
+  const spent = taskSpend(views.get(taskId));
+  return spent && { ...spent, denied: deniedOf(views)(taskId) };
+};
 
 /**
  * What each step's current check exited with, off the engine's record: the code its process gave, or

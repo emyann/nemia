@@ -1790,7 +1790,8 @@ ran out of rounds or budget keeps its question on its record, and the question i
 hold lifts. So `wf ls` says `→ held until a-1x2y ships` where it would say `→ waiting on you`, and a step's note
 says `held until a-1x2y ships; its approval is asked once the hold lifts` where it would offer `wf approve`.
 `wf decide` says the hold, what is still running, and how to go on before the hold lifts:
-`wf hold <run> --off`. `wf approve`, `wf retry`, `wf round` and `wf accept` refuse a held run and name that
+`wf hold <run> --off`. On a run that also waits `--after` a run, it says both, and that `--off` lifts the
+hold and not the wait. `wf say` to a step that has settled offers no `wf retry` while the hold stands. `wf approve`, `wf retry`, `wf round` and `wf accept` refuse a held run and name that
 command, and a pass files nothing on an ask written by hand while the hold stands. A run named that will
 never ship without a person (`(cancelled)`, `(no such run)`, `(<branch> gone)`) is said beside the hold,
 with the two ways out: lift the hold, or `wf cancel` the run.

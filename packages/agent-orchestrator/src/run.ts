@@ -2158,7 +2158,11 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
   if (!taskId) return `${name} has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls ${run.id}.`;
   const phase = phaseOf(taskId);
   if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
-    return `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything. Words for the step go into its next try's brief, where it may be tried again (wf decide ${run.id} says): wf retry ${run.id} ${name} --message "<words>".`;
+    const settled = `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything.`;
+    // The try that would carry the words is refused of a pruned run (`prunedRefusal`) and, while it stands, of a held one (`heldRefusal`).
+    if (run.pruned) return `${settled} Nor is it tried again: ${run.id} was ${prunedWords(run.pruned)}.`;
+    if (run.hold) return `${settled} Words for the step go into its next try's brief, and no try is filed while ${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))}: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`;
+    return `${settled} Words for the step go into its next try's brief, where it may be tried again (wf decide ${run.id} says): wf retry ${run.id} ${name} --message "<words>".`;
   }
   return null;
 }
@@ -2690,12 +2694,12 @@ export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
  * names `runs/r-xyz.json` as a run's directory, which is another run's record, and a run with no record of its own is swept of it with
  * nothing asked. `..` or a path would name a directory that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm'): string | null {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `wf ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
   const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.asks)$/.exec(id);
-  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: wf ${verb} ${file[1]}.`;
+  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: ${command} ${file[1]}.`;
   const does = verb === 'hold' ? 'wf hold writes its file under WF_ROOT by id' : `wf ${verb} removes what is under WF_ROOT by id`;
-  return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id wf ls prints, as in wf ${verb} add-a-flag-x1y2.`;
+  return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id wf ls prints, as in ${command} add-a-flag-x1y2.`;
 }
 
 /** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */

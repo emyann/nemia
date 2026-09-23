@@ -1035,7 +1035,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
       // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
-      if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
+      // A hold beside the wait is said too: lifting it is not enough to start the run, and the line says so.
+      if (waiting.length) {
+        const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
+        const alsoHeld = run.hold ? `\n  ${holdWord(holding)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}` : '';
+        return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
+      }
       // Nor while a person holds it (wf hold): what is in flight finishes, and what its steps ask is asked once the hold lifts — so the hold,
       // and what is still running, are the whole of what there is to say, and nothing is offered.
       if (run.hold) {

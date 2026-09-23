@@ -261,9 +261,12 @@ export type Holding = { run: Run; hold: Hold };
  */
 export async function hold(e: Engine, id: string, until: readonly string[]): Promise<Holding> {
   const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
-  for (const named of [id, ...until]) {
-    const bad = idRefusal(named, 'hold');
-    if (bad) refuse(bad);
+  const bad = idRefusal(id, 'hold');
+  if (bad) refuse(bad);
+  // A run named is fixed on its own flag: the command that fixes it keeps the run to hold.
+  for (const named of until) {
+    const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
+    if (badUntil) refuse(`--until ${badUntil}`);
   }
   if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`);
   const run = readRun(id);

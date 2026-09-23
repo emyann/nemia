@@ -276,17 +276,18 @@ after a space starts a comment. The keys are a closed list:
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
 | `effort` | how hard the harness thinks, in its own words — see below |
-| `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
+| `budgetUsd` | the most one attempt may spend, in dollars, digits only — a job on `claude`, or `claude-detached`; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
+| `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which `ae say` can reach, instead of as a job (`claude -p`); see below |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
-`tools`, `effort`, `contextTokens` — under the task's `config`, where `file()` takes them.
+`tools`, `effort`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` that is not `true` or `false`, a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
@@ -296,7 +297,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `priority` that is not a finite number (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `priority` that is not a finite number (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:

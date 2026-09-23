@@ -359,6 +359,18 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
   assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
 });
 
+test('ae show prints what the harness denied an attempt, as the rules that would allow it, and nothing when it denied nothing', () => {
+  const base: Event[] = [
+    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'starting', at: '2026-09-23T09:00:01Z', attempt: 1 },
+  ];
+  const ended = (extra: object) => fold('t-1', [...base, { kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra }]).attempts[0]!;
+  assert.equal(attemptLine(ended({ denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }] })),
+    'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured  denied: Skill(look), Bash(pytest), WebFetch');
+  assert.equal(attemptLine(ended({})), 'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured');
+  assert.equal(attemptLine(ended({ denials: [] })), 'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured', 'none denied: nothing said');
+});
+
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, ...extra });
   assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000 }, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);

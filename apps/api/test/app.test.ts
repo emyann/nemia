@@ -1196,9 +1196,10 @@ test('a step says the mode its session runs in, as its harness decides it — a 
   }
 });
 
-test("the mode the api says a Claude Code task runs in is the one the engine's `claude --bg` runner spawns it with", async (t) => {
-  // That runner's spawn is no pure function the engine exports, so the api says its rule after it. This holds the two together: the
-  // argv the runner hands a fake `claude` on PATH, as the engine's own tests record it.
+test("the mode the api says a Claude Code task runs in is the one the engine's `claude` spawns it with, as a job and as a background session", async (t) => {
+  // Neither spawn is a pure function the engine exports, so the api says its rule after them. This holds the three together: the argv
+  // the background runner hands a fake `claude` on PATH, as the engine's own tests record it, and the flags of `claude -p`, which a job
+  // and `claude-detached` share (`claudePrintFlags`) and the detached spec's `command` prints.
   // Seeded here, not borrowed from the test before, whose first wrong mode would stop it before it seeds the second.
   const said = new Map<string, string>();
   for (const [id, permissionMode] of [['r-59-claude', undefined], ['r-59-claude-mode', 'dontAsk']] as const) {
@@ -1228,6 +1229,14 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   };
   assert.equal(said.get('r-59-claude'), await spawnedWith(undefined), 'filed with no mode');
   assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
+
+  const { claudeDetached } = await import('agent-runtime/effect');
+  const jobWith = (permissionMode: string | undefined) => {
+    const { args } = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) });
+    return args[args.indexOf('--permission-mode') + 1];
+  };
+  assert.equal(said.get('r-59-claude'), jobWith(undefined), 'a job filed with no mode');
+  assert.equal(said.get('r-59-claude-mode'), jobWith('dontAsk'), 'a job filed with one');
 });
 
 test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {

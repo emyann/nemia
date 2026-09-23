@@ -18,7 +18,7 @@ import { HARNESSES } from 'agent-orchestrator';
 import { capabilitiesOf, denyingRule, MEASURED_TOOLS, READ_ONLY_COMMANDS, SETTINGS, type Capabilities, type DeniedRule } from './capabilities.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from './workflows.ts';
 
-/** The harnesses that are Claude Code, as the engine names them: its `--bg` sessions, and `claude -p` detached. */
+/** The harnesses that are Claude Code, as the engine names them: its jobs and background sessions (`claude`), and `claude -p` detached. */
 const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
 
 /** Where a step's own deny rules are read from. */

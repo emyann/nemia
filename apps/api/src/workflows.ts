@@ -52,6 +52,8 @@ export type WorkflowStepSpec = {
   disallow: string[];
   /** What the session may do without being asked, in the same rules (`allow:`): empty where the step allows nothing beyond its mode. */
   allow: string[];
+  /** `background:` as written, `true` or `false`: null where the step has no line, and runs as a job (`claude -p`). */
+  background: boolean | null;
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -247,6 +249,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],
   allow: step.allow ?? [],
+  background: step.background ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,

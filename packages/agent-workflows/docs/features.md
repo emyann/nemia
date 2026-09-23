@@ -3725,7 +3725,7 @@ What it leaves:
   passed, a number refused, none unfinished) once, in one place, instead of in `refusedCheck`; and the schema it answered carried
   with it, so the board can render a payload without reading the folder frozen on the run. (The board's side is taken up by *a
   node's outcome drawn, not printed*, below: the api reads the schema off the frozen folder for now.)
-- **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api.ts`) does not name `signoff`. The api sends it, and the board's
+- **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api/tries.ts`) does not name `signoff`. The api sends it, and the board's
   words come from `tryNote`; the type is a mirror only. Owned by apps/, not changed here.
 
 ## Shipped: the subscription's quota on the board

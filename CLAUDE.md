@@ -35,6 +35,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   copy, file for file, and the api's picture of `dev` and `dev-build` (`apps/api/test/workflows.test.ts`). After touching
   `workflows/`, run `npx turbo run test --force`, and copy a `workflows/ui` change into
   `packages/agent-orchestrator/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
+- **A package's former name is refused outside history, and turbo can replay that refusal's pass.** `packages/agent-orchestrator/test/names.test.ts`
+  reads every file git lists, tracked or not yet added, and fails on a line naming either package by the name it had before 2026-09-23,
+  except in a file on its `HISTORY` (dated writing, each with a line at its top saying it keeps its words), in a store's path
+  (`~/.agent-workflows`, `~/.agent-engine`, whose names stay), or on a line that says `renamed on 2026-09-23`. New dated writing that
+  quotes the old names joins `HISTORY`. Turbo caches the package's pass by the package's own files, so a change only to a doc or to
+  another package replays it: run `npx turbo run test --force` after such a change (learned by the run that renamed the packages).
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).

@@ -1238,6 +1238,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
+| `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message with `config` in its metadata, a sighting or a journalled attempt a Task |
 | `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's `spawn`, `observe` and `stop` as calls through the SDK's `Client` |

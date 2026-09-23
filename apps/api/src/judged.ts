@@ -2,7 +2,7 @@
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
  */
-import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-orchestrator';
+import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-orchestrator';
 import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
@@ -66,6 +66,24 @@ export const spentOf = (spend: Spend): Spent | null =>
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
+  word: string;
+  advice: string;
+  onYou: boolean;
+};
+
+/**
+ * What a person's hold on a run says (`wf hold <run> --until <run>`, `Run.hold`), as `wf ls` and `wf decide` say it — never worded here.
+ *
+ * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped, and,
+ * for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next tick
+ * has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), and `advice` the line `wf
+ * decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it names never
+ * ships on its own — the rule `wf ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every verb a step's word
+ * would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and nothing is offered.
+ */
+export type RunHolding = {
+  at: string;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
   word: string;
   advice: string;
   onYou: boolean;
@@ -136,6 +154,36 @@ export function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
 }
 
 /**
+ * The runs a held run waits on to ship (`holdsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
+ * none, without a look, for a run nobody holds or one called off, of which the package says no hold (`listing`, `decide`).
+ */
+export async function holdsIn(run: Run, reader: typeof e): Promise<Wait[]> {
+  if (!run.hold || run.cancelledAt) return [];
+  const read = new Map<string, ParentRun>();
+  for (const id of new Set(run.hold.until)) read.set(id, await parentOf(reader, id));
+  return holdsOf(run, (id) => read.get(id) ?? { shipped: false });
+}
+
+/**
+ * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never ships on its own — no such run, a
+ * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli.ts). Not `neverShips` above, which reads any reason a `Wait`
+ * carries as one it may never ship for: a hold's `shipped` is the opposite.
+ */
+const holdNeedsYou = (holds: readonly Wait[]): boolean => !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
+
+/** A person's hold on a run (`RunHolding`), in the package's words; null for a run nobody holds, and one called off. */
+export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
+  if (!run.hold || run.cancelledAt) return null;
+  return {
+    at: run.hold.at,
+    runs: holds.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [], shipped: Boolean(w.shipped) })),
+    word: holdWord(holds),
+    advice: holdAdvice(run, holds),
+    onYou: holdNeedsYou(holds),
+  };
+}
+
+/**
  * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it: `list`'s,
  * which the package does not export. `unknown` where `phaseOfView` says so, for a task the engine has no record of: the
  * engine folds it to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight.
@@ -158,6 +206,8 @@ type Judged = {
   moving: boolean;
   /** The runs its roots wait on (`waitingOf`). */
   waiting: RunWaiting | null;
+  /** A person's hold on it (`holdingOf`). */
+  holding: RunHolding | null;
   /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
   asked: ReadonlyMap<string, Retry>;
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a try was answered (`answerOf`). */
@@ -247,6 +297,10 @@ export function standingsOf(run: Run, steps: readonly Workflow[], status: RunSta
  * Given the runs its roots wait on, read once (`waitsIn`): a root of a run waiting on runs says `waiting on <run>`, as `list` words it, and
  * the run moves while each may still ship — the tick files the roots when they do — and not once one never will without a person.
  *
+ * Given the runs a person holds it until, read once (`holdsIn`): what `wf ls` says of the hold, and `listing` offers nothing on a held run,
+ * so no step of it waits on you. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it once every
+ * run it names has shipped, and files then what is due — as a run waiting on runs does, and not once it lifts only by a person's hand.
+ *
  * And given where the run's result branches stand, asked of git for the runs where the answer can decide anything (`standingsOf`), which is
  * why the status is read first: without them only a gate says a run is one nobody has decided, and a finished run whose branch nobody merged
  * would say there is nothing to decide.
@@ -257,6 +311,8 @@ export function judge(
   folder: readonly Workflow[] | null,
   views: Views,
   waits: readonly Wait[],
+  /** The runs it is held until (`holdsIn`): none for a run nobody holds. */
+  holds: readonly Wait[],
   /** Where each result branch stands, asked once the run's status is known (`standingsOf`); left out, no branch is read, and a to-decide branch says nothing. */
   readStandings: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[] = () => [],
 ): Judged {
@@ -280,12 +336,17 @@ export function judge(
   // And the harness's word, as the tick has it (`harnessBlocked`): a person's try of a step whose session the harness blocked is due, the
   // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
   // And the cost, as the tick has it: a step over its budget is not tried, nor its loop sent round, on the run's word, so it does not move.
-  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  const judgedOf = (on: Run) => assess(steps, on, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  const { status, ready, check, retry, round } = judgedOf(run);
   // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
   // inputs as `assess`, so the words and the judgement are the package's single reading.
   const standings = readStandings(status, steps);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings, undefined, undefined, undefined, holds);
   const waiting = waitingOf(run, said.waiting);
+  const holding = holdingOf(run, holds);
+  // What the tick files once the hold lifts, for a hold that lifts on its own: the run as it stands without it. A held run has nothing due.
+  const { hold: _, ...unheld } = run;
+  const due = holding && !holding.onYou ? judgedOf(unheld) : { ready, check, retry, round };
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
@@ -302,9 +363,10 @@ export function judge(
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
     // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
     // Roots `assess` makes ready on a run waiting on runs are filed once those ship (`runReady`), which never happens on its own for a
-    // run that never ships: the gate is the tick's, and `assess` does not know it.
-    moving: inFlight(run, phase).length > 0 || (tickReads && ((ready.length > 0 && !waiting?.onYou) || check.length > 0 || retry.length > 0 || round.length > 0)),
+    // run that never ships: the gate is the tick's, and `assess` does not know it. A held run's due is what it files once the hold lifts (`due`).
+    moving: inFlight(run, phase).length > 0 || (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
+    holding,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers,
     spendOf,

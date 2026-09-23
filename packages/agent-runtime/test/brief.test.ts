@@ -48,6 +48,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     budgetUsd: ['0.25', 0.25],
     contextTokens: ['200000', 200000],
     background: ['true', true],
+    holdOpen: ['true', true],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];

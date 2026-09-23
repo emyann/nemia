@@ -10,11 +10,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Effect, Layer } from 'effect';
 import {
   answer, close, file, InputRefused, Journal, Runner, testOps, tick, view, type Event, type Sighting, type SpawnRequest,
 } from '../src/index.ts';
 import { createEngine, type PromiseJournal, type PromiseRunner } from '../src/facade.ts';
+import { fold } from '../src/domain.ts';
+import { parseBrief, taskLine } from '../src/cli.ts';
 
 /** Sign the session `name` off: done, with a closeout given after its attempt started. */
 const signed = (sessions: Map<string, Sighting>, name: string, summary: string) => sessions.set(name, {
@@ -219,4 +223,70 @@ test('file refuses a holdOpen that is not true', async () => {
     });
   }
   assert.equal(b.tasks.size, 0);
+});
+
+// ─── ae ──────────────────────────────────────────────────────────────────────
+
+const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
+
+test('ae answer prints the line it journalled, the words being everything after the id but --budget; ae close; each refusal exits 2', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-hold-open-cli-'));
+  try {
+    const engine = createEngine({ root });
+    const waiting = async () => {
+      const id = await engine.file({ brief: 'b', cwd: root, holdOpen: true });
+      await Effect.runPromise(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(id, e))).pipe(Effect.provide(Journal.files(root))));
+      return id;
+    };
+    const journal = async (id: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(id)).pipe(Effect.provide(Journal.files(root))));
+    const run = (...args: string[]) => spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
+
+    const a = await waiting();
+    const bad = run('answer', a, 'shorter', '--budget', '$5');
+    assert.equal(bad.status, 2, bad.stderr);
+    assert.match(bad.stderr, /^answer: `--budget \$5` is not an amount of dollars\. Write dollars above 0, digits only/);
+    assert.match(run('answer', a, 'shorter', '--budget').stderr, /^answer: `--budget ` is not an amount of dollars/);
+    assert.equal((await journal(a)).length, 4, 'nothing journalled');
+    const ok = run('answer', a, 'shorter,', 'please', '--budget', '0.5');
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
+    const last = (await journal(a)).at(-1)!;
+    assert.deepEqual(last.kind === 'input' ? [last.text, last.budgetUsd] : last, ['shorter, please', 0.5]);
+    const again = run('close', a);
+    assert.equal(again.status, 2);
+    assert.match(again.stderr, /^close: `t-.*` has been answered already/);
+    const empty = run('answer', a, '');
+    assert.equal(empty.status, 2);
+    assert.match(empty.stderr, /^answer: `text` is empty/);
+
+    const c = await waiting();
+    const closed = run('close', c);
+    assert.equal(closed.status, 0, closed.stderr);
+    assert.match(closed.stdout, /closed: the next tick settles it/);
+    assert.equal((await journal(c)).at(-1)!.kind, 'closed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a brief says `holdOpen: true` or `false`, and nothing else', () => {
+  const brief = (v: string) => `---\nholdOpen: ${v}\n---\ndo it`;
+  assert.equal(parseBrief(brief('true'), '/r').holdOpen, true);
+  assert.equal(Object.hasOwn(parseBrief(brief('false'), '/r'), 'holdOpen'), false, 'false: not held open, and no key');
+  for (const bad of ['yes', 'True', '1']) {
+    assert.throws(() => parseBrief(brief(bad), '/r'), (e: Error & { exitCode?: number }) =>
+      e.exitCode === 2 && /^brief: `holdOpen: .*` is not true or false\. Write `holdOpen: true`/.test(e.message));
+  }
+});
+
+test('ae ls counts the current turn\'s attempts against maxAttempts, and names the turn', () => {
+  const at = new Date().toISOString();
+  const events: Event[] = [
+    { kind: 'filed', at, brief: 'b', cwd: '/r', maxAttempts: 2, holdOpen: true }, ...signedJournal(),
+    { kind: 'input', at, text: 'again' }, { kind: 'starting', at, attempt: 2 },
+  ];
+  const line = (n: number) => taskLine({ id: 't-1', state: fold('t-1', events.slice(0, n)), phase: 'x', sessionId: null });
+  assert.match(line(4), / 1\/2  /, 'turn 0: every attempt');
+  assert.match(line(5), / 0\/2 turn 1  /, 'answered: a turn with none yet');
+  assert.match(line(6), / 1\/2 turn 1  /);
 });

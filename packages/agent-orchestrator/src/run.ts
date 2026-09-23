@@ -3398,6 +3398,12 @@ export function listing(
    * its step's `status` reaches the board's chip unchanged.
    */
   waitingOf: (taskId: string) => string | undefined = () => undefined,
+  /**
+   * What each task's sessions were denied, as permission rules name them (`deniedOf` in views.ts): said as `denied: Skill(look), Bash(pytest)`
+   * (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its status — which stays the word every
+   * reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field of its own (`StepNeeds.denied`).
+   */
+  deniedOf: (taskId: string) => readonly string[] = () => [],
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
@@ -3459,8 +3465,10 @@ export function listing(
     const gate = !atGates.has(step.name) || retry ? ''
       : takenByHand(step.name) ? onBaseNote(run, step.name, standings)
       : gateNote(run, step.name, sendBackTo(step, run));
-    // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh.
-    const note = [tried, gate, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh. And
+    // what its current try's sessions were denied, last: a tool the step was not allowed, which it carried on without.
+    const taskId = run.steps[step.name]?.taskId;
+    const note = [tried, gate, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : ''].filter(Boolean).join(' · ');
     return { ...row, ...(note ? { note } : {}), ...cost };
   });
 
@@ -3583,6 +3591,26 @@ export function waitingWords(waitingFor: string): string {
 export function oneLine(text: string, cap: number): string {
   const line = text.trim().replace(/\s+/g, ' ');
   return line.length <= cap ? line : `${line.slice(0, cap - 1).trimEnd()}…`;
+}
+
+/** The most denied calls a line names before it counts the rest: `denied: A, B, C, D, E and 3 more`. */
+const DENIED_SHOWN = 5;
+
+/** The longest one denied call a line prints: a file tool's is its path, which can be long, and a command's first word is free text. */
+const DENIED_CAP = 60;
+
+/**
+ * What a step's sessions were denied, in a line a person reads: `denied: Skill(look), Bash(pytest)` — or nothing, for none. Pure.
+ *
+ * **One writer for these words**, as `waitingWords` is for a wait: `wf ls`, `wf decide` and the board say the same fact. Each call is the
+ * harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `wf ls` prints the
+ * line in its note, `wf decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many more.
+ */
+export function deniedWords(denied: readonly string[]): string {
+  if (!denied.length) return '';
+  const named = denied.slice(0, DENIED_SHOWN).map((d) => oneLine(d, DENIED_CAP));
+  const more = denied.length - named.length;
+  return `denied: ${named.join(', ')}${more ? ` and ${more} more` : ''}`;
 }
 
 /**

@@ -5,7 +5,7 @@
  * (`runtime-client.ts`), and the store's files beneath it, and files nothing — the tick (`tick.ts`), the verbs and the screens read through it.
  */
 import fs from 'node:fs';
-import type { Engine, TaskView } from './runtime-client.ts';
+import { denialText, type Engine, type TaskView } from './runtime-client.ts';
 import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import type { Consumed } from './radius.ts';
 import type { Workflow } from './workflow.ts';
@@ -95,6 +95,21 @@ export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId:
  * run.ts, which is the only place this repository turns the harness's word into a sentence.
  */
 export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string | undefined => views.get(taskId)?.waitingFor;
+
+/**
+ * What a task's sessions were denied, off views already read: every call the harness refused on an attempt that ended, as a permission rule
+ * names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task nobody read, one whose
+ * attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the runtime's `Attempt.denials`) —
+ * so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials are on the engine's journal.
+ *
+ * Every attempt of the task, not only its last: an attempt the engine started again within one filing is the same try, and what the first
+ * was denied is still what the step could not do. A try is a task of its own (`checkTaskId`, `sessionTasks`), so the current try's task
+ * says the current try's denials, and a try filed after them starts with none.
+ *
+ * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in run.ts.
+ */
+export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string[] =>
+  [...new Set((views.get(taskId)?.state.attempts ?? []).flatMap((a) => (a.denials ?? []).map(denialText)))];
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`

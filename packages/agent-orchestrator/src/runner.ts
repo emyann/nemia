@@ -19,7 +19,7 @@
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LARGE_CONTEXT, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, peakMark, readWords, rebuiltCache, sumUsage, touchedLines, usedLines } from './radius.ts';
 export { isGitRun, placeOf } from './run.ts';
-export { answerIn, harnessWaitLine, waitingWords } from './run.ts';
+export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
  * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-runtime — it is not a
@@ -58,7 +58,7 @@ export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritt
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
 export type { InboxDropped, InboxQueued } from './inbox-store.ts';
 export { HARNESSES, engine } from './runtime-client.ts';
-export { closeoutAsked, closeoutOf, closeoutReader, consumption, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf } from './views.ts';
+export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf } from './views.ts';
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
 export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';

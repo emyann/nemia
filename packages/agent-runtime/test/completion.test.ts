@@ -425,7 +425,7 @@ test('remoteControl reaches Claude Code as --remote-control, and a flag follows 
   assert.equal((await argvOf({ config: { remoteControl: false } })).includes('--remote-control'), false, 'false asks for nothing');
 });
 
-test('at shipped defaults, a task filed with remoteControl: true is spawned with --remote-control, on every attempt, and one filed without it never is', async () => {
+test('at shipped defaults, a background task filed with remoteControl: true is spawned with --remote-control, on every attempt, and one filed without it never is', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
   const registry = path.join(dir, 'registry.json');
   const runs = path.join(dir, 'runs.jsonl');
@@ -446,8 +446,8 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'ae-remote-')) });
-    await engine.file({ brief: 'bridged', cwd: dir, config: { remoteControl: true }, maxAttempts: 2 });
-    await engine.file({ brief: 'plain', cwd: dir, maxAttempts: 2 });
+    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, remoteControl: true }, maxAttempts: 2 });
+    await engine.file({ brief: 'plain', cwd: dir, config: { background: true }, maxAttempts: 2 });
     await engine.tick();
     // Both fail: each is retried, and the retry is spawned from the record as the first attempt was.
     fs.writeFileSync(registry, JSON.stringify(JSON.parse(fs.readFileSync(registry, 'utf8')).map((r: object) => ({ ...r, state: 'failed' }))));

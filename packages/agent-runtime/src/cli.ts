@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
+import { createEngine, denialText, type Attempt, type Engine, type Event, type ResumePolicy, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -22,7 +22,7 @@ import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy,
 export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
   'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
-  'contextTokens',
+  'contextTokens', 'background',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -90,6 +90,10 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
     throw refuse(`\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2]!.toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`);
   }
+  const background = meta.get('background');
+  if (background !== undefined && background !== 'true' && background !== 'false') {
+    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which \`ae say\` can reach, or leave it out to run it as a job.`);
+  }
   const resume = meta.get('resume');
   if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
     throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
@@ -131,6 +135,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     tools: toolList,
     effort: meta.get('effort'),
     contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
+    background: background !== undefined ? background === 'true' : undefined,
   }).filter(([, value]) => value !== undefined));
   return {
     brief,
@@ -217,7 +222,9 @@ export const attemptLine = (a: Attempt): string => {
   const how = `${a.ended}${a.reason === 'lost' || a.reason === 'budget' ? ` (${a.reason})` : ''}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
-  return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${failedCall}`;
+  // What the harness denied the session, as the rules a person would write to allow it: the calls it went on without.
+  const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
+  return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
 };
 
 /**
@@ -260,7 +267,7 @@ const HELP = `ae — an engine for agent sessions
   ae show <id>                 the journal, line by line
   ae logs <id>                 the session's output
   ae stop <id>                 ask it to stop
-  ae say <id> "<text>"         tell its running session something, and journal it
+  ae say <id> "<text>"         tell its running background session something, and journal it
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae watch [cursor]            the same, followed
 
@@ -276,8 +283,10 @@ const HELP = `ae — an engine for agent sessions
                      unless the list has Bash, Write or Edit)
     effort           claude: low | medium | high | xhigh | max
                      codex:  none | minimal | low | medium | high | xhigh | max
-    budgetUsd        dollars one attempt may spend — claude-detached only: claude -p
-                     ends the session at it; a --bg session keeps no cap
+    budgetUsd        dollars one attempt may spend — a job on claude, or claude-detached:
+                     claude -p ends the session at it; a background session keeps no cap
+    background       true — claude only: run the session as claude --bg, which ae say
+                     can reach, instead of as a job (claude -p, the default)
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
   a key not listed here, or a value the harness cannot take, is refused (exit 2)

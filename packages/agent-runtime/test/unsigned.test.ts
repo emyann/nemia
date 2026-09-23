@@ -99,7 +99,7 @@ test('a task that asked for a closeout, whose session goes quiet without one, do
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA, maxAttempts: 2 });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA, maxAttempts: 2 });
     await engine.tick();
     const [row] = claude.rows();
 
@@ -147,7 +147,7 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), maxAttempts: 2 });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), maxAttempts: 2 });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
@@ -166,7 +166,7 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
 
-    const said = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
+    const said = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
@@ -177,7 +177,7 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
 
     // A continuation whose transcript holds only its parent's conversation, statement included, from an hour before it began.
-    const inherited = await engine.file({ brief: 'go on', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
+    const inherited = await engine.file({ config: { background: true }, brief: 'go on', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
     const anHourAgo = new Date(Date.now() - 60 * MINUTES).toISOString();
@@ -200,8 +200,8 @@ test("THE HARNESS'S `done` without a statement is unsigned too, for a task that 
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const asked = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
-    const nothing = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const asked = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
+    const nothing = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     for (const row of claude.rows()) {
       wrote(row.sessionId, 0, prompt('the prompt'), says('msg_1', 'I have finished.'));

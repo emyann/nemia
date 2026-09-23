@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Observed, Sighting, Usage } from './domain.ts';
+import type { Denial, Observed, Sighting, Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
 import { writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
@@ -86,6 +86,13 @@ export type HarnessSpec = {
    * task that sets one rather than let it run on a window it did not ask for.
    */
   contextTokens?: { least: number; most: number };
+  /**
+   * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
+   * `claude -p --resume` since 2.1.278 (open issue 4). Set, the run file keeps the id it resumed, and `observe` takes the
+   * parent's printed totals off — the latest run started before it under that id, as its own output read them. Where
+   * there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
+   */
+  resumeCostCarried?: true;
 };
 
 /**
@@ -116,6 +123,8 @@ export type HarnessOutput = {
   usage?: Usage;
   /** The harness says it ended the session because it spent its budget. */
   budgetSpent?: true;
+  /** The tool calls the harness denied the session, in the order it first did. Absent when none, or when it does not say. */
+  denials?: Denial[];
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -135,13 +144,30 @@ const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); 
  * says a session is waiting, and says what for — Claude Code's `claude agents --json` — can fill that field.
  */
 type RunFile = {
-  name?: string; state: Observed; pid: number; heartbeatAt: string;
+  name?: string; state: Observed; pid: number; heartbeatAt: string; startedAt?: string;
   nativeId?: string; logFile: string; exitCode?: number;
+  /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
+  resumeFrom?: string;
 };
+
+const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
+
+/**
+ * A run found by its name, from its own run file alone: no other run is read, and no output. A detached run's handle
+ * is its name, so that is the id found. A file whose name is not this one — `safe` folds two names into one path — is
+ * not this run, and a file that cannot be read yet is not found, as `observe` skips it.
+ */
+export const detachedFind = (spec: HarnessSpec, root: string) => (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
+  Effect.sync(() => {
+    try {
+      const run = JSON.parse(fs.readFileSync(runFileOf(spec, root, name), 'utf8')) as RunFile;
+      return run.name === name ? { sessionId: name } : undefined;
+    } catch { return undefined; }
+  });
 
 export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
-  const runFile = (name: string) => path.join(dir, `${safe(name)}.json`);
+  const runFile = (name: string) => runFileOf(spec, root, name);
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
   const closeoutFile = (name: string) => path.join(dir, `${safe(name)}.closeout.json`);
   const schemaFile = (name: string) => path.join(dir, `${safe(name)}.schema.json`);
@@ -212,6 +238,28 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
    * read. A name with no run file is taken for that id itself: the id an attempt's end was recorded with,
    * which is what the engine asks by once the run file is gone.
    */
+  /**
+   * What a run's output says it used, as the attempt's own. A resumed run of a spec whose totals carry the parent's
+   * has the parent's taken off: the parent is the run under the id it resumed that started last before it — a resume
+   * keeps its parent's id, so a later run under that id is a child, never the parent. No parent, a parent that
+   * printed no total, or a total that would go below nothing: that measure is dropped, never overcounted.
+   */
+  const usageOf = (all: Array<{ name: string; run: RunFile }>, run: RunFile, usage: Usage | undefined): Usage | undefined => {
+    if (!usage || !spec.resumeCostCarried || !run.resumeFrom) return usage;
+    const at = (r: RunFile) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN);
+    const parent = all
+      .filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run))
+      .sort((a, b) => at(b.run) - at(a.run))[0];
+    const carried = parent && outputOf(parent.name)?.read.usage;
+    const { costUsd, apiMs, ...own } = usage;
+    const less = (mine: number | undefined, theirs: number | undefined) =>
+      mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
+    const cost = less(costUsd, carried?.costUsd);
+    const api = less(apiMs, carried?.apiMs);
+    const left: Usage = { ...own, ...(cost ? { costUsd: cost.value } : {}), ...(api ? { apiMs: api.value } : {}) };
+    return Object.keys(left).length ? left : undefined;
+  };
+
   const transcriptOf = (reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
     (sessionId, after) => Effect.tryPromise({
       try: async () => {
@@ -253,6 +301,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           const plan = {
             name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
+            ...(spec.resumeCostCarried && r.resumeFrom ? { resumeFrom: r.resumeFrom } : {}),
           };
           // Written before the spawn, with no pid: the run is intended, and a crash here leaves
           // a file that says so. The worker overwrites it with its own pid the moment it starts.
@@ -276,21 +325,23 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     observe: Effect.sync(() => {
       const now = Date.now();
       const m = new Map<string, Sighting>();
-      // sessionId is the NAME here: our handle, since this harness's own id may never appear.
       // sessionId is the NAME here: our handle. `nativeId` is the harness's own, scraped from its
       // output by the worker — present only once the harness has printed it, which is why resume
       // is best-effort for this kind of harness and exact for one with a registry.
-      for (const { name, run } of readAll()) {
+      const all = readAll();
+      for (const { name, run } of all) {
         // The file the harness wrote its answer to, when it wrote one; otherwise what its output says.
         const output = outputOf(name);
+        const usage = usageOf(all, run, output?.read.usage);
         const printed = output?.read.closeout && { payload: output.read.closeout.payload, at: output.at };
         m.set(name, {
           sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name) ?? printed,
           // The process's own exit code, once it has one. The worker writes -1 when there is none —
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
-          ...(output?.read.usage ? { usage: output.read.usage } : {}),
+          ...(usage ? { usage } : {}),
           ...(output?.read.budgetSpent ? { budgetSpent: true as const } : {}),
+          ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
         });
       }
       return m;

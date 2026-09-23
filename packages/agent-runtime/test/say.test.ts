@@ -27,13 +27,14 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
 const { createEngine } = await import('../src/facade.ts');
-const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner-claude-inbox.ts');
+const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, processStart, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner-claude-inbox.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
 
 /**
  * A fake `claude`. `agents` prints its rows, each with a `pid`, busy, as a session at work is listed; `--bg --name <n>`
- * adds one; `stop` and `rm` do what they do. While `<bin>/agents-fails` exists, `agents` fails.
+ * adds one; `stop` and `rm` do what they do; `-p`, a job, works for ten seconds and prints nothing. While
+ * `<bin>/agents-fails` exists, `agents` fails.
  */
 const fakeClaude = () => {
   const bin = tmp('bin');
@@ -56,6 +57,7 @@ if (args[0] === 'stop' || args[0] === 'rm') {
   save();
   process.exit(0);
 }
+if (args[0] === '-p') setTimeout(() => {}, 10_000);
 if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now(), cwd: process.cwd(), pid: 900000 + rows.length });
   save();
@@ -108,9 +110,12 @@ const register = (row: Row, fields: Record<string, unknown>) => {
   fs.writeFileSync(path.join(sessions, `${row.pid}.json`), JSON.stringify({ pid: row.pid, sessionId: row.sessionId, name: row.name, kind: 'bg', ...fields }));
 };
 
-/** A task filed and ticked once, so its session is listed working — and, unless told not to, registered with an inbox. */
+/**
+ * A task filed and ticked once, so its session is listed working — and, unless told not to, registered with an inbox. A
+ * background session: at shipped defaults a Claude task is a job, which has no inbox.
+ */
 const running = async (engine: Engine, spec: Partial<TaskSpec> = {}, withInbox = true) => {
-  const id = await engine.file({ brief: 'do the work', cwd: work, ...spec });
+  const id = await engine.file({ brief: 'do the work', cwd: work, ...spec, config: { background: true, ...spec.config } });
   await engine.tick();
   const row = fake.rows().find((r) => r.name === `ae/${id}/1`)!;
   assert.ok(row, 'the fake listed the session');
@@ -183,6 +188,24 @@ test('a session its harness lists blocked is running, and its inbox is handed th
   await box.close();
 });
 
+test("a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words", async () => {
+  const root = tmp('board');
+  const engine = createEngine({ root });
+  const { id, box } = await running(engine);
+  // Its filing as it was written then: the same session, the config saying nothing of a mode.
+  const journal = path.join(root, 'tasks', `${id}.jsonl`);
+  const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
+  const event = JSON.parse(filed!);
+  delete event.config.background;
+  fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
+  assert.equal((await engine.view(id)).state.config?.background, undefined, 'the record names no mode');
+
+  await engine.say(id, 'and the web app');
+  assert.equal(box.lines.length, 1, 'the words reached its inbox');
+  assert.equal((await engine.view(id)).state.said.length, 1);
+  await box.close();
+});
+
 // ─── refusals: exit 2, nothing sent, nothing journalled ─────────────────────
 
 test('refused: empty words, and words that are only whitespace', async () => {
@@ -224,9 +247,20 @@ test("refused: words longer than Claude Code's inbox reads", async () => {
   await box.close();
 });
 
+test('refused: a job that is running — listed working under its name, it takes no words — in words that name the mode that does', async () => {
+  const engine = createEngine({ root: tmp('board') });
+  const id = await engine.file({ brief: 'do the work', cwd: work });
+  await engine.tick();
+  const seen = await engine.view(id);
+  assert.equal(seen.state.attempts.at(-1)?.ended, null, 'its attempt is running');
+  await refused(engine, id, 'hello', /^say: A job \(`claude -p`\) is given its brief and takes no words while it runs\. File the task with `config\.background: true`/);
+  await engine.stop(id);
+  await engine.tick();
+});
+
 test('refused: a task that has not started an attempt', async () => {
   const engine = createEngine({ root: tmp('board') });
-  const id = await engine.file({ brief: 'queued', cwd: work });
+  const id = await engine.file({ brief: 'queued', cwd: work, config: { background: true } });
   await refused(engine, id, 'hello', /has not started an attempt yet/);
 });
 
@@ -284,11 +318,16 @@ test('refused: an attempt its harness does not list, and one it lists as no long
 
 test('a registry that cannot be read rejects, not refuses: ask again', async () => {
   const engine = createEngine({ root: tmp('board') });
-  const { id, box } = await running(engine);
+  const { id, row, box } = await running(engine);
+  // Registered by a live process, as Claude Code registers one: the listing that fails is the only thing that misses it.
+  // On `claude` the listing reads past a registry that failed, so its jobs stay seen; the registration is what says so.
+  fs.writeFileSync(path.join(sessions, `${process.pid}.json`), JSON.stringify({
+    pid: process.pid, sessionId: row.sessionId, name: row.name, kind: 'bg', procStart: processStart(process.pid), messagingSocketPath: box.path,
+  }));
   fake.agentsFails(true);
   try {
     await failed(engine, id, /the `claude` registry could not be read/);
-  } finally { fake.agentsFails(false); }
+  } finally { fake.agentsFails(false); fs.rmSync(path.join(sessions, `${process.pid}.json`)); }
   assert.equal(box.lines.length, 0);
   await box.close();
 });

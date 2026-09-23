@@ -59,6 +59,24 @@ export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | unde
   : `\`budgetUsd: ${task.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
 
 /**
+ * What Claude Code cannot be asked for as the engine runs it by default, in the mode the task chose. A job (`claude -p`, the
+ * default) refuses what Claude Code does, and a bridge to claude.ai, which only a background session can open — so the
+ * refusal names the key that makes one. A background session (`config.background: true`) refuses what `claude --bg` does,
+ * a spend cap among it, and names the mode that keeps one.
+ */
+export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  const refused = claudeRefuses(task);
+  if (refused) return refused;
+  if (task.config?.background) {
+    return task.budgetUsd === undefined ? undefined
+      : `\`budgetUsd: ${task.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
+  }
+  return task.config?.remoteControl
+    ? '`remoteControl: true` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge. Give `config.background: true` as well, or leave `remoteControl` off.'
+    : undefined;
+};
+
+/**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,
  * so it is stable, greppable, and — the point — never absent.
  */

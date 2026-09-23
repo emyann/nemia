@@ -251,6 +251,29 @@ orchestrator's calls to the runtime change.
    by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
    `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's
    call at the gate.
+   Planned 2026-09-23 and split by the owner at its gate into five parts, each a card of its own: **(1) the runtime's
+   Claude Code adapter** — `claude` runs a task as a job, `claude -p --output-format stream-json --verbose
+   --permission-prompts none` in the detached worker, and as `claude --bg` only when the task says `config.background:
+   true`, a harness argument like the others; one harness, two modes, each verb routed by the session id's shape
+   (`src/runner-claude-code.ts`), so a `--bg` session journalled on `claude` before is still observed, stopped, settled and said to.
+   `say` and `remoteControl` on a job are refused in words that name `background: true`, a budget beside it is refused as
+   `--bg` keeps none, and `background` on any other harness is refused. What a job was denied is on its attempt
+   (`denials`) and on `ae show`, and `decide` never reads it. The orchestrator stays on `claude-bg` until part 2. Done, on
+   the same day, measured first on Claude Code 2.1.280 (M1 to M7, `packages/agent-runtime/docs/open-issues.md` issue 28).
+   **(2) steps become jobs**, with the orchestrator's `claude` mapped to the adapter. **(3) denials on every surface** — a
+   `denied:` line on `wf decide`, `wf ls`, the api and the board — and a `denials: fail` step key. **(4) a gate or a blocked
+   sign-off as `TASK_STATE_INPUT_REQUIRED` on one task**, the runtime holding it open; R1, a card of its own. **(5) the A2A
+   stream**, the closeout and collected files as `Artifact`s, and `contextId` as the session.
+
+   **A correction to the design above: permission modes follow roles, not `auto` by default.** The planner, the reviewer
+   and the observer run in `dontAsk` with an allow list; implement and ship run in `auto`; denials are recorded everywhere.
+   Part 1 measured why a role's mode must be named rather than left to a default: `-p` waits on nobody in any mode — a call
+   that would ask is denied and the session carries on — and `auto` on haiku ran as `default`, where sonnet kept `auto`.
+
+   **`wf say` to a job (M6).** A `claude -p --input-format stream-json` process given a second user message on its stdin
+   while a turn ran took it into that turn, before its one result. So part 2 can keep a job's stdin open and hand it a
+   person's words — the long-lived `stream-json` process above — rather than stop the job and resume it with the words,
+   which M4 showed also works (SIGTERM or SIGINT, then `-p --resume`, the session intact). Until part 2, `say` refuses a job.
 3. **The Codex adapter.**
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**

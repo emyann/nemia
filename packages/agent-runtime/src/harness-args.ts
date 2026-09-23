@@ -62,12 +62,20 @@ export type HarnessArgs = {
    * brought as a `PromiseRunner` is handed it on the spawn and asked nothing.
    */
   remoteControl?: boolean;
+  /**
+   * How Claude Code runs the session on the `claude` harness. Absent or false: as a job — `claude -p`, which runs its
+   * prompt to the end and exits, prints every event as it goes, and says what it was denied (`Sighting.denials`). True: as
+   * a background session — `claude --bg`, listed in `claude agents`, which a person can attach to, say words to while it
+   * runs, and bridge to claude.ai (`remoteControl`, which asks for it). Refused unless true or false, and `true` on any
+   * other harness, none of which has two ways to run.
+   */
+  background?: boolean;
 };
 
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
   model: true, permissionMode: true, effort: true, tools: true, allowedTools: true, disallowedTools: true,
-  mcp: true, contextTokens: true, remoteControl: true, worktree: true,
+  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -115,6 +123,9 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (mcp) return mcp;
   if (config.remoteControl !== undefined && typeof config.remoteControl !== 'boolean') {
     return `\`remoteControl: ${JSON.stringify(config.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
+  }
+  if (config.background !== undefined && typeof config.background !== 'boolean') {
+    return `\`background: ${JSON.stringify(config.background)}\` is not true or false. Give true to run the session as \`claude --bg\`, or leave it out to run it as a job.`;
   }
   if (config.contextTokens !== undefined && !(typeof config.contextTokens === 'number' && Number.isSafeInteger(config.contextTokens) && config.contextTokens > 0)) {
     return `\`contextTokens: ${typeof config.contextTokens === 'number' ? config.contextTokens : JSON.stringify(config.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;

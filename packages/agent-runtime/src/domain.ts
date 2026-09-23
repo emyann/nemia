@@ -107,7 +107,23 @@ export type Sighting = {
    * records it as the end's reason, and settles the task: no attempt follows one that spent its budget.
    */
   budgetSpent?: true;
+  /**
+   * Every tool call the harness denied the session, as the harness recorded it, in the order it first did: a session
+   * with no approval surface carries on past a denial, and this is the only trace of it. Absent when the harness denied
+   * nothing, or cannot say (`claude --bg` records no denial anywhere the runner reads). **Carried, never judged**:
+   * `decide` does not read it; a person, and the upper layer, do.
+   */
+  denials?: Denial[];
 };
+
+/**
+ * One tool call a harness denied: the tool, and what it was asked for — a command's first word, a skill's name, a
+ * file's path — when the harness said. Printed `Tool(what)`, as a permission rule is written.
+ */
+export type Denial = { tool: string; what?: string };
+
+/** A denial as a person reads it, and as a permission rule is written: `Bash(pytest)`, `Skill(look)`, `WebFetch`. */
+export const denialText = (d: Denial): string => (d.what ? `${d.tool}(${d.what})` : d.tool);
 
 /**
  * What a session consumed, as its runner measured it.
@@ -279,10 +295,10 @@ export type Event =
    */
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
   /**
-   * An attempt reached a terminal state, as observed — never as assumed. `usage` and `exitCode`
-   * come from the same sighting, when its runner measured them; `decide` reads neither.
+   * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode` and `denials`
+   * come from the same sighting, when its runner measured them; `decide` reads none of them.
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; error?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -331,6 +347,8 @@ export type Attempt = {
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
   exitCode: number | null;
+  /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
+  denials?: Denial[];
   /** What a failed spawn call said: the refusal behind `unstartable`, or an error after which a session may still exist. */
   error?: string;
 };
@@ -391,7 +409,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
+        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
         break;
       }
       case 'measured': {

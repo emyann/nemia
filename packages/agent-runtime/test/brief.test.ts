@@ -47,6 +47,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     effort: ['high', 'high'],
     budgetUsd: ['0.25', 0.25],
     contextTokens: ['200000', 200000],
+    background: ['true', true],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
@@ -61,6 +62,14 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
 test('an unknown key is refused by name, with the list of keys a brief has', () => {
   refuses(brief('afer: implement'), /`afer` is not a key a brief has/);
   assert.throws(() => parse(brief('maxAtempts: 3')), (e: Error) => BRIEF_KEYS.every((k) => e.message.includes(k)));
+});
+
+test('`background:` is true or false, as written — anything else is refused, not read as a job', () => {
+  assert.equal(parse(brief('background: false')).config?.background, false, 'false is a job, said out loud');
+  assert.equal(parse(brief('model: opus')).config?.background, undefined, 'absent: the harness default, a job');
+  for (const bad of ['yes', 'True', '1', 'bg']) {
+    refuses(brief(`background: ${bad}`), /is not true or false\. Write `background: true` to run the session as `claude --bg`, which `ae say` can reach, or leave it out to run it as a job/);
+  }
 });
 
 test('`deadlineSeconds: 5m` is refused — it became NaN, and stopped the task on its first pass', () => {

@@ -82,8 +82,9 @@ That's the whole engine. `decide()` is pure, total, and returns exactly one step
 effectful is the four verbs of `Runner`, and four optional ones: one that finds a session by its name for less than observing them all, one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
-**The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
-resume, stop, logs and a registry that outlives us. So a three-hour session is not a three-hour
+**The engine never holds a session.** A step on `claude` runs as a job, `claude -p` in a worker the engine
+detaches, whose run file is its registry; a session filed with `config.background: true` runs as `claude --bg`, which hands it
+to the harness, which already owns resume, stop, logs and a registry that outlives us. Either way the session outlives the engine. So a three-hour session is not a three-hour
 process here — the engine can be killed, upgraded or restarted at any point in it.
 
 ### Letting a finished session go
@@ -153,7 +154,8 @@ Bring your own harness — three ways, in order of how much you have to write:
 
 | | |
 |---|---|
-| `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
+| `'claude'` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), and a background session (`claude --bg`) when its task asks with `config.background: true` |
+| `'claude-bg'` | Claude Code's background sessions alone; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
 
@@ -194,7 +196,7 @@ Three are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
-| `claude` | `claude --bg --name` | **the harness** — `claude agents --json`, free |
+| `claude` | a job: `claude -p --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
 
@@ -276,17 +278,18 @@ after a space starts a comment. The keys are a closed list:
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
 | `effort` | how hard the harness thinks, in its own words — see below |
-| `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
+| `budgetUsd` | the most one attempt may spend, in dollars, digits only — a job on `claude`, or `claude-detached`; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
+| `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which `ae say` can reach, instead of as a job (`claude -p`); see below |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
-`tools`, `effort`, `contextTokens` — under the task's `config`, where `file()` takes them.
+`tools`, `effort`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` that is not `true` or `false`, a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
@@ -296,7 +299,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `priority` that is not a finite number (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `priority` that is not a finite number (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -311,6 +314,17 @@ taken though its help no longer lists it). Its efforts are refused here because 
 refuse one: an unknown `--effort` gets a warning and the default. Codex's efforts are the ones its
 API named when refusing a bad one, for the default model; Codex itself checks none, and a bad one
 fails the session. A harness brought as a `PromiseRunner` is asked nothing.
+
+**A job waits on nobody, and says what it was denied.** Measured on 2.1.280 (`test/live.test.ts`, M1): `claude -p` in
+`auto`, `dontAsk`, `default` and `acceptEdits`, with and without `--permission-prompts none`, told to write outside its
+folder, fetch a page and run a command it was not allowed, ended on its own in every one — a call that would have asked
+was denied and the session carried on. Each denial is a `permission_denied` line as it happens and an entry of
+`permission_denials` on the result, so a job killed before its result still says what it was denied. The job is given
+`--permission-prompts none` all the same, so a later default cannot make it wait. The attempt carries them as `denials`
+(`{ tool, what }`: a file tool's path, a command's first word, a skill's name), `ae show` prints them as
+`denied: Write(/elsewhere/x.txt), Bash(curl), WebFetch`,
+and `decide` never reads them. `auto` on haiku ran as `default` — its `init` line said so — while sonnet kept `auto`. A
+background session's denials are not read (open issue 28).
 
 The lists are exported, from both entries: `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`,
 `CODEX_SANDBOXES` and `CODEX_EFFORTS`. agent-orchestrator refuses the same words when it loads a workflow, before
@@ -434,8 +448,8 @@ it so. What `decide` learns is that a harness *ended* a session on its cap, a fa
 
 | harness | given | a session that reaches the cap |
 |---|---|---|
-| `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost, and its task settles `failed` |
-| `claude` | refused at `file()`: a `--bg` session keeps no cap | — |
+| `claude` (a job), `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost, and its task settles `failed` |
+| `claude` with `background: true` | refused at `file()`: a `--bg` session keeps no cap | — |
 | `codex` | refused at `file()`: `codex exec` has no spend cap, and its stream no cost | — |
 
 **Measured before it was built** (Claude Code 2.1.272, haiku, a $0.01 cap, a session told to read a file forty times).
@@ -443,16 +457,17 @@ it so. What `decide` learns is that a harness *ended* a session on its cap, a fa
 ($0.01)", and `total_cost_usd` $0.018 — the cap is checked after the response that crosses it, so a session spends past it
 by up to one response. `claude --bg` took the same flag without a word, read the file 42 times, spent $0.19 and was listed
 `done`; neither the registry nor its transcript said anything of a budget, and the flag's help says it "only works with
---print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget on `claude`, naming
-`claude-detached`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API, which refuses
+--print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget beside `background: true`, naming
+a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API, which refuses
 no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
 **A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
 spent its budget`, and no attempt follows — resumed or clean, whatever `maxAttempts` and `resume` say. To run it again,
-file the task again with a larger budget; to continue that session, with `resumeFrom` its id: `claude -p --resume` counts
-only its own process's spend (measured: a resumed session reported $0.0042 of its own, where the one it continued had
-spent $0.018). The harness counts one session's spend, and the engine counts none: an attempt that fails *under* its cap —
+file the task again with a larger budget; to continue that session, with `resumeFrom` its id: a cap on `claude -p --resume` bounds
+only its own process's spend (measured on 2.1.280: a resume capped at half of what its session had spent finished). What it
+prints is not its own: on 2.1.280 a resume's `total_cost_usd` and `duration_api_ms` carry its parent's on (2.1.272 printed
+its own), so the runner takes off what the run it continues printed (`resumeCostCarried`, open issue 4). The harness counts one session's spend, and the engine counts none: an attempt that fails *under* its cap —
 the harness's verdict, or lost — is retried under the same cap, so `maxAttempts: 3` can still spend nearly three caps
 before one is reached.
 
@@ -497,7 +512,8 @@ workload, declared on the workload.
 
 | harness | `remoteControl: true` |
 |---|---|
-| `claude` | `--remote-control`, on every attempt |
+| `claude` with `background: true` | `--remote-control`, on every attempt |
+| `claude`, a job | refused at `file()`: file it with `background: true`, since a job runs a prompt and exits |
 | `claude-detached` | refused at `file()`: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
 | `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
 | a `PromiseRunner` | asked nothing: handed `remoteControl` on the spawn, to honour or not |
@@ -830,7 +846,8 @@ An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of it
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
-| `claude` | from the transcript it already reads: responses, tool calls, tokens in their three classes and the peak context since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
+| `claude`, a job | as `claude-detached`, from its stream's result, less what its parent printed on a resume | the worker's record of the process |
+| `claude` with `background: true` | from the transcript it already reads: responses, tool calls, tokens in their three classes and the peak context since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
 | `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens and their classes from `turn.completed`; no peak, no turns — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
 | `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`), and its tokens in their classes from the same result's `usage`; no peak, turns or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
 | `sdkRunner()` | from the SDK's result message: tokens, their classes when it gives all three, and cost when it gives one; no peak | `null` |
@@ -960,7 +977,7 @@ the attempt began — decides what to show.
 
 | harness | read from | what it cannot give |
 |---|---|---|
-| `claude` | the session's transcript: the raw JSONL the closeout is read from, not `getSessionMessages`, whose messages carry no time | the text of thinking Claude Code wrote empty — three blocks in four, in the transcripts measured — which is a thinking event with no `text` |
+| `claude` | the session's transcript — a job's while it runs, found by the id its stream names first: the raw JSONL the closeout is read from, not `getSessionMessages`, whose messages carry no time | the text of thinking Claude Code wrote empty — three blocks in four, in the transcripts measured — which is a thinking event with no `text` |
 | `codex` | the thread's rollout, `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-…-<thread id>.jsonl`, found by the thread id the worker reads off `exec --json` | below |
 | `claude-detached` | the same transcript as `claude` | anything before the session exits: its id is in the one object `claude -p --output-format json` prints, last |
 | a `PromiseRunner` | its own `transcript`, when it has one | — |
@@ -1055,7 +1072,8 @@ refused (`docs/open-issues.md`, issue 16).
 
 | harness | how | refused |
 |---|---|---|
-| `claude` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
+| `claude`, a job | — | always: a job is given its brief and takes no words while it runs; file with `background: true`, or continue it with a new task (`resumeFrom`) |
+| `claude` with `background: true` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
 | `codex` | — | always: `codex exec` reads its prompt once and takes nothing while it runs |
 | `claude-detached` | — | always: its session's id is known only once `claude -p` exits |
 | a `PromiseRunner` | its own `say`, when it has one | when it has none |
@@ -1174,7 +1192,7 @@ await Effect.runPromise(file({ brief, cwd }).pipe(Effect.provide(board)))
 The engine does not change between them — only what is true after a crash does. That is the whole
 reason `Runner` is a seam and not an import.
 
-| | `Runner.claude()` (what `createEngine` uses) | `sdkRunner()` |
+| | `Runner.claude()` (`claude-bg`, and `claude` with `background: true`) | `sdkRunner()` |
 |---|---|---|
 | how | `claude --bg --name …` | Agent SDK `query()` |
 | owns the session | the **harness** | **this process** |
@@ -1247,6 +1265,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/runner-codex-transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/runner-detached-output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
 | `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
+| `src/runner-claude-code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |

@@ -13,7 +13,8 @@ bug 1, a quiet session with no closeout recorded a success (§6 item 18), and wh
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
 admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
-`0e7b02a`.
+`0e7b02a`. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
+only when its task asks with `config.background: true` (issue 28).
 
 ## Bugs
 
@@ -57,6 +58,13 @@ own over a parent's $0.018). Not fixed: its own share cannot be read off the res
 too, and the engine prices nothing — and the parent's total is on the parent's attempt, which the runner is not handed.
 Low priority: this harness exists for comparison — and, since only `claude -p` keeps a spend cap (issue 17), for a task
 that must not spend past one.
+
+**Narrowed for a job on `claude`** (stage 2 part 1). Measured again on 2.1.280 (issue 28, M2): a `-p --resume` printed
+$0.0257 over a parent's $0.0210, and a second resume $0.0284 — and its `duration_api_ms` is carried on the same way. So the
+job's spec says so (`resumeCostCarried`), and the worker's registry takes off the cost and API time its parent printed: the
+parent is the run under the id it resumed that started last before it. What is left: a job whose parent is no run of the
+worker's — a `--bg` session, or a session another tool started — records no cost and no API time, since what it printed
+cannot be told apart from what its parent spent. `claude-detached` records what it printed, as before.
 
 ### 6. The Effect door's `file` refuses no harness's words
 
@@ -147,6 +155,10 @@ has no Codex servers configured.
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
 (`claudeResultOutput` in `agent-runtime/src/runner-detached-output.ts`). Low priority, like issue 4: this
 harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
+
+**Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
+worker has its id while it runs and `transcript` reads it by the job's name then (`claudeStreamOutput`). `claude-detached`
+keeps the json form, and this issue, as the harness there to compare against.
 
 ### 12. `said` means the words were handed to the inbox, not that the session read them
 
@@ -240,9 +252,10 @@ busy, but Claude Code writes none until the process exits (issue 18): a session 
 `claude stop` returned. So a layer that stops a `--bg` session once `costUsd` passes a cap, reading it each pass, never
 sees a cost while the session runs, and sees one only after the engine has let it go.
 
-**Effect.** `file()` refuses `budgetUsd` on `claude` (engine `26020c1`), so nothing bounds what a `--bg` session spends — and
-`claude` is the harness agent-orchestrator runs its steps on. A task can have a cap only on `claude-detached`, which gives up
-what `-p` lacks: `say`, and following the conversation while it runs (issue 11).
+**Effect.** `file()` refuses `budgetUsd` beside `background: true` (engine `26020c1`, and stage 2 part 1), so nothing bounds
+what a `--bg` session spends. A job on `claude` keeps a cap (`claude -p --max-budget-usd`), and since stage 2 part 1 a job is
+what `claude` runs by default; it gives up `say` (issue 28). agent-orchestrator still runs its steps on `claude-bg` until
+stage 2 part 2 moves them.
 
 **Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
 read of a running session says what it has spent. Pricing its transcript's tokens here would be a price list of the
@@ -586,6 +599,57 @@ session's name through the extension's `sessionTranscript`. What is still direct
 - **Nothing is served by URL.** The handler is the SDK's `A2ARequestHandler`, so its HTTP transports can serve it later
   (stage 6), unchanged.
 
+### 28. Claude Code as a job: what was measured, and what a job gives up
+
+Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
+--verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
+`config.background: true` (`src/runner-claude-code.ts`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M7).
+
+- **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
+  and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
+  fetch a page: all eight exited 0 on their own, with a result. A call that would have asked was denied and the session
+  carried on. Each denial is said twice: a `{type: system, subtype: permission_denied, tool_name, tool_use_id,
+  decision_reason_type, decision_reason?, message}` line as it happens, and a `{tool_name, tool_use_id, tool_input}` entry of
+  the result's `permission_denials`, the same calls. The reason differs by flag — `workingDir`, `other` or none without
+  `--permission-prompts none`, `asyncAgent` (*"no approval surface in this session"*) with it, `mode` in `dontAsk` either
+  way — and the outcome does not. A Skill was not denied in any mode. The job is given the flag so a later default cannot
+  make it wait.
+- **`auto` on haiku runs as `default`.** Its `init` line said `permissionMode: default` in both `auto` runs on haiku; on
+  sonnet it said `auto`, and denied nothing the same brief asked. So a haiku step filed in `auto` is fenced as `default`.
+  Nothing refuses it: the mode is Claude Code's to choose per model.
+- **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
+- **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
+  stopped first). So a job may continue a background session, and the new attempt's mode is the job's.
+- **M4: a job stopped mid-turn can be resumed.** SIGTERM while a `sleep 40` ran: exit 143 within a second, a result
+  printed. SIGINT: exit 0, a result of `error_during_execution`. Resumed with `-p --resume`, each remembered its word and
+  knew its command had not finished. The engine stops a job as it stops any detached run: SIGTERM to the worker, which
+  sends SIGTERM to the harness's process group (`bin/ae-worker.ts`).
+- **M5: a budget caps a resume's own spend**, not its session's: a resume capped at half of what its session had spent
+  finished (`success`), and one capped below one response ended `error_max_budget_usd`.
+- **M6, for `wf say`: a job can be told something, over its stdin.** A `claude -p --input-format stream-json
+  --output-format stream-json --verbose` given a second user message on stdin while a turn ran a `sleep 20` answered with
+  the word from that message in the same turn's one result (`num_turns: 2`). So words can reach a running job, if its stdin
+  is kept open — the worker gives the harness none today (`stdio: ['ignore', …]` in `bin/ae-worker.ts`). That is stage 2 part 2's choice (the plan's option (d)); until then `say`
+  refuses a job in words that name `background: true` and `resumeFrom`. The control, SIGINT and then `-p --resume` with the
+  words, is M4.
+- **M7: a resume is not charged its parent's denials.** Asked in review after the rest, and measured by hand the same
+  way: a job denied a write outside its folder, then `claude -p --resume` of it told to call nothing, printed
+  `permission_denials: []` and no `permission_denied` line, under the same session id — where its cost (M2) is carried on.
+  So a resumed job's result is read for denials as a first job's is, and a round, a retry or a gate's answer resumed from
+  a denied attempt says only what it was itself denied. Were a later version to carry them, M7 fails.
+
+What a job gives up, or what is not done:
+
+- **`say` to a job is refused** (above). A person who means to speak to a step files it with `background: true`.
+- **A background session's denials are not read.** M1's two shapes are `claude -p`'s output, which a `--bg` session does
+  not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
+  `denials`.
+- **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
+  observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
+  running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
+- **A job resumed from a `--bg` session records no cost** (issue 4).
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -631,6 +695,20 @@ session's name through the extension's `sessionTranscript`. What is still direct
   with none, looked at again fifteen seconds after both had registered. Both were stopped and removed by the test, and were
   gone from `claude agents` afterwards. Whether the agents view listed the bridged one was not looked at: the registration's
   `bridgeSessionId` is what the 2.1.273 measurement found the view follows.
+
+- **Claude Code as a job** (issue 28, thin runtime stage 2 part 1). `test/live.test.ts`'s M1 to M7 on Claude Code 2.1.280,
+  2026-09-23, haiku, each run by the implementing step after the hand measurements. M1: all eight
+  mode and flag pairs exited 0 with a result, nothing written outside the folder, one `permission_denied` line for each
+  entry of `permission_denials`; `auto` ran as `default`. Under the engine, a job on `claude` at shipped defaults settled
+  `succeeded` with `denials` of `Write(<the outside path>)`, `Bash(curl)` and `WebFetch`, and a control asked for nothing
+  it may not do settled with none. M3: a job resumed from a `--bg` session remembered its word, under the same id, and
+  recorded no cost (issue 4). M2: a job at $0.0438, and the job resumed from it charged $0.0034. M5: a resume capped at
+  $0.02, under its session's $0.0473, finished at $0.0032. M4: SIGTERM exit 143, SIGINT exit 0, each resumed and
+  remembered its word. M6: one result, `num_turns: 2`, with the word said on stdin while `sleep 20` ran. M7, run
+  in round 2: a job denied `Write`, `Bash(curl)` and `WebFetch`, then resumed and told to call nothing, settled `succeeded`
+  with no `denials` in the same session, charged $0.0052. The first run
+  failed M1's `dontAsk` pair — `--allowedTools` took the prompt given after it for a rule, so the test puts the prompt first
+  as the job's spec does — and M4, on a brief haiku did not follow; both passed on the second.
 
 ## Verified by tests, not by a live run
 

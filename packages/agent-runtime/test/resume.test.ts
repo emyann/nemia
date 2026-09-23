@@ -98,7 +98,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
     const schema = { type: 'object' };
 
     // The first try gives its closeout and is listed done: its end is written with both.
-    const first = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema });
+    const first = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
@@ -112,7 +112,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
     assert.deepEqual(was?.usage, { turns: 2, toolCalls: 2, inputTokens: 200, uncachedTokens: 20, cacheWriteTokens: 0, cacheReadTokens: 180, outputTokens: 10, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
 
     // The retry continues that session, and the harness keeps its id.
-    const retry = await engine.file({ brief: 'give your closeout', cwd: tmp('cwd'), closeoutSchema: schema, resumeFrom: row!.sessionId });
+    const retry = await engine.file({ config: { background: true }, brief: 'give your closeout', cwd: tmp('cwd'), closeoutSchema: schema, resumeFrom: row!.sessionId });
     await engine.tick();
     const [resumed] = claude.rows();
     assert.equal(resumed?.name, `ae/${retry}/1`);
@@ -141,7 +141,7 @@ test('a statement read as nothing from a final sighting is read again once the t
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);

@@ -60,7 +60,7 @@ const full: Sighting = {
     costUsd: 0.42, apiMs: 5000, toolMs: 700, unpricedModel: true,
   },
   exitCode: 0, closeout: { payload: { outcome: 'done', notes: ['a', 'b'] }, at: 1790000000000 }, quietMs: 95_000,
-  waitingFor: 'permission prompt', budgetSpent: true,
+  waitingFor: 'permission prompt', budgetSpent: true, denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
 };
 
 test('a sighting rides whole in its Task, and survives a transport that serialises', () => {

@@ -47,8 +47,8 @@ export { sdkRunner } from './runner-sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
 // ─── the vocabulary ─────────────────────────────────────────────────────────
-export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said } from './domain.ts';
-export { fold, nameFor } from './domain.ts';
+export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage, Said, Denial } from './domain.ts';
+export { denialText, fold, nameFor } from './domain.ts';
 // The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';

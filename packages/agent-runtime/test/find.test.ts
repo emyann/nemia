@@ -96,7 +96,7 @@ test("a session registered under its attempt's name is found by it: its conversa
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     register(row!);
@@ -127,7 +127,7 @@ test('a registration whose process has gone is not found, nor one whose pid anot
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!.sessionId, 'hello');
@@ -186,7 +186,7 @@ test("a registration and the registry that disagree: the registry's word is take
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
 

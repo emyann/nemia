@@ -535,6 +535,28 @@ agent step `context: 200k` on the strength of the unattended run above; a step t
 to widen it. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
 under the engine.
 
+### 27. The A2A seam carries a session's start, sight and stop, and nothing else yet
+
+Since thin runtime stage 1 part 2 (2026-09-23), `createEngine` puts every harness behind an A2A agent of its own
+(`src/a2a-handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a-client.ts`):
+`spawn` is a message, `observe` a listing, `stop` a cancel. What is still direct, and what the seam does not do:
+
+- **`logs`, `find`, `release`, `transcript`, `say` and `refuses` reach the driver directly** — from `a2aOps`, which
+  spreads the driver's verbs beneath its own, and from the facade's calls by harness. Part 3 moves them.
+- **The Effect door is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
+  engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `createEngine`
+  takes.
+- **`listTasks` lists what the harness sees, never the journal.** An attempt the harness has let go is answered by
+  `getTask`, off the journal; it is in no listing. So `observe` through the seam is the map it was.
+- **A stop of a session no harness lists fails in words** (`` the `<harness>` harness lists no session `<id>`: there is
+  nothing to stop. ``), where the driver was handed the id to make of what it would. The engine stops only a session its
+  pass has just seen live, so it never asks. One that ended between the listing and the stop is not refused: the agent
+  answers `TaskNotCancelableError` and the stop does nothing, as a driver's stop of an ended session did.
+- **Each stop costs one more `observe`**: the agent, holding nothing, lists to find the session it is asked to cancel.
+  Stops are rare — an operator's, a deadline, before a continue.
+- **Nothing is served by URL.** The handler is the SDK's `A2ARequestHandler`, so its HTTP transports can serve it later
+  (stage 6), unchanged.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

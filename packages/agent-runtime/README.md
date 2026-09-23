@@ -227,6 +227,25 @@ Exit 0 is success, anything else is failure. That is all a generic harness has t
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
 
+### Beneath the harnesses: an A2A seam
+
+Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `createEngine` reaches it through the
+`@a2a-js/sdk` client, in this process, with no HTTP between them. A session is an A2A Task named for it, `ae/<task>/<n>`,
+whose `contextId` is the task; a spawn is a user Message, the brief its one text part and the rest of the request —
+`config` whole and unopened — its metadata; `observe` is a listing, and `stop` a cancel. What a harness says comes back in
+the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
+`SUBMITTED` and waits out the grace window, as before.
+
+The agent (`src/a2a-handler.ts`) holds nothing. Every answer is read afresh off the harness and the journal, so a runtime
+restarted mid-session answers for a session it never started, before its first tick, and an attempt the harness has let
+go is answered from the journal (`test/restart.test.ts`). It is not the SDK's `DefaultRequestHandler`, whose task store
+would be a second record beside the journal. Streaming, push notifications and an extended card are refused in the SDK's
+own errors, never taken and ignored.
+
+`logs`, `find`, `release`, `transcript`, `say` and `refuses` still reach the driver directly, and so does a runner an
+Effect program provides with `Runner.layer`; `a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts`
+import the SDK, and neither entry exports a name of its (`test/a2a-boundary.test.ts`).
+
 ## What a task may say, and what is refused
 
 A brief is markdown: `key: value` frontmatter, one line per key, and the body is the prompt. `#`

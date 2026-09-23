@@ -395,6 +395,16 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   --package-lock-only` is enough; the next step's worktree installs it), and after merging such a
   branch, `npm install` on main before the next run, or every worktree cut from it pays the minute
   (main's lockfile ahead of its tree counts as a difference). (U1 hit the linked tree; W2 replaced it.)
+- **Node's type stripping refuses a parameter property.** `constructor(private readonly ops: RunnerOps)` fails the
+  file at load with *"TypeScript parameter property is not supported in strip-only mode"*, and `tsc` passes it. Declare
+  the field and assign it in the constructor (`HarnessHandler`, learned by the run that put the A2A seam in the runtime).
+- **The A2A SDK's `Transport` and `A2ARequestHandler` spell three methods differently, and its `Client` answers some calls
+  itself.** `getExtendedAgentCard`, `listTaskPushNotificationConfig` and `resubscribeTask` on the transport are
+  `getAuthenticatedExtendedAgentCard`, `listTaskPushNotificationConfigs` and `resubscribe` on the handler; a transport forwards
+  those three by hand (`InProcessTransport`). The `Client` throws
+  `PushNotificationNotSupportedError` before the transport unless the card says `pushNotifications`, so a test of the
+  handler's own refusal calls the transport; and `Client.sendMessage` fills `returnImmediately` from the client's `polling`,
+  so a refusal of a send without it is reached only by the handler directly (same run).
 
 ## Rules the code keeps
 

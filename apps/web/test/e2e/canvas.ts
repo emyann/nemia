@@ -19,15 +19,18 @@ export async function showFinished(page: Page): Promise<void> {
   await expectCount(page.getByRole('switch', { name: 'Show finished', checked: true }), 1, 'pressed, Show finished is on');
 }
 
-/** The fake run on the Factory: its card, its step nodes, and both together. */
-export function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; step: (name: string) => Locator } {
-  const card = `.react-flow__node[data-id="${FAKE.id}"]`;
-  const steps = `.react-flow__node[data-id^="${FAKE.id}/"]`;
+/**
+ * The fake run on the Factory: its card; the pills of its rail, at rest; and the tiles it opens into, one a step, each a button that opens
+ * the step's inspector.
+ */
+export function onTheFloor(page: Page): { card: Locator; pills: Locator; tiles: Locator; pill: (name: string) => Locator; tile: (name: string) => Locator } {
+  const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
   return {
-    card: page.locator(card),
-    steps: page.locator(steps),
-    run: page.locator(`${card}, ${steps}`),
-    step: (name) => page.locator(`.react-flow__node[data-id="${FAKE.id}/${name}"]`),
+    card,
+    pills: card.locator('ul[aria-label="Steps"] [data-step]'),
+    tiles: card.locator('[data-tile]'),
+    pill: (name) => card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`),
+    tile: (name) => card.locator(`[data-tile="${name}"]`),
   };
 }
 
@@ -40,12 +43,6 @@ export const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
     const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec((el as HTMLElement).style.transform) ?? [];
     return { x: Number(m[1]), y: Number(m[2]) };
   });
-
-/** Where a step is beside its card, in the canvas's units: the same on every visit that keeps the arrangement, wherever the card went. */
-export async function besideCard(step: Locator, card: Locator): Promise<{ x: number; y: number }> {
-  const [s, c] = await Promise.all([placeOf(step), placeOf(card)]);
-  return { x: s.x - c.x, y: s.y - c.y };
-}
 
 /** How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units. */
 export const zoomOf = (page: Page): Promise<number> =>
@@ -66,31 +63,67 @@ export async function dragBy(page: Page, grip: Locator, by: { x: number; y: numb
 }
 
 /**
- * Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how tall it is drawn.
- * A card's node alone — a step's node is named `<run>/<step>`.
+ * A picture of one card at its own size, which a picture of the fitted floor draws a third as large: the floor zoomed in about the card by
+ * the wheel, as a person zooms, up to its own size or as much as fits; the pane dragged from an empty spot to bring it to the middle; the
+ * card photographed alone; and the floor fitted again, as the page found it.
  */
-export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; height: number }>> => {
+export async function photographCard(page: Page, card: Locator, file: string): Promise<void> {
+  const floor = page.locator('.react-flow').first();
+  const [frame, size] = [await floor.boundingBox(), await card.evaluate((el) => ({ width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight }))];
+  if (!frame) throw new Refused('the floor is on the page, to photograph a card on');
+  const wanted = Math.min(1, (0.9 * frame.width) / size.width, (0.8 * frame.height) / size.height);
+  for (let turns = 0; (await zoomOf(page)) < wanted * 0.97 && turns < 60; turns++) {
+    const box = await card.boundingBox();
+    if (!box) throw new Refused('the card is on the page, to be photographed');
+    const at = (from: number, length: number, lo: number, span: number) => Math.min(Math.max(from + length / 2, lo + 8), lo + span - 8);
+    await page.mouse.move(at(box.x, box.width, frame.x, frame.width), at(box.y, box.height, frame.y, frame.height));
+    await page.mouse.wheel(0, -Math.max(8, Math.min(60, Math.log2(wanted / (await zoomOf(page))) * 500)));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+  await settled(page);
+  const [box, empty] = [await card.boundingBox(), await floor.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    for (let y = r.top + 24; y < r.bottom - 24; y += 24) {
+      for (let x = r.left + 24; x < r.right - 24; x += 24) {
+        if (document.elementFromPoint(x, y)?.classList.contains('react-flow__pane')) return { x, y };
+      }
+    }
+    return null;
+  })];
+  if (!box || !empty) throw new Refused('an empty spot on the floor, to move it by');
+  await page.mouse.move(empty.x, empty.y);
+  await page.mouse.down();
+  await page.mouse.move(empty.x + frame.x + frame.width / 2 - (box.x + box.width / 2), empty.y + frame.y + frame.height / 2 - (box.y + box.height / 2), { steps: 12 });
+  await page.mouse.up();
+  await settled(page);
+  await card.screenshot({ path: file });
+  await page.getByRole('button', { name: 'Fit view' }).click();
+  await settled(page);
+}
+
+/** Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how wide and tall it is drawn. */
+export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; width: number; height: number }>> => {
   const zoom = await zoomOf(page);
-  return page.locator('.react-flow__node[data-id]:not([data-id*="/"])').evaluateAll((nodes, z) => nodes.map((node) => {
+  return page.locator('.react-flow__node[data-id]').evaluateAll((nodes, z) => nodes.map((node) => {
     const el = node as HTMLElement;
     const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform) ?? [];
-    return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), height: el.getBoundingClientRect().height / z };
+    const box = el.getBoundingClientRect();
+    return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), width: box.width / z, height: box.height / z };
   }), zoom);
 };
 
 /**
- * That no card on the floor reaches over the card beneath it: for each card, the nearest card down its own column starts below its bottom
- * edge. The grid puts that card a cell's height below (`CELL_HEIGHT`), so a card drawn taller than its cell is over it wherever it is put.
+ * That no card on the floor reaches over another: no two cards' boxes meet. The grid puts the card beneath a cell's height below
+ * (`CELL_HEIGHT`), so a card drawn taller than its cell is over it wherever it is put; and an open card reaches right across the cells its
+ * tiles take (`openSpan`), so a card left in one of them is under it.
  */
 export async function expectClearOfEachOther(page: Page): Promise<void> {
   const cards = await cardsDrawn(page);
-  const over = cards.flatMap((card) => {
-    const beneath = cards.filter((other) => Math.abs(other.x - card.x) < 1 && other.y > card.y).sort((a, b) => a.y - b.y)[0];
-    return beneath && beneath.y < card.y + card.height
-      ? [`${card.id} is ${Math.round(card.height)} tall in a cell of ${CELL_HEIGHT}, and ${beneath.id} starts ${Math.round(beneath.y - card.y)} below it`]
-      : [];
-  });
-  if (over.length) throw new Refused(`no card on the floor reaches over the card beneath it — ${over.join('; ')}`);
+  const over = cards.flatMap((card, i) => cards.slice(i + 1).flatMap((other) =>
+    card.x < other.x + other.width && other.x < card.x + card.width && card.y < other.y + other.height && other.y < card.y + card.height
+      ? [`${card.id}, ${Math.round(card.width)} by ${Math.round(card.height)} at ${said(card)}, and ${other.id}, ${Math.round(other.width)} by ${Math.round(other.height)} at ${said(other)} (a cell is ${CELL_HEIGHT} tall)`]
+      : []));
+  if (over.length) throw new Refused(`no card on the floor reaches over another — ${over.join('; ')}`);
 }
 
 /**
@@ -102,7 +135,7 @@ export async function expectClearOfPanels(page: Page, when: string): Promise<voi
   const under = await page.locator('.react-flow').first().evaluate((floor) => {
     const boxes = (selector: string) => Array.from(floor.querySelectorAll(selector)).map((el) => ({ el, box: el.getBoundingClientRect() })).filter(({ box }) => box.height > 0);
     const panels = boxes('.react-flow__panel');
-    return boxes('.react-flow__node').filter(({ el }) => !(el as HTMLElement).dataset.id?.includes('/')).flatMap(({ el, box }) =>
+    return boxes('.react-flow__node').flatMap(({ el, box }) =>
       panels
         .filter(({ box: at }) => box.left < at.right && at.left < box.right && box.top < at.bottom && at.top < box.bottom)
         .map(({ el: panel }) => `${(el as HTMLElement).dataset.id} is under the ${panel.getAttribute('aria-label') ?? Array.from(panel.classList).join('.')} panel`));

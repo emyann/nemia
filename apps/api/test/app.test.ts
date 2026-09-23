@@ -136,6 +136,8 @@ test('runs are read from the workflow store and summarized, with what each step 
       { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null },
       { name: 'review', taskId: null, branch: null, status: 'waiting', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null },
     ],
+    // No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page.
+    graph: { roots: ['implement', 'review'], edges: [] },
     waitingOnYou: [],
     onYou: [],
     // Called off: nothing to decide about a result nobody is waiting for.
@@ -286,6 +288,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
   assert.match(run.warning, /without their spec or prose/);
   // From before runs froze their workflow, and its folder gone: nothing on the record says what waits on what.
   assert.deepEqual(run.graph, { roots: ['implement', 'review'], edges: [] });
+  assert.deepEqual((await listed('r-3')).graph, run.graph);
   assert.deepEqual(run.waitingOnYou, ['implement']);
   const implementTry = {
     taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
@@ -408,6 +411,8 @@ test('a run that froze its workflow draws from it when its folder does not read:
     ['review', frozenSpecs.review, 'Review it, as frozen.'],
   ]);
   assert.deepEqual(run.graph, frozenGraph);
+  // The list draws the card's flow off the same graph, with no read of the run.
+  assert.deepEqual((await listed('r-40')).graph, frozenGraph);
   // Not filed: what the tick would file it with, composed from the frozen workflow.
   assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), run.steps[0].told);
 
@@ -417,6 +422,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.match(gone.warning, /is gone\. Nothing here is read from it/);
   assert.deepEqual(gone.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
   assert.deepEqual(gone.graph, frozenGraph);
+  assert.deepEqual((await listed('r-41')).graph, frozenGraph);
 });
 
 test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
@@ -432,6 +438,8 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
   assert.deepEqual(run.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
   assert.deepEqual(run.steps.map((s: { body: string }) => s.body), ['Implement it, as frozen.', 'Review it, as frozen.']);
   assert.deepEqual(run.graph, frozenGraph);
+  // And so is its card: not the edited folder's graph, which has no edge at all.
+  assert.deepEqual((await listed('r-42')).graph, frozenGraph);
   assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), run.steps[1].told);
 });
 
@@ -449,6 +457,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
   assert.deepEqual(run.steps.map((s: { name: string }) => s.name), ['implement', 'review']);
   // Not a root beside implement: the graph is the one the run froze.
   assert.deepEqual(run.graph, frozenGraph);
+  assert.deepEqual((await listed('r-43')).graph, frozenGraph);
   assert.deepEqual((await listed('r-43')).steps.map((s: { name: string }) => s.name), ['implement', 'review']);
   // The steps `wf ls` lists, and no other.
   assert.deepEqual((await list(engine(), readRun('r-43'))).steps.map((s: { name: string }) => s.name), ['implement', 'review']);

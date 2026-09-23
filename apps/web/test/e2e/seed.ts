@@ -46,10 +46,6 @@ export const FAKE = {
   said: 'not ok 7 - the Factory hides a finished run',
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
-  /** The steps that wait on no other, which the run's card leads into on the Factory. */
-  first: ['implement', 'tokens'],
-  /** What a drag of `implement` on the Factory leaves where it is: the steps that wait on it, and the other lane. It moves alone. */
-  drag: { waiting: ['review', 'respond'], lane: ['tokens', 'theme'] },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
   branch: 'wf/give-the-board-a-look-e2e0/tokens',
   /** What the Factory's card says that branch touched, once the card is opened: `apps/web` and the root. */
@@ -142,7 +138,7 @@ function conversation(session: typeof SESSION, ago: (minutes: number) => string)
  * A second run, started after FAKE: `plan` signed off and `draft`, which waits on it, has its session running, so work moves
  * along the edge between them. `sketch` failed and `ship`, which waits on it, will never be filed, so `assess` has the run
  * failed — while draft's session still runs. It still moves, so it is in flight: on the floor, with HELD's, until finished
- * runs are shown. Laid out oldest first, its card takes the cell beside FAKE's — the cell FAKE's graph unfolds over, which
+ * runs are shown. Laid out oldest first, its card takes the cell beside FAKE's — the cell FAKE's card grows over when it is opened, which
  * the Factory must move this card out of.
  */
 export const NEIGHBOUR = {

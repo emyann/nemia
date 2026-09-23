@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { themeOf } from '../board.ts';
-import { cardOf, cardsDrawn, expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { cardOf, cardsDrawn, expectClearOfEachOther, placeOf, said } from '../canvas.ts';
+import { expectCount, expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -79,6 +79,7 @@ export default {
   route: '/',
   expect: async (page) => {
     const { id, ending, back, onto } = LONG_NAMES;
+    const notes = LONG_NAMES.steps[1];
     // Dated before every run in the store, so the grid, oldest first, puts it in the first cell — the top of its column, with the default
     // floor's cards beneath it. Dated among the others, it moves whenever a run joins or leaves the default floor, and lands in its last row.
     const runs = path.join(store!, 'runs');
@@ -107,7 +108,31 @@ export default {
       // the screen rounds to none.
       const rows = await line.evaluate((el) => Math.round((el as HTMLElement).offsetHeight / parseFloat(getComputedStyle(el).lineHeight)));
       if (rows !== 1) throw new Refused(`the gate line holds one row whatever the names — it is ${rows} rows`);
+      // Its rail: a pill a step, each name cut to its pill and whole on hover; the two steps after implement side by side in two lanes.
+      const pills = card.locator('ul[aria-label="Steps"] [data-step]');
+      await expectCount(pills, LONG_NAMES.steps.length, 'a pill per step on the rail');
+      for (const name of LONG_NAMES.steps) {
+        const title = await card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`).getAttribute('title');
+        if (!title?.startsWith(`${name}: `)) throw new Refused(`${name}'s pill is whole on hover — its title is ${JSON.stringify(title)}`);
+      }
+      const cut = await pills.locator('span').evaluateAll((spans) => spans.filter((span) => span.scrollWidth > span.clientWidth).length);
+      if (cut === 0) throw new Refused('a name longer than its pill is cut to it, not drawn over the next pill — no pill is cut');
+      await expectInside(pills, card, 'and every pill stays inside the card');
+      const [notesAt, backAt] = await Promise.all([notes, back].map((name) => placeOf(card.locator(`ul[aria-label="Steps"] [data-step="${name}"]`))));
+      if (Math.abs(notesAt.x - backAt.x) > 1 || Math.abs(notesAt.y - backAt.y) < 1) {
+        throw new Refused(`${notes} and ${back}, both after ${LONG_NAMES.steps[0]}, are one column in two lanes — at ${said(notesAt)} and ${said(backAt)}`);
+      }
       await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
+      // Opened: a tile a step, each named whole for a screen reader and on hover, the ending's saying what approving does; and no card over another.
+      await card.locator('time').click();
+      await expectCount(card.locator('[data-tile]'), LONG_NAMES.steps.length, 'the card opens into a tile per step');
+      for (const name of LONG_NAMES.steps) {
+        await expectCount(card.locator(`[data-tile="${name}"][aria-label="Inspect step ${name}"]`).getByTitle(name, { exact: true }), 1, `${name}'s tile is named whole, and on hover`);
+      }
+      await expectVisible(card.locator(`[data-tile="${ending}"] [data-need="approve"]`, { hasText: `approve ${ending} to run it` }), "the ending's tile says approving runs it");
+      await expectClearOfEachOther(page);
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await expectCount(card.locator('[data-tile]'), 0, 'Reset layout closes it again');
     } finally {
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
     }

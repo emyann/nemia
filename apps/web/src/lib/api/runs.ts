@@ -2,6 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
+import type { RunGraph } from './graph.ts';
 import type { RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
 
 /** Mirrors `PlaceKind` in agent-orchestrator's run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
@@ -42,6 +43,8 @@ export type RunSummary = {
    * `needs` and `blockedByHarness` are what a person has to know to act on it (`StepNeeds`).
    */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
+  /** The steps as a graph, as the run's page has it: the Factory's card draws its flow off it, with no read of the run. */
+  graph: RunGraph;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, awaiting approval at their gate, out of rounds or past their
    * budget. Empty on a cancelled run.

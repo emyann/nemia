@@ -110,6 +110,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
   e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
   calendar day — rather than hardcoding which form it will take (learned by the second round of the run that gave an agent its skills).
+- **A picture of one card on the fitted Factory is a third of its size.** `card.screenshot()` photographs the node as the floor draws it,
+  zoomed out to fit every run, so a card at rest came out 110 pixels wide and nothing on it could be read. Photograph a card with
+  `photographCard` (`apps/web/test/e2e/canvas.ts`): it zooms the floor in about the card with the wheel, drags the pane from an empty spot to
+  bring the card to the middle, takes the picture and fits the view again (learned by the run that put a run's steps on its card).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

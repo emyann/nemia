@@ -76,9 +76,9 @@ export default {
     // The inspector of the ending, opened from the card: what it asks, first, in full, and the facts to decide on — the round and the
     // cost, the review's word, and whether the branch still merges onto main — then Approve and Send back. It is not filed: it says so.
     await card.locator('time').click();
-    const node = page.locator(`.react-flow__node[data-id="${id}/${ending}"]`);
+    const node = card.locator(`[data-tile="${ending}"]`);
     await expectVisible(node, `the card opens into its steps, ${ending} among them`);
-    await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${ending} to run it` }), `${ending}'s node says approving runs it`);
+    await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${ending} to run it` }), `${ending}'s tile says approving runs it`);
     await node.click();
     const inspector = page.locator(`aside[aria-label="Step ${ending}"]`);
     const asked = inspector.locator(`section[aria-label="What ${ending} asks of you"]`);

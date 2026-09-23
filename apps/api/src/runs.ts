@@ -5,7 +5,8 @@ import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
 import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
-import { everyView, filedTimes, findRun, noSuchRun, seenBy, stepNames, type Views, workflowsOf } from './store.ts';
+import { type RunGraph, runGraph } from './graph.ts';
+import { everyView, filedTimes, findRun, judgedSteps, noSuchRun, seenBy, stepNames, type Views, workflowsOf } from './store.ts';
 
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
 export type RunSummary = {
@@ -48,6 +49,8 @@ export type RunSummary = {
    * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
    */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
+  /** The steps as a graph, as the run's page has it (`runGraph`): the Factory's card draws its flow off it, with no read of the run. */
+  graph: RunGraph;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, awaiting approval at their gate, out of rounds or past their
    * budget — on a run nobody has called off.
@@ -89,6 +92,7 @@ async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, stri
       note: judged.notes.get(name) ?? null,
       ...needsOf(run, name, views, judged),
     })),
+    graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
     toDecide: judged.toDecide,

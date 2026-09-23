@@ -1,10 +1,11 @@
 /**
  * What the Factory works out about the runs, without React Flow: which are in flight, what a card
- * says, where a card goes, and where an open run's graph goes beside it. Pure.
+ * says, where a card goes, and how many cells an open card takes. Pure.
  */
 import type { RunSummary, RunToDecide } from './api';
 import { duration, type EdgeState } from './canvas.ts';
-import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point } from './layout.ts';
+import type { Flow } from './flow.ts';
+import { layers, type Point } from './layout.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves
@@ -166,143 +167,98 @@ export const inFlightFirst = <T extends Pick<RunSummary, 'id' | 'createdAt' | 's
   [...runs].sort((a, b) => Number(inFlight(b)) - Number(inFlight(a)) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
 
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
-export const CELL_WIDTH = 320;
+export const CELL_WIDTH = 384;
 /**
- * A cell holds the cards the board draws and the gap under one, as its width holds a card and the gap beside it: the tallest card a person
- * is asked to act on is a gate's with four steps, one of them asking — each step a row, the ask two, the gate's line one and its buttons
- * under it — and it stands 291 tall whatever the names, the e2e's `factory-gate-long-names` measures, which a cell of 260 did not hold. At
- * 320 the cell is square and the gap under that card about the one beside every card; five such steps still fit. Every other card pays for
- * it in room: a row of the floor is 60 taller, so a floor of three rows is 180 taller and Fit view draws it a little smaller. At 220 the
- * grid put the card beneath under the bottom edge of the cards of the day.
+ * A cell holds a card at rest and the gap under it, as its width holds a card and the gap beside it. A card's steps no longer make it
+ * taller: they are its rail (`StepRail`), a pill a step, never more than `RAIL_LANES` lanes whatever the run, and an open card takes as
+ * many cells down as its tiles need (`openSpan`). What makes a card at rest tall is what it asks of a person — a line per ask and per step
+ * blocked (`needsOf`, two lines each), a gate's line and its buttons. Of the cards the e2e seeds, the tallest is the gate's in
+ * `factory-gate-long-names`, 262; then a card with its cost and an ask, 228; most stand about 190. At 320 the tallest keeps about 60 under
+ * it, more than the gap beside every card (`CELL_WIDTH` less `CARD_WIDTH`, 32), and most keep about 130. Every card pays for the room:
+ * Fit view draws a floor of three rows a little smaller than a lower cell would.
  *
- * Names cost no height: the card cuts a long name to its line (the title, the gate's line) or cuts the status beside it (a step), whole on
- * hover. Counts do, and nothing here makes the cell a bound on them: a card draws a line per ask and per step blocked (`needsOf`, two lines
- * each), so a run whose steps each ask outgrows any cell, and the card beneath is under its foot again. The board takes that over capping
- * the card, which would cut what a person has to act on — the ask itself — and the cards that outgrow it are the rare ones.
- * `expectClearOfEachOther` in the e2e measures the floor it seeds against this number; it does not stand for a bound there is none of.
+ * Names cost no height: the card cuts a long name to its line (the title, the gate's line), and the rail cuts a step's name to its pill,
+ * whole on hover. Counts do, and nothing here makes the cell a bound on them: a run whose steps each ask outgrows any cell, and the card
+ * beneath is under its foot. The board takes that over capping the card, which would cut what a person has to act on — the ask itself —
+ * and the cards that outgrow it are the rare ones. `expectClearOfEachOther` in the e2e measures the floor it seeds against this number;
+ * it does not stand for a bound there is none of.
  */
 export const CELL_HEIGHT = 320;
 export const GRID_COLUMNS = 4;
-/** How wide a card is drawn (`w-72`): the rest of its cell is the gap to the next card. */
-export const CARD_WIDTH = 288;
-/** How far below its card's top an open run's graph starts, so the edge from the card runs about level. */
-export const GRAPH_TOP = 24;
+/** How wide a card is drawn (`w-88`, room for four pills of its rail): the rest of its cell is the gap to the next card. */
+export const CARD_WIDTH = 352;
+/** The gap a card leaves beside it in its cell, and the one an open card keeps under it. */
+const GAP = CELL_WIDTH - CARD_WIDTH;
+/**
+ * What an open card draws around its tiles (`StepTiles`): across, the section's left border and its padding each side; down, the
+ * card's own padding over and under it and the section's heading line.
+ */
+export const TILES_FRAME = { across: 1 + 2 * 12, down: 2 * 12 + 16 + 4 };
 
 /** The cells a run takes, from its card's cell: across, and down. A closed card takes its one. */
 export type Span = { columns: number; rows: number };
 export const ONE_CELL: Span = { columns: 1, rows: 1 };
 
 /**
- * The cells an open run takes: its card's, as many more to the right as its steps reach, and as many rows down. From
- * where each step is beside the card (`arranged`: the layering's places, moved where a person dragged them), which reads
- * names, `after` and the person's moves only, so a refetch that moves a status moves no card.
- *
- * Across, to a gap's width past the rightmost step's right edge — the layering puts a step a column's arrow right of the
- * card, so a graph a column wide takes the card's cell and one more; down, to a row's height under the lowest step's top.
- * Never less than the card's own cell. A step dragged left of the card, or above it, is outside these cells: what the run
- * claims lies right of its card and below its top, and a card a person left under such a step is theirs to move.
+ * The cells an open run takes: its card's, and as many more to the right as its tiles reach and as many rows down, with a gap's
+ * room past them. From the tiles' size alone (`tilesOf`), which reads the steps' names and the graph and not their words, so a
+ * refetch that moves a status moves no card. Never less than the card's own cell.
  */
-export function spanOf(at: ReadonlyMap<string, Point>): Span {
-  const xs = [...at.values()].map((p) => p.x);
-  const ys = [...at.values()].map((p) => p.y);
+export function openSpan(tiles: Pick<Flow, 'width' | 'height'>): Span {
   return {
-    columns: Math.max(1, Math.ceil((Math.max(...xs) + NODE_WIDTH + (CELL_WIDTH - CARD_WIDTH)) / CELL_WIDTH)),
-    rows: Math.max(1, Math.ceil((Math.max(...ys) + ROW_HEIGHT) / CELL_HEIGHT)),
+    columns: Math.max(1, Math.ceil((CARD_WIDTH + TILES_FRAME.across + tiles.width + GAP) / CELL_WIDTH)),
+    rows: Math.max(1, Math.ceil((TILES_FRAME.down + tiles.height + GAP) / CELL_HEIGHT)),
   };
 }
-
-/**
- * Where each step of an open run goes, relative to its card's corner: the layering's places, moved to
- * start a column's arrow right of the card and `GRAPH_TOP` below its top.
- */
-export function graphAt(at: ReadonlyMap<string, Point>): Map<string, Point> {
-  const left = Math.min(...[...at.values()].map((p) => p.x));
-  const top = Math.min(...[...at.values()].map((p) => p.y));
-  return new Map(
-    [...at].map(([name, p]) => [name, { x: CARD_WIDTH + COLUMN_WIDTH - NODE_WIDTH + p.x - left, y: GRAPH_TOP + p.y - top }]),
-  );
-}
-
-/** A step's node on the floor, named by its run too: two runs may each have an `implement`. */
-export const stepId = (runId: string, step: string): string => `${runId}/${step}`;
-
-/** The run a node on the floor is of: a card's own id, or the run a step's node is named by — a run id has no slash (`wf start` refuses one), so the last is the step's. */
-export const runOfNode = (id: string): string => (id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : id);
-
-/**
- * Where each step of an open run is beside its card: where the layering puts it (`graphAt`), moved by as far as a person
- * dragged it. `dragged` is how far each step on the floor was moved, by its node's id (`stepId`); a step not in it is where
- * the layering put it.
- */
-export function arranged(runId: string, at: ReadonlyMap<string, Point>, dragged: ReadonlyMap<string, Point>): Map<string, Point> {
-  return new Map(
-    [...at].map(([name, p]) => {
-      const by = dragged.get(stepId(runId, name));
-      return [name, by ? { x: p.x + by.x, y: p.y + by.y } : p];
-    }),
-  );
-}
-
-/** Of the steps a person dragged, those of runs the store still lists — open or not, as `keepLayout` keeps a card off the floor — and nothing for a run it has lost. */
-export const keepDragged = (dragged: ReadonlyMap<string, Point>, known: ReadonlySet<string>): Map<string, Point> =>
-  new Map([...dragged].filter(([id]) => known.has(runOfNode(id))));
 
 /** The Factory's open runs after a click on one: closed if it was open, else open, and opened last. */
 export const toggleOpen = (open: readonly string[], id: string): string[] =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
 /**
- * The open runs whose graphs are unfolding on the floor on this pass — `placeRuns`' `unfolding` — and what to remember for the
- * next. A graph unfolds when it is drawn and was not on the last pass: opened by a click, or brought back onto the floor open,
- * finished runs shown again or a run in flight waiting on it. A graph drawn on the last pass is not unfolding, however it grew:
- * a step dragged out of it moves no card. `drawn` is what the last pass remembered, `spans` the graphs drawn now, and `reading`
- * the open runs on the floor, some not yet drawn: one of them remembered stays remembered until its graph is read, so a graph
- * that was on the floor as the page opened — left open on the last visit — is not taken for one unfolding over the cards a
- * person left around it.
+ * The open cards opening on the floor on this pass — `placeRuns`' `unfolding` — and what to remember for the next. A card opens
+ * when it is drawn open and was not on the last pass: opened by a click, or brought back onto the floor open, finished runs shown
+ * again or a run in flight waiting on it. A card drawn open on the last pass is not opening, however its tiles grew — a step added
+ * to a run moves no card. `drawn` is what the last pass remembered, and `spans` the cards drawn open now. The floor starts with the
+ * cards left open on the last visit remembered, so they are not taken for cards opening over the ones a person left around them.
  */
-export function unfoldingNow(
-  drawn: ReadonlySet<string>,
-  spans: ReadonlyMap<string, Span>,
-  reading: readonly string[],
-): { unfolding: Set<string>; drawn: Set<string> } {
-  return {
-    unfolding: new Set([...spans.keys()].filter((id) => !drawn.has(id))),
-    drawn: new Set([...spans.keys(), ...reading.filter((id) => drawn.has(id) && !spans.has(id))]),
-  };
+export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<string, Span>): { unfolding: Set<string>; drawn: Set<string> } {
+  return { unfolding: new Set([...spans.keys()].filter((id) => !drawn.has(id))), drawn: new Set(spans.keys()) };
 }
 
 /**
  * Where each run's card goes, for the runs on the floor, oldest first. `spans` holds the runs drawn open
- * and the cells each takes (`spanOf`), the run a person opened last first; a run not in it takes one cell.
- * `unfolding` holds the open runs whose graphs are unfolding now — drawn since the floor was last laid out
+ * and the cells each takes (`openSpan`), the run a person opened last first; a run not in it takes one cell.
+ * `unfolding` holds the open cards opening now — drawn open since the floor was last laid out
  * (`unfoldingNow`) — and only those move a card aside: every open run by default.
  *
  * Claims are made open runs first, the one opened last first, then closed cards oldest first — so the run
  * a person just opened is never the one moved aside. In order of claim:
  *
  * 1. A card on the floor now stays where it is: a person put it there, or is looking at it. Unless a run
- *    unfolding that claimed before it is in any of its cells — a graph opening over the cards beside it —
+ *    opening that claimed before it is in any of its cells — a card growing over the cards beside it —
  *    and then it takes a free place (3). Nothing else moves a card on the floor: not a card or a step
- *    dropped over it, nor a graph that grew when a step was dragged, even stacked — that is the person's
+ *    dropped over it, nor an open card that grew when its run gained a step, even stacked — that is the person's
  *    layout, as in a modeller where each piece moves alone.
  * 2. A card coming onto the floor goes back where it was left (`saved`), unless a card placed before
- *    it is in any of those cells. The cells were free while this card was off the floor — finished and
+ *    it is in any of those cells. An open one opening as it comes claims before (1), when no card on the
+ *    floor is in its own cell, and moves the cards beside it aside as a card opened there would. The cells were free while this card was off the floor — finished and
  *    hidden, say — and a run that started meanwhile took one; putting both there would hide one under
  *    the other, so the card coming back takes a free place instead.
  * 3. Any other card takes the first free place, row by row: the first cell from which every cell it
- *    takes is free. An open run wider than the grid starts a row, and its graph runs past the grid's edge.
+ *    takes is free. An open run wider than the grid starts a row, and its card runs past the grid's edge.
  *    Closed cards joined by `after` — each run's parents on the floor — are placed together, the first time
  *    one of them comes up: layered as a run's steps are (`layers`), each a column right of every card it
  *    waits on and level with the middle of them, so a diamond reads as one; and the whole at the first free
  *    place right of every card already down that one of them waits on, and left of every one that waits on it.
- *    When some of a group are down and others are not, the group is laid out again together if a graph moved
+ *    When some of a group are down and others are not, the group is laid out again together if an open card moved
  *    one of them aside, and the others go in among the cards down if they are coming onto the floor — each
  *    only where every edge still points right, the other way if that one cannot, and the cards down kept
  *    where they are if neither can.
  *
  * A card is in the cell nearest its corner — both rows, for one the layering puts halfway down a row — and
  * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
- * graph unfolding past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
+ * card opening past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
  * floor holds no cell: finished runs pile up, and holding their cells would leave holes that never close.
  */
 export function placeRuns(
@@ -343,9 +299,16 @@ export function placeRuns(
   const free = (point: Point, span: Span, of: ReadonlySet<string>) => cellsOf(point, span).every((cell) => !of.has(cell));
   const columnOf = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
 
+  // An open run coming back onto the floor opens as it comes: back in its own cell, when no card on the floor is in it, it claims first,
+  // and the cards that started beside it while it was away move aside for it (1) — as if it had come back closed and been opened there.
+  const standing = new Set(order.flatMap((id) => (onFloor.has(id) ? cellsOf(onFloor.get(id)!, spanOfId(id)) : [])));
+  for (const id of order) {
+    const left = saved?.get(id);
+    if (unfolding.has(id) && spans.has(id) && !onFloor.has(id) && left && free(left, ONE_CELL, standing) && free(left, spanOfId(id), taken)) put(id, left);
+  }
   for (const id of order) {
     const here = onFloor.get(id);
-    if (here && free(here, spanOfId(id), unfolded)) put(id, here);
+    if (!at.has(id) && here && free(here, spanOfId(id), unfolded)) put(id, here);
   }
   for (const id of order) {
     const left = saved?.get(id);
@@ -424,7 +387,7 @@ export function placeRuns(
       for (const [m, point] of were) put(m, point);
       return false;
     };
-    // A card of the group that was on the floor and has lost its place — a graph unfolded over it — takes the rest of its group with it,
+    // A card of the group that was on the floor and has lost its place — a card opened over it — takes the rest of its group with it,
     // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone. Cards coming onto the
     // floor go in among the ones down first, which a person is looking at. Either only where every edge still points right: laid out
     // again, a group that waits on an open run and that the open run waits on too has no column when the two are also joined directly
@@ -454,6 +417,20 @@ function cellsOf({ x, y }: Point, span: Span): string[] {
     for (let c = column; c < column + span.columns; c++) cells.push(`${r}:${c}`);
   }
   return cells;
+}
+
+/** How wide a cell was before a card carried its rail: an arrangement saved then puts its cards this far apart. */
+export const NARROW_CELL_WIDTH = 320;
+
+/**
+ * An arrangement saved while a cell was `NARROW_CELL_WIDTH` wide, on today's grid: each card as many cells across as it was then, and
+ * as far into its cell, so a card on the third column is on the third column still. Read unchanged, the cards kept their old places
+ * `NARROW_CELL_WIDTH` apart, each on a cell of its own by `placeRuns`' rounding, and every card covered the right of the one beside it.
+ * Down is unchanged: a cell is as tall as it was.
+ */
+export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<string, Point> | null {
+  if (!saved) return null;
+  return new Map([...saved].map(([id, { x, y }]) => [id, { x: (x * CELL_WIDTH) / NARROW_CELL_WIDTH, y }]));
 }
 
 /**

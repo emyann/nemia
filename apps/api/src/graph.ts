@@ -35,3 +35,12 @@ export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop'
   }
   return { roots, edges };
 }
+
+/**
+ * The graph of the steps a run is judged by (`judgedSteps`) and shown with (`stepNames`): `graphOf` over the judged workflow, then a
+ * step with no `after` for each name the run shows beside it, which is a root. One function for the run's page and the list, so a card
+ * draws what its page draws.
+ */
+export function runGraph(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop' | 'rounds'>[], names: readonly string[]): RunGraph {
+  return graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map((name) => ({ name, after: [] }))]);
+}

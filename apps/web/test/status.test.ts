@@ -144,7 +144,7 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
 });
 
 test('on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves', () => {
-  const held = ['waiting', 'pending', 'waiting on a-1x2y', 'succeeded · BLOCKED', 'awaiting approval', 'rounds exhausted', 'over budget $4.20 of $3', 'budget exhausted $3.02 of $3'];
+  const held = ['waiting', 'pending', 'waiting on a-1x2y', 'succeeded · BLOCKED', 'input-required · BLOCKED', 'awaiting approval', 'rounds exhausted', 'over budget $4.20 of $3', 'budget exhausted $3.02 of $3'];
   for (const status of held) {
     assert.equal(stepState(status, false, true), 'held', status);
     // Nobody is asked while the hold stands: every verb that would answer the gate is refused.

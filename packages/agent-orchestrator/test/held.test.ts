@@ -203,6 +203,31 @@ test('a try of a waiting step that is not an answer — `--fresh`, `--model` —
   assert.equal(readRun(run.id).steps.plan!.taskId, `${run.id}-plan-try2`);
 });
 
+test("a held task whose job ended `done` with no statement (`stated: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
+  for (const keys of [{}, { plan: 'gate: true' }]) {
+    const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false });
+    const { e, pass, sessions } = engine();
+    const plan = `${run.id}-plan`;
+    await pass(run.id);
+    await pass(run.id);
+    // The job ended and gave no closeout: the runtime records `stated: false`, and holds the task open all the same, since it ended `done`.
+    sessions.set(nameFor(plan, 1), { ...sessions.get(nameFor(plan, 1))!, state: 'done', busy: false });
+    await e.tick();
+    const waiting = await stateOf(e, plan);
+    assert.deepEqual([waiting.phase, waiting.state.attempts.at(-1)?.stated], ['input-required', false], `${JSON.stringify(keys)}: held, and no statement`);
+    assert.equal((await statuses(e, run.id)).plan, 'unsigned', `${JSON.stringify(keys)}: the run's word, not the engine's`);
+
+    const nudged = await advance(e, readRun(run.id));
+    assert.deepEqual(nudged.tried, ['plan'], `${JSON.stringify(keys)}: the sign-off nudge`);
+    const old = await stateOf(e, plan);
+    assert.deepEqual([old.state.closed, old.state.inputs.length], [true, 0], `${JSON.stringify(keys)}: closed, never answered`);
+    const next = await stateOf(e, `${plan}-try2`);
+    assert.match(next.state.brief, /StructuredOutput/, `${JSON.stringify(keys)}: filed as a task of its own, told to sign off`);
+    assert.equal(next.state.resumeFrom, 'native-1', `${JSON.stringify(keys)}: continuing the session that ended`);
+    assert.equal(readRun(run.id).steps.plan!.taskId, `${plan}-try2`);
+  }
+});
+
 test('a pass that answered and died before writing the run down is adopted: the turn is the try it is, nothing is stopped and nothing is filed again', async () => {
   const { run, e, pass } = await signedPlan({}, BLOCKED);
   const plan = `${run.id}-plan`;

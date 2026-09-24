@@ -708,7 +708,7 @@ What a job gives up, or what is not done:
 - **A background session's denials are not read.** M1's two shapes are `claude -p`'s output, which a `--bg` session does
   not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
   `denials`. Since stage 2 part 2 every orchestrator step is a job, and its attempt carries its denials, but for a step that
-  says `background: true`: the shipped supervisor, in `dontAsk`, whose calls off its `allow:` list are denied unread.
+  says `background: true`: the shipped supervisor, in `dontAsk`, whose calls off its `allowedTools:` list are denied unread.
 - **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
   observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
   running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).

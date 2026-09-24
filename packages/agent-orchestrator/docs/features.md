@@ -4203,7 +4203,7 @@ reviewers' fences rest on.
 
 **What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and since part 3a (the same day) `wf ls`, `wf decide`, the
 api and the board say them: a `denied:` note beside the status, never in it. Since part 3b a step can decide on them — `denials: fail`,
-below. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+below. The supervisor's `allowedTools:` list is what its brief runs today: a command off it is denied with no prompt, unread.
 
 ## Shipped: a step that says `denials: fail` is stopped on a denied call (thin runtime stage 2 part 3b)
 
@@ -4211,15 +4211,15 @@ Registered as §10 and shipped 2026-09-23. A job's denied calls were said on eve
 in `dontAsk` denied the command it was told to run signed off all the same. A step that says `denials: fail` is not passed on.
 
 - **A status of its own, `denied`, not a failure.** §10 asked for a denied try to settle the step failed and spend `retries:`. The run's
-  `allow:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
+  `allowedTools:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
   itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
   `run.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
   is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
   'blocked'`).
-- **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allow:` for a new run, worded as Claude Code
+- **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allowedTools:` for a new run, worded as Claude Code
   matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
   the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path
-  as `//path`, the run's id as `*`), except for a call the step's own `disallow:` may have denied, which no allow overrides
+  as `//path`, the run's id as `*`), except for a call the step's own `disallowedTools:` may have denied, which no allow overrides
   (`disallowedBy`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What
   your session was denied`), or the same session continued. `--recheck` is refused: no check ran. A pruned run offers nothing.
 - **Refused at load:** any word but `fail`; the key on codex, which records no denials; and beside `background: true`, whose denials
@@ -4228,8 +4228,39 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   command. The board draws the step amber, as it does one that did not sign, and its Decide section offers a new session first. The
   builder's step form sets the key (`KINDS`, `specOf`, the board's mirror with `UNSET`).
 
-**What it leaves.** No verb widens `allow:` on a live run: a person who wants the call allowed starts a new run. No e2e page draws a
+**What it leaves.** No verb widens `allowedTools:` on a live run: a person who wants the call allowed starts a new run. No e2e page draws a
 denied step; its rendering is proven by the web's component tests.
+
+## Shipped: the rule lists under Claude Code's names — `disallowedTools:` and `allowedTools:`
+
+A step's two rule lists were `disallow:` and `allow:` until 2026-09-23; they are `disallowedTools:` and `allowedTools:` now, the names
+Claude Code gives the flags they become (`--disallowedTools`, `--allowedTools`), and the names the runtime's task already carried
+them under. The sections above keep the words they were written in.
+
+- **The former names are accepted, not migrated.** `readKeys` reads `disallow:` and `allow:` as the new keys (`FORMER_KEYS`), in a step
+  and in an agent, so a folder written before still starts; every refusal of the list quotes the line as it was written and says the
+  name is the former one. The same list under both names is refused, naming both lines and the one to keep. `wf start` prints a line for
+  each file and key to rename (`formerKeyLines`), after the run is started, which it does not stop. Nothing rewrites a folder by
+  itself; `renderStep` and `renderAgent` write the new names, so a step or an agent saved from the board is renamed.
+- **A run frozen with the former names loads.** `readRun` reads each frozen step through `asNamed` — its fields, and the agent's `keys`
+  and `given` — so the tick, `wf ls`, `wf decide` and the api see the new names, and the tick's next write of the record saves them.
+  `resolved-before.json`, which is never regenerated, is read the same way.
+- **A record is written under both names.** A `wf up` daemon runs the code it was started with until it is restarted, and the tick
+  from before the change files a step's lists from its `disallow` and `allow` alone: given a record with only the new names, it would
+  file every step of a run started since with no rule list, and nothing would say so — the reviewers' `Bash(npm run build)` deny and the
+  supervisor's git denies gone. So both writers of a record (`writeRun`, `rewriteRun`) copy each list under its former name beside the
+  new one (`withFormerNames`), and `asNamed` reads it back under the new name alone. `store.test.ts` reads a record as that tick did,
+  after `wf start` and after a pass.
+- **Outside the package**, as CLAUDE.md's `STEP_KEYS` obligations say: the builder's `KINDS`, `WorkflowStepSpec` and `specOf`, the
+  board's mirror with `UNSET`, the agent form's role keys, and the capabilities page, which names the lists as a step writes them.
+
+**What it leaves.** The note is printed by `wf start` alone: a run started from a card by the daemon, or from the board, starts under
+the former names silently. A board page opened before the change sends `disallow`/`allow` on a save, and `renderStep` and `renderAgent`
+refuse them (`formerKeyWritten`): the api answers 422, saying the name is the former one and to reload the page and save again. Restart
+`wf up` once this merges all the same: an old daemon keeps filing lists, off the copies, but it starts a queued card by parsing a
+shipped folder, which now says `disallowedTools:`, a key it does not know, and refuses the start — loudly, but until it is restarted. The
+copies under the former names are written until a change removes `withFormerNames` from `recordText`, once no daemon from before
+2026-09-23 can be running.
 
 ## 1. A run that grows steps from a plan
 
@@ -4524,7 +4555,7 @@ it asks and what it gets wrong.
 ## 10. `denials: fail`: a step that fails on what it was denied
 
 Shipped 2026-09-23 as *Shipped: a step that says `denials: fail` is stopped on a denied call*, above: a status of its own, `denied`,
-rather than a failure spending `retries:`, since the run's `allow:` is frozen and a try is denied the same again. The number kept so §11
+rather than a failure spending `retries:`, since the run's `allowedTools:` is frozen and a try is denied the same again. The number kept so §11
 keeps its.
 
 ## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)

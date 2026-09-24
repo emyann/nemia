@@ -108,7 +108,7 @@ export const stepAnchor = (step: string): string => `step-${step}`;
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
  *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as `wf decide` offers it —
- *              the run's `allow:` is frozen, so a try is denied the same call again. `calls` is the line naming them (`StepNeeds.denied`)
+ *              the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them (`StepNeeds.denied`)
  *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
  *              that did not finish past it. With its try — `wf retry --budget`, a nudge or a new session, and for a step that signed off
  *              blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with its loop's

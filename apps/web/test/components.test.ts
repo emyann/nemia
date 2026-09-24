@@ -634,7 +634,7 @@ async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; re
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
@@ -1242,8 +1242,8 @@ test("a step `denials: fail` stopped is offered Try again with a new session fir
   const html = offersMarkup([{ step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' }, { step: 'bare', kind: 'denied', calls: null }]);
   const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
   const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]!).join(' ');
-  assert.equal(said('notes'), "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allow: is frozen, so a try is denied the same again: a new session is told to do without it");
-  assert.equal(said('bare'), "bare signed off having been denied a call, and says denials: fail. This run's allow: is frozen, so a try is denied the same again: a new session is told to do without it");
+  assert.equal(said('notes'), "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it");
+  assert.equal(said('bare'), "bare signed off having been denied a call, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it");
   const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
   assert.deepEqual(radios, [['fresh', true], ['nudge', false]], 'a new session first, and no recheck: no check of it ran');
   assert.match(rows.get('notes')!, /<form aria-label="Try notes again"/);

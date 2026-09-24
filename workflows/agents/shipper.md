@@ -13,7 +13,7 @@ context: 200k
 permissionMode: auto
 # Denied by name what no step needs and an unattended session otherwise has, as the implementer is: messaging other
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger
 ---
 Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.
 

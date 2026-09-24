@@ -12,6 +12,8 @@ import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANI
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/workflow-store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
+import { asNamed, FORMER_KEYS, formerKeyLine, formerKeysIn, parseAgent, renderAgent } from '../src/workflow.ts';
+import { formerKeyLines } from '../src/workflow-store.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -336,7 +338,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   // Claude Code's alone and keeps no `budget:`: read below too.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**), Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**), Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -358,7 +360,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
   assert.equal(w.gate, true);
   assert.equal(w.remote, true);
-  assert.deepEqual([w.effort, w.tools, w.disallow, w.allow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
+  assert.deepEqual([w.effort, w.tools, w.disallowedTools, w.allowedTools], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
   assert.equal(w.context, 150000);
   assert.equal(w.denials, 'fail');
 });
@@ -390,7 +392,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, allow, denials, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -502,90 +504,182 @@ test('REFUSED: tools: on a codex step, naming the sandbox permissionMode sets in
   for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ntools: Read`).tools, ['Read'], h);
 });
 
-test('disallow: is the rules the harness is given to deny, one rule per entry, trimmed — and absent, nothing is denied', () => {
-  const w = fm('review', 'tools: Read, Bash\ndisallow: Bash(npm run build) ,  Bash(npm run e2e), SendMessage,');
-  assert.deepEqual(w.disallow, ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'], 'a space inside a rule stays in it; a trailing comma adds none');
-  assert.deepEqual(fm('review', 'disallow: mcp__playwright__browser_run_code_unsafe, Read(//home/**)').disallow, ['mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)']);
+test('disallowedTools: is the rules the harness is given to deny, one rule per entry, trimmed — and absent, nothing is denied', () => {
+  const w = fm('review', 'tools: Read, Bash\ndisallowedTools: Bash(npm run build) ,  Bash(npm run e2e), SendMessage,');
+  assert.deepEqual(w.disallowedTools, ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'], 'a space inside a rule stays in it; a trailing comma adds none');
+  assert.deepEqual(fm('review', 'disallowedTools: mcp__playwright__browser_run_code_unsafe, Read(//home/**)').disallowedTools, ['mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)']);
   // A quote is legal inside a rule, whichever entry comes after it: `tools:`'s quote check refused the first order and took the second.
   for (const q of [`'`, `"`]) {
     const rule = `Bash(git commit -m ${q}wip${q})`;
-    assert.deepEqual(fm('review', `disallow: ${rule}, SendMessage`).disallow, [rule, 'SendMessage'], `${q}: a quoted rule, then another`);
-    assert.deepEqual(fm('review', `disallow: SendMessage, ${rule}`).disallow, ['SendMessage', rule], `${q}: another, then a quoted rule`);
+    assert.deepEqual(fm('review', `disallowedTools: ${rule}, SendMessage`).disallowedTools, [rule, 'SendMessage'], `${q}: a quoted rule, then another`);
+    assert.deepEqual(fm('review', `disallowedTools: SendMessage, ${rule}`).disallowedTools, ['SendMessage', rule], `${q}: another, then a quoted rule`);
   }
-  assert.equal(fm('review', 'harness: claude').disallow, undefined, 'absent: nothing denied beyond the settings');
-  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ndisallow: SendMessage`).disallow, ['SendMessage'], h);
+  assert.equal(fm('review', 'harness: claude').disallowedTools, undefined, 'absent: nothing denied beyond the settings');
+  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ndisallowedTools: SendMessage`).disallowedTools, ['SendMessage'], h);
 });
 
-test('REFUSED: an empty disallow: — blank, or only commas — which denies nothing and reads as a fence', () => {
-  assert.throws(() => fm('review', 'disallow:'), refusedWith(/^review: `disallow` has no value, which denies nothing and reads as a fence\. Name what the session may not have — `disallow: Bash\(npm run build\), SendMessage` — or delete the line/));
-  assert.throws(() => fm('review', 'disallow: ,'), refusedWith(/^review: `disallow: ,` names no rule\. .*Without the line, the step is denied nothing beyond the checkout's settings\./));
-  assert.throws(() => fm('review', 'disallow:  , ,'), refusedWith(/names no rule/));
+test('REFUSED: an empty disallowedTools: — blank, or only commas — which denies nothing and reads as a fence', () => {
+  assert.throws(() => fm('review', 'disallowedTools:'), refusedWith(/^review: `disallowedTools` has no value, which denies nothing and reads as a fence\. Name what the session may not have — `disallowedTools: Bash\(npm run build\), SendMessage` — or delete the line/));
+  assert.throws(() => fm('review', 'disallowedTools: ,'), refusedWith(/^review: `disallowedTools: ,` names no rule\. .*Without the line, the step is denied nothing beyond the checkout's settings\./));
+  assert.throws(() => fm('review', 'disallowedTools:  , ,'), refusedWith(/names no rule/));
 });
 
-test('REFUSED: a disallow: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
-  assert.throws(() => fm('review', 'disallow: Bash(git push, git reset)'),
-    refusedWith(/^review: `disallow: Bash\(git push, git reset\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(git push`, `git reset\)` as rules\. .*Two commands are two rules: `Bash\(git push\), Bash\(git reset\)`\./));
-  assert.throws(() => fm('review', "disallow: Bash(git commit -m 'a, b'), SendMessage"), refusedWith(/has a comma inside an entry/), 'a comma in quotes inside the parentheses is still inside them');
-  assert.throws(() => fm('review', 'disallow: [SendMessage, CronCreate]'), refusedWith(/has `\[SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
-  assert.throws(() => fm('review', 'disallow: "SendMessage, CronCreate"'), refusedWith(/has `"SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
-  assert.throws(() => fm('review', 'disallow: SendMessage CronCreate'),
-    refusedWith(/^review: `disallow: SendMessage CronCreate` has `SendMessage CronCreate`, which is not one rule: a space outside the parentheses separates two rules, to the harness\. Each entry is one rule/));
-  assert.throws(() => fm('review', 'disallow: "SendMessage"'), refusedWith(/has `"SendMessage"`, which is not one rule: a rule is a bare name, without quotes or brackets/));
-  assert.throws(() => fm('review', 'disallow: Bash(npm run build'), refusedWith(/has `Bash\(npm run build`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
-  assert.throws(() => fm('review', 'disallow: Bash (npm run build)'), refusedWith(/which is not one rule: a rule has one pair of parentheses, right after the name/));
+test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
+  assert.throws(() => fm('review', 'disallowedTools: Bash(git push, git reset)'),
+    refusedWith(/^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(git push`, `git reset\)` as rules\. .*Two commands are two rules: `Bash\(git push\), Bash\(git reset\)`\./));
+  assert.throws(() => fm('review', "disallowedTools: Bash(git commit -m 'a, b'), SendMessage"), refusedWith(/has a comma inside an entry/), 'a comma in quotes inside the parentheses is still inside them');
+  assert.throws(() => fm('review', 'disallowedTools: [SendMessage, CronCreate]'), refusedWith(/has `\[SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallowedTools: "SendMessage, CronCreate"'), refusedWith(/has `"SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallowedTools: SendMessage CronCreate'),
+    refusedWith(/^review: `disallowedTools: SendMessage CronCreate` has `SendMessage CronCreate`, which is not one rule: a space outside the parentheses separates two rules, to the harness\. Each entry is one rule/));
+  assert.throws(() => fm('review', 'disallowedTools: "SendMessage"'), refusedWith(/has `"SendMessage"`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallowedTools: Bash(npm run build'), refusedWith(/has `Bash\(npm run build`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
+  assert.throws(() => fm('review', 'disallowedTools: Bash (npm run build)'), refusedWith(/which is not one rule: a rule has one pair of parentheses, right after the name/));
 });
 
-test('REFUSED: disallow: on a codex step, naming the sandbox permissionMode sets instead', () => {
-  assert.throws(() => fm('review', 'harness: codex\ndisallow: Bash(npm run build)'),
-    refusedWith(/^review: `disallow: Bash\(npm run build\)` is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: read-only` for a step that must not write\./));
-  assert.throws(() => fm('review', 'disallow: SendMessage\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has no tool list to deny from/), 'wherever the harness line is, and beside the sandbox too');
+test('REFUSED: disallowedTools: on a codex step, naming the sandbox permissionMode sets instead', () => {
+  assert.throws(() => fm('review', 'harness: codex\ndisallowedTools: Bash(npm run build)'),
+    refusedWith(/^review: `disallowedTools: Bash\(npm run build\)` is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: read-only` for a step that must not write\./));
+  assert.throws(() => fm('review', 'disallowedTools: SendMessage\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has no tool list to deny from/), 'wherever the harness line is, and beside the sandbox too');
 });
 
-test('allow: is the rules the harness is given to allow without asking, one rule per entry, trimmed — and absent, the step may do only what its permissionMode allows', () => {
-  const w = fm('write', 'permissionMode: dontAsk\nallow: Edit(**) ,  Bash(npm test), Read,');
-  assert.deepEqual(w.allow, ['Edit(**)', 'Bash(npm test)', 'Read'], 'a space inside a rule stays in it; a trailing comma adds none');
-  assert.equal(fm('review', 'harness: claude').allow, undefined, 'absent: only what the permission mode allows by itself');
-  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('write', `harness: ${h}\nallow: Edit(**)`).allow, ['Edit(**)'], h);
+test('allowedTools: is the rules the harness is given to allow without asking, one rule per entry, trimmed — and absent, the step may do only what its permissionMode allows', () => {
+  const w = fm('write', 'permissionMode: dontAsk\nallowedTools: Edit(**) ,  Bash(npm test), Read,');
+  assert.deepEqual(w.allowedTools, ['Edit(**)', 'Bash(npm test)', 'Read'], 'a space inside a rule stays in it; a trailing comma adds none');
+  assert.equal(fm('review', 'harness: claude').allowedTools, undefined, 'absent: only what the permission mode allows by itself');
+  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('write', `harness: ${h}\nallowedTools: Edit(**)`).allowedTools, ['Edit(**)'], h);
   // The deny list beside it, on the same step: neither is the other's opposite, and a deny still beats an allow.
-  assert.deepEqual(fm('write', 'allow: Edit(**)\ndisallow: SendMessage').allow, ['Edit(**)']);
+  assert.deepEqual(fm('write', 'allowedTools: Edit(**)\ndisallowedTools: SendMessage').allowedTools, ['Edit(**)']);
 });
 
-test('REFUSED: an allow: that names no rule, or an entry that is not one rule — the deny list\'s refusals in the allow list\'s words', () => {
-  assert.throws(() => fm('write', 'allow:'), refusedWith(/^write: `allow` has no value, which allows nothing and reads as a permission\. Name what the session may do without being asked — `allow: Edit\(\*\*\), Bash\(npm test\)` — or delete the line/));
-  assert.throws(() => fm('write', 'allow: ,'), refusedWith(/^write: `allow: ,` names no rule\. .*Without the line, the step may do only what its `permissionMode` allows by itself\./));
-  assert.throws(() => fm('write', 'allow: Bash(npm test, npm run build)'),
-    refusedWith(/^write: `allow: Bash\(npm test, npm run build\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(npm test`, `npm run build\)` as rules\. .*Two tools are two rules: `Edit\(\*\*\), Bash\(npm test\)`\./));
-  assert.throws(() => fm('write', 'allow: [Write, Edit]'), refusedWith(/has `\[Write`, which is not one rule: a rule is a bare name, without quotes or brackets/));
-  assert.throws(() => fm('write', 'allow: Write Edit'), refusedWith(/has `Write Edit`, which is not one rule: a space outside the parentheses separates two rules, to the harness/));
-  assert.throws(() => fm('write', 'allow: Write(**'), refusedWith(/has `Write\(\*\*`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
+test('REFUSED: an allowedTools: that names no rule, or an entry that is not one rule — the deny list\'s refusals in the allow list\'s words', () => {
+  assert.throws(() => fm('write', 'allowedTools:'), refusedWith(/^write: `allowedTools` has no value, which allows nothing and reads as a permission\. Name what the session may do without being asked — `allowedTools: Edit\(\*\*\), Bash\(npm test\)` — or delete the line/));
+  assert.throws(() => fm('write', 'allowedTools: ,'), refusedWith(/^write: `allowedTools: ,` names no rule\. .*Without the line, the step may do only what its `permissionMode` allows by itself\./));
+  assert.throws(() => fm('write', 'allowedTools: Bash(npm test, npm run build)'),
+    refusedWith(/^write: `allowedTools: Bash\(npm test, npm run build\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(npm test`, `npm run build\)` as rules\. .*Two tools are two rules: `Edit\(\*\*\), Bash\(npm test\)`\./));
+  assert.throws(() => fm('write', 'allowedTools: [Write, Edit]'), refusedWith(/has `\[Write`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('write', 'allowedTools: Write Edit'), refusedWith(/has `Write Edit`, which is not one rule: a space outside the parentheses separates two rules, to the harness/));
+  assert.throws(() => fm('write', 'allowedTools: Write(**'), refusedWith(/has `Write\(\*\*`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
 });
 
 test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, which Claude Code takes and never matches', () => {
-  // Measured on Claude Code 2.1.278: with `allow: Write(**)` the shipped note writer could not write its own `note.md`
+  // Measured on Claude Code 2.1.278: with `allowedTools: Write(**)` the shipped note writer could not write its own `note.md`
   // — "Permission to use Write has been denied" — while the harness said, on a stderr nobody reads, that the rule "is not
   // matched by file permission checks". With `Edit(**)` it wrote inside its folder and was denied outside it.
-  assert.throws(() => fm('write', 'allow: Write(**)'),
-    refusedWith(/^write: `allow: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./));
-  assert.throws(() => fm('write', 'allow: Edit(**), NotebookEdit(notes/**)'),
+  assert.throws(() => fm('write', 'allowedTools: Write(**)'),
+    refusedWith(/^write: `allowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./));
+  assert.throws(() => fm('write', 'allowedTools: Edit(**), NotebookEdit(notes/**)'),
     refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/), 'wherever in the list it sits, and whatever the path');
   for (const h of ['claude', 'claude-detached']) {
-    assert.throws(() => fm('write', `harness: ${h}\nallow: Write(src/**)`), refusedWith(/Claude Code matches a file write against `Edit` rules alone/), h);
+    assert.throws(() => fm('write', `harness: ${h}\nallowedTools: Write(src/**)`), refusedWith(/Claude Code matches a file write against `Edit` rules alone/), h);
   }
   // The deny list is read in the same check, so a rule it can never match is refused there too: taken, the step reads as fenced and is not.
-  assert.throws(() => fm('write', 'disallow: Write(**)'),
-    refusedWith(/^write: `disallow: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and allows the write anyway — so the step would be fenced by nothing while its file reads as fenced\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./));
-  assert.throws(() => fm('write', 'disallow: SendMessage, NotebookEdit(notes/**)'), refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/), 'wherever in the deny list it sits');
+  assert.throws(() => fm('write', 'disallowedTools: Write(**)'),
+    refusedWith(/^write: `disallowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and allows the write anyway — so the step would be fenced by nothing while its file reads as fenced\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./));
+  assert.throws(() => fm('write', 'disallowedTools: SendMessage, NotebookEdit(notes/**)'), refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/), 'wherever in the deny list it sits');
   // Allowed: the rule that works, in either list, and the bare name, which has no path to miss.
-  assert.deepEqual(fm('write', 'allow: Edit(**)').allow, ['Edit(**)']);
-  assert.deepEqual(fm('write', 'disallow: Edit(../**)').disallow, ['Edit(../**)']);
-  assert.deepEqual(fm('write', 'allow: Write').allow, ['Write'], 'no path, so no file permission check to miss');
-  assert.deepEqual(fm('write', 'disallow: Write').disallow, ['Write'], 'the bare name denies the tool itself');
+  assert.deepEqual(fm('write', 'allowedTools: Edit(**)').allowedTools, ['Edit(**)']);
+  assert.deepEqual(fm('write', 'disallowedTools: Edit(../**)').disallowedTools, ['Edit(../**)']);
+  assert.deepEqual(fm('write', 'allowedTools: Write').allowedTools, ['Write'], 'no path, so no file permission check to miss');
+  assert.deepEqual(fm('write', 'disallowedTools: Write').disallowedTools, ['Write'], 'the bare name denies the tool itself');
 });
 
-test('REFUSED: allow: on a codex step, naming the sandbox permissionMode sets instead', () => {
-  assert.throws(() => fm('write', 'harness: codex\nallow: Edit(**)'),
-    refusedWith(/^write: `allow: Edit\(\*\*\)` is an allow list, and codex has no tool list to allow from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: workspace-write` for a step that writes in its workspace and asks nobody\./));
-  assert.throws(() => fm('write', 'allow: Edit(**)\nharness: codex\npermissionMode: workspace-write'), refusedWith(/codex has no tool list to allow from/), 'wherever the harness line is, and beside the sandbox too');
+test('REFUSED: allowedTools: on a codex step, naming the sandbox permissionMode sets instead', () => {
+  assert.throws(() => fm('write', 'harness: codex\nallowedTools: Edit(**)'),
+    refusedWith(/^write: `allowedTools: Edit\(\*\*\)` is an allow list, and codex has no tool list to allow from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: workspace-write` for a step that writes in its workspace and asks nobody\./));
+  assert.throws(() => fm('write', 'allowedTools: Edit(**)\nharness: codex\npermissionMode: workspace-write'), refusedWith(/codex has no tool list to allow from/), 'wherever the harness line is, and beside the sandbox too');
+});
+
+test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are still read, as `disallowedTools:` and `allowedTools:`', () => {
+  assert.deepEqual(FORMER_KEYS, { disallow: 'disallowedTools', allow: 'allowedTools' });
+  const old = fm('write', 'disallow: Bash(git push *), SendMessage\nallow: Edit(**), Bash(npm test)');
+  assert.deepEqual(old, fm('write', 'disallowedTools: Bash(git push *), SendMessage\nallowedTools: Edit(**), Bash(npm test)'), 'the same step, field for field');
+  assert.equal(Object.hasOwn(old, 'allow') || Object.hasOwn(old, 'disallow'), false, 'and no field under the former name');
+  // An agent's file reads them the same way.
+  const agent = parseAgent('writer', '---\ndescription: Writes\nallow: Edit(**)\n---\nWrite.\n');
+  assert.deepEqual(agent.keys, parseAgent('writer', '---\ndescription: Writes\nallowedTools: Edit(**)\n---\nWrite.\n').keys);
+  assert.deepEqual(agent.keys, { allowedTools: 'Edit(**)' });
+  // Written back, a step read under the former name is written under the new one: saved from the board, the file is renamed.
+  assert.match(renderStep(old), /^disallowedTools: Bash\(git push \*\), SendMessage$/m);
+  assert.match(renderStep(old), /^allowedTools: Edit\(\*\*\), Bash\(npm test\)$/m);
+  assert.doesNotMatch(renderStep(old), /^(dis)?allow:/m);
+});
+
+test('a step on the former name beside an agent on the new one sets that one key, its own, over the agent\'s', () => {
+  const agents = new Map([['writer', parseAgent('writer', '---\nallowedTools: Edit(**)\ndisallowedTools: SendMessage\n---\nWrite.\n')]]);
+  const [step] = parseFolder([['write', '---\nagent: writer\nallow: Edit(notes/**)\n---\n']], undefined, agents);
+  assert.deepEqual(step!.allowedTools, ['Edit(notes/**)'], "the step's own, as a step's own key always is");
+  assert.deepEqual(step!.disallowedTools, ['SendMessage'], "and the agent's other key is the step's");
+  assert.deepEqual(step!.agent!.keys, ['allowedTools'], 'owned under the new name');
+  assert.equal(step!.agent!.given.disallowedTools, 'SendMessage');
+  assert.equal(Object.hasOwn(step!.agent!.given, 'allowedTools'), false, 'what the step sets is not given to it');
+});
+
+test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which write the name a key has now — as a board page open since before sends it', () => {
+  assert.throws(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft),
+    refusedWith(/^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\.$/));
+  assert.throws(() => renderAgent({ name: 'writer', body: 'Write.', keys: { allow: 'Edit(**)' } } as never),
+    refusedWith(/^agents\/writer\.md: `allow` is `allowedTools`'s former name, .* Send `allowedTools`/));
+  // Unset, it is nothing to write, as any key is.
+  assert.doesNotThrow(() => renderStep({ name: 'write', after: [], body: 'Write.', allow: null } as unknown as StepDraft));
+});
+
+test('REFUSED: a list set under both its names, naming both lines and which one to keep', () => {
+  assert.throws(() => fm('write', 'allow: Edit(**)\nallowedTools: Read'),
+    refusedWith(/^write: `allowedTools` is set twice, as `allow:` and as `allowedTools:` — `allow:` is its former name, and reads as `allowedTools:`\. Keep the `allowedTools:` line and delete the other\.$/));
+  assert.throws(() => fm('write', 'disallowedTools: SendMessage\ndisallow: Bash'),
+    refusedWith(/^write: `disallowedTools` is set twice, as `disallowedTools:` and as `disallow:` — `disallow:` is its former name/), 'whichever comes first');
+  assert.throws(() => parseAgent('writer', '---\nallow: Edit(**)\nallowedTools: Edit(**)\n---\nWrite.\n'), refusedWith(/`allowedTools` is set twice, as `allow:` and as `allowedTools:`/), 'in an agent too, even with one value');
+  assert.throws(() => fm('write', 'allow: Edit(**)\nallow: Read'), refusedWith(/^write: `allow` is set twice, and a step that says two things says nothing\./), 'the former name twice is refused as any key twice');
+});
+
+test('REFUSED: a list under its former name, in the words of the line as written', () => {
+  assert.throws(() => fm('write', 'allow:'), refusedWith(/^write: `allow` has no value, which allows nothing and reads as a permission\./));
+  assert.throws(() => fm('write', 'disallow:'), refusedWith(/^write: `disallow` has no value, which denies nothing and reads as a fence\./));
+  assert.throws(() => fm('write', 'allow: Write(**)'),
+    refusedWith(/^write: `allow: Write\(\*\*\)` \(`allow:` is `allowedTools:`'s former name\) has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone/));
+  assert.throws(() => fm('write', 'disallow: NotebookEdit(notes/**)'), refusedWith(/^write: `disallow: NotebookEdit\(notes\/\*\*\)` \(`disallow:` is `disallowedTools:`'s former name\) has/));
+  assert.throws(() => fm('write', 'harness: codex\nallow: Edit(**)'), refusedWith(/^write: `allow: Edit\(\*\*\)` \(`allow:` is `allowedTools:`'s former name\) is an allow list, and codex has no tool list/));
+  assert.throws(() => fm('write', 'allow: Bash(npm test, npm run build)'), refusedWith(/^write: `allow: Bash\(npm test, npm run build\)` \(`allow:` is/));
+});
+
+test('a frozen step under the former names is read under the new ones (`asNamed`), and a step already on them is the same object', () => {
+  const now = fm('write', 'disallowedTools: SendMessage\nallowedTools: Edit(**)');
+  assert.equal(asNamed(now), now, 'nothing to rename, nothing copied');
+  const frozen = { name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'], allow: ['Edit(**)'] } as unknown as Workflow;
+  assert.deepEqual(asNamed(frozen), { name: 'write', after: [], body: 'Write.', disallowedTools: ['SendMessage'], allowedTools: ['Edit(**)'] });
+  // Resolved against an agent, the record names what was the step's own and what it was given under the former names too.
+  const resolved = {
+    name: 'write', after: [], body: 'Write.', allow: ['Edit(**)'], disallow: ['SendMessage'],
+    agent: { name: 'writer', keys: ['allow'], body: '', given: { disallow: 'SendMessage' } },
+  } as unknown as Workflow;
+  assert.deepEqual(asNamed(resolved), {
+    name: 'write', after: [], body: 'Write.', allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
+    agent: { name: 'writer', keys: ['allowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
+  });
+  // A record that somehow holds both keeps the new name's value: it is the one a newer writer put there.
+  const both = { name: 'write', after: [], body: 'Write.', allow: ['Read'], allowedTools: ['Edit(**)'] } as unknown as Workflow;
+  assert.deepEqual(asNamed(both), { name: 'write', after: [], body: 'Write.', allowedTools: ['Edit(**)'] });
+});
+
+test('`wf start` is told which files still write a former name: the steps, then the agents they name, and nothing of a folder on the new names', () => {
+  assert.deepEqual(formerKeysIn('---\nallow: Edit(**)\n# disallow: Bash\n  disallow : SendMessage\n---\nallow: is in the body\n'), ['allow', 'disallow'],
+    'read as the parser reads the block: trimmed, comments skipped, the body not read');
+  assert.deepEqual(formerKeysIn('no frontmatter\nallow: x\n'), []);
+  assert.equal(formerKeyLine('w/write.md', 'allow'),
+    "w/write.md: `allow:` is read as `allowedTools:`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.");
+  // The agents are beside the workflow folder (`agentsDir`), as the shipped ones are in `workflows/agents/`.
+  const root = folder({
+    'team/write.md': '---\nagent: writer\ndisallow: SendMessage\n---\n',
+    'team/review.md': '---\nafter: write\n---\nReview.\n',
+    'agents/writer.md': '---\nallow: Edit(**)\n---\nWrite.\n',
+    'agents/unused.md': '---\nallow: Edit(**)\n---\nNobody names me.\n',
+  });
+  const dir = path.join(root, 'team');
+  assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former names stop nothing');
+  assert.deepEqual(formerKeyLines(dir), [formerKeyLine(path.join(dir, 'write.md'), 'disallow'), formerKeyLine(path.join(root, 'agents', 'writer.md'), 'allow')]);
+  assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nallowedTools: Edit(**)\n---\nWrite.\n' })), []);
+  assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
 test("REFUSED: an effort the step's harness does not take, by name, with the efforts it does", () => {
@@ -970,7 +1064,7 @@ test('REFUSED at load: a background step of a folder team in a permission mode t
   // The line left off is the same defect: the engine files such a task in `auto`.
   refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);
   // And the fix is named, all three ways.
-  refused(team(undefined), /Delete `background: true`, and the step runs as a job, which asks nobody in any mode; or write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step in `dontAsk` that must write its own work needs `allow: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/);
+  refused(team(undefined), /Delete `background: true`, and the step runs as a job, which asks nobody in any mode; or write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step in `dontAsk` that must write its own work needs `allowedTools: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/);
 
   // A job waits on nobody in any mode: `claude -p` in `auto`, `dontAsk`, `default` and `acceptEdits`, in folders under `/tmp`, was denied each
   // call it could not make and exited on its own (agent-runtime's open issue 28, M1, 2.1.280). So a claude step without `background: true`
@@ -1033,13 +1127,13 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
     refusedWith(/^review: `denials: fail` stops the step on a call the harness denied, and `codex exec` records none: .* Run the step on claude — delete `harness: codex` — or delete `denials: fail`\.$/));
   assert.throws(() => fm('supervise', 'background: true\ndenials: fail'),
     refusedWith(/^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job \(`claude -p`\), which records each call it was denied, or delete `denials: fail`\.$/));
-  // Written back after `allow`, before `background`, and read back as the step.
-  const step = fm('review', 'denials: fail\nallow: Edit(**)');
-  assert.equal(renderStep(step), ['---', 'allow: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'));
+  // Written back after `allowedTools`, before `background`, and read back as the step.
+  const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
+  assert.equal(renderStep(step), ['---', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'));
   assert.deepEqual(parseWorkflow('review', renderStep(step)), step);
 });
 
-test('`allowRuleOf`: the rule a folder\'s `allow:` takes for a call the harness denied — a file edit by any tool as `Edit(…)`, an absolute path from the root, a command by its first word and whatever follows it; any other call as it was denied', () => {
+test('`allowRuleOf`: the rule a folder\'s `allowedTools:` takes for a call the harness denied — a file edit by any tool as `Edit(…)`, an absolute path from the root, a command by its first word and whatever follows it; any other call as it was denied', () => {
   assert.equal(allowRuleOf('Write(/tmp/w/notes.md)'), 'Edit(//tmp/w/notes.md)');
   assert.equal(allowRuleOf('MultiEdit(/tmp/w/a.ts)'), 'Edit(//tmp/w/a.ts)');
   assert.equal(allowRuleOf('NotebookEdit(/tmp/w/n.ipynb)'), 'Edit(//tmp/w/n.ipynb)');
@@ -1051,9 +1145,9 @@ test('`allowRuleOf`: the rule a folder\'s `allow:` takes for a call the harness 
   assert.equal(allowRuleOf('SendMessage'), 'SendMessage');
   assert.equal(allowRuleOf('mcp__playwright__browser_click'), 'mcp__playwright__browser_click');
   assert.equal(allowRuleOf('Write(/tmp/a (copy).md)'), 'Edit(//tmp/a (copy).md)', 'a path with brackets in it is the path');
-  // Every rule it words for a file edit is one `allow:` takes: `fileRuleRefusal` refuses a path rule on any other file-editing tool.
+  // Every rule it words for a file edit is one `allowedTools:` takes: `fileRuleRefusal` refuses a path rule on any other file-editing tool.
   for (const denied of ['Write(/tmp/w/notes.md)', 'MultiEdit(src/a.ts)', 'NotebookEdit(n.ipynb)', 'Bash(pytest)']) {
-    assert.doesNotThrow(() => fm('review', `allow: ${allowRuleOf(denied)}`), denied);
+    assert.doesNotThrow(() => fm('review', `allowedTools: ${allowRuleOf(denied)}`), denied);
   }
 });
 
@@ -1067,7 +1161,7 @@ test("`allowRuleOf` of a path this run made: from the step's own directory insid
   assert.equal(allowRuleOf('Write(/tmp/r-70/x)', at), 'Edit(//tmp/r-70/x)', 'a part is the run\'s id whole, or it is kept');
   assert.equal(allowRuleOf('Bash(pytest)', at), 'Bash(pytest:*)');
   for (const denied of ['Write(/home/me/.agent-workflows/worktrees/r-7/implement/notes.md)', 'Write(/home/me/.agent-workflows/runs/r-7/artifacts/implement/shot.png)']) {
-    assert.doesNotThrow(() => fm('review', `allow: ${allowRuleOf(denied, at)}`), denied);
+    assert.doesNotThrow(() => fm('review', `allowedTools: ${allowRuleOf(denied, at)}`), denied);
   }
 });
 
@@ -1274,7 +1368,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   // `agent:` renders in test/agents.test.ts, which has agents to resolve it with, and `background:`, which keeps no `budget:`, below.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', allow: 'Edit(**),Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
+    tools: 'Read, Grep,Glob , Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**),Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
@@ -1291,8 +1385,8 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'context: 200k',
     'permissionMode: dontAsk',
     'tools: Read, Grep, Glob, Bash',
-    'disallow: Bash(npm run build), SendMessage',
-    'allow: Edit(**), Bash(npm test)',
+    'disallowedTools: Bash(npm run build), SendMessage',
+    'allowedTools: Edit(**), Bash(npm test)',
     'denials: fail',
     'remote: true',
     'deadlineSeconds: 900',
@@ -1326,18 +1420,18 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   assert.equal(watched, ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'));
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
 
-  // And `background: true`, which keeps no `budget:`: after `allow`, before `remote`; `background: false` is written too.
-  const session = parseWorkflow('supervise', '---\nremote: true\nbackground: true\nallow: Read\n---\nWatch the runs.\n');
+  // And `background: true`, which keeps no `budget:`: after `allowedTools`, before `remote`; `background: false` is written too.
+  const session = parseWorkflow('supervise', '---\nremote: true\nbackground: true\nallowedTools: Read\n---\nWatch the runs.\n');
   const kept = renderStep(session);
-  assert.equal(kept, ['---', 'allow: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'));
+  assert.equal(kept, ['---', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'));
   assert.deepEqual(parseWorkflow('supervise', kept), session);
   assert.match(renderStep({ ...session, background: false }), /^background: false$/m);
 });
 
-test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input`, `disallow` or `allow` are no line — and a step that sets nothing is its body', () => {
+test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input`, `disallowedTools` or `allowedTools` are no line — and a step that sets nothing is its body', () => {
   const bare: StepDraft = { name: 'implement', after: [], body: 'Implement it.' };
   assert.equal(renderStep(bare), 'Implement it.\n');
-  assert.equal(renderStep({ ...bare, harness: undefined, input: [], disallow: [], allow: [], model: null } as unknown as StepDraft), 'Implement it.\n', 'as the board lists a step: null and [] for what it does not set');
+  assert.equal(renderStep({ ...bare, harness: undefined, input: [], disallowedTools: [], allowedTools: [], model: null } as unknown as StepDraft), 'Implement it.\n', 'as the board lists a step: null and [] for what it does not set');
   assert.deepEqual(parseWorkflow('implement', renderStep(bare)), { ...parseWorkflow('implement', 'Implement it.') }, 'and reads back as the step');
 
   // A draft names its `output:` by file, and the schema is read from the folder; a loop's rounds are the default when it sets none.
@@ -1390,7 +1484,7 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
     [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m'],
     [{ ...step, gate: false }, 'gate: false'],
     [{ ...step, harness: 'banana' }, 'harness: banana'],
-    [{ ...step, disallow: ['Bash(git push, git reset)'] }, 'disallow: Bash(git push, git reset)'],
+    [{ ...step, disallowedTools: ['Bash(git push, git reset)'] }, 'disallowedTools: Bash(git push, git reset)'],
     [{ ...step, output: {} }, 'output: '],
   ] as const) {
     const text = renderStep(draft as unknown as StepDraft);

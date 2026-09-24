@@ -87,7 +87,7 @@ export const stateMeaning: Record<StepState, string> = {
   'over-budget': 'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
   'budget-exhausted': 'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
-  denied: "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allow: is where the call is let through",
+  denied: "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',

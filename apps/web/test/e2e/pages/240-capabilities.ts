@@ -55,9 +55,9 @@ export default {
     for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
     await expectCount(review.locator('[data-tool]'), declared.length, `review has exactly the tools it declares (${good.tools})`);
     await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
-    // The fence as the file declares it, allow list and all: in dontAsk what a rule allows is what the step may do, and the page said only what it denies.
-    await expectVisible(review.locator('dt', { hasText: /^allow$/ }), "review's fence says what it allows, beside what it denies");
-    await expectVisible(review.locator('dt', { hasText: /^allow$/ }).locator('xpath=following-sibling::dd[1]').getByText('nothing', { exact: true }), 'nothing, where the step names no rule');
+    // The fence as the file declares it, its allowedTools: and all: in dontAsk what a rule allows is what the step may do, and the page said only what it denies.
+    await expectVisible(review.locator('dt', { hasText: /^allowed tools$/ }), "review's fence says what it allows, beside what it denies");
+    await expectVisible(review.locator('dt', { hasText: /^allowed tools$/ }).locator('xpath=following-sibling::dd[1]').getByText('nothing', { exact: true }), 'nothing, where the step names no rule');
     for (const command of CHECKOUT.allowed.map((rule) => rule.slice('Bash('.length, -1))) {
       await expectVisible(review.locator(`[data-bash="${command}"]`), `review, in dontAsk, shows the Bash command the settings allow (${command})`);
     }
@@ -87,8 +87,8 @@ export default {
     await expectVisible(implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }), "implement has the harness's own set, with the date and version it was measured on");
     await expectVisible(implement.locator('[data-tool="WebFetch"]:not([data-inferred])'), 'a tool the measurement named is shown as measured (WebFetch)');
     for (const tool of ['Edit', 'Bash']) await expectVisible(implement.locator(`[data-tool="${tool}"][data-inferred]`), `a tool no unfenced measurement named is marked inferred (${tool})`);
-    await expectVisible(implement.locator(`[data-removed="${good.disallow}"]`), `implement's disallow: takes ${good.disallow} from it`);
-    await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
+    await expectVisible(implement.locator(`[data-removed="${good.disallowedTools}"]`), `implement's disallowedTools: takes ${good.disallowedTools} from it`);
+    await expectCount(implement.locator(`[data-tool="${good.disallowedTools}"]`), 0, `and ${good.disallowedTools} is not among its tools`);
     await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
     await expectVisible(implement.locator('[data-read-only="grep"]:not([data-documented])'), 'implement, in no mode, runs the read-only commands without a rule too (grep)');
     // Implement is a job, which asks nobody in any mode: what an ask rule makes ask is denied there too, and the page said it would ask.

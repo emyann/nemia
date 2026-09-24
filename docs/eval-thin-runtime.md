@@ -376,8 +376,13 @@ orchestrator's calls to the runtime change.
    and `wf retry`; a journal filed with them still folds. The orchestrator files neither, refuses the `maxAttempts:` step key
    in a step or an agent (the run's own `resume:`, which continues another step's session, stays), and still loads a run
    frozen with it; the board's *max attempts* row is gone. Open issue 5's case — continue what an `unstartable` attempt was
-   filed to continue — is the orchestrator's `continuesFrom` now. Not covered here: a held-open step, which the orchestrator
-   does not file until stage 2 part 4b lands; whichever of the two lands second makes a held turn that fails, is lost or
-   cannot start fall back to `retries:` / `wf retry` as a new `-tryN`.
+   filed to continue — is the orchestrator's `continuesFrom` now, and so is an attempt its harness lost or never named: each
+   continues the session it was started to continue. Held-open steps (stage 2 part 4b) landed first, and part 2 was merged
+   over them: an answer's turn that fails, is lost or cannot start settles its task `failed` (the runtime's
+   `HELD OPEN: a turn is one attempt` in `decide.test.ts`), the step reads `failed`, nothing is tried inside the task, and a
+   `wf retry --message` is a `-tryN` task of its own, held open itself — never an answer to the settled task — continuing
+   the failed session, or for a lost or unstartable turn the session that signed the turn before (`an answer's turn that
+   FAILED` / `was LOST` / `COULD NOT START` in `agent-orchestrator/test/held.test.ts`). `retries:` still spends nothing on
+   such an end.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

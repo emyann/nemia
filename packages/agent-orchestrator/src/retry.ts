@@ -20,16 +20,17 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
 /**
  * The session a try continues, off the attempts of the task before it: the harness's own id for the last attempt's session — what
- * `--resume` takes. An attempt whose spawn the harness refused (`unstartable`) ran no session and has no id of its own, but the session
- * it was filed to continue is still there, and the try continues that one rather than starting cold (agent-runtime's open issue 5, which
- * the runtime answered on its next attempt until stage 4a part 2 made it one attempt a start). Undefined for a task with no attempt, and
- * for one whose last attempt ran a session its harness never named. Pure; typed by what it reads, so this file imports no runtime.
+ * `--resume` takes. An attempt its harness never named — one whose spawn it refused (`unstartable`), one it lost, one that died before it
+ * said its id — continues nothing of its own, but the session it was started to continue is still there, and where the work last stood:
+ * the try continues that one rather than starting cold (agent-runtime's open issue 5, which the runtime answered on its next attempt until
+ * stage 4a part 2 made it one attempt a start). For a later turn of a task held open, that is the session that signed the turn before,
+ * which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and left
+ * no id. Pure; typed by what it reads, so this file imports no runtime.
  */
-export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null; reason: string | null; resumeFrom?: string }> | undefined): string | undefined => {
+export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined): string | undefined => {
   const last = attempts?.at(-1);
   if (!last) return undefined;
-  if (last.nativeId) return last.nativeId;
-  return last.reason === 'unstartable' ? last.resumeFrom : undefined;
+  return last.nativeId ?? last.resumeFrom;
 };
 
 /**

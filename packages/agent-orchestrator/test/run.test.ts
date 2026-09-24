@@ -4452,11 +4452,13 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
   assert.match(composeBrief(join, run({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join].map((s) => ({ ...s, workspace: undefined }))), /has been merged into this branch/);
 });
 
-test("continuesFrom (open issue 5): the session a try continues is its last attempt's own; an attempt that could not start continues what it was filed to; a lost one with no id, and no attempt, continue nothing", () => {
+test("continuesFrom (open issue 5): the session a try continues is its last attempt's own; an attempt with no id — it could not start, was lost, died unnamed — continues what it was started to; no attempt continues nothing", () => {
   const attempt = (nativeId: string | null, reason: string | null, resumeFrom?: string) => ({ nativeId, reason, ...(resumeFrom ? { resumeFrom } : {}) });
   assert.equal(continuesFrom([attempt('s-2', 'harness', 's-1')]), 's-2', 'its own id first, even when it continued another');
   assert.equal(continuesFrom([attempt(null, 'unstartable', 's-1')]), 's-1', 'refused before a session ran: the chain it was handed');
-  assert.equal(continuesFrom([attempt(null, 'lost', 's-1')]), undefined, 'lost with no id: nothing is known to continue');
+  assert.equal(continuesFrom([attempt(null, 'lost', 's-1')]), 's-1', 'lost with no id: the session it continued, where the work last stood');
+  assert.equal(continuesFrom([attempt(null, 'lost')]), undefined, 'lost on a fresh session: a fresh one again');
+  assert.equal(continuesFrom([attempt(null, 'harness', 's-1')]), 's-1', 'ended on its harness before it said its id: the same');
   assert.equal(continuesFrom([attempt(null, 'unstartable')]), undefined, 'unstartable on a fresh session: a fresh one again');
   assert.equal(continuesFrom([attempt('s-9', 'harness'), attempt(null, 'unstartable', 's-1')]), 's-1', 'the last attempt is read, not the first');
   assert.equal(continuesFrom([]), undefined);

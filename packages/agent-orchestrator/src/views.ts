@@ -186,7 +186,7 @@ export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => 
 
 /**
  * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
- * refused to start that one, the session it was filed to continue (`continuesFrom`).
+ * never named that one, the session it was started to continue (`continuesFrom`).
  */
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
   continuesFrom(views.get(taskId)?.state.attempts);

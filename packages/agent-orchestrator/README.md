@@ -1007,7 +1007,9 @@ retries: 1
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
-  `wf retry`. A `--nudge` of one that could not start continues the session it was filed to continue (`continuesFrom`).
+  `wf retry`. A `--nudge` of one whose harness never named its session — it could not start, or was lost — continues the
+  session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
+  is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:

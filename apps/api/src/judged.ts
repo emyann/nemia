@@ -2,7 +2,7 @@
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
  */
-import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-orchestrator';
+import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord, wordOfView } from 'agent-orchestrator';
 import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
@@ -184,14 +184,11 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
 }
 
 /**
- * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it: `list`'s,
- * which the package does not export. `unknown` where `phaseOfView` says so, for a task the engine has no record of: the
- * engine folds it to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight.
+ * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it (`wordOfView`): `unknown`
+ * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
+ * and `succeeded` for a task held open that was closed after it signed, which it calls `between attempts` until its next pass settles it.
  */
-export const wordOf = (views: Views) => (taskId: string): string => {
-  const view = views.get(taskId);
-  return view && phaseOfView(view) !== 'unknown' ? view.phase : 'unknown';
-};
+export const wordOf = (views: Views) => (taskId: string): string => wordOfView(views.get(taskId));
 
 /** What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it still moves. */
 type Judged = {

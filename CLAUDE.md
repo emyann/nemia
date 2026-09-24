@@ -78,6 +78,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A step's check logs its stdout alone, and a person is shown the tail of its stderr.** The whole stderr is on disk at the check's
+  `WF_STDERR` (`~/.agent-workflows/checks/<run>-<step>-check.stderr`), named on the check's record beside its `.log`. The e2e said why a
+  page failed once, first, on stderr, and then thirty lines of the servers' output: the check read as an exit 1 after
+  `the factory page … ✓`, with nothing printed. `exitOn` (`visit.ts`) now ends both streams with the failure in a few lines (`headlineOf`:
+  the page, the theme and the error; the element Playwright waited for and what lay over it; the picture), and `visit.test.ts` reads the
+  end of each. Anything a check runs that can fail says why last, on stdout too (learned by thin runtime stage 2 part 4b, round 2).
 - **The e2e's watch counts every 4xx a page sees against it.** A refusal the e2e makes on purpose goes
   in a page of its own, with a watch that must see that one refusal and nothing else (the `answer` page,
   learned by the run that added the answer box). And the e2e visits every page in light, then every page
@@ -294,6 +300,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
   chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
   undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A new engine phase is read in two places in the orchestrator, and the second is not `phaseOfView`.** `listing` (`run.ts`) is handed the
+  engine's word as text and narrows it itself (`settledOf`), since it prints that word; `phaseOfView` (`views.ts`) narrows the view for the
+  tick. Taught `input-required` in `phaseOfView` alone, `assess` held a gated step at its gate while `wf ls` printed `input-required · done`
+  and never `awaiting approval`, and every pure test passed, since they hand `listing` the settled words. Teach both, and the board's
+  `stepState` (learned by the run that held a gate on the step's own task).
 - **A new step status is a word the board draws as `working` until it knows it.** `stepState` (`apps/web/src/lib/status.ts`) falls
   through to `working` for any word it does not match, so a status added to `StepStatus` in `run.ts` passes every orchestrator and api
   test and shows on the board as a step still running — the one surface that says nothing is wrong. Add the word to `stepState`, its

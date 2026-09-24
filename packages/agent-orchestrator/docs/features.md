@@ -4260,6 +4260,39 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
 **What it leaves.** No verb widens `allowedTools:` on a live run: a person who wants the call allowed starts a new run. No e2e page draws a
 denied step; its rendering is proven by the web's component tests.
 
+## Shipped: a gate and a blocked sign-off wait on the step's own task (thin runtime stage 2 part 4b)
+
+Shipped 2026-09-24, on part 4a's held task (the runtime's `holdOpen`, `answer` and `close`). A person's word to a step that signed
+off blocked, or to a gated step sent back, was a try of its own: a `-try2` task that `--resume`d the session. It is now the task's
+next turn: the same task, the same id, in the session that signed.
+
+- **What is filed held open** (`holdsOpenOn` in `run.ts`): a Claude Code job — `claude`, without `background: true`. The one harness the
+  runtime's held task was measured on (M12); codex, `claude-detached`, a background session and a check are filed as before.
+- **When it stays open** (`holdsOpen`, pure): while a person's word is what moves the step — it signed off `blocked`, or it is gated and
+  checking or `awaiting approval`. Anything else is closed (`e.close`) on the pass that reads it waiting, and what waits on it is filed
+  on that same pass: an ungated step that signed, a gate approved, a check that refused, `denied`, `unsigned`, and every waiting task
+  of a run cancelled or pruned. `wf cancel` and `wf rm` close a task that waits themselves, since nothing runs for them to stop.
+- **An answer is a turn** (`e.answer`). `wf retry --message` with `--nudge` on a step whose task waits is written as any ask; the tick
+  answers the task with the try's brief and what is left of the step's cap (the cap raised by `--budget`, less what it has spent), and
+  writes the try on the record as it always did — `tries` gains the same task id with `then: 'nudge'`. Every other try — `--fresh`,
+  `--model`, `--recheck`, `retries:`, the run's sign-off nudge — and every round close the waiting task first and file a `-try<n>`
+  task, as before.
+- **Turns are read, not recorded.** A turn is a try on the record whose task id is the current one (`turnsOf` in `retry.ts`); the
+  runtime counts the answers (`answersIn`). A pass that answered and died before writing the run down leaves more answers than turns,
+  and the next pass adopts the answer as the try it was (`adoptTries`), as it adopts a filed try. A step's closeout, its denials and
+  whether its closeout was asked for are its current turn's (`views.ts`), so an answered turn still running reads none of the last.
+- **A refusal is a note.** A close or an answer the runtime refuses (exit 2) is said on the pass, in its words, and asked again by
+  the next.
+- **The engine's word, beside the run's.** `input-required` is read as a session that signed (`phaseOfView`, and `listing`'s
+  `settledOf`, which reads the engine's word itself). A blocked step prints `input-required · BLOCKED`; a gated one `awaiting
+  approval`. Nothing compares `needs-human` differently. The board draws `input-required` alone as a session that ended
+  (`stepState`), never as one still going. No new field on the api.
+- **Old runs.** A task filed before this has no `holdOpen`: it settles at its sign-off, and a send-back is a `-try2` task, as it was.
+
+**What it leaves.** A closed task reads `between attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
+a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. A blocked run is
+`finished` to `wf cancel`, so its waiting task stays open until it is answered, or the run is forgotten with `wf rm`. Rounds stay
+`-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner.
 ## Shipped: the rule lists under Claude Code's names — `disallowedTools:` and `allowedTools:`
 
 A step's two rule lists were `disallow:` and `allow:` until 2026-09-23; they are `disallowedTools:` and `allowedTools:` now, the names

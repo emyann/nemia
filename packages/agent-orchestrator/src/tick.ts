@@ -13,18 +13,18 @@ import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
-import { admissionOrder, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
+import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
 import { feedPhase, feedWords, type FeedWords } from './run.ts';
 import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
-import { modeWord, nextTry, sessionModel, tryOf, type RetryAsk } from './retry.ts';
+import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { gitSays, handOff, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
 import { refsOf } from './branches.ts';
-import { closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf } from './views.ts';
+import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
 
 /**
@@ -89,6 +89,15 @@ export async function adoptTries(
 ): Promise<string[]> {
   const adopted: string[] = [];
   for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
+    // A person's nudge a pass gave as an answer to the step's task, held open, and died before writing down: the task has more answers than
+    // the record has turns (`answersIn`, `turnsOf`). The answered task reads running, so the ask reads as one to stop it first — adopted
+    // here, it is the turn it is, and nothing is stopped and nothing filed.
+    const current = run.steps[r.step]?.taskId;
+    if (r.by === 'ask' && r.mode === 'nudge' && current && answersIn(views.get(current)) > turnsOf(run.steps[r.step])) {
+      run.steps[r.step] = nextTry(run.steps[r.step]!, r, current);
+      adopted.push(r.step);
+      continue;
+    }
     const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
     const view = await e.view(taskId);
     if (!view.state.brief) continue;   // not filed: due, and this pass's to file
@@ -352,6 +361,26 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   }
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const { check, retry, round, blocked, status } = assessed;
+  // A step's task held open that waits for a word nobody is to give is closed (`holdsOpen`): an ungated step that signed off, a gate a person
+  // approved, a run called off. The engine settles it as it signed, on its next pass; the run has read it as settled since it signed
+  // (`phaseOfView`), so what waits on it is filed on this pass all the same. Level-triggered: a close the engine refuses is said, and asked
+  // again by the next pass that reads the task waiting.
+  const waits = waitsForWord(views);
+  const closed = new Set<string>();
+  const closeNotes: string[] = [];
+  /** Close a task that waits, and say why not where the engine refuses: undefined once it is closed. */
+  const closeWaiting = async (name: string, taskId: string): Promise<string | undefined> => {
+    const refused = await closeHeld(e, taskId);
+    if (!refused) closed.add(taskId);
+    return refused && `${name}: ${refused}`;
+  };
+  for (const step of steps) {
+    const taskId = run.steps[step.name]?.taskId;
+    if (!taskId || !waits(taskId) || holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf)) continue;
+    const refused = await closeWaiting(step.name, taskId);
+    if (refused) closeNotes.push(refused);
+  }
+  const awaitsWord = (taskId: string | null | undefined): boolean => Boolean(taskId && waits(taskId) && !closed.has(taskId));
   // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
   // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
   const parent = await parentsOf(e, run);
@@ -376,7 +405,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
-  const notes: string[] = [...askNotes, ...collected, ...liftNotes];
+  const notes: string[] = [...askNotes, ...collected, ...liftNotes, ...closeNotes];
   // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
   // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
   // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
@@ -410,19 +439,32 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       continue;
     }
     if (!mayFile()) continue;
-    tried.push(r.step);
-    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`);
+    const said = `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`;
     // A recheck files no session. Its check is filed below with the others, under the new try's id.
     if (r.mode === 'recheck') {
+      tried.push(r.step);
+      notes.push(said);
       run.steps[r.step] = nextTry(record, r);
       rechecked.push(r.step);
       continue;
     }
 
-    const taskId = stepTaskId(run, r.step, r.try);
+    // A person's nudge of a step whose task is held open and waits for their word — it signed off blocked, or waits at its gate — is an
+    // answer to that task (`answers`): its next turn, in the session that signed, under the same id. Any other try of a task that waits —
+    // `--fresh`, `--model` — closes it first, and is filed as its own task, as every try was before tasks were held open.
+    const answers = awaitsWord(record.taskId) && r.by === 'ask' && r.mode === 'nudge' && Boolean(sessionIn(views, record.taskId!))
+      && holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf);
+    if (!answers && awaitsWord(record.taskId)) {
+      const refused = await closeWaiting(r.step, record.taskId!);
+      if (refused) {
+        notes.push(refused);
+        continue;
+      }
+    }
+    const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
     // A try an earlier pass filed and never wrote down was adopted above. Looked up once more all the same,
     // as a check is: filing an id the engine already holds would journal it twice.
-    if (!(await e.view(taskId)).state.brief) {
+    if (answers || !(await e.view(taskId)).state.brief) {
       const files = artifactsDir(run, r.step);
       fs.mkdirSync(files, { recursive: true });
       // A nudge continues the last try's session. With none to continue — a session the harness never
@@ -438,9 +480,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       const reads = (name: string): Closeout | undefined =>
         (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
       const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
-      await e.file({
-        id: taskId,
-        brief: composeBrief(step, run, steps, reads, files, undefined, {
+      const brief = composeBrief(step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}),
           ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
           // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
@@ -452,7 +492,21 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
           // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
           ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
-        }, undefined, undefined, inputsDir(run)),
+        }, undefined, undefined, inputsDir(run));
+      // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
+      // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it. A turn's cap is its own, as a task's is (agent-runtime's `answer`).
+      const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf));
+      if (answers) {
+        // The brief of a nudge that continues the session, told as the turn's words: the runtime hands the session the answer in place of
+        // the brief, in the session it continues. The tools, the model and the fence are the task's, as filed.
+        const refused = await answerHeld(e, taskId, brief, budgetUsd);
+        if (refused) {
+          notes.push(`${r.step}: ${refused}`);
+          continue;
+        }
+      } else await e.file({
+        id: taskId,
+        brief,
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
         // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
@@ -473,17 +527,19 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           remoteControl: step.remote,
         },
         deadlineSeconds: step.deadlineSeconds,
-        // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
-        // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it.
-        budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf)),
+        budgetUsd,
         // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
         priority: MOMENTUM,
         resumeFrom,
+        // Held open when it signs, as the step's first try is (`holdsOpenOn`).
+        ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
         // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
         // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
         closeoutSchema: closeoutSchemaOf(step, steps),
       });
     }
+    tried.push(r.step);
+    notes.push(said);
     run.steps[r.step] = nextTry(record, r, taskId);
     // Sent back from an ending that stopped on the base branch: its try moves behind in the same write, so it waits for the work again.
     for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]!);
@@ -500,6 +556,15 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     const target = steps.find((s) => s.name === r.target)!;
     const record = run.steps[r.target]!;
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
+    // A round is a task of its own, never a turn: a target whose task still waits for a word is closed first. It signed off verified to be
+    // looped at all, so the sweep above has closed it already, unless the engine refused.
+    if (awaitsWord(record.taskId)) {
+      const refused = await closeWaiting(r.target, record.taskId!);
+      if (refused) {
+        notes.push(refused);
+        continue;
+      }
+    }
     looped.push(r.step);
     notes.push(`${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`);
     // A round an earlier pass filed and never wrote down was adopted above. Looked up once more all the same, as a try is.
@@ -533,6 +598,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         priority: MOMENTUM,
         resumeFrom,
+        ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
         // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
         closeoutSchema: closeoutSchemaOf(target, steps),
       });
@@ -643,6 +709,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       // None on a run's first steps, and `MOMENTUM` on a step after another: a run in flight goes before a newer run's first step.
       priority: priorityOf(step),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
+      // Held open when it signs, on a Claude Code job (`holdsOpenOn`): a person's answer to it — a blocked sign-off answered, a send-back from
+      // its gate — is the task's next turn, and the run closes it once nothing waits on a person's word (`holdsOpen`).
+      ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the
       // answer without reading it; what the fields mean is ours — see `Closeout`.
@@ -677,6 +746,49 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     ...(held ? { held } : {}),
     feed,
   };
+}
+
+/**
+ * Close a task held open that waits for a word (`e.close`): undefined once closed, and the engine's refusal in its words where it refused
+ * (an `Error` whose `exitCode` is 2 — the task was answered, settled or stopped since this pass read it). A refusal is a note, not a failure
+ * of the pass: the next pass reads the task again. Any other error is the engine's, and thrown.
+ */
+async function closeHeld(e: Engine, taskId: string): Promise<string | undefined> {
+  try {
+    await e.close(taskId);
+    return undefined;
+  } catch (err) {
+    if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
+    throw err;
+  }
+}
+
+/**
+ * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `wf cancel`, `wf rm` — at once rather
+ * than on the next pass. A close is no stop: nothing is running, and the engine settles the task as it signed. Only a step's current task can
+ * wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a cancelled
+ * run's next pass closes it again (the sweep in `advance`).
+ */
+export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<string, TaskView>): Promise<string[]> {
+  const waits = waitsForWord(views);
+  const refused: string[] = [];
+  for (const [name, { taskId }] of Object.entries(run.steps)) {
+    if (!taskId || !waits(taskId)) continue;
+    const said = await closeHeld(e, taskId);
+    if (said) refused.push(`${name}: ${said}`);
+  }
+  return refused;
+}
+
+/** Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one: undefined once answered, as `closeHeld`. */
+async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: number | undefined): Promise<string | undefined> {
+  try {
+    await e.answer(taskId, text, budgetUsd === undefined ? {} : { budgetUsd });
+    return undefined;
+  } catch (err) {
+    if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
+    throw err;
+  }
 }
 
 /**

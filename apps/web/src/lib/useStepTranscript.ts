@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { readTranscript, transcriptPath } from './api';
 import { animationFrames, follow, type Following } from './following.ts';
 import { mergeEvents } from './transcript';
@@ -14,13 +14,18 @@ export type { Following } from './following.ts';
  * it was sent. Events that arrive together are merged once a frame, not once each: a stream opened on a long session sends
  * hundreds at once.
  *
- * Read afresh for another task: a step tried again is filed as a new one.
+ * Read afresh for another task: a step tried again is filed as a new one. And read again, keeping what was read, when the step stops or
+ * starts waiting on a person (`waiting`): a task held open that signed is not live, nothing of it runs, and a person's answer runs its next
+ * turn under the same id — the page would not follow it otherwise.
  */
-export function useStepTranscript(runId: string, step: string, taskId: string | null): Following {
+export function useStepTranscript(runId: string, step: string, taskId: string | null, waiting = false): Following {
   const [state, setState] = useState<Following>({ events: [], live: false, loading: taskId !== null, error: null });
+  const read = useRef(taskId);
 
   useEffect(() => {
-    setState({ events: [], live: false, loading: taskId !== null, error: null });
+    const again = read.current === taskId;
+    read.current = taskId;
+    if (!again) setState({ events: [], live: false, loading: taskId !== null, error: null });
     if (!taskId) return;
     const reading = new AbortController();
     let stop: (() => void) | undefined;
@@ -28,7 +33,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
     readTranscript(runId, step, reading.signal).then(
       (first) => {
         if (reading.signal.aborted) return;
-        setState({ events: mergeEvents([], first.events), live: first.live, loading: false, error: null });
+        setState((s) => ({ events: mergeEvents(again ? s.events : [], first.events), live: first.live, loading: false, error: null }));
         if (!first.live || first.cursor === null) return;
         const stream = new EventSource(`${transcriptPath(runId, step)}/stream?after=${encodeURIComponent(first.cursor)}`);
         stop = follow(stream, setState, animationFrames);
@@ -42,7 +47,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
       reading.abort();
       stop?.();
     };
-  }, [runId, step, taskId]);
+  }, [runId, step, taskId, waiting]);
 
   return state;
 }

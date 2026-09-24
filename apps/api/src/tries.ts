@@ -5,7 +5,7 @@ import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/wo
 import { artifactOf, type StepArtifact } from './artifacts.ts';
 import { wordOf } from './judged.ts';
 import { checkIn, type StepCheck } from './logs.ts';
-import { bare, type Views } from './store.ts';
+import { bare, type TaskView, type Views } from './store.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
 export type StepReply = { finding: string; answer: string; why: string };
@@ -86,12 +86,19 @@ export type StepAttempts = {
 };
 
 /**
- * How one try of a step signed off, off the engine's record of its task's last attempt — as `closeoutOf` reads the current try's —
+ * A task's attempts on one turn, its current by default: a task held open and answered (`holdOpen`) is one try per turn under one id,
+ * and an answer not yet started has no attempt on its turn, so the last attempt of the task is then the turn before's.
+ */
+const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskView['state']['attempts'] =>
+  state ? state.attempts.filter((a) => (a.turn ?? 0) === (turn ?? state.inputs?.length ?? 0)) : [];
+
+/**
+ * How one try of a step signed off, off the engine's record of its turn's last attempt — as `closeoutOf` reads the current try's —
  * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
  * try that gave none, and for one whose closeout could not be read, which `unreadableIn` answers for.
  */
-export function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views): StepCloseout | null {
-  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+export function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views, turn?: number): StepCloseout | null {
+  const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
   // `replies` apart: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field.
@@ -114,8 +121,8 @@ export function closeoutIn(run: Run, name: string, step: Workflow, taskId: strin
 }
 
 /** A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched. */
-export function unreadableIn(taskId: string | null, views: Views): StepUnreadable | null {
-  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+export function unreadableIn(taskId: string | null, views: Views, turn?: number): StepUnreadable | null {
+  const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   if (said === undefined) return null;
   const c = parseCloseout(said);
   return 'error' in c ? { error: c.error, raw: said } : null;
@@ -146,6 +153,9 @@ export function triesOf(
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
+  // The turn of its task the i-th earlier try was: a held task a person answered keeps each try they answered under its one id. A recheck
+  // replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them).
+  const turnAt = (i: number): number => earlier.slice(0, i).filter((t) => t.taskId === earlier[i]!.taskId && t.then !== 'recheck').length;
   // The step's record as it stood on its n-th try: the tries behind that one.
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   // What a person said to the n-th try, asked of the record as it stood then: `answerOf` reads a step's current try.
@@ -160,11 +170,12 @@ export function triesOf(
       current: false,
       taskId: t.taskId,
       note: noteOf(i + 1),
-      status: wordOf(views)(t.taskId),
-      attempts: attemptsIn(t.taskId, views),
+      // A turn a person answered signed, and ended `done` for it: the task's own word is the turn it is on now.
+      status: turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId),
+      attempts: attemptsIn(t.taskId, views, turnAt(i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
-      closeout: closeoutIn(run, name, step, t.taskId, views),
-      unreadable: unreadableIn(t.taskId, views),
+      closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(i)),
+      unreadable: unreadableIn(t.taskId, views, turnAt(i)),
       answer: answerAt(i + 1),
     })),
     {
@@ -181,13 +192,13 @@ export function triesOf(
 }
 
 /**
- * Off the engine's view of a try's task. A try with no task, or one the engine has lost, has had none. How the latest ended is
- * read through `endWords`: an end without the statement its task asked for is `failed · unsigned`, the orchestrator's word since
- * the runtime stopped judging it, and never the harness's `done` that the runtime records.
+ * Off the engine's view of a try's task, on the turn it was (`attemptsOn`). A try with no task, or one the engine has lost, has had
+ * none. How the latest ended is read through `endWords`: an end without the statement its task asked for is `failed · unsigned`,
+ * the orchestrator's word since the runtime stopped judging it, and never the harness's `done` that the runtime records.
  */
-export function attemptsIn(taskId: string | null, views: Views): StepAttempts {
+export function attemptsIn(taskId: string | null, views: Views, turn?: number): StepAttempts {
   const state = taskId ? views.get(taskId)?.state : undefined;
-  const attempts = state?.attempts ?? [];
+  const attempts = attemptsOn(state, turn);
   const latest = attempts.at(-1);
   return {
     count: attempts.length,

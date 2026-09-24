@@ -236,7 +236,8 @@ export type RunDetail = {
     raise: StepRaise | null;
     /**
      * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
-     * round of a loop, and each try within one, is a task of its own.
+     * round of a loop, and each try within one, is a task of its own — but a person's answer to a task held open, a turn of the
+     * same task, each try reading its own turn's attempts and closeout (`attemptsIn`).
      */
     tries: StepTry[];
     /** Where the step's time went, try by try and check by check (`StepTimelineTry`); empty for a step not filed. */

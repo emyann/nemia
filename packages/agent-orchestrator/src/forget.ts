@@ -1,7 +1,8 @@
 /**
  * Forgetting a run that is over (`forget`, `wf rm`), and removing its worktrees alone (`prune`, `wf prune`): each reads a run as `cancel`
  * does, adopting what a pass filed and never wrote down (`tick.ts`), refuses by name before anything is touched, and removes through git. A
- * controller, reaching the runtime through the client (`runtime-client.ts`); neither ever stops anything.
+ * controller, reaching the runtime through the client (`runtime-client.ts`); neither ever stops anything. `wf rm` closes a task held open
+ * that waits for a word, which runs nothing and is settled as it signed: no pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +14,7 @@ import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneF
 import { gitSays, handOff } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries, unrecordedSteps } from './tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from './tick.ts';
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
@@ -73,6 +74,9 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
   const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings);
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
+  // A step's task held open that waits for a word nobody will give now: closed, since once the record is gone no pass reads the run to close
+  // it. A refusal changes nothing here — the engine refuses a task answered, settled or stopped since it was read, none of which waits.
+  await closeWaitingTasks(e, run, views);
   // A folder run's folders are under its own directory, which goes with its record: no worktree, no branch, and no git asked.
   if (!isGitRun(run)) return { ...said, folder: true, kind: 'forgotten', ...nothing, files: removeKeyed(id, Object.keys(run.steps)) };
 

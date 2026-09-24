@@ -5,7 +5,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
 
@@ -20,6 +21,13 @@ const run = (fixture: string) => {
     cwd: PACKAGE, env: { ...env, TMPDIR: tmp }, encoding: 'utf8',
   });
   return { status: r.status, out: `${r.stdout}${r.stderr}`, tmp };
+};
+
+/** The roots a run left in `tmp`, each made removable again so this file's own `scratch` can take `tmp` away. */
+const left = (tmp: string) => {
+  const roots = fs.readdirSync(tmp).filter((e) => e.startsWith('ae-detached-'));
+  for (const r of roots) execFileSync('chmod', ['-R', 'u+rwx', path.join(tmp, r)]);
+  return roots;
 };
 
 test('a test file that fails with its workers running leaves no folder and no process behind', () => {
@@ -41,6 +49,18 @@ test('REFUSED: a test file that makes its root by hand and never stops its worke
   assert.equal(left.processes.filter((p) => /\bae-worker\.ts\b/.test(p.args)).length, 1, 'its worker left');
   assert.equal(left.processes.length, 2, 'its worker and its harness');
   assert.deepEqual(await reap([tmp]), [], 'and reaped here');
+});
+
+test('REFUSED: a test file that leaves a root scratch cannot remove fails, and names it', (t) => {
+  // Root may remove a folder it may not write, and nothing here can be left behind.
+  if (process.getuid?.() === 0) return t.skip('run as root, which removes any folder');
+  const { status, out, tmp } = run('leak-kept.ts');
+  const kept = left(tmp);
+  assert.notEqual(status, 124, `the fixture ran out its time:\n${out}`);
+  assert.equal(kept.length, 1, 'its root kept');
+  assert.notEqual(status, 0, `its test passes, and the file fails:\n${out}`);
+  assert.match(out, /scratch: the file left 0 process\(es\) and 1 root\(s\) behind/);
+  assert.ok(out.includes(path.join(tmp, kept[0]!)), 'the root it left named');
 });
 
 test('a process whose only tie to a root is its environment is found in it, and reaped', async () => {

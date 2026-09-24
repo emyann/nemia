@@ -234,7 +234,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   when its arguments, its cwd or its environment name one. Each package's `scratch.test.ts` refuses a `tmpdir(` call anywhere
   else under `test/`; a line that makes no root there says `// not a root` and why. It also holds the copy to the runtime's, so a
   change to the helper is made in `packages/agent-runtime/test/scratch.ts` and copied. `agent-runtime/test/leaks.test.ts` runs a
-  failing fixture file under `timeout` with a TMPDIR of its own and requires that nothing is left. A fake harness that reads stdin
+  failing fixture file under `timeout` with a TMPDIR of its own and requires that nothing is left, and one that leaves a root
+  it cannot remove, which must fail the file. A fake harness that reads stdin
   bounds its own life all the same. The worker itself also ends its harness and exits when its run file or store is removed
   (open issue 30). To measure a leak, run with `TMPDIR=$(mktemp -d)`: other worktrees' suites write to `/tmp` too (learned by
   the run that found the leak).

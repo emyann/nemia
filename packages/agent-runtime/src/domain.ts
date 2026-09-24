@@ -556,11 +556,19 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
   // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
   // counts sessions at work, and one on a permission prompt makes no API calls.
+  //
+  // It stops what runs and refuses what would start; an end its harness recorded is judged by that end. A pass steps a
+  // task until nothing moves, so an end recorded past the deadline is read past it too: before 2026-09-24 a check that
+  // exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end.
+  let overdue: Action | undefined;
   if (state.deadlineSeconds !== undefined && turn.attempts.length > 0) {
     const ranFor = now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {
       if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
-      return cut('deadline') ?? { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
+      const ending = cut('deadline');
+      if (ending) return ending;
+      overdue = { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
+      if (last?.reason === 'deadline') return overdue;
     }
   }
 
@@ -579,6 +587,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     if (turn.attempts.length >= state.maxAttempts) return { do: 'settle', outcome: 'failed', note: none };
     // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
     if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
+    // Past the deadline, no attempt follows, and none waits on the pool for one.
+    if (overdue) return overdue;
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {

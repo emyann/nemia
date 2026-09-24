@@ -31,6 +31,7 @@ export const stepMinimapFill: Record<StepState, string> = {
   'over-budget': 'var(--color-amber-500)',
   'budget-exhausted': 'var(--color-amber-500)',
   unsigned: 'var(--color-amber-400)',
+  denied: 'var(--color-amber-400)',
   failed: 'var(--color-red-500)',
   'failed-check': 'var(--color-red-500)',
   waiting: 'var(--color-neutral-400)',

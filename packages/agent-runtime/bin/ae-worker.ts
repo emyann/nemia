@@ -18,14 +18,18 @@
  * (`inputAt`), written before each line is, so a worker started again on the run file writes no word twice: at most once,
  * never twice. What it cannot give a harness it starts again is the words the one before heard (open issue 29).
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, nativeIdPattern?, input?, inputAt? }
+ * A stop sent before its pid is on disk has no process to signal, so the driver leaves it as a file (`stopFile`) and reads
+ * the pid again; this reads the file once the pid is published, before it starts the harness, and starts nothing if it is
+ * there. One of the two always sees the other, so a stop is heard whenever it lands (open issue 30).
+ *
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, stopFile?, nativeIdPattern?, input?, inputAt? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const runFile = process.argv[2]!;
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
-  cmd: string; args: string[]; cwd: string; logFile: string; nativeIdPattern?: string;
+  cmd: string; args: string[]; cwd: string; logFile: string; stopFile?: string; nativeIdPattern?: string; pid?: number;
   input?: { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
   inputAt?: number;
 };
@@ -55,6 +59,14 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => { stopping = true; killGroup(); });
 }
 write();
+// Read after the pid is published, never before: a stop that finds no pid left this file first, and one that wrote it
+// after this read finds the pid. Asked already, the harness is never started, and no process runs to be stopped. Only by
+// the worker `spawn` launched, whose run file had no pid: one started again on a run file its worker left is not the
+// run a stop asked before was asked of.
+if (!plan.pid && plan.stopFile && fs.existsSync(plan.stopFile)) {
+  write({ state: 'stopped', exitCode: -1 });
+  process.exit(0);
+}
 
 // `detached` here is not about outliving anything — it gives the harness its own PROCESS GROUP,
 // so a stop can take its children with it. A harness that shells out (codex does) leaves orphans

@@ -14,7 +14,8 @@ with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small item
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
 admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
 `0e7b02a`. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
-only when its task asks with `config.background: true` (issue 28).
+only when its task asks with `config.background: true` (issue 28). Since stage 3 (the same day), Codex is proven as an A2A agent in the
+same shape (issue 31).
 
 ## Bugs
 
@@ -200,8 +201,8 @@ system says when a process started.
 A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
 `working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
 was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
-or its going busy, still reads it quiet and ends the attempt — `done`, or `unsigned` for a task that asked for a
-statement — and releases the session with the words unread. The window is that one moment against a pass every few
+or its going busy, still reads it quiet and ends the attempt — `done`, with `stated: false` for a task that asked for a
+statement (`unsigned` until stage 4a) — and releases the session with the words unread. The window is that one moment against a pass every few
 seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
 observes.
 
@@ -483,6 +484,11 @@ fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` chec
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
 
+**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
+false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `run.ts`, filed by `retriesDue`),
+which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
+folds it and spawns with it.
+
 **Not measured.** Whether the wording alone closes the next such session — the two that were measured were closed by a
 person. The harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run
 `the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
@@ -691,7 +697,7 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   and its own id the same), the job was spawned with `--max-budget-usd 0.3`, and it answered the code word, which only that
   session was told; it read 8,020 tokens from the prompt cache. It signed, waited again, and a close settled it `succeeded`,
   note `closed`. Measured first by hand through `ae start`, `ae answer` and `ae close` (the same shape: an animal it picked,
-  and that animal back with `-again`), then as M12. Not measured: a held task on `codex` or on a `--bg` session
+  and that animal back with `-again`), then as M12. A held task on `codex` is M13 (issue 31). Not measured: a held task on a `--bg` session
   (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
   `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
   `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
@@ -739,6 +745,73 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   whose result the output reader takes as the job's (`claudeStreamOutput`, the last result). Not seen live.
 - **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
   and a `--bg` session's words are refused past it; a job's are not refused on length.
+
+### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
+
+A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
+(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
+group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
+`stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
+answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
+told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
+re-issuing tick.
+
+**Fixed** (2026-09-23, in review of stage 3). The stop is left on disk before the pid is read: `stop` writes a marker of its own
+(`<name>.stop`, so the run file keeps one writer, the worker) and then reads the run file again, signalling the pid it finds
+there. The worker looks for the marker once its pid is published and before it starts the harness, and on finding it writes
+`stopped` and starts nothing — the worker `spawn` launched, whose run file had no pid, alone: one started again by hand on a
+run file its worker left (issue 29) has a pid there already, and was not what an earlier stop was asked of. Whichever of the two came first, one sees the other: a worker that found no marker published
+its pid before the marker was written, so the stop's second read finds it. So `CANCELED` is true whenever it is answered, the
+engine's stop is heard on its first pass, and nothing waits or is held in memory. `spawn` clears a marker left under the
+name, so a run spawned again after a stop starts. Each order is made to happen on demand in `test/detached.test.ts`, the
+worker frozen before its first rename: stopped while frozen, the harness never runs; stopped with the marker's write held
+until the harness has started, the second read signals it. Each test fails with its half of the fix taken out, and
+`test/codex-agent.test.ts` cancels a Task the moment it is sent, which fails every time without the worker's check. A
+handler answering `WORKING` until the listing says `stopped`, the other way considered, would have changed every
+harness's cancel and still left a direct caller to ask again.
+
+### 31. Codex as an A2A agent: what maps, and what `codex exec` cannot do
+
+Since thin runtime stage 3 (2026-09-23), the detached Codex driver is proven as an A2A agent in stage 2's shape, through the
+real worker and the SDK's client, with a fake `codex` first on PATH (`test/codex-agent.test.ts`): its context is the thread id,
+empty until `thread.started` is printed, and a listing by `contextId` finds it; its `-o` file is the `closeout` Artifact, a
+`data` part under a schema and `text/plain` for prose, carried by a listing only with `includeArtifacts`; `cancelTask` ends the
+harness and a grandchild it started, a repeat cancel is answered `CANCELED` again, and a cancel of a finished session is
+refused `TaskNotCancelableError`; a held task's signed attempt is `INPUT_REQUIRED` on `getTask` (`COMPLETED` in a listing), its
+answered turn runs `codex exec … resume <thread> <words>` and is `WORKING`, then waits again in the same context. The plan said
+a second cancel is refused; the handler answers it `CANCELED`, as a stop is idempotent, so the refusal is proven on a session
+that has ended instead.
+
+- **M13: a resumed Codex thread keeps its id and its rollout.** On **codex-cli 0.154.0**, the default model, effort `low`,
+  `read-only`, a store under `/tmp` (`test/live.test.ts`, `AE_LIVE=1`, run once, about 15 s): a held task whose brief gave a
+  code word signed `{word: 'ready'}` and waited with its worker gone; answered *give the code word I gave you*, the next pass
+  resumed the thread (attempt 2's `resumeFrom` its first's id), which answered the code word only that thread was told, under
+  the same thread id; `codexRolloutFile` named one file for both. So a held Codex task is one A2A context across its turns,
+  as a Claude Code job's is (M12), and a resumed attempt's transcript holds its parent's conversation. A close settled it
+  `succeeded`. Not measured: a turn that fails and is retried, whose conversation then holds the failure as a job's does.
+
+What `codex exec` cannot do, said and not faked:
+
+- **No words while it runs.** It reads its prompt and then only its own shell. Its card says `say: false`; an A2A
+  follow-up is refused `UnsupportedOperationError` naming the way on — once the session has ended, a spawn in its
+  context, which `test/codex-agent.test.ts` follows to a `resume` of the same thread; spawned while it runs, a second
+  process would resume the thread beside the first, and nothing refuses that, so the words say *once* — and the facade
+  refuses first in the harness's own words (`noChannel`), which `wf` and the board print unchanged.
+- **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
+  so only a held task's signed attempt, between turns, waits on a person.
+- **No spend cap.** A budget is refused at `file` and at `answer`.
+- **No live stream.** `SubscribeToTask` is refused for every harness, by the owner's decision at stage 2's plan gate; a
+  transcript is read from a cursor.
+
+And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
+attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/engine.ts`), and Codex writes
+`-o` before it exits; the worker writes `done` only once Codex has exited and its pipes have drained. For that moment `view`
+says `input-required` while `getTask` still answers the harness's `WORKING`, and the process is still there. It closes by
+itself, and the test pins both sides of it with a fake that holds its exit (`test/codex-agent.test.ts`). Nothing reads the
+two together; were something to, the handler would read the journal for a listed `working` session too, one more journal
+read per read of a running session.
+
+The `claude -p` job, which shares the worker, is stage 2's and unchanged here: its stdin (issue 29) is what Codex lacks.
 
 ## Verified live, once
 
@@ -832,9 +905,8 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   shapes of the 150 transcripts last written on this machine (Claude Code up to 2.1.270), the Codex
   reader against the 34 rollouts here (codex-cli 0.154.0); each is checked on a file the test writes,
   and end to end only with a fake `claude` or `codex`. No board has polled a running session with it
-  yet. Not measured: whether `codex exec resume` goes on writing its thread's rollout or starts another
-  — so whether a resumed Codex attempt's transcript holds its parent's conversation, as Claude Code's
-  does; any rollout item of a type other than the five read; a Codex thread whose reasoning has a
+  yet. `codex exec resume` goes on writing its thread's rollout, so a resumed Codex attempt's transcript
+  holds its parent's conversation, as Claude Code's does (M13, issue 31). Not measured: any rollout item of a type other than the five read; a Codex thread whose reasoning has a
   summary; and how long a command's item waits to be written, since none of the commands in those
   rollouts ran long.
 - **What a poll of a running Claude session costs** (§6 item 17). Measured on this machine's board (2.1.271, 231 rows
@@ -857,7 +929,9 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   given its closeout; none that ended by quiet, and none settled without an end.
 
 - **An unsigned end, and its nudge** (§6 item 18). A fake `claude` that keeps a registry, at shipped defaults
-  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. The live test
+  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. Since stage 4a
+  the same fake holds the fact the engine reports instead (`stated: false`, nothing continued), and the judgement and
+  the nudge are held in agent-orchestrator (`test/store.test.ts`, *UNSIGNED is the orchestrator's word since stage 4a*). The live test
   that would show how Claude Code itself ends such a session was written and not run (last section).
 
 - **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
@@ -1067,6 +1141,15 @@ listing the session `done` in `test/unsigned.test.ts`; both fail with it reverte
 it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
 engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
 own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
+
+**The judgement, moved up (stage 4a, 2026-09-23).** Both doors now end the attempt as its harness ended it — `done`,
+reason `harness` — with `stated: false` beside it, written on every end read off a sighting of a task that asked for a
+statement (`true` when one came). The engine settles such a task `succeeded`, continues nothing and nudges nothing, whatever
+attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked`, `endWords` in its
+`views.ts`), and files its sign-off nudge on it; `wf` and the board say what they said. An end with no `stated` key — any
+journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles `failed` with its
+note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`; retiring them
+is part 2 of stage 4a.
 
 **Ends that carried neither statement nor reason, closed (2026-09-19, P0.5).** Every ended attempt now carries the agent's
 statement or the machine's reason (README, *Every ended attempt carries its statement or the reason it has none*). Measured

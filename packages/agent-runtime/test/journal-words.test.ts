@@ -1,5 +1,5 @@
 /**
- * What the journal says, word for word, for five scripted runs through `createEngine` — and what the harness was asked.
+ * What the journal says, word for word, for six scripted runs through `createEngine` — and what the harness was asked.
  *
  * Written before the A2A seam went in beneath the engine's harnesses (thin runtime, stage 1 part 2), and kept unchanged
  * after it: whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the
@@ -10,6 +10,8 @@
  * beside `usage` and `exitCode` off the same sighting. A journal written before it has no such key, and folds the same.
  * And again by stage 2 part 4: `filed` carries `holdOpen`, and a task held open writes `input` and `closed` — the fifth run.
  * A journal written before has neither key nor kind, and folds and decides the same (`decide.test.ts`, HELD OPEN).
+ * And by stage 4a: an `ended` read off a sighting of a task that asked for a closing statement carries `stated`, whether one
+ * came — the fact the runtime reports where it once judged. A journal written before has no such key, and folds the same.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -81,10 +83,34 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
-      closeout: { outcome: 'done', summary: 'wrote them' }, usage: { turns: 3, outputTokens: 120, costUsd: 0.25 }, exitCode: undefined, denials: undefined },
+      closeout: { outcome: 'done', summary: 'wrote them' }, stated: true, usage: { turns: 3, outputTokens: 120, costUsd: 0.25 }, exitCode: undefined, denials: undefined },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
+});
+
+test('a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above\'s — and an end without the key folds the same', async () => {
+  const b = board();
+  const id = await b.engine.file({ ...filing, maxAttempts: 2 });
+  await b.engine.tick();
+  b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'done', busy: false });
+  await b.engine.tick();
+  await b.engine.tick();
+  assert.deepEqual(await b.record(id), [
+    { ...filed, maxAttempts: 2 },
+    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
+      closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined },
+    { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
+  ]);
+  assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged, with an attempt left');
+
+  const events = (await b.record(id)) as Event[];
+  const without = events.map((e) => (e.kind === 'ended' ? (({ stated: _, ...rest }) => rest)(e) : e)) as Event[];
+  const old = fold(id, without);
+  assert.equal('stated' in old.attempts[0]!, false, 'a journal from before stage 4a carries no key');
+  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0]!, stated: false }] });
 });
 
 test('a spawn the harness refused: the attempt ends unstartable in its words, and the task settles failed', async () => {
@@ -146,7 +172,7 @@ test('what the harness denied the session is written on its end, as it said it, 
   const ended = (await b.record(id)).find((e) => e.kind === 'ended');
   assert.deepEqual(ended, {
     kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'failed', reason: 'harness', nativeId: 's-1',
-    closeout: undefined, usage: undefined, exitCode: undefined, denials,
+    closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials,
   });
   assert.deepEqual((await b.engine.view(id)).state.attempts[0]?.denials, denials);
 
@@ -178,7 +204,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   await b.engine.close(id);
   await b.engine.tick();
   const ended = (n: number, summary: string) => ({ kind: 'ended', at: '<at>', attempt: n, sessionId: `s-${n}`, observed: 'done', reason: 'harness',
-    nativeId: `s-${n}`, closeout: { outcome: 'done', summary }, usage: undefined, exitCode: undefined, denials: undefined });
+    nativeId: `s-${n}`, closeout: { outcome: 'done', summary }, stated: true, usage: undefined, exitCode: undefined, denials: undefined });
   assert.deepEqual(await b.record(id), [
     { ...filed, holdOpen: true },
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },

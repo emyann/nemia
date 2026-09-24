@@ -16,6 +16,7 @@ import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRu
 import type { Run, TaskPhase } from '../src/run.ts';
 import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
+import { SIGNOFF } from '../src/run.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -231,6 +232,12 @@ const board = () => {
   const waiting = new Map<string, string>();
   /** What the harness denied each task's last attempt, as the runtime records it on the attempt's end (`Attempt.denials`): once it has settled. */
   const denials = new Map<string, Array<{ tool: string; what?: string }>>();
+  /**
+   * Whether each task's last attempt gave the statement it was asked for, as the runtime reports it since stage 4a (`Attempt.stated`): once
+   * it has settled, its attempt ended `done` by its harness with the fact beside it. Absent, the attempt carries no such key, as every
+   * journal written before does.
+   */
+  const stated = new Map<string, boolean>();
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
@@ -250,6 +257,7 @@ const board = () => {
             : {
               n: i + 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
               ...(reason ? { ended: 'failed', reason } : {}), ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
+              ...(settled && !reason && stated.has(id) ? { ended: 'done', reason: 'harness', stated: stated.get(id) } : {}),
             })),
         },
       };
@@ -273,7 +281,7 @@ const board = () => {
     },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials };
+  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials, stated };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -1892,6 +1900,56 @@ test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a s
   }
 });
 
+test("UNSIGNED is the orchestrator's word since stage 4a, at shipped defaults: a task whose job ended `done` with `stated: false` settled `succeeded`, and the step reads `unsigned`; the run nudges its session once to sign off, and a nudge that ends the same leaves it on you — an end with no `stated` key is not nudged", async () => {
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const first = `${run.id}-implement`;
+  // As the runtime records it now: the harness said `done`, no statement came, and the runtime judges nothing — the task succeeded.
+  b.stated.set(first, false);
+  b.settle(first, 'succeeded');
+  const views = new Map([[first, await b.e.view(first)]]);
+  assert.deepEqual([phaseOfView(views.get(first)), closeoutAsked(views)(first)], ['succeeded', 'unsigned']);
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'unsigned');
+
+  // The run's one nudge, continuing the session that did not sign off and told so in the owner's words.
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.tried, pass.filed], [['implement'], []], 'nothing after implement is filed');
+  const nudge = readRun(run.id).steps.implement!;
+  assert.equal(nudge.tries?.at(-1)?.then, 'signoff');
+  const spec = b.tasks.get(nudge.taskId!)!.spec;
+  assert.equal(spec.resumeFrom, `native-${first}`, 'the session that ended unsigned is continued');
+  assert.ok(spec.brief.includes(SIGNOFF), spec.brief);
+
+  // It ends the same: the nudge is spent, and the step waits on a person — REFUSED a second nudge by the run.
+  b.stated.set(nudge.taskId!, false);
+  b.settle(nudge.taskId!, 'succeeded');
+  const again = await advance(b.e, readRun(run.id));
+  assert.deepEqual([again.tried, again.filed], [[], []], 'a second nudge is not filed');
+  const l = await list(b.e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['unsigned', ['implement']]);
+  const { decision: d } = await decide(b.e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed }, { outcome: 'blocked', unsigned: ['implement'], failed: [] });
+
+  // A `done` with no `stated` key — every journal written before stage 4a — is not read as a missing statement, and is not nudged:
+  // the step still reads `unsigned` (nothing said), as it always did, and waits on a person.
+  const before = board();
+  const old = started(folder());
+  await advance(before.e, readRun(old.id));
+  before.settle(`${old.id}-implement`, 'succeeded');
+  const oldViews = new Map([[`${old.id}-implement`, await before.e.view(`${old.id}-implement`)]]);
+  assert.equal(closeoutAsked(oldViews)(`${old.id}-implement`), true);
+  assert.deepEqual((await advance(before.e, readRun(old.id))).tried, [], 'no nudge on an end that says nothing of a statement');
+  // And one that stated, with nothing the run can read, is not nudged either: a statement came.
+  const garbled = board();
+  const said = started(folder());
+  await advance(garbled.e, readRun(said.id));
+  garbled.stated.set(`${said.id}-implement`, true);
+  garbled.settle(`${said.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
+  assert.equal((await list(garbled.e, readRun(said.id))).steps[0]!.status, 'unsigned · closeout unreadable');
+  assert.deepEqual((await advance(garbled.e, readRun(said.id))).tried, [], 'a statement given is not nudged for');
+});
+
 test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose attempt 1 went quiet and whose nudge was `lost` reads `failed` on `wf ls`, `wf decide` and a try's brief — and one lost, then quiet, reads `unsigned`", async () => {
   const through = async (reasons: string[]) => {
     const b = board();
@@ -2465,6 +2523,40 @@ test("a step whose job was denied a call says so — on `wf ls` beside its line 
   b.settle(`${run.id}-review`, 'succeeded', SIGNED);
   assert.match(await printedBy('decide', run.id), /\n {2}implement\n(?: {4}.*\n)*? {4}denied: Skill\(look\), Bash\(pytest\)\n/, '`wf decide`: under the step');
   assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
+});
+
+test("a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `wf decide` names the rule for `allow:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on", async (t) => {
+  const run = started(folder('denials: fail'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.denials.set(taskId, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
+  b.settle(taskId, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(b.filings, [taskId], 'nothing after it is filed, however many passes');
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const printedBy = async (...args: string[]) => { printed.length = 0; await main(args, b.e); return printed.join('\n'); };
+
+  const listed = await list(b.e, readRun(run.id));
+  assert.deepEqual([listed.steps[0]!.status, listed.steps[0]!.note, listed.waitingOnYou], ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']]);
+  const decided = await printedBy('decide', run.id);
+  assert.match(decided, /\n {2}DENIED, waiting on you: implement {2}— its harness denied its try a call/);
+  assert.match(decided, new RegExp(`add Edit\\(//tmp/w/notes\\.md\\) to the folder's allow:, .* told to do without it: {2}wf retry ${run.id} implement --fresh {2}\\(`));
+
+  await main(['retry', run.id, 'implement', '--fresh'], b.e);
+  await advance(b.e, readRun(run.id));
+  const again = b.filings.at(-1)!;
+  assert.notEqual(again, taskId, 'a new task for try 2');
+  const brief = (b.tasks.get(again)!.spec as { brief: string }).brief;
+  assert.match(brief, /## What your session was denied\n\n```text\nWrite\(\/tmp\/w\/notes\.md\)\n```/);
+  assert.match(brief, /the same call will be denied again/);
+
+  b.settle(again, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  assert.equal(b.filings.at(-1), `${run.id}-review`, 'denied nothing, it hands on');
 });
 
 test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {

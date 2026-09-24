@@ -179,8 +179,11 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   private async follow(m: Message): Promise<Task> {
     const refused = followUpRefusal(m);
     if (refused) throw new RequestMalformedError(refused);
+    // A2A's way on is a message in the session's context; here, since a plain message naming a Task only continues it,
+    // that is a spawn under a name of its own — once the session has ended: spawned while it runs, a second process would
+    // resume the same conversation beside it. Before any observe: a harness with no channel is asked nothing.
     if (!this.ops.say) {
-      throw new UnsupportedOperationError(`the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started.`);
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked \`${RUNTIME_EXTENSION}\` — in this session's contextId.`);
     }
     const seen = (await this.run(this.ops.observe)).get(m.taskId);
     if (!seen) throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);

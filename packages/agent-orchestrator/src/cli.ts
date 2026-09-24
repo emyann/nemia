@@ -133,7 +133,7 @@ A workflow is a folder of markdown files. One file is one step:
 
 No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
 tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
-\`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
+\`denials\` holds one whose try the harness denied a call, \`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
 and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
 permissionMode, tools, disallow, allow, background, remote, deadlineSeconds, maxAttempts, budget) say who does the work, with
 what, who may drive it, for how long and for how much. Everything else the agent is told is prose.
@@ -143,6 +143,7 @@ what, who may drive it, for how long and for how much. Everything else the agent
   output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
   it on the run's word) · budget exhausted (its harness ended its session at its budget:)
+  · denied (its harness denied its try a call, and the step says denials: fail: nothing after it is filed)
   · awaiting approval (at its gate: nothing after it is filed until wf approve — and, on an ending step
   that runs in the repository's checkout, nothing of it at all until then).
 
@@ -1096,6 +1097,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      // A call denied is a person's to weigh: whether the work stands without it, or the folder's allow: grows for a new run.
+      if (decision.denied.length) console.log(`  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`);
       // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
       // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
       const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);

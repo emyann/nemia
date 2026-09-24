@@ -149,7 +149,7 @@ test("an edge runs while work moves along it — into a step at work or at its c
   assert.equal(into('working'), 'running', 'its session is at work');
   assert.equal(into('checking'), 'running', 'its check is running');
   // Nothing is moving into a human gate, a refused check, a step asking a person, one that ended badly, or one not filed.
-  const stillInto = ['blocked', 'exhausted', 'failed-check', 'needs-human', 'unsigned', 'failed', 'unknown', 'cancelled', 'waiting'] as const;
+  const stillInto = ['blocked', 'exhausted', 'failed-check', 'needs-human', 'unsigned', 'denied', 'failed', 'unknown', 'cancelled', 'waiting'] as const;
   for (const state of stillInto) assert.equal(into(state), 'to-come', state);
   for (const state of ['verified', 'unverified'] as const) assert.equal(into(state), 'done', state);
   assert.equal(into('waiting', 'working'), 'to-come', 'out of a step at work, nothing has reached the next one yet');

@@ -272,6 +272,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
   chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
   undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A new step status is a word the board draws as `working` until it knows it.** `stepState` (`apps/web/src/lib/status.ts`) falls
+  through to `working` for any word it does not match, so a status added to `StepStatus` in `run.ts` passes every orchestrator and api
+  test and shows on the board as a step still running — the one surface that says nothing is wrong. Add the word to `stepState`, its
+  meaning and class, `stepGraph`'s fill and `offersOf` in `asks.ts` in the same change, with a test of each. And the git fixture
+  (`agent-orchestrator/test/fixtures/git-runs-before.json`) pins every `Decision` whole, so a new list on `Decision` fails
+  `git-before-after.test.ts` on every folder: refresh it with `everything()` of `git-runs-pin.ts`, read the diff line by line — only the
+  new key may move — and say so in that test's doc (learned by the run that added `denials: fail`).
 - **A word from outside, printed into a column, is made one line before it is measured.** `wf ls` pads each status to the width of
   the widest (`cli.ts`), so a harness's `waitingFor` — free text, which can carry a newline — breaks its row in two and mis-aligns
   every other row of that run, and `wf decide` splits the same way. A browser would have collapsed it and nothing would have shown
@@ -360,6 +367,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
   and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
+  denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
+  which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own
+  directory from it and this run's id as `*`, and a call the step's own `disallow:` may have denied is offered no allow at all, since a deny
+  beats every allow (`disallowedBy`). A fixture for a path the run makes is a path the run makes (learned in review of that run).
 - **A path a fenced step's brief names must be inside the step's own folder.** A folder team runs in `dontAsk`, so a read
   outside its directory is denied with no prompt and the session carries on: the brief is the only thing that says the path
   exists, and it was lying twice — the parents' folders a fan-in is told to read, and `runs/<id>/inputs` on every brief of a
@@ -431,6 +443,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and `a2aRunner` passed that to `Runner.layer(ops: RunnerOps)`: an optional key absent and an extra key present both type-check,
   so the Effect door's `Runner.transcript` read `undefined` — a harness with no conversation — and no test called it through
   that door. Keep the old verb beside the new one, and test each door by calling the verb through it (learned in review, round 1).
+- **A stop between two processes that share only files: each writes its half before it reads the other's.** A detached
+  run's stop signalled the pid on the run file, and the worker publishes its pid as it starts: a stop in between did nothing,
+  and the A2A handler answered `CANCELED` to it, so a direct caller's harness ran on (open issue 30). Now the stop writes a
+  marker and then reads the pid again, and the worker publishes its pid and then reads the marker, so one of the two always
+  sees the other; each order is made to happen with the worker frozen before its first rename (`detached.test.ts`). An
+  answer that says something happened — `CANCELED` — is a claim about the world, and a level-triggered loop that asks again
+  does not make it true for a caller that asks once (learned in review of the run that made Codex an A2A agent).
 - **Node's type stripping refuses a parameter property.** `constructor(private readonly ops: RunnerOps)` fails the
   file at load with *"TypeScript parameter property is not supported in strip-only mode"*, and `tsc` passes it. Declare
   the field and assign it in the constructor (`HarnessHandler`, learned by the run that put the A2A seam in the runtime).
@@ -465,6 +484,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **An e2e page's own screenshot named `<name>-<theme>.png` is overwritten.** `visit.ts` takes that name for the picture it takes after
   `expect` returns, so a picture the page took mid-read under the same name shows the page's end state, and reads as a wrong picture.
   Name a page's own shots `<name>-<what>-<theme>.png` (same run).
+- **The engine can say a task waits before its harness has let the session go.** `closedOut` (`agent-runtime/src/engine.ts`)
+  ends an attempt on a statement on disk while the session is `working` and not busy, and Codex writes `-o` before it exits:
+  for that moment `view` says `input-required` and `getTask` still answers the harness's `WORKING`, with the process alive. A
+  test that asserts the Task the instant `view` moves passes alone and fails under `npx turbo run test --force`'s load. Hold the
+  fake's exit on a file and assert both sides, or wait for the Task (learned by the run that proved Codex as an A2A agent;
+  open issue 31).
+- **`unsigned` is the orchestrator's word, not the runtime's.** Since stage 4a the runtime records a fact — `stated: false` on a
+  `done` end of a task that asked for a statement — and settles it `succeeded`. Read an attempt's end through `closeoutAsked` or
+  `endWords` (`agent-orchestrator/src/views.ts`), never off its raw `ended` and `reason`: the api's `attemptsIn` read them raw, and
+  the board drew such a try as `done` under a step chip that said `unsigned`. An end with no `stated` key is from before the fact
+  and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
+  A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
+  (learned by the run that moved the judgement up).
 
 ## Rules the code keeps
 

@@ -219,12 +219,19 @@ const ranLine = (a: Attempt): string => a.endedAt === null
   ? `since ${a.startedAt.slice(11, 19)}`
   : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
 
+/**
+ * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
+ * the runtime records since stage 4a, where it once recorded `failed (unsigned)` itself. What it means for the work is the
+ * layer above's to say; `ae` says only what happened.
+ */
+const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');
+
 /** One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. */
 export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
   if (a.ended === null) return `attempt ${a.n}  running ${when}`;
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
-  const how = `${a.ended}${a.reason === 'lost' || a.reason === 'budget' ? ` (${a.reason})` : ''}`;
+  const how = `${a.ended}${a.reason === 'lost' || a.reason === 'budget' ? ` (${a.reason})` : unstated(a.stated)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
   // What the harness denied the session, as the rules a person would write to allow it: the calls it went on without.
@@ -257,10 +264,10 @@ const KINDS: Record<string, string> = {
   input: 'answered', closed: 'closed',
 };
 
-const entryLine = (taskId: string, event: Event) => {
+export const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
     : event.kind === 'measured' ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
-    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
     : event.kind === 'input' ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.budgetUsd !== undefined ? `  (budget $${event.budgetUsd})` : ''}`

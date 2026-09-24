@@ -435,6 +435,36 @@ Refused at load: any word but `true` or `false`, and `true` on `codex` or `claud
 `background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
 that can ask (below).
 
+### When a denied call stops a step: `denials:`
+
+```md
+---
+permissionMode: dontAsk
+allow: Edit(**)
+denials: fail   # a try the harness denied a call is not passed on
+---
+Write the note.
+```
+
+A job's denied calls are recorded on its attempt and said beside the step (`wf ls`, `wf decide`, the board), and by default
+they decide nothing: the session carried on without the call, signed off, and its work is passed on like any other. A step
+that says `denials: fail` is not passed on after a denial. The try reads `denied`: nothing after it is filed, its check is
+not run, `retries:` spends nothing on it and never retries it, and the run waits on you (`DENIED, waiting on you` in
+`wf decide`), as it does for a step that did not sign.
+
+The run's `allow:` is frozen on its record at `wf start`, so another try of the same run is denied the same call again. What
+`wf decide` offers says both ways out: the rule to add to the folder's `allow:` for a new run, and `wf retry <run> <step>
+--fresh`, a new session whose brief names what the last one was denied and tells it to do without (or `wf retry <run> <step>`
+to continue the session; never `--recheck`, since no check ran). A denied `Bash(npm)` is offered as `Bash(npm:*)` (the
+runtime keeps a command's first word), and a denied write, by any file-editing tool, as `Edit(<path>)`: Claude Code matches
+every file write against `Edit` rules alone. A path in the step's own directory is offered from it, `Edit(notes.md)`, since
+the next run's step works in a worktree named by its own id; any other absolute path is written `//path`, with this run's id
+as `*`. A call the step's own `disallow:` may have denied is offered no rule, since a deny beats every allow: the offer names
+the deny rule instead. There is no verb that widens `allow:` on a live run.
+
+Refused at load: any word but `fail`; the key on `codex`, which records no denials (its fence is the sandbox); and the key
+beside `background: true`, whose denials are not read. On any of them the line would never stop anything.
+
 ### Who may drive a step's session: `remote:`
 
 ```md
@@ -912,7 +942,7 @@ another repository and change that line.
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's word: `running (working)`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine settled it `failed` (a journal from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares | **never runs** — the run nudges it once a round first, below |
+| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -966,8 +996,9 @@ retries: 1
   of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before.
-- **An unsigned step is nudged once, by the run, before it waits on you.** A session the engine ended `unsigned`
-  — quiet, or `done` by its harness, without calling `StructuredOutput` — that said nothing is continued once:
+- **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
+  — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
+  the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
   the next tick files the next try as a nudge on no one's word (`then: 'signoff'` on the record), with the same
   schema, model, effort, context window, tools and permission mode as the session it continues, told in
   `## Try <n>` that it ended without calling `StructuredOutput`, that the work stands and it should change
@@ -976,7 +1007,7 @@ retries: 1
   `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
-  engine said `unsigned` for `done`. Why the run and not the engine's `maxAttempts`: an engine allowance is per
+  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine's `maxAttempts`: an engine allowance is per
   task, so a person's try would earn another in the same round; each engine attempt gets the whole
   `budgetUsd`; and `maxAttempts: 2` also restarts a session the harness failed.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:

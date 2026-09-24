@@ -27,7 +27,9 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['failed ✗ check (exit 1)', 'failed-check'],
     ['failed ✗ check (unfinished)', 'failed-check'],
     ['unsigned', 'unsigned'],
+    ['denied', 'denied'],
     ['unsigned · done', 'unsigned'],
+    ['denied', 'denied'],
     ['succeeded · BLOCKED', 'blocked'],
     ['stopped · BLOCKED', 'blocked'],
     ['failed', 'failed'],
@@ -48,7 +50,7 @@ test('a session that ended is not work that was done: the engine\'s `succeeded` 
 });
 
 test('only verified and unverified are work done; a refused check, a failed session and an unsigned step are not', () => {
-  const notDone = ['failed ✗ check (exit 1)', 'failed · done', 'unsigned', 'succeeded · BLOCKED', 'rounds exhausted', 'checking', 'running (working)', 'waiting', 'unknown'];
+  const notDone = ['failed ✗ check (exit 1)', 'failed · done', 'unsigned', 'denied', 'succeeded · BLOCKED', 'rounds exhausted', 'checking', 'running (working)', 'waiting', 'unknown'];
   for (const status of notDone) assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
   for (const status of ['verified ✓', 'unverified · done']) assert.equal(satisfiesAfter(stepState(status, false, false)), true, status);
   // A refused check is its own state, not a session that failed: the colour says which to read, the check's output or the log.
@@ -109,7 +111,7 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
     assert.equal(isGate(stepState(status, true, false), true), false, `${status}, on a cancelled run`);
   }
   // Waiting on you too, but work to try again, not a decision; and every state that waits on nobody.
-  const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
+  const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'denied', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
   for (const status of notGates) assert.equal(isGate(stepState(status, false, false), false), false, status);
 });
 
@@ -153,6 +155,7 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
     ['unverified · done', 'unverified'],
     ['failed ✗ check (exit 1)', 'failed-check'],
     ['unsigned', 'unsigned'],
+    ['denied', 'denied'],
     ['failed', 'failed'],
     ['stopped', 'cancelled'],
     ['unknown', 'unknown'],

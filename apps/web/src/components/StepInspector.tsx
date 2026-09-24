@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
-import { stepState, type StepState } from '../lib/status';
+import { isGate, stepState, type StepState } from '../lib/status';
 import { foldTranscript } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
@@ -198,7 +198,8 @@ const ACTIVITY_TURNS = 30;
 
 /** The tail of the step's conversation — the session page's, read and followed the same way — and the way to the whole of it. */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
-  const following = useStepTranscript(run.id, step.name, step.taskId);
+  const cancelled = run.cancelledAt !== null;
+  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled), cancelled));
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

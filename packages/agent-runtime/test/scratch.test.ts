@@ -1,6 +1,8 @@
 /**
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
- * a call of `os.tmpdir` anywhere else under `test/` is refused, and each package's copy of the helper is this one.
+ * a call of `os.tmpdir` anywhere else under `test/` is refused, and each package's copy of the helper is this one. A line
+ * that names the temp directory without making a root in it — a test of where the code under test runs a process —
+ * says so with `// not a root` and why.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,8 +15,9 @@ const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', '
 /** The files under `test/` that may make a root by hand: the helper, and the fixture that shows the guard a leak. */
 const ALLOWED = ['scratch.ts', 'fixtures/leak-unguarded.ts'];
 
-/** Each line of `text` that calls the temp directory by name. */
-const tmpdirCalls = (text: string) => text.split('\n').flatMap((line, i) => (/\btmpdir\s*\(/.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+/** Each line of `text` that calls the temp directory by name, and does not say it makes no root there. */
+const tmpdirCalls = (text: string) => text.split('\n')
+  .flatMap((line, i) => (/\btmpdir\s*\(/.test(line) && !/\/\/ not a root\b/.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
 
 test('REFUSED: a line that makes a root under the temp directory by hand is found', () => {
   // Spelled in two, or this file would call it by name.
@@ -23,6 +26,8 @@ test('REFUSED: a line that makes a root under the temp directory by hand is foun
     [`2: const dir = fs.mkdtempSync(path.join(os.${call}(), 'ae-x-'));`]);
   assert.equal(tmpdirCalls(`import { ${call} } from 'node:os';\nconst d = ${call} ();`).length, 1);
   assert.deepEqual(tmpdirCalls("const dir = scratch('ae-x-');\n// under the machine's temp directory"), []);
+  assert.equal(tmpdirCalls(`assert.equal(ran.cwd, os.${call}());`).length, 1, 'refused without the words');
+  assert.deepEqual(tmpdirCalls(`assert.equal(ran.cwd, os.${call}()); // not a root: where the ask runs`), [], 'and let through with them');
 });
 
 test('no test makes a root but through scratch', () => {

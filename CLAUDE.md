@@ -78,6 +78,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A step's check logs its stdout alone, and a person is shown the tail of its stderr.** The whole stderr is on disk at the check's
+  `WF_STDERR` (`~/.agent-workflows/checks/<run>-<step>-check.stderr`), named on the check's record beside its `.log`. The e2e said why a
+  page failed once, first, on stderr, and then thirty lines of the servers' output: the check read as an exit 1 after
+  `the factory page … ✓`, with nothing printed. `exitOn` (`visit.ts`) now ends both streams with the failure in a few lines (`headlineOf`:
+  the page, the theme and the error; the element Playwright waited for and what lay over it; the picture), and `visit.test.ts` reads the
+  end of each. Anything a check runs that can fail says why last, on stdout too (learned by thin runtime stage 2 part 4b, round 2).
 - **The e2e's watch counts every 4xx a page sees against it.** A refusal the e2e makes on purpose goes
   in a page of its own, with a watch that must see that one refusal and nothing else (the `answer` page,
   learned by the run that added the answer box). And the e2e visits every page in light, then every page

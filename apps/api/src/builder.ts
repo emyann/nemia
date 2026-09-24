@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, loadAgents, writeWorkflow } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
@@ -32,7 +32,7 @@ import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, t
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
  * `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`).
- * `workspace` is a `choice` of its words, `main` and `folder`, and `slot` of one word, `none`, since a step either says it or says nothing. `agent` is a
+ * `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a
  * `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
@@ -43,7 +43,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
-  tools: 'list', disallowedTools: 'list', allowedTools: 'list', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
+  tools: 'list', disallowedTools: 'list', allowedTools: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
 
@@ -101,7 +101,7 @@ export const keyForm = (home: string = HOME): KeyForm => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
+    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'denials' ? DENIALS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
     byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,

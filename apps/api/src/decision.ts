@@ -1,7 +1,7 @@
 /** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands. */
 import { branchesToRead, type BranchStanding, branchStandings, branchWord, CHECK_AFFECTING, closeoutAsked, closeoutReader, consumption, diffStat, exitVerdicts, harnessBlocked, isShipped, lessonLine, merges, phaseOfView, readAsks, resultSteps, runCostLines, sendBackTo, sensitiveDiff, touchedBy } from 'agent-orchestrator';
 import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
-import { judge, type RunWaiting, waitingOf, waitsIn } from './judged.ts';
+import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from './judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { e, judgedSteps, stepNames, viewsOf, workflowsOf } from './store.ts';
 import { type StepUsed, totalOf, usedOf } from './usage.ts';
@@ -71,11 +71,13 @@ export type Decidable = {
 
 /**
  * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `wf decide` says that, and offers
- * nothing else. `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
+ * nothing else — and the hold beside it, `holding`, for one a person also holds, as `wf decide` says both. `holding` alone for a run a
+ * person holds (`wf hold`): `wf decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is
+ * refused while it stands (`heldRefusal`). `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
  * git asked. `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
  * what there is to decide.
  */
-export type RunDecision = { waiting: RunWaiting } | { running: true } | { nothing: string } | Decidable;
+export type RunDecision = { waiting: RunWaiting; holding?: RunHolding } | { holding: RunHolding } | { running: true } | { nothing: string } | Decidable;
 
 /** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
 export const DIFF_LINES = 400;
@@ -125,16 +127,21 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 }
 
 /**
- * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
- * past a cap — after the colon and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
+ * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, `--fresh` for a step `denials: fail` stopped (whose
+ * offer is a new session, told to do without the call), or `wf round <run> <step>` — with `--budget <amount>` past a cap — after the colon
+ * and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
  * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer — which
  * the board also presses itself, through `POST /api/runs/:id/steps/:step/accept`, reading the step off this command (`acceptStepOf` in
  * apps/web/src/lib/decide.ts).
  *
  * A verb this does not know is not dropped: `commandsOf` falls back to the whole English sentence, which the board then offers as a
  * command to copy and run. So an offer worded in the package goes in here in the same change (CLAUDE.md).
+ *
+ * A held run (`wf hold`) has no offer for this to read: `decisionOf` answers it `holding` before any line is made. The package's own lines
+ * say the hold where they would offer a verb — `held until a-1 ships; once more is asked once the hold lifts` (`heldLater` in run.ts) — a
+ * sentence with no `wf` verb in it, which would reach a person as a command to run if one got here.
  */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --budget <amount>| --message "<(?:objection|why)>")?)/;
+const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --fresh| --budget <amount>| --message "<(?:objection|why)>")?)/;
 
 /**
  * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as
@@ -203,18 +210,22 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: rea
  * read with `touchedBy`, and with `sensitiveDiff` over the default check-affecting list. A branch git cannot read is
  * an `error` on its entry, never a failed request. A few `git` calls a branch, so read once, never on a poll.
  *
- * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read.
+ * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read. Then a
+ * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered.
  */
 export async function decisionOf(run: Run): Promise<RunDecision> {
   const waits = await waitsIn(run, e);
   const waiting = waitingOf(run, waits);
-  if (waiting) return { waiting };
+  const holds = await holdsIn(run, e);
+  const holding = holdingOf(run, holds);
+  if (waiting) return { waiting, ...(holding ? { holding } : {}) };
+  if (holding) return { holding };
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const views = await viewsOf(run);
   // Judged without the branch standings, which this answer does not carry: a run still running is answered `running` below without one
   // `git` being run for it, and what there is to decide is on the run's own detail, off its own read.
-  const judged = judge(run, names, folder, views, waits);
+  const judged = judge(run, names, folder, views, waits, holds);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
 

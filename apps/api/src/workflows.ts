@@ -52,6 +52,8 @@ export type WorkflowStepSpec = {
   disallowedTools: string[];
   /** What the session may do without being asked, in the same rules (`allowedTools:`): empty where the step allows nothing beyond its mode. */
   allowedTools: string[];
+  /** `denials: fail`: a try the harness denied a call reads `denied` and waits on a person. Null for a step without the line, whose denials decide nothing. */
+  denials: 'fail' | null;
   /** `background:` as written, `true` or `false`: null where the step has no line, and runs as a job (`claude -p`). */
   background: boolean | null;
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
@@ -249,6 +251,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   tools: step.tools ?? null,
   disallowedTools: step.disallowedTools ?? [],
   allowedTools: step.allowedTools ?? [],
+  denials: step.denials ?? null,
   background: step.background ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,

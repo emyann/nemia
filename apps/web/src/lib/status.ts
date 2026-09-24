@@ -17,6 +17,7 @@ export type StepState =
   | 'exhausted'
   | 'over-budget'
   | 'budget-exhausted'
+  | 'denied'
   | 'unsigned'
   | 'failed'
   | 'failed-check'
@@ -45,6 +46,8 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   if (word === 'unverified') return 'unverified';
   // Ended without the closeout it was asked for.
   if (word === 'unsigned') return 'unsigned';
+  // Signed off, having been denied a call, on a step that says `denials: fail`: nothing after it is filed, and its check did not run.
+  if (word === 'denied') return 'denied';
   if (word === 'needs-human') return 'needs-human';
   if (word === 'failed') return 'failed';
   if (word === 'stopped') return 'cancelled';
@@ -84,6 +87,7 @@ export const stateMeaning: Record<StepState, string> = {
   'over-budget': 'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
   'budget-exhausted': 'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
+  denied: "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',
@@ -107,6 +111,8 @@ export const stateClass: Record<StepState, string> = {
   'over-budget': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   'budget-exhausted': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   unsigned: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
+  // As `unsigned`: work to try again, not a question — it signed off, and what it did without the call is a person's to weigh.
+  denied: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
   'failed-check': 'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',

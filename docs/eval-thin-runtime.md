@@ -301,6 +301,14 @@ orchestrator's calls to the runtime change.
    (`deniedWords`), one writer for every surface. Nothing is decided on them: `denials: fail`, a step key that fails a step
    on a denial, is a card of its own.
 
+   **Part 3b done, the same day: a step can be stopped on a denial.** A step that says `denials: fail` is not passed on
+   when its signed try was denied a call: it reads `denied`, a status of its own, which stops its followers, runs no check,
+   spends no `retries:` and waits on a person. The run's `allow:` is frozen at `wf start`, so a try is denied the same again,
+   and the offer says both ways out: the rule for the folder's `allow:` in a new run (`Edit(<path>)` for any file write,
+   `Bash(<command>:*)`), and `wf retry <run> <step> --fresh`, whose brief names what was denied. Refused on codex and beside
+   `background: true`, where no denial is read. The orchestrator's policy alone: the runtime's `decide` never reads denials.
+   Widening `allow:` on a live run is left for later.
+
    **Part 4a done, the same day: the runtime holds a task open (R1).** A task filed `holdOpen: true` does not settle when an
    attempt signs: `view` says `input-required` — A2A's `TASK_STATE_INPUT_REQUIRED` — and nothing runs, the signed session
    let go as any ended attempt's is. `answer` journals an `input`, and the next pass starts the task's next turn, an attempt
@@ -328,7 +336,22 @@ orchestrator's calls to the runtime change.
    consumer yet, the api polling the facade, and would pay a transcript read per event (open issue 27); the collected
    files as Artifacts, which are the orchestrator's Task's, stage 6; and one A2A Task per runtime task rather than per
    attempt.
-3. **The Codex adapter.**
+3. **The Codex adapter.** **Done, 2026-09-23.** Part 5a had already built the Codex Task in stage 2's shape, since the
+   seam is one handler over every driver, so the card proved that shape on Codex rather than building a second one:
+   `packages/agent-runtime/test/codex-agent.test.ts` drives the real detached worker through the SDK's client with a fake
+   `codex` — the thread id as `contextId` (empty until `thread.started`), the `-o` file as the `closeout` Artifact (a `data`
+   part, `text/plain` for prose), a `cancelTask` that ends the harness and what it started, and a held task's answered turn
+   running `codex exec … resume <thread>` in the same context. Measured live (M13, codex-cli 0.154.0, open issue 31): a
+   resumed thread keeps its id and its rollout, and remembered what only the signed thread was told. What Codex cannot do is
+   said rather than faked: no words while it runs (its card says `say: false`, and an A2A follow-up is refused naming a
+   spawn in the session's context, once it has ended, as the way on — the only handler change; `wf` and the board keep
+   their words), never
+   `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way, and fixed in review: a
+   cancel landing before the worker had written its pid was answered `CANCELED` and sent nothing, harmless under the
+   engine's re-issuing tick and false to a direct A2A caller; the stop is now left on disk for the worker, which starts no
+   harness (open issue 30). **The `claude -p` driver stays with stage 2**, unchanged: it shares
+   the worker, but its Task shape, its stdin (issue 29) and M12 were stage 2's, and nothing in it moved. **Still deferred**,
+   as the owner decided at stage 2's gate: the stream (`SubscribeToTask`).
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

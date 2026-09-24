@@ -22,6 +22,8 @@ export type WorkflowStepSpec = {
   disallowedTools: string[];
   /** What the session may do without being asked (`allowedTools:`): empty where the step allows nothing beyond its mode. */
   allowedTools: string[];
+  /** `denials: fail` as written: null where the step has no line, and what the harness denied it decides nothing. */
+  denials: 'fail' | null;
   /** `background:` as written: null where the step has no line, and runs as a job. */
   background: boolean | null;
   /** `remote:` as written: null where the step has no line. */

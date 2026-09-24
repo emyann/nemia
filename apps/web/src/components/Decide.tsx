@@ -149,6 +149,8 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
       return 'signed off blocked, and said nothing of what it needs';
     case 'try-again':
       return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
+    case 'denied':
+      return `signed off having been denied a call${offer.calls ? ` (${offer.calls})` : ''}, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it`;
   }
 }
 
@@ -160,7 +162,8 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
 export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
   const [message, setMessage] = useState('');
   // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
-  const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : 'nudge');
+  // A denied step, a new session first, as `wf decide` offers it: the one it had was denied, and carries on the same permissions.
+  const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : offer.kind === 'denied' ? 'fresh' : 'nudge');
   const field = useId();
   // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
   const rechecking = mode === 'recheck';
@@ -182,7 +185,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
     );
   }
 
-  const modes: RetryMode[] = offer.kind === 'try-again' && offer.recheck ? ['nudge', 'fresh', 'recheck'] : ['nudge', 'fresh'];
+  const modes: RetryMode[] = offer.kind === 'try-again' && offer.recheck ? ['nudge', 'fresh', 'recheck'] : offer.kind === 'denied' ? ['fresh', 'nudge'] : ['nudge', 'fresh'];
   return (
     <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
       {offer.kind === 'answer' && offer.needs ? (

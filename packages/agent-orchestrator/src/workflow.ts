@@ -130,6 +130,17 @@ export type Workflow = {
    */
   allowedTools?: string[];
   /**
+   * `denials: fail`: a try whose session the harness denied a call is not passed on. It signs off as ever, and the step reads `denied` —
+   * nothing after it is filed, no check is run on work done without the tool, and it waits on a person — rather than going on with the
+   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `wf start`, so a try the run
+   * filed on its own would be denied the same call again. A person tries it again with `wf retry` (a new session, told what it was denied,
+   * to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials are recorded and
+   * said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make on purpose included.
+   * Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside `background: true`,
+   * whose `claude --bg` session records none either (agent-runtime's open issue 28).
+   */
+  denials?: 'fail';
+  /**
    * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
    * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
@@ -241,7 +252,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -273,6 +284,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallowedTools: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
   allowedTools: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
+  denials: "`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only",
   background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
   remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
@@ -460,6 +472,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     tools: toolsOf(name, meta.tools, harness),
     disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, harness, spelled.disallowedTools),
     allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, harness, spelled.allowedTools),
+    denials: denialsOf(name, meta.denials, harness, background),
     background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
@@ -987,6 +1000,117 @@ function workspaceOf(step: string, workspace: string | undefined, check: string 
     refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`);
   }
   return 'main';
+}
+
+/** The words `denials:` takes. One: a denied try fails its step's hand-off; without the line, denials are said and decide nothing. */
+export const DENIALS: readonly string[] = ['fail'];
+
+/**
+ * `denials:` as written: `fail`, or refused — and refused where the run would never read a denial, rather than accepted and never met: on
+ * codex, whose `codex exec` records none, and beside `background: true`, whose `claude --bg` session records none (agent-runtime's open
+ * issue 28). Only a job, `claude -p` on `claude` or `claude-detached`, says what it was denied.
+ */
+function denialsOf(step: string, denials: string | undefined, harness: string | undefined, background: boolean | undefined): 'fail' | undefined {
+  if (denials === undefined) return undefined;
+  if (denials !== 'fail') {
+    refuse(`${step}: \`denials: ${denials}\` is not \`fail\`. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing. Write \`denials: fail\`, or delete the line.`);
+  }
+  if ((harness ?? DEFAULT_HARNESS) === 'codex') {
+    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`);
+  }
+  if (background) {
+    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job (\`claude -p\`), which records each call it was denied, or delete \`denials: fail\`.`);
+  }
+  return 'fail';
+}
+
+/** The file-editing tools whose calls a permission rule names by `Edit(…)`: Claude Code matches a file write against `Edit` rules alone. */
+const EDITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+
+/** The tools whose calls a permission rule names by a path, as `denialOf` in agent-runtime names the call by the path it was given. */
+const PATH_TOOLS = ['Read', ...EDITING_TOOLS];
+
+/**
+ * Where a denied call was made: the session's own directory (the step's workspace on the run record) and the run's id. A new run works
+ * in directories named by its own id — `worktrees/<id>/<step>`, `runs/<id>/…` — so a path offered as denied would name this run's and
+ * never match the next's.
+ */
+export type DeniedAt = { cwd?: string; runId?: string };
+
+/** A call or a rule, `Tool` or `Tool(what)`, split. Pure. */
+const callOf = (written: string): { tool: string; what?: string } => {
+  const call = /^([^()]+)\((.*)\)$/s.exec(written);
+  return call ? { tool: call[1]!, what: call[2]! } : { tool: written };
+};
+
+/** A directory as a prefix: no trailing slash. */
+const dirOf = (cwd: string): string => cwd.replace(/\/+$/, '');
+
+/**
+ * The rule that would allow a denied call, in `allowedTools:`'s words, from the call as the runtime words it (`denialText`: `Bash(pytest)`,
+ * `Write(/abs/notes.md)`, `SendMessage`). Pure. Claude Code's rules, which `allowedTools:` is written in (`fileRuleRefusal`):
+ *
+ *   - a file-editing call is `Edit(…)`, whatever tool made it: Write, MultiEdit and NotebookEdit are matched against `Edit` rules alone,
+ *     and `allowedTools:` refuses a path rule on any of them;
+ *   - a path in the session's own directory is written from it (`Edit(notes.md)`), as a rule without a leading `/` is read: the next
+ *     run's step works in a directory of its own, named by its own id, and an absolute path to this run's would never match it;
+ *   - any other absolute path takes a second `/` (`Edit(//abs/notes.md)`): one `/` reads as a path from the settings' folder, not the
+ *     root. A part of it that is this run's id is `*`, which matches the next run's: a path under `runs/<id>/artifacts` is offered with `*` for `<id>`;
+ *   - a command is `Bash(<its first word>:*)`, since its first word is all the runtime keeps of it (`Bash(pytest)`), and a rule without
+ *     `:*` allows that bare word and no command that goes on past it;
+ *   - any other call is as it was denied: `Skill(look)`, `SendMessage`.
+ *
+ * What a person adds to a folder's `allowedTools:` for a new run; nothing here widens the run that was denied, whose `allowedTools:` is frozen.
+ */
+export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
+  const { tool, what } = callOf(denied);
+  if (what === undefined) return denied;
+  if (tool === 'Bash') return `Bash(${what}:*)`;
+  if (!PATH_TOOLS.includes(tool)) return denied;
+  return `${EDITING_TOOLS.includes(tool) ? 'Edit' : tool}(${pathRuleOf(what, at)})`;
+}
+
+function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
+  if (!path.startsWith('/') || path.startsWith('//')) return path;
+  if (cwd && path.startsWith(`${dirOf(cwd)}/`)) return path.slice(dirOf(cwd).length + 1);
+  return `/${runId ? path.split('/').map((part) => (part === runId ? '*' : part)).join('/') : path}`;
+}
+
+/**
+ * The first of a step's `disallowedTools:` rules that may be what denied a call, or undefined. Pure. A deny beats every allow, so a call one
+ * of them denied is denied again in a new run whatever its `allowedTools:` says, and is offered no allow rule (`deniedOffer`). *May*: the
+ * runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallowedTools: Bash(npm run build)` at work, or `npm test` that
+ * nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names nothing, or names
+ * that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's directory for any
+ * other; `~` is nobody's here, and matches nothing), or exactly what the call names.
+ */
+export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}): string | undefined {
+  const call = callOf(denied);
+  return disallowedTools.find((written) => {
+    const rule = callOf(written);
+    if (rule.tool !== call.tool && !(rule.tool === 'Edit' && EDITING_TOOLS.includes(call.tool))) return false;
+    if (rule.what === undefined) return true;
+    if (call.what === undefined) return false;
+    if (call.tool === 'Bash') {
+      const first = rule.what.replace(/:\*$/, '').trim().split(/\s+/)[0];
+      return first === call.what || first === '*';
+    }
+    if (PATH_TOOLS.includes(call.tool)) return pathUnder(rule.what, call.what, at.cwd);
+    return rule.what === call.what;
+  });
+}
+
+/** Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. Pure. */
+function pathUnder(pattern: string, path: string, cwd: string | undefined): boolean {
+  const target = path.startsWith('/') ? path.replace(/^\/\//, '/') : cwd ? `${dirOf(cwd)}/${path.replace(/^\.\//, '')}` : undefined;
+  if (target === undefined || pattern.startsWith('~')) return false;
+  const relative = !pattern.startsWith('//');
+  if (relative && !cwd) return false;
+  const bare = relative ? pattern.replace(/^\.?\//, '') : pattern.slice(1);
+  const glob = bare.split(/(\*\*|\*|\?)/).map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&'))).join('');
+  // A relative pattern with no `/` in it names a file at any depth below the directory, as a gitignore line does.
+  const from = relative ? `${dirOf(cwd!).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
+  return new RegExp(`^${from}${glob}(?:/.*)?$`, 's').test(target);
 }
 
 /** The words `slot:` takes. One: a run is counted against the cap on runs in flight, or it is one that watches the counted ones. */

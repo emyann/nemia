@@ -266,6 +266,26 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   ]);
 });
 
+test("a step `denials: fail` stopped is offered the bare `wf retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `wf decide` said — and reads `denied`, waited on by a person", async () => {
+  const denying = [{ ...workflow[0], harness: 'claude', denials: 'fail' }, { ...workflow[1], harness: 'claude' }];
+  journal('t-d11-implement', [
+    { ...filed('t-d11-implement'), harness: 'claude' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-d11-implement/1', observed: 'done', reason: 'harness', closeout: done, denials: [{ tool: 'Write', what: '/tmp/w/notes.md' }] },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]);
+  writeRun({ id: 'r-d11', repo, baseRef: base, workflow: denying, steps: { implement: { taskId: 't-d11-implement', branch }, review: { taskId: null } } });
+
+  const detail = await (await app.request('/api/runs/r-d11')).json();
+  assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'waiting', ['implement']]);
+  const { status, body } = await decisionOf('r-d11');
+  assert.equal(status, 200);
+  const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
+  assert.deepEqual(once.map(({ label, command }: DecideCommand) => ({ label, command })), [{ label: 'once more', command: 'wf retry r-d11 implement --fresh' }]);
+  assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
+});
+
 test("a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers", async () => {
   // implement signed off blocked on a branch nobody made, and review is never filed: the branch a step worked on is read.
   settledTask('t-d3-implement', blocked);

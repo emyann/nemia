@@ -285,7 +285,7 @@ test("a codex step that names its sandbox as `permissionMode:`, as before 2026-0
   const stale = await put('fenced', { steps: [{ ...step, spec: { ...rest, permissionMode: sandbox } }] });
   const refusal = await stale.json() as BuildRefused;
   assert.equal(stale.status, 422, JSON.stringify(refusal));
-  assert.equal(refusal.error, 'review: `permissionMode: read-only` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send `sandbox: read-only` — a page open since before then sends the former name: reload it, and save again.');
+  assert.equal(refusal.error, 'review: `permissionMode: read-only` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send `sandbox: read-only` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.');
   assert.deepEqual(refusal.steps, ['review']);
   assert.deepEqual(snapshot(dir), before, 'nothing written');
 

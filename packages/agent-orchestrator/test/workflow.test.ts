@@ -1522,7 +1522,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
 
 test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sandbox as `permissionMode`, as a page open since before 2026-09-23 does', () => {
   const said = (file: string, word: string, as: string) => (e: Error) =>
-    e.message === `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send \`sandbox: ${as}\` — a page open since before then sends the former name: reload it, and save again.`;
+    e.message === `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send \`sandbox: ${as}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
   assert.throws(() => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'read-only' } as StepDraft), said('review', 'read-only', 'read-only'));
   assert.throws(() => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'bypassPermissions' } as StepDraft), said('review', 'bypassPermissions', 'danger-full-access'));
   assert.throws(() => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'read-only' }, body: 'You review.' } as Parameters<typeof renderAgent>[0]), said('agents/reviewer.md', 'read-only', 'read-only'));
@@ -1530,6 +1530,13 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
   assert.match(renderStep({ name: 'review', body: 'Review it.', harness: 'codex', sandbox: 'read-only' } as StepDraft), /^sandbox: read-only$/m);
   assert.match(renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' } as Parameters<typeof renderAgent>[0]), /^sandbox: read-only$/m);
   assert.match(renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft), /^permissionMode: dontAsk$/m);
+  // A Claude Code mode kept by a step moved onto codex names no sandbox and no former line: written as given, for the parser to refuse
+  // naming `sandbox:` — not told to reload a page, which would send it again.
+  const moved = renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft);
+  assert.throws(() => parseWorkflow('review', moved), (e: Error) => e.message.startsWith('review: `permissionMode: dontAsk` is not a key codex takes.') && e.message.includes('Write `sandbox:` instead'));
+  const agent = renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' } as Parameters<typeof renderAgent>[0]);
+  assert.match(agent, /^permissionMode: dontAsk$/m);
+  assert.throws(() => parseAgent('reviewer', agent), (e: Error) => e.message.startsWith('agents/reviewer.md: `permissionMode: dontAsk` is not a key codex takes.'));
 });
 
 test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input`, `disallowedTools` or `allowedTools` are no line — and a step that sets nothing is its body', () => {

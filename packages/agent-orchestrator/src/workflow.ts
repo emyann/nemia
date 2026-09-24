@@ -435,7 +435,7 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
- * the step's unless the step sets it too, and what the step is told is the agent's instructions, a blank line, then the step's own note —
+ * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key — and what the step is told is the agent's instructions, a blank line, then the step's own note —
  * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
  * parser sees the resolved step; `agent` on it says what was the step's own.
  */
@@ -452,17 +452,29 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   // The step's own lines are read against the harness the step will run on, its agent's where it names none, before the two are merged: so a
   // step's `permissionMode:` from before `sandbox:` is its own `sandbox:`, and wins over its agent's as any key of its own does.
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
+  // A fence is one key on each harness, and a step's own replaces its agent's under either name: so a step that runs a Claude Code agent on
+  // codex with a sandbox of its own is not also given the agent's permission mode, which no line of it could unset — and the other way round.
+  const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
   if (!body) throw new WorkflowError(`${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`);
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
-  const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read, spelled);
+  const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
     const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
     return value === undefined ? [] : [[key, value]];
   }));
   return { ...step, agent: { name: agent.name, keys, body: own, given } };
+}
+
+/** The fence a step's lines write, under either name: Claude Code's permission mode or Codex's sandbox. */
+const fenceOf = (keys: Partial<Record<string, string>>): string | undefined => keys.sandbox ?? keys.permissionMode;
+
+/** An agent's keys with neither fence, for a step that writes its own. */
+function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
+  const { permissionMode: _mode, sandbox: _sandbox, ...rest } = keys;
+  return rest as T;
 }
 
 /** The agent `agent:` names, or why not: one there is not, listing those there are, or one whose file is refused, in its words. */
@@ -555,7 +567,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools',
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
   if (unknown !== undefined) refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
-  if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
+  if (step.harness === 'codex' && step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined) refuse(codexModeWritten(step.name, step.permissionMode));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
@@ -1603,7 +1615,7 @@ export function renderAgent(draft: AgentDraft): string {
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  if (keys.harness === 'codex' && keys.permissionMode != null) refuse(codexModeWritten(file, keys.permissionMode));
+  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined) refuse(codexModeWritten(file, keys.permissionMode));
   const own: ReadonlyArray<'description' | 'skills'> = ['description', 'skills'];
   const values: Array<[string, string | null | undefined]> = [['description', draft.description], ['skills', draft.skills], ...AGENT_KEYS.filter((key) => !(own as readonly string[]).includes(key)).map((key) => [key, keys[key]] as [string, string | null | undefined])];
   const lines = values.flatMap(([key, value]) => {
@@ -1734,12 +1746,13 @@ const formerKeyWritten = (file: string, former: string): string =>
   `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file written before 2026-09-23 may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page open since before then sends the former name: reload it, and save again.`;
 
 /**
- * Why a codex `permissionMode` is not written, as `formerKeyWritten` says of a former name: read from a file, it is `sandbox:` on the step
- * (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and `writeWorkflow` for a step whose harness is its
- * agent's. What sends one is a form drawn before the key was Codex's own.
+ * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read from a
+ * file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and `writeWorkflow` for a
+ * step whose harness is its agent's. What sends one is a form drawn before the key was Codex's own, or a step moved onto codex that kept its
+ * Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
-  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until ${SANDBOX_SINCE}, which a file written before may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` — a page open since before then sends the former name: reload it, and save again.`;
+  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until ${SANDBOX_SINCE}, which a file written before may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
 
 /** What `wf start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
 export const codexModeLine = (file: string, word: string): string =>

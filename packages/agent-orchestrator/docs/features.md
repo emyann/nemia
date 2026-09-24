@@ -4273,7 +4273,10 @@ at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test
   is read as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias for the widest sandbox, as
   `sandbox: danger-full-access`; `wf start` prints a line naming each file to rewrite (`codexModeLine`). A word that was never a
   sandbox — `dontAsk` on codex — is refused naming `sandbox:`, as is the former line written beside a `sandbox:`. An agent's line is
-  read against the harness the step runs on, the step's own or the agent's.
+  read against the harness the step runs on, the step's own or the agent's. A step's own fence, under either name, replaces both of its
+  agent's: a Claude Code agent's `permissionMode: dontAsk` is not given to a step that runs it on codex with a sandbox of its own — the
+  step could not unset it — and the other way round. A save of `permissionMode:` on codex is refused as the former name only when it names
+  a sandbox; a Claude Code mode a step kept when it was moved onto codex is written as sent and refused by the parser, naming `sandbox:`.
 - **A run frozen before loads**: `asNamed` reads a codex step's `permissionMode` as its `sandbox`. A record is written with the
   sandbox under both names (`withFormerNames`), since a `wf up` from before files a codex step's `-s` from its `permissionMode` alone.
 - **The runtime is unchanged.** The engine's task still calls either fence `config.permissionMode`, and the tick files the one a step

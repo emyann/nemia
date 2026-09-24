@@ -123,7 +123,7 @@ test("a codex agent that names its sandbox as `permissionMode:`, as before 2026-
     assert.deepEqual(agents.find((a) => a.name === 'moded-broken')!.keys, { harness: 'claude', permissionMode: 'dontAsk' }, "a Claude Code agent's mode is its own");
 
     await refused(send('PUT', '/api/agents/yours/fenced', { name: 'fenced', description: fenced.description, keys: { harness: 'codex', permissionMode: 'bypassPermissions' }, body: fenced.body, version: fenced.version }), 422,
-      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, .* Send `sandbox: danger-full-access` — .* reload it, and save again\.$/);
+      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, .* Send `sandbox: danger-full-access` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/);
     const put = await send('PUT', '/api/agents/yours/fenced', { name: 'fenced', description: fenced.description, keys: fenced.keys, body: fenced.body, version: fenced.version });
     assert.equal(put.status, 200, await put.clone().text());
     assert.equal(fs.readFileSync(path.join(AGENTS, 'fenced.md'), 'utf8'), '---\ndescription: Reviews on codex.\nharness: codex\nsandbox: danger-full-access\n---\nReview it.\n');

@@ -21,7 +21,7 @@ only in its folder. Both run in `permissionMode: dontAsk`, which every step of a
 (`validateFolderMode`): a folder is nobody's checkout, nobody is there to answer a prompt, and in a mode that can
 ask a call outside the folder can stop the session for ever. `dontAsk` denies it with no prompt instead, and
 the session reads the refusal and carries on — so the writer, which that mode would deny its own `note.md`, is
-given `allow: Edit(**)`, a glob against the folder it is in. One rule is enough for Write and Edit both: Claude
+given `allowedTools: Edit(**)`, a glob against the folder it is in. One rule is enough for Write and Edit both: Claude
 Code matches a file write against `Edit` rules alone, whatever tool made it, and a `Write(…)` rule is taken and
-never matched (which is why `allow:` refuses one). When the note has been read, `wf rm <run>` forgets the run
+never matched (which is why `allowedTools:` refuses one). When the note has been read, `wf rm <run>` forgets the run
 with its folders and files.

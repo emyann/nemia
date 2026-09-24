@@ -14,7 +14,7 @@ tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
 # The settings allow `npm run build` and `npm run e2e` for implement's check, and both write into the workspace. Denied here
 # by name, as on review (`--disallowedTools`) — those two spellings only; workflows/dev/README.md says which allows still reach them.
-disallow: Bash(npm run build), Bash(npm run e2e)
+disallowedTools: Bash(npm run build), Bash(npm run e2e)
 # The plan travels as this step's closeout — `approach`, `files`, `steps` and `risks`, in the shape plan.schema.json declares —
 # and implement reads it (`input: plan`), as data.
 output: plan.schema.json

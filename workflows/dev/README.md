@@ -20,7 +20,7 @@ the step could edit, and `packages/agent-orchestrator/test/web-check.test.ts` ru
 by its brief: `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it
 has no tool that writes and a command `.claude/settings.json` does not allow is denied without a prompt.
 The settings allow `npm run build` and `npm run e2e` for implement's sake, and both write into the
-workspace, so review is denied those two by name — `disallow: Bash(npm run build), Bash(npm run e2e)`,
+workspace, so review is denied those two by name — `disallowedTools: Bash(npm run build), Bash(npm run e2e)`,
 passed as `--disallowedTools`, which beats the settings' allow. Those two spellings only: the settings'
 `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still run the build and the e2e by other names
 (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), which only review's brief keeps it

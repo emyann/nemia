@@ -12,7 +12,7 @@ implement ⇄ review
 skill (`.claude/skills/look/SKILL.md`) on every page it changed before it signs off, and declares the
 screenshots it read and the pages they show (`implement.schema.json`). `review` runs on Claude with
 `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it has no tool that
-writes and a command `.claude/settings.json` does not allow is denied without a prompt; and with `disallow:
+writes and a command `.claude/settings.json` does not allow is denied without a prompt; and with `disallowedTools:
 Bash(npm run build), Bash(npm run e2e)`, the two commands the settings allow for implement's check, so it
 cannot run those two. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach the
 build and the e2e by other names (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), and

@@ -1112,6 +1112,14 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only', "the workflow's word, as filed");
   assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox, 'workspace-write · this try');
   assert.equal(rowsOf(readOnly, null).sandbox, 'read-only', 'and a step not filed yet says what its workflow says');
+  // A codex run frozen before 2026-09-23 with `permissionMode: bypassPermissions` reads as `sandbox: danger-full-access`, and its tries were
+  // filed with the former word: the same fence, which Codex ran as `-s danger-full-access`, so no try of its own — as run, or where the api
+  // could not ask the harness.
+  const widest: StepSpec = { ...unset, harness: 'codex', sandbox: 'danger-full-access' };
+  const former: StepFiled = { ...bare, permissionMode: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
+  assert.equal(rowsOf(widest, former).sandbox, 'danger-full-access');
+  assert.equal(rowsOf(widest, { ...former, runsIn: null }).sandbox, 'danger-full-access');
+  assert.equal(rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only · this try', 'another sandbox is still a try of its own');
 
   // A model a person's `wf retry --model` asked for is this try's, and not a default, where the workflow names none.
   assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');

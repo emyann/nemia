@@ -92,8 +92,11 @@ export type StepReach = {
   harness: string;
   /** Whether it runs on Claude Code, whose set was measured. Every field below that says null says it is not. */
   claudeCode: boolean;
-  /** The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has. */
-  fence: { tools: string[] | null; disallowedTools: string[]; allowedTools: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  /**
+   * The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has. `permissionMode`
+   * is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
+   */
+  fence: { tools: string[] | null; disallowedTools: string[]; allowedTools: string[]; permissionMode: string | null; sandbox: string | null; effort: string | null; mcp: null };
   /**
    * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes. `inferred`
    * are those of the measured set no measurement named (`MEASURED_TOOLS.inferred`); none for a step that declares its tools.
@@ -208,7 +211,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   const askDenier = CLAUDE_CODE.has(harness) ? askDenierOf(harness, spec) : null;
   const reach = {
     workflow: workflow.name, from: workflow.from, step, harness,
-    fence: { tools: spec.tools, disallowedTools: spec.disallowedTools, allowedTools: spec.allowedTools, permissionMode: spec.permissionMode, effort: spec.effort, mcp: null },
+    fence: { tools: spec.tools, disallowedTools: spec.disallowedTools, allowedTools: spec.allowedTools, permissionMode: spec.permissionMode, sandbox: spec.sandbox, effort: spec.effort, mcp: null },
   };
   if (!CLAUDE_CODE.has(harness)) {
     return {

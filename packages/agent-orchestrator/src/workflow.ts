@@ -665,6 +665,16 @@ function codexSandboxNamed<K extends string>(file: string, meta: Partial<Record<
 const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
 
 /**
+ * The sandbox a codex file's `permissionMode: <word>` is read as, written before 2026-09-23, or `undefined` for a word that names none,
+ * which the parser refuses. For code outside the package that reads a file's lines the parser did not read — the api's picture of an agent
+ * that does not load — so it reads the former line as the parser would. Pure.
+ */
+export const formerSandbox = (word: string): string | undefined => {
+  const sandbox = sandboxNamed(word);
+  return SANDBOXES.codex!.includes(sandbox) ? sandbox : undefined;
+};
+
+/**
  * The fence a step asks its harness for: the engine's task calls both `permissionMode`, Claude Code's permission mode and Codex's sandbox,
  * and a step has at most one of the two (`wordOf`). What the tick files as `config.permissionMode`. Pure.
  */

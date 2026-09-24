@@ -108,6 +108,30 @@ test('an agent that writes a list under its former name — `disallow:`, `allow:
   }
 });
 
+test("a codex agent that names its sandbox as `permissionMode:`, as before 2026-09-23, is listed with its `sandbox`, read or not; a save writes `sandbox:`, and a page from before that sends `permissionMode` is refused", async () => {
+  fs.writeFileSync(path.join(AGENTS, 'fenced.md'), '---\ndescription: Reviews on codex.\nharness: codex\npermissionMode: bypassPermissions\n---\nReview it.\n');
+  fs.writeFileSync(path.join(AGENTS, 'fenced-broken.md'), '---\nharness: codex\npermissionMode: read-only\ncheck: npm test\n---\nReview it.\n');
+  fs.writeFileSync(path.join(AGENTS, 'moded-broken.md'), '---\nharness: claude\npermissionMode: dontAsk\ncheck: npm test\n---\nDo it.\n');
+  try {
+    const agents = await listed();
+    const fenced = agents.find((a) => a.name === 'fenced')!;
+    assert.equal(fenced.error ?? null, null);
+    assert.deepEqual(fenced.keys, { harness: 'codex', sandbox: 'danger-full-access' });
+    const broken = agents.find((a) => a.name === 'fenced-broken')!;
+    assert.match(broken.error ?? '', /`check` is wiring/);
+    assert.deepEqual(broken.keys, { harness: 'codex', sandbox: 'read-only' }, 'its lines as the parser reads them, so the form can put it right');
+    assert.deepEqual(agents.find((a) => a.name === 'moded-broken')!.keys, { harness: 'claude', permissionMode: 'dontAsk' }, "a Claude Code agent's mode is its own");
+
+    await refused(send('PUT', '/api/agents/yours/fenced', { name: 'fenced', description: fenced.description, keys: { harness: 'codex', permissionMode: 'bypassPermissions' }, body: fenced.body, version: fenced.version }), 422,
+      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, .* Send `sandbox: danger-full-access` — .* reload it, and save again\.$/);
+    const put = await send('PUT', '/api/agents/yours/fenced', { name: 'fenced', description: fenced.description, keys: fenced.keys, body: fenced.body, version: fenced.version });
+    assert.equal(put.status, 200, await put.clone().text());
+    assert.equal(fs.readFileSync(path.join(AGENTS, 'fenced.md'), 'utf8'), '---\ndescription: Reviews on codex.\nharness: codex\nsandbox: danger-full-access\n---\nReview it.\n');
+  } finally {
+    for (const name of ['fenced', 'fenced-broken', 'moded-broken']) fs.rmSync(path.join(AGENTS, `${name}.md`), { force: true });
+  }
+});
+
 test('an agent that is a link is listed with its refusal alone: nothing of what it points at, outside the folder, is read', async () => {
   const outside = path.join(root, 'outside-agent.md');
   fs.writeFileSync(outside, '---\nmodel: opus\n---\nA secret from outside.\n');

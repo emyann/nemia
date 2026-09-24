@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { AgentWriteError, agentUsers, agentVersion, HOME, loadAgents, removeAgent, writeAgent, type AgentSchema } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, formerSandbox, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { sourcesOf, type WorkflowSource } from './workflows.ts';
@@ -98,6 +98,12 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
       const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
       return value === undefined ? [] : [[key, value]];
     })) as Partial<Record<RoleKey, string>>;
+    // A codex agent's sandbox, written as `permissionMode:` before 2026-09-23, is its `sandbox` — as the parser reads it (`formerSandbox`).
+    const former = keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined ? formerSandbox(keys.permissionMode) : undefined;
+    if (former !== undefined) {
+      delete keys.permissionMode;
+      keys.sandbox = former;
+    }
     let body = '';
     try { body = splitFrontmatter(file, source).body; } catch { body = source; }
     return {

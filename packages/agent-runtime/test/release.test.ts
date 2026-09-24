@@ -275,7 +275,7 @@ test("a task settled before its session's id was recorded keeps that session lis
   // Two journals a person stopped, as an engine without the id wrote one and as this one writes the other.
   const at = new Date().toISOString();
   const stopped = (settled: Event): Event[] => [
-    { kind: 'filed', at, brief: 'the prompt', cwd: '/r', maxAttempts: 1, harness: 'claude' },
+    { kind: 'filed', at, brief: 'the prompt', cwd: '/r', harness: 'claude' },
     { kind: 'starting', at, attempt: 1 },
     { kind: 'spawned', at, attempt: 1 },
     { kind: 'stop-requested', at },

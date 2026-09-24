@@ -385,23 +385,18 @@ test('refused: a task asked to stop, before its session has', async () => {
   await box.close();
 });
 
-test('refused: an attempt that has ended, with another still to come', async () => {
-  const root = tmp('board');
-  const engine = createEngine({ root });
-  const { id, row, box } = await running(engine, { maxAttempts: 2 });
-  const other = await running(engine);
-  // A pass that writes an end starts the next attempt in the same breath, unless the ceiling is full. So the same
-  // board with a ceiling of one, which the other session fills: the window in which the attempt has ended and
-  // nothing runs to hear anything.
-  const full = createEngine({ root, maxConcurrent: 1 });
-  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'failed' } : r)));
-  await full.tick();
-  const { state } = await full.view(id);
-  assert.deepEqual(state.attempts.map((a) => a.ended), ['failed'], 'the end is written and the next attempt not started');
-  assert.equal(state.settled, null);
-  await refused(full, id, 'hello', /has no attempt running: attempt 1 ended `failed`/, box);
+test('refused: an attempt that has ended on a task that has not settled — one held open, waiting on its answer', async () => {
+  // A task makes one attempt per start, so the window is a task held open between turns: its turn ended `done`, and
+  // nothing runs to hear anything until a person answers it.
+  const engine = createEngine({ root: tmp('board') });
+  const { id, row, box } = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
+  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
+  await engine.tick();
+  const { state } = await engine.view(id);
+  assert.deepEqual(state.attempts.map((a) => a.ended), ['done'], 'the end is written');
+  assert.equal(state.settled, null, 'and the task waits');
+  await refused(engine, id, 'hello', /has no attempt running: attempt 1 ended `done`/, box);
   await box.close();
-  await other.box.close();
 });
 
 test('refused: an attempt its harness does not list, and one it lists as no longer running', async () => {

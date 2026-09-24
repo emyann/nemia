@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, denialText, type Attempt, type Engine, type Event, type ResumePolicy, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
+import { createEngine, denialText, retiredKeyRefusal, type Attempt, type Engine, type Event, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -20,16 +20,17 @@ import { createEngine, denialText, type Attempt, type Engine, type Event, type R
  * none can be accepted here and then dropped.
  */
 export const BRIEF_KEYS = [
-  'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
-  'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
+  'cwd', 'harness', 'model', 'permissionMode', 'deadlineSeconds',
+  'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
   'contextTokens', 'background', 'holdOpen',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
 const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
 
-/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
-const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+/** Keys a brief had until the runtime made one attempt per start (stage 4a part 2): refused by name, saying where trying again went. */
+const RETIRED_BRIEF_KEYS = ['maxAttempts', 'resume'] as const;
+const isRetiredBriefKey = (key: string): key is (typeof RETIRED_BRIEF_KEYS)[number] => (RETIRED_BRIEF_KEYS as readonly string[]).includes(key);
 
 /** A refusal: exit code 2, and a sentence that says what to write instead. */
 const refuse = (message: string) => Object.assign(new Error(`brief: ${message}`), { exitCode: 2 });
@@ -40,8 +41,8 @@ const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); 
  * A brief is a markdown file: optional `key: value` frontmatter, body is the prompt.
  *
  * It refuses rather than guesses: a key not in `BRIEF_KEYS`, a key given twice, a line that is not
- * `key: value`, an empty value, a count or a number of seconds that is not one, a `resume` that is
- * not a policy, a `cwd` or schema file that is not there, and a brief with nothing to do. What a
+ * `key: value`, an empty value, a count or a number of seconds that is not one, a retired
+ * `maxAttempts` or `resume`, a `cwd` or schema file that is not there, and a brief with nothing to do. What a
  * value means to a harness — a permission mode, a harness name — is the engine's to check, and
  * `file()` checks it, so this is not the only door that does.
  */
@@ -60,6 +61,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
     const key = line.slice(0, i).trim();
     const value = line.slice(i + 1).trim();
+    if (isRetiredBriefKey(key)) throw refuse(retiredKeyRefusal(key));
     if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
     if (meta.has(key)) throw refuse(`\`${key}\` is given twice. Keep one.`);
     if (!value) throw refuse(`\`${key}:\` has no value. Give it one, or delete the line.`);
@@ -69,11 +71,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const brief = (m ? source.slice(m[0].length) : source).trim();
   if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
 
-  const maxAttempts = meta.get('maxAttempts');
-  // Digits alone are not a count: 309 nines is `Infinity` once converted, so the number is checked too.
-  if (maxAttempts !== undefined && !(/^[1-9]\d*$/.test(maxAttempts) && Number.isSafeInteger(Number(maxAttempts)))) {
-    throw refuse(`\`maxAttempts: ${maxAttempts}\` is not a number of attempts. Write a whole number from 1, like \`maxAttempts: 2\`.`);
-  }
   const deadlineSeconds = meta.get('deadlineSeconds');
   if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
     throw refuse(`\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`);
@@ -97,10 +94,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const holdOpen = meta.get('holdOpen');
   if (holdOpen !== undefined && holdOpen !== 'true' && holdOpen !== 'false') {
     throw refuse(`\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`);
-  }
-  const resume = meta.get('resume');
-  if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
-    throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
   }
   const cwd = meta.get('cwd');
   if (cwd !== undefined && !isDirectory(path.resolve(cwd))) {
@@ -145,11 +138,8 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     brief,
     cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
     harness: meta.get('harness'),
-    maxAttempts: maxAttempts !== undefined ? Number(maxAttempts) : 1,
     deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
-    resume: resume as ResumePolicy | undefined,
-    // Which session to CONTINUE, as opposed to `resume` which is the retry policy between
-    // attempts of this task. Two different questions that the same English word answers.
+    // Which session to CONTINUE: the task's one attempt starts from it rather than cold.
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
     budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
@@ -242,16 +232,15 @@ export const attemptLine = (a: Attempt): string => {
 /**
  * One task, for `ae ls`: its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
  * turns — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
- * Code writes a session's cost as its process exits. A task held open and answered counts the attempts of its current
- * turn against `maxAttempts`, as `decide` does, and says which turn — `1/2 turn 1`.
+ * Code writes a session's cost as its process exits. A task held open and answered says which turn it is on — `turn 1`.
  */
 export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
-  const tries = `${v.state.attempts.filter((a) => (a.turn ?? 0) === turn).length}/${v.state.maxAttempts}${turn ? ` turn ${turn}` : ''}`;
+  const tries = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const priority = v.state.priority !== undefined ? `  priority ${v.state.priority}` : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${tries}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
 /**
@@ -294,10 +283,9 @@ const HELP = `ae — an engine for agent sessions
   ae watch [cursor]            the same, followed
 
   a brief is markdown with optional frontmatter:
-    cwd, model, maxAttempts, permissionMode
+    cwd, model, permissionMode
     harness          claude (default) | codex | claude-detached
-    deadlineSeconds  wall clock across all attempts (of a turn, when held open)
-    resume           interrupted (default) | always | never — the RETRY policy
+    deadlineSeconds  wall clock of the task's attempt (of a turn's, when held open)
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
     closeoutSchema   a JSON Schema file — the workload ends by answering in that shape
@@ -310,11 +298,13 @@ const HELP = `ae — an engine for agent sessions
     background       true — claude only: run the session as claude --bg, which a person
                      can attach to, instead of as a job (claude -p, the default); ae say
                      reaches either
-    holdOpen         true — when an attempt signs, wait for ae answer or ae close
+    holdOpen         true — when a turn ends done, wait for ae answer or ae close
                      rather than settle: input-required, with nothing running
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
+  one attempt per start: a task that fails settles failed — file it again, with
+  resumeFrom to continue its session (maxAttempts and resume are retired)
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster
   AE_MAX_CONCURRENT  sessions at work at once per pool: claude and claude-detached

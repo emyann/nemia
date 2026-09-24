@@ -141,7 +141,7 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
   const engine = createEngine({ journal, harnesses: harnesses ?? { fake } });
   /** Write a task's journal by hand: the filing, held open unless said, then `events`. */
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) => tasks.set(id, [
-    { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', maxAttempts: 2, holdOpen: true, harness: 'fake', ...filed }, ...events]);
+    { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', holdOpen: true, harness: 'fake', ...filed }, ...events]);
   return { engine, sessions, tasks, write };
 };
 
@@ -291,14 +291,15 @@ test('a brief says `holdOpen: true` or `false`, and nothing else', () => {
   }
 });
 
-test('ae ls counts the current turn\'s attempts against maxAttempts, and names the turn', () => {
+test('ae ls names the turn of a task held open, and counts no attempts: one per start', () => {
   const at = new Date().toISOString();
   const events: Event[] = [
-    { kind: 'filed', at, brief: 'b', cwd: '/r', maxAttempts: 2, holdOpen: true }, ...signedJournal(),
+    { kind: 'filed', at, brief: 'b', cwd: '/r', holdOpen: true }, ...signedJournal(),
     { kind: 'input', at, text: 'again' }, { kind: 'starting', at, attempt: 2 },
   ];
   const line = (n: number) => taskLine({ id: 't-1', state: fold('t-1', events.slice(0, n)), phase: 'x', sessionId: null });
-  assert.match(line(4), / 1\/2  /, 'turn 0: every attempt');
-  assert.match(line(5), / 0\/2 turn 1  /, 'answered: a turn with none yet');
-  assert.match(line(6), / 1\/2 turn 1  /);
+  assert.doesNotMatch(line(4), /turn/, 'turn 0: nothing to name');
+  assert.match(line(5), / x {17} turn 1  /, 'answered: a turn with no attempt yet');
+  assert.match(line(6), / x {17} turn 1  /);
+  for (const n of [4, 5, 6]) assert.doesNotMatch(line(n), /\d\/\d/, 'no count of attempts against a maximum');
 });

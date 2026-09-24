@@ -37,9 +37,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     harness: ['codex', 'codex'],
     model: ['opus', 'opus'],
     permissionMode: ['acceptEdits', 'acceptEdits'],
-    maxAttempts: ['3', 3],
     deadlineSeconds: ['900', 900],
-    resume: ['always', 'always'],
     resumeFrom: ['abc-123', 'abc-123'],
     worktree: ['my-branch', 'my-branch'],
     closeoutSchema: [schema, { type: 'object' }],
@@ -96,17 +94,13 @@ test('a contextTokens that is not a whole number of tokens, in digits, is refuse
   assert.equal(parse(brief('contextTokens: 150000')).config?.contextTokens, 150000, 'the range is file()\'s to check');
 });
 
-test('a maxAttempts that is not a whole number from 1 is refused', () => {
-  // The last is digits only, and converts to Infinity: the syntax passes, the number does not.
-  for (const bad of ['0', '2.5', 'two', '-1', '1e2', '9'.repeat(309)]) {
-    refuses(brief(`maxAttempts: ${bad}`), /is not a number of attempts/);
-  }
-});
-
-test('a resume that is not a retry policy is refused, and points at resumeFrom', () => {
-  refuses(brief('resume: sometimes'), /not a retry policy.*interrupted, always, never.*resumeFrom/);
-  // `in` would have said yes: every object has a `toString`.
-  refuses(brief('resume: toString'), /not a retry policy/);
+test('maxAttempts and resume are retired: refused at what were their defaults, pointing at filing again, retries: and wf retry', () => {
+  refuses(brief('maxAttempts: 1'), /^brief: `maxAttempts` is retired: the runtime makes one attempt per start.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/);
+  refuses(brief('maxAttempts: 3'), /^brief: `maxAttempts` is retired/);
+  refuses(brief('resume: interrupted'), /^brief: `resume` is retired: .*`retries:`.*`wf retry <run> <step>`/);
+  refuses(brief('resume: sometimes'), /^brief: `resume` is retired/);
+  // resumeFrom, the session a task continues, is not the policy that went.
+  assert.equal(parse(brief('resumeFrom: abc-123')).resumeFrom, 'abc-123');
 });
 
 test('a key given twice, a line that is not key: value, and an empty value are refused', () => {
@@ -152,7 +146,7 @@ test('no frontmatter is all prompt, at the defaults', () => {
   const spec = parse('just do it');
   assert.equal(spec.brief, 'just do it');
   assert.equal(spec.cwd, '/fallback');
-  assert.equal(spec.maxAttempts, 1);
+  assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'no retry policy: one attempt per start');
 });
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));

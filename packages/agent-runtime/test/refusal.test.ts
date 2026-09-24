@@ -37,17 +37,18 @@ const promiseDoor = () => {
 const ok: Filing = { brief: 'b', cwd: '/r' };
 
 /** Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are cast, as a JSON caller would send them. */
-const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs, unknown>>, RegExp]> = [
+const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume', unknown>>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
   [{ cwd: 'repo' }, new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`)],
-  [{ maxAttempts: 0 }, /^`maxAttempts: 0` is not a number of attempts\./],
-  [{ maxAttempts: 1.5 }, /^`maxAttempts: 1\.5` is not a number of attempts\./],
-  [{ maxAttempts: Number.NaN }, /^`maxAttempts: NaN` is not a number of attempts\./],
+  // Retired, at what were their defaults: the runtime makes one attempt per start, and trying again is the caller's.
+  [{ maxAttempts: 1 }, /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/],
+  [{ maxAttempts: 2 }, /^`maxAttempts` is retired:/],
+  [{ resume: 'interrupted' }, /^`resume` is retired: the runtime makes one attempt per start.*`retries:`.*`wf retry <run> <step>`/],
+  [{ resume: 'always' }, /^`resume` is retired:/],
   [{ deadlineSeconds: Number.NaN }, /^`deadlineSeconds: NaN` is not a number of seconds\./],
   [{ deadlineSeconds: 0 }, /^`deadlineSeconds: 0` is not a number of seconds\./],
   [{ deadlineSeconds: Infinity }, /^`deadlineSeconds: Infinity` is not a number of seconds\./],
-  [{ resume: 'sometimes' }, /^`resume: sometimes` is not a retry policy\. It is one of: interrupted, always, never\.$/],
   [{ config: { model: '' } }, /^`model` is empty\./],
   [{ resumeFrom: '' }, /^`resumeFrom` is empty\./],
   [{ config: { effort: '' } }, /^`effort` is empty\./],
@@ -102,7 +103,7 @@ for (const [bad, says] of REFUSALS) {
 test('the Effect door journals a filing that refuses nothing, with every checked key set', async () => {
   const effect = effectDoor();
   const full: Filing = {
-    ...ok, maxAttempts: 2, deadlineSeconds: 60, resume: 'always', resumeFrom: 's-1', budgetUsd: 0.25, priority: -1,
+    ...ok, deadlineSeconds: 60, resumeFrom: 's-1', budgetUsd: 0.25, priority: -1,
     config: {
       model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
       allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, background: false, contextTokens: 200000,

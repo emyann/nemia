@@ -406,7 +406,7 @@ test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reaso
   const ids = {
     capped: await engine.file({
       brief: LOOP_BRIEF, cwd: notesIn('budget-p'), harness: 'claude-detached', config: { model: 'haiku', tools: ['Read'] },
-      budgetUsd: 0.01, maxAttempts: 2, resume: 'always', deadlineSeconds: 480,
+      budgetUsd: 0.01, deadlineSeconds: 480,
     }),
   };
   await settleThenCheck(engine, ids, (views) => {
@@ -416,7 +416,7 @@ test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reaso
     const [first] = state.attempts;
     assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'it ended at its cap, as the harness printed it');
     assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
-    assert.equal(state.attempts.length, 1, 'a budget spent is spent: maxAttempts 2 and resume always start no attempt 2');
+    assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
   });
 });
 
@@ -948,7 +948,7 @@ test('M12: a job held open signs and waits with no process, an answer resumes it
   const secret = `m12-${randomUUID().slice(0, 8)}`;
   const id = await engine.file({
     brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
-    cwd: tmp('m12-work'), closeoutSchema: M12_CLOSEOUT, holdOpen: true, budgetUsd: 0.5, maxAttempts: 2, deadlineSeconds: 300,
+    cwd: tmp('m12-work'), closeoutSchema: M12_CLOSEOUT, holdOpen: true, budgetUsd: 0.5, deadlineSeconds: 300,
     config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'] },
   });
   const until = async (phase: string) => {
@@ -1002,7 +1002,7 @@ test('M13: a Codex task held open signs and waits with no process; its answer re
   const secret = `m13-${randomUUID().slice(0, 8)}`;
   const id = await engine.file({
     brief: `Remember the code word ${secret}. Run no command. Give your final answer with word set to ready.`,
-    cwd: tmp('m13-work'), harness: 'codex', closeoutSchema: M13_CLOSEOUT, holdOpen: true, maxAttempts: 2, deadlineSeconds: 300,
+    cwd: tmp('m13-work'), harness: 'codex', closeoutSchema: M13_CLOSEOUT, holdOpen: true, deadlineSeconds: 300,
     config: { permissionMode: 'read-only', effort: 'low' },
   });
   const until = async (phase: string) => {

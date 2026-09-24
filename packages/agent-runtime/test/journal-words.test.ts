@@ -12,6 +12,8 @@
  * A journal written before has neither key nor kind, and folds and decides the same (`decide.test.ts`, HELD OPEN).
  * And by stage 4a: an `ended` read off a sighting of a task that asked for a closing statement carries `stated`, whether one
  * came — the fact the runtime reports where it once judged. A journal written before has no such key, and folds the same.
+ * And by stage 4a part 2: `filed` no longer carries `maxAttempts` or `resume` — the runtime makes one attempt per start. A
+ * journal written before carries both, and folds and decides as if it did not (the last test here; `decide.test.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -62,8 +64,8 @@ const spawnAsked = {
 };
 
 const filed = {
-  kind: 'filed', at: '<at>', brief: 'write the words down', cwd: '/repo', maxAttempts: 1, harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, deadlineSeconds: undefined, resume: undefined,
+  kind: 'filed', at: '<at>', brief: 'write the words down', cwd: '/repo', harness: 'fake',
+  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, deadlineSeconds: undefined,
   resumeFrom: undefined, closeoutSchema: { type: 'object' }, budgetUsd: undefined, priority: undefined, holdOpen: undefined,
 };
 
@@ -91,20 +93,20 @@ test('a session that signs off: spawned, ended with its statement and usage, set
 
 test('a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above\'s — and an end without the key folds the same', async () => {
   const b = board();
-  const id = await b.engine.file({ ...filing, maxAttempts: 2 });
+  const id = await b.engine.file(filing);
   await b.engine.tick();
   b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'done', busy: false });
   await b.engine.tick();
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
-    { ...filed, maxAttempts: 2 },
+    filed,
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
       closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
-  assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged, with an attempt left');
+  assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged');
 
   const events = (await b.record(id)) as Event[];
   const without = events.map((e) => (e.kind === 'ended' ? (({ stated: _, ...rest }) => rest)(e) : e)) as Event[];
@@ -221,4 +223,13 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
     ['spawn', spawnAsked],
     ['spawn', { ...spawnAsked, name: 'ae/t-words/2', brief: 'shorter, please', resumeFrom: 's-1', budgetUsd: 0.5 }],
   ]);
+});
+
+test('a journal filed before stage 4a part 2, with `maxAttempts` and `resume`, folds as one without them, and a refused spawn settles it on its first attempt', async () => {
+  const b = board(Object.assign(new Error('fake: no binary called `fake` on PATH'), { refused: true }));
+  const id = await b.engine.file(filing);
+  await b.engine.tick();
+  const now = (await b.record(id)) as Event[];
+  const before = now.map((e) => (e.kind === 'filed' ? { ...e, maxAttempts: 3, resume: 'always' } : e)) as Event[];
+  assert.deepEqual(fold(id, before), fold(id, now));
 });

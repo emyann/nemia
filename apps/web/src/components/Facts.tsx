@@ -41,7 +41,6 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   ['permission mode', modeRow(spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
-  ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));

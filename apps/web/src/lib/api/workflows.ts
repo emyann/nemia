@@ -29,7 +29,6 @@ export type WorkflowStepSpec = {
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
-  maxAttempts: number | null;
   /** The most the step's tries may cost together, in dollars (`budget:`). */
   budget: number | null;
   check: string | null;

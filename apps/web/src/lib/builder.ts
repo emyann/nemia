@@ -15,7 +15,7 @@ export const DEFAULT_ROUNDS = 3;
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
   harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
-  deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
+  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
 /** A folder's steps as a draft: as they are listed, nothing pasted — and none of its lists the listing's, which the page's cache holds. */

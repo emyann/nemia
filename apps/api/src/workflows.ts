@@ -59,7 +59,6 @@ export type WorkflowStepSpec = {
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
-  maxAttempts: number | null;
   /** The most the step's tries may cost together, in dollars (`budget:`). */
   budget: number | null;
   check: string | null;
@@ -255,7 +254,6 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   background: step.background ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
-  maxAttempts: step.maxAttempts ?? null,
   budget: step.budget ?? null,
   check: step.check ?? null,
   retries: step.retries ?? null,

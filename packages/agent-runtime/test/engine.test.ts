@@ -295,6 +295,23 @@ test('a task past its deadline is stopped and settles failed', async () => {
   assert.equal(state.settled, 'failed');
 });
 
+test('a session that finished before the pass past its deadline read it settles on its end, in that one pass', async () => {
+  // The 2026-09-24 check: exit 0 at 607 s of 600, recorded `ended done` and settled `failed` at the same millisecond.
+  const b = board();
+  const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
+  await b.run(tick(9));
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', exitCode: 0 });
+  await pastIt();
+
+  const before = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).length;
+  await b.run(tick(9));
+  const events = await b.run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const state = fold(id, events);
+  assert.equal(state.settled, 'succeeded', 'the deadline did not overrule a session that finished');
+  assert.deepEqual([state.attempts[0]!.ended, state.attempts[0]!.reason, state.attempts[0]!.exitCode], ['done', 'harness', 0]);
+  assert.deepEqual(events.slice(before).map((e) => e.kind), ['ended', 'settled'], 'its end and its settle, in one pass');
+});
+
 test('a deadline ends a blocked session, which would otherwise wait on a person for ever — and the queue never waited on it', async () => {
   const b = board();
   // Ids are explicit because admission runs in sorted id order: with a ceiling of one, WHICH

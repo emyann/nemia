@@ -265,6 +265,32 @@ test('once the session is gone, the deadline ends its attempt DEADLINE, then set
   assert.match(a.do === 'settle' ? a.note ?? '' : '', /deadline exceeded/);
 });
 
+test('a session that ended DONE is judged by that end, even read past the deadline — the deadline stops, it never overrules', () => {
+  // 2026-09-24: a check exited 0 at 607 s against 600. One pass recorded its end, then — stepping the task until nothing
+  // moves — read that end past the deadline and settled it `failed, deadline exceeded after 607s`.
+  const done = { kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', exitCode: 0 } as const;
+  const walked = decide(fold(TASK, [withDeadline(10), ...started()]), new Map([[N1, { sessionId: 's0', state: 'done', exitCode: 0 }]]), now(20_000));
+  assert.equal(walked.do, 'record-end');
+  assert.deepEqual(walked.do === 'record-end' && [walked.observed, walked.reason], ['done', 'harness'], 'its harness ended it before the cut');
+  const ended = fold(TASK, [withDeadline(10), ...started([done])]);
+  assert.deepEqual(decide(ended, seen(), now(20_001)), { do: 'settle', outcome: 'succeeded' }, 'in the same pass as its end');
+  assert.deepEqual(decide(ended, seen([N1, 'done']), now(20_001)), { do: 'settle', outcome: 'succeeded' });
+  assert.deepEqual(decide(ended, seen(), now(20_001, 30_000, 3, 3)), { do: 'settle', outcome: 'succeeded' }, 'a full pool holds no terminal answer');
+  // Stopped by its harness, it settles stopped, as it would inside the deadline.
+  const stopped = fold(TASK, [withDeadline(10), ...started([{ ...done, observed: 'stopped', exitCode: undefined }])]);
+  assert.deepEqual(decide(stopped, seen(), now(20_001)), { do: 'settle', outcome: 'stopped', note: 'session stopped' });
+});
+
+test('an attempt that FAILED past the deadline is judged by its end, never followed by another, and never waits on a full pool', () => {
+  // Its harness ended it, so the deadline cut nothing: the note is the end's, as it is inside the deadline.
+  const events: Event[] = [withDeadline(10),
+    ...started([{ kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', exitCode: 1 }])];
+  for (const n of [now(20_001), now(20_001, 30_000, 3, 3), now(5_000), now(5_000, 30_000, 3, 3)]) {
+    assert.deepEqual(decide(fold(TASK, events), seen(), n), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+      `${n.at.getTime() - T0.getTime()} ms, ${n.used}/${n.max}: never start, never wait`);
+  }
+});
+
 test('the deadline runs from the first ATTEMPT, not from filing — a queued task burns nothing', () => {
   // Filed at t0, started at t+1s. At t+10.5s it has run 9.5s, which is inside a 10s deadline.
   const s = fold(TASK, [withDeadline(10), ...started()]);
@@ -444,10 +470,10 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
       sessionId: 's0', nativeId: 'native-1', state: state === 'quiet' ? 'working' : state, ...(state === 'quiet' ? { quietMs: 60_000 } : {}),
       ...(said ? { closeout: { payload: STATEMENT, at: T0.getTime() + 30_000 } } : {}), ...(budgetSpent ? { budgetSpent: true as const } : {}),
     };
-    let settled = false;
+    let settled: string | undefined;
     for (let step = 0; step < 6 && !settled; step++) {
       const a = decide(fold(TASK, events), new Map(sighting ? [[N1, sighting]] : []), now(60_000));
-      if (a.do === 'settle') settled = true;
+      if (a.do === 'settle') settled = a.outcome;
       else if (a.do === 'stop') sighting = { ...sighting!, state: 'stopped' };
       else if (a.do === 'record-end') events.push({ kind: 'ended', at: at(4 + step), attempt: a.attempt, sessionId: a.sessionId, observed: a.observed, reason: a.reason, nativeId: a.nativeId, closeout: a.closeout, ...(a.stated !== undefined ? { stated: a.stated } : {}) });
       else break;
@@ -462,6 +488,8 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
     assert.equal(attempt!.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
     if (state === 'done' || state === 'failed') assert.ok(!['operator', 'deadline'].includes(attempt!.reason!), `${at_}: its harness ended it before the cut, and that end is recorded`);
     if (budgetSpent && state !== undefined) assert.deepEqual([attempt!.ended, attempt!.reason], ['failed', 'budget'], `${at_}: a spent budget is failed, never done`);
+    // An end on record is judged by that end: a deadline read in the same pass does not overrule it (2026-09-24).
+    if (attempt!.ended === 'done' && cut !== 'operator') assert.equal(settled, 'succeeded', `${at_}: ended done, and settled ${settled}`);
     // Whether the statement came is on every end read off a sighting of a task that asked for one, and on no other.
     if (!schema) assert.equal('stated' in attempt!, false, `${at_}: nothing asked, nothing reported`);
     else if (attempt!.reason === 'harness' || attempt!.reason === 'budget') assert.equal(attempt!.stated, attempt!.closeout !== undefined, `${at_}: stated is whether a statement came`);

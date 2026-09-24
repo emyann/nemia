@@ -550,11 +550,17 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
   // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
   // counts sessions at work, and one on a permission prompt makes no API calls.
+  //
+  // It stops what runs and settles what it cut; an end its harness recorded is judged by that end, below, and no attempt
+  // follows an ended one. A pass steps a task until nothing moves, so an end recorded past the deadline is read past it
+  // too: before 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end.
   if (state.deadlineSeconds !== undefined && turn.attempts.length > 0) {
     const ranFor = now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {
       if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
-      return cut('deadline') ?? { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
+      const ending = cut('deadline');
+      if (ending) return ending;
+      if (last?.reason === 'deadline') return { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
     }
   }
 

@@ -330,7 +330,7 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
   const spec = tasks.get(id)!.spec;
   assert.deepEqual(
     { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, closeoutSchema: spec.closeoutSchema },
-    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, closeoutSchema: undefined },
+    { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, closeoutSchema: undefined },
   );
   assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'one attempt, as every task is: the runtime refuses a count or a policy');
   assert.deepEqual(readCheckBrief(spec.brief), {

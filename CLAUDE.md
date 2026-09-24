@@ -512,6 +512,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   test that asserts the Task the instant `view` moves passes alone and fails under `npx turbo run test --force`'s load. Hold the
   fake's exit on a file and assert both sides, or wait for the Task (learned by the run that proved Codex as an A2A agent;
   open issue 31).
+- **The engine decides a task again in the pass that recorded its end.** `settleTask` steps a task until nothing moves, against
+  one observation, so an `ended` that `cut` recorded off a sighting is read on the next `decide` of the same pass, with the same
+  clock. The deadline sat above the judgement of an ended attempt and settled a check that exited 0 at 607 s of 600 `failed`, at the
+  millisecond of its `ended done`; `refusedCheck` then read `failed` with exit 0 as a refusal. A rule that stops or refuses — the
+  deadline — must not overrule an end on record: test it with the end and the rule in one pass, the fixture a journal with the end
+  already on it and a clock past the rule (learned by the run that raised the check's deadline to 1200 s).
 - **`unsigned` is the orchestrator's word, not the runtime's.** Since stage 4a the runtime records a fact — `stated: false` on a
   `done` end of a task that asked for a statement — and settles it `succeeded`. Read an attempt's end through `closeoutAsked` or
   `endWords` (`agent-orchestrator/src/views.ts`), never off its raw `ended` and `reason`: the api's `attemptsIn` read them raw, and

@@ -13,10 +13,25 @@ import { loopSpan, type Workflow } from './workflow.ts';
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
  * engine. decide.ts hands `timeline` the engine's views, which have this shape.
  */
-export type AttemptClock = { startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null; resumeFrom?: string };
+export type AttemptClock = {
+  startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null; resumeFrom?: string;
+  /** How it ended — `done` once it signed — and the turn of a task held open it ran, as the engine's `Attempt` keeps them. */
+  ended?: string | null; turn?: number;
+};
 
-/** A task as the timeline reads it off the engine's view: its brief, its attempts, whether it settled, and what the attempt in flight has consumed so far. */
-export type TaskClock = { state: { brief: string; attempts: readonly AttemptClock[]; settled: string | null }; usage?: Consumed };
+/**
+ * A task as the timeline reads it off the engine's view: its brief, its attempts, whether it settled, and what the attempt in flight has
+ * consumed so far; and, for a task held open, the engine's word for it and whether a person closed it (`signedAndHeld`).
+ */
+export type TaskClock = { phase?: string; state: { brief: string; attempts: readonly AttemptClock[]; settled: string | null; closed?: boolean }; usage?: Consumed };
+
+/**
+ * A task held open whose turn signed, with nothing more to come of it but by a person's word: waiting for that word (the engine's
+ * `input-required`), or closed, which the engine settles as it signed on its next pass. Nothing runs, as nothing runs of a settled task:
+ * `phaseOfView` reads it as the session it signed, and the timeline as a session that ended. Pure, and here because this file is.
+ */
+export const signedAndHeld = (v: TaskClock): boolean =>
+  !v.state.settled && (v.phase === 'input-required' || (v.state.closed === true && v.state.attempts.at(-1)?.ended === 'done'));
 
 /**
  * What one task's session consumed, summed over its attempts (`sumUsage`): a settled attempt's usage off the engine's record, the one in
@@ -35,11 +50,13 @@ export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
  * `filedAt` is when the task was filed, off the engine's feed — its view carries no such time — and null where the feed has no filing of it.
  * `spawnedAt` is its first attempt's spawn, `endedAt` its last attempt's end once the task settled. A task waits for a slot between
  * being filed and its first attempt, so `queuedMs` — filed → spawned — is the slot wait and the spawn; `ranMs` is spawned → ended,
- * gaps between attempts included. Each is null where it cannot be measured, never 0.
+ * gaps between attempts included — but for a task held open, turn by turn: each turn's first spawn to its last end, summed, since between
+ * the turn that signed and the next a person was deciding, and nothing ran. Each is null where it cannot be measured, never 0.
  *
  * `at` is where the task stands: `unknown` to the engine; `queued`, filed and no attempt yet; `starting`, a slot taken and not spawned;
- * `running`, spawned and not settled; `ended`, settled after it spawned; `unspawned`, settled before it ever spawned — stopped in the queue,
- * or never startable. `queued` and `ran` are the two times in words: a duration, or why there is none.
+ * `running`, spawned and not settled; `ended`, settled after it spawned, or held open and signed, waiting on a person's word or closed on it
+ * (`signedAndHeld`); `unspawned`, settled before it ever spawned — stopped in the queue, or never startable. `queued` and `ran` are the two
+ * times in words: a duration, or why there is none.
  */
 export type TaskSpan = {
   taskId: string;
@@ -172,6 +189,26 @@ export const runStartedAt = (run: Run, filed: ReadonlyMap<string, string>): stri
 
 const between = (from: string | null, to: string | null): number | null => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
 
+/**
+ * How long a task that ended ran: each turn's first spawn to its last end, summed — one turn, for a task not held open. Null where a turn
+ * that spawned has no end on the record, or where nothing spawned.
+ */
+function ranOf(attempts: readonly AttemptClock[]): number | null {
+  const turns = new Map<number, AttemptClock[]>();
+  for (const a of attempts) turns.set(a.turn ?? 0, [...(turns.get(a.turn ?? 0) ?? []), a]);
+  let ms = 0;
+  let spawned = false;
+  for (const turn of turns.values()) {
+    const from = turn.find((a) => a.spawnedAt)?.spawnedAt ?? null;
+    if (!from) continue;
+    const ran = between(from, turn.at(-1)!.endedAt);
+    if (ran === null) return null;
+    ms += ran;
+    spawned = true;
+  }
+  return spawned ? ms : null;
+}
+
 /** One task on the clock (`TaskSpan`), off the engine's view of it and its filing time. */
 function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | undefined): TaskSpan {
   const attempts = view?.state.attempts ?? [];
@@ -180,10 +217,11 @@ function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | u
   const at: TaskSpan['at'] = !view || (!attempts.length && !view.state.brief) ? 'unknown'
     : settled ? (spawnedAt ? 'ended' : 'unspawned')
     : !attempts.length ? 'queued'
+    : signedAndHeld(view) ? 'ended'
     : spawnedAt ? 'running' : 'starting';
   const endedAt = at === 'ended' ? attempts.at(-1)?.endedAt ?? null : null;
   const queuedMs = between(filedAt ?? null, spawnedAt);
-  const ranMs = between(spawnedAt, endedAt);
+  const ranMs = at === 'ended' ? ranOf(attempts) : null;
   const queued = at === 'unknown' ? 'not on the record'
     : at === 'queued' ? 'waiting for a slot'
     : at === 'starting' ? 'not spawned yet'

@@ -17,7 +17,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-held-'));
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { engine, list, readRun } = await import('agent-orchestrator');
+const { approve, engine, list, readRun } = await import('agent-orchestrator');
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -52,6 +52,10 @@ writeRun('h-blocked');
 waiting('h-blocked-plan', BLOCKED);
 writeRun('h-gate', ['plan']);
 waiting('h-gate-plan', DONE);
+// Approved: closed on the pass that filed implement, and not yet settled — the engine settles it on its next pass.
+writeRun('h-closed', ['plan']);
+waiting('h-closed-plan', DONE);
+fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-closed-plan.jsonl'), `${JSON.stringify({ kind: 'closed', at: at(30) })}\n`);
 
 type Step = { name: string; status: string; needs: string | null };
 const detail = async (id: string) => (await app.request(`/api/runs/${id}`)).json();
@@ -74,5 +78,15 @@ test('a held step at its gate reads `awaiting approval`, never the engine\'s wor
   for (const run of [await detail('h-gate'), await summary('h-gate')]) {
     assert.deepEqual(run.steps.map((s: Step) => s.status), ['awaiting approval', 'waiting']);
     assert.deepEqual(run.waitingOnYou, ['plan']);
+  }
+});
+
+test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `wf ls` says", async () => {
+  assert.equal((await engine().view('h-closed-plan')).phase, 'between attempts', 'the seed: closed, and the engine has not settled it');
+  await approve(engine(), 'h-closed', 'plan');
+  const listed = await list(engine(), readRun('h-closed'));
+  for (const run of [await detail('h-closed'), await summary('h-closed')]) {
+    assert.deepEqual(run.steps.map((s: Step) => s.status), listed.steps.map((s) => s.status));
+    assert.doesNotMatch(run.steps[0].status, /between attempts|running/);
   }
 });

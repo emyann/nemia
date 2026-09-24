@@ -60,7 +60,7 @@ export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritt
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
 export type { InboxDropped, InboxQueued } from './inbox-store.ts';
 export { HARNESSES, engine } from './runtime-client.ts';
-export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf } from './views.ts';
+export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf, wordOfView } from './views.ts';
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
 export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';

@@ -2603,6 +2603,34 @@ test('a run with one step and no check: one try, no check, and the run\'s total 
   assert.deepEqual(timelineTotalLines(timeline(run({ implement: null }), new Map())), []);
 });
 
+test("a task held open that signed waits on a person, and nothing runs: it ended, as a settled one did — and answered, it ran each turn's time, never the night between", () => {
+  const r = run({ implement: 't1' });
+  const filed = new Map([['t1', clock(0)]]);
+  // One turn, signed at 08:09:04: waiting on a person's word, closed on it and not yet settled, and settled.
+  const signedTurn = { startedAt: clock(0, 1), spawnedAt: clock(0, 4), endedAt: clock(9, 4), reason: 'harness', usage: null, ended: 'done' };
+  const held = (phase: string, extra: object = {}, attempts: object[] = [signedTurn]): TaskClock =>
+    ({ phase, state: { brief: 'filed', settled: null, attempts, ...extra } } as TaskClock);
+  for (const [said, view] of [
+    ['waiting', held('input-required')],
+    ['closed', held('between attempts', { closed: true })],
+  ] as const) {
+    const t = timeline(r, new Map([['t1', view]]), filed);
+    const session = t.steps.implement![0]!.session!;
+    assert.deepEqual([session.at, session.endedAt, session.ran], ['ended', clock(9, 4), '9m00s'], said);
+    assert.deepEqual([t.run.inFlight, t.run.ran, t.run.wall], [0, '9m00s', '9m04s'], `${said}: nothing of the run in flight`);
+  }
+  // Signed and not held open, between attempts: the engine starts another, so it is still running — as it was.
+  assert.equal(timeline(r, new Map([['t1', held('between attempts')]]), filed).steps.implement![0]!.session!.at, 'running');
+
+  // A person answered at 18:00, ten hours on; the second turn ran 5 minutes, signed and was closed. Ran: 9 minutes and 5, not ten hours.
+  const secondTurn = { startedAt: clock(600), spawnedAt: clock(600, 3), endedAt: clock(605, 3), reason: 'harness', usage: null, ended: 'done', turn: 1 };
+  const answered = timeline(r, new Map([['t1', { ...held('succeeded', {}, [signedTurn, secondTurn]), state: { brief: 'filed', settled: 'succeeded', attempts: [signedTurn, secondTurn] } }]]), filed);
+  assert.deepEqual([answered.steps.implement![0]!.session!.ranMs, answered.run.ran, answered.run.wall], [14 * 60_000, '14m00s', '10h05m']);
+  // And while that second turn runs, the task is running again.
+  const running = timeline(r, new Map([['t1', held('running (working)', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]), filed);
+  assert.deepEqual([running.steps.implement![0]!.session!.at, running.run.inFlight], ['running', 1]);
+});
+
 test('REFUSED: a queue time the feed cannot give is `not known`, never 0 — and a task the engine has no record of is said, not timed', () => {
   const { r, views } = B4();
   const t = timeline(r, views);

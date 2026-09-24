@@ -11,7 +11,7 @@ import type { Consumed } from './radius.ts';
 import type { Workflow } from './workflow.ts';
 import { decision, gated, resultSteps, taskSpend, type CloseoutAsked, type ParentRun, type Run, type Said, type SpendOf, type TaskPhase } from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
-import { taskUsage } from './timeline.ts';
+import { signedAndHeld, taskUsage } from './timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './store.ts';
 import { parentRecord, shippedOf } from './branches.ts';
 
@@ -35,7 +35,7 @@ export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
   // A task held open whose turn signed waits on a person with no process running (`input-required`): the step's session is over, as a
   // settled one's is, and the run reads it so — its closeout, its check, its gate. And one closed after it signed, which the engine settles
   // `succeeded` on its next pass: read as that already, or it would read `running` for the pass between.
-  if (v.phase === 'input-required' || (v.state.closed && v.state.attempts.at(-1)?.ended === 'done')) return 'succeeded';
+  if (signedAndHeld(v)) return 'succeeded';
   if (v.state.attempts.length) return 'running';
   return v.state.brief ? 'pending' : 'unknown';
 };
@@ -173,10 +173,15 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
  * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `wf ls`
  * prints beside a step, and what the feed words it from (`feedPhase`).
  */
-export const engineWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string => {
-  const v = views.get(taskId);
-  return v?.state.brief ? v.phase : 'unknown';
-};
+export const engineWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string => wordOfView(views.get(taskId));
+
+/**
+ * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
+ * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on it,
+ * so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
+ */
+export const wordOfView = (v: TaskView | undefined): string =>
+  !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
 
 /**
  * How many times a person said something to each step's current try while it ran (`wf say`): the engine's `said` on the try's task, off

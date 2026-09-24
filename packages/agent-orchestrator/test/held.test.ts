@@ -237,6 +237,23 @@ test('a gated step that signed stays open until `wf approve`, and is closed on t
   assert.equal((await stateOf(e, `${run.id}-plan`)).state.closed, true);
 });
 
+test("a gated step closed on its approval reads on `wf ls` as it signed, in the pass before the engine settles it — as the tick, which filed what follows, reads it", async () => {
+  const { run, e, pass } = await signedPlan({ plan: 'gate: true' }, SIGNED);
+  const plan = `${run.id}-plan`;
+  await approve(e, run.id, 'plan');
+  assert.deepEqual((await pass(run.id)).filed, ['implement']);
+  const closed = await stateOf(e, plan);
+  assert.deepEqual([closed.phase, closed.state.closed, closed.state.settled], ['between attempts', true, null], 'the seed: closed, and the engine has not settled it yet');
+  assert.equal(phaseOfView(closed), 'succeeded');
+  const between = (await statuses(e, run.id)).plan;
+  await e.tick();
+  assert.equal((await stateOf(e, plan)).state.settled, 'succeeded');
+  assert.equal(between, (await statuses(e, run.id)).plan, 'the same line before the engine settles it and after');
+  assert.doesNotMatch(between!, /between attempts|running/);
+  const listed = (await list(e, readRun(run.id)));
+  assert.deepEqual(listed.waitingOnYou, []);
+});
+
 test('a gated step stays open while its check runs, so a send-back once the check passes is still an answer to it', async () => {
   const { run, e, signed, pass, sessions } = await signedPlan({ plan: 'gate: true\ncheck: true' }, SIGNED);
   const plan = `${run.id}-plan`;

@@ -5,13 +5,13 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-hold-'));
+const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
 const { accept, advance, approve, decide, forget, hold, holdAdvice, holdRefusal, holdWord, holdsOf, prune, readRun, retry, round, say, start, unhold } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');

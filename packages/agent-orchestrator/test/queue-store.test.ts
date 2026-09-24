@@ -10,14 +10,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { queueLine } from '../src/inbox.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-queue-'));
+const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
 const INBOX = path.join(ROOT, 'inbox');
 

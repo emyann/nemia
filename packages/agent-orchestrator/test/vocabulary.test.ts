@@ -9,10 +9,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES, CODEX_EFFORTS, CODEX_SANDBOXES, claudeDetached, codex, createEngine } from 'agent-runtime';
 import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
+import { scratch } from './scratch.ts';
 
 type Lists = Readonly<Record<string, readonly string[]>>;
 
@@ -97,7 +97,7 @@ test("REFUSED at load in the engine's words: a `budget:` on a codex step, which 
 
 test("REFUSED at load in the engine's words: a `budget:` beside `background: true`, which a `claude --bg` session has no spend cap to keep — and a job's is taken", async () => {
   const { parseWorkflow } = await import('../src/workflow.ts');
-  const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'wf-vocabulary-')), harnesses: { claude: 'claude' } });
+  const engine = createEngine({ root: scratch('wf-vocabulary-'), harnesses: { claude: 'claude' } });
   const refusal = async (config: { background?: boolean }): Promise<string | undefined> => {
     try { await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', budgetUsd: 5, config }); return undefined; } catch (e) { return (e as Error).message; }
   };

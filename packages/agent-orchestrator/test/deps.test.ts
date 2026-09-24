@@ -10,14 +10,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from '../src/deps.ts';
 import { composeBrief, type Run } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-deps-'));
+const ROOT = scratch('wf-deps-');
 // runner.ts reads WF_ROOT as it loads. Nothing here files a run, and nothing here touches the operator's store either.
 process.env.WF_ROOT = ROOT;
 const { provisionDeps } = await import('../src/runner.ts');

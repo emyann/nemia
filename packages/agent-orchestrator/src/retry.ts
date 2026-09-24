@@ -133,6 +133,15 @@ export function sessionModel(step: Workflow, record: StepRecord | undefined): st
   return step.model;
 }
 
+/**
+ * How many of a step's tries answered the task it is on (`e.answer`), each a turn of that one task rather than a task of its own: the tries
+ * behind it on the same task that were not a recheck, which replaces only the check. Zero for a step on a task of its own. Pure: counted off
+ * the record, as the turns the runtime has journalled are counted off its view (`answersIn`), so a turn a pass gave and died before writing
+ * down is found (`adoptTries`).
+ */
+export const turnsOf = (record: StepRecord | undefined): number =>
+  (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.then !== 'recheck').length;
+
 /** The asks a record already answers — each names a try its step has reached. The tick consumes these. */
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
 

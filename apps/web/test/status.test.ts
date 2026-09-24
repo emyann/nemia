@@ -32,6 +32,8 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['denied', 'denied'],
     ['succeeded · BLOCKED', 'blocked'],
     ['stopped · BLOCKED', 'blocked'],
+    ['input-required · BLOCKED', 'blocked'],
+    ['input-required', 'unverified'],
     ['failed', 'failed'],
     ['failed · done', 'failed'],
     ['failed · closeout unreadable', 'failed'],
@@ -60,6 +62,9 @@ test('only verified and unverified are work done; a refused check, a failed sess
 test('a step that signed off blocked is not shown as done, though its session succeeded', () => {
   assert.equal(stepState('succeeded · BLOCKED', false, false), 'blocked');
   assert.equal(stepState('succeeded · BLOCKED', true, false), 'blocked');
+  // Held open, the engine's word for the same session is `input-required`: waiting for the word, with nothing running.
+  assert.equal(stepState('input-required · BLOCKED', false, false), 'blocked');
+  assert.notEqual(stepState('input-required', false, false), 'working', 'a session that signed and waits is not drawn as still going');
 });
 
 test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {
@@ -139,7 +144,7 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
 });
 
 test('on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves', () => {
-  const held = ['waiting', 'pending', 'waiting on a-1x2y', 'succeeded · BLOCKED', 'awaiting approval', 'rounds exhausted', 'over budget $4.20 of $3', 'budget exhausted $3.02 of $3'];
+  const held = ['waiting', 'pending', 'waiting on a-1x2y', 'succeeded · BLOCKED', 'input-required · BLOCKED', 'awaiting approval', 'rounds exhausted', 'over budget $4.20 of $3', 'budget exhausted $3.02 of $3'];
   for (const status of held) {
     assert.equal(stepState(status, false, true), 'held', status);
     // Nobody is asked while the hold stands: every verb that would answer the gate is refused.

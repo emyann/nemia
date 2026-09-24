@@ -93,9 +93,13 @@ fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 fs.writeFileSync(path.join(root, 'runs', `${RUN}.json`), JSON.stringify({
   id: RUN, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Talk it through',
   workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: ['implement', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map((name) => ({ name, after: [], body: `${name} it.` })),
+  workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map((name) => ({ name, after: [], body: `${name} it.` })),
   steps: {
     implement: { taskId: 't-implement' },
+    // Held open (thin runtime stage 2 part 4b), their one turn signed: waiting on a person's word, closed on it, and answered.
+    held: { taskId: 't-held' },
+    closed: { taskId: 't-closed' },
+    answered: { taskId: 't-answered' },
     resumed: { taskId: 't-resumed' },
     live: { taskId: 't-live' },
     gone: { taskId: 't-gone' },
@@ -108,6 +112,16 @@ fs.writeFileSync(path.join(root, 'runs', `${RUN}.json`), JSON.stringify({
   },
 }));
 settledTask('t-implement');
+
+/** A task filed held open whose one turn signed, its conversation on disk, and nothing settled; then `after`, a person's word on it. */
+const heldTask = (taskId: string, after: object[]) => {
+  const sessionId = randomUUID();
+  writeTranscript(sessionId, conversation(sessionId));
+  journal(taskId, [{ ...filed, holdOpen: true }, ...started.slice(1), ending(taskId, sessionId)[0]!, ...after]);
+};
+heldTask('t-held', []);
+heldTask('t-closed', [{ kind: 'closed', at: at(20) }]);
+heldTask('t-answered', [{ kind: 'input', at: at(20), text: 'Warm colours.' }]);
 
 const url = (step: string, query = '') => `/api/runs/${RUN}/steps/${step}/transcript${query}`;
 const streamUrl = (step: string, query = '') => `/api/runs/${RUN}/steps/${step}/transcript/stream${query}`;
@@ -133,6 +147,26 @@ test("a step's transcript is the engine's read of its task's session — its eve
   const again = await app.request(url('implement', `?after=${encodeURIComponent(body.cursor)}`));
   assert.equal(again.status, 200);
   assert.deepEqual(await again.json(), { events: [], cursor: body.cursor, live: false }, 'read again from the cursor it gave: nothing new');
+});
+
+test("a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — nor followed, its stream settled at once", async () => {
+  assert.equal((await engine().view('t-held')).phase, 'input-required', "the seed is the engine's held task, waiting");
+  assert.equal((await engine().view('t-closed')).phase, 'between attempts', 'closed and not yet settled: the engine calls it between attempts until its next pass');
+  for (const step of ['held', 'closed']) {
+    const engines = await engine().transcript(`t-${step}`);
+    assert.equal(engines.events.length, 8, step);
+    assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false }, step);
+    const said = blocks(await (await app.request(streamUrl(step))).text());
+    assert.deepEqual(eventsIn(said), engines.events, step);
+    assert.deepEqual(said.at(-1), { event: 'settled', data: JSON.stringify({ cursor: engines.cursor }), id: engines.cursor }, step);
+  }
+});
+
+test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
+  assert.equal((await engine().view('t-answered')).phase, 'between attempts');
+  const body = await (await app.request(url('answered'))).json();
+  assert.equal(body.live, true);
+  assert.equal(body.events.length, 8);
 });
 
 test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {

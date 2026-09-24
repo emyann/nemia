@@ -417,6 +417,33 @@ export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): st
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
+/**
+ * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on this
+ * pass. Pure. Open while a person's word is what moves the step, so that word reaches the session that signed as its next turn (`e.answer`)
+ * rather than a new task: the step signed off `blocked`, or it is gated and the try it is on is not approved — checking, or at its gate.
+ * Anything else closes it (`e.close`), which settles it as it signed: an ungated step that signed off, a gated one once approved, a check
+ * that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned, whose
+ * steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`, as every try was before tasks were held open.
+ */
+export function holdsOpen(
+  step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+): boolean {
+  if (run.cancelledAt || run.pruned) return false;
+  const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
+  if (own === 'blocked') return true;
+  // `awaiting approval` is a gate with no approval of the try it is on (`atGate`), and `wf approve` refuses a step still checking.
+  return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
+}
+
+/**
+ * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, without `background: true`. The
+ * one harness the runtime's held task was measured on (agent-runtime's open issue 28, M12); a codex step, a `claude-detached` one and a
+ * background session are filed to settle when they sign, as before, and a person's word to them is a try of its own. Never a check.
+ */
+export const holdsOpenOn = (step: Pick<Workflow, 'harness' | 'background'>): boolean => (step.harness ?? 'claude') === 'claude' && !step.background;
+
 /** The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask. Pure. */
 export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
@@ -3677,9 +3704,11 @@ export function listing(
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   // The engine's word for a settled task IS its outcome, and `unknown` a task it has no record of, which the tick stops nothing of; any other
-  // word is a task still going.
+  // word is a task still going — but `input-required`, a task held open whose turn signed, which the run reads as it signed, settled
+  // (`phaseOfView`). The word itself is still what a step's line prints: `input-required · BLOCKED`.
   const settledOf = (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
+    if (word === 'input-required') return 'succeeded';
     return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
   };
   const readable = (name: string): Closeout | undefined => {

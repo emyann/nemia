@@ -8,6 +8,7 @@ import { StatusChip, StepNote } from '@/components/StatusChip';
 import { runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
+import { isGate, stepState } from '@/lib/status';
 import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
 import { useStepTranscript } from '@/lib/useStepTranscript';
 
@@ -62,7 +63,10 @@ function SessionPage() {
 }
 
 function Session({ run, step }: { run: RunDetail; step: Step }) {
-  const following = useStepTranscript(run.id, step.name, step.taskId);
+  const cancelled = run.cancelledAt !== null;
+  // Whether the step waits on a person's word — its session over, nothing of it running — never `held`: a hold on the run (`wf hold`)
+  // answers nothing, and the session runs or rests as it did.
+  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled, false), cancelled));
   // What this page said that the run, as last read, does not have yet — kept with the task it was said to, so a later try starts afresh.
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);

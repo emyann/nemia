@@ -43,7 +43,7 @@ class Unread extends Error {
 
 /**
  * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, and whether
- * the task is live.
+ * the task is live — pending or running as the run reads it (`phaseOfView`), which a task held open and signed is not.
  *
  * Live is read first. A task that settles between the two reads reads as live once more, and its last lines are read on the
  * next pass; read the other way round, it could read as settled before them. A read costs an observation of every harness
@@ -58,12 +58,16 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
     const why = err instanceof Error ? err.message : String(err);
     throw new Unread(502, `Could not read task ${taskId} of step '${step}': ${why}. \`wf ls\` reads the same record from the command line.`);
   }
-  if (phaseOfView(view) === 'unknown') {
+  const phase = phaseOfView(view);
+  if (phase === 'unknown') {
     throw new Unread(404, `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`wf ls\` shows the step unknown.`);
   }
   try {
     const { events, cursor } = await e.transcript(taskId, after);
-    return { events, cursor, live: view.state.settled === null };
+    // Live while something runs or is to: not a task held open that signed and waits on a person's word, or was closed on it — nothing
+    // runs of it, for hours at a gate, and it is not `settled` until closed (`phaseOfView` reads it as it signed). Answered, its next turn
+    // is live again, under the same id: the board reads the conversation again when the step stops waiting on a person.
+    return { events, cursor, live: phase === 'running' || phase === 'pending' };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     if ((err as { exitCode?: unknown }).exitCode !== 2) {
@@ -173,7 +177,8 @@ export const steps = new Hono()
     }
   })
   // The same conversation followed, as server-sent events: read again every second while the task is live, each new event sent
-  // as `transcript`, then `settled` once the task is, and the stream closed. A reconnect resumes from its Last-Event-ID.
+  // as `transcript`, then `settled` once the task is, or is held open and signed and so waits on a person, and the stream closed. A
+  // reconnect resumes from its Last-Event-ID.
   .get('/api/runs/:id/steps/:step/transcript/stream', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');

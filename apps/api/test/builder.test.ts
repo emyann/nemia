@@ -91,7 +91,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], denials: null, background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -105,6 +105,8 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
   assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
   assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
+  // `denials:` says one word or nothing, as `slot:` does: a choice of `fail`, which the parser reads and nothing else.
+  assert.deepEqual([kindOf.denials, form.keys.find((k) => k.key === 'denials')?.choices], ['choice', ['fail']]);
   // The agent is picked from yours' agents/, and the keys a step takes from it are the package's agent keys but the description.
   // Each that loads comes with its role values as a step's spec gives them — only those it sets — and one the load refuses is picked from
   // all the same, with no values: a step saved naming it is refused in its words.

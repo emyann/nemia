@@ -139,8 +139,8 @@ A worktree the run cuts no longer links the main checkout's whole `node_modules`
 branch's app imported main's workspace packages, and M1's check was refused four times over it (plan
 §4b): a dependency the branch pinned was not in the shared tree, and main moving under the branch
 failed tests the branch never touched. `depsPlan` (`src/deps.ts`, pure) gives the worktree a directory
-of its own. Workspace packages link to the worktree's copies and third-party packages to main's, and
-`.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
+of its own. Workspace packages link to the worktree's copies and third-party packages to main's (hardlinked
+since 2026-09-23, the next section), and `.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
 package main's `node_modules` does not have on disk (`lockfileParting`), `provisionDeps` runs `npm ci`
 there instead, and the brief says so under *Where to look*. The gitignored
 paths `.worktreeinclude` lists are copied from the main checkout at the cut, and `node_modules` is never
@@ -160,8 +160,8 @@ What it leaves:
   version, is not provisioned. Here `apps/web/node_modules` holds only vite's caches. The day one holds
   a package, the worktree resolves the root's version of it.
 - **The cut is the only time the run provisions.** A step that changes the lockfile mid-session installs
-  for itself. `npm install` in a linked worktree replaces the links it touches with directories and
-  writes nothing of main's (measured with a local tarball, not a registry).
+  for itself. `npm install` in a linked worktree replaced the links it touched with directories and
+  wrote nothing of main's (measured with a local tarball, not a registry, before packages were hardlinked).
 - **npm only.** The worktree's `package-lock.json` is compared with what is on disk in main's
   `node_modules`, so a change to another package manager's lockfile goes unseen and that tree is linked
   as npm's would be.
@@ -180,6 +180,60 @@ What it leaves:
   root of the repository. Patterns would need `git ls-files --others --ignored` and a matcher.
 - **Worktrees cut before this keep their link.** `provisionDeps` leaves a `node_modules` that is a link
   alone (`shared`), and nothing re-provisions a worktree after its cut.
+
+## Shipped: a worktree's third-party packages hardlinked, so a fenced step can read them
+
+Since stage 2 part 2 every Claude step is a `claude -p` job, and the planner and reviewer run in `dontAsk`, where a call
+nothing allows is denied with no prompt. A worktree's `node_modules` linked each third-party package to main's, and Claude
+Code allows a path through a symlink only when the link and its target both match: a read of `node_modules/hono/package.json`
+was a read of `/home/…/hkb-v2/node_modules/hono/package.json`, outside the step's working directory, and denied. Main's
+packages are now made again in the worktree, each directory the worktree's own and each file hardlinked to main's
+(`{ kind: 'tree' }` in `depsPlan`, `hardlinkTree` in `worktree.ts`), so every path under `node_modules` is inside the
+worktree, for every harness and every tool. Workspace packages keep their links to the worktree's copies; `.bin` keeps the
+relative links npm wrote, which now resolve in the worktree; npm's dot files are still left out, and a lockfile main has not
+installed still gets `npm ci`. A package is made under `.wf-making-<name>` and renamed into place whole, so a pass that died
+halfway leaves nothing that reads as a package, and the next pass makes it again; one a step installed itself is never added to.
+`provisionDeps` answers `{ tree: 'hardlinked', made }`.
+
+**What it costs**, measured 2026-09-23 on this repository's tree (WSL2, ext4, Node 24.20; the store and the checkout on one
+filesystem): main's `node_modules` is 729 MB in 3,134 directories, 37,154 files and 46 links. A walk hardlinking all of it took
+0.79, 0.54 and 0.51 s over three runs, and `du` over main's tree and the copy together counts 13 MB for the copy — its
+directories. `provisionDeps` itself, on the real tree, took 0.58 s. `npm ci` took about a minute and 729 MB.
+
+**The live proof**, the same day, Claude Code 2.1.281: a `claude -p --permission-mode dontAsk --tools Read,Grep,Bash` job in a
+directory provisioned by `provisionDeps`, asked to `Read` `node_modules/hono/package.json`, `Grep` it and `ls node_modules/hono`,
+ended with `permission_denials: []`; the same job over the same tree linked as before was denied all three. $0.34 for both.
+
+**The denials recorded on live runs before this**, read off the jobs' `permission_denials` on the plan and review steps of the
+2026-09-23 runs (23 on 13 steps), by cause:
+
+- *Under the worktree's `node_modules`, fixed by this (3):* `ls node_modules/@a2a-js/sdk/ …` and `Read …/plan/node_modules/@a2a-js/sdk/package.json`
+  (part 5's plan), `Grep` in `…/plan/node_modules/@a2a-js/sdk/dist` (part 5's review).
+- *Outside the worktree, denied rightly (9):* `Grep` in `~/.agent-engine` (three steps), `Grep` in main's `node_modules` by its absolute
+  path, `find` and three `stat`s on main's `node_modules` and the worktrees directory (this card's plan), and `ls` of a run's artifacts
+  directory and of the stores (two steps). A step reads a path outside its folder only when its brief names it; these were a step exploring.
+- *A command no rule covers, denied and recorded as before (11):* `cd <dir> && …` compounds (six, on five steps — the list has
+  `Bash(cd:*)`, but a compound is allowed only when each part is), a `for` loop (two steps), `grep … | xargs …`,
+  `timeout 500 bash -c '…'`, and one `grep` over a path written with `\$`.
+
+So three of twenty-three. The rest are the fence doing its job, or a role reaching for a command its rules do not cover, and they
+stay on the `denied:` line, where `denials: fail` can stop a step on them. A bare `ls` inside the worktree needs no rule in `dontAsk`
+(the live proof above).
+
+What it leaves:
+
+- **A hardlinked file is main's file.** A tool that rewrites one in place under the worktree's `node_modules` writes main's too.
+  npm replaces a package's files rather than writing into them, and nothing else here writes under `node_modules`, but it is not
+  isolation.
+- **A kept worktree holds main's replaced files.** After main's next `npm install`, a worktree still holding the old files keeps their
+  blocks until `wf prune`. `du` of a worktree alone counts every hardlinked file, so `wf prune` measures it beside main's
+  `node_modules` in one `du` and reads the worktree's line (`diskBytes`): what removing it frees.
+- **A store on another filesystem falls back to links.** A hardlink there fails `EXDEV` (or `EPERM`, `ENOTSUP` where the filesystem
+  refuses one); main's packages are then linked as before, `provisionDeps` answers `{ tree: 'linked', why }`, and the run's notes say
+  that a fenced step's reads under `node_modules` are denied. A second pass reads the links it left and says so again.
+- **Worktrees cut before this keep their links.** `provisionDeps` adds only what a worktree lacks.
+- **Node resolves a third-party package's real path in the worktree, not in main.** The tree's shape is the same; a tool that caches
+  by real path across checkouts sees a copy per worktree.
 
 ## Shipped: trying again — `retries:` and `wf retry`
 
@@ -2095,9 +2149,26 @@ Where it departs from the plan:
 
 Left for later:
 
-- **The api and the board** (the next two cards): the api carries `hold` and `holding` on a run and says the hold where its Decide
-  section would offer a command. The board shows it on the run's card and page, with a way to lift it.
+- **The board** (the third card): it shows the hold on the run's card and page, with a way to lift it, off the api's `holding`.
 - **`wf cancel` and `wf say` on a held run** are allowed. Cancelling ends the hold's meaning, and `wf say` files no work.
+
+## Shipped: holding a run — the api's half
+
+The second of the three cards. The api says a held run is held, not waiting on you, in `wf ls`'s and `wf decide`'s words:
+
+- **The list and the detail** carry `heldUntil`, the runs the hold names, and `holding`: each run as `holdsOf` reads it, `word`
+  (`holdWord`), `advice` (`holdAdvice`), and `onYou`, true when only a person can lift the hold: it names no run, or a run that is
+  missing, cancelled or whose branch is gone. A run nobody holds, or one called off, carries `[]` and `null`. The runs a hold names are
+  read with `seenBy`, as `--after` reads its runs, so no harness is asked anything more.
+- **Nothing waits on you**: `waitingOnYou`, `onYou` and `toDecide` are empty, as `listing` says, and no step is offered an approval or a
+  raise (`costOf` reads the hold beside the cancel and the prune).
+- **The decision is `{ holding }`**, and `{ waiting, holding }` for a run started `--after` and held as well. It offers no command, since
+  `decide` offers nothing on a held run, so `ONCE_MORE` has nothing to parse, and `heldLater`'s words carry no `wf` verb.
+- **The verbs the board sends** answer 409 in the package's own words (`heldRefusal`), since the api calls the package's verbs.
+
+Where it departs from the plan: **`moving` is true for a held run while its hold may lift on its own**, when the run would move
+unheld. That is the rule `--after` keeps: the tick files the work in the same pass that lifts the hold. For a hold only a person can lift,
+only work in flight counts. `apps/api/test/hold.test.ts` holds each of these against `list()` and `decide()`, over a store with real git.
 
 ## Shipped: two small items from the plan's queue
 
@@ -4131,8 +4202,34 @@ reviewers' fences rest on.
 - **`wf say` keeps its meaning**: part 2a writes a word to a job's stdin until its result (issue 29).
 
 **What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and since part 3a (the same day) `wf ls`, `wf decide`, the
-api and the board say them: a `denied:` note beside the status, never in it. Nothing is decided on them yet — `denials: fail`,
-§10. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+api and the board say them: a `denied:` note beside the status, never in it. Since part 3b a step can decide on them — `denials: fail`,
+below. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+
+## Shipped: a step that says `denials: fail` is stopped on a denied call (thin runtime stage 2 part 3b)
+
+Registered as §10 and shipped 2026-09-23. A job's denied calls were said on every surface since part 3a and decided nothing: a reviewer
+in `dontAsk` denied the command it was told to run signed off all the same. A step that says `denials: fail` is not passed on.
+
+- **A status of its own, `denied`, not a failure.** §10 asked for a denied try to settle the step failed and spend `retries:`. The run's
+  `allow:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
+  itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
+  `run.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
+  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
+  'blocked'`).
+- **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allow:` for a new run, worded as Claude Code
+  matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
+  the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path
+  as `//path`, the run's id as `*`), except for a call the step's own `disallow:` may have denied, which no allow overrides
+  (`disallowedBy`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What
+  your session was denied`), or the same session continued. `--recheck` is refused: no check ran. A pruned run offers nothing.
+- **Refused at load:** any word but `fail`; the key on codex, which records no denials; and beside `background: true`, whose denials
+  are not read (issue 28).
+- **The api and the board.** The step's status is `denied`; `ONCE_MORE` parses the `--fresh` offer, so the board's button copies the bare
+  command. The board draws the step amber, as it does one that did not sign, and its Decide section offers a new session first. The
+  builder's step form sets the key (`KINDS`, `specOf`, the board's mirror with `UNSET`).
+
+**What it leaves.** No verb widens `allow:` on a live run: a person who wants the call allowed starts a new run. No e2e page draws a
+denied step; its rendering is proven by the web's component tests.
 
 ## 1. A run that grows steps from a plan
 
@@ -4426,17 +4523,9 @@ it asks and what it gets wrong.
 
 ## 10. `denials: fail`: a step that fails on what it was denied
 
-**Registered** 2026-09-23, as part 3 of thin runtime stage 2 (`docs/eval-thin-runtime.md` §5); part 3a shipped the surfaces
-and left this. A denial is recorded on every job's attempt and said on every surface, and nothing is decided on one: a
-reviewer in `dontAsk` denied the command it was told to run signs off all the same, and a person learns it only by reading
-the `denied:` line.
-
-**What it needs.** A step key, `denials: fail` (absent: record only, as today), read by the tick off the attempt's
-`denials` as `refusedCheck` reads a check: a signed try that was denied anything settles the step failed, with the denied
-calls as the reason, spending `retries:` like any failure. Its obligations: `STEP_KEYS` and the three outside the package
-(`KINDS`, `WorkflowStepSpec` and `specOf`, the board's mirror with `UNSET`), and a test that makes it *refuse* — a denied
-try failed — at shipped defaults. A background step's denials are not read (issue 28), so the key is refused beside
-`background: true` rather than accepted and never met.
+Shipped 2026-09-23 as *Shipped: a step that says `denials: fail` is stopped on a denied call*, above: a status of its own, `denied`,
+rather than a failure spending `retries:`, since the run's `allow:` is frozen and a try is denied the same again. The number kept so §11
+keeps its.
 
 ## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)
 

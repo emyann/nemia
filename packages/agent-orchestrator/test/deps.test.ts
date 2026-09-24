@@ -29,7 +29,7 @@ test('deps.ts reads no disk and spawns nothing: it imports path, and nothing els
   assert.deepEqual([...text.matchAll(/^\s*(?:import|export)\b[^'";]*?\bfrom\s*['"]([^'"]+)['"]/gm)].map((m) => m[1]), ['node:path']);
 });
 
-test('the plan: workspace packages to the worktree\'s copy, everything else to main\'s, scopes and .bin its own, npm\'s dot files left out', () => {
+test('the plan: workspace packages to the worktree\'s copy, every other package main\'s hardlinked, scopes and .bin its own with npm\'s links as written, npm\'s dot files left out', () => {
   const listing: DepsListing = {
     entries: [
       { name: '.bin' }, { name: '.package-lock.json' }, { name: '.vite-temp' },
@@ -42,23 +42,25 @@ test('the plan: workspace packages to the worktree\'s copy, everything else to m
       { name: 'alias', link: 'third' },
     ],
     scopes: { '@fx': [{ name: 'other' }, { name: 'sx', link: '../../packages/sx' }] },
-    bins: [{ name: 'xbin', link: '../x/bin.js' }, { name: 'sxbin', link: '../@fx/sx/bin.js' }, { name: 'third', link: '../third/cli.js' }],
+    // A bin that is a file, not npm's link to one: hardlinked like a package.
+    bins: [{ name: 'xbin', link: '../x/bin.js' }, { name: 'sxbin', link: '../@fx/sx/bin.js' }, { name: 'third', link: '../third/cli.js' }, { name: 'shim' }],
   };
   const nm = '/wt/run/implement/node_modules';
   assert.deepEqual(depsPlan('/repo', '/wt/run/implement', listing), [
     { kind: 'dir', path: nm },
     { kind: 'dir', path: `${nm}/@fx` },
-    { kind: 'link', path: `${nm}/@fx/other`, target: '/repo/node_modules/@fx/other' },
+    { kind: 'tree', path: `${nm}/@fx/other`, from: '/repo/node_modules/@fx/other' },
     { kind: 'link', path: `${nm}/@fx/sx`, target: '../../packages/sx' },
     { kind: 'link', path: `${nm}/app`, target: '../apps/app' },
-    { kind: 'link', path: `${nm}/third`, target: '/repo/node_modules/third' },
+    { kind: 'tree', path: `${nm}/third`, from: '/repo/node_modules/third' },
     { kind: 'link', path: `${nm}/x`, target: '../packages/x' },
     { kind: 'link', path: `${nm}/far`, target: '/repo/node_modules/far' },
     { kind: 'link', path: `${nm}/alias`, target: '/repo/node_modules/alias' },
     { kind: 'dir', path: `${nm}/.bin` },
     { kind: 'link', path: `${nm}/.bin/xbin`, target: '../x/bin.js' },
     { kind: 'link', path: `${nm}/.bin/sxbin`, target: '../@fx/sx/bin.js' },
-    { kind: 'link', path: `${nm}/.bin/third`, target: '/repo/node_modules/.bin/third' },
+    { kind: 'link', path: `${nm}/.bin/third`, target: '../third/cli.js' },
+    { kind: 'tree', path: `${nm}/.bin/shim`, from: '/repo/node_modules/.bin/shim' },
   ]);
 });
 
@@ -131,7 +133,9 @@ test('the brief says a tree was installed, under Where to look and before the cl
   assert.equal(later.split('## Where to look').length, 2, 'one section, not two');
   assert.ok(later.indexOf('git diff abc123') < later.indexOf('`npm ci`'), 'the line joins what is already there');
 
-  assert.doesNotMatch(composeBrief(implement, { ...run, steps: { implement: { taskId: null } } }, [implement], undefined, undefined, { tree: 'linked', made: 12 }), /Where to look|npm ci/);
+  for (const deps of [{ tree: 'hardlinked', made: 12 }, { tree: 'linked', made: 12 }] as const) {
+    assert.doesNotMatch(composeBrief(implement, { ...run, steps: { implement: { taskId: null } } }, [implement], undefined, undefined, deps), /Where to look|npm ci/);
+  }
   const failed = composeBrief(review, run, steps, undefined, undefined, { tree: 'failed', error: 'npm error code EUSAGE' });
   assert.match(failed, /npm error code EUSAGE/);
   assert.match(failed, /Run `npm ci` here before anything that needs a dependency/);
@@ -195,7 +199,7 @@ function aCheckout(): { main: string; wt: string } {
 /** What `require(name)` gives from a directory, asked of a fresh node: the real path it resolved, and the export. */
 const required = (dir: string, name: string): { real: string; value: unknown } => JSON.parse(execFileSync(process.execPath, ['-e',
   `const p = require.resolve(${JSON.stringify(name)}); console.log(JSON.stringify({ real: require('fs').realpathSync(p), value: require(p) }))`,
-], { cwd: dir, encoding: 'utf8' }));
+], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
 
 /** Everything under a directory, without following a link: kind, link target, bytes, mtime. A write anywhere shows. */
 function snapshot(dir: string): Record<string, string> {
@@ -215,7 +219,7 @@ function snapshot(dir: string): Record<string, string> {
 
 test('a workspace package resolves to the worktree\'s own copy: what the worktree\'s app imports is the branch\'s packages/x', async () => {
   const { main, wt } = aCheckout();
-  assert.deepEqual(await provisionDeps(main, wt), { tree: 'linked', made: 10 });
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 10 });
 
   assert.deepEqual(required(path.join(wt, 'apps/app'), 'x'), { real: fs.realpathSync(path.join(wt, 'packages/x/index.js')), value: 'branch-x' });
   assert.equal(required(wt, 'app').value, 'branch-x', 'through the app, too');
@@ -223,23 +227,40 @@ test('a workspace package resolves to the worktree\'s own copy: what the worktre
   assert.equal(required(path.join(main, 'apps/app'), 'x').value, 'main-x', 'while main still imports its own');
 });
 
-test('a third-party package resolves to main\'s: one inode, linked and never copied', async () => {
+test('a third-party package is main\'s files, hardlinked into a directory of the worktree\'s: one inode, never copied, and its path the worktree\'s', async () => {
   const { main, wt } = aCheckout();
   await provisionDeps(main, wt);
   const theirs = path.join(main, 'node_modules/third/index.js');
-  assert.equal(fs.statSync(path.join(wt, 'node_modules/third/index.js')).ino, fs.statSync(theirs).ino);
-  assert.equal(required(wt, 'third').real, fs.realpathSync(theirs));
-  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  const ours = path.join(wt, 'node_modules/third/index.js');
+  assert.equal(fs.statSync(ours).ino, fs.statSync(theirs).ino);
+  assert.equal(required(wt, 'third').real, fs.realpathSync(ours), 'node resolves it in the worktree');
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isDirectory());
   assert.equal(required(wt, '@fx/other').value, 'main-other', 'a scoped one as well');
 });
 
-test('a bin of a workspace package runs the worktree\'s file; a third-party bin runs main\'s', async () => {
+test('every path under a provisioned node_modules is inside the worktree: a fenced step reading it never leaves its working directory', async () => {
+  const { wt, main } = aCheckout();
+  await provisionDeps(main, wt);
+  const real = fs.realpathSync(wt) + path.sep;
+  const walk = (p: string): string[] => {
+    const st = fs.lstatSync(p);
+    const here = [p];
+    return st.isDirectory() ? here.concat(fs.readdirSync(p).flatMap((name) => walk(path.join(p, name)))) : here;
+  };
+  const paths = walk(path.join(wt, 'node_modules'));
+  assert.ok(paths.length > 10);
+  for (const p of paths) assert.ok(fs.realpathSync(p).startsWith(real), `${path.relative(wt, p)} is ${fs.realpathSync(p)}`);
+});
+
+test('a bin of a workspace package runs the worktree\'s file; a third-party bin runs main\'s, hardlinked in the worktree', async () => {
   const { main, wt } = aCheckout();
   await provisionDeps(main, wt);
   const bins = path.join(wt, 'node_modules/.bin');
   assert.ok(!fs.lstatSync(bins).isSymbolicLink(), '.bin is the worktree\'s own directory');
   assert.equal(execFileSync(path.join(bins, 'xbin'), { encoding: 'utf8' }).trim(), 'branch-x');
   assert.equal(execFileSync(path.join(bins, 'third'), { encoding: 'utf8' }).trim(), 'main-third-cli');
+  assert.equal(fs.readlinkSync(path.join(bins, 'third')), '../third/cli.js', 'npm\'s link, as npm wrote it');
+  assert.equal(fs.realpathSync(path.join(bins, 'third')), fs.realpathSync(path.join(wt, 'node_modules/third/cli.js')));
 });
 
 test('a lockfile that differs from main\'s provisions a tree of its own with npm ci — once — and none of main\'s is in it', async () => {
@@ -289,14 +310,76 @@ test('a second provisioning is a no-op, and replaces nothing a step installed ov
   const { main, wt } = aCheckout();
   await provisionDeps(main, wt);
   const nm = path.join(wt, 'node_modules');
-  // What `npm install` in the worktree does to a package it updates: the link becomes a directory.
-  fs.unlinkSync(path.join(nm, 'third'));
+  // What `npm install` in the worktree does to a package it updates: the directory is replaced.
+  fs.rmSync(path.join(nm, 'third'), { recursive: true });
   write(path.join(nm, 'third/index.js'), "module.exports = 'installed-here';\n");
   const once = snapshot(nm);
 
-  assert.deepEqual(await provisionDeps(main, wt), { tree: 'linked', made: 0 });
-  assert.deepEqual(snapshot(nm), once);
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 0 });
+  assert.deepEqual(snapshot(nm), once, 'main\'s other files are not added to the package the step installed');
   assert.equal(required(wt, 'third').value, 'installed-here');
+});
+
+test('a package a pass died making is made again, whole, and not taken for a package meanwhile', async () => {
+  const { main, wt } = aCheckout();
+  await provisionDeps(main, wt);
+  const nm = path.join(wt, 'node_modules');
+  // As a pass leaves it that died inside the walk: the package's place empty, a part of it under the name it is made at.
+  fs.rmSync(path.join(nm, 'third'), { recursive: true });
+  write(path.join(nm, '.wf-making-third/index.js'), 'half\n');
+  assert.throws(() => required(wt, 'third'), 'what is half made is not found as the package');
+
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 1 });
+  assert.deepEqual(fs.readdirSync(path.join(nm, 'third')).sort(), ['cli.js', 'index.js']);
+  assert.equal(required(wt, 'third').value, 'main-third');
+  assert.ok(!fs.existsSync(path.join(nm, '.wf-making-third')), 'and nothing is left of the half');
+});
+
+test('a file main replaces after the cut — as npm install does, by rename — leaves the worktree\'s copy as it was', async () => {
+  const { main, wt } = aCheckout();
+  await provisionDeps(main, wt);
+  const theirs = path.join(main, 'node_modules/third/index.js');
+  fs.writeFileSync(`${theirs}.new`, "module.exports = 'main-third-2';\n");
+  fs.renameSync(`${theirs}.new`, theirs);
+  assert.equal(required(main, 'third').value, 'main-third-2');
+  assert.equal(required(wt, 'third').value, 'main-third', 'the worktree keeps the file it was cut with');
+});
+
+test('a link inside a package is copied as written and never followed: one out of the tree, and one that loops', async () => {
+  const { main, wt } = aCheckout();
+  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
+  write(path.join(outside, 'secret.txt'), 'not a dependency\n');
+  link(outside, path.join(main, 'node_modules/third/out'));
+  link('.', path.join(main, 'node_modules/third/loop'));
+  assert.equal((await provisionDeps(main, wt)).tree, 'hardlinked');
+  const third = path.join(wt, 'node_modules/third');
+  assert.ok(fs.lstatSync(path.join(third, 'out')).isSymbolicLink());
+  assert.equal(fs.readlinkSync(path.join(third, 'out')), outside);
+  assert.equal(fs.readlinkSync(path.join(third, 'loop')), '.');
+  assert.deepEqual(fs.readdirSync(outside), ['secret.txt'], 'nothing was made where it leads');
+});
+
+test('where a hardlink cannot be made — another filesystem — main\'s packages are linked, and the answer says why; any other failure is a failure', async (t) => {
+  const exdev = () => { throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' }); };
+  const { main, wt } = aCheckout();
+  const linking = t.mock.method(fs, 'linkSync', exdev);
+  const got = await provisionDeps(main, wt);
+  assert.equal(got.tree, 'linked');
+  assert.ok(got.tree === 'linked' && /^EXDEV: cross-device link not permitted/.test(got.why ?? ''), JSON.stringify(got));
+  assert.equal(got.tree === 'linked' && got.made, 10, 'every entry is still made');
+  const nm = path.join(wt, 'node_modules');
+  assert.equal(fs.readlinkSync(path.join(nm, 'third')), path.join(main, 'node_modules/third'), 'as worktrees were before');
+  assert.equal(fs.readlinkSync(path.join(nm, '@fx/other')), path.join(main, 'node_modules/@fx/other'));
+  assert.equal(required(wt, 'third').value, 'main-third');
+  assert.deepEqual(fs.readdirSync(nm).filter((n) => n.startsWith('.wf-making-')), [], 'nothing half made is left');
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'linked', made: 0, why: 'an earlier pass linked them' }, 'a second call still says so');
+  linking.mock.restore();
+
+  const other = aCheckout();
+  t.mock.method(fs, 'linkSync', () => { throw Object.assign(new Error('EACCES: permission denied, link'), { code: 'EACCES', syscall: 'link' }); });
+  const failed = await provisionDeps(other.main, other.wt);
+  assert.equal(failed.tree, 'failed', 'a refusal that is not about where the store is is not taken for one');
+  assert.ok(!fs.lstatSync(path.join(other.wt, 'node_modules/third'), { throwIfNoEntry: false }), 'and nothing is linked for it');
 });
 
 test('nothing in main\'s node_modules is written — by provisioning, or by a tool writing the worktree\'s bins, scopes and caches after', async () => {

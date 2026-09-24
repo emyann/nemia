@@ -4,7 +4,7 @@ import { listRuns, runStartedAt } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
-import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
+import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { everyView, filedTimes, findRun, judgedSteps, noSuchRun, seenBy, stepNames, type Views, workflowsOf } from './store.ts';
 
@@ -31,6 +31,13 @@ export type RunSummary = {
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
+  /** The runs a person holds this one until (`wf hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or one called off. */
+  heldUntil: string[];
+  /**
+   * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
+   * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `wf ls` says it.
+   */
+  holding: RunHolding | null;
   status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
@@ -39,6 +46,7 @@ export type RunSummary = {
    *
    * A run waiting on runs moves: the tick files its roots once they ship. Not one waiting on a run that never ships without a
    * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
    */
   moving: boolean;
   /** What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was measured. */
@@ -68,7 +76,8 @@ export type RunSummary = {
 async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, string>): Promise<RunSummary> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
-  const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
+  const seen = seenBy(views);
+  const judged = judge(run, names, folder, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) => standingsOf(run, steps, status));
   return {
     id: run.id,
     repo: run.repo ?? null,
@@ -81,6 +90,8 @@ async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, stri
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
     waiting: judged.waiting,
+    heldUntil: judged.holding ? run.hold!.until : [],
+    holding: judged.holding,
     status: judged.status,
     moving: judged.moving,
     cost: judged.cost,

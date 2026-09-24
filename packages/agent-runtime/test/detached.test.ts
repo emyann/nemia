@@ -72,8 +72,8 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
   await settle(ops, 'ae/t4/1', 'working');
 
-  // Re-issued every pass, exactly as the engine does: the first may land in the window before
-  // the worker has published its pid, and a level-triggered loop simply asks again.
+  // Re-issued every pass, exactly as the engine does. The first is heard wherever it lands (the tests below make the
+  // window before the pid happen); asking again is what a level-triggered loop does anyway.
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
@@ -191,6 +191,103 @@ test('a worker whose run file is taken away while it writes words on ends its ha
   fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
   await within(() => runningIn([dir]).length === 0, 'the worker and the listener ended');
   assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
+});
+
+/**
+ * A worker spawned under a hook that freezes it just BEFORE its first rename: its status, pid and all, is in the run
+ * file's `.tmp`, and the run file still says `pid: 0`. Answers the worker's pid, read off that `.tmp`, once it is frozen.
+ */
+const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir: string, name: string) => {
+  const hook = path.join(dir, 'freeze-before-publish.mjs');
+  fs.writeFileSync(hook, [
+    "import fs from 'node:fs';",
+    "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
+    '  const rename = fs.renameSync;',
+    "  fs.renameSync = (...a) => { fs.renameSync = rename; process.kill(process.pid, 'SIGSTOP'); rename(...a); };",
+    '}',
+  ].join('\n'));
+  const was = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
+  try { await Effect.runPromise(ops.spawn(req(name, dir))); } finally {
+    if (was === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = was;
+  }
+  const runFile = path.join(dir, 'runs', 'sh', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
+  const read = (f: string) => { try { return (JSON.parse(fs.readFileSync(f, 'utf8')) as { pid: number }).pid; } catch { return 0; } };
+  let pid = 0;
+  await until(() => (pid = read(`${runFile}.tmp`)) > 0, 'the worker writes its status');
+  // Continued before it has frozen, it would freeze for good: wait to see it stopped.
+  await until(() => isFrozen(pid), 'the worker freezes before it publishes its pid');
+  assert.equal(read(runFile), 0, 'the run file has no pid while the worker is frozen');
+  return pid;
+};
+const isFrozen = (pid: number) => { try { return execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('T'); } catch { return false; } };
+const isAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+test('a stop that lands before the worker has published its pid is heard: the harness never starts', async () => {
+  // Open issue 30: a stop that found no pid did nothing, so a direct A2A caller answered CANCELED had stopped nothing,
+  // and the harness ran to its end. The stop is left on disk now, and the worker reads it before it starts the harness.
+  const dir = root();
+  const ran = path.join(dir, 'ran');
+  const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
+  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/3');
+  let heard = false;
+  try {
+    await Effect.runPromise(ops.stop('ae/t4/3'));
+    process.kill(pid, 'SIGCONT');
+    await settle(ops, 'ae/t4/3', 'stopped');
+    await until(() => !isAlive(pid), 'the worker exits');
+    heard = true;
+  } finally {
+    if (!heard) {
+      for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
+      await Effect.runPromise(ops.stop('ae/t4/3'));
+    }
+  }
+  assert.equal(fs.existsSync(ran), false, 'the harness never ran');
+  const seen = (await Effect.runPromise(ops.observe)).get('ae/t4/3')!;
+  assert.equal(seen.exitCode, undefined, 'a harness never started has no exit code');
+  // Spawned again under the name, it runs: the stop asked of the one before is not asked of it.
+  const again = detachedOps(sh(`touch ${ran}; exit 0`), dir);
+  await Effect.runPromise(again.spawn(req('ae/t4/3', dir)));
+  await settle(again, 'ae/t4/3', 'done');
+  assert.equal(fs.existsSync(ran), true, 'a run spawned again after a stop starts its harness');
+});
+
+test('a stop whose marker lands after the worker looked for it finds the pid it published, and is heard', async () => {
+  // The other order: the stop reads no pid, the worker publishes, finds no marker and starts the harness, and only then
+  // is the marker written. The stop reads the pid again after its marker, so it signals the worker all the same.
+  const dir = root();
+  const ran = path.join(dir, 'ran');
+  const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
+  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/4');
+  const write = fs.writeFileSync;
+  let held = false;
+  // The marker's write, held until the worker has gone on and started its harness: the stop has read `pid: 0` by then.
+  (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = ((f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+    if (typeof f === 'string' && f.endsWith('.stop') && !held) {
+      held = true;
+      process.kill(pid, 'SIGCONT');
+      const wait = new Int32Array(new SharedArrayBuffer(4));
+      for (const bound = performance.now() + 10_000; !fs.existsSync(ran);) {
+        if (performance.now() > bound) break;
+        Atomics.wait(wait, 0, 0, 20);
+      }
+    }
+    return (write as (...a: unknown[]) => void)(f, ...rest);
+  }) as typeof fs.writeFileSync;
+  let heard = false;
+  try {
+    try { await Effect.runPromise(ops.stop('ae/t4/4')); } finally { fs.writeFileSync = write; }
+    assert.equal(held, true, 'the stop wrote its marker');
+    assert.equal(fs.existsSync(ran), true, 'the harness started before the marker was written');
+    await settle(ops, 'ae/t4/4', 'stopped');
+    heard = true;
+  } finally {
+    if (!heard) {
+      for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
+      await Effect.runPromise(ops.stop('ae/t4/4'));
+    }
+  }
 });
 
 test('THE LEASE: a run file whose heartbeat stopped is reported dead, not running', async () => {

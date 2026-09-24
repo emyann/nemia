@@ -57,7 +57,7 @@ test('the role keys are the keys a step has, but for wiring, the description and
 });
 
 test('REFUSED at shipped defaults: every wiring key in an agent file, by name, saying it belongs on the step', () => {
-  const wiring = ['after', 'resume', 'input', 'workspace', 'slot', 'background', 'check', 'retries', 'gate', 'loop', 'rounds', 'budget', 'maxAttempts', 'deadlineSeconds'];
+  const wiring = ['after', 'resume', 'input', 'workspace', 'slot', 'denials', 'background', 'check', 'retries', 'gate', 'loop', 'rounds', 'budget', 'maxAttempts', 'deadlineSeconds'];
   assert.deepEqual(STEP_KEYS.filter((k) => !(AGENT_KEYS as readonly string[]).includes(k) && k !== ('agent' as string)).sort(), [...wiring].sort(), 'every key an agent may not set is wiring');
   for (const key of wiring) {
     const said = refusal(() => agent('implementer', `---\n${key}: something\n---\nImplement it.\n`));

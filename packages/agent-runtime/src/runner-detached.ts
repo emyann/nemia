@@ -161,7 +161,7 @@ const sizeOf = (p: string) => { try { return fs.statSync(p).size; } catch { retu
  * says a session is waiting, and says what for — Claude Code's `claude agents --json` — can fill that field.
  *
  * The file is the session: `stop` finds the worker by it. Removed, alone or with the store it is in, the worker takes it
- * for a stop, ends its harness and exits, and never writes the file again (open issue 30).
+ * for a stop, ends its harness and exits, and never writes the file again (open issue 32).
  */
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string; startedAt?: string;
@@ -211,6 +211,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
   // `.jsonl`, so `readAll` never takes it for a run file.
   const inboxFile = (name: string) => path.join(dir, `${safe(name)}.inbox.jsonl`);
+  // A stop asked of a run, a file of its own so the run file keeps one writer, the worker. Not `.json`, so never a run file.
+  const stopFile = (name: string) => path.join(dir, `${safe(name)}.stop`);
 
   const readAll = (): Array<{ name: string; run: RunFile }> => {
     if (!fs.existsSync(dir)) return [];
@@ -352,6 +354,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           try { fs.rmSync(closeoutFile(r.name)); } catch { /* nothing to clear */ }
           // Nor in its output, which a spec that reads one would take the previous answer from.
           fs.rmSync(logFile(r.name), { force: true });
+          // Nor a stop asked of it, which its worker would read as asked of this one and start nothing.
+          fs.rmSync(stopFile(r.name), { force: true });
           outputs.delete(r.name);
           let io: HarnessIO = {};
           if (r.closeoutSchema) {
@@ -369,7 +373,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             first: spec.input.line(r.brief), inbox: inboxFile(r.name), from: sizeOf(inboxFile(r.name)), closesOn: spec.input.closesOn,
           };
           const plan = {
-            name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name),
+            name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name), stopFile: stopFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
             ...(spec.resumeCostCarried && r.resumeFrom ? { resumeFrom: r.resumeFrom } : {}),
             ...(input ? { input } : {}),
@@ -422,15 +426,20 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       Effect.try({
         try: () => {
           const hit = find(sessionId);
-          // `pid > 0` is load-bearing: the run file exists before the worker has written its own
-          // pid, and `process.kill(0, ...)` signals OUR ENTIRE PROCESS GROUP. A stop issued in
-          // that window simply does nothing, and the next pass issues it again — which is what
-          // level-triggering is for. Never a special case, never a wait.
-          if (hit && hit.run.pid > 0) {
+          if (!hit || hit.run.state !== 'working') return;
+          // The run file exists before the worker has written its own pid, and a stop in that window has no process to
+          // signal: `pid > 0` is load-bearing, since `process.kill(0, ...)` signals OUR ENTIRE PROCESS GROUP. So the stop
+          // is left on disk first, and the worker reads it once its pid is published, before it starts the harness: it
+          // writes `stopped` and starts nothing. Then the pid is read again. Whichever came first, one of the two sees
+          // the other — a worker that read no marker published its pid before the marker was written, so this read finds
+          // it — and a stop that lands at any moment is heard, on the pass that sends it.
+          fs.writeFileSync(stopFile(sessionId), '');
+          const now = find(sessionId);
+          if (now && now.run.state === 'working' && now.run.pid > 0) {
             // SIGTERM the worker, which kills the harness's process group and writes `stopped`.
             // Not our business to write that state: the worker is the one that saw it happen. It hears
             // SIGTERM from the moment its pid is on disk, so a stop that lands any time after is heard.
-            try { process.kill(hit.run.pid, 'SIGTERM'); } catch { /* already gone */ }
+            try { process.kill(now.run.pid, 'SIGTERM'); } catch { /* already gone */ }
           }
         },
         catch: (cause) => new RunnerError({ verb: 'stop', message: String(cause) }),

@@ -18,20 +18,26 @@
  * (`inputAt`), written before each line is, so a worker started again on the run file writes no word twice: at most once,
  * never twice. What it cannot give a harness it starts again is the words the one before heard (open issue 29).
  *
+ * A stop sent before its pid is on disk has no process to signal, so the driver leaves it as a file (`stopFile`) and reads
+ * the pid again; this reads the file once the pid is published, before it starts the harness, and starts nothing if it is
+ * there. One of the two always sees the other, so a stop is heard whenever it lands (open issue 30). A stop heard once the
+ * harness runs ends its process group, and kills what is left of it `STOP_GRACE_MS` later: the worker exits only once the
+ * group is empty, since a child that ignored SIGTERM, left behind by a harness that did not, has nothing to find it by after.
+ *
  * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
  * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
- * from under it for a stop — it ends the harness's group, SIGKILLs what of it is still there `GONE_KILL_MS` later, and
- * writes nothing again, so the file is never made anew — and exits. It notices at its next write: the heartbeat, within
- * five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine is what it is for.
+ * from under it for a stop, writes nothing again, so the file is never made anew, and exits. It notices at its next write:
+ * the heartbeat, within five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine
+ * is what it is for (open issue 32).
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, nativeIdPattern?, input?, inputAt? }
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, stopFile?, nativeIdPattern?, input?, inputAt? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const runFile = process.argv[2]!;
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
-  cmd: string; args: string[]; cwd: string; logFile: string; nativeIdPattern?: string;
+  cmd: string; args: string[]; cwd: string; logFile: string; stopFile?: string; nativeIdPattern?: string; pid?: number;
   input?: { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
   inputAt?: number;
 };
@@ -43,12 +49,13 @@ let status = {
   // A harness started here has closed nothing yet, whatever the one before it did.
   inputClosed: undefined as true | undefined,
 };
-/** How long a harness whose run file is gone has to end on SIGTERM before its group is killed. */
-const GONE_KILL_MS = 5_000;
+/** How long a harness told to stop has to end on SIGTERM before what is left of its group is killed. */
+const STOP_GRACE_MS = 5_000;
 let spawned = false;
 let gone = false;
-/** When the run file was found gone, on `performance.now()`'s clock: its group is killed `GONE_KILL_MS` after. */
-let goneAt = 0;
+let stopping = false;
+/** When the harness was first told to stop, on `performance.now()`'s clock: what is left is killed `STOP_GRACE_MS` after. */
+let stoppedAt: number | undefined;
 const write = (patch: Partial<typeof status> = {}) => {
   if (gone) return;
   status = { ...status, ...patch, heartbeatAt: new Date().toISOString() };
@@ -65,33 +72,41 @@ const write = (patch: Partial<typeof status> = {}) => {
   }
 };
 /**
- * The run file is gone: the session was taken away. Before the harness is started, nothing is; after, it is ended. Every
+ * The run file is gone: the session was taken away. Before the harness is started, nothing is; after, it is stopped. Every
  * write after the first is heard on the event loop, once this start has run to its end, so `beat`, `inbox` and `child`
  * below are set by then.
  */
 const vanished = () => {
   gone = true;
   if (!spawned) process.exit(0);
-  goneAt = performance.now();
-  stopping = true;
   clearInterval(beat);
   clearInterval(inbox);
-  killGroup();
-  // For a harness that ignores SIGTERM itself: its exit, below, then waits for nothing.
-  setTimeout(killGone, GONE_KILL_MS).unref();
+  stop();
 };
-const killGone = () => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } };
+const killGroup = () => {
+  try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
+};
+const killLeft = () => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } };
 /** Whether anything is left in the harness's process group — the harness itself, or what it started. */
 const groupAlive = () => { try { process.kill(-child.pid!, 0); return true; } catch { return false; } };
+/** Asks the harness's group to end, and gives it `STOP_GRACE_MS` from the first time it was asked. */
+const stop = () => {
+  stopping = true;
+  killGroup();
+  if (stoppedAt !== undefined) return;
+  stoppedAt = performance.now();
+  // For a harness that ignores SIGTERM itself: its exit, below, then waits for nothing.
+  setTimeout(killLeft, STOP_GRACE_MS).unref();
+};
 /**
- * Exits. A worker whose run file is gone first sees its harness's whole group ended: the harness can die on SIGTERM and
- * leave a child that ignores it, and once this exits nothing can find that child again. So it waits for the group to
- * empty until `GONE_KILL_MS` after the file was found gone, and kills what is left.
+ * Exits. A worker told to stop first sees its harness's whole group ended: the harness can die on SIGTERM and leave a
+ * child that ignores it holding its output, and the drain gives up on that at `DRAIN_MS`. So it waits for the group to
+ * empty until `STOP_GRACE_MS` after the stop, and kills what is left.
  */
 const leave = async (code: number) => {
-  if (gone) {
-    while (groupAlive() && performance.now() < goneAt + GONE_KILL_MS) await new Promise((r) => setTimeout(r, 50));
-    killGone();
+  if (stoppedAt !== undefined) {
+    while (groupAlive() && performance.now() < stoppedAt + STOP_GRACE_MS) await new Promise((r) => setTimeout(r, 50));
+    killLeft();
   }
   process.exit(code);
 };
@@ -99,14 +114,16 @@ const leave = async (code: number) => {
 // it had a handler would die of it, leaving its harness running under a run file that says `working` until the
 // lease calls it dead. Node runs a signal handler on the event loop, never inside this synchronous start, so
 // `child` below is set by the time one runs.
-let stopping = false;
-const killGroup = () => {
-  try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
-};
-for (const sig of ['SIGTERM', 'SIGINT'] as const) {
-  process.on(sig, () => { stopping = true; killGroup(); });
-}
+for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, stop);
 write();
+// Read after the pid is published, never before: a stop that finds no pid left this file first, and one that wrote it
+// after this read finds the pid. Asked already, the harness is never started, and no process runs to be stopped. Only by
+// the worker `spawn` launched, whose run file had no pid: one started again on a run file its worker left is not the
+// run a stop asked before was asked of.
+if (!plan.pid && plan.stopFile && fs.existsSync(plan.stopFile)) {
+  write({ state: 'stopped', exitCode: -1 });
+  process.exit(0);
+}
 
 // `detached` here is not about outliving anything — it gives the harness its own PROCESS GROUP,
 // so a stop can take its children with it. A harness that shells out (codex does) leaves orphans

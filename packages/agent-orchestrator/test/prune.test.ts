@@ -64,7 +64,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 
 /**
  * A run that is over: started for real, its one step filed in a worktree of its own, `work` committed on its branch, signed off, and handed
- * off by a pass — with a `node_modules` in the worktree that git ignores, holding a link out of it. Merged into `main` with `merged`.
+ * off by a pass — with a `node_modules` in the worktree that git ignores, holding a link out of it and a file of main's, hardlinked. Merged into `main` with `merged`.
  */
 const aFinished = async (b: ReturnType<typeof board>, { merged = false, work = 'fix.ts', budget, costUsd, closeout = SIGNED }: { merged?: boolean; work?: string; budget?: number; costUsd?: number; closeout?: object } = {}) => {
   const repo = aRepo();
@@ -79,6 +79,11 @@ const aFinished = async (b: ReturnType<typeof board>, { merged = false, work = '
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
   fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me\n');
   fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
+  // And a package of main's, hardlinked as the run provisions one: a megabyte removing the worktree does not free.
+  fs.mkdirSync(path.join(repo, 'node_modules', 'big'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'node_modules', 'big', 'index.js'), 'y'.repeat(1024 * 1024));
+  fs.mkdirSync(path.join(wt, 'node_modules', 'big'));
+  fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
   b.settle(`${run.id}-implement`, 'succeeded', closeout, costUsd === undefined ? undefined : { costUsd });
   await advance(b.e, readRun(run.id));   // the hand-off: nothing left uncommitted
   const branch = `wf/${run.id}/implement`;
@@ -119,6 +124,7 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
   const measured = (await prune(b.e, run.id)).worktrees[0]!.bytes;
   assert.ok(measured >= 64 * 1024, `what node_modules holds is counted (${measured})`);
+  assert.ok(measured < 1024 * 1024, `and not a file main still holds, which removing the worktree does not free (${measured})`);
 
   const done = await typed(t, b.e, 'prune', run.id, '--yes');
   assert.equal(done.error, undefined);
@@ -126,6 +132,7 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   assert.ok(!fs.existsSync(wt) && !under('worktrees', run.id), 'the worktree, and the run\'s directory of them, are gone');
   assert.ok(!worktreesOf(repo).includes(fs.realpathSync(ROOT) + wt.slice(ROOT.length)), 'git lists it no more');
   assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me\n', 'a link in node_modules is not followed');
+  assert.equal(fs.statSync(path.join(repo, 'node_modules', 'big', 'index.js')).size, 1024 * 1024, 'nor is main\'s file, hardlinked, touched');
   assert.ok(git(repo, 'branch', '--list', branch), 'the branch is kept');
   assert.ok(under('runs', `${run.id}.json`) && under('runs', run.id, 'artifacts', 'implement', 'report.md') && under('runs', `${run.id}.asks`, 'done'));
   const pruned = readRun(run.id).pruned!;

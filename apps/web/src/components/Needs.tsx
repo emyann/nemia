@@ -70,7 +70,7 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
               </Fragment>
             ))}
           </strong>{' '}
-          — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —{' '}
+          — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —{' '}
           <code>wf decide {run.id}</code>
         </p>
       )}

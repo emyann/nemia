@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, deniedWords, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, deniedOffer, deniedWords, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, parseCloseout, placeText, REPLIES_SCHEMA, type Closeout } from '../src/closeout.ts';
 import { answerOf, dueNote, messageRefusal, nextTry, retriesSpent, sessionModel, signoffsSpent, spentAsks, tryOf, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry.ts';
 import { firstFiledAt, runStartedAt, taskUsage, timeline, timelineLines, timelineTotalLines, type TaskClock } from '../src/timeline.ts';
@@ -2871,6 +2871,106 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   assert.equal(refusal({ mode: 'nudge', budget: 3 }, unmeasured), "--budget 3 is not above $3, the $3 budget implement's session was ended at: a try under it would read budget exhausted again as soon as it ended. Give more than $3: wf retry r-1 implement --budget <amount>.");
   assert.equal(refusal({ mode: 'fresh', budget: 5 }, unmeasured), null);
   assert.equal(listing(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, unmeasured).steps[0]!.status, 'budget exhausted at $3');
+});
+
+const deniedSpend = (denied: Record<string, string[]>): SpendOf => (id) =>
+  (id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id]! } : undefined);
+
+test("a step that says `denials: fail` and signed off denied a call reads denied: nothing after it filed, no check of it run, never tried by `retries:`, waited on by a person — and without the key, or without a denial, it reads as it did", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
+  assert.equal(stepStatus(DENYING[0]!, r, p, signedDone, asked, DENYING, denied), 'denied');
+  assert.equal(stepStatus(DENYING[0]!, r, p, signedDone, asked, DENYING, deniedSpend({ t1: [] })), 'checking', 'denied nothing: its check is what comes');
+  assert.equal(stepStatus(CHECKED[0]!, r, p, signedDone, asked, CHECKED, denied), 'checking', 'no `denials:` line: a denial is a note, never a stop');
+  assert.equal(stepStatus(DENYING[0]!, r, p, () => undefined, asked, DENYING, denied), 'unsigned', 'what it did not sign is said first');
+  assert.equal(stepStatus(DENYING[0]!, r, p, () => ({ ...said('blocked') }), asked, DENYING, denied), 'blocked', 'a step that stopped itself said why');
+
+  const a = assess(DENYING, r, p, signedDone, asked, () => undefined, [], [], () => false, denied);
+  assert.deepEqual([a.check, a.retry, a.blocked, a.status, a.stoppedOn], [[], [], ['review'], 'failed', 'blocked'], 'stopped on a person, nothing broke');
+  assert.deepEqual(retriesDue(DENYING, r, p, signedDone, asked, () => undefined, [], () => false, denied), [], '`retries: 2` spends nothing on it');
+
+  const d = decision(DENYING, r, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['blocked', ['implement'], [], []]);
+  const l = listing(DENYING, r, shown({ t1: 'succeeded' }), signedOff({ implement: signedDone() }), asked, () => undefined, [], [], [], [], () => 0, denied, undefined, [], undefined, () => undefined, (id) => denied(id)?.denied ?? []);
+  assert.deepEqual([l.steps[0]!.status, l.steps[0]!.note, l.waitingOnYou], ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']]);
+
+  assert.deepEqual(retryable(DENYING[0]!, r, p, signedDone, asked, DENYING, () => false, denied), { status: 'denied', modes: ['nudge', 'fresh'], blockedByHarness: false });
+  const refusal = (how: RetryHow) => retryRefusal(DENYING, r, 'implement', how, p, signedDone, asked, () => undefined, [], () => false, denied);
+  assert.equal(refusal({ mode: 'recheck' }), "--recheck runs a step's check again, and implement was denied a call by its harness, and its check was never run: no check of it failed. Ask for another session instead: wf retry r-1 implement (or --fresh).");
+  assert.equal(refusal({ mode: 'fresh' }), null);
+  assert.equal(refusal({ mode: 'nudge' }), null);
+  const GATED: Workflow[] = [{ ...DENYING[0]!, gate: true }, DENYING[1]!];
+  assert.equal(approvalRefusal(GATED, r, 'implement', undefined, p, signedDone, asked, () => undefined, [], denied),
+    'implement signed off, and its harness denied its try a call, which `denials: fail` does not pass on: there is nothing to approve. See what it was denied: wf decide r-1.', 'a gate holds nothing a denial stopped');
+
+  // Past its budget too: held there, as a step that stopped on its own work is, and named for both — the raise is what a new session needs.
+  const BUDGETED: Workflow[] = [{ ...DENYING[0]!, budget: 3 }, DENYING[1]!];
+  const over: SpendOf = (id) => (id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined);
+  assert.deepEqual([stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, over), ownStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, over)], ['over budget', 'denied']);
+  const od = decision(BUDGETED, r, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, over);
+  assert.match(retryLines(BUDGETED, r, od, p, signedDone, asked, over)[0]!, /^implement: over budget \(denied\), \$4\.00 of \$3\. Raise its cap above \$4\.00/);
+
+  // A new try is read on its own task: denied nothing, it goes on to its check.
+  const again = run({ implement: 't2', review: null });
+  assert.equal(stepStatus(DENYING[0]!, again, phases({ t2: 'succeeded' }), signedDone, asked, DENYING, denied), 'checking');
+});
+
+test("`wf decide` offers a denied step a new session with the bare `wf retry <run> <step> --fresh`, and names the rule for the folder's `allow:` a new run needs — a write as `Edit(//…)`, a command as `Bash(word:*)` — and nothing on a pruned run", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'MultiEdit(/tmp/w/notes.md)', 'Bash(pytest)'] });
+  const d = decision(DENYING, r, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  const lines = retryLines(DENYING, r, d, p, signedDone, asked, denied);
+  assert.deepEqual(lines, [
+    "implement: denied — its harness denied its try calls, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md), Bash(pytest:*) to the folder's allow:, which allows them. This run's allow: is frozen at wf start, so a try of it is denied the same again. A new session, told to do without it:  wf retry r-1 implement --fresh  (or continue its session: wf retry r-1 implement)",
+  ]);
+  assert.equal(/:  (wf [^(]*?)\s*(?:\(|$)/.exec(lines[0]!)![1], 'wf retry r-1 implement --fresh', 'the first command on the line is the bare offer');
+  assert.deepEqual(retryLines(DENYING, { ...r, pruned: { at: '2026-09-23T00:00:00Z' } } as Run, d, p, signedDone, asked, denied), [], 'pruned: nothing to try');
+});
+
+test("a denied step's offer names a rule the next run can match: a path in its worktree from the worktree, not by this run's id", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const wt = '/home/me/.agent-workflows/worktrees/r-1/implement';
+  const r = run({ implement: 't1', review: null });
+  const placed: Run = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement!, workspace: wt } } };
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: [`Write(${wt}/notes.md)`, 'Write(/home/me/.agent-workflows/runs/r-1/artifacts/implement/shot.png)'] });
+  const d = decision(DENYING, placed, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  const [line] = retryLines(DENYING, placed, d, p, signedDone, asked, denied);
+  assert.match(line!, /add Edit\(notes\.md\), Edit\(\/\/home\/me\/\.agent-workflows\/runs\/\*\/artifacts\/implement\/shot\.png\) to the folder's allow:/);
+  assert.doesNotMatch(line!, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
+});
+
+test("a denied step's offer gives no allow rule for a call its own disallow: may have denied, since a deny beats every allow, and says which rule", () => {
+  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail', disallow: ['Bash(npm run build)', 'SendMessage'] }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const denied = deniedSpend({ t1: ['Bash(npm)', 'SendMessage', 'Bash(pytest)'] });
+  const d = decision(DENYING, r, p, nothingShipped, signedDone, asked, () => undefined, [], [], () => false, denied);
+  assert.deepEqual(retryLines(DENYING, r, d, p, signedDone, asked, denied), [
+    "implement: denied — its harness denied its try calls, and denials: fail passes none on. For a new run, add Bash(pytest:*) to the folder's allow:, which allows it. Bash(npm), SendMessage may be its own disallow: at work (Bash(npm run build), SendMessage), which beats any allow:, so no rule is offered for them. This run's allow: is frozen at wf start, so a try of it is denied the same again. A new session, told to do without it:  wf retry r-1 implement --fresh  (or continue its session: wf retry r-1 implement)",
+  ]);
+  const only = deniedOffer(['SendMessage'], { disallow: ['SendMessage'] });
+  assert.doesNotMatch(only, /add .* to the folder's allow:/, 'every call its own deny: nothing to add');
+  assert.match(only, /its try a call, .* SendMessage may be its own disallow: at work \(SendMessage\), which beats any allow:, so no rule is offered for it\./);
+});
+
+test("`deniedOffer`: each rule once, one line, the first five named and the rest counted", () => {
+  assert.match(deniedOffer(['Skill(look)']), /its try a call, .* add Skill\(look\) to the folder's allow:, which allows it\./);
+  const many = deniedOffer(['Bash(a)', 'Bash(b)', 'Bash(c)', 'Bash(d)', 'Bash(e)', 'Bash(f)', 'Bash(a)']);
+  assert.match(many, /add Bash\(a:\*\), Bash\(b:\*\), Bash\(c:\*\), Bash\(d:\*\), Bash\(e:\*\) and 1 more \(wf logs\) to/);
+  const broken = deniedOffer(['Bash(rm\n-rf)']);
+  assert.doesNotMatch(broken, /[\n\t]/, 'the harness\'s words made one line');
+});
+
+test("a try of a denied step is told what its session was denied, as data, and that the same call will be denied again", () => {
+  const brief = retrySection(step('implement'), { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'denied', denied: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
+  assert.match(brief, /denials: fail`, so nothing that waits on it started and its check did not run\. This try runs with the same permissions, and the same call will be denied again/);
+  assert.match(brief, /## What your session was denied\n\n```text\nWrite\(\/tmp\/w\/notes\.md\)\nBash\(pytest\)\n```/);
+  assert.doesNotMatch(retrySection(step('implement'), { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'unsigned', denied: ['Bash(pytest)'] }), /What your session was denied/, 'only when it is why');
 });
 
 test("`budgetUsdFor`: what is left of the cap in force, once the step's tries are taken off, goes to the engine on every harness that runs `claude -p` — claude-detached, and claude as a job — so its harness holds the tries together to the cap; never to a background session, which keeps none, nor with no cap", () => {

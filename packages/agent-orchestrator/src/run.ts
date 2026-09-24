@@ -17,7 +17,7 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
 import { answerOf, dueNote, messageRefusal, modeWord, retriesSpent, signoffsSpent, spentAsks, tryOf, type EarlierTry, type Retry, type RetryAsk, type RetryHow, type RetryMode } from './retry.ts';
@@ -224,6 +224,9 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
  *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap (`roundSpans`)
  *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
+ *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is filed and
+ *                    no check is run on work done without the tool; `retries:` never files a try of it, since the try would run under the
+ *                    same frozen `allow:` — a person does, `wf retry`
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *
@@ -232,14 +235,14 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  */
 export type StepStatus =
   | 'waiting' | 'running' | 'blocked' | 'unsigned' | 'checking' | 'verified' | 'unverified' | 'awaiting approval' | 'exhausted' | 'over budget' | 'budget exhausted'
-  | 'failed (check)' | 'failed' | 'stopped';
+  | 'denied' | 'failed (check)' | 'failed' | 'stopped';
 
 /** What a follower may be filed on. */
 export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified';
 
 /** Final without satisfying `after`: nothing waiting on a step in one of these can ever run. */
 export const stopsFollowers = (s: StepStatus): boolean =>
-  s === 'blocked' || s === 'unsigned' || s === 'awaiting approval' || s === 'exhausted' || s === 'over budget' || s === 'budget exhausted' || s === 'failed (check)' || s === 'failed' || s === 'stopped';
+  s === 'blocked' || s === 'unsigned' || s === 'awaiting approval' || s === 'exhausted' || s === 'over budget' || s === 'budget exhausted' || s === 'denied' || s === 'failed (check)' || s === 'failed' || s === 'stopped';
 
 export type Assessment = {
   /** Steps whose predecessors are all verified or unverified, and which have not been filed. File these. */
@@ -540,6 +543,7 @@ export function approvalRefusal(
     'failed (check)': `${name} has not passed its check, so its work is not verified and there is nothing to approve. See what the check said: wf decide ${run.id}.`,
     failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
     stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
+    denied: `${name} signed off, and its harness denied its try a call, which \`denials: fail\` does not pass on: there is nothing to approve. See what it was denied: wf decide ${run.id}.`,
     exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — wf round ${run.id} ${name} — and approve what a later round hands on, or take the work as it stands and approve that: wf accept ${run.id} ${name} --message "<why>".`,
     verified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
@@ -1365,7 +1369,7 @@ export function triedFrom(
 }
 
 /** The statuses a try takes a step on from (`retryable`): a step over its budget in one waits for a person to raise the cap. */
-const TRIED_FROM: ReadonlySet<StepStatus> = new Set(['unsigned', 'failed (check)', 'failed', 'stopped', 'blocked']);
+const TRIED_FROM: ReadonlySet<StepStatus> = new Set(['unsigned', 'failed (check)', 'failed', 'stopped', 'blocked', 'denied']);
 const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', 'stopped']);
 
 /**
@@ -1421,6 +1425,8 @@ export function ownStatus(
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && declaredOutput(step, said, owedFields(step, run, steps)).missing.length) return 'unsigned';
   if (said && step.loop && typeof said.output?.again !== 'boolean') return 'unsigned';
+  // Signed, and denied a call on a step that says a denial fails it: before its check, which would judge work done without the tool.
+  if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   const signed = (s: 'verified' | 'unverified'): StepStatus =>
     (askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s);
   if (!step.check) return signed('unverified');
@@ -1440,8 +1446,13 @@ export function ownStatus(
  */
 export type Spend = { usd: number; measured: number; unmeasured: number };
 
-/** What one task's sessions cost (`Spend`), and whether its harness ended its last attempt at its budget — the engine's reason `budget`. */
-export type TaskSpend = Spend & { budgetEnded: boolean };
+/**
+ * What one task's sessions cost (`Spend`), whether its harness ended its last attempt at its budget — the engine's reason `budget` — and
+ * what its sessions were denied, in the runtime's words (`deniedOf` in views.ts, which `spendReader` fills it from: this file reads no
+ * runtime). Not money, and here all the same: every reader of a step's standing is handed a `SpendOf` already, and a reader handed a
+ * parameter of its own could leave it out and read no denial. Absent where nobody read them, as `taskSpend` alone leaves it.
+ */
+export type TaskSpend = Spend & { budgetEnded: boolean; denied?: readonly string[] };
 
 /** What a task's sessions cost, off the engine's view of it (`taskSpend`); undefined for a task nobody read. */
 export type SpendOf = (taskId: string) => TaskSpend | undefined;
@@ -1743,7 +1754,7 @@ export function retryable(
       && followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
   const modes: RetryMode[] =
     tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
-    : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness || sendsBack ? ['nudge', 'fresh']
+    : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || tried === 'denied' || blockedByHarness || sendsBack ? ['nudge', 'fresh']
     : [];
   const raise = settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
@@ -1944,7 +1955,8 @@ export function retryRefusal(
     return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
   }
   if (!modes.includes(how.mode)) {
-    const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off' : `is ${status}`;
+    const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off'
+      : status === 'denied' ? 'was denied a call by its harness, and its check was never run' : `is ${status}`;
     return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${sendsBack
       ? `To send it back from its gate, say what to change: wf retry ${run.id} ${name} --message "<objection>".`
       : `Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`}`;
@@ -2068,11 +2080,45 @@ export function retryLines(
       const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
+    } else if (status === 'denied') {
+      lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], step, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
     } else {
       lines.push(`${step.name}: ${status}.${shipAgain} Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
   }
   return lines;
+}
+
+/** The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allow:`, so a path goes whole but for a pathological one. */
+const RULE_CAP = 240;
+
+/**
+ * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allow:` needs for a new run
+ * (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a file
+ * written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A call
+ * the step's own `disallow:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would allow
+ * nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are free
+ * text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
+ */
+export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallow'> = {}, at: DeniedAt = {}): string {
+  const calls = [...new Set(denied)];
+  const fenced = calls.flatMap((call) => {
+    const rule = disallowedBy(call, step.disallow ?? [], at);
+    return rule ? [{ call, rule }] : [];
+  });
+  const rules = [...new Set(calls.filter((call) => !fenced.some((f) => f.call === call)).map((call) => allowRuleOf(call, at)))];
+  const add = rules.length ? ` For a new run, add ${shownList(rules)} to the folder's allow:, which allows ${rules.length === 1 ? 'it' : 'them'}.` : '';
+  const own = fenced.length
+    ? ` ${shownList(fenced.map((f) => f.call))} may be its own disallow: at work (${shownList([...new Set(fenced.map((f) => f.rule))])}), which beats any allow:, so no rule is offered for ${fenced.length === 1 ? 'it' : 'them'}.`
+    : '';
+  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allow: is frozen at wf start, so a try of it is denied the same again.`;
+}
+
+/** Rules or calls as `deniedOffer` names them: each one line, the first `DENIED_SHOWN`, then how many more. Pure. */
+function shownList(words: readonly string[]): string {
+  const named = words.slice(0, DENIED_SHOWN).map((word) => oneLine(word, RULE_CAP));
+  const more = words.length - named.length;
+  return `${named.join(', ')}${more ? ` and ${more} more (wf logs)` : ''}`;
 }
 
 /**
@@ -3396,6 +3442,8 @@ export type Decision =
       overBudget: string[];
       /** Steps whose harness ended their session at their `budget:`. */
       budgetExhausted: string[];
+      /** Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran. */
+      denied: string[];
       /** Gated steps that signed off and wait for a person's `wf approve` (`stepStatus`): nothing after them is filed. */
       awaitingApproval: string[];
       /** The steps worked on the base branch itself (`--no-worktree`): there is nothing to merge. */
@@ -3510,14 +3558,16 @@ export function decision(
   // Nor did a cap reached: spending more on the step is a person's call.
   const pastBudget = steps.filter((s) => statusOf.get(s.name) === 'over budget').map((s) => s.name).sort();
   const budgetExhausted = named('budget exhausted');
+  // Nor did a call its harness denied: the step did its work without it, and whether that stands is a person's call.
+  const denied = named('denied');
   const outcome = failed.length || checkFailed.length ? 'failed'
-    : stuck.length || unsigned.length || exhausted.length || pastBudget.length || budgetExhausted.length || awaitingApproval.length ? 'blocked'
+    : stuck.length || unsigned.length || exhausted.length || pastBudget.length || budgetExhausted.length || denied.length || awaitingApproval.length ? 'blocked'
     : 'succeeded';
   // A branch that never moved is on the base branch from the moment it was cut: shipped only when there was nothing wrong to hide.
   if (onBase && outcome === 'succeeded') return { kind: 'shipped', branches };
   return {
     kind: 'awaiting', outcome,
-    branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, exhausted, overBudget: pastBudget, budgetExhausted, awaitingApproval, direct,
+    branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, exhausted, overBudget: pastBudget, budgetExhausted, denied, awaitingApproval, direct,
   };
 }
 
@@ -3705,7 +3755,7 @@ export function listing(
     if (waitingAgain.has(name)) return { name, status: 'waiting', branch };
 
     const status = refiled.has(name) ? own : stands;
-    const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'awaiting approval' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted';
+    const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'awaiting approval' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted' || status === 'denied';
     if (onYou && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
     if (status === 'over budget' || status === 'budget exhausted') {
@@ -3729,6 +3779,8 @@ export function listing(
     if (status === 'verified') return { name, status: 'verified ✓', branch };
     if (status === 'checking') return { name, status: 'checking', branch };
     if (status === 'failed (check)') return { name, status: `failed ✗ check (${verdictWord(verdictOf(name) ?? 'unfinished')})`, branch };
+    // A step its `denials: fail` stopped, in the word every reader compares: what it was denied is its note (`deniedWords`), never in it.
+    if (status === 'denied') return { name, status: 'denied', branch };
 
     const c = closeoutOf(name);
     // Still worth a word: a statement nobody can read is not the same as no statement, and
@@ -4171,6 +4223,8 @@ export type RetryBriefing = {
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
+  /** What the last try's sessions were denied, in the runtime's words (`deniedOf`), when that is why it is tried again: `denied`. */
+  denied?: readonly string[];
   /** What the person who asked for this try said with it (`wf retry --message`), as they wrote it. */
   message?: string;
   /** The cap the person who asked for this try raised the step's budget to (`wf retry --budget`). */
@@ -4252,6 +4306,8 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
     failed: "The last try's session ended `failed` before it signed off.",
     stopped: "The last try's session was stopped before it signed off.",
     'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
+    denied: "The last try signed off, and its harness had denied it a call on the way: this step declares `denials: fail`, so nothing that waits on it started and its check did not run."
+      + ' This try runs with the same permissions, and the same call will be denied again: do the work without it, or sign off `blocked` and say in `needs` what you cannot do without it.',
     'awaiting approval': "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
   };
   // Beside why the last try ended, never in its place: a budget reached is why nothing more was filed, not what the session has to fix.
@@ -4275,7 +4331,9 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
     ? `You signed off, and the work went on to ${r.ending.step}, which a person approved: it acts on ${r.ending.onto} in the repository's own checkout, and it stopped there — \`${r.ending.status}\` — without doing what it was approved for. `
       + `A person sent the work back to you rather than ship it again: what they object to is below, then what ${r.ending.step} said.`
     : why[r.status] ?? `The last try ended \`${r.status}\`.`;
-  return ['', `## Try ${r.try}`, '', said, ...pastBudget, who, '', where, ...told, ...answer, ...(r.ending ? endingSection(step, r.ending) : []), ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+  // What was denied, as data: each call as the runtime names it, whose path or command is the session's own words.
+  const denied = r.status === 'denied' && r.denied?.length ? ['', '## What your session was denied', '', ...fenced(r.denied.join('\n'), 'text')] : [];
+  return ['', `## Try ${r.try}`, '', said, ...pastBudget, who, '', where, ...told, ...answer, ...denied, ...(r.ending ? endingSection(step, r.ending) : []), ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
 /**

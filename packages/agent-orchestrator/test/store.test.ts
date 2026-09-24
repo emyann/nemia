@@ -772,10 +772,11 @@ test('a step\'s worktree gets what .worktreeinclude lists from the main checkout
   assert.ok(!fs.existsSync(path.join(wt, 'notes.txt')), 'nor one git does not ignore');
   assert.equal(gitOut(wt, 'status', '--porcelain'), '', 'so the cut leaves nothing for the hand-off to commit');
 
-  // `node_modules` was listed, and is not a copy: a directory of the worktree's own, linking main's
-  // packages, without the file npm keeps for main's tree.
+  // `node_modules` was listed, and is not a copy: a directory of the worktree's own, main's packages
+  // hardlinked into it, without the file npm keeps for main's tree.
   assert.ok(fs.lstatSync(path.join(wt, 'node_modules')).isDirectory());
-  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isDirectory());
+  assert.equal(fs.statSync(path.join(wt, 'node_modules/third/index.js')).ino, fs.statSync(path.join(repo, 'node_modules/third/index.js')).ino);
   assert.equal(fs.realpathSync(path.join(wt, 'node_modules/x')), fs.realpathSync(path.join(wt, 'packages/x')), 'its workspace package is its own');
   assert.ok(!fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')));
 
@@ -786,6 +787,18 @@ test('a step\'s worktree gets what .worktreeinclude lists from the main checkout
     'implement: .worktreeinclude: refused "notes.txt" is not gitignored — the hand-off would commit it',
   ]);
   assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
+});
+
+test('a worktree whose main packages could only be linked — its store on another filesystem — says so in the run\'s notes: a fenced step\'s reads under them are denied', async (t) => {
+  const run = isolated(aNodeRepo());
+  t.mock.method(fs, 'linkSync', () => { throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' }); });
+  const { e } = board();
+  const pass = await advance(e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  assert.deepEqual(pass.notes, [
+    "implement: node_modules: main's packages linked, not hardlinked — EXDEV: cross-device link not permitted, link 'a' -> 'b'; a fenced step's reads under it leave its worktree and are denied",
+  ]);
 });
 
 test('wf start refuses a .worktreeinclude line outside the repository, by name, before a run is written', () => {
@@ -2452,6 +2465,40 @@ test("a step whose job was denied a call says so — on `wf ls` beside its line 
   b.settle(`${run.id}-review`, 'succeeded', SIGNED);
   assert.match(await printedBy('decide', run.id), /\n {2}implement\n(?: {4}.*\n)*? {4}denied: Skill\(look\), Bash\(pytest\)\n/, '`wf decide`: under the step');
   assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
+});
+
+test("a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `wf decide` names the rule for `allow:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on", async (t) => {
+  const run = started(folder('denials: fail'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.denials.set(taskId, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
+  b.settle(taskId, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(b.filings, [taskId], 'nothing after it is filed, however many passes');
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const printedBy = async (...args: string[]) => { printed.length = 0; await main(args, b.e); return printed.join('\n'); };
+
+  const listed = await list(b.e, readRun(run.id));
+  assert.deepEqual([listed.steps[0]!.status, listed.steps[0]!.note, listed.waitingOnYou], ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']]);
+  const decided = await printedBy('decide', run.id);
+  assert.match(decided, /\n {2}DENIED, waiting on you: implement {2}— its harness denied its try a call/);
+  assert.match(decided, new RegExp(`add Edit\\(//tmp/w/notes\\.md\\) to the folder's allow:, .* told to do without it: {2}wf retry ${run.id} implement --fresh {2}\\(`));
+
+  await main(['retry', run.id, 'implement', '--fresh'], b.e);
+  await advance(b.e, readRun(run.id));
+  const again = b.filings.at(-1)!;
+  assert.notEqual(again, taskId, 'a new task for try 2');
+  const brief = (b.tasks.get(again)!.spec as { brief: string }).brief;
+  assert.match(brief, /## What your session was denied\n\n```text\nWrite\(\/tmp\/w\/notes\.md\)\n```/);
+  assert.match(brief, /the same call will be denied again/);
+
+  b.settle(again, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  assert.equal(b.filings.at(-1), `${run.id}-review`, 'denied nothing, it hands on');
 });
 
 test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {

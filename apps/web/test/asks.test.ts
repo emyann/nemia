@@ -97,6 +97,7 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
     step('theme', 'failed ✗ check (exit 1)', { check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null } }),
     step('lint', 'failed ✗ check (unfinished)', { check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } }),
     step('docs', 'unsigned'),
+    step('notes', 'denied', { denied: { words: 'denied: Write(/tmp/w/notes.md)', calls: ['Write(/tmp/w/notes.md)'] } }),
     step('plan', 'succeeded · BLOCKED', {
       needs: 'Which plan?', note: 'try 2 asked (--fresh, with your answer) — the next tick files it',
       asked: { try: 2, mode: 'fresh', model: null, message: 'The small one.' },
@@ -106,13 +107,15 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
     // Done, and waiting on nobody.
     step('tokens', 'unverified · done'),
   ];
-  const waiting = ['implement', 'quiet', 'theme', 'lint', 'docs', 'review'];
+  const waiting = ['implement', 'quiet', 'theme', 'lint', 'docs', 'notes', 'review'];
   assert.deepEqual(offersOf(run(steps, waiting)), [
     { step: 'implement', kind: 'answer', needs: 'Which database?' },
     { step: 'quiet', kind: 'answer', needs: null },
     { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
     { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
     { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
+    // Denied a call on a step that says `denials: fail`: a try, a new session first, with the calls the api named.
+    { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
     { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--fresh, with your answer) — the next tick files it' },
   ]);
   // A blocked step the api does not name as waiting on you is offered nothing: what waits is the api's word.

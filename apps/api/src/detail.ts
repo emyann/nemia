@@ -4,7 +4,7 @@ import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, ha
 import { loopSpan, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { judge, needsOf, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
+import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
 import { bare, e, everyView, filedTimes, judgedSteps, seenBy, stepNames, type TaskView, type Views, workflowsOf, workFolderOf } from './store.ts';
 import { attemptsIn, closeoutIn, type StepAttempts, type StepCloseout, type StepTry, triesOf, unreadableIn } from './tries.ts';
@@ -30,7 +30,7 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
  * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
- * `failed (check)`, `failed`, `stopped` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
+ * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
  * says which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
@@ -152,6 +152,10 @@ export type RunDetail = {
   /** Where it came from, as `wf decide` says it under the run's line (`fromNote`): absent with `from`. */
   fromNote?: string;
   waiting: RunWaiting | null;
+  /** As on `RunSummary`. */
+  heldUntil: string[];
+  /** As on `RunSummary` (`RunHolding`). */
+  holding: RunHolding | null;
   status: RunStatus;
   /** As on `RunSummary`. */
   moving: boolean;
@@ -231,7 +235,7 @@ export type RunDetail = {
     spent: Spent | null;
     /** Its cap in force, and what its tries have cost of it (`StepBudget`); null for a step with no `budget:`. */
     budget: StepBudget | null;
-    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off or pruned. */
+    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off, pruned or held. */
     raise: StepRaise | null;
     /**
      * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
@@ -282,7 +286,8 @@ function costOf(run: Run, name: string, steps: readonly Workflow[], views: Views
   const budget = step && cap !== undefined
     ? { usd: cap, said: budgetWord(cap), of: spent && `${spent.said} of ${budgetWord(cap)}`, over: Boolean(overBudget(step, run, spendOf)) }
     : null;
-  return { spent, budget, raise: step && !run.cancelledAt && !run.pruned ? raiseOf(run, step, steps, views, spendOf) : null };
+  // None on a held run, as on one pruned: the raise is asked with a try or a round, which the verb refuses while the hold stands (`heldRefusal`).
+  return { spent, budget, raise: step && !run.cancelledAt && !run.pruned && !run.hold ? raiseOf(run, step, steps, views, spendOf) : null };
 }
 
 /**
@@ -430,7 +435,8 @@ export async function detail(run: Run): Promise<RunDetail> {
   // One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
   // run's own detail reads.
   const views = await everyView();
-  const judged = judge(run, names, workflows, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
+  const seen = seenBy(views);
+  const judged = judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) => standingsOf(run, steps, status));
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
@@ -457,6 +463,8 @@ export async function detail(run: Run): Promise<RunDetail> {
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
+    heldUntil: judged.holding ? run.hold!.until : [],
+    holding: judged.holding,
     status: judged.status,
     moving: judged.moving,
     cost: judged.cost,

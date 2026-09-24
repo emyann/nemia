@@ -435,6 +435,36 @@ Refused at load: any word but `true` or `false`, and `true` on `codex` or `claud
 `background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
 that can ask (below).
 
+### When a denied call stops a step: `denials:`
+
+```md
+---
+permissionMode: dontAsk
+allow: Edit(**)
+denials: fail   # a try the harness denied a call is not passed on
+---
+Write the note.
+```
+
+A job's denied calls are recorded on its attempt and said beside the step (`wf ls`, `wf decide`, the board), and by default
+they decide nothing: the session carried on without the call, signed off, and its work is passed on like any other. A step
+that says `denials: fail` is not passed on after a denial. The try reads `denied`: nothing after it is filed, its check is
+not run, `retries:` spends nothing on it and never retries it, and the run waits on you (`DENIED, waiting on you` in
+`wf decide`), as it does for a step that did not sign.
+
+The run's `allow:` is frozen on its record at `wf start`, so another try of the same run is denied the same call again. What
+`wf decide` offers says both ways out: the rule to add to the folder's `allow:` for a new run, and `wf retry <run> <step>
+--fresh`, a new session whose brief names what the last one was denied and tells it to do without (or `wf retry <run> <step>`
+to continue the session; never `--recheck`, since no check ran). A denied `Bash(npm)` is offered as `Bash(npm:*)` (the
+runtime keeps a command's first word), and a denied write, by any file-editing tool, as `Edit(<path>)`: Claude Code matches
+every file write against `Edit` rules alone. A path in the step's own directory is offered from it, `Edit(notes.md)`, since
+the next run's step works in a worktree named by its own id; any other absolute path is written `//path`, with this run's id
+as `*`. A call the step's own `disallow:` may have denied is offered no rule, since a deny beats every allow: the offer names
+the deny rule instead. There is no verb that widens `allow:` on a live run.
+
+Refused at load: any word but `fail`; the key on `codex`, which records no denials (its fence is the sandbox); and the key
+beside `background: true`, whose denials are not read. On any of them the line would never stop anything.
+
 ### Who may drive a step's session: `remote:`
 
 ```md
@@ -713,9 +743,14 @@ filed, it fills in the rest:
   are links whose real path is the main checkout, so through that link a branch's app imported main's
   packages: the branch was tested against code it did not contain. Now the worktree gets a directory in
   which each workspace package (`packages/*`, `apps/*`) links to the worktree's own copy. Every
-  third-party package links to the main checkout's, one inode and no install. `.bin` and each `@scope`
-  are directories of the worktree's own, so installing into the worktree never writes main's tree, and a
-  workspace package's bin runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
+  third-party package is main's, hardlinked: directories of the worktree's own, each file one inode with
+  main's, no install and no data copied (about half a second here). Hardlinked and not linked, because
+  every path then lies inside the worktree: Claude Code allows a path through a symlink only when the
+  link and its target both match, so a `dontAsk` step was denied reads under a linked tree. Where the
+  store is on another filesystem and a hardlink fails, the packages are linked as before and the run's
+  notes say so. `.bin` and each `@scope` are directories of the worktree's own, so installing into the
+  worktree never writes main's tree; `.bin` holds npm's relative links, so a workspace package's bin
+  runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
   `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/worktree.ts`
   does the work.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's

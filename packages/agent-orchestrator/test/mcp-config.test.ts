@@ -16,10 +16,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type Engine, type TaskView } from 'agent-runtime';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -159,7 +159,7 @@ test("a --bg task filed in this repository has Playwright's browser_navigate and
 }, async () => {
   // Shipped defaults: the engine's built-in harnesses, `claude` first, asked for a background session. No `mcp` on the task, so the
   // only servers it can have are the ones the checkout's .mcp.json names.
-  const engine: Engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'wf-live-mcp-')) });
+  const engine: Engine = createEngine({ root: scratch('wf-live-mcp-') });
   const id = await engine.file({ brief: BRIEF, cwd: REPO, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } });
   let view: TaskView | undefined;
   try {

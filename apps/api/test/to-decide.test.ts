@@ -13,16 +13,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-to-decide-'));
+const root = scratch('hkb-api-to-decide-');
 process.env.WF_ROOT = root;
 
 // A `git` in front of the real one that notes each call and runs it, as decision.test.ts has: what says which runs the api asks git about.
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
-const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-to-decide-bin-'));
+const bin = scratch('hkb-api-to-decide-bin-');
 const gitCalls = path.join(bin, 'git-calls');
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;

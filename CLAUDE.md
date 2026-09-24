@@ -226,6 +226,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   faster than its interval proves no overlap guard: the old test passed with `start()`'s guard deleted. Run a mutant of a
   loop under `timeout`: one whose `stop()` no longer clears its interval holds `node --test` open for ever (learned by the
   run that made the timer test pass under load).
+- **A test's temporary folder comes from `scratch(prefix)`, never from `os.tmpdir()`.** A test that failed before it stopped its
+  detached worker left the worker, and a fake that reads its stdin for ever, running for hours, and roots nobody removed piled up
+  to 12,583 `ae-detached-*` folders in `/tmp`. `test/scratch.ts` is the same byte for byte in every package whose tests make
+  folders. After each test it stops what still runs in that test's roots (a worker by SIGTERM, then the rest killed with its
+  group). After the file it removes every root and fails the file if a process or a root is left. A process counts as in a root
+  when its arguments, its cwd or its environment name one. Each package's `scratch.test.ts` refuses a `tmpdir(` call anywhere
+  else under `test/`; a line that makes no root there says `// not a root` and why. It also holds the copy to the runtime's, so a
+  change to the helper is made in `packages/agent-runtime/test/scratch.ts` and copied. `agent-runtime/test/leaks.test.ts` runs a
+  failing fixture file under `timeout` with a TMPDIR of its own and requires that nothing is left, and one that leaves a root
+  it cannot remove, which must fail the file. A fake harness that reads stdin
+  bounds its own life all the same. The worker itself also ends its harness and exits when its run file or store is removed
+  (open issue 32). To measure a leak, run with `TMPDIR=$(mktemp -d)`: other worktrees' suites write to `/tmp` too (learned by
+  the run that found the leak).
 - **A test that fails only under load is a race until shown otherwise, and it is made to happen on demand before it is fixed.**
   Of the three a loaded suite failed on 2026-09-23, two were races in the code. The detached worker published its pid and only
   then installed its SIGTERM handler, so a stop sent in between killed it by the signal's default action and its harness ran on
@@ -484,12 +497,27 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   key beyond `run` as a run that will not ship, so, read for a hold, it would take a run that has shipped for one only a person can lift.
   A hold is read by `holdNeedsYou`, which asks the three facts by name (`missing`, `cancelledAt`, `gone`): read a `Wait` by the key you
   mean, never by what else is on it (learned by the run that put the hold on the api).
+- **A held run is `running` whatever its steps say, even one only a person can lift.** `assess` returns early for a held run with
+  `status: 'running'` (`run.ts`), and the api passes that status through. So the board's `status === 'running'` keeps every held run
+  in flight, and the one that waits on a person has to be taken out by name: `inFlight` excludes `holding.onYou` as it excludes
+  `waiting.onYou`, and `waitsOnYou` reads it (`apps/web/src/lib/factory.ts`). A board fixture for a held run has `status: 'running'`.
+  The first round wrote it `failed`, from a belief about the api that nobody had read off `assess`. It then added a clause the api never
+  needed, tested on a state the board is never given (learned by the run that drew the hold on the board, round 2).
+- **An e2e page's own screenshot named `<name>-<theme>.png` is overwritten.** `visit.ts` takes that name for the picture it takes after
+  `expect` returns, so a picture the page took mid-read under the same name shows the page's end state, and reads as a wrong picture.
+  Name a page's own shots `<name>-<what>-<theme>.png` (same run).
 - **The engine can say a task waits before its harness has let the session go.** `closedOut` (`agent-runtime/src/engine.ts`)
   ends an attempt on a statement on disk while the session is `working` and not busy, and Codex writes `-o` before it exits:
   for that moment `view` says `input-required` and `getTask` still answers the harness's `WORKING`, with the process alive. A
   test that asserts the Task the instant `view` moves passes alone and fails under `npx turbo run test --force`'s load. Hold the
   fake's exit on a file and assert both sides, or wait for the Task (learned by the run that proved Codex as an A2A agent;
   open issue 31).
+- **The engine decides a task again in the pass that recorded its end.** `settleTask` steps a task until nothing moves, against
+  one observation, so an `ended` that `cut` recorded off a sighting is read on the next `decide` of the same pass, with the same
+  clock. The deadline sat above the judgement of an ended attempt and settled a check that exited 0 at 607 s of 600 `failed`, at the
+  millisecond of its `ended done`; `refusedCheck` then read `failed` with exit 0 as a refusal. A rule that stops or refuses — the
+  deadline — must not overrule an end on record: test it with the end and the rule in one pass, the fixture a journal with the end
+  already on it and a clock past the rule (learned by the run that raised the check's deadline to 1200 s).
 - **`unsigned` is the orchestrator's word, not the runtime's.** Since stage 4a the runtime records a fact — `stated: false` on a
   `done` end of a task that asked for a statement — and settles it `succeeded`. Read an attempt's end through `closeoutAsked` or
   `endWords` (`agent-orchestrator/src/views.ts`), never off its raw `ended` and `reason`: the api's `attemptsIn` read them raw, and

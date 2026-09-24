@@ -8,13 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-builder-'));
+const root = scratch('hkb-api-builder-');
 process.env.WF_ROOT = root;
-const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-builder-repo-'));
+const repo = scratch('hkb-api-builder-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 

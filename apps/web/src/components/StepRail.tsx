@@ -61,6 +61,7 @@ const at = (pill: Pill) => ({ left: pill.x, top: pill.y, width: pill.width, heig
  */
 export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
   const cancelled = run.cancelledAt !== null;
+  const held = run.holding != null;
   const byName = new Map(run.steps.map((step) => [step.name, step]));
   return (
     <div className="px-3">
@@ -75,7 +76,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
               data-more={pill.kind === 'more' ? pill.names.join(' ') : undefined}
               data-state={pill.state ?? (pill.done ? 'done' : 'mixed')}
               data-live={pill.live || undefined}
-              title={pill.kind === 'step' ? stepTitle(byName.get(pill.names[0]!), pill.names[0]!, cancelled) : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled)).join('\n')}
+              title={pill.kind === 'step' ? stepTitle(byName.get(pill.names[0]!), pill.names[0]!, cancelled, held) : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled, held)).join('\n')}
               style={at(pill)}
               className={[
                 'absolute flex items-center justify-center rounded-full px-1.5 font-mono text-[10px] leading-none',
@@ -98,8 +99,8 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
 }
 
 /** A step's name, its status and its meaning, and its note: what hovering over it says. */
-const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boolean): string =>
-  step ? `${name}: ${step.status} — ${stateMeaning[stepState(step.status, cancelled)]}${step.note ? `\n${step.note}` : ''}` : name;
+const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string =>
+  step ? `${name}: ${step.status} — ${stateMeaning[stepState(step.status, cancelled, held)]}${step.note ? `\n${step.note}` : ''}` : name;
 
 /**
  * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with its
@@ -117,7 +118,8 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
   const byName = new Map(run.steps.map((step) => [step.name, step]));
   const details = new Map(detail?.steps.map((step) => [step.name, step]));
   const gate = gateOfSummary(run);
-  const live = run.steps.some((step) => isLive(stepState(step.status, cancelled)));
+  const held = run.holding != null;
+  const live = run.steps.some((step) => isLive(stepState(step.status, cancelled, held)));
   // Every second while a step's attempt counts; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
   return (
@@ -129,7 +131,7 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
           const name = pill.names[0]!;
           const step = byName.get(name);
           if (!step) return null;
-          const state = stepState(step.status, cancelled);
+          const state = stepState(step.status, cancelled, held);
           const onYou = run.waitingOnYou.includes(name);
           const need = needOf(step, onYou, cancelled);
           const read = details.get(name);
@@ -160,7 +162,7 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
                 {name}
               </span>
               <span className="flex min-w-0">
-                <StatusChip status={step.status} runCancelled={cancelled} note={step.note} />
+                <StatusChip status={step.status} runCancelled={cancelled} runHeld={held} note={step.note} />
               </span>
               <span className="flex min-w-0 gap-1 font-mono text-[10px] text-muted-foreground">
                 <span className="truncate">{attempt ?? '…'}</span>

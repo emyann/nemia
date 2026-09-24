@@ -6,11 +6,11 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as its module loads: set first.
-process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-daemon-'));
+process.env.WF_ROOT = scratch('hkb-api-daemon-');
 const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
 
 const { app } = await import('../src/app.ts');

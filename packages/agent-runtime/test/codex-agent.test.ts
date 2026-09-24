@@ -16,7 +16,6 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { TaskState, type Task } from '@a2a-js/sdk';
 import type { Client } from '@a2a-js/sdk/client';
@@ -29,6 +28,7 @@ import { Journal } from '../src/journal.ts';
 import { codex } from '../src/runner-codex.ts';
 import { detachedOps } from '../src/runner-detached.ts';
 import type { SpawnRequest } from '../src/runner.ts';
+import { scratch } from './scratch.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' }, summary: { type: 'string' } }, required: ['outcome', 'summary'], additionalProperties: false };
@@ -69,19 +69,19 @@ wait();
 let bin: string;
 const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
 before(() => {
-  bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-codex-agent-bin-'));
+  bin = scratch('ae-codex-agent-bin-');
   fs.writeFileSync(path.join(bin, 'fake-codex.cjs'), FAKE);
   fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, 'fake-codex.cjs')}" "$@"\n`, { mode: 0o755 });
   process.env.PATH = `${bin}:${prev.PATH}`;
   // An empty Codex home: no operator's config trusts or serves anything to these sessions.
-  process.env.CODEX_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-codex-agent-home-'));
+  process.env.CODEX_HOME = scratch('ae-codex-agent-home-');
 });
 after(() => {
   process.env.PATH = prev.PATH;
   if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prev.CODEX_HOME;
 });
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-codex-agent-${label}-`));
+const tmp = (label: string) => scratch(`ae-codex-agent-${label}-`);
 /** A session's working directory, with what the fake is told there. */
 const workdir = (fake: Fake = {}) => {
   const cwd = tmp('work');

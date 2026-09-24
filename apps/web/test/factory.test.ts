@@ -837,3 +837,61 @@ test("REFUSED: a run nothing of which is filed has no time at work — it is wai
     ['created 4h 29m ago', `Created ${new Date(createdAt).toLocaleString()}. Called off before anything of it was filed.`]);
   assert.equal(clockCounts(called, true), false);
 });
+
+/** What the api says of a run a person holds until `p` ships (`wf hold`): a hold that lifts on its own, or one only a person lifts. */
+const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
+  at: '2026-09-13T00:30:00.000Z',
+  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], shipped: false }],
+  word: 'held until p ships',
+  advice: onYou ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1' : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has shipped; to go on before then: wf hold r-1 --off',
+  onYou,
+});
+
+test('a run held until runs that may still ship is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
+  // A step at its gate, held: `assess` calls a held run running whatever its steps say, and the api says nothing waits on you, and nothing moves.
+  const gated = { status: 'running', moving: false, waitingOnYou: [] as string[], waiting: null };
+  const lifts = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(false) });
+  assert.deepEqual([inFlight(lifts), waitsOnYou(lifts)], [true, false]);
+  const yours = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(true) });
+  assert.deepEqual([inFlight(yours), waitsOnYou(yours)], [false, true]);
+  // A step of it still at work when the hold was written moves, and is in flight whoever lifts the hold.
+  assert.equal(inFlight({ ...yours, moving: true }), true);
+  // A run called off waits on nobody, held or not.
+  const off = run(['awaiting approval', 'waiting'], { ...gated, status: 'cancelled', cancelledAt, heldUntil: ['p'], holding: holdingOn(true) });
+  assert.deepEqual([inFlight(off), waitsOnYou(off)], [false, false]);
+  // Where the run stands on the start form, in the same words.
+  assert.deepEqual([standingOf(lifts), standingOf(yours)], ['in flight', 'waiting on you']);
+});
+
+test('a held run stays on the floor while it is held, and brings the finished run it is held until, so the edge into it leaves from a card', () => {
+  const runs = [
+    run([], { id: 'p', status: 'succeeded', createdAt: at(0) }),
+    run(['awaiting approval'], { id: 'h', status: 'running', heldUntil: ['p'], holding: holdingOn(false), createdAt: at(1) }),
+    // Held until a run that is not listed at all: its card stays, and brings nothing.
+    run(['awaiting approval'], { id: 'q', status: 'running', heldUntil: ['gone'], holding: holdingOn(true), createdAt: at(2) }),
+  ];
+  assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['p', 'h', 'q']);
+  // Lifted, off runs that had finished: the api lists no run and no hold, and says each run's own status again, and the parent goes with them.
+  const lifted = runs.map((r) => ({ ...r, heldUntil: [], holding: null, status: r.id === 'p' ? 'succeeded' as const : 'failed' as const }));
+  assert.deepEqual(floorRuns(lifted, false).map((r) => r.id), []);
+});
+
+test('an edge from each run a card is held until, both on the floor, drawn as an `after` edge — to come while the hold stands, whether or not the card started — and none where an `after` edge already joins the two', () => {
+  const edges = runEdges([
+    run(['verified ✓'], { id: 'a' }),
+    run(['running (working)'], { id: 'b' }),
+    // Started, and held until a and b: two edges to come, whatever its steps say.
+    run(['awaiting approval'], { id: 'h', heldUntil: ['a', 'b', 'a', 'off-the-floor', 'h'] }),
+    // Waiting on a and held until it too: one edge, the `after` one.
+    run(['waiting'], { id: 'd', after: ['a'], heldUntil: ['a'] }),
+    // An api older than the hold lists no `heldUntil`: no edge, and no refusal.
+    run(['waiting'], { id: 'e' }),
+  ]);
+  assert.deepEqual(edges, [
+    { id: 'hold:a->h', source: 'a', target: 'h', state: 'to-come' },
+    { id: 'hold:b->h', source: 'b', target: 'h', state: 'to-come' },
+    { id: 'after:a->d', source: 'a', target: 'd', state: 'to-come' },
+  ]);
+  // Lifted: the api lists no run, and the edge goes.
+  assert.deepEqual(runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: [] })]), []);
+});

@@ -142,3 +142,12 @@ test("the board presses `accept` on the step its command names, and on no other 
   assert.equal(acceptStepOf(accept('wf accept r-1 review extra --message "<why>"'), 'r-1'), null);
   assert.equal(acceptStepOf(accept('wf accept r-1 review'), 'r-1'), null);
 });
+
+test('a decision is read again when a hold is written, lifted, or its runs ship — the hold is what the api answers for a held run', () => {
+  const holding = (word: string) => ({ at: '2026-09-23T07:00:00.000Z', runs: [], word, advice: '', onYou: false });
+  const unheld = decisionStamp(fanOut('running (working)'));
+  const held = decisionStamp({ ...fanOut('running (working)'), holding: holding('held until a-1 ships') });
+  assert.notEqual(held, unheld, 'a hold written');
+  assert.equal(decisionStamp({ ...fanOut('running (working)'), holding: null }), unheld, 'no hold, and an api older than the hold, alike');
+  assert.notEqual(decisionStamp({ ...fanOut('running (working)'), holding: holding('held until a-1 ships — it has shipped, and the next tick lifts the hold') }), held, 'its run shipped');
+});

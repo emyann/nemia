@@ -12,11 +12,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-say-${label}-`));
+const tmp = (label: string) => scratch(`hkb-api-say-${label}-`);
 
 // agent-orchestrator locates its store, and the Claude runner where sessions register, as their modules load: both are set first.
 const root = tmp('root');

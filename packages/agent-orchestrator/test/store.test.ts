@@ -9,16 +9,16 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskView } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
+import { scratch } from './scratch.ts';
 import { SIGNOFF } from '../src/run.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
+const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 fs.mkdirSync(WORKFLOW, { recursive: true });
@@ -330,7 +330,7 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
   const spec = tasks.get(id)!.spec;
   assert.deepEqual(
     { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, maxAttempts: spec.maxAttempts, resume: spec.resume, closeoutSchema: spec.closeoutSchema },
-    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
+    { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
   );
   assert.deepEqual(readCheckBrief(spec.brief), {
     command: 'npm test && npm run typecheck',

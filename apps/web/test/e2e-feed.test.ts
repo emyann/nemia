@@ -5,19 +5,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { fed } from './e2e/board.ts';
 import { REPO, setStore } from './e2e/world.ts';
+import { scratch } from './scratch.ts';
 
 type Line = { at: string; run: string; step?: string; word: string; note?: string };
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-feed-'));
-after(() => {
-  setStore(undefined);
-  fs.rmSync(dir, { recursive: true, force: true });
-});
+const dir = scratch('e2e-feed-');
+after(() => setStore(undefined));
 
 /**
  * The feed as the package reads it back: `wf feed 0` over the store, its CLI. The web imports nothing of the package, and reaching into its

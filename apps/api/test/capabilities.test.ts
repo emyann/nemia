@@ -2,11 +2,11 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
-process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
+process.env.WF_ROOT = scratch('hkb-api-capabilities-');
 const { app } = await import('../src/app.ts');
 const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } = await import('../src/capabilities.ts');
 const { DISALLOW, askDenierOf, bashCovers } = await import('../src/reach.ts');
@@ -17,7 +17,7 @@ const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts
 
 /** A checkout with only these files in it. An object is written as JSON. */
 const repoWith = (files: Record<string, string | object>): string => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-repo-'));
+  const repo = scratch('hkb-api-repo-');
   for (const [file, content] of Object.entries(files)) write(path.join(repo, file), content);
   return repo;
 };
@@ -91,7 +91,7 @@ test('skills and agents, with frontmatter and without: named by it or by their d
 });
 
 test('a repository with none of it — or no repository at all — is empty lists and a 200, never an error', async () => {
-  const gone = path.join(os.tmpdir(), `hkb-api-no-such-repo-${process.pid}`);
+  const gone = path.join(scratch('hkb-api-nowhere-'), 'no-such-repo');
   // `.claude/skills` a file, not a directory: absent all the same.
   for (const repo of [repoWith({}), gone, repoWith({ '.claude/skills': 'a file', '.claude/agents': 'a file' })]) {
     const { status, body } = await served(repo);
@@ -170,7 +170,7 @@ test('a server that exits before it answers is an error with what it printed on 
 });
 
 test('a server that never answers is an error once its time is up, and it is stopped', async () => {
-  const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
+  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { silent: fixture({ HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['silent'] },
@@ -184,7 +184,7 @@ test('a server that never answers is an error once its time is up, and it is sto
 });
 
 test('each server is asked once while the api runs: requests after the first, and requests at once, read that answer', async () => {
-  const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
+  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { fixture: fixture({ HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
@@ -242,7 +242,7 @@ test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} 
 });
 
 test("an entry naming a variable the api's environment does not set, with no default, is an error on its entry, and not started", async () => {
-  const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
+  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': {
       mcpServers: {
@@ -265,7 +265,7 @@ test("an entry naming a variable the api's environment does not set, with no def
 });
 
 test('a server .claude/settings.json does not enable is listed, and not started', async () => {
-  const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
+  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
   const off = fixture({ HKB_TEST_STARTS: starts });
   for (const settings of [
     null,

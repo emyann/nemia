@@ -37,6 +37,21 @@ export type RunWaiting = {
 };
 
 /**
+ * Mirrors `RunHolding` in apps/api/src/judged.ts: a person's hold on a run (`wf hold <run> --until <run>`), in the package's words. `at` is when
+ * it was put; `runs` each run it names that has not shipped, and why one never will without a person — or, in the moment every one has shipped
+ * and the next tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints (`held until a-1x2y ships`), `advice`
+ * the line `wf decide` prints under it, which names `wf hold <run> --off`; `onYou` whether only a person's hand lifts it. While it stands no
+ * step waits on you and nothing is offered: every verb that would release work is refused.
+ */
+export type RunHolding = {
+  at: string;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
+  word: string;
+  advice: string;
+  onYou: boolean;
+};
+
+/**
  * Mirrors `StepNeeds` in apps/api/src/judged.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
  * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`: what that harness
  * says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null where the harness said

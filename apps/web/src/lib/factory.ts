@@ -20,9 +20,17 @@ import { layers, type Point } from './layout.ts';
  * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots
  * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
  * `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until a person acts, and it waits on them.
+ *
+ * So is a run a person holds until runs ship (`wf hold`), and on the same terms: while its hold may lift on its own the tick lifts it when
+ * they ship, though nothing of it is filed before then, and a step at its gate has it read `failed` and not moving; not once only a person
+ * lifts it (`holding.onYou`), when it waits on them (`waitsOnYou`). Not on a run called off. `holding` is read tolerantly, for an api older
+ * than the hold.
  */
-export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & { waiting?: RunSummary['waiting'] }): boolean =>
-  run.moving || (run.status === 'running' && !run.waiting?.onYou);
+export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
+  run.moving || (run.status === 'running' && !run.waiting?.onYou) || (Boolean(run.holding) && !run.holding!.onYou && !run.cancelledAt);
+
+/** What `inFlight` and `waitsOnYou` read beside their own fields, each missing from an api older than it. */
+type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; cancelledAt?: string | null };
 
 /**
  * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
@@ -33,11 +41,12 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
- * waits on never ships without one — what `wf ls` prints `→ waiting on you` for, either way. Not once it is cancelled: a cancelled run
- * waits on nobody, whatever its steps last said.
+ * waits on never ships without one — what `wf ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
+ * (`holding.onYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on nobody,
+ * whatever its steps last said.
  */
-export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & { waiting?: RunSummary['waiting'] }): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou));
+export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
 
 /**
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
@@ -98,12 +107,14 @@ export function runClock(run: Clocked, now: number, finished: boolean): { words:
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
   toDecide?: RunToDecide | null;
+  heldUntil?: readonly string[];
+  holding?: RunSummary['holding'];
 };
 
 /**
  * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, every run
  * nobody has decided (`toDecideOf`), every run that waits on a person (`waitsOnYou`), and each finished run that a run in flight waits on
- * (`after`), so the edge into it leaves from a card.
+ * (`after`) or is held until (`heldUntil`), so the edge into it leaves from a card.
  *
  * A run to decide stays on the floor whatever "Show finished" says, and until it is decided. Nothing of it moves, so `inFlight` has it
  * finished and the switch would hide it: a run that finished with its ending waiting for a word, or its branch waiting for a merge, would
@@ -121,11 +132,14 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
  */
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
-  const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => run.after));
+  const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => [...run.after, ...(run.heldUntil ?? [])]));
   return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitsOnYou(run) || waitedOn.has(run.id));
 }
 
-/** An edge between two cards on the Factory: from a run to one that waits on it. Dashed, to come, until the child starts; solid once it has. */
+/**
+ * An edge between two cards on the Factory: from a run to one that waits on it (`after:`), or that a person holds until it ships (`hold:`).
+ * Dashed, to come, until the child starts; solid once it has. A hold's is to come while it stands: once it lifts, the api lists no run.
+ */
 export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come' | 'done'> };
 
 /**
@@ -134,14 +148,22 @@ export type RunEdge = { id: string; source: string; target: string; state: Extra
  * `waiting` line still names it.
  *
  * A child has started once any of its steps is filed: its parents shipped, and it no longer waits (`gated` in agent-orchestrator).
+ *
+ * And one from each run a card is held until (`heldUntil`, `wf hold`) that is on the floor too, drawn as an `after` edge is: the hold is a
+ * wait on a run's shipping, set after the start rather than at it. None where an `after` edge already joins the two, which says the same.
+ * `heldUntil` is read tolerantly, for an api older than the hold.
  */
-export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): RunEdge[] {
+export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>): RunEdge[] {
   const floor = new Set(runs.map((run) => run.id));
   return runs.flatMap((child) => {
     const started = child.steps.some((step) => step.taskId !== null);
-    return [...new Set(child.after)]
-      .filter((parent) => floor.has(parent) && parent !== child.id)
-      .map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: started ? 'done' : 'to-come' }));
+    const onTheFloor = (parent: string) => floor.has(parent) && parent !== child.id;
+    const after = [...new Set(child.after)].filter(onTheFloor);
+    const held = [...new Set(child.heldUntil ?? [])].filter((parent) => onTheFloor(parent) && !after.includes(parent));
+    return [
+      ...after.map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: started ? 'done' : 'to-come' })),
+      ...held.map((parent): RunEdge => ({ id: `hold:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
+    ];
   });
 }
 

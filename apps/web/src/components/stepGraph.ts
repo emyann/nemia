@@ -80,6 +80,6 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
  * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that waits on it, out of the one card's right
  * side and into the other's left, drawn as every edge is — dashed while the card waits, solid once its run has started.
  */
-export function afterEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): StateFlowEdge[] {
+export function afterEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>): StateFlowEdge[] {
   return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
 }

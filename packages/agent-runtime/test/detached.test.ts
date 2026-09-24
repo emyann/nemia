@@ -135,9 +135,9 @@ const alive = (pid: number) => {
   try { return !execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('Z'); } catch { return false; }
 };
 /** Until `ok` holds, under a bound of seconds: past one heartbeat of the worker, and its drain. */
-const within = async (ok: () => boolean, what: string) => {
-  for (const bound = performance.now() + 15_000; !ok();) {
-    if (performance.now() > bound) assert.fail(`${what}, in 15s`);
+const within = async (ok: () => boolean, what: string, ms = 15_000) => {
+  for (const bound = performance.now() + ms; !ok();) {
+    if (performance.now() > bound) assert.fail(`${what}, in ${ms / 1000}s`);
     await new Promise((r) => setTimeout(r, 50));
   }
 };
@@ -167,6 +167,20 @@ for (const [what, takeAway] of [
     assert.equal(fs.existsSync(file), false, 'the run file is not made again');
   });
 }
+
+test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits, holding its output or not', async () => {
+  // The harness dies on SIGTERM and leaves a child that ignores it holding its stdout: the worker's drain gives up at
+  // two seconds, and a worker that exited then left the child running, with no run file left to find it by.
+  const dir = root();
+  const cwd = scratch('ae-harness-');
+  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+  await Effect.runPromise(ops.spawn(req('ae/g3/1', cwd)));
+  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
+  // A heartbeat to notice, then five seconds for SIGTERM to be enough.
+  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 25_000);
+});
 
 test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
   const dir = root();

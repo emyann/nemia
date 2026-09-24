@@ -747,8 +747,10 @@ file was removed wrote it again at its next heartbeat and ran on, and one whose 
 write and left its harness running, which nothing could find to stop. The runtime's own tests showed it: a test that failed
 before it stopped its worker left the worker, and a harness that reads its stdin for ever, running for hours, and 12,583
 `ae-detached-*` folders piled up under `/tmp`. Now the worker takes a run file gone, alone or with its store, for a stop.
-It sends SIGTERM to the harness's process group, SIGKILLs the group five seconds later if it is still there, writes nothing
-again, and exits (`bin/ae-worker.ts`, `test/detached.test.ts`). What that leaves:
+It sends SIGTERM to the harness's process group, SIGKILLs the group five seconds later if anything of it is still there,
+writes nothing again, and exits — only once the group is empty or killed, since a harness can die on SIGTERM and leave a
+child that ignores it holding its output, and the worker's drain gives up on that at two seconds: exited then, it left the
+child running with nothing to find it by (review, round 1). What that leaves (`bin/ae-worker.ts`, `test/detached.test.ts`):
 
 - **It is noticed at the worker's next write**: the heartbeat, within five seconds, or sooner at a word written on or an id.
 - **A removal in the instant between the worker's look and its rename is undone.** The worker looks for the file, then

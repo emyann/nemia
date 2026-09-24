@@ -20,7 +20,7 @@
  *
  * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
  * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
- * from under it for a stop — it ends the harness's group, SIGKILLs it if it is still there `GONE_KILL_MS` later, and
+ * from under it for a stop — it ends the harness's group, SIGKILLs what of it is still there `GONE_KILL_MS` later, and
  * writes nothing again, so the file is never made anew — and exits. It notices at its next write: the heartbeat, within
  * five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine is what it is for.
  *
@@ -47,6 +47,8 @@ let status = {
 const GONE_KILL_MS = 5_000;
 let spawned = false;
 let gone = false;
+/** When the run file was found gone, on `performance.now()`'s clock: its group is killed `GONE_KILL_MS` after. */
+let goneAt = 0;
 const write = (patch: Partial<typeof status> = {}) => {
   if (gone) return;
   status = { ...status, ...patch, heartbeatAt: new Date().toISOString() };
@@ -70,11 +72,28 @@ const write = (patch: Partial<typeof status> = {}) => {
 const vanished = () => {
   gone = true;
   if (!spawned) process.exit(0);
+  goneAt = performance.now();
   stopping = true;
   clearInterval(beat);
   clearInterval(inbox);
   killGroup();
-  setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } }, GONE_KILL_MS).unref();
+  // For a harness that ignores SIGTERM itself: its exit, below, then waits for nothing.
+  setTimeout(killGone, GONE_KILL_MS).unref();
+};
+const killGone = () => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } };
+/** Whether anything is left in the harness's process group — the harness itself, or what it started. */
+const groupAlive = () => { try { process.kill(-child.pid!, 0); return true; } catch { return false; } };
+/**
+ * Exits. A worker whose run file is gone first sees its harness's whole group ended: the harness can die on SIGTERM and
+ * leave a child that ignores it, and once this exits nothing can find that child again. So it waits for the group to
+ * empty until `GONE_KILL_MS` after the file was found gone, and kills what is left.
+ */
+const leave = async (code: number) => {
+  if (gone) {
+    while (groupAlive() && performance.now() < goneAt + GONE_KILL_MS) await new Promise((r) => setTimeout(r, 50));
+    killGone();
+  }
+  process.exit(code);
 };
 // Heard before the pid is published: a stop is sent to the pid on disk, and a worker that met SIGTERM before
 // it had a handler would die of it, leaving its harness running under a run file that says `working` until the
@@ -188,7 +207,7 @@ child.on('exit', (code) => {
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
   void Promise.race([drained, bound]).then(() => log.end(() => {
     write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
-    setTimeout(() => process.exit(0), 50);
+    setTimeout(() => void leave(0), 50);
   }));
 });
 

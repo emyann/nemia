@@ -35,8 +35,9 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one — a task from before closeouts; `true`,
- * asked; `unsigned`, asked, and its last attempt ended without it — the attempt's `reason`, on a session that went quiet, which the
- * engine settles `failed`. `stepStatus` reads it; a caller with only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
+ * asked; `unsigned`, asked, and its last attempt ended without it — `stated: false` on its end since stage 4a, where the runtime
+ * reports and this layer judges, or the `reason: 'unsigned'` the runtime wrote when it judged it. `stepStatus` reads it; a caller with
+ * only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
@@ -1282,12 +1283,13 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  *
  * **`unsigned` before any check.** A step that was asked for a closeout and gave none has not said it
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
- * engine ends a session that goes quiet without it `failed`, with reason `unsigned`, nudges it under
- * its resume policy, and out of attempts settles the task `failed` (engine open issues, *Quiet without
- * a closeout*). That failure is this word, as it was when the engine settled the same session
- * `succeeded`: read as `failed`, the run would be called failed rather than waiting on you, and a
- * nudged try told its session broke rather than that it gave no closeout. Only a `failed` task — one
- * a person stopped is `stopped`. A task that settled `succeeded` with nothing said is `unsigned` too.
+ * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
+ * ended it, and says so — `stated: false` — and settles the task `succeeded`; this layer judges it
+ * (`closeoutAsked`) and nudges it once a round (`retriesDue`). Until stage 4a the runtime judged it
+ * itself: `failed`, with reason `unsigned`. Either is this word: read as `failed`, the run would be
+ * called failed rather than waiting on you, and a nudged try told its session broke rather than that
+ * it gave no closeout. Only a `failed` task — one a person stopped is `stopped`. A task that settled
+ * `succeeded` with nothing said is `unsigned` too.
  * An unreadable closeout counts as none: the run cannot read that the work is done. A task never
  * asked — a run from before closeouts — is not held to one.
  *
@@ -1787,12 +1789,13 @@ const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boole
  * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
  * person, as it always has.
  *
- * And a session the engine ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
+ * And a session that ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
  * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`), told it ended without calling `StructuredOutput`, that its work stands and it
  * should change nothing and sign off, finishing first if it had not, and signing off anyway saying what stops it if it cannot
  * (`retrySection`). Once a round (`signoffsSpent`), never in a loop: a nudge that ends unsigned again leaves the step `unsigned`, on a
- * person. Keyed on the engine's reason, not on the step's word `unsigned`, which also covers a closeout short of a declared field — a
- * statement given, which a reminder to give one would not mend — and a journal written before the engine said `unsigned` for `done`. Nor
+ * person. Keyed on what the engine recorded (`closeoutAsked`: `stated: false`, or an old journal's reason `unsigned`), not on the step's
+ * word `unsigned`, which also covers a closeout short of a declared field — a statement given, which a reminder to give one would not
+ * mend — and a journal written before the engine said anything of a `done` with no statement. Nor
  * is a step over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
@@ -4269,7 +4272,8 @@ function endingSection(step: Workflow, e: EndingStopped): string[] {
 /**
  * What the run's sign-off nudge tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
  * pinned by a test. It names the tool: the engine's own nudge named nothing until 2026-09-17, and did not get a finished step to sign
- * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-runtime's open issue 25).
+ * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-runtime's open issue 25). Since
+ * stage 4a it is the only one: the engine reports an end without its statement and nudges nothing.
  */
 export const SIGNOFF = [
   'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',

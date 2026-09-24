@@ -1,5 +1,5 @@
 /** A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them. */
-import type { RetryAsk } from 'agent-orchestrator';
+import { endWords, type RetryAsk } from 'agent-orchestrator';
 import { answerOf, declaredOutput, type EarlierTry, parseCloseout, roundIn, type Run, type StepRecord, tryNote } from 'agent-orchestrator/run';
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
 import { artifactOf, type StepArtifact } from './artifacts.ts';
@@ -180,12 +180,17 @@ export function triesOf(
   ];
 }
 
-/** Off the engine's view of a try's task. A try with no task, or one the engine has lost, has had none. */
+/**
+ * Off the engine's view of a try's task. A try with no task, or one the engine has lost, has had none. How the latest ended is
+ * read through `endWords`: an end without the statement its task asked for is `failed · unsigned`, the orchestrator's word since
+ * the runtime stopped judging it, and never the harness's `done` that the runtime records.
+ */
 export function attemptsIn(taskId: string | null, views: Views): StepAttempts {
-  const attempts = (taskId && views.get(taskId)?.state.attempts) || [];
+  const state = taskId ? views.get(taskId)?.state : undefined;
+  const attempts = state?.attempts ?? [];
   const latest = attempts.at(-1);
   return {
     count: attempts.length,
-    latest: latest ? { startedAt: latest.startedAt, ended: latest.ended, endedAt: latest.endedAt ?? null, reason: latest.reason } : null,
+    latest: state && latest ? { startedAt: latest.startedAt, ...endWords(state, latest), endedAt: latest.endedAt ?? null } : null,
   };
 }

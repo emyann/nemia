@@ -201,8 +201,8 @@ system says when a process started.
 A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
 `working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
 was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
-or its going busy, still reads it quiet and ends the attempt — `done`, or `unsigned` for a task that asked for a
-statement — and releases the session with the words unread. The window is that one moment against a pass every few
+or its going busy, still reads it quiet and ends the attempt — `done`, with `stated: false` for a task that asked for a
+statement (`unsigned` until stage 4a) — and releases the session with the words unread. The window is that one moment against a pass every few
 seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
 observes.
 
@@ -483,6 +483,11 @@ cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-ru
 fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
+
+**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
+false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `run.ts`, filed by `retriesDue`),
+which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
+folds it and spawns with it.
 
 **Not measured.** Whether the wording alone closes the next such session — the two that were measured were closed by a
 person. The harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run
@@ -924,7 +929,9 @@ The `claude -p` job, which shares the worker, is stage 2's and unchanged here: i
   given its closeout; none that ended by quiet, and none settled without an end.
 
 - **An unsigned end, and its nudge** (§6 item 18). A fake `claude` that keeps a registry, at shipped defaults
-  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. The live test
+  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. Since stage 4a
+  the same fake holds the fact the engine reports instead (`stated: false`, nothing continued), and the judgement and
+  the nudge are held in agent-orchestrator (`test/store.test.ts`, *UNSIGNED is the orchestrator's word since stage 4a*). The live test
   that would show how Claude Code itself ends such a session was written and not run (last section).
 
 - **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
@@ -1134,6 +1141,15 @@ listing the session `done` in `test/unsigned.test.ts`; both fail with it reverte
 it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
 engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
 own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
+
+**The judgement, moved up (stage 4a, 2026-09-23).** Both doors now end the attempt as its harness ended it — `done`,
+reason `harness` — with `stated: false` beside it, written on every end read off a sighting of a task that asked for a
+statement (`true` when one came). The engine settles such a task `succeeded`, continues nothing and nudges nothing, whatever
+attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked`, `endWords` in its
+`views.ts`), and files its sign-off nudge on it; `wf` and the board say what they said. An end with no `stated` key — any
+journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles `failed` with its
+note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`; retiring them
+is part 2 of stage 4a.
 
 **Ends that carried neither statement nor reason, closed (2026-09-19, P0.5).** Every ended attempt now carries the agent's
 statement or the machine's reason (README, *Every ended attempt carries its statement or the reason it has none*). Measured

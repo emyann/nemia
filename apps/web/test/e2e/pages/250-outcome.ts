@@ -65,13 +65,13 @@ function writeRun(root: string): string[] {
     tasks.push(task);
     return task;
   };
-  /** A task that ran once: ended as `end` says, with the statement it gave, or none. */
-  const ran = (step: string, end: { observed: string; reason: string; settled: string }, closeout?: object | string) =>
+  /** A task that ran once: ended as `end` says, with the statement it gave, or none — asked for one when `end` says whether it came. */
+  const ran = (step: string, end: { observed: string; reason: string; settled: string; stated?: boolean }, closeout?: object | string) =>
     write(taskOf(step), lines([
-      { kind: 'filed', at: ago(9), brief: `Do ${step}.`, cwd: REPO_SAID, maxAttempts: 1, harness: 'claude' },
+      { kind: 'filed', at: ago(9), brief: `Do ${step}.`, cwd: REPO_SAID, maxAttempts: 1, harness: 'claude', ...(end.stated !== undefined ? { closeoutSchema: { type: 'object' } } : {}) },
       { kind: 'starting', at: ago(8.9), attempt: 1 },
       { kind: 'spawned', at: ago(8.9), attempt: 1 },
-      { kind: 'ended', at: ago(4), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: end.observed, reason: end.reason, ...(closeout !== undefined ? { closeout } : {}) },
+      { kind: 'ended', at: ago(4), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: end.observed, reason: end.reason, ...(end.stated !== undefined ? { stated: end.stated } : {}), ...(closeout !== undefined ? { closeout } : {}) },
       { kind: 'settled', at: ago(4), outcome: end.settled },
     ]));
   const signed = { observed: 'done', reason: 'harness', settled: 'succeeded' };
@@ -97,7 +97,8 @@ function writeRun(root: string): string[] {
   }));
   ran('review', signed, said('Three findings, none worth another round.', { findings: OUTCOME.findings, again: false }));
   ran('ask', signed, said('Half of it is drawn.', { needs: OUTCOME.needs }, 'blocked'));
-  ran('quiet', { observed: 'failed', reason: 'unsigned', settled: 'failed' });
+  // As the runtime records it since stage 4a: done, no statement, succeeded. `unsigned` is the orchestrator's word for it (`endWords`).
+  ran('quiet', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
   ran('odd', signed, said('Gave what its schema asked, in shapes nothing draws.', { matrix: [[1, 2, 3], [4, 5, 6]], weights: { plan: 0.2, review: { findings: 0.7 } } }));
   // A statement cut off mid-string: no closeout, and still what the agent said.
   ran('garbled', signed, OUTCOME.garbled);

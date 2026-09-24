@@ -353,5 +353,15 @@ orchestrator's calls to the runtime change.
    the worker, but its Task shape, its stdin (issue 29) and M12 were stage 2's, and nothing in it moved. **Still deferred**,
    as the owner decided at stage 2's gate: the stream (`SubscribeToTask`).
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
+   **Stage 4a, part 1 done, 2026-09-23: the signed statement is the orchestrator's word.** The runtime reports a fact and
+   judges nothing about it: an attempt of a task that asked for a closing statement records `stated: true | false` on its
+   `ended` event, and a quiet session that gave none ends `done`, `stated: false`, and settles `succeeded` under every
+   resume policy. `NUDGE` is gone, a resume carries the caller's words alone (`turn.words`), and `ae` prints
+   `done (no statement)`. The orchestrator reads the fact: `closeoutAsked` and `endWords` (`agent-orchestrator/src/views.ts`)
+   read an end without its statement as `unsigned`, the words `wf` and the board have always said, `retriesDue` files its
+   one sign-off nudge (`SIGNOFF`) per step per round as before, and the api's attempt lines go through `endWords`. A journal
+   written before keeps its words: an end recorded `reason: 'unsigned'` settles `failed` with its old note, attempts left or
+   not, and is read `unsigned` above; an end with no `stated` key is never read as unsigned. **Part 2 is the rest:** retiring
+   the runtime's `maxAttempts:` and `resume:`, so a retry is the orchestrator's filing alone.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

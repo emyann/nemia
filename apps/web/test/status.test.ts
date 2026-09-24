@@ -31,6 +31,8 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['denied', 'denied'],
     ['succeeded · BLOCKED', 'blocked'],
     ['stopped · BLOCKED', 'blocked'],
+    ['input-required · BLOCKED', 'blocked'],
+    ['input-required', 'unverified'],
     ['failed', 'failed'],
     ['failed · done', 'failed'],
     ['failed · closeout unreadable', 'failed'],
@@ -59,6 +61,9 @@ test('only verified and unverified are work done; a refused check, a failed sess
 test('a step that signed off blocked is not shown as done, though its session succeeded', () => {
   assert.equal(stepState('succeeded · BLOCKED', false), 'blocked');
   assert.equal(stepState('succeeded · BLOCKED', true), 'blocked');
+  // Held open, the engine's word for the same session is `input-required`: waiting for the word, with nothing running.
+  assert.equal(stepState('input-required · BLOCKED', false), 'blocked');
+  assert.notEqual(stepState('input-required', false), 'working', 'a session that signed and waits is not drawn as still going');
 });
 
 test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {

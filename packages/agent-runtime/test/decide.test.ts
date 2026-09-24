@@ -108,26 +108,37 @@ test('a QUIET session that was asked for no statement is done — quiet is all s
     { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined });
 });
 
-test('a QUIET session asked for a statement that gave none ends UNSIGNED: failed, not done', () => {
+test('a QUIET session asked for a statement that gave none ends `done`, and says it gave none — `stated: false`, a fact the engine does not judge', () => {
+  // Stage 4a: `unsigned` is the orchestrator's word, read off `stated`. The engine recorded it `failed` before.
   assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet(), now(5)),
-    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined, stated: false });
-  const said = decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5));
-  assert.equal(said.do === 'record-end' && said.observed, 'done', 'with a statement, done');
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined, stated: false });
+  assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: { ok: true }, stated: true });
 });
 
-test("the HARNESS'S `done` without a statement ends UNSIGNED too, for a task that asked for one — not only quiet", () => {
-  // The second door (open issue 25's neighbour, measured 2026-09-19: 5 of 344 schema'd tasks settled `succeeded` this way).
+test("the HARNESS'S `done` without a statement is recorded as the harness said it, with `stated: false` — for a task that asked for one, and only for one", () => {
   const done = (extra: Partial<Sighting> = {}): Map<string, Sighting> => new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'done' as const, ...extra }]]);
   assert.deepEqual(decide(fold(TASK, inFlight(true)), done(), now(5)),
-    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined, stated: false });
-  // The controls: a statement given, and a task that asked for none, end `done` on the harness's word as they did.
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined, stated: false });
   assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ closeout: { payload: { ok: true }, at: 3 } }), now(5)),
     { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: { ok: true }, stated: true });
+  // A task that asked for nothing is told of nothing: no `stated` key.
   assert.deepEqual(decide(fold(TASK, inFlight(false)), done(), now(5)),
     { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined });
   // A harness's `failed` is its verdict, statement or not, and a budget spent keeps its own reason.
-  assert.equal((decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)) as { reason?: string }).reason, 'harness');
+  assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'n1', closeout: undefined, stated: false });
   assert.equal((decide(fold(TASK, inFlight(true)), done({ budgetSpent: true }), now(5)) as { reason?: string }).reason, 'budget');
+});
+
+test('an end with `stated: false` settles SUCCEEDED, with attempts left and under every policy: the engine neither nudges nor retries it', () => {
+  for (const resume of [undefined, 'interrupted', 'always', 'never'] as const) {
+    const s = fold(TASK, [...inFlight(true, 3, resume),
+      { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', stated: false }]);
+    assert.equal(s.attempts[0]?.stated, false);
+    assert.deepEqual(decide(s, quiet(), now(9)), { do: 'settle', outcome: 'succeeded' }, `resume ${resume}: quiet, and not stopped to be continued`);
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'succeeded' }, `resume ${resume}`);
+  }
 });
 
 test('an old journal that recorded a `done` end with no statement on a schema task folds, and settles, as it did', () => {
@@ -142,32 +153,18 @@ test('quiet ends only a WORKING session: not a blocked one, and no session its r
   assert.equal(decide(fold(TASK, inFlight(true)), quiet({ quietMs: undefined }), now(5)).do, 'nothing', 'idle, but not quiet for long enough');
 });
 
+/** A journal from before stage 4a, whose engine judged attempt 1 `unsigned`. */
 const unsigned = (maxAttempts: number, resume?: 'interrupted' | 'always' | 'never'): Event[] => [
   ...inFlight(true, maxAttempts, resume),
   { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1' },
 ];
 
-test('UNSIGNED with an attempt left: its session is stopped while it still runs, then continued with a nudge', () => {
-  const s = fold(TASK, unsigned(2));
-  assert.deepEqual(decide(s, quiet(), now(9)), { do: 'stop', sessionId: 's0', why: 'to continue it' }, 'still running, quiet: stopped first');
-  const a = decide(s, seen(), now(9));
-  assert.equal(a.do, 'start');
-  assert.equal(a.do === 'start' && a.resumeFrom, 'n1', 'continues the session: nobody judged that work, the session included');
-  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
-  assert.deepEqual(decide(s, seen([N1, 'stopped']), now(9)), a, 'a stopped session is let go enough');
-});
-
-test('THE NUDGE, word for word: it names the tool and says the work stands', () => {
-  // Pinned, not matched loosely: two sessions that had finished their work read a nudge asking for "your closing
-  // statement" and signed off for neither; a person's sentence naming StructuredOutput got each within thirty
-  // seconds (issue 25). The words are the fix, so changing them is a decision, not an edit.
-  const a = decide(fold(TASK, unsigned(2)), seen(), now(9));
-  assert.equal(a.do === 'start' ? a.nudge : undefined,
-    'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.');
-});
-
-test("UNSIGNED under `resume: never` starts clean, and a clean start is told the brief, not a nudge", () => {
-  assert.deepEqual(decide(fold(TASK, unsigned(2, 'never')), seen(), now(9)), { do: 'start', attempt: 2, resumeFrom: undefined });
+test('an old UNSIGNED end with attempts left settles failed and says why, under every policy — never continued, never nudged: the nudge is the orchestrator\'s now', () => {
+  for (const resume of [undefined, 'interrupted', 'always', 'never'] as const) {
+    const note = { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for' };
+    assert.deepEqual(decide(fold(TASK, unsigned(2, resume)), seen(), now(9)), note, `resume ${resume}`);
+    assert.deepEqual(decide(fold(TASK, unsigned(3, resume)), quiet(), now(9)), note, `resume ${resume}: still quiet, not stopped to be continued`);
+  }
 });
 
 test('UNSIGNED with no attempt left settles failed, and says why', () => {
@@ -384,16 +381,14 @@ test('...under any policy, and after as many refusals as there are attempts to s
 test('an ADOPTED attempt ran, though its spawn was never journalled: it is judged by the policy, as one that spawned', () => {
   // The crash between the spawn call and its `spawned` entry: the session is found under our name and ended
   // from its sighting, so the attempt has a session id and an ending, and no `spawnedAt`.
-  const ended = (reason: 'unsigned' | 'harness'): Event =>
+  const ended = (reason: 'lost' | 'harness'): Event =>
     ({ kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason, nativeId: 'n1' });
-  // A task filed against no session: an unsigned attempt is continued, with the nudge, as it always was.
-  const plain = fold(TASK, [filed(2), { kind: 'starting', at: at(1), attempt: 1 }, ended('unsigned')]);
+  // A task filed against no session: a lost attempt is continued, as it always was.
+  const plain = fold(TASK, [filed(2), { kind: 'starting', at: at(1), attempt: 1 }, ended('lost')]);
   assert.equal(plain.attempts[0]?.spawnedAt, null, 'the fixture is an adoption: no spawn on the record');
-  const a = decide(plain, seen(), now(9));
-  assert.equal(a.do === 'start' && a.resumeFrom, 'n1');
-  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
-  // A continuation of `sess-1`: the nudge goes to the session that did this attempt's work, not to `sess-1`.
-  const b = decide(fold(TASK, continuation([ended('unsigned')])), seen(), now(9));
+  assert.deepEqual(decide(plain, seen(), now(9)), { do: 'start', attempt: 2, resumeFrom: 'n1' });
+  // A continuation of `sess-1`: the retry goes to the session that did this attempt's work, not to `sess-1`.
+  const b = decide(fold(TASK, continuation([ended('lost')])), seen(), now(9));
   assert.equal(b.do === 'start' && b.resumeFrom, 'n1');
   // And `resume: never` still starts a harness failure clean.
   assert.deepEqual(decide(fold(TASK, continuation([ended('harness')], { resume: 'never' })), seen(), now(9)),
@@ -517,7 +512,7 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
       const a = decide(fold(TASK, events), new Map(sighting ? [[N1, sighting]] : []), now(60_000));
       if (a.do === 'settle') settled = true;
       else if (a.do === 'stop') sighting = { ...sighting!, state: 'stopped' };
-      else if (a.do === 'record-end') events.push({ kind: 'ended', at: at(4 + step), attempt: a.attempt, sessionId: a.sessionId, observed: a.observed, reason: a.reason, nativeId: a.nativeId, closeout: a.closeout });
+      else if (a.do === 'record-end') events.push({ kind: 'ended', at: at(4 + step), attempt: a.attempt, sessionId: a.sessionId, observed: a.observed, reason: a.reason, nativeId: a.nativeId, closeout: a.closeout, ...(a.stated !== undefined ? { stated: a.stated } : {}) });
       else break;
     }
     if (!settled) {
@@ -530,9 +525,9 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
     assert.equal(attempt!.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
     if (state === 'done' || state === 'failed') assert.ok(!['operator', 'deadline'].includes(attempt!.reason!), `${at_}: its harness ended it before the cut, and that end is recorded`);
     if (budgetSpent && state !== undefined) assert.deepEqual([attempt!.ended, attempt!.reason], ['failed', 'budget'], `${at_}: a spent budget is failed, never done`);
-    if (attempt!.closeout === undefined && schema) {
-      assert.ok(attempt!.ended !== 'done', `${at_}: a task that asked for a statement is never done without one`);
-    }
+    // Whether the statement came is on every end read off a sighting of a task that asked for one, and on no other.
+    if (!schema) assert.equal('stated' in attempt!, false, `${at_}: nothing asked, nothing reported`);
+    else if (attempt!.reason === 'harness' || attempt!.reason === 'budget') assert.equal(attempt!.stated, attempt!.closeout !== undefined, `${at_}: stated is whether a statement came`);
   }
   assert.ok(walked > 100, `walked ${walked}`);
 });
@@ -549,9 +544,9 @@ const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] =
 const answer = (ms: number, text = 'make it smaller', budgetUsd?: number): Event =>
   ({ kind: 'input', at: at(ms), text, ...(budgetUsd !== undefined ? { budgetUsd } : {}) });
 /** Turn 1's first attempt, started at `ms`, and its end if given. */
-const turn1 = (ms: number, ended?: { observed: Observed; reason?: 'harness' | 'unsigned' | 'lost' | 'budget'; nativeId?: string }): Event[] => [
+const turn1 = (ms: number, ended?: { observed: Observed; reason?: 'harness' | 'unsigned' | 'lost' | 'budget'; nativeId?: string; stated?: boolean }): Event[] => [
   { kind: 'starting', at: at(ms), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' }, { kind: 'spawned', at: at(ms + 100), attempt: 2 },
-  ...(ended ? [{ kind: 'ended', at: at(ms + 2_000), attempt: 2, sessionId: 's1', observed: ended.observed, reason: ended.reason ?? 'harness', nativeId: ended.nativeId ?? 'native-1' } as Event] : []),
+  ...(ended ? [{ kind: 'ended', at: at(ms + 2_000), attempt: 2, sessionId: 's1', observed: ended.observed, reason: ended.reason ?? 'harness', nativeId: ended.nativeId ?? 'native-1', ...(ended.stated !== undefined ? { stated: ended.stated } : {}) } as Event] : []),
 ];
 
 test('HELD OPEN: a signed end waits as input-required, not settled — and past its deadline too, since the deadline times work, not a person reading it', () => {
@@ -613,10 +608,13 @@ test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed tu
     'which on a harness that resumes under the same id, as claude -p does, holds the failed attempt too (open issue 28)');
   const lost = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' })]);
   assert.deepEqual(decide(lost, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-2', nudge: 'make it smaller' }, 'a lost one continues its own');
+  // A turn that ended `done` without its statement waits on a person like any other: the engine does not nudge it.
+  const unstated = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done', nativeId: 'native-2', stated: false })]);
+  assert.deepEqual(decide(unstated, seen(), now(70_000)), { do: 'nothing', why: 'input-required' });
+  // And an old one the engine judged `unsigned` settles failed, as a task not held open does.
   const unsigned = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' })]);
-  const nudged = decide(unsigned, seen(), now(70_000));
-  assert.equal(nudged.do === 'start' && nudged.resumeFrom, 'native-2');
-  assert.match(nudged.do === 'start' ? nudged.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
+  assert.deepEqual(decide(unsigned, seen(), now(70_000)),
+    { do: 'settle', outcome: 'failed', note: '1 attempt(s) of turn 1, none succeeded: the last ended without the closing statement it was asked for' });
   const twice = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed' }),
     { kind: 'starting', at: at(70_000), attempt: 3 }, { kind: 'spawned', at: at(70_100), attempt: 3 },
     { kind: 'ended', at: at(72_000), attempt: 3, sessionId: 's2', observed: 'failed', reason: 'harness', nativeId: 'native-1' }]);

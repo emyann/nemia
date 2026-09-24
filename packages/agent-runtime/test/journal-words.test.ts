@@ -1,5 +1,5 @@
 /**
- * What the journal says, word for word, for five scripted runs through `createEngine` — and what the harness was asked.
+ * What the journal says, word for word, for six scripted runs through `createEngine` — and what the harness was asked.
  *
  * Written before the A2A seam went in beneath the engine's harnesses (thin runtime, stage 1 part 2), and kept unchanged
  * after it: whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the
@@ -87,6 +87,30 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
+});
+
+test('a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above\'s — and an end without the key folds the same', async () => {
+  const b = board();
+  const id = await b.engine.file({ ...filing, maxAttempts: 2 });
+  await b.engine.tick();
+  b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'done', busy: false });
+  await b.engine.tick();
+  await b.engine.tick();
+  assert.deepEqual(await b.record(id), [
+    { ...filed, maxAttempts: 2 },
+    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
+      closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined },
+    { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
+  ]);
+  assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged, with an attempt left');
+
+  const events = (await b.record(id)) as Event[];
+  const without = events.map((e) => (e.kind === 'ended' ? (({ stated: _, ...rest }) => rest)(e) : e)) as Event[];
+  const old = fold(id, without);
+  assert.equal('stated' in old.attempts[0]!, false, 'a journal from before stage 4a carries no key');
+  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0]!, stated: false }] });
 });
 
 test('a spawn the harness refused: the attempt ends unstartable in its words, and the task settles failed', async () => {

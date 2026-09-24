@@ -107,6 +107,11 @@ test('a closeout is an Artifact of one part: data for a value, text/plain for pr
   }
   assert.deepEqual(taskOfAttempt('ae/t-1/1', ended, 'm').artifacts, [], 'an attempt that said nothing has no Artifact');
   assert.equal(closeoutOf(taskOfAttempt('ae/t-1/1', ended, 'm')), undefined);
+  // Since stage 4a an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED,
+  // no Artifact, and `stated: false` on the attempt it carries — for the layer above to judge, as the journal has it.
+  const unstated = overTheWire(taskOfAttempt('ae/t-1/1', { ...ended, stated: false }, 'm'));
+  assert.deepEqual([unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.stated],
+    [TaskState.TASK_STATE_COMPLETED, [], false]);
 });
 
 test('a Task whose state is not its sighting\'s carries no sighting', () => {

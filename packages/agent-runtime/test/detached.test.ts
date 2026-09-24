@@ -182,6 +182,19 @@ test('a worker whose run file is taken away kills what of its harness ignored SI
   await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 25_000);
 });
 
+test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async () => {
+  // The same child, left by an ordinary stop: the worker exited after its drain, and the child ran on under init.
+  const dir = root();
+  const cwd = scratch('ae-harness-');
+  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+  await Effect.runPromise(ops.spawn(req('ae/g3/2', cwd)));
+  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  await Effect.runPromise(ops.stop('ae/g3/2'));
+  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 20_000);
+  await settle(ops, 'ae/g3/2', 'stopped');
+});
+
 test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
   const dir = root();
   const ops = detachedOps(listener(dir), dir);

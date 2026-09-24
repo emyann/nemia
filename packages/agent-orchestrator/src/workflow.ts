@@ -508,7 +508,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools',
  */
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
-  if (unknown !== undefined) refuse(unknownKey(step.name, unknown));
+  if (unknown !== undefined) refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
@@ -1378,6 +1378,7 @@ export function renderAgent(draft: AgentDraft): string {
     if (keys[key] == null) continue;
     if (key === 'description') refuse(`${file}: \`description\` is the agent's own line, not one of its role keys — give it as the description, once.`);
     if (key === 'skills') refuse(`${file}: \`skills\` is the agent's own line — the file beside it that says what it can do — not one of its role keys. Give it as the skills, once.`);
+    if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
@@ -1502,6 +1503,14 @@ export function formerKeysIn(text: string): string[] {
 }
 
 /** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
+/**
+ * Why a former name is not written: read from a file, it is never put in one (`renderStep`, `renderAgent`). What sends one is a form drawn
+ * before the key was renamed — a board page left open across the change — and its save is refused rather than written under a name the
+ * file would then carry on.
+ */
+const formerKeyWritten = (file: string, former: string): string =>
+  `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file written before 2026-09-23 may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page open since before then sends the former name: reload it, and save again.`;
+
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 

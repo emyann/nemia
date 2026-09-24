@@ -12,7 +12,7 @@ import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANI
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/workflow-store.ts';
 import { HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
-import { asNamed, FORMER_KEYS, formerKeyLine, formerKeysIn, parseAgent } from '../src/workflow.ts';
+import { asNamed, FORMER_KEYS, formerKeyLine, formerKeysIn, parseAgent, renderAgent } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/workflow-store.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
@@ -612,6 +612,15 @@ test('a step on the former name beside an agent on the new one sets that one key
   assert.deepEqual(step!.agent!.keys, ['allowedTools'], 'owned under the new name');
   assert.equal(step!.agent!.given.disallowedTools, 'SendMessage');
   assert.equal(Object.hasOwn(step!.agent!.given, 'allowedTools'), false, 'what the step sets is not given to it');
+});
+
+test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which write the name a key has now — as a board page open since before sends it', () => {
+  assert.throws(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft),
+    refusedWith(/^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\.$/));
+  assert.throws(() => renderAgent({ name: 'writer', body: 'Write.', keys: { allow: 'Edit(**)' } } as never),
+    refusedWith(/^agents\/writer\.md: `allow` is `allowedTools`'s former name, .* Send `allowedTools`/));
+  // Unset, it is nothing to write, as any key is.
+  assert.doesNotThrow(() => renderStep({ name: 'write', after: [], body: 'Write.', allow: null } as unknown as StepDraft));
 });
 
 test('REFUSED: a list set under both its names, naming both lines and which one to keep', () => {

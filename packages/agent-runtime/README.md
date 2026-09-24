@@ -803,7 +803,10 @@ statement it read is recorded as read.
 | `deadline` | `failed` | its task ran past `deadlineSeconds`, and the session was stopped before its harness ended it |
 
 A statement given before the cut is carried on `operator` and `deadline` ends too; a session its harness had already
-ended when the cut came is recorded as its harness ended it.
+ended when the cut came is recorded as its harness ended it, and a task past its deadline settles on that end: the
+deadline stops a session that runs and refuses an attempt that would start, and never overrules one that finished.
+Until 2026-09-24 it did: a pass steps a task until nothing moves, so the end it recorded was read again past the
+deadline in the same pass, and a check that exited 0 at 607 s of 600 settled `failed`, `deadline exceeded after 607s`.
 
 **Two ends left neither, until 2026-09-19.** A stop and a deadline settled the task over its open attempt, with no
 `ended` at all: 4 of the 511 settled tasks in this machine's store, all stopped by a person, every one on a task that

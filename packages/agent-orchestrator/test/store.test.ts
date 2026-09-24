@@ -330,7 +330,7 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
   const spec = tasks.get(id)!.spec;
   assert.deepEqual(
     { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, maxAttempts: spec.maxAttempts, resume: spec.resume, closeoutSchema: spec.closeoutSchema },
-    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
+    { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
   );
   assert.deepEqual(readCheckBrief(spec.brief), {
     command: 'npm test && npm run typecheck',

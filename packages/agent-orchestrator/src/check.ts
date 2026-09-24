@@ -20,13 +20,22 @@
  * which is the contract every detached harness already has. What that buys without a line of engine
  * code: the check survives a tick that dies, `wf cancel` stops a running suite through `e.stop`, a
  * hung suite ends at the task's deadline, and checks have a concurrency pool of their own, so a
- * ten-minute suite never holds an agent's slot or the tick itself.
+ * suite that runs for minutes never holds an agent's slot or the tick itself.
  *
  * Pure: no disk, no process, no engine. `tick.ts` is the file that files these.
  */
 
-/** The seconds a check may run before the engine stops it. A hung suite must not hold a run for ever. */
-export const CHECK_DEADLINE_SECONDS = 600;
+/**
+ * The seconds a check may run before the engine stops it. A hung suite must not hold a run for ever.
+ *
+ * A guard against a hang, not a budget, so it is set well above the slowest check that finished. Measured spawned →
+ * ended over the store's checks of 2026-09-20 to 09-24: those that ran the web build and the e2e took 91–443 s, a
+ * median of 376 s, and 582 s and 607 s with several runs on the machine; the rest under 25 s. None was ever cut at
+ * its deadline while hung; the 607 s one exited 0 and was settled `failed` by the old 600. Durations grow as e2e
+ * pages are added. A constant rather than a step key: every shipped check is the same command family and none needs
+ * another number, and a step key is three edits outside the package (CLAUDE.md, `STEP_KEYS`).
+ */
+export const CHECK_DEADLINE_SECONDS = 1200;
 
 /** How many lines of each stream `wf decide` shows for a check that refused. */
 export const CHECK_TAIL_LINES = 20;

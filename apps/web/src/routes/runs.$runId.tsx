@@ -69,6 +69,8 @@ function Run({ run }: { run: RunDetail }) {
 
       <WaitingOnRuns run={run} />
 
+      <HeldUntil run={run} />
+
       {run.warning && (
         <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
           {run.warning}
@@ -300,6 +302,43 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * A person's hold on the run (`wf hold`), as `wf decide` says it: until which runs ship, what that means and how to lift it, and each run it
+ * is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While it stands no step
+ * offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
+ */
+function HeldUntil({ run }: { run: RunDetail }) {
+  const { holding } = run;
+  if (!holding) return null;
+  return (
+    <section
+      aria-label="Held"
+      data-on-you={holding.onYou}
+      className={`space-y-1 rounded px-3 py-2 text-sm ${
+        holding.onYou ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200'
+      }`}
+    >
+      <p className="font-mono">{holding.word}</p>
+      <p data-advice>{holding.advice}</p>
+      {holding.runs.length > 0 && (
+        <ul className="flex flex-wrap gap-x-3 text-xs">
+          {holding.runs.map((h) => (
+            <li key={h.run}>
+              {h.missing ? (
+                <span className="font-mono">{h.run}</span>
+              ) : (
+                <Link to="/runs/$runId" params={{ runId: h.run }} className="font-mono underline underline-offset-2">
+                  {h.run}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -95,6 +95,16 @@ function RunRow({ run }: { run: RunSummary }) {
               waiting on you: {onYouOf(run).length ? onYouOf(run).join(', ') : run.waiting?.advice}
             </span>
           )}
+          {/* A person's hold on it (`wf hold`), in `wf ls`'s word, and how to lift it on hover: amber once only a person lifts it. */}
+          {run.holding && (
+            <span
+              data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
+              title={run.holding.advice}
+              className={`font-mono ${run.holding.onYou ? 'font-medium text-amber-600' : 'text-violet-700 dark:text-violet-400'}`}
+            >
+              {run.holding.word}
+            </span>
+          )}
         </p>
         {/* What there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that
             approves it, or a branch nobody has merged. The step's own `approve <step>` is on this line, and not above it too. */}

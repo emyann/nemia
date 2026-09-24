@@ -301,6 +301,14 @@ orchestrator's calls to the runtime change.
    (`deniedWords`), one writer for every surface. Nothing is decided on them: `denials: fail`, a step key that fails a step
    on a denial, is a card of its own.
 
+   **Part 3b done, the same day: a step can be stopped on a denial.** A step that says `denials: fail` is not passed on
+   when its signed try was denied a call: it reads `denied`, a status of its own, which stops its followers, runs no check,
+   spends no `retries:` and waits on a person. The run's `allow:` is frozen at `wf start`, so a try is denied the same again,
+   and the offer says both ways out: the rule for the folder's `allow:` in a new run (`Edit(<path>)` for any file write,
+   `Bash(<command>:*)`), and `wf retry <run> <step> --fresh`, whose brief names what was denied. Refused on codex and beside
+   `background: true`, where no denial is read. The orchestrator's policy alone: the runtime's `decide` never reads denials.
+   Widening `allow:` on a live run is left for later.
+
    **Part 4a done, the same day: the runtime holds a task open (R1).** A task filed `holdOpen: true` does not settle when an
    attempt signs: `view` says `input-required` — A2A's `TASK_STATE_INPUT_REQUIRED` — and nothing runs, the signed session
    let go as any ended attempt's is. `answer` journals an `input`, and the next pass starts the task's next turn, an attempt

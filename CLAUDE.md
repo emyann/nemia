@@ -272,6 +272,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
   chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
   undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A new step status is a word the board draws as `working` until it knows it.** `stepState` (`apps/web/src/lib/status.ts`) falls
+  through to `working` for any word it does not match, so a status added to `StepStatus` in `run.ts` passes every orchestrator and api
+  test and shows on the board as a step still running — the one surface that says nothing is wrong. Add the word to `stepState`, its
+  meaning and class, `stepGraph`'s fill and `offersOf` in `asks.ts` in the same change, with a test of each. And the git fixture
+  (`agent-orchestrator/test/fixtures/git-runs-before.json`) pins every `Decision` whole, so a new list on `Decision` fails
+  `git-before-after.test.ts` on every folder: refresh it with `everything()` of `git-runs-pin.ts`, read the diff line by line — only the
+  new key may move — and say so in that test's doc (learned by the run that added `denials: fail`).
 - **A word from outside, printed into a column, is made one line before it is measured.** `wf ls` pads each status to the width of
   the widest (`cli.ts`), so a harness's `waitingFor` — free text, which can carry a newline — breaks its row in two and mis-aligns
   every other row of that run, and `wf decide` splits the same way. A browser would have collapsed it and nothing would have shown
@@ -360,6 +367,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
   and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
+  denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
+  which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own
+  directory from it and this run's id as `*`, and a call the step's own `disallow:` may have denied is offered no allow at all, since a deny
+  beats every allow (`disallowedBy`). A fixture for a path the run makes is a path the run makes (learned in review of that run).
 - **A path a fenced step's brief names must be inside the step's own folder.** A folder team runs in `dontAsk`, so a read
   outside its directory is denied with no prompt and the session carries on: the brief is the only thing that says the path
   exists, and it was lying twice — the parents' folders a fan-in is told to read, and `runs/<id>/inputs` on every brief of a

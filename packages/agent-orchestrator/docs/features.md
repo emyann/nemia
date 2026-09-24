@@ -4202,8 +4202,34 @@ reviewers' fences rest on.
 - **`wf say` keeps its meaning**: part 2a writes a word to a job's stdin until its result (issue 29).
 
 **What it leaves.** A job's denials are on its attempt (`ae`, `wf logs`), and since part 3a (the same day) `wf ls`, `wf decide`, the
-api and the board say them: a `denied:` note beside the status, never in it. Nothing is decided on them yet — `denials: fail`,
-§10. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+api and the board say them: a `denied:` note beside the status, never in it. Since part 3b a step can decide on them — `denials: fail`,
+below. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
+
+## Shipped: a step that says `denials: fail` is stopped on a denied call (thin runtime stage 2 part 3b)
+
+Registered as §10 and shipped 2026-09-23. A job's denied calls were said on every surface since part 3a and decided nothing: a reviewer
+in `dontAsk` denied the command it was told to run signed off all the same. A step that says `denials: fail` is not passed on.
+
+- **A status of its own, `denied`, not a failure.** §10 asked for a denied try to settle the step failed and spend `retries:`. The run's
+  `allow:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
+  itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
+  `run.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
+  is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
+  'blocked'`).
+- **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allow:` for a new run, worded as Claude Code
+  matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
+  the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path
+  as `//path`, the run's id as `*`), except for a call the step's own `disallow:` may have denied, which no allow overrides
+  (`disallowedBy`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What
+  your session was denied`), or the same session continued. `--recheck` is refused: no check ran. A pruned run offers nothing.
+- **Refused at load:** any word but `fail`; the key on codex, which records no denials; and beside `background: true`, whose denials
+  are not read (issue 28).
+- **The api and the board.** The step's status is `denied`; `ONCE_MORE` parses the `--fresh` offer, so the board's button copies the bare
+  command. The board draws the step amber, as it does one that did not sign, and its Decide section offers a new session first. The
+  builder's step form sets the key (`KINDS`, `specOf`, the board's mirror with `UNSET`).
+
+**What it leaves.** No verb widens `allow:` on a live run: a person who wants the call allowed starts a new run. No e2e page draws a
+denied step; its rendering is proven by the web's component tests.
 
 ## 1. A run that grows steps from a plan
 
@@ -4497,17 +4523,9 @@ it asks and what it gets wrong.
 
 ## 10. `denials: fail`: a step that fails on what it was denied
 
-**Registered** 2026-09-23, as part 3 of thin runtime stage 2 (`docs/eval-thin-runtime.md` §5); part 3a shipped the surfaces
-and left this. A denial is recorded on every job's attempt and said on every surface, and nothing is decided on one: a
-reviewer in `dontAsk` denied the command it was told to run signs off all the same, and a person learns it only by reading
-the `denied:` line.
-
-**What it needs.** A step key, `denials: fail` (absent: record only, as today), read by the tick off the attempt's
-`denials` as `refusedCheck` reads a check: a signed try that was denied anything settles the step failed, with the denied
-calls as the reason, spending `retries:` like any failure. Its obligations: `STEP_KEYS` and the three outside the package
-(`KINDS`, `WorkflowStepSpec` and `specOf`, the board's mirror with `UNSET`), and a test that makes it *refuse* — a denied
-try failed — at shipped defaults. A background step's denials are not read (issue 28), so the key is refused beside
-`background: true` rather than accepted and never met.
+Shipped 2026-09-23 as *Shipped: a step that says `denials: fail` is stopped on a denied call*, above: a status of its own, `denied`,
+rather than a failure spending `retries:`, since the run's `allow:` is frozen and a try is denied the same again. The number kept so §11
+keeps its.
 
 ## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)
 

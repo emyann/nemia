@@ -146,7 +146,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           value={(value as string | null) ?? ''}
           onChange={(v) => set(key, (v || null) as never)}
           options={field.choices ?? []}
-          unset={given ?? (key === 'agent' ? 'no agent' : `not set — ${form.defaultHarness}`)}
+          unset={given ?? (key === 'agent' ? 'no agent' : key === 'harness' ? `not set — ${form.defaultHarness}` : 'not set')}
           stray={key === 'agent' ? (v) => `${v} — not in agents/` : undefined}
         />
       );

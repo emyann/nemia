@@ -127,8 +127,9 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 }
 
 /**
- * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
- * past a cap — after the colon and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
+ * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, `--fresh` for a step `denials: fail` stopped (whose
+ * offer is a new session, told to do without the call), or `wf round <run> <step>` — with `--budget <amount>` past a cap — after the colon
+ * and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
  * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer — which
  * the board also presses itself, through `POST /api/runs/:id/steps/:step/accept`, reading the step off this command (`acceptStepOf` in
  * apps/web/src/lib/decide.ts).
@@ -140,7 +141,7 @@ function lessonOf(touched: readonly Touched[]): Lesson {
  * say the hold where they would offer a verb — `held until a-1 ships; once more is asked once the hold lifts` (`heldLater` in run.ts) — a
  * sentence with no `wf` verb in it, which would reach a person as a command to run if one got here.
  */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --budget <amount>| --message "<(?:objection|why)>")?)/;
+const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --fresh| --budget <amount>| --message "<(?:objection|why)>")?)/;
 
 /**
  * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as

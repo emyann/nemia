@@ -57,6 +57,21 @@ writeRun('h-closed', ['plan']);
 waiting('h-closed-plan', DONE);
 fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-closed-plan.jsonl'), `${JSON.stringify({ kind: 'closed', at: at(30) })}\n`);
 
+// Blocked, then answered (`wf retry --message`): the answer is the task's next turn, under the same id, and its attempt has not ended.
+writeRun('h-answered');
+waiting('h-answered-plan', BLOCKED);
+fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-answered-plan.jsonl'), [
+  { kind: 'input', at: at(20), text: 'Warm ones.' },
+  { kind: 'starting', at: at(21), attempt: 2 },
+  { kind: 'spawned', at: at(21), attempt: 2 },
+].map((event) => `${JSON.stringify(event)}\n`).join(''));
+{
+  const file = path.join(root, 'runs', 'h-answered.json');
+  const run = JSON.parse(fs.readFileSync(file, 'utf8'));
+  run.steps.plan.tries = [{ taskId: 'h-answered-plan', then: 'nudge' }];
+  fs.writeFileSync(file, JSON.stringify(run));
+}
+
 type Step = { name: string; status: string; needs: string | null };
 const detail = async (id: string) => (await app.request(`/api/runs/${id}`)).json();
 const summary = async (id: string) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
@@ -89,4 +104,13 @@ test("a held step closed and not yet settled reads as it signed, never the engin
     assert.deepEqual(run.steps.map((s: Step) => s.status), listed.steps.map((s) => s.status));
     assert.doesNotMatch(run.steps[0].status, /between attempts|running/);
   }
+});
+
+test("each try of a held task a person answered is its own turn: the try answered keeps its sign-off and its end, and the turn it started reads none of them", async () => {
+  const plan = (await detail('h-answered')).steps[0];
+  type Try = { try: number; current: boolean; taskId: string; status: string; attempts: { count: number; latest: { ended: string | null } | null }; closeout: { needs: string | null } | null };
+  assert.deepEqual(plan.tries.map((t: Try) => [t.try, t.current, t.taskId]), [[1, false, 'h-answered-plan'], [2, true, 'h-answered-plan']], 'one task, two tries');
+  const [answered, going] = plan.tries as Try[];
+  assert.deepEqual([answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs], ['succeeded', 1, 'done', BLOCKED.needs], 'the turn answered, as it signed');
+  assert.deepEqual([going.attempts.count, going.attempts.latest?.ended, going.closeout], [1, null, null], 'the turn going on: its own attempt, still running, and no sign-off yet');
 });

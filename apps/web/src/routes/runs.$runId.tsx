@@ -187,7 +187,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">{step.name}</h2>
-          <StatusChip status={step.status} runCancelled={runCancelled} />
+          <StatusChip status={step.status} runCancelled={runCancelled} runHeld={run.holding != null} />
         </div>
         <StepNote note={step.note} />
       </div>

@@ -14,6 +14,7 @@ export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   step: run.steps[index]!,
   index,
   runCancelled: run.cancelledAt !== null,
+  runHeld: run.holding != null,
   waitingOnYou: run.waitingOnYou.includes(run.steps[index]!.name),
 });
 
@@ -33,6 +34,7 @@ export const stepMinimapFill: Record<StepState, string> = {
   failed: 'var(--color-red-500)',
   'failed-check': 'var(--color-red-500)',
   waiting: 'var(--color-neutral-400)',
+  held: 'var(--color-violet-400)',
   cancelled: 'var(--color-neutral-400)',
   unknown: 'var(--color-neutral-400)',
 };
@@ -64,7 +66,8 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
  */
 export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
   const runCancelled = run.cancelledAt !== null;
-  const steps = run.steps.map((s) => ({ name: s.name, state: stepState(s.status, runCancelled), note: s.note }));
+  const runHeld = run.holding != null;
+  const steps = run.steps.map((s) => ({ name: s.name, state: stepState(s.status, runCancelled, runHeld), note: s.note }));
   return edgesOf(run.graph, steps).map((e) => {
     const edge = drawn(prefix + e.id, prefix + e.source, prefix + e.target, e.state, e.kind === 'loop');
     return e.kind === 'loop'

@@ -107,7 +107,7 @@ function RunRow({ run }: { run: RunSummary }) {
           {run.steps.map((step) => (
             <li key={step.name} className="flex items-center gap-1.5">
               <span className="text-neutral-700 dark:text-neutral-300">{step.name}</span>
-              <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} note={step.note} />
+              <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} note={step.note} />
             </li>
           ))}
         </ul>

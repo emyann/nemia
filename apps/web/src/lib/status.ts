@@ -5,6 +5,11 @@
  * shows them as they are; this only chooses the colour. `cancelled` is a fact about the run rather than
  * the step: a step that has not started on a run somebody called off never will, and a step the
  * cancellation stopped reads `stopped`.
+ *
+ * `held` is a fact about the run too: a person holds it until other runs ship (`wf hold`), so a step not filed will not be until the hold
+ * lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. The words stay
+ * `wf ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work, asking through
+ * its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
  */
 export type StepState =
   | 'working'
@@ -21,10 +26,24 @@ export type StepState =
   | 'failed'
   | 'failed-check'
   | 'waiting'
+  | 'held'
   | 'cancelled'
   | 'unknown';
 
-export function stepState(status: string, runCancelled: boolean): StepState {
+/**
+ * `runHeld` has no default, on purpose: a caller that forgot the hold would draw a held run's gate as asking a person, and the compiler names
+ * every caller that has to say it.
+ */
+export function stepState(status: string, runCancelled: boolean, runHeld: boolean): StepState {
+  const state = wordState(status, runCancelled);
+  return runHeld && !runCancelled && HELD_BY_A_HOLD.has(state) ? 'held' : state;
+}
+
+/** What a hold makes `held`: a step not filed yet, and one at a human gate (`isGate`), whose answer is refused while the hold stands. */
+const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['waiting', 'blocked', 'awaiting-approval', 'exhausted', 'over-budget', 'budget-exhausted']);
+
+/** A step's state from its word alone, and whether the run was called off. */
+function wordState(status: string, runCancelled: boolean): StepState {
   // `succeeded · BLOCKED`: the session ended cleanly, and the step is waiting on a person.
   const [word = '', said] = status.split(' · ');
   if (said === 'BLOCKED') return 'blocked';
@@ -87,6 +106,7 @@ export const stateMeaning: Record<StepState, string> = {
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',
+  held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
   unknown: 'unknown: the engine has no record of its task',
 };
@@ -110,6 +130,8 @@ export const stateClass: Record<StepState, string> = {
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
   'failed-check': 'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  // Nobody is asked, as with `waiting`, and not grey: a person's word stops it, not the order of the steps.
+  held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
   unknown: 'border border-dashed border-neutral-300 text-neutral-500 dark:border-neutral-700',
 };

@@ -132,17 +132,19 @@ export type Answer = Exclude<Offer, { kind: 'continue' }>;
  * has none. A step the api carries a raise for (`raise`) is offered that, whatever its word: over its budget its word is `over budget`,
  * whether it signed off blocked, ended unsigned or was refused by its check, and a check that did not finish past its budget reads as any
  * such check — and a try of either that files a session is refused without the raise. None where the package takes none: the target of a
- * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off.
+ * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off, and nothing on a run a
+ * person holds (`wf hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that fails.
+ * `holding` is read tolerantly, for an api older than the hold.
  */
-export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'>): Offer[] {
-  if (run.cancelledAt !== null) return [];
+export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Offer[] {
+  if (run.cancelledAt !== null || run.holding != null) return [];
   return run.steps.flatMap((step): Offer[] => {
     if (step.asked) return [{ step: step.name, kind: 'asked', try: step.asked.try, note: step.note }];
     if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
     const unfinished = step.check?.verdict === 'unfinished';
     if (step.raise) return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, ...step.raise }];
-    const state = stepState(step.status, false);
+    const state = stepState(step.status, false, false);
     if (state === 'blocked') return [{ step: step.name, kind: 'answer', needs: step.needs }];
     if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
     if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];
@@ -157,7 +159,7 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
 export const raiseTo = (above: number): number => Math.floor(above) + 1;
 
 /** What the Decide section offers, in the run's order: every offer but Continue, which the banner makes (`Answer`). */
-export const answersOf = (run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'>): Answer[] =>
+export const answersOf = (run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Answer[] =>
   offersOf(run).filter((offer): offer is Answer => offer.kind !== 'continue');
 
 /**

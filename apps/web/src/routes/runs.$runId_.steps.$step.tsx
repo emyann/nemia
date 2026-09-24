@@ -79,7 +79,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <BackToRun run={run} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-semibold">{step.name}</h1>
-          <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} />
+          <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
           {following.live && (
             <span data-following className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-green-500" />

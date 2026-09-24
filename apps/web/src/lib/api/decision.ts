@@ -1,7 +1,7 @@
 /** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`, apps/api/src/decision.ts). */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
-import type { RunWaiting } from './judged.ts';
+import type { RunHolding, RunWaiting } from './judged.ts';
 import type { StepUsed } from './usage.ts';
 
 /** Mirrors `Change` in agent-orchestrator's radius.ts: a file a branch changed. A binary file has null counts, never 0. */
@@ -59,10 +59,11 @@ export type Decidable = {
 };
 
 /**
- * Mirrors `RunDecision` in apps/api/src/decision.ts: `waiting` for a run whose roots wait on runs not shipped, `running` while nobody is
- * waited on, `nothing` for a run called off or shipped.
+ * Mirrors `RunDecision` in apps/api/src/decision.ts: `waiting` for a run whose roots wait on runs not shipped — with `holding` beside it for
+ * one a person holds too — `holding` alone for a run a person holds (`wf hold`), which offers nothing, `running` while nobody is waited on,
+ * `nothing` for a run called off or shipped.
  */
-export type RunDecision = { waiting: RunWaiting } | { running: true } | { nothing: string } | Decidable;
+export type RunDecision = { waiting: RunWaiting; holding?: RunHolding } | { holding: RunHolding } | { running: true } | { nothing: string } | Decidable;
 
 /**
  * What `wf decide` shows a person about a run. Read once for each state of the run, never on the page's beat: the api

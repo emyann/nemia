@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
 import type { RunGraph } from './graph.ts';
-import type { RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
+import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
 
 /** Mirrors `PlaceKind` in agent-orchestrator's run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
@@ -30,6 +30,10 @@ export type RunSummary = {
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
+  /** The runs a person holds this one until (`wf hold`), as its hold file names them: the edges from their cards to its card, as `after`'s are. None for a run nobody holds. */
+  heldUntil: string[];
+  /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
+  holding: RunHolding | null;
   status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a

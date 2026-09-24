@@ -20,12 +20,14 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
 
 /**
  * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its gate
- * on you. Null on a run called off, and where no gate waits. A to-decide gate whose `back` names the step itself holds after the step ran,
+ * on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits. A to-decide gate whose `back` names the step itself holds after the step ran,
  * as §6's does (`sendBackTo` gives the step once it has a task); one whose `back` does not is an ending, not filed until approved. A list
  * from an api without `back` reads the step alone as where a send-back goes, which the package would refuse for an ending, in its words.
  */
-export function gateOfSummary(run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'>): GateAsk | null {
-  if (run.cancelledAt !== null) return null;
+export function gateOfSummary(
+  run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunSummary['holding'] },
+): GateAsk | null {
+  if (run.cancelledAt !== null || run.holding != null) return null;
   const decide = run.toDecide;
   if (decide?.kind === 'approve') {
     const back = decide.back ?? [decide.step];

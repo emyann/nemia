@@ -138,3 +138,13 @@ test('what else a run waits on a person for, in full words for the inspector and
   assert.equal(decideLine(['wf/r/implement']), 'decide its result: a branch ahead of the base that nothing merges');
   assert.equal(decideLine(['a', 'b']), 'decide its result: 2 branches ahead of the base that nothing merges');
 });
+
+test("REFUSED: a run a person holds has no gate on its card, whether a to-decide or a step waiting at its gate names it — the package refuses the approval", () => {
+  const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 ships', advice: 'wf hold r --off', onYou: false };
+  const steps = [step('plan', { approve: 'approve plan' })] as unknown as RunSummary['steps'];
+  assert.notEqual(gateOfSummary(summary({ toDecide: ENDING_DECIDE })), null);
+  assert.equal(gateOfSummary({ ...summary({ toDecide: ENDING_DECIDE }), holding }), null);
+  assert.notEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), null);
+  assert.equal(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding }), null);
+  assert.notEqual(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding: null }), null, 'a run nobody holds');
+});

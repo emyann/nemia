@@ -35,7 +35,8 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
   // The try a Rounds row selected, and of which step: the panel stays mounted as another step is clicked, and that one's current try is shown.
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
   const runCancelled = run.cancelledAt !== null;
-  const state = stepState(step.status, runCancelled);
+  const runHeld = run.holding != null;
+  const state = stepState(step.status, runCancelled, runHeld);
   const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
   const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
   const select = (n: number) => {
@@ -122,7 +123,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
       {/* What the run asks of you here, first: above the step's own state, which is the reason it waits and not what to do about it. */}
       <Asked run={run} step={step} />
       <div className="space-y-1">
-        <StatusChip status={step.status} runCancelled={runCancelled} />
+        <StatusChip status={step.status} runCancelled={runCancelled} runHeld={run.holding != null} />
         <StepNote note={step.note} />
       </div>
       {/* A step not filed has run nothing, so every row of its facts would be a dash: said once instead, and its spec below. */}

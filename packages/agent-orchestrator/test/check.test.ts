@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { codex, createEngine, type Engine } from 'agent-runtime';
 import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { modeOf } from '../src/workflow.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
 
@@ -185,7 +186,8 @@ test("this repository's own workflow checks the suite and the types after every 
   assert.equal(steps.review?.harness, 'codex');
   // Read-only again. It lost the line at C's merge because a read-only reviewer could not write the
   // REVIEW.md that respond read; the review now travels as its closeout (plan §4 J), so it writes nothing.
-  assert.equal(steps.review?.permissionMode, 'read-only');
+  assert.equal(steps.review?.sandbox, 'read-only');
+  assert.equal(steps.review?.permissionMode, undefined);
   assert.equal(steps.review?.output?.file, 'review.schema.json');
   const findings = steps.review?.output?.schema.properties.findings as { type: string; items: { required: string[] } } | undefined;
   assert.equal(findings?.type, 'array');
@@ -196,7 +198,8 @@ test("this repository's own workflow checks the suite and the types after every 
 });
 
 test('the shipped review is read-only on an engine that honours it, and that is fine: REVIEW.md is not how the review reaches implement', () => {
-  // review.md sets `permissionMode: read-only`, and the engine runs a read-only codex step `-s read-only`,
+  // review.md sets `sandbox: read-only`, the tick files it as the task's `permissionMode` (`modeOf`), and the engine runs a
+  // read-only codex step `-s read-only`,
   // so the reviewer cannot write a file. That pair was refused here while respond.md answered a REVIEW.md
   // the reviewer wrote. It is fine now because the file is not the transport: the findings are review's
   // closeout, declared with `output:`, and its `loop: implement` hands them back to implement as data. This
@@ -207,9 +210,9 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   // runtime's src/ by path, when node_modules was a link into the main checkout; docs/architecture.md now
   // refuses that route (packages/agent-runtime/test/contract.test.ts).
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
-  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), config: { permissionMode: 'read-only' } });
+  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), config: { permissionMode: steps.review && modeOf(steps.review) } });
   const sandbox = args[args.indexOf('-s') + 1];
-  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
+  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.sandbox === 'read-only';
   assert.ok(reviewCannotWrite, 'the shipped reviewer runs read-only on the engine in this tree');
   const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') || /REVIEW\.md/.test(steps.implement?.body ?? '');
   assert.ok(!(reviewCannotWrite && handedOnAsAFile),

@@ -203,7 +203,7 @@ test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`,
     assert.deepEqual(byName.implement?.disallowedTools, IMPLEMENT_DENIED, `${dir}: implement`);
     const review = byName.review!;
     if (review.harness === 'codex') {
-      assert.deepEqual([review.permissionMode, review.disallowedTools], ['read-only', undefined], `${dir}: codex has no tool list, and its sandbox writes nothing`);
+      assert.deepEqual([review.sandbox, review.permissionMode, review.disallowedTools], ['read-only', undefined, undefined], `${dir}: codex has no tool list, and its sandbox writes nothing`);
     } else {
       assert.deepEqual([review.permissionMode, review.disallowedTools], ['dontAsk', REVIEW_DENIED], `${dir}: review`);
     }

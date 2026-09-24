@@ -1735,8 +1735,8 @@ export const asRan = (step: Workflow): Workflow =>
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen before a key was renamed holds the step's
  * field under its former name, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
- * a former name, and the next pass that writes the record back writes the new ones. A field under both names keeps the new one's value. A
- * step with no former name is returned as it is. Pure.
+ * a former name, and the next pass that writes the record back writes the new ones, with the former beside them (`withFormerNames`). A
+ * field under both names keeps the new one's value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: Workflow): Workflow {
   const fields = Object.keys(step);
@@ -1757,6 +1757,19 @@ export function asNamed(step: Workflow): Workflow {
         .map(([key, value]) => [keyNamed(key), value])) } : {}),
     },
   };
+}
+
+/**
+ * A step as a record is written: each renamed field under its name now and, with the same value, under its former one (`FORMER_KEYS`). A
+ * `wf up` daemon started before the rename runs its old code until it is restarted, and its tick reads a step's rule lists by the former
+ * names alone: a record with the new ones only would have it file every step of a run started since with no rule list, and say nothing —
+ * a reviewer's `Bash(npm run build)` deny and the supervisor's git denies gone. `asNamed` reads the record back under the new names
+ * alone, so no reader of today's code sees the copy. Only the step's own fields are copied: they are all the old tick filed from. Pure.
+ */
+export function withFormerNames(step: Workflow): Workflow {
+  const fields = step as unknown as Record<string, unknown>;
+  const copies = Object.entries(FORMER_KEYS).filter(([, now]) => fields[now] !== undefined).map(([former, now]) => [former, fields[now]]);
+  return copies.length ? { ...step, ...Object.fromEntries(copies) } : step;
 }
 
 /** Every step `name` waits on, directly or through another. */

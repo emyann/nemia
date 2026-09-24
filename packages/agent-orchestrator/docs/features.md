@@ -4202,12 +4202,22 @@ them under. The sections above keep the words they were written in.
 - **A run frozen with the former names loads.** `readRun` reads each frozen step through `asNamed` — its fields, and the agent's `keys`
   and `given` — so the tick, `wf ls`, `wf decide` and the api see the new names, and the tick's next write of the record saves them.
   `resolved-before.json`, which is never regenerated, is read the same way.
+- **A record is written under both names.** A `wf up` daemon runs the code it was started with until it is restarted, and the tick
+  from before the change files a step's lists from its `disallow` and `allow` alone: given a record with only the new names, it would
+  file every step of a run started since with no rule list, and nothing would say so — the reviewers' `Bash(npm run build)` deny and the
+  supervisor's git denies gone. So both writers of a record (`writeRun`, `rewriteRun`) copy each list under its former name beside the
+  new one (`withFormerNames`), and `asNamed` reads it back under the new name alone. `store.test.ts` reads a record as that tick did,
+  after `wf start` and after a pass.
 - **Outside the package**, as CLAUDE.md's `STEP_KEYS` obligations say: the builder's `KINDS`, `WorkflowStepSpec` and `specOf`, the
   board's mirror with `UNSET`, the agent form's role keys, and the capabilities page, which names the lists as a step writes them.
 
 **What it leaves.** The note is printed by `wf start` alone: a run started from a card by the daemon, or from the board, starts under
-the former names silently. A board page opened before the change sends `disallow`/`allow` on a save, and the api refuses them as keys it
-does not know. And a record the tick rewrote holds only the new names, so a `wf` from before the change reads its lists as absent.
+the former names silently. A board page opened before the change sends `disallow`/`allow` on a save, and `renderStep` and `renderAgent`
+refuse them (`formerKeyWritten`): the api answers 422, saying the name is the former one and to reload the page and save again. Restart
+`wf up` once this merges all the same: an old daemon keeps filing lists, off the copies, but it starts a queued card by parsing a
+shipped folder, which now says `disallowedTools:`, a key it does not know, and refuses the start — loudly, but until it is restarted. The
+copies under the former names are written until a change removes `withFormerNames` from `recordText`, once no daemon from before
+2026-09-23 can be running.
 
 ## 1. A run that grows steps from a plan
 

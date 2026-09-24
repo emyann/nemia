@@ -188,7 +188,8 @@ it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 `disallowedTools:` and `allowedTools:` are Claude Code's names for its two rule lists, and the keys took them on 2026-09-23;
 until then they were `disallow:` and `allow:`. The former names are still read, in a step and in an agent, as the new ones —
 a folder written before goes on starting, and `wf start` prints a line naming each file and key to rename — and a run frozen
-with them is read under the new names and written back so (`asNamed`, on every read of a run record). A list set under both
+with them is read under the new names (`asNamed`, on every read of a run record). A record is written with each list under both
+names (`withFormerNames`), so a `wf up` started before the rename, which reads the former ones, still files them. A list set under both
 names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
 the new name.
 

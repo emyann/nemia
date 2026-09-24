@@ -251,12 +251,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api/workflows.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
-- **A key renamed in `STEP_KEYS` is still read under its old name, in three places.** Folders on disk and frozen run records say
+- **A key renamed in `STEP_KEYS` is still read under its old name, and written under it on a record.** Folders on disk and frozen run records say
   the old name, so the old name goes into `FORMER_KEYS` (`workflow.ts`), which `readKeys` reads as the new one (and refuses when both
   are written). `asNamed` renames a frozen step in `readRun`, since a record never goes back through the parser, and the api's
   fallback for an agent whose file does not load reads the old name too (`formerOf` in `apps/api/src/agents.ts`). And `renderStep`
   and `renderAgent` refuse the old name with a message saying to reload (`formerKeyWritten`), because a board page opened before the
-  rename sends it back. Nothing migrates a file: `wf start` names each line to rename (`formerKeyLines`). Learned by the run that
+  rename sends it back. And a record is *written* under both names (`withFormerNames`, in `store.ts`'s `recordText`): a `wf up` started
+  before the rename keeps its code, and its tick, reading only the old field, would file every step with no rule list and say nothing.
+  Nothing migrates a file: `wf start` names each line to rename (`formerKeyLines`). Learned by the run that
   renamed `disallow:` and `allow:` to `disallowedTools:` and `allowedTools:` (renamed on 2026-09-23, Claude Code's names).
 - **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
   `apps/api/src/decision.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole

@@ -1503,7 +1503,7 @@ test('a step with `disallowedTools:` reaches `e.file` with exactly those rules a
   assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.disallowedTools, undefined, "the check is the run's own, and denied nothing");
 });
 
-test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under them', async () => {
+test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under both', async () => {
   const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
   // The record as a `wf` from before 2026-09-23 froze it: the same step, its lists under the former names.
   const at = path.join(ROOT, 'runs', `${run.id}.json`);
@@ -1511,6 +1511,7 @@ test('a run frozen while the lists were `disallow` and `allow` loads, files each
   record.workflow = record.workflow.map(({ disallowedTools, allowedTools, ...step }) => ({ ...step, ...(disallowedTools ? { disallow: disallowedTools } : {}), ...(allowedTools ? { allow: allowedTools } : {}) }));
   fs.writeFileSync(at, JSON.stringify(record, null, 2));
   assert.match(fs.readFileSync(at, 'utf8'), /"disallow": \[/, 'the fixture is the old record');
+  assert.doesNotMatch(fs.readFileSync(at, 'utf8'), /"(disallowed|allowed)Tools":/, 'and holds no new name');
   const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
   assert.deepEqual([read.disallowedTools, read.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'read under the names the keys have now');
   assert.equal(Object.hasOwn(read, 'allow') || Object.hasOwn(read, 'disallow'), false);
@@ -1519,9 +1520,29 @@ test('a run frozen while the lists were `disallow` and `allow` loads, files each
   await advance(e, readRun(run.id));
   const config = tasks.get(`${run.id}-implement`)!.spec.config as { disallowedTools?: string[]; allowedTools?: string[] } | undefined;
   assert.deepEqual([config?.disallowedTools, config?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'the frozen rules reach the engine: none is dropped');
-  const written = fs.readFileSync(at, 'utf8');
-  assert.doesNotMatch(written, /"(dis)?allow":/, 'the pass that filed it wrote the record back under the new names');
-  assert.match(written, /"allowedTools": \[/);
+  const written = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+  assert.deepEqual([written.disallowedTools, written.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'the pass that filed it wrote the record back under the new names');
+  assert.deepEqual([written.disallow, written.allow], [written.disallowedTools, written.allowedTools], 'and the former beside them (`withFormerNames`)');
+});
+
+test("a record written today holds each step's rule lists under their former names too, so a daemon older than the rename, reading a step as it did, still files them", async () => {
+  const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
+  const at = path.join(ROOT, 'runs', `${run.id}.json`);
+  // What the tick before 2026-09-23 filed from: the raw step's `disallow` and `allow`, read off the record with no renaming.
+  const oldTickReads = () => {
+    const step = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+    return [step.disallow, step.allow];
+  };
+  const LISTS = [['SendMessage'], ['Edit(**)', 'Bash(npm test)']];
+  assert.deepEqual(oldTickReads(), LISTS, '`wf start` writes them (`writeRun`)');
+  const { e } = board();
+  await advance(e, readRun(run.id));
+  assert.deepEqual(oldTickReads(), LISTS, 'and the tick writes them back (`rewriteRun`)');
+  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.equal(Object.hasOwn(read, 'disallow') || Object.hasOwn(read, 'allow'), false, "today's code reads the new names alone");
+  // A step with no list gets no former field either: nothing is written that the step did not say.
+  const bare = (JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${started(folder('')).id}.json`), 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow;
+  assert.equal(bare.some((s) => Object.hasOwn(s, 'disallow') || Object.hasOwn(s, 'allow')), false);
 });
 
 test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {

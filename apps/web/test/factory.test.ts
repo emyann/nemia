@@ -847,20 +847,18 @@ const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
   onYou,
 });
 
-test('a run held until runs that may still ship is in flight, though a step at its gate has the api read it failed and not moving; one only a person lifts is not, and waits on you', () => {
-  // A step at its gate, held: the api says nothing waits on you, and nothing moves.
-  const gated = { status: 'failed', moving: false, waitingOnYou: [] as string[] };
+test('a run held until runs that may still ship is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
+  // A step at its gate, held: `assess` calls a held run running whatever its steps say, and the api says nothing waits on you, and nothing moves.
+  const gated = { status: 'running', moving: false, waitingOnYou: [] as string[], waiting: null };
   const lifts = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(false) });
   assert.deepEqual([inFlight(lifts), waitsOnYou(lifts)], [true, false]);
   const yours = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(true) });
   assert.deepEqual([inFlight(yours), waitsOnYou(yours)], [false, true]);
-  // Unheld, the same run is finished and waits on nobody: the hold alone keeps it.
-  assert.deepEqual([inFlight(run(['awaiting approval', 'waiting'], gated)), waitsOnYou(run(['awaiting approval', 'waiting'], gated))], [false, false]);
-  // A run called off is neither, held or not.
+  // A step of it still at work when the hold was written moves, and is in flight whoever lifts the hold.
+  assert.equal(inFlight({ ...yours, moving: true }), true);
+  // A run called off waits on nobody, held or not.
   const off = run(['awaiting approval', 'waiting'], { ...gated, status: 'cancelled', cancelledAt, heldUntil: ['p'], holding: holdingOn(true) });
   assert.deepEqual([inFlight(off), waitsOnYou(off)], [false, false]);
-  const offLifts = run(['awaiting approval', 'waiting'], { ...gated, status: 'cancelled', cancelledAt, heldUntil: ['p'], holding: holdingOn(false) });
-  assert.equal(inFlight(offLifts), false);
   // Where the run stands on the start form, in the same words.
   assert.deepEqual([standingOf(lifts), standingOf(yours)], ['in flight', 'waiting on you']);
 });
@@ -868,13 +866,13 @@ test('a run held until runs that may still ship is in flight, though a step at i
 test('a held run stays on the floor while it is held, and brings the finished run it is held until, so the edge into it leaves from a card', () => {
   const runs = [
     run([], { id: 'p', status: 'succeeded', createdAt: at(0) }),
-    run(['awaiting approval'], { id: 'h', status: 'failed', heldUntil: ['p'], holding: holdingOn(false), createdAt: at(1) }),
+    run(['awaiting approval'], { id: 'h', status: 'running', heldUntil: ['p'], holding: holdingOn(false), createdAt: at(1) }),
     // Held until a run that is not listed at all: its card stays, and brings nothing.
-    run(['awaiting approval'], { id: 'q', status: 'failed', heldUntil: ['gone'], holding: holdingOn(true), createdAt: at(2) }),
+    run(['awaiting approval'], { id: 'q', status: 'running', heldUntil: ['gone'], holding: holdingOn(true), createdAt: at(2) }),
   ];
   assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['p', 'h', 'q']);
-  // Lifted: the api lists no run and no hold, and the finished parent goes with it.
-  const lifted = runs.map((r) => ({ ...r, heldUntil: [], holding: null }));
+  // Lifted, off runs that had finished: the api lists no run and no hold, and says each run's own status again, and the parent goes with them.
+  const lifted = runs.map((r) => ({ ...r, heldUntil: [], holding: null, status: r.id === 'p' ? 'succeeded' as const : 'failed' as const }));
   assert.deepEqual(floorRuns(lifted, false).map((r) => r.id), []);
 });
 

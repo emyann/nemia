@@ -2191,9 +2191,8 @@ The third of the three cards. The board says a held run is held, in the api's wo
 
 Where it departs from the plan:
 
-- **A held run is in flight while its hold may lift on its own**, as a run waiting on `--after` runs is (`inFlight`). The api reads a
-  held run with a step at its gate as `failed` and not moving, with nothing waiting on you. Without this rule its card left the floor
-  the moment it was held.
+- **A held run only a person can lift is not in flight; it waits on you**, as a run whose `--after` runs never ship does. `assess`
+  calls every held run `running`, so `inFlight` leaves out `holding.onYou` by name, and `waitsOnYou` reads it. The plan left this unsaid.
 - **The e2e holds GATED until HELD, not until the diamond's running run.** `holdRefusal` refuses a hold across repositories, and those
   two runs are on different ones.
 

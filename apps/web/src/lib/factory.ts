@@ -21,13 +21,12 @@ import { layers, type Point } from './layout.ts';
  * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
  * `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until a person acts, and it waits on them.
  *
- * So is a run a person holds until runs ship (`wf hold`), and on the same terms: while its hold may lift on its own the tick lifts it when
- * they ship, though nothing of it is filed before then, and a step at its gate has it read `failed` and not moving; not once only a person
- * lifts it (`holding.onYou`), when it waits on them (`waitsOnYou`). Not on a run called off. `holding` is read tolerantly, for an api older
- * than the hold.
+ * So is a run a person holds until runs ship (`wf hold`), and on the same terms. `assess` calls a held run running whatever its steps say, and
+ * the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it (`holding.onYou`):
+ * then it waits on them (`waitsOnYou`). `holding` is read tolerantly, for an api older than the hold.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
-  run.moving || (run.status === 'running' && !run.waiting?.onYou) || (Boolean(run.holding) && !run.holding!.onYou && !run.cancelledAt);
+  run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
 
 /** What `inFlight` and `waitsOnYou` read beside their own fields, each missing from an api older than it. */
 type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; cancelledAt?: string | null };

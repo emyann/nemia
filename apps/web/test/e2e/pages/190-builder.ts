@@ -136,6 +136,9 @@ export default {
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
       const keys = builder.locator('[data-step-form="plan"]');
       await expectVisible(keys, "plan's form, open as the builder opens");
+      // plan runs on codex: its fence is Codex's sandbox, and the form has no permission mode, which codex has not.
+      await expectVisible(keys.locator('[data-field="sandbox"] select'), "plan's form offers its sandbox");
+      await expectCount(keys.locator('[data-field="permissionMode"]'), 0, 'and no permission mode');
       await keys.getByRole('textbox', { name: 'What it is told' }).fill('Write PLAN.md, briefly.');
       fs.writeFileSync(planFile, byHand);
       const [answered] = await Promise.all([

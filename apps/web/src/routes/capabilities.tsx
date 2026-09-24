@@ -233,7 +233,8 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
           ['disallowed tools', fence.disallowedTools.join(', ') || 'nothing'],
           ['allowed tools', fence.allowedTools.join(', ') || 'nothing'],
-          ['permission mode', fence.permissionMode ?? OWN],
+          // Each harness has one fence under its own name: Codex's sandbox, Claude Code's permission mode.
+          step.harness === 'codex' ? ['sandbox', fence.sandbox ?? OWN] : ['permission mode', fence.permissionMode ?? OWN],
           ['effort', fence.effort ?? OWN],
           ['mcp', 'none named: a step has no mcp: key'],
         ] as const).map(([label, value]) => (

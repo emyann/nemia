@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import type { KeyField, KeyForm, WorkflowStepSpec } from '../lib/api';
-import { contextText, listOf, numberOf, removeStep, setBody, setKey, setSchema, tokensOf, type DraftStep } from '../lib/builder';
+import { contextText, listOf, numberOf, removeStep, setBody, setKey, setSchema, takes, tokensOf, type DraftStep } from '../lib/builder';
 import { AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
@@ -105,6 +105,9 @@ function KeyInput({ field, step, others, form, schemas, update }: {
   const given = inherited ? givenText(key, step.spec[key], step.spec.agent) : null;
   const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v, form));
   const harness = step.spec.harness ?? form.defaultHarness;
+  // A fence the step's harness does not have — `sandbox` on Claude Code, `permissionMode` on codex — is not drawn, unless the step says it,
+  // to be taken off.
+  if (!takes(form, field, harness) && value === null && given === null) return null;
 
   let control: ReactNode;
   switch (kind) {

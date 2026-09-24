@@ -38,11 +38,15 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
   ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],
-  ['permission mode', modeRow(spec.permissionMode, filed)],
+  // A codex step's fence is its sandbox, which the engine's task files as its permission mode: the same row, under Codex's name.
+  [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
   ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
+
+/** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
+export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string => (spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode');
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');

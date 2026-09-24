@@ -497,6 +497,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
   A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
   (learned by the run that moved the judgement up).
+- **A step's fence is read through `modeOf`, never off `permissionMode`.** Claude Code's fence is `permissionMode:` and Codex's `sandbox:`
+  (since 2026-09-23), and the engine's task still calls either `config.permissionMode`. A codex step's `permissionMode` is undefined now, so
+  code that files a step, or compares it with what the engine filed, and reads that field sends Codex no `-s`: the read-only reviewer runs in
+  Codex's default, `workspace-write`, which writes, and nothing says so (`vocabulary.test.ts` shows it). And a form that draws a harness
+  word draws only the fence its harness has (`takes`, `hasKey` in `apps/web`), or Claude Code gets an empty Sandbox picker (learned by the
+  run that named Codex's sandbox `sandbox:`).
 
 ## Rules the code keeps
 

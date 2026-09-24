@@ -1,7 +1,7 @@
 import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 
 /** The role keys, in the package's order (`AGENT_KEYS` without the description): the order an agent's file writes them. */
-export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'];
+export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'];
 
 /** What each role key is called on the form. */
 export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
@@ -10,6 +10,7 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
   effort: 'Effort',
   context: 'Context',
   permissionMode: 'Permission mode',
+  sandbox: 'Sandbox',
   tools: 'Tools',
   disallowedTools: 'Denied tools',
   allowedTools: 'Allowed without asking',
@@ -95,6 +96,19 @@ export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness:
   const on = harness.trim() || form!.defaultHarness;
   if (field.byHarness) return field.byHarness[on] ?? null;
   return field.choices;
+}
+
+/**
+ * Whether the harness the agent names has the key at all: a key whose words are the harness's is had only on a harness that has some. Each
+ * harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and the form draws the other only where it is written, as
+ * free text, to be taken off. A harness the form does not know is not judged here: its keys are typed, and the package judges them on save.
+ */
+export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string): boolean {
+  const field = form?.keys.find((k) => k.key === key);
+  if (!field?.byHarness) return true;
+  const on = harness.trim() || form!.defaultHarness;
+  const known = form!.keys.find((k) => k.key === 'harness')?.choices ?? [];
+  return Object.hasOwn(field.byHarness, on) || !known.includes(on);
 }
 
 /** A key's line of meaning, as the package says it for a step's key of the same name. */

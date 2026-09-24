@@ -574,7 +574,8 @@ const STEPS = [
   },
   {
     file: 'review.md',
-    text: '---\nharness: codex\nafter: implement\npermissionMode: read-only\n---\nReview the change.\n',
+    text: '---\nharness: codex\nafter: implement\nsandbox: read-only\n---\nReview the change.\n',
+    // Frozen as a run started before 2026-09-23 wrote it, when a codex step's sandbox was its `permissionMode`: read as its `sandbox`.
     frozen: { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'codex', permissionMode: 'read-only' },
   },
   {

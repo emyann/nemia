@@ -142,7 +142,7 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 ---
 harness: codex             # claude (default) | codex | claude-detached
 after: implement           # what must finish first: verified, or unverified if it has no check
-permissionMode: read-only
+sandbox: read-only         # Codex's sandbox; a Claude Code step's fence is permissionMode:
 output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
 ---
 Review the changes on this branch. Be specific about correctness, not style.
@@ -181,7 +181,7 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
@@ -192,6 +192,18 @@ with them is read under the new names (`asNamed`, on every read of a run record)
 names (`withFormerNames`), so a `wf up` started before the rename, which reads the former ones, still files them. A list set under both
 names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
 the new name.
+
+`sandbox:` is Codex's name for its fence (`-s`, `sandbox_mode`), and a codex step took it on 2026-09-23; until then a codex step
+wrote its sandbox as `permissionMode:`, which is Claude Code's name for Claude Code's fence. So each harness has one fence under its
+own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is refused on the other harness with words naming the right
+key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
+as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
+prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
+`sandbox:`. A run frozen before is read the same way (`asNamed`), and a record is written with a codex step's sandbox under both
+names (`withFormerNames`), so a `wf up` started before still files it. The engine's task still calls either fence `permissionMode`,
+and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
+on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
+Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.
@@ -205,8 +217,8 @@ directory a step works in, `slot` says whether the run is one the cap on runs in
 who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
 (*Going round again*, under the check).
 
-`permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
-`read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
+`permissionMode` and `sandbox` are the harness's words, checked against the harness the step runs on: Claude Code's permission
+mode, and Codex's sandbox. `sandbox: read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
 the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
 a step its check refused (*Trying again*, under the check).
 
@@ -241,7 +253,7 @@ rounds: 3
 ---
 ```
 
-Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
+Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
 `output` — and two of its own, `description:` and `skills:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
@@ -337,7 +349,7 @@ session — not `--allowedTools`, where an unapproved one is still there to try.
 Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
 `Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex. Codex has no tool list, only
-one shell in a sandbox, so its fence is `permissionMode`, and `read-only` writes nothing.
+one shell in a sandbox, so its fence is `sandbox:`, and `read-only` writes nothing.
 
 `effort:` is one word the step's harness takes: `low`, `medium`, `high`, `xhigh` or `max` on Claude Code,
 and `none` and `minimal` besides on codex. Another word is refused by name with the list, as a permission
@@ -632,7 +644,7 @@ round, it is handed implement's replies to the last findings and nothing else, b
 asked for them. In `workflows/ui/`, `review` also reads implement's `screenshots` and `pages`: pictures
 of the change, which are artifacts, and not an account of it.
 
-The transport buys three things. The reviewer writes nothing, so it runs `permissionMode: read-only`.
+The transport buys three things. The reviewer writes nothing, so it runs `sandbox: read-only`.
 The harness enforces the review's shape. And the review lives on the engine's record of the attempt,
 not on a branch, so `git branch -D` no longer deletes the only copy. `wf decide` prints a declared
 output after the step's summary: `findings` as a list, any other field as `name: value`. A step that
@@ -1140,7 +1152,7 @@ person.
 ---
 harness: codex
 after: implement
-permissionMode: read-only
+sandbox: read-only
 output: review.schema.json   # findings, and again: boolean
 loop: implement
 rounds: 3

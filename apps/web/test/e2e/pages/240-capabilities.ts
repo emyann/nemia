@@ -99,6 +99,8 @@ export default {
     );
     const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
     await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
+    await expectVisible(codexed.locator('dt', { hasText: /^sandbox$/ }), 'its fence under Codex\'s name, sandbox');
+    await expectCount(codexed.locator('dt', { hasText: /^permission mode$/ }), 0, 'and no permission mode, which codex has not');
     await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only], [data-ask-rule]'), 0, 'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read');
   },
 } satisfies PageSpec;

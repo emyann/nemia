@@ -16,7 +16,10 @@ export type WorkflowStepSpec = {
   input: string[];
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
   agent: string | null;
+  /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
+  /** Codex's sandbox (`sandbox:`, read from `permissionMode:` in a file written before 2026-09-23): null on Claude Code, and where a codex step names none. */
+  sandbox: string | null;
   tools: string[] | null;
   /** What the session may not have (`disallowedTools:`): empty where the step denies nothing. */
   disallowedTools: string[];

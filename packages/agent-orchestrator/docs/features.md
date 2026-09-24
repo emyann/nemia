@@ -4262,6 +4262,35 @@ shipped folder, which now says `disallowedTools:`, a key it does not know, and r
 copies under the former names are written until a change removes `withFormerNames` from `recordText`, once no daemon from before
 2026-09-23 can be running.
 
+## Shipped: a codex step's sandbox under Codex's name — `sandbox:`
+
+A codex step named its sandbox `permissionMode:` until 2026-09-23: Claude Code's name for Claude Code's fence, over Codex's `-s`
+(`sandbox_mode`: `read-only`, `workspace-write`, `danger-full-access`). It is `sandbox:` now, and each harness has one fence under its
+own name. `permissionMode:` on a codex step is refused naming `sandbox:`, and `sandbox:` on a Claude Code step naming `permissionMode:`,
+at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test.ts`).
+
+- **The former line is read, not migrated,** on codex alone. `permissionMode: read-only`, `workspace-write` or `danger-full-access`
+  is read as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias for the widest sandbox, as
+  `sandbox: danger-full-access`; `wf start` prints a line naming each file to rewrite (`codexModeLine`). A word that was never a
+  sandbox — `dontAsk` on codex — is refused naming `sandbox:`, as is the former line written beside a `sandbox:`. An agent's line is
+  read against the harness the step runs on, the step's own or the agent's.
+- **A run frozen before loads**: `asNamed` reads a codex step's `permissionMode` as its `sandbox`. A record is written with the
+  sandbox under both names (`withFormerNames`), since a `wf up` from before files a codex step's `-s` from its `permissionMode` alone.
+- **The runtime is unchanged.** The engine's task still calls either fence `config.permissionMode`, and the tick files the one a step
+  has (`modeOf`). `validateFolderMode`'s judgement is unchanged, read off `modeOf`: it judges a step that says `background: true`, which
+  is refused on codex. Codex's approval policy is not a key: `codex exec` asks nobody, and the engine passes no `-a`.
+- **Outside the package**: the builder's `KINDS` (`sandbox` a harness word whose lists are `SANDBOXES`), `WorkflowStepSpec` and
+  `specOf`, the board's mirror with `UNSET`, the run detail's spec and the capabilities page's fence, the agent form's role keys and
+  label. The step and agent forms draw only the fence their harness has, and the other only where it is written, to be taken off. The
+  api's reading of an agent that does not load converts the former line as the parser does (`formerSandbox`). The shipped `review.md`
+  says `sandbox: read-only`.
+
+**What it leaves.** A board page opened before the change sends `permissionMode` on a codex step's save, and is refused (`codexModeWritten`,
+by `renderStep` and `renderAgent`, and by `writeWorkflow` where the codex harness is the agent's), saying to reload; a save of a legacy
+file that changes nothing keeps the file, former line and all. Restart `wf up` once this merges: an old daemon parses the shipped
+`review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted. The copies under
+`permissionMode` go when `withFormerNames` does.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

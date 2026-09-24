@@ -31,8 +31,9 @@
  *
  * And a session that ends its turn without its closing statement is measured, because bug 1 was a success recorded for
  * exactly that, and only a fake `claude` has shown the fix: told to answer in plain text and give no statement, it must
- * never be recorded `succeeded` with none. Whether Claude Code nudges such a session itself, or ends it on its own, is
- * what the diagnostic says.
+ * never be recorded as ended with none unless its end says so — `stated: false`, the fact the orchestrator reads as
+ * unsigned since stage 4a (before, the runtime judged it `unsigned` itself). Whether Claude Code nudges such a session
+ * itself, or ends it on its own, is what the diagnostic says.
  *
  * And `remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
  * engine never reads: a session filed with it must be registered under `sessions/` with a `bridgeSessionId`, beside a
@@ -458,7 +459,7 @@ const UNSIGNED_BRIEF = [
   'Call no tool, and give no closing statement, even when you are asked for one.',
 ].join(' ');
 
-test('a --bg session asked for a closing statement that ends its turn without one is never recorded succeeded without one', {
+test('a --bg session asked for a closing statement that ends its turn without one is never recorded as ending without one unsaid', {
   skip,
   timeout: 15 * 60_000,
 }, async (t) => {
@@ -469,10 +470,10 @@ test('a --bg session asked for a closing statement that ends its turn without on
   await settleThenCheck(engine, ids, (views) => {
     const v = views.unsigned!;
     const [a] = v.state.attempts;
-    t.diagnostic(`attempt 1 ended ${a?.ended} (${a?.reason}), closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`);
+    t.diagnostic(`attempt 1 ended ${a?.ended} (${a?.reason}), stated ${a?.stated}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`);
     assert.ok(v.state.settled, `settled: ${v.phase}`);
-    assert.ok(!(v.state.settled === 'succeeded' && a?.closeout === undefined),
-      `recorded succeeded with nothing said, ended ${a?.ended} (${a?.reason}). A harness end means Claude Code ended the session itself: a way to bug 1 that quiet does not cover (docs/open-issues.md)`);
+    assert.ok(a?.closeout !== undefined || a?.stated === false || a?.ended !== 'done',
+      `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), stated ${a?.stated}: bug 1, which the orchestrator could then not read as unsigned`);
   });
 });
 

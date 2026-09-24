@@ -510,6 +510,26 @@ test('each step says how many attempts it has had, when the latest began, and ho
     latest: { startedAt: at, ended: 'done', endedAt: later, reason: 'harness' },
   });
 
+  // A session that ended with no statement where its task asked for one: since stage 4a the runtime says so as a fact,
+  // `stated: false`, and settles it as its harness ended it — the api says what it said before, off the orchestrator's reading.
+  const quiet = (taskId: string, end: object, settled: string) => journal(taskId, [
+    { ...filed(taskId), closeoutSchema: { type: 'object' } },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at: later, attempt: 1, sessionId: `ae/${taskId}/1`, ...end },
+    { kind: 'settled', at: later, outcome: settled },
+  ]);
+  const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
+  quiet('t-8u', { observed: 'done', reason: 'harness', stated: false }, 'succeeded');
+  writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
+  const unsigned = await (await app.request('/api/runs/r-8u')).json();
+  assert.deepEqual([unsigned.steps[0].attempts, unsigned.steps[0].status], [unsignedWords, 'unsigned']);
+  // As a journal from before stage 4a has it: the runtime's own word.
+  quiet('t-8o', { observed: 'failed', reason: 'unsigned' }, 'failed');
+  writeRun({ ...r2, id: 'r-8o', steps: { implement: { taskId: 't-8o', branch: 'wf/r-8o/implement' }, review: { taskId: null } } });
+  const old = await (await app.request('/api/runs/r-8o')).json();
+  assert.deepEqual([old.steps[0].attempts, old.steps[0].status], [unsignedWords, 'unsigned']);
+
   // A task the engine has no record of has had no attempts it can speak for.
   assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
 

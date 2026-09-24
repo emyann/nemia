@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner-claude-transcript.ts';
 import { codexOutput } from '../src/runner-detached-output.ts';
-import { attemptLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
+import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 
 const line = (o: object) => JSON.stringify(o);
@@ -369,6 +369,25 @@ test('ae show prints what the harness denied an attempt, as the rules that would
     'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured  denied: Skill(look), Bash(pytest), WebFetch');
   assert.equal(attemptLine(ended({})), 'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured');
   assert.equal(attemptLine(ended({ denials: [] })), 'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured', 'none denied: nothing said');
+});
+
+test('ae show and ae feed say an end gave no statement where its task asked for one — `done (no statement)` — and nothing where it gave one or none was asked', () => {
+  const base: Event[] = [
+    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, closeoutSchema: { type: 'object' } },
+    { kind: 'starting', at: '2026-09-23T09:00:01Z', attempt: 1 },
+  ];
+  const end = (extra: object): Event => ({ kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra });
+  const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]!), entryLine('t-1', end(extra))];
+  assert.deepEqual(shown({ stated: false }), [
+    'attempt 1  done (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
+    `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done (no statement)`,
+  ]);
+  for (const extra of [{ stated: true, closeout: { outcome: 'done' } }, {}]) assert.deepEqual(shown(extra), [
+    'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured',
+    `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done`,
+  ], JSON.stringify(extra));
+  // An old journal's end, judged by the engine: its reason, as ever.
+  assert.equal(entryLine('t-1', end({ observed: 'failed', reason: 'unsigned' })), `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  failed (unsigned)`);
 });
 
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {

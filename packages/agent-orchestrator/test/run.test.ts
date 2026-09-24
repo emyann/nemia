@@ -865,6 +865,41 @@ test("UNSIGNED is the LAST attempt's word: a task of `maxAttempts: 2` whose atte
   assert.equal(closeoutAsked(viewed('unsigned', 'unsigned'))('t1'), 'unsigned', 'quiet twice is quiet');
 });
 
+test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its harness ended `done` with `stated: false` reads `unsigned` on `closeoutAsked`, and `failed · unsigned` on `endWords` — the words an old journal's `reason: 'unsigned'` reads too; a `done` with no `stated` key, or with a statement, is neither", async () => {
+  const { closeoutAsked, endWords } = await import('../src/runner.ts');
+  const at = (n: number) => `2026-09-24T10:0${n}:00.000Z`;
+  type End = { ended: string; reason: string; stated?: boolean; closeout?: unknown };
+  /** A task filed with a closeout schema (or, not `asked`, none), settled `settled`, one attempt per end, in order. */
+  const viewed = (settled: string, ends: End[], asked = true) => new Map([['t1', {
+    id: 't1', phase: settled, sessionId: 's',
+    state: {
+      taskId: 't1', brief: 'filed', cwd: '/wt', maxAttempts: 2, closeoutSchema: asked ? CLOSEOUT_SCHEMA : undefined, settled, stopRequested: false,
+      attempts: ends.map((end, i) => ({ n: i + 1, startedAt: at(i * 2), spawnedAt: at(i * 2), endedAt: at(i * 2 + 1), nativeId: 'native-t1', usage: null, exitCode: null, ...end })),
+    },
+  } as unknown as TaskView]]);
+  const unstated: End = { ended: 'done', reason: 'harness', stated: false };
+  const r = signedOffOnce(run({ implement: 't1', review: null }));
+  const none = () => undefined;
+
+  const quiet = viewed('succeeded', [unstated]);
+  assert.equal(closeoutAsked(quiet)('t1'), 'unsigned');
+  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'succeeded' }), none, closeoutAsked(quiet)).waitingOnYou, ['implement']);
+  assert.equal(closeoutAsked(viewed('succeeded', [{ ended: 'failed', reason: 'lost' }, unstated]))('t1'), 'unsigned', 'the LAST attempt\'s word');
+  const words = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
+  assert.deepEqual(words(quiet), [{ ended: 'failed', reason: 'unsigned' }]);
+  const legacy = viewed('failed', [{ ended: 'failed', reason: 'unsigned' }]);
+  assert.deepEqual([closeoutAsked(legacy)('t1'), words(legacy)], ['unsigned', [{ ended: 'failed', reason: 'unsigned' }]], 'as an old journal reads');
+
+  // The controls: each of these is what the runtime recorded, word for word.
+  const before = viewed('succeeded', [{ ended: 'done', reason: 'harness' }]);
+  assert.deepEqual([closeoutAsked(before)('t1'), words(before)], [true, [{ ended: 'done', reason: 'harness' }]], 'no `stated` key: a journal from before');
+  const signed = viewed('succeeded', [{ ended: 'done', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } }]);
+  assert.deepEqual([closeoutAsked(signed)('t1'), words(signed)], [true, [{ ended: 'done', reason: 'harness' }]]);
+  const unasked = viewed('succeeded', [unstated], false);
+  assert.deepEqual([closeoutAsked(unasked)('t1'), words(unasked)], [false, [{ ended: 'done', reason: 'harness' }]], 'a task asked for no statement');
+});
+
 test('a cancelled run files no check, however due', () => {
   const a = assess(CHECKED, withCheck(null, CANCELLED), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual(a.check, []);

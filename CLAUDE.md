@@ -494,6 +494,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   test that asserts the Task the instant `view` moves passes alone and fails under `npx turbo run test --force`'s load. Hold the
   fake's exit on a file and assert both sides, or wait for the Task (learned by the run that proved Codex as an A2A agent;
   open issue 31).
+- **`unsigned` is the orchestrator's word, not the runtime's.** Since stage 4a the runtime records a fact — `stated: false` on a
+  `done` end of a task that asked for a statement — and settles it `succeeded`. Read an attempt's end through `closeoutAsked` or
+  `endWords` (`agent-orchestrator/src/views.ts`), never off its raw `ended` and `reason`: the api's `attemptsIn` read them raw, and
+  the board drew such a try as `done` under a step chip that said `unsigned`. An end with no `stated` key is from before the fact
+  and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
+  A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
+  (learned by the run that moved the judgement up).
 
 ## Rules the code keeps
 

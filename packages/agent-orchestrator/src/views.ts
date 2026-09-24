@@ -68,16 +68,35 @@ export async function taskPhases(e: Engine, run: Run, { earlierTries = true }: {
 }
 
 /**
+ * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement since stage 4a, off
+ * what the runtime reports: its harness let the session go `done` with `stated: false`. And, on a journal written before stage 4a,
+ * the runtime's own old verdict, `reason: 'unsigned'` (an attempt it ended `failed`). An end with no `stated` key is not read as a
+ * missing statement: a `done` with no closeout from before 2026-09-19 would otherwise read unsigned, and be nudged, long after.
+ */
+const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][number] | undefined): boolean =>
+  state.closeoutSchema !== undefined && a !== undefined && a.closeout === undefined
+  && (a.reason === 'unsigned' || (a.ended === 'done' && a.stated === false));
+
+/**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
- * attempt ended without it, the reason the engine records on a session that went quiet before it settles the task `failed`. What
- * tells a step that ended without one — `unsigned` — from a task that was never asked, and from one that failed. Exported,
- * log-free, for a consumer that words a step as `wf ls` does.
+ * attempt ended without it (`unsignedEnd`), which the runtime reports and the orchestrator judges. What tells a step that ended
+ * without one — `unsigned` — from a task that was never asked, and from one that failed. Exported, log-free, for a consumer that
+ * words a step as `wf ls` does.
  */
 export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): CloseoutAsked => {
   const state = views.get(taskId)?.state;
   if (!state?.closeoutSchema) return false;
-  return state.attempts.at(-1)?.reason === 'unsigned' ? 'unsigned' : true;
+  return unsignedEnd(state, state.attempts.at(-1)) ? 'unsigned' : true;
 };
+
+/**
+ * How an attempt ended, in the words a person has read for it since 2026-09-19: an attempt that ended without the statement its task
+ * asked for is `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) — and any other is as
+ * the runtime recorded it. The one writer of those words for a surface that shows an attempt's end, so the board says what it said
+ * when the runtime judged it: never read an attempt's raw `reason` for `unsigned`.
+ */
+export const endWords = (state: TaskView['state'], a: TaskView['state']['attempts'][number]): { ended: string | null; reason: string | null } =>
+  unsignedEnd(state, a) ? { ended: 'failed', reason: 'unsigned' } : { ended: a.ended, reason: a.reason };
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What

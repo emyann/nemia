@@ -84,9 +84,9 @@ export type Sighting = {
    * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
    * ends such an attempt.)
    *
-   * A fact about the session, not a verdict on the work: a quiet session is the end of a task that asked for nothing,
-   * and an unsigned attempt of one that asked for a closing statement and was told none. Only the journal knows which,
-   * so `decide` reads this, and no runner turns it into `done`.
+   * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `done` —
+   * with `stated: false` where its task asked for a closing statement and was told none, which the layer above judges.
+   * Only the journal knows the task, so `decide` reads this, and no runner turns it into `done`.
    */
   quietMs?: number;
   /**
@@ -188,32 +188,17 @@ export type Usage = {
 export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${attempt}`;
 
 /**
- * What a session that stopped without its closing statement is told when it is continued: not the brief, which it has,
- * but why it is back. Shape-free, since what a statement says is the task's vocabulary, not the engine's.
- *
- * It NAMES THE TOOL and says the work stands. Measured twice (issue 25): two implement steps finished their work — every
- * commit in, the check green — and ended their turn with a prose summary instead of calling `StructuredOutput`. The old
- * nudge, which asked for "your closing statement" and named nothing, got neither to sign off; a person's `wf retry
- * --message` saying "you ended in prose instead of calling the StructuredOutput tool; change nothing; sign off now" got
- * each within thirty seconds. So this says that, and the unfinished case keeps its sentence at the end.
- *
- * The tool's name is Claude Code's. `unsigned` has two doors — quiet, which only the `claude --bg` runner reports, and the
- * harness's `done` with no statement, which any runner can — but every harness that takes a schema today is Claude Code's.
- * A harness with another word for its closing statement would need its own nudge, and that would be a value on the task
- * rather than a branch in here.
- */
-const NUDGE = 'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.';
-
-/**
  * Why an attempt ended, in the only categories the engine can tell apart.
  *
- *   `harness`      the harness reported a terminal state — or the session went quiet, and its task asked for no
- *                  closing statement, so quiet is the only end it has. It ran, and this is what it concluded.
+ *   `harness`      the harness reported a terminal state — or the session went quiet, which is the only end it has.
+ *                  It ran, and this is what it concluded. Whether it gave the closing statement its task asked for
+ *                  is `stated` on the end, a fact beside the reason: the layer above judges it, not the engine.
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unsigned`     the session ended without the closing statement its task asked for — went quiet, or its harness
- *                  said `done` — and did not say so. It stopped; it may have finished, and it did not say so, which is
- *                  all a statement is for. Recorded `failed`: a task that asked for a statement never succeeds without one.
+ *   `unsigned`     only in a journal written before stage 4a (2026-09-23): the session ended without the closing
+ *                  statement its task asked for, and the engine judged it, recorded `failed`. It judges no longer:
+ *                  such an end is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles
+ *                  `failed` with the note it always had, whatever attempts it has left, and is never continued.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
  *                  cap is the task's, once: the task settles `failed`, and no attempt follows, resumed or clean.
@@ -233,7 +218,7 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budge
 
 /** What a new attempt does with the one before it. A workload property, not a callback. */
 export type ResumePolicy =
-  /** Continue only when the last attempt was LOST, or UNSIGNED: work nobody has judged, the session
+  /** Continue only when the last attempt was LOST: work nobody has judged, the session
    *  included. A harness that reached a conclusion we did not like is usually not improved by being
    *  dropped back into the context that produced it. */
   | 'interrupted'
@@ -291,7 +276,8 @@ export type Event =
     }
   /**
    * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
-   * the brief — why it is back — decided here with `resumeFrom`, and never re-derived.
+   * the brief — a later turn's answer; before stage 4a, also why a session that stopped unsigned was back — decided
+   * here with `resumeFrom`, and never re-derived.
    */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string }
   /**
@@ -302,9 +288,12 @@ export type Event =
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
   /**
    * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode` and `denials`
-   * come from the same sighting, when its runner measured them; `decide` reads none of them.
+   * come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
+   * read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict —
+   * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
+   * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -356,10 +345,16 @@ export type Attempt = {
   nativeId: string | null;
   /** What this attempt was told to continue, decided when it started and never re-derived. */
   resumeFrom?: string;
-  /** What it was told instead of the task's brief, continuing a session that stopped unsigned. Carried, never read. */
+  /** What it was told instead of the task's brief: a later turn's answer (before stage 4a, why an unsigned session was back). Carried, never read. */
   nudge?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
   closeout?: unknown;
+  /**
+   * Whether the closing statement its task asked for came, as its end reported it: `false` is a session its harness
+   * let go with none. Absent where its task asked for none, where no sighting ended it, and on every end written
+   * before stage 4a. Carried, never read: whether that is a failure is the caller's judgement, not the runtime's.
+   */
+  stated?: boolean;
   /** What this attempt consumed; `null` when its runner measured nothing, never zeros. Carried, never read. */
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
@@ -438,7 +433,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
+        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; if (e.stated !== undefined) a.stated = e.stated; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
         break;
       }
       case 'measured': {
@@ -493,12 +488,12 @@ export function waitsForInput(state: State): boolean {
 export type Action =
   /** Nothing to do. Not an error — the common case on a busy board. */
   | { do: 'nothing'; why: string }
-  /** Journal the intent to run attempt N, continuing `resumeFrom` when policy says so — told `nudge`, when that session stopped unsigned. */
+  /** Journal the intent to run attempt N, continuing `resumeFrom` when policy says so — told `nudge`, a later turn's answer, instead of the brief. */
   | { do: 'start'; attempt: number; resumeFrom?: string; nudge?: string }
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
   /** The harness says this attempt is over. Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown }
+  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -577,10 +572,11 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     if (ended?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
     // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
     if (ended?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${ended.n} spent its budget. File the task again with a larger one to run it again` };
-    if (turn.attempts.length >= state.maxAttempts) {
-      const why = ended?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
-      return { do: 'settle', outcome: 'failed', note: `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded${why}` };
-    }
+    const none = `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded`;
+    // An end the engine judged `unsigned`, in a journal from before stage 4a: settled as it would have been, never continued —
+    // the nudge that continued it is the orchestrator's now, and a session nudged from both layers would be told twice.
+    if (ended?.reason === 'unsigned') return { do: 'settle', outcome: 'failed', note: `${none}: the last ended without the closing statement it was asked for` };
+    if (turn.attempts.length >= state.maxAttempts) return { do: 'settle', outcome: 'failed', note: none };
     // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
     if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
@@ -589,10 +585,11 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
       return { do: 'nothing', why: `${state.harness ?? 'default'}'s pool is at its ceiling (${now.used}/${now.max})` };
     }
     const resumeFrom = resumeTarget(state, turn);
-    // An unsigned session is quiet, not gone: stopped before it is continued, or two would share one conversation.
+    // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
+    // would share one conversation.
     if (resumeFrom && sighting && isLive(sighting.state)) return { do: 'stop', sessionId: sighting.sessionId, why: 'to continue it' };
-    // Told why it is back when it stopped unsigned; else, in a later turn, the person's answer; else the brief.
-    const nudge = resumeFrom && ended?.reason === 'unsigned' && resumeFrom === ended.nativeId ? NUDGE : turn.words;
+    // In a later turn, told the person's answer; else the brief.
+    const nudge = turn.words;
     return { do: 'start', attempt: state.attempts.length + 1, resumeFrom, ...(nudge ? { nudge } : {}) };
   }
 
@@ -602,9 +599,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // spawn call and its journal entry leaves a session running under a name we can still find,
   // so it is adopted rather than started a second time. That is the whole reason the name is ours.
   if (sighting) {
-    // Quiet and working: its runner holds it has stopped. The end of a task that asked for no statement; for one that
-    // asked and was told none, an UNSIGNED end — it never said it had finished, and that is not a success. Nor is the
-    // harness's `done` without one: by either door, a task that asked for a statement succeeds only on one.
+    // Quiet and working: its runner holds it has stopped, and that is its end. Whether it gave the statement its task
+    // asked for is recorded beside it (`stated`), and judged by the layer above: the engine reports, and never nudges.
     const quiet = sighting.state === 'working' && sighting.quietMs !== undefined;
     if (isLive(sighting.state) && !quiet) {
       return { do: 'nothing', why: NEEDS_HUMAN.has(sighting.state) ? 'blocked — needs a person' : `running (${sighting.state})` };
@@ -625,18 +621,18 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
 /** The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. */
 function endOf(state: State, last: Attempt, sighting: Sighting): Action {
   const quiet = sighting.state === 'working';
-  const unsigned = (quiet || sighting.state === 'done') && !sighting.budgetSpent && state.closeoutSchema !== undefined && sighting.closeout === undefined;
   // A spent budget is `failed` whatever state the harness left it in: cut off, not concluded — `done` would settle it succeeded.
-  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned || sighting.budgetSpent ? 'failed' : quiet ? 'done' : sighting.state,
-    reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
+  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: sighting.budgetSpent ? 'failed' : quiet ? 'done' : sighting.state,
+    reason: sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
+    // Whether the statement its task asked for came: a fact for the layer above, which judges it.
+    ...(state.closeoutSchema !== undefined ? { stated: sighting.closeout !== undefined } : {}) };
 }
 
 /**
  * The session a new attempt should continue, if any. THE policy call of this engine.
  *
- * Default `interrupted`: resume what was lost or stopped unsigned, start clean after a harness verdict.
- * A lost session's transcript is real work nobody has judged, and so is an unsigned one's, whose
- * session did not judge it either; a failed one is a conclusion, and dropping
+ * Default `interrupted`: resume what was lost, start clean after a harness verdict.
+ * A lost session's transcript is real work nobody has judged; a failed one is a conclusion, and dropping
  * a model back into the context that produced a conclusion tends to reproduce it. Both other
  * answers are defensible for particular work, which is why this is a field on the task.
  */
@@ -651,7 +647,7 @@ function resumeTarget(state: State, turn: ReturnType<typeof turnOf>): string | u
   const last = turn.attempts.at(-1);
   if (!last || turn.attempts.every((a) => a.reason === 'unstartable')) return turn.continues;
   const own = !last.nativeId || state.resume === 'never' ? undefined
-    : state.resume === 'always' || last.reason === 'lost' || last.reason === 'unsigned' ? last.nativeId : undefined;
+    : state.resume === 'always' || last.reason === 'lost' ? last.nativeId : undefined;
   // Clean, in a later turn, is where the turn began: the conversation its session signed is judged work, and an answer
   // told to a session that never heard the question means nothing.
   return own ?? (turn.n > 0 ? turn.continues : undefined);

@@ -5,9 +5,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { leftBehind, reap, scratch } from './scratch.ts';
+import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
@@ -41,4 +41,19 @@ test('REFUSED: a test file that makes its root by hand and never stops its worke
   assert.equal(left.processes.filter((p) => /\bae-worker\.ts\b/.test(p.args)).length, 1, 'its worker left');
   assert.equal(left.processes.length, 2, 'its worker and its harness');
   assert.deepEqual(await reap([tmp]), [], 'and reaped here');
+});
+
+test('a process whose only tie to a root is its environment is found in it, and reaped', async () => {
+  // A harness exec'd from a fake — `exec sleep 30` — names no root in its arguments and runs elsewhere, and still has
+  // the root on its PATH, or in an AE_ROOT it inherited.
+  const tmp = scratch('ae-leaks-');
+  const child = spawn('sleep', ['30'], { cwd: '/', env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH}` }, detached: true, stdio: 'ignore' });
+  child.unref();
+  // Read once the child has exec'd, under a bound: until then its environment is this process's.
+  for (const bound = performance.now() + 10_000; !runningIn([tmp]).length;) {
+    if (performance.now() > bound) break;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  assert.deepEqual(runningIn([tmp]).map((p) => p.pid), [child.pid]);
+  assert.deepEqual(await reap([tmp]), []);
 });

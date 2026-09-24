@@ -15,8 +15,9 @@
  * - after the file, the same for every root it made, then each root is removed, and the hook fails the file if a
  *   process or a root is still there.
  *
- * A process is in a root when an argument of its command line is a path in it, or its working directory is (read from
- * `/proc`, so on Linux only). Waits are for a count, under a bound, never for a length of time.
+ * A process is in a root when an argument of its command line is a path in it, its working directory is, or a variable of
+ * its environment names one — a PATH, an AE_ROOT a harness inherited — read from `/proc`, so the last two on Linux only.
+ * Waits are for a count, under a bound, never for a length of time.
  */
 import { after, afterEach, beforeEach } from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -35,9 +36,9 @@ export const scratch = (prefix: string): string => {
   return root;
 };
 
-export type Proc = { pid: number; pgid: number; state: string; args: string; cwd?: string };
+export type Proc = { pid: number; pgid: number; state: string; args: string; cwd?: string; env?: string };
 
-/** Every process on the machine: from `/proc` where there is one, or else from `ps`, which says no working directory. */
+/** Every process on the machine: from `/proc` where there is one, or else from `ps`, which says no working directory or environment. */
 const processes = (): Proc[] => {
   if (!fs.existsSync('/proc/self/stat')) {
     return execFileSync('ps', ['-eo', 'pid=,pgid=,stat=,args='], { encoding: 'utf8' }).split('\n').flatMap((line) => {
@@ -54,8 +55,10 @@ const processes = (): Proc[] => {
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       const args = fs.readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0').join(' ').trim();
       let cwd: string | undefined;
+      let env: string | undefined;
       try { cwd = fs.readlinkSync(`/proc/${entry}/cwd`).replace(/ \(deleted\)$/, ''); } catch { /* another user's */ }
-      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0]!, args, cwd });
+      try { env = fs.readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').join(' '); } catch { /* another user's */ }
+      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0]!, args, cwd, env });
     } catch { /* gone while read */ }
   }
   return found;
@@ -65,7 +68,7 @@ const realOf = (p: string) => { try { return fs.realpathSync(p); } catch { retur
 const pathIn = (text: string, dir: string) => {
   for (let at = text.indexOf(dir); at !== -1; at = text.indexOf(dir, at + 1)) {
     const next = text[at + dir.length];
-    if (next === undefined || next === '/' || next === ' ') return true;
+    if (next === undefined || next === '/' || next === ' ' || next === path.delimiter) return true;
   }
   return false;
 };
@@ -74,7 +77,8 @@ const pathIn = (text: string, dir: string) => {
 export const runningIn = (dirs: string[]): Proc[] => {
   const all = dirs.flatMap((d) => [d, realOf(d)]);
   return processes().filter((p) => p.pid !== process.pid && p.pid !== process.ppid && !p.state.startsWith('Z')
-    && all.some((d) => pathIn(p.args, d) || (p.cwd !== undefined && (p.cwd === d || p.cwd.startsWith(`${d}/`)))));
+    && all.some((d) => pathIn(p.args, d) || (p.env !== undefined && pathIn(p.env, d))
+      || (p.cwd !== undefined && (p.cwd === d || p.cwd.startsWith(`${d}/`)))));
 };
 
 /** What a test run left in `dir`: every entry still in it, and every process still alive in it. */

@@ -53,10 +53,11 @@ import { createEngine, nameFor, type Engine, type Said, type TaskView } from '..
 import { file, tick, view } from '../src/engine.ts';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
+import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-live-${label}-`));
+const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
 /**
  * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
@@ -141,7 +142,7 @@ const WRITTEN = ['BUILT', 'E2E'];
 
 /**
  * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
- * Made inside this package, not in `os.tmpdir()`, whose directories Claude Code does not trust.
+ * Made inside this package, not under the machine's temp directory, whose directories Claude Code does not trust.
  */
 const allowingCheckout = (label: string) => {
   const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));

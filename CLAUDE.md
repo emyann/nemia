@@ -456,6 +456,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   key beyond `run` as a run that will not ship, so, read for a hold, it would take a run that has shipped for one only a person can lift.
   A hold is read by `holdNeedsYou`, which asks the three facts by name (`missing`, `cancelledAt`, `gone`): read a `Wait` by the key you
   mean, never by what else is on it (learned by the run that put the hold on the api).
+- **A held run at its gate reads as finished and waiting on nobody.** The api empties `waitingOnYou` on a held run and computes `moving`
+  as `assess` does, so a run held at a gate is `failed`, not moving, and waits on no one. The Factory's `inFlight` read only those,
+  and dropped the card from the default floor the moment the hold was written. The hold's own edge still pointed at it. A run is on
+  the floor while `holding` says only other runs can lift it (`inFlight`), and it waits on you once `holding.onYou` (`waitsOnYou`, in
+  `apps/web/src/lib/factory.ts`). A surface that sorts runs by what moves reads `holding` beside `moving` (learned by the run that
+  drew the hold on the board).
+- **An e2e page's own screenshot named `<name>-<theme>.png` is overwritten.** `visit.ts` takes that name for the picture it takes after
+  `expect` returns, so a picture the page took mid-read under the same name shows the page's end state, and reads as a wrong picture.
+  Name a page's own shots `<name>-<what>-<theme>.png` (same run).
 
 ## Rules the code keeps
 

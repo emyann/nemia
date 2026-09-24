@@ -2149,7 +2149,8 @@ Where it departs from the plan:
 
 Left for later:
 
-- **The board** (the third card): it shows the hold on the run's card and page, with a way to lift it, off the api's `holding`.
+- **The board** (the third card): it shows the hold on the run's card and page, with a way to lift it, off the api's `holding`. (Since
+  shipped, below, without the way to lift it: the api has no route that lifts a hold, and the board names `wf hold <run> --off`.)
 - **`wf cancel` and `wf say` on a held run** are allowed. Cancelling ends the hold's meaning, and `wf say` files no work.
 
 ## Shipped: holding a run — the api's half
@@ -2169,6 +2170,34 @@ The second of the three cards. The api says a held run is held, not waiting on y
 Where it departs from the plan: **`moving` is true for a held run while its hold may lift on its own**, when the run would move
 unheld. That is the rule `--after` keeps: the tick files the work in the same pass that lifts the hold. For a hold only a person can lift,
 only work in flight counts. `apps/api/test/hold.test.ts` holds each of these against `list()` and `decide()`, over a store with real git.
+
+## Shipped: holding a run — the board's half
+
+The third of the three cards. The board says a held run is held, in the api's words, and draws the hold as it draws `--after`:
+
+- **The chip reads `held`**, in violet. `stepState` takes whether the run is held as a third argument, with no default, so the compiler
+  named every caller. On a held run a step not filed and a step at a human gate read `held` and keep their words (`awaiting approval`).
+  A step at work, `needs-human`, checking or settled keeps its state. The phase is not touched, so the four exact comparisons of
+  `needs-human` still match.
+- **The Factory's card** says the hold's `word` where its gate would be, with `advice` on hover, and has a `held` badge. It is amber
+  once only a person can lift the hold, and then counts as waiting on you (`waitsOnYou`). It draws no Approve: `gateOfSummary` and
+  `offersOf` are null and empty on a held run, since the package refuses those verbs. **The run's page** has a Held section beside
+  Waiting on runs. **The Runs list** says the word on the run's row.
+- **An edge `hold:<run>-><held>`** comes from each run in `heldUntil` that is on the floor, drawn as an `--after` edge is. It stays dashed
+  while the hold stands, and is left out where an `--after` edge already joins the two runs. `floorRuns` brings a finished run that a held
+  run is held until onto the floor, so the edge has a card to leave from.
+- **The e2e's `hold` page** holds GATED until HELD, as `wf hold` would write it, reads the card, the edge and the run's page, and then
+  takes the hold back.
+
+Where it departs from the plan:
+
+- **A held run is in flight while its hold may lift on its own**, as a run waiting on `--after` runs is (`inFlight`). The api reads a
+  held run with a step at its gate as `failed` and not moving, with nothing waiting on you. Without this rule its card left the floor
+  the moment it was held.
+- **The e2e holds GATED until HELD, not until the diamond's running run.** `holdRefusal` refuses a hold across repositories, and those
+  two runs are on different ones.
+
+Left for later: **lifting a hold from the board**, which needs a route on the api.
 
 ## Shipped: two small items from the plan's queue
 

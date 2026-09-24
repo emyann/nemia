@@ -788,7 +788,9 @@ that has ended instead.
 What `codex exec` cannot do, said and not faked:
 
 - **No words while it runs.** It reads its prompt and then only its own shell. Its card says `say: false`; an A2A
-  follow-up is refused `UnsupportedOperationError` naming the way on — a spawn in the session's context — and the facade
+  follow-up is refused `UnsupportedOperationError` naming the way on — once the session has ended, a spawn in its
+  context, which `test/codex-agent.test.ts` follows to a `resume` of the same thread; spawned while it runs, a second
+  process would resume the thread beside the first, and nothing refuses that, so the words say *once* — and the facade
   refuses first in the harness's own words (`noChannel`), which `wf` and the board print unchanged.
 - **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
   so only a held task's signed attempt, between turns, waits on a person.

@@ -276,7 +276,7 @@ and the SDK's client, with a fake `codex` (`test/codex-agent.test.ts`) and once 
 | `INPUT_REQUIRED` | only a signed attempt of a held task, between turns | the answered turn is `WORKING`, then waits again |
 
 What `codex exec` cannot do, said rather than faked: **it takes no words while it runs** — the card says `say: false`, and a
-follow-up is refused in A2A's own terms, naming a spawn in the session's context as the way on, while `wf` and the board keep
+follow-up is refused in A2A's own terms, naming a spawn in the session's context, once it has ended, as the way on, while `wf` and the board keep
 the harness's own words (`noChannel`); **it never asks mid-run** — the worker has no `blocked` to write, so a running Codex
 Task is never `INPUT_REQUIRED`, only a held one between turns; **it keeps no spend cap**, so a budget is refused at `file`
 and at `answer`; and **its context is empty until its first line** is printed. As for every detached run, a cancel that

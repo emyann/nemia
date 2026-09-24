@@ -200,7 +200,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
   ['words not sent returnImmediately', (h) => h.handler.sendMessage({ ...said(), configuration: undefined }, ctx),
     refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.')],
   ['words to a harness with no channel into a session', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sendMessage(said(), ctx); },
-    refusedWith(UnsupportedOperationError, "the `fake` harness has no channel into a running session: it takes no words once a session has started. To go on with its conversation, spawn a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId."), { bare: true }],
+    refusedWith(UnsupportedOperationError, "the `fake` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId."), { bare: true }],
   ['words to a session nobody lists', (h) => h.handler.sendMessage(said('ae/t-9/1'), ctx),
     refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.')],
   ['words to a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done' }); return h.handler.sendMessage(said(), ctx); },

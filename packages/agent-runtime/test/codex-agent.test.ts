@@ -251,7 +251,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   assert.equal((await get(client, nameFor(id, 2))).status!.state, TaskState.TASK_STATE_COMPLETED, 'closed, nothing waits');
 });
 
-test("what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context — nothing written to it", async () => {
+test("what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it", async () => {
   const root = tmp('store');
   const ops = detachedOps(codex, root);
   const extension = cardOf('codex', ops).capabilities!.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
@@ -267,7 +267,7 @@ test("what `codex exec` cannot take while it runs: its card says no words, and a
       configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
     }),
     (e: Error) => e instanceof UnsupportedOperationError
-      && e.message === 'the `codex` harness has no channel into a running session: it takes no words once a session has started. To go on with its conversation, spawn a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session\'s contextId.',
+      && e.message === 'the `codex` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session\'s contextId.',
   );
   const runs = fs.readdirSync(path.join(root, 'runs', 'codex'));
   assert.equal(runs.some((f) => f.endsWith('.inbox.jsonl')), false, 'no inbox written');
@@ -275,4 +275,12 @@ test("what `codex exec` cannot take while it runs: its card says no words, and a
   assert.equal('input' in run, false, 'and the worker holds no way in: its stdin is not open');
   fs.writeFileSync(path.join(cwd, 'go'), '');
   await until(() => stateIs(client, 'ae/c-say/1', TaskState.TASK_STATE_COMPLETED), 'completed');
+
+  // The refusal's advice, followed once the session has ended: a spawn of its own, marked, in the session's context.
+  const context = (await get(client, 'ae/c-say/1')).contextId;
+  assert.equal(context, THREAD);
+  const next = await ran(client, { name: 'ae/c-say/2', brief: 'hello', cwd, harness: 'codex', resumeFrom: context });
+  assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'hello'], 'the words reach the same thread, as a turn of its own');
+  assert.equal(next.contextId, THREAD, 'in the same context');
+  assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id).sort(), ['ae/c-say/1', 'ae/c-say/2']);
 });

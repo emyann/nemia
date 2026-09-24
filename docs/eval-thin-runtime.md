@@ -336,7 +336,8 @@ orchestrator's calls to the runtime change.
    running `codex exec … resume <thread>` in the same context. Measured live (M13, codex-cli 0.154.0, open issue 31): a
    resumed thread keeps its id and its rollout, and remembered what only the signed thread was told. What Codex cannot do is
    said rather than faked: no words while it runs (its card says `say: false`, and an A2A follow-up is refused naming a
-   spawn in the session's context as the way on — the only handler change; `wf` and the board keep their words), never
+   spawn in the session's context, once it has ended, as the way on — the only handler change; `wf` and the board keep
+   their words), never
    `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way, and fixed in review: a
    cancel landing before the worker had written its pid was answered `CANCELED` and sent nothing, harmless under the
    engine's re-issuing tick and false to a direct A2A caller; the stop is now left on disk for the worker, which starts no

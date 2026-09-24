@@ -31,13 +31,19 @@
  *
  * And a session that ends its turn without its closing statement is measured, because bug 1 was a success recorded for
  * exactly that, and only a fake `claude` has shown the fix: told to answer in plain text and give no statement, it must
- * never be recorded `succeeded` with none. Whether Claude Code nudges such a session itself, or ends it on its own, is
- * what the diagnostic says.
+ * never be recorded as ended with none unless its end says so — `stated: false`, the fact the orchestrator reads as
+ * unsigned since stage 4a (before, the runtime judged it `unsigned` itself). Whether Claude Code nudges such a session
+ * itself, or ends it on its own, is what the diagnostic says.
  *
  * And `remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
  * engine never reads: a session filed with it must be registered under `sessions/` with a `bridgeSessionId`, beside a
  * control identical but for the field, which must have none — or the flag is not what bridged it. Both have no tools,
  * so a session anyone on the account can drive from claude.ai for the minute it lives can do nothing.
+ *
+ * And Codex as an A2A agent (M13, which runs only where `codex` is on PATH): a held Codex task is an A2A context, and that
+ * rests on a claim no fake can make — that `codex exec resume <thread>` goes on under the same thread id and in the same
+ * rollout, rather than forking a thread of its own. A task told a word signs, waits with no worker, is answered, and must
+ * say the word under the thread id it signed with (codex-cli 0.154.0, 2026-09-23: one id, one rollout).
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
@@ -53,10 +59,16 @@ import { createEngine, nameFor, type Engine, type Said, type TaskView } from '..
 import { file, tick, view } from '../src/engine.ts';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
+import { TaskState } from '@a2a-js/sdk';
+import { clientOf } from '../src/a2a-client.ts';
+import { codex } from '../src/runner-codex.ts';
+import { codexRolloutFile } from '../src/runner-codex-transcript.ts';
+import { detachedOps } from '../src/runner-detached.ts';
+import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-live-${label}-`));
+const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
 /**
  * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
@@ -141,7 +153,7 @@ const WRITTEN = ['BUILT', 'E2E'];
 
 /**
  * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
- * Made inside this package, not in `os.tmpdir()`, whose directories Claude Code does not trust.
+ * Made inside this package, not under the machine's temp directory, whose directories Claude Code does not trust.
  */
 const allowingCheckout = (label: string) => {
   const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
@@ -447,7 +459,7 @@ const UNSIGNED_BRIEF = [
   'Call no tool, and give no closing statement, even when you are asked for one.',
 ].join(' ');
 
-test('a --bg session asked for a closing statement that ends its turn without one is never recorded succeeded without one', {
+test('a --bg session asked for a closing statement that ends its turn without one is never recorded as ending without one unsaid', {
   skip,
   timeout: 15 * 60_000,
 }, async (t) => {
@@ -458,10 +470,10 @@ test('a --bg session asked for a closing statement that ends its turn without on
   await settleThenCheck(engine, ids, (views) => {
     const v = views.unsigned!;
     const [a] = v.state.attempts;
-    t.diagnostic(`attempt 1 ended ${a?.ended} (${a?.reason}), closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`);
+    t.diagnostic(`attempt 1 ended ${a?.ended} (${a?.reason}), stated ${a?.stated}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`);
     assert.ok(v.state.settled, `settled: ${v.phase}`);
-    assert.ok(!(v.state.settled === 'succeeded' && a?.closeout === undefined),
-      `recorded succeeded with nothing said, ended ${a?.ended} (${a?.reason}). A harness end means Claude Code ended the session itself: a way to bug 1 that quiet does not cover (docs/open-issues.md)`);
+    assert.ok(a?.closeout !== undefined || a?.stated === false || a?.ended !== 'done',
+      `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), stated ${a?.stated}: bug 1, which the orchestrator could then not read as unsigned`);
   });
 });
 
@@ -969,6 +981,73 @@ test('M12: a job held open signs and waits with no process, an answer resumes it
   assert.deepEqual(second?.closeout, { word: secret }, 'and it remembered what only that session was told');
   const args = fs.readFileSync(path.join(root, 'runs', 'claude', `${nameFor(id, 2).replaceAll('/', '_').replaceAll('-', '_')}.json`), 'utf8');
   assert.match(args, /"--max-budget-usd","0\.3"/, "under the answer's cap");
+
+  await engine.close(id);
+  await engine.tick();
+  assert.equal((await engine.view(id)).state.settled, 'succeeded');
+});
+
+const M13_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false };
+const hasCodex = (() => { try { execFileSync('codex', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
+
+test('M13: a Codex task held open signs and waits with no process; its answer resumes the thread that signed — whether under the same thread id, and in the same rollout, is what it records', {
+  skip: live ? (hasCodex ? false : 'no `codex` on PATH') : 'set AE_LIVE=1 to run against Codex (spends from its subscription)',
+  timeout: 15 * 60_000,
+}, async (t) => {
+  t.diagnostic(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
+  const root = tmp('m13-board');
+  const engine = createEngine({ root, harnesses: { codex } });
+  const journal = Journal.filesOps(root);
+  const client = clientOf('codex', detachedOps(codex, root), (taskId) => Effect.runPromise(journal.read(taskId)));
+  // Said in the brief and nowhere else: only a turn that continues the first thread knows it.
+  const secret = `m13-${randomUUID().slice(0, 8)}`;
+  const id = await engine.file({
+    brief: `Remember the code word ${secret}. Run no command. Give your final answer with word set to ready.`,
+    cwd: tmp('m13-work'), harness: 'codex', closeoutSchema: M13_CLOSEOUT, holdOpen: true, maxAttempts: 2, deadlineSeconds: 300,
+    config: { permissionMode: 'read-only', effort: 'low' },
+  });
+  const until = async (phase: string) => {
+    const by = Date.now() + 5 * 60_000;
+    let v = await engine.view(id);
+    while (v.phase !== phase && !v.state.settled && Date.now() < by) {
+      await new Promise((r) => setTimeout(r, 3_000));
+      await engine.tick();
+      v = await engine.view(id);
+    }
+    return v;
+  };
+  await engine.tick();
+  const waiting = await until('input-required');
+  const first = waiting.state.attempts[0];
+  t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify([first?.ended, first?.closeout, first?.nativeId])}`);
+  assert.equal(waiting.phase, 'input-required');
+  assert.deepEqual(first?.closeout, { word: 'ready' });
+  assert.ok(first?.nativeId, 'the worker read a thread id off what Codex printed');
+  const held = await client.getTask({ tenant: '', id: nameFor(id, 1), historyLength: undefined });
+  assert.equal(held.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'its A2A Task waits on a person');
+  assert.equal(held.contextId, first.nativeId, 'in the context of its thread');
+  const workerOf = (n: number) => (fs.readdirSync(path.join(root, 'runs', 'codex')).filter((f) => f.endsWith('.json'))
+    .map((f) => JSON.parse(fs.readFileSync(path.join(root, 'runs', 'codex', f), 'utf8')) as { name?: string; pid: number })
+    .find((r) => r.name === nameFor(id, n)))?.pid;
+  const alive = (pid: number | undefined) => { try { return !!pid && process.kill(pid, 0); } catch { return false; } };
+  assert.ok(workerOf(1), 'the worker recorded its pid');
+  assert.equal(alive(workerOf(1)), false, 'and no worker runs for it while it waits');
+
+  await engine.answer(id, 'Run no command. Give your final answer with word set to the code word I gave you.');
+  await engine.tick();
+  const answered = await until('input-required');
+  const second = answered.state.attempts[1];
+  const rollouts = [first.nativeId, second?.nativeId].map((n) => (n ? codexRolloutFile(n) : undefined));
+  t.diagnostic(`turn 1: ${answered.phase}, ${JSON.stringify([second?.ended, second?.closeout, second?.resumeFrom, second?.nativeId])}`);
+  t.diagnostic(`same thread id: ${second?.nativeId === first.nativeId}; rollouts: ${JSON.stringify(rollouts)}`);
+  assert.equal(answered.phase, 'input-required', 'signed again, it waits again');
+  assert.equal(second?.resumeFrom, first.nativeId, 'the turn resumed the thread that signed');
+  assert.deepEqual(second?.closeout, { word: secret }, 'and it remembered what only that thread was told');
+  assert.equal(second?.nativeId, first.nativeId, 'a resumed Codex thread keeps its id: one context across both turns');
+  assert.ok(rollouts[0], 'Codex kept a rollout of the thread');
+  assert.equal(rollouts[1], rollouts[0], 'and the resume wrote into the same one');
+  const resumed = await client.getTask({ tenant: '', id: nameFor(id, 2), historyLength: undefined });
+  assert.equal(resumed.contextId, held.contextId, 'the answered turn is a Task in the same context');
 
   await engine.close(id);
   await engine.tick();

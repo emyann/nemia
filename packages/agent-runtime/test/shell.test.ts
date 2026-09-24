@@ -13,10 +13,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-shell-${label}-`));
+const tmp = (label: string) => scratch(`ae-shell-${label}-`);
 
 // Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
 const config = tmp('config');
@@ -150,12 +150,12 @@ test('a session held busy that gave no closeout is left where it was: the existi
     await engine.tick();
     assert.equal((await engine.view(id)).state.attempts[0]?.ended, null, 'a busy session with nothing said is not quiet');
 
-    // Idle, the quiescence floor reads it as it always has: quiet, with no statement — unsigned.
+    // Idle, the quiescence floor reads it as it always has: quiet, with no statement — `stated: false`, which the layer
+    // above reads as unsigned (the engine judged it `unsigned` itself until stage 4a).
     claude.set(row!.name, { status: 'idle' });
     await engine.tick();
     const v = await engine.view(id);
-    assert.equal(v.state.attempts[0]?.reason, 'unsigned');
-    assert.equal(v.state.settled, 'failed');
+    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.stated], ['done', false]);
   });
 });
 

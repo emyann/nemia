@@ -343,7 +343,32 @@ orchestrator's calls to the runtime change.
    consumer yet, the api polling the facade, and would pay a transcript read per event (open issue 27); the collected
    files as Artifacts, which are the orchestrator's Task's, stage 6; and one A2A Task per runtime task rather than per
    attempt.
-3. **The Codex adapter.**
+3. **The Codex adapter.** **Done, 2026-09-23.** Part 5a had already built the Codex Task in stage 2's shape, since the
+   seam is one handler over every driver, so the card proved that shape on Codex rather than building a second one:
+   `packages/agent-runtime/test/codex-agent.test.ts` drives the real detached worker through the SDK's client with a fake
+   `codex` — the thread id as `contextId` (empty until `thread.started`), the `-o` file as the `closeout` Artifact (a `data`
+   part, `text/plain` for prose), a `cancelTask` that ends the harness and what it started, and a held task's answered turn
+   running `codex exec … resume <thread>` in the same context. Measured live (M13, codex-cli 0.154.0, open issue 31): a
+   resumed thread keeps its id and its rollout, and remembered what only the signed thread was told. What Codex cannot do is
+   said rather than faked: no words while it runs (its card says `say: false`, and an A2A follow-up is refused naming a
+   spawn in the session's context, once it has ended, as the way on — the only handler change; `wf` and the board keep
+   their words), never
+   `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way, and fixed in review: a
+   cancel landing before the worker had written its pid was answered `CANCELED` and sent nothing, harmless under the
+   engine's re-issuing tick and false to a direct A2A caller; the stop is now left on disk for the worker, which starts no
+   harness (open issue 30). **The `claude -p` driver stays with stage 2**, unchanged: it shares
+   the worker, but its Task shape, its stdin (issue 29) and M12 were stage 2's, and nothing in it moved. **Still deferred**,
+   as the owner decided at stage 2's gate: the stream (`SubscribeToTask`).
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.
+   **Stage 4a, part 1 done, 2026-09-23: the signed statement is the orchestrator's word.** The runtime reports a fact and
+   judges nothing about it: an attempt of a task that asked for a closing statement records `stated: true | false` on its
+   `ended` event, and a quiet session that gave none ends `done`, `stated: false`, and settles `succeeded` under every
+   resume policy. `NUDGE` is gone, a resume carries the caller's words alone (`turn.words`), and `ae` prints
+   `done (no statement)`. The orchestrator reads the fact: `closeoutAsked` and `endWords` (`agent-orchestrator/src/views.ts`)
+   read an end without its statement as `unsigned`, the words `wf` and the board have always said, `retriesDue` files its
+   one sign-off nudge (`SIGNOFF`) per step per round as before, and the api's attempt lines go through `endWords`. A journal
+   written before keeps its words: an end recorded `reason: 'unsigned'` settles `failed` with its old note, attempts left or
+   not, and is read `unsigned` above; an end with no `stated` key is never read as unsigned. **Part 2 is the rest:** retiring
+   the runtime's `maxAttempts:` and `resume:`, so a retry is the orchestrator's filing alone.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

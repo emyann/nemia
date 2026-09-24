@@ -7,15 +7,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { feedPhase, feedWords, listing } from '../src/run.ts';
 import { feedChanges, foldFeed, type FeedLine } from '../src/feed.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-feed-'));
+const ROOT = scratch('wf-feed-');
 const RUNS = path.join(ROOT, 'runs');
 const FEED = path.join(ROOT, 'feed.jsonl');
 

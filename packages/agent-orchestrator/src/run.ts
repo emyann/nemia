@@ -35,8 +35,9 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one — a task from before closeouts; `true`,
- * asked; `unsigned`, asked, and its last attempt ended without it — the attempt's `reason`, on a session that went quiet, which the
- * engine settles `failed`. `stepStatus` reads it; a caller with only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
+ * asked; `unsigned`, asked, and its last attempt ended without it — `stated: false` on its end since stage 4a, where the runtime
+ * reports and this layer judges, or the `reason: 'unsigned'` the runtime wrote when it judged it. `stepStatus` reads it; a caller with
+ * only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
@@ -226,7 +227,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is filed and
  *                    no check is run on work done without the tool; `retries:` never files a try of it, since the try would run under the
- *                    same frozen `allow:` — a person does, `wf retry`
+ *                    same frozen `allowedTools:` — a person does, `wf retry`
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *
@@ -1309,12 +1310,13 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  *
  * **`unsigned` before any check.** A step that was asked for a closeout and gave none has not said it
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
- * engine ends a session that goes quiet without it `failed`, with reason `unsigned`, nudges it under
- * its resume policy, and out of attempts settles the task `failed` (engine open issues, *Quiet without
- * a closeout*). That failure is this word, as it was when the engine settled the same session
- * `succeeded`: read as `failed`, the run would be called failed rather than waiting on you, and a
- * nudged try told its session broke rather than that it gave no closeout. Only a `failed` task — one
- * a person stopped is `stopped`. A task that settled `succeeded` with nothing said is `unsigned` too.
+ * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
+ * ended it, and says so — `stated: false` — and settles the task `succeeded`; this layer judges it
+ * (`closeoutAsked`) and nudges it once a round (`retriesDue`). Until stage 4a the runtime judged it
+ * itself: `failed`, with reason `unsigned`. Either is this word: read as `failed`, the run would be
+ * called failed rather than waiting on you, and a nudged try told its session broke rather than that
+ * it gave no closeout. Only a `failed` task — one a person stopped is `stopped`. A task that settled
+ * `succeeded` with nothing said is `unsigned` too.
  * An unreadable closeout counts as none: the run cannot read that the work is done. A task never
  * asked — a run from before closeouts — is not held to one.
  *
@@ -1814,12 +1816,13 @@ const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boole
  * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
  * person, as it always has.
  *
- * And a session the engine ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
+ * And a session that ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
  * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`), told it ended without calling `StructuredOutput`, that its work stands and it
  * should change nothing and sign off, finishing first if it had not, and signing off anyway saying what stops it if it cannot
  * (`retrySection`). Once a round (`signoffsSpent`), never in a loop: a nudge that ends unsigned again leaves the step `unsigned`, on a
- * person. Keyed on the engine's reason, not on the step's word `unsigned`, which also covers a closeout short of a declared field — a
- * statement given, which a reminder to give one would not mend — and a journal written before the engine said `unsigned` for `done`. Nor
+ * person. Keyed on what the engine recorded (`closeoutAsked`: `stated: false`, or an old journal's reason `unsigned`), not on the step's
+ * word `unsigned`, which also covers a closeout short of a declared field — a statement given, which a reminder to give one would not
+ * mend — and a journal written before the engine said anything of a `done` with no statement. Nor
  * is a step over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
@@ -2116,29 +2119,29 @@ export function retryLines(
   return lines;
 }
 
-/** The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allow:`, so a path goes whole but for a pathological one. */
+/** The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allowedTools:`, so a path goes whole but for a pathological one. */
 const RULE_CAP = 240;
 
 /**
- * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allow:` needs for a new run
+ * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allowedTools:` needs for a new run
  * (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a file
  * written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A call
- * the step's own `disallow:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would allow
+ * the step's own `disallowedTools:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would allow
  * nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are free
  * text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
  */
-export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallow'> = {}, at: DeniedAt = {}): string {
+export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
   const calls = [...new Set(denied)];
   const fenced = calls.flatMap((call) => {
-    const rule = disallowedBy(call, step.disallow ?? [], at);
+    const rule = disallowedBy(call, step.disallowedTools ?? [], at);
     return rule ? [{ call, rule }] : [];
   });
   const rules = [...new Set(calls.filter((call) => !fenced.some((f) => f.call === call)).map((call) => allowRuleOf(call, at)))];
-  const add = rules.length ? ` For a new run, add ${shownList(rules)} to the folder's allow:, which allows ${rules.length === 1 ? 'it' : 'them'}.` : '';
+  const add = rules.length ? ` For a new run, add ${shownList(rules)} to the folder's allowedTools:, which allows ${rules.length === 1 ? 'it' : 'them'}.` : '';
   const own = fenced.length
-    ? ` ${shownList(fenced.map((f) => f.call))} may be its own disallow: at work (${shownList([...new Set(fenced.map((f) => f.rule))])}), which beats any allow:, so no rule is offered for ${fenced.length === 1 ? 'it' : 'them'}.`
+    ? ` ${shownList(fenced.map((f) => f.call))} may be its own disallowedTools: at work (${shownList([...new Set(fenced.map((f) => f.rule))])}), which beats any allowedTools:, so no rule is offered for ${fenced.length === 1 ? 'it' : 'them'}.`
     : '';
-  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allow: is frozen at wf start, so a try of it is denied the same again.`;
+  return `denied — its harness denied its try ${calls.length === 1 ? 'a call' : 'calls'}, and denials: fail passes none on.${add}${own} This run's allowedTools: is frozen at wf start, so a try of it is denied the same again.`;
 }
 
 /** Rules or calls as `deniedOffer` names them: each one line, the first `DENIED_SHOWN`, then how many more. Pure. */
@@ -4298,7 +4301,8 @@ function endingSection(step: Workflow, e: EndingStopped): string[] {
 /**
  * What the run's sign-off nudge tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
  * pinned by a test. It names the tool: the engine's own nudge named nothing until 2026-09-17, and did not get a finished step to sign
- * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-runtime's open issue 25).
+ * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-runtime's open issue 25). Since
+ * stage 4a it is the only one: the engine reports an end without its statement and nudges nothing.
  */
 export const SIGNOFF = [
   'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',
@@ -4770,7 +4774,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So two things the run has always written into a
  * folder brief — the run's `inputs/`, and the folders of the steps this one waits on but did not continue — were paths no session could
  * read. Copying is what makes them true: a read inside the session's own directory needs no permission of any harness, which is what the
- * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allow:`) measured live when it read `note.md` in its
+ * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allowedTools:`) measured live when it read `note.md` in its
  * cwd. Reaching out instead would mean a new field on the engine's task, a per-harness argument for it, and a fresh live measurement;
  * `artifactsContract`'s folder branch already chose the same way round, and this follows it.
  *

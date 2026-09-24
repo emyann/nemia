@@ -114,7 +114,8 @@ There are three layers, and they are Effect `Layer`s (`src/judge.ts`):
 The tests are hermetic. Every test file imports `test/hermetic.ts` first, which removes every
 `TYPESAFE_*` variable and replaces the global `fetch` with one that throws.
 `test/hermetic.test.ts` refuses any test file that does not import it first. A test that means to
-ask hands the judge a stub `fetch`, and each failure kind is made to happen through that stub:
+ask hands the judge a stub `fetch`, and each failure kind is made to happen through that stub. A test's temporary
+folder comes from `tmp`, which makes it through `test/scratch.ts`, and is removed before its file ends:
 
 | Test file | Covers |
 |---|---|
@@ -129,6 +130,7 @@ ask hands the judge a stub `fetch`, and each failure kind is made to happen thro
 | `test/decide.test.ts` | `decide`. |
 | `test/boundary.test.ts` | The package is optional, and Effect stays inside it. |
 | `test/source.test.ts` | No raw control character or BOM in the package's files. |
+| `test/scratch.test.ts` | No test makes a temporary folder but through `test/scratch.ts`, whose copy here is the runtime's, byte for byte. The one file here that reads outside the package, and it reads a file rather than importing one. |
 | `test/readme.test.ts` | This file, held to the code. |
 
 ## Where Effect is used, and what it buys

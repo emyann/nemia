@@ -8,25 +8,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from '../scratch.ts';
 
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };
 
 /** broken-page.ts, run to its end, with the screenshots it wrote. */
 async function e2eOn(how: string): Promise<Ended> {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-refusal-'));
-  try {
-    const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk));
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk));
-    const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
-    return { code, stdout, stderr, shots: fs.readdirSync(out).sort() };
-  } finally {
-    fs.rmSync(out, { recursive: true, force: true });
-  }
+  const out = scratch('hkb-e2e-refusal-');
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk: Buffer) => (stdout += chunk));
+  child.stderr.on('data', (chunk: Buffer) => (stderr += chunk));
+  const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
+  return { code, stdout, stderr, shots: fs.readdirSync(out).sort() };
 }
 
 const said = (ended: Ended) => `exit ${ended.code}\n--- stdout\n${ended.stdout}\n--- stderr\n${ended.stderr}`;

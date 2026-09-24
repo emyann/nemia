@@ -8,7 +8,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
@@ -19,8 +18,9 @@ import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
 import type { Sighting } from '../src/domain.ts';
+import { runningIn, scratch } from './scratch.ts';
 
-const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-detached-'));
+const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 
@@ -72,8 +72,8 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
   await settle(ops, 'ae/t4/1', 'working');
 
-  // Re-issued every pass, exactly as the engine does: the first may land in the window before
-  // the worker has published its pid, and a level-triggered loop simply asks again.
+  // Re-issued every pass, exactly as the engine does. The first is heard wherever it lands (the tests below make the
+  // window before the pid happen); asking again is what a level-triggered loop does anyway.
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
@@ -130,6 +130,179 @@ test('a stop that lands the moment the worker has published its pid is heard, no
   }
 });
 
+/** Alive: in the process table, and not a zombie waiting on its parent. */
+const alive = (pid: number) => {
+  try { return !execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('Z'); } catch { return false; }
+};
+/** Until `ok` holds, under a bound of seconds: past one heartbeat of the worker, and its drain. */
+const within = async (ok: () => boolean, what: string, ms = 15_000) => {
+  for (const bound = performance.now() + ms; !ok();) {
+    if (performance.now() > bound) assert.fail(`${what}, in ${ms / 1000}s`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
+
+for (const [what, takeAway] of [
+  ['its run file', (_dir: string, file: string) => fs.rmSync(file)],
+  ['the whole store', (dir: string) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 })],
+] as const) {
+  test(`a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`, async () => {
+    // Nobody could stop it otherwise: `stop` finds a worker by its run file, and a store removed under a running
+    // session left the worker beating into nothing and its harness running for as long as it liked.
+    const dir = root();
+    const cwd = scratch('ae-harness-');
+    const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
+    await Effect.runPromise(ops.spawn(req('ae/g1/1', cwd)));
+    const file = path.join(dir, 'runs', 'sh', 'ae_g1_1.json');
+    let worker = 0;
+    let harness = 0;
+    await within(() => {
+      try { worker = (JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number }).pid; } catch { /* mid-write */ }
+      try { harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8')); } catch { /* not yet */ }
+      return worker > 0 && harness > 0;
+    }, 'the worker and its harness started');
+
+    takeAway(dir, file);
+    await within(() => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+    assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+  });
+}
+
+test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits, holding its output or not', async () => {
+  // The harness dies on SIGTERM and leaves a child that ignores it holding its stdout: the worker's drain gives up at
+  // two seconds, and a worker that exited then left the child running, with no run file left to find it by.
+  const dir = root();
+  const cwd = scratch('ae-harness-');
+  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+  await Effect.runPromise(ops.spawn(req('ae/g3/1', cwd)));
+  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
+  // A heartbeat to notice, then five seconds for SIGTERM to be enough.
+  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 25_000);
+});
+
+test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async () => {
+  // The same child, left by an ordinary stop: the worker exited after its drain, and the child ran on under init.
+  const dir = root();
+  const cwd = scratch('ae-harness-');
+  const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
+  await Effect.runPromise(ops.spawn(req('ae/g3/2', cwd)));
+  await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  await Effect.runPromise(ops.stop('ae/g3/2'));
+  await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 20_000);
+  await settle(ops, 'ae/g3/2', 'stopped');
+});
+
+test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
+  await within(() => heardIn(dir).length === 1, 'the brief read');
+  assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
+  fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
+  await within(() => runningIn([dir]).length === 0, 'the worker and the listener ended');
+  assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
+});
+
+/**
+ * A worker spawned under a hook that freezes it just BEFORE its first rename: its status, pid and all, is in the run
+ * file's `.tmp`, and the run file still says `pid: 0`. Answers the worker's pid, read off that `.tmp`, once it is frozen.
+ */
+const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir: string, name: string) => {
+  const hook = path.join(dir, 'freeze-before-publish.mjs');
+  fs.writeFileSync(hook, [
+    "import fs from 'node:fs';",
+    "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
+    '  const rename = fs.renameSync;',
+    "  fs.renameSync = (...a) => { fs.renameSync = rename; process.kill(process.pid, 'SIGSTOP'); rename(...a); };",
+    '}',
+  ].join('\n'));
+  const was = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
+  try { await Effect.runPromise(ops.spawn(req(name, dir))); } finally {
+    if (was === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = was;
+  }
+  const runFile = path.join(dir, 'runs', 'sh', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
+  const read = (f: string) => { try { return (JSON.parse(fs.readFileSync(f, 'utf8')) as { pid: number }).pid; } catch { return 0; } };
+  let pid = 0;
+  await until(() => (pid = read(`${runFile}.tmp`)) > 0, 'the worker writes its status');
+  // Continued before it has frozen, it would freeze for good: wait to see it stopped.
+  await until(() => isFrozen(pid), 'the worker freezes before it publishes its pid');
+  assert.equal(read(runFile), 0, 'the run file has no pid while the worker is frozen');
+  return pid;
+};
+const isFrozen = (pid: number) => { try { return execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('T'); } catch { return false; } };
+const isAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+test('a stop that lands before the worker has published its pid is heard: the harness never starts', async () => {
+  // Open issue 30: a stop that found no pid did nothing, so a direct A2A caller answered CANCELED had stopped nothing,
+  // and the harness ran to its end. The stop is left on disk now, and the worker reads it before it starts the harness.
+  const dir = root();
+  const ran = path.join(dir, 'ran');
+  const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
+  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/3');
+  let heard = false;
+  try {
+    await Effect.runPromise(ops.stop('ae/t4/3'));
+    process.kill(pid, 'SIGCONT');
+    await settle(ops, 'ae/t4/3', 'stopped');
+    await until(() => !isAlive(pid), 'the worker exits');
+    heard = true;
+  } finally {
+    if (!heard) {
+      for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
+      await Effect.runPromise(ops.stop('ae/t4/3'));
+    }
+  }
+  assert.equal(fs.existsSync(ran), false, 'the harness never ran');
+  const seen = (await Effect.runPromise(ops.observe)).get('ae/t4/3')!;
+  assert.equal(seen.exitCode, undefined, 'a harness never started has no exit code');
+  // Spawned again under the name, it runs: the stop asked of the one before is not asked of it.
+  const again = detachedOps(sh(`touch ${ran}; exit 0`), dir);
+  await Effect.runPromise(again.spawn(req('ae/t4/3', dir)));
+  await settle(again, 'ae/t4/3', 'done');
+  assert.equal(fs.existsSync(ran), true, 'a run spawned again after a stop starts its harness');
+});
+
+test('a stop whose marker lands after the worker looked for it finds the pid it published, and is heard', async () => {
+  // The other order: the stop reads no pid, the worker publishes, finds no marker and starts the harness, and only then
+  // is the marker written. The stop reads the pid again after its marker, so it signals the worker all the same.
+  const dir = root();
+  const ran = path.join(dir, 'ran');
+  const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
+  const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/4');
+  const write = fs.writeFileSync;
+  let held = false;
+  // The marker's write, held until the worker has gone on and started its harness: the stop has read `pid: 0` by then.
+  (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = ((f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+    if (typeof f === 'string' && f.endsWith('.stop') && !held) {
+      held = true;
+      process.kill(pid, 'SIGCONT');
+      const wait = new Int32Array(new SharedArrayBuffer(4));
+      for (const bound = performance.now() + 10_000; !fs.existsSync(ran);) {
+        if (performance.now() > bound) break;
+        Atomics.wait(wait, 0, 0, 20);
+      }
+    }
+    return (write as (...a: unknown[]) => void)(f, ...rest);
+  }) as typeof fs.writeFileSync;
+  let heard = false;
+  try {
+    try { await Effect.runPromise(ops.stop('ae/t4/4')); } finally { fs.writeFileSync = write; }
+    assert.equal(held, true, 'the stop wrote its marker');
+    assert.equal(fs.existsSync(ran), true, 'the harness started before the marker was written');
+    await settle(ops, 'ae/t4/4', 'stopped');
+    heard = true;
+  } finally {
+    if (!heard) {
+      for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
+      await Effect.runPromise(ops.stop('ae/t4/4'));
+    }
+  }
+});
+
 test('THE LEASE: a run file whose heartbeat stopped is reported dead, not running', async () => {
   const dir = root();
   const ops = detachedOps(sh('true'), dir);
@@ -162,12 +335,14 @@ test('logs come back from the worker capture', async () => {
 /**
  * A harness that reads its messages on its stdin: each line it reads is appended to `heard` in its cwd; `end` makes it
  * print its closing line, and `end and linger` the same, after which it runs on for a minute once its stdin ends; its
- * stdin ended, it writes `EOF` and exits.
+ * stdin ended, it writes `EOF` and exits. Nothing ending its stdin, it exits after two minutes all the same: a test killed
+ * before its hooks run leaves nobody to stop it.
  */
 const listener = (dir: string): HarnessSpec => {
   const script = path.join(dir, 'listener.cjs');
   fs.writeFileSync(script, `
 const fs = require('node:fs');
+setTimeout(() => process.exit(0), 120_000).unref();
 let got = '', linger = false;
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => {
@@ -473,7 +648,7 @@ test('codex is given the schema and an output file, and the prompt still comes l
 
 test("a detached harness's final answer is its closing statement — and nothing lands in the workspace", async () => {
   const dir = root();
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-ws-'));
+  const workspace = scratch('ae-ws-');
   const answers: HarnessSpec = {
     name: 'sh',
     command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
@@ -529,12 +704,12 @@ test('trusted projects are read the way Codex writes them, and only those', () =
 
 /** A repository with one linked worktree, and a Codex home that does or does not trust it. */
 const repoWithWorktree = (trust: boolean) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-trust-repo-'));
+  const repo = scratch('ae-trust-repo-');
   execFileSync('git', ['init', '-q'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: repo });
-  const wt = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ae-trust-wt-')), 'step');
+  const wt = path.join(scratch('ae-trust-wt-'), 'step');
   execFileSync('git', ['worktree', 'add', '-q', wt], { cwd: repo, stdio: 'ignore' });
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-codex-home-'));
+  const home = scratch('ae-codex-home-');
   if (trust) fs.writeFileSync(path.join(home, 'config.toml'), `[projects."${repo}"]\ntrust_level = "trusted"\n`);
   return { repo, wt, home };
 };
@@ -562,7 +737,7 @@ test('a repository you never trusted gets no trust from the engine', async () =>
 
 test('outside a repository there is nothing to extend', async () => {
   const { codex } = await import('../src/runner-codex.ts');
-  const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-plain-'));
+  const plain = scratch('ae-plain-');
   assert.deepEqual(codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: plain }), {});
 });
 
@@ -881,7 +1056,7 @@ test("a denial event whose call is not in the stream is the tool alone — and t
 
 test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {
   const dir = root();
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-ws-'));
+  const workspace = scratch('ae-ws-');
   const prints: HarnessSpec = {
     name: 'sh', readOutput: claudeResultOutput,
     command: () => ({ cmd: 'sh', args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
@@ -955,7 +1130,7 @@ test('a re-spawn of the same attempt does not find the last answer in the output
 test('claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id', async () => {
   // A fake `claude` on PATH that answers the way `claude -p --output-format json` does — and, asked for
   // the `claude` harness's registry, as `claude agents` does when nothing of its own is running.
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-claude-'));
+  const bin = scratch('ae-fake-claude-');
   fs.writeFileSync(path.join(bin, 'claude'), [
     '#!/bin/sh',
     `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
@@ -988,7 +1163,7 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
 });
 
 test('claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules', async () => {
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-claude-'));
+  const bin = scratch('ae-fake-claude-');
   fs.writeFileSync(path.join(bin, 'claude'), [
     '#!/bin/sh',
     `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
@@ -1040,7 +1215,7 @@ test('REFUSED: an allow list on codex, for the same reason and in the same shape
 // ─── codex: what it consumed, from its stream ───────────────────────────────
 
 test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async () => {
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-codex-'));
+  const bin = scratch('ae-fake-codex-');
   const stream = [
     { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
     { type: 'turn.started' },

@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Hold, type Pruned, type RoundAsk, type Run } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { asRan, orderSteps, type Workflow } from './workflow.ts';
+import { asNamed, asRan, orderSteps, withFormerNames, type Workflow } from './workflow.ts';
 import { loadWorkflows } from './workflow-store.ts';
 import { inputsRoot } from './places.ts';
 
@@ -125,7 +125,9 @@ export const readRun = (id: string): Run => {
   // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
-  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...read } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  // A run frozen before a step key was renamed is read under the names the keys have now (`asNamed`), and written back under both (`recordText`).
+  const run = read.workflow ? { ...read, workflow: read.workflow.map(asNamed) } : read;
   const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);
@@ -395,10 +397,17 @@ export const listRuns = (): Run[] =>
     }).sort((a, b) => a.id.localeCompare(b.id))
     : [];
 
+/**
+ * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
+ * so a daemon older than the rename that ticks the run still files each step's rule lists.
+ */
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold'>): string =>
+  JSON.stringify(run.workflow ? { ...run, workflow: run.workflow.map(withFormerNames) } : run, null, 2);
+
 /** A new run's record: `start`'s, and the one writer that makes one. */
 export const writeRun = (run: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
-  fs.writeFileSync(runFile(run.id), JSON.stringify(run, null, 2));
+  fs.writeFileSync(runFile(run.id), recordText(run));
 };
 
 /**
@@ -422,7 +431,7 @@ export const rewriteRun = ({ approvals: _, acceptances: __, pruned: ___, hold: _
   }
   try {
     fs.ftruncateSync(fd);
-    fs.writeFileSync(fd, JSON.stringify(run, null, 2));
+    fs.writeFileSync(fd, recordText(run));
   } finally {
     fs.closeSync(fd);
   }

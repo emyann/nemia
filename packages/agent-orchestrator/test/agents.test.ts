@@ -5,13 +5,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { AGENT_KEYS, agentsDir, parseAgent, parseWorkflow, renderStep, STEP_KEYS, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
 import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-agents-'));
+const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { start, writeWorkflow } = await import('../src/runner.ts');
 
@@ -39,10 +39,10 @@ function refusal(fn: () => unknown): string {
 const agent = (name: string, text: string, read?: (file: string) => string | undefined): Agent => parseAgent(name, text, read);
 
 test('an agent is its role keys as written, its description, and its body as its instructions', () => {
-  const a = agent('implementer', '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallow: SendMessage\n---\nImplement what you are asked.\n');
+  const a = agent('implementer', '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\nImplement what you are asked.\n');
   assert.equal(a.name, 'implementer');
   assert.equal(a.description, 'Does the work');
-  assert.deepEqual(a.keys, { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallow: 'SendMessage' });
+  assert.deepEqual(a.keys, { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' });
   assert.equal(a.body, 'Implement what you are asked.');
   assert.equal(agent('quiet', '---\nmodel: opus\n---\n').body, '', 'an agent may set only how its steps run');
 });
@@ -144,7 +144,7 @@ test('REFUSED at shipped defaults: a workflow named agents — loaded, named bar
 /** The agents a step may name, by name, each parsed from its file's text. */
 const agentsOf = (files: Record<string, string>): Agents => new Map(Object.entries(files).map(([name, text]) => [name, agent(name, text)]));
 
-const IMPLEMENTER = '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallow: SendMessage\n---\nImplement what you are asked.\n';
+const IMPLEMENTER = '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\nImplement what you are asked.\n';
 
 test("a step that names an agent runs with the agent's role keys, its own keys winning, and is told the agent's words, then its own", () => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
@@ -155,20 +155,20 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   assert.equal(build.model, 'sonnet', "the step's own key wins");
   assert.equal(build.effort, 'high', "the agent's key is the default");
   assert.equal(build.context, 200000);
-  assert.deepEqual(build.disallow, ['SendMessage']);
+  assert.deepEqual(build.disallowedTools, ['SendMessage']);
   assert.deepEqual(build.after, ['plan']);
   assert.equal(build.check, 'npm test');
   assert.equal(build.body, 'Implement what you are asked.\n\nBuild the parser first.');
   assert.deepEqual(build.agent, {
     name: 'implementer', keys: ['after', 'model', 'check'], body: 'Build the parser first.',
-    given: { harness: 'claude', effort: 'high', context: '200k', disallow: 'SendMessage' },
+    given: { harness: 'claude', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
   }, 'the keys the step set, its note, and what each key it did not set read as');
 
   const bare = parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents);
   assert.equal(bare.body, 'Implement what you are asked.', "no note of its own: the agent's words alone");
   assert.equal(bare.model, 'opus');
 
-  const same = parseWorkflow('build', '---\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallow: SendMessage\n---\nImplement what you are asked.\n');
+  const same = parseWorkflow('build', '---\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\nImplement what you are asked.\n');
   const { agent: _agent, ...resolved } = bare;
   assert.deepEqual(resolved, same, 'resolved, it is the step written out whole');
   assert.equal(same.agent, undefined, 'a step with no agent carries no `agent`');
@@ -263,7 +263,7 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   const [build] = run.workflow;
   assert.equal(build!.model, 'opus');
   assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
-  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallow: 'SendMessage' } });
+  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' } });
 });
 
 test("`wf start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {

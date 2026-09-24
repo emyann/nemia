@@ -51,7 +51,7 @@ read by the pass that orders the board.
 
 | | continues when |
 |---|---|
-| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it ended — quiet, or `done` by its harness — without the closing statement it was asked for |
+| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating |
 | `always` | any failure, including one the harness reported — but a session that spent its budget |
 | `never` | nothing; every attempt starts clean |
 
@@ -212,6 +212,9 @@ has ever taken. It is the price of not having somebody else's registry to read, 
 price of running more than one harness. It is a handful of lines, because the engine already had a
 journal and a seam.
 
+The other way round, the run file removed is a stop: `stop` finds the worker by it, so a worker whose run file is gone,
+alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
+
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
 optionally the words it refuses, a reader of what it prints, where it keeps its conversation, and
 the pool it is counted in under the ceiling:
@@ -263,6 +266,24 @@ word; the two differ on purpose. `answer` and `close` stay the engine's verbs, j
 never writes it. Not done, by the owner's decision at the plan gate: no `SubscribeToTask` (nothing reads a live stream —
 the api polls the facade — and every subscription opens with the Task, a listing here); no collected files as Artifacts
 (they are the orchestrator's, for its own Task, stage 6); and a Task is still one attempt, not one runtime task.
+
+**Codex as an A2A agent** (stage 3). The detached `codex exec` driver answers in the same shape, through the real worker
+and the SDK's client, with a fake `codex` (`test/codex-agent.test.ts`) and once live (M13, open issue 31):
+
+| A2A | Codex | Proven by |
+|---|---|---|
+| `contextId` | the thread id from `thread.started`; empty until that line is printed | a Task found by `listTasks({ contextId })` |
+| a held task's turns | `codex exec … resume <thread> <words>`, the same thread id and the same rollout file | M13, codex-cli 0.154.0 |
+| the `closeout` Artifact | the `-o` file: a `data` part under a schema, `text/plain` without one parsed | a listing without `includeArtifacts` carries none |
+| `cancelTask` | SIGTERM to the worker, which ends the harness's process group, then `CANCELED` | the harness and its grandchild end; a done session is refused |
+| `INPUT_REQUIRED` | only a signed attempt of a held task, between turns | the answered turn is `WORKING`, then waits again |
+
+What `codex exec` cannot do, said rather than faked: **it takes no words while it runs** — the card says `say: false`, and a
+follow-up is refused in A2A's own terms, naming a spawn in the session's context, once it has ended, as the way on, while `wf` and the board keep
+the harness's own words (`noChannel`); **it never asks mid-run** — the worker has no `blocked` to write, so a running Codex
+Task is never `INPUT_REQUIRED`, only a held one between turns; **it keeps no spend cap**, so a budget is refused at `file`
+and at `answer`; and **its context is empty until its first line** is printed. As for every detached run, a cancel that
+lands before the worker has published its pid is left on disk, and the worker starts no harness (open issue 30, fixed). The `claude -p` job shares the worker and is stage 2's, unchanged.
 
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
@@ -710,49 +731,53 @@ session whose transcript cannot be read gets no verdict at all; the deadline is 
 
 ### Quiet, when a closing statement was asked for and none came
 
-Quiet used to be `done`, for every task. A task that had asked for a closeout, and whose session ended its turn
-without one — a crash, a rate limit, a model that forgot — settled `succeeded` with nothing said, and whatever waited
-on it ran: a false completion, the one failure worse than a stall. Measured at shipped defaults before the fix, with a
-fake `claude` listing the session working and idle over a transcript quiet for ten minutes: `ended: done`, `reason:
-harness`, `settled: succeeded`, no closeout. Only the journal knows whether a statement was asked for, so the runner
-reports how long a session has been quiet, and `decide` says what that means:
+Quiet used to be `done`, for every task, with nothing more said. A task that had asked for a closeout, and whose session
+ended its turn without one — a crash, a rate limit, a model that forgot — settled `succeeded` with nothing said, and
+whatever waited on it ran: a false completion, the one failure worse than a stall. Measured at shipped defaults before the
+fix, with a fake `claude` listing the session working and idle over a transcript quiet for ten minutes: `ended: done`,
+`reason: harness`, `settled: succeeded`, no closeout. Only the journal knows whether a statement was asked for, so the
+runner reports how long a session has been quiet, and `decide` records what came of it:
 
-| the task | quiet ends the attempt | and then |
-|---|---|---|
-| asked for no `closeoutSchema` | `done`, reason `harness` | `succeeded`, as before: quiet is all such a task has |
-| asked for one, and this attempt gave one | `done`, with the statement | `succeeded` |
-| asked for one, and none came — or only one made before the attempt began | `failed`, reason **`unsigned`** | the resume policy: continued with a nudge while attempts remain, `failed` when they run out |
+| the task | quiet — or its harness's `done` — ends the attempt |
+|---|---|
+| asked for no `closeoutSchema` | `done`, reason `harness`: quiet is all such a task has |
+| asked for one, and this attempt gave one | `done`, with the statement, and **`stated: true`** |
+| asked for one, and none came — or only one made before the attempt began | `done`, reason `harness`, and **`stated: false`** |
 
-**The harness's `done` is the second door, and it is shut the same way.** A session its harness lists `done` with no
-statement was journalled `done`, reason `harness`, and settled `succeeded` until 2026-09-19: of the 344 tasks filed with a
-schema in this machine's store that day, 5 had ended so. For a task that asked for a statement, `done` without one is
-now `unsigned` too, recorded `failed` — one condition in `decide`, held by `test/decide.test.ts` and a fake `claude`
-listing the session `done` in `test/unsigned.test.ts`. A task that asked for nothing still succeeds on `done`, and a
-journal written before the rule folds as it did: `fold` reads an end as recorded, never re-derives it.
+**`stated` is a fact, and the engine does not judge it** (stage 4a, 2026-09-23). Whether an end without its statement is
+a failure, and whether its session is told to sign off, is the workload's question, so it is the layer above's: the
+orchestrator reads `stated: false` as `unsigned`, and continues the session once a round with a sign-off nudge
+(`closeoutAsked` and `endWords` in `agent-orchestrator/src/views.ts`, `retriesDue` in its `run.ts`). The task here settles
+as its harness ended it, whatever attempts it has left: it is not retried, not continued, and nobody is nudged. `ae show`
+and `ae feed` print such an end `done (no statement)`. The key is written only on an end read off a sighting of a task
+that asked for a statement; an end with no `stated` key — a journal written before, or a task that asked for nothing — is
+not read as unsigned by anyone.
 
-`unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
-has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
-attempt `--resume`s it, told why it is back instead of the brief it already has: *"You ended without calling
-StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is
-being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then
-call it; if you cannot finish it, call it anyway, saying what stops you."* The nudge is journalled on the attempt's
-`starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
-`N attempt(s), none succeeded: the last ended without the closing statement it was asked for`.
+Until then, the engine judged it itself: such an end was recorded `failed`, reason **`unsigned`**, continued with a
+nudge while attempts remained, and settled `failed` when they ran out. A journal written in that time folds as it was
+written — `fold` reads an end as recorded, never re-derives it — and a task whose last attempt ended `unsigned` settles
+`failed` with the note it always had, `N attempt(s), none succeeded: the last ended without the closing statement it was
+asked for`, whatever attempts it has left. It is not continued: the nudge is the orchestrator's now, and a session nudged
+from both layers would be told twice. An attempt started with a nudge keeps it on its `starting` entry, and is spawned
+with those words.
 
-**The nudge names the tool, and its words are pinned by a test.** It asked for "your closing statement" and named
-nothing until 2026-09-17, and twice that did not get a finished step to sign off: each had done all its work and ended
-its turn with a prose summary, and each signed off within thirty seconds of a person's `wf retry --message` naming
-`StructuredOutput` and saying to change nothing (issue 25). The tool's name is Claude Code's, and that is the only
-harness a quiet end reaches — quiet is reported by the `claude --bg` runner alone, though `done` without a statement is
-`unsigned` on any runner. Whether the wording
-alone closes the next such session is not measured.
+**The harness's `done` is the second door, and it is reported the same way.** A session its harness lists `done` with no
+statement was journalled `done`, reason `harness`, and settled `succeeded` until 2026-09-19, with nothing to say it had
+not signed: of the 344 tasks filed with a schema in this machine's store that day, 5 had ended so. It carries
+`stated: false` now, as a quiet end does — held by `test/decide.test.ts`, and a fake `claude` listing the session `done`
+in `test/unsigned.test.ts`.
+
+**The nudge names the tool.** It asked for "your closing statement" and named nothing until 2026-09-17, and twice that
+did not get a finished step to sign off: each had done all its work and ended its turn with a prose summary, and each
+signed off within thirty seconds of a person's `wf retry --message` naming `StructuredOutput` and saying to change
+nothing (issue 25). The nudge that replaced it, the orchestrator's `SIGNOFF`, names the tool too, in its own words.
 
 Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
 continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
 would end the moment the registry listed it idle.
 
 **What is not measured.** `test/unsigned.test.ts` holds all of this with a fake `claude`; no live session has gone
-quiet unsigned under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
+quiet without its statement under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
 and 2 of their attempts ended `done` without one — both the read fixed in `00e301b`, not a session that said nothing —
 so the case has not been seen live either way. Claude Code 2.1.271's bundle has a retry count for structured output
 (`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of it. Whether a `--bg` session is nudged by the harness
@@ -769,8 +794,8 @@ statement it read is recorded as read.
 
 | `reason` | recorded | the attempt |
 |---|---|---|
-| `harness` | the harness's own state | its harness ended it: `done` with the statement, where one was asked for; `failed` or `stopped` as the harness said; `done` with nothing, on a task that asked for nothing |
-| `unsigned` | `failed` | ended — quiet, or `done` — without the statement it was asked for (above) |
+| `harness` | the harness's own state | its harness ended it, or it went quiet: `done` with the statement, where one was asked for; `failed` or `stopped` as the harness said; `done` with nothing — `stated: false` where a statement was asked for (above) |
+| `unsigned` | `failed` | only in a journal written before stage 4a: the engine judged an end without its statement (above) |
 | `lost` | `failed` | vanished, or its worker stopped beating: nobody said anything |
 | `unstartable` | `failed` | its spawn was refused, and nothing ran |
 | `budget` | `failed` | its harness cut it at the task's spend cap — `failed` whatever state it was left in |
@@ -842,7 +867,7 @@ It layers UNDER the harness's own answer rather than replacing it. [Hermes
 Kanban](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) solves the same
 problem with a terminal tool call, `kanban_complete(...)`, which it can require because every worker
 is its own. Here a structured final answer is the fast path and observation is the floor: a workload
-that never gives one ends by quiet — unsigned, where one was asked for (above).
+that never gives one ends by quiet — `stated: false`, where one was asked for (above).
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
@@ -1172,7 +1197,8 @@ and its next turn not begun. An answer, not a close, is refused too where the at
 
 **Through the seam** (stage 2 part 5), the attempt that signed is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
 waits, its closeout its Artifact, and each turn's attempt is a Task of its own in one context, the session's. A held task is
-not yet one A2A Task across its turns. Measured live on Claude Code jobs only — see open issue 28.
+not yet one A2A Task across its turns. Measured live on Claude Code jobs (M12, open issue 28) and on Codex threads (M13,
+open issue 31); not on a `--bg` session.
 
 ## What a read asks of the harness: `observe` and `find`
 
@@ -1365,7 +1391,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, the ceiling, what it counts and which waiting task a free slot goes to, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
-| `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/unsigned.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `stated: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
@@ -1385,6 +1411,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |
+| `test/codex-agent.test.ts` | Codex as an A2A agent through the real worker and the SDK's client, a fake `codex` on PATH: its context, its closeout Artifact, a cancel that ends what it started, a held task's turns in one context, and no words while it runs |
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
 | `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |

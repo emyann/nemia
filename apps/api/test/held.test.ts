@@ -9,11 +9,11 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-held-'));
+const root = scratch('hkb-api-held-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

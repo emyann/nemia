@@ -11,20 +11,20 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-folder-'));
+const root = scratch('hkb-api-folder-');
 process.env.WF_ROOT = root;
 // What the board is pointed at: a plain directory, no git, no `workflows/` of its own. The api reads it as any repository.
-const notARepo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-folder-here-'));
+const notARepo = scratch('hkb-api-folder-here-');
 process.env.HKB_REPO = notARepo;
 
 // A folder team of the store's own, as `workflows/note` is: every step says `workspace: folder`, so it looks at no repository.
 const team = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(team, { recursive: true });
-fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nWrite the note.\n');
+fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n');
 // And one that works on a repository, to hold the two apart.
 const onRepo = path.join(root, 'workflows', 'change');
 fs.mkdirSync(onRepo, { recursive: true });

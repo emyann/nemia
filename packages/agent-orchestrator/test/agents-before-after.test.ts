@@ -13,17 +13,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { asNamed, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 /**
  * The fixture names the package's folders as they were when it was written, and keeps those words: its keys are read at the package's
- * folder today. Nothing else of it is touched.
+ * folder today. And its steps hold `disallow` and `allow`, the names `disallowedTools` and `allowedTools` had until 2026-09-23: each is
+ * read as a run frozen then is read (`asNamed`, in `readRun`). Nothing else of it is touched.
  */
 const FORMER_PACKAGE = 'packages/agent-workflows/'; // renamed on 2026-09-23
 const atToday = (folder: string) => (folder.startsWith(FORMER_PACKAGE) ? `packages/agent-orchestrator/${folder.slice(FORMER_PACKAGE.length)}` : folder);
 const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(Object.entries(
-  JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Array<Record<string, unknown>>>,
-).map(([folder, steps]) => [atToday(folder), steps]));
+  JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Workflow[]>,
+).map(([folder, steps]) => [atToday(folder), steps.map(asNamed) as unknown as Array<Record<string, unknown>>]));
 
 /**
  * The steps whose resolved body is not the one it had, as `<folder>/<step>`: the implementer's and the shipper's, reworded so one file
@@ -42,7 +44,7 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  *
  * The supervisor's body moved when the packages were renamed (2026-09-23): it names the runtime's open issues and the orchestrator's
  * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
- * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allow:` lets no shell loop through.
+ * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
@@ -80,13 +82,13 @@ const AGENTS: Record<string, string> = {
  * (docs/pivot-2026-09-18.md §6, P1): the one session here that never ends is the one a cap is for.
  *
  * When steps became jobs (`claude -p`, thin runtime stage 2 part 2) the supervisor alone stayed a background session, and its mode was
- * written by its role: `background: true`, `permissionMode: dontAsk` and an `allow:` list, read here from its file rather than copied.
+ * written by its role: `background: true`, `permissionMode: dontAsk` and an `allowedTools:` list, read here from its file rather than copied.
  * The agents that build and ship — implementer, ui-implementer, shipper — say `permissionMode: auto`, the engine's default, so the mode
  * of every role is written where the role is. Each step naming one of them gains that key and nothing else.
  */
-const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allow!;
+const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allowedTools!;
 const KEYS_ADDED: Record<string, Record<string, unknown>> = {
-  'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allow: SUPERVISOR_ALLOW },
+  'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allowedTools: SUPERVISOR_ALLOW },
   ...Object.fromEntries(Object.entries(AGENTS).filter(([, agent]) => ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at]) => [at, { permissionMode: 'auto' }])),
 };
 

@@ -38,7 +38,7 @@ export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Acceptance, Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, Spend, SpendOf, TaskSpend, Wait } from './run.ts';
 export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry.ts';
-export { agentUsers, agentVersion, loadAgents, loadWorkflows, workflowDescription, workflowFolder, workflowsIn } from './workflow-store.ts';
+export { agentUsers, agentVersion, formerKeyLines, loadAgents, loadWorkflows, workflowDescription, workflowFolder, workflowsIn } from './workflow-store.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -60,7 +60,7 @@ export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritt
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
 export type { InboxDropped, InboxQueued } from './inbox-store.ts';
 export { HARNESSES, engine } from './runtime-client.ts';
-export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf, wordOfView } from './views.ts';
+export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, endWords, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf, wordOfView } from './views.ts';
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
 export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';

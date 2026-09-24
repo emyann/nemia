@@ -427,7 +427,7 @@ export function seedFolder(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FOLDER;
   const workflowDir = path.join(root, FOLDER.workflow);
-  const fence = 'permissionMode: dontAsk\nallow: Edit(**)\n';
+  const fence = 'permissionMode: dontAsk\nallowedTools: Edit(**)\n';
   write(path.join(workflowDir, 'write.md'), `---\nharness: claude\nworkspace: folder\n${fence}---\nWrite a short note on what was asked.\n`);
   write(path.join(workflowDir, 'review.md'), `---\nharness: claude\nafter: write\nworkspace: folder\npermissionMode: dontAsk\n---\nRead the note, and say whether it holds up.\n`);
 
@@ -446,7 +446,7 @@ export function seedFolder(root: string, now = Date.now()): void {
     brief: `${FOLDER.title}\n\nA run seeded by npm run e2e: a team that works in folders it makes for its steps.`,
     workflowDir,
     workflow: [
-      { name: 'write', after: [], body: 'Write a short note on what was asked.', harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk', allow: ['Edit(**)'] },
+      { name: 'write', after: [], body: 'Write a short note on what was asked.', harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] },
       { name: 'review', after: ['write'], body: 'Read the note, and say whether it holds up.', harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk' },
     ],
     createdAt: ago(20),
@@ -659,7 +659,7 @@ export const WORKFLOWS = {
     /** The context window review sets, as a step writes it; implement sets none, and its node says nothing of it. */
     context: '200k',
     /** What implement disallows, which the Capabilities page takes from the set it has. */
-    disallow: 'SendMessage',
+    disallowedTools: 'SendMessage',
     loop: 'implement · 3 rounds',
     /** What review's agent is told, in markdown: a heading and a list, which its page renders. */
     review: {
@@ -710,7 +710,7 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
   write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), `---\nskills: ${good.agent.name}.skills.json\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`);
   write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.skills.json`), `${JSON.stringify([good.agent.skill], null, 2)}\n`);
-  write(path.join(dev, 'implement.md'), `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
+  write(path.join(dev, 'implement.md'), `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallowedTools: ${good.disallowedTools}\n---\nImplement what was asked.\n`);
   write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
   const bad = path.join(repo, 'workflows', broken.name);

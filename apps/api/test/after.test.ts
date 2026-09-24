@@ -8,11 +8,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-after-'));
+const root = scratch('hkb-api-after-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

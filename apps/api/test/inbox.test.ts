@@ -7,13 +7,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store, and so its inbox, when the module loads: point it at a scratch directory first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-inbox-'));
+const root = scratch('hkb-api-inbox-');
 process.env.WF_ROOT = root;
-const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-inbox-repo-'));
+const repo = scratch('hkb-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -81,7 +81,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   assert.equal((await (await file({ body: 'Both, the repository', workflow: 'both', from: 'repo' })).json()).workflow, 'both');
   assert.equal((await (await file({ body: 'Both, yours', workflow: 'both', from: 'yours' })).json()).workflow, path.join(root, 'workflows', 'both'));
   // The repository's, on a card about another repository: its folder, since the name would be looked for in that one.
-  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-inbox-elsewhere-'));
+  const elsewhere = scratch('hkb-api-inbox-elsewhere-');
   assert.equal((await (await file({ body: 'Elsewhere', workflow: 'dev', repo: elsewhere })).json()).workflow, dev);
 
   // Listed in the package's order, each with its body and a filing time; `started as` none.

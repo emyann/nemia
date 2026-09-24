@@ -274,8 +274,9 @@ export const step = Effect.fn('step')(function* (
       // The intent is journalled BEFORE the spawn, and the session's name is derivable from it.
       // That ordering is the whole crash-safety story: a session we asked for always has a record,
       // and the record implies the name, so a restart finds it instead of starting a second one.
-      // `resumeFrom` is journalled with it, and the nudge a continued session is told, so what an attempt
-      // was told to continue, and what it was told, are facts on the record rather than re-derived later.
+      // `resumeFrom` is journalled with it, and what a continued session is told in place of the brief (a later turn's
+      // answer), so what an attempt was told to continue, and what it was told, are facts on the record rather than
+      // re-derived later.
       yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge });
       break;
 
@@ -317,7 +318,7 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
+        closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}), usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
       });
       break;
     }

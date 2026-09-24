@@ -64,7 +64,9 @@ function SessionPage() {
 
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled), cancelled));
+  // Whether the step waits on a person's word — its session over, nothing of it running — never `held`: a hold on the run (`wf hold`)
+  // answers nothing, and the session runs or rests as it did.
+  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled, false), cancelled));
   // What this page said that the run, as last read, does not have yet — kept with the task it was said to, so a later try starts afresh.
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
@@ -81,7 +83,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <BackToRun run={run} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-semibold">{step.name}</h1>
-          <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} />
+          <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
           {following.live && (
             <span data-following className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-green-500" />

@@ -29,7 +29,7 @@ import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, t
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
  * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
+ * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
  * `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`).
  * `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a
@@ -43,7 +43,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
-  tools: 'list', disallow: 'list', allow: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
+  tools: 'list', disallowedTools: 'list', allowedTools: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
 

@@ -7,12 +7,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { codex, createEngine, type Engine } from 'agent-runtime';
 import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
 
@@ -108,8 +108,8 @@ const settled = async (e: Engine, id: string, ms = 20_000) => {
   }
 };
 
-const scratch = () => {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-check-')));
+const rig = () => {
+  const root = fs.realpathSync(scratch('wf-check-'));
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(workspace);
   const e = createEngine({ root: path.join(root, 'engine'), harnesses: { check: CHECK } });
@@ -122,7 +122,7 @@ const scratch = () => {
 };
 
 test('LIVE: the engine settles a check on its exit code, in the workspace, with stderr kept apart', async () => {
-  const { root, workspace, e, file } = scratch();
+  const { root, workspace, e, file } = rig();
 
   // Everything that could go wrong between a YAML-ish line and a shell: an `exit` that must not end
   // the script, a `# comment` that must not swallow the parenthesis, a forged trailer, stderr noise.
@@ -145,7 +145,7 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
 test('LIVE: a brief filed by hand, with no WF_STDERR, still runs its command — and keeps stderr in the log', async () => {
   // The fallback once redirected to `/dev/stderr`, which cannot be reopened on the socket the worker
   // hands the process: the redirection failed and the command never ran. Found end to end.
-  const { workspace, e } = scratch();
+  const { workspace, e } = rig();
   const id = await e.file({ id: 'by-hand', harness: 'check', cwd: workspace, brief: 'echo work > work.txt; echo said >&2; exit 4' });
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed');
@@ -156,7 +156,7 @@ test('LIVE: a brief filed by hand, with no WF_STDERR, still runs its command —
 });
 
 test('LIVE: a stderr file that cannot be opened fails the check with a number, not a silent shell', async () => {
-  const { root, e } = scratch();
+  const { root, e } = rig();
   const id = await e.file({
     id: 'nowhere', harness: 'check', cwd: root,
     brief: checkBrief('echo fine', { ...ENV, WF_WORKSPACE: root, WF_STDERR: path.join(root, 'gone', 'x.stderr') }),
@@ -167,7 +167,7 @@ test('LIVE: a stderr file that cannot be opened fails the check with a number, n
 });
 
 test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async () => {
-  const { e, file } = scratch();
+  const { e, file } = rig();
   const hung = await file('hung', 'sleep 60', 1);
   const v = await settled(e, hung);
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');
@@ -207,7 +207,7 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   // runtime's src/ by path, when node_modules was a link into the main checkout; docs/architecture.md now
   // refuses that route (packages/agent-runtime/test/contract.test.ts).
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
-  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), config: { permissionMode: 'read-only' } });
+  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: scratch('wf-check-probe-'), config: { permissionMode: 'read-only' } });
   const sandbox = args[args.indexOf('-s') + 1];
   const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
   assert.ok(reviewCannotWrite, 'the shipped reviewer runs read-only on the engine in this tree');
@@ -219,7 +219,7 @@ test('the shipped review is read-only on an engine that honours it, and that is 
 });
 
 test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-check-leak-'));
+  const dir = scratch('wf-check-leak-');
   const file = path.join(dir, 'outer.stderr');
   const out = execFileSync('sh', ['-c', checkScript('printf "seen=%s\\n" "${WF_STDERR-unset}"; echo said >&2')], {
     env: { ...process.env, WF_STDERR: file }, encoding: 'utf8',

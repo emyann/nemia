@@ -6,13 +6,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
+import { scratch } from './scratch.ts';
 
-const REAL = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-linked-'));
-const ROOT = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-link-')), 'store');
+const REAL = scratch('wf-linked-');
+const ROOT = path.join(scratch('wf-link-'), 'store');
 fs.mkdirSync(path.join(REAL, 'store'));
 fs.symlinkSync(path.join(REAL, 'store'), ROOT);
 process.env.WF_ROOT = ROOT;

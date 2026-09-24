@@ -1,0 +1,89 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fed, themeOf } from '../board.ts';
+import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
+import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { GATED, HELD } from '../seed.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT, store } from '../world.ts';
+
+export default {
+  // A run a person holds until another ships (`wf hold`), on the board: GATED, at plan's gate, held until HELD, a run in flight on the same
+  // repository and branch, which `wf hold` takes (`holdRefusal`). Its card says the hold's word where its gate was, with no Approve and not
+  // waiting on you; plan's chip reads held; an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and
+  // how to lift it, and offers no answer. The hold is written as `wf hold` writes it, then taken back, so every page after reads the store
+  // as seeded — and the card, read again, offers its gate as it did.
+  name: 'hold',
+  route: '/',
+  expect: async (page) => {
+    const { id, gated } = GATED;
+    const until = HELD.id;
+    const hold = path.join(store!, 'runs', `${id}.hold`);
+    const word = `held until ${until} ships`;
+    const advice = `nothing of ${id} is filed, and nothing is asked of you, until wf decide says ${until} has shipped; to go on before then: wf hold ${id} --off`;
+    // The floor as the grid lays it out, whatever the page before left open.
+    await page.getByRole('button', { name: 'Reset layout' }).click();
+    await settled(page);
+    const card = cardOf(page, id);
+    const edge = holdEdgeOf(page, until, id);
+    await expectVisible(card.locator('[data-answer="Approve"]'), `before the hold, ${id}'s card offers ${gated}'s gate`);
+    await expectCount(edge, 0, 'and no hold edge comes into it');
+
+    try {
+      if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
+      fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });
+      fed(id, 'held');
+
+      // The card: the hold's word, whole, with how to lift it on hover; no gate, no Approve, not waiting on you; plan and implement held.
+      const said = card.locator('[data-holding="on-runs"]');
+      await expectVisible(said.filter({ hasText: new RegExp(`^${word}$`) }), `the card says ${word}`);
+      const title = await said.getAttribute('title');
+      if (title !== advice) throw new Refused(`the card's hold says how to lift it on hover — it says ${JSON.stringify(title)}`);
+      await expectCount(card.locator('[data-answer="Approve"]'), 0, 'and offers no Approve: the package refuses it on a held run');
+      await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
+      await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
+      await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
+      for (const step of GATED.steps) {
+        await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="held"]`), `${step}'s pill on its rail is held`);
+      }
+      // The edge: one, from the run it is held until into its card, counted, since a straight edge's path is hidden to Playwright.
+      await expectCount(edge, 1, `an edge comes into ${id}'s card from ${until}'s, which it is held until`);
+      if ((await edge.locator('path').count()) < 1) throw new Refused('the hold edge is drawn: it has a path');
+      await expectVisible(cardOf(page, until), `${until}'s card is on the floor, for the edge to leave from`);
+      await expectClearOfEachOther(page);
+      await expectClearOfPanels(page, 'with a run held');
+      await settled(page);
+      const theme = await themeOf(page);
+      await page.screenshot({ path: path.join(OUT, `hold-held-${theme}.png`), fullPage: true });
+      await photographCard(page, card, path.join(OUT, `hold-card-${theme}.png`));
+
+      // The run's page: the hold and how to lift it, the run it is held until linked; plan's chip held, no Approve, and no Decide section.
+      await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
+      await idle(page);
+      const section = page.locator('section[aria-label="Held"]');
+      await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${word}$`) }), `the run's page says ${word}`);
+      await expectVisible(section.locator('[data-advice]', { hasText: new RegExp(`^${advice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }), 'and how to lift it');
+      await expectVisible(section.getByRole('link', { name: until, exact: true }), `and links ${until}`);
+      const step = page.locator(`article > section#step-${gated}`);
+      await expectVisible(step.locator('[data-state="held"]'), `${gated}'s chip is held on its page`);
+      await expectCount(step.getByRole('button', { name: 'Approve', exact: true }), 0, `and ${gated}'s section offers no Approve`);
+      await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the page no Decide section');
+      await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `hold-run-${theme}.png`), fullPage: true });
+    } finally {
+      // Taken back as `wf hold --off` does, and said on the feed as the step's word: the board reads the run again.
+      fs.rmSync(hold, { force: true });
+      fed(id, gated, 'awaiting approval');
+    }
+
+    // Lifted: the page says no hold, and offers the gate again; the Factory draws no hold edge, and the card offers Approve as before.
+    await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold lifted, the run page says no hold');
+    await expectVisible(page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
+    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
+    await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
+    await expectCount(edge, 0, 'and no hold edge comes into it');
+  },
+} satisfies PageSpec;

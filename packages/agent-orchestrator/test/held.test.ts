@@ -10,12 +10,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest, type TaskView } from 'agent-runtime';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-held-'));
+const ROOT = scratch('wf-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.

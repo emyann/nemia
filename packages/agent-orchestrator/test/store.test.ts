@@ -9,15 +9,16 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskView } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
+import { scratch } from './scratch.ts';
+import { SIGNOFF } from '../src/run.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
+const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 fs.mkdirSync(WORKFLOW, { recursive: true });
@@ -231,6 +232,12 @@ const board = () => {
   const waiting = new Map<string, string>();
   /** What the harness denied each task's last attempt, as the runtime records it on the attempt's end (`Attempt.denials`): once it has settled. */
   const denials = new Map<string, Array<{ tool: string; what?: string }>>();
+  /**
+   * Whether each task's last attempt gave the statement it was asked for, as the runtime reports it since stage 4a (`Attempt.stated`): once
+   * it has settled, its attempt ended `done` by its harness with the fact beside it. Absent, the attempt carries no such key, as every
+   * journal written before does.
+   */
+  const stated = new Map<string, boolean>();
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
@@ -250,6 +257,7 @@ const board = () => {
             : {
               n: i + 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
               ...(reason ? { ended: 'failed', reason } : {}), ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
+              ...(settled && !reason && stated.has(id) ? { ended: 'done', reason: 'harness', stated: stated.get(id) } : {}),
             })),
         },
       };
@@ -273,7 +281,7 @@ const board = () => {
     },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials };
+  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials, stated };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -1484,9 +1492,9 @@ test("a step that continues another's session (`resume:`) is filed with that ses
   assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.config?.contextTokens, 200_000, 'its nudge, continuing the same chain');
 });
 
-test('a step with `disallow:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+test('a step with `disallowedTools:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'];
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallow: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallowedTools: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
   assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.disallowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
@@ -1503,9 +1511,51 @@ test('a step with `disallow:` reaches `e.file` with exactly those rules as `disa
   assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.disallowedTools, undefined, "the check is the run's own, and denied nothing");
 });
 
-test('a step with `allow:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under both', async () => {
+  const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
+  // The record as a `wf` from before 2026-09-23 froze it: the same step, its lists under the former names.
+  const at = path.join(ROOT, 'runs', `${run.id}.json`);
+  const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+  record.workflow = record.workflow.map(({ disallowedTools, allowedTools, ...step }) => ({ ...step, ...(disallowedTools ? { disallow: disallowedTools } : {}), ...(allowedTools ? { allow: allowedTools } : {}) }));
+  fs.writeFileSync(at, JSON.stringify(record, null, 2));
+  assert.match(fs.readFileSync(at, 'utf8'), /"disallow": \[/, 'the fixture is the old record');
+  assert.doesNotMatch(fs.readFileSync(at, 'utf8'), /"(disallowed|allowed)Tools":/, 'and holds no new name');
+  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.deepEqual([read.disallowedTools, read.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'read under the names the keys have now');
+  assert.equal(Object.hasOwn(read, 'allow') || Object.hasOwn(read, 'disallow'), false);
+  assert.deepEqual(listRuns().find((r) => r.id === run.id)!.workflow, readRun(run.id).workflow, 'and listed the same way the tick reads it');
+  const { e, tasks } = board();
+  await advance(e, readRun(run.id));
+  const config = tasks.get(`${run.id}-implement`)!.spec.config as { disallowedTools?: string[]; allowedTools?: string[] } | undefined;
+  assert.deepEqual([config?.disallowedTools, config?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'the frozen rules reach the engine: none is dropped');
+  const written = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+  assert.deepEqual([written.disallowedTools, written.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'the pass that filed it wrote the record back under the new names');
+  assert.deepEqual([written.disallow, written.allow], [written.disallowedTools, written.allowedTools], 'and the former beside them (`withFormerNames`)');
+});
+
+test("a record written today holds each step's rule lists under their former names too, so a daemon older than the rename, reading a step as it did, still files them", async () => {
+  const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
+  const at = path.join(ROOT, 'runs', `${run.id}.json`);
+  // What the tick before 2026-09-23 filed from: the raw step's `disallow` and `allow`, read off the record with no renaming.
+  const oldTickReads = () => {
+    const step = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+    return [step.disallow, step.allow];
+  };
+  const LISTS = [['SendMessage'], ['Edit(**)', 'Bash(npm test)']];
+  assert.deepEqual(oldTickReads(), LISTS, '`wf start` writes them (`writeRun`)');
+  const { e } = board();
+  await advance(e, readRun(run.id));
+  assert.deepEqual(oldTickReads(), LISTS, 'and the tick writes them back (`rewriteRun`)');
+  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.equal(Object.hasOwn(read, 'disallow') || Object.hasOwn(read, 'allow'), false, "today's code reads the new names alone");
+  // A step with no list gets no former field either: nothing is written that the step did not say.
+  const bare = (JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${started(folder('')).id}.json`), 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow;
+  assert.equal(bare.some((s) => Object.hasOwn(s, 'disallow') || Object.hasOwn(s, 'allow')), false);
+});
+
+test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallow: Edit(**), Bash(npm test)', 'failed', 1);
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallowedTools: Edit(**), Bash(npm test)', 'failed', 1);
   assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.allowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
@@ -1533,7 +1583,7 @@ test("at shipped defaults a step names neither, and is filed with neither: the h
 test("a round files its target with the target's tools, deny list and effort, and the looping step — a new session each round — with its own", async () => {
   const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
   const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
-  const run = started(looped('tools: Read, Grep, Glob, Bash\ndisallow: Bash(npm run build)\neffort: max\n', 'tools: Read, Edit, Write, Bash\ndisallow: SendMessage\nallow: Edit(**)\neffort: low\n'));
+  const run = started(looped('tools: Read, Grep, Glob, Bash\ndisallowedTools: Bash(npm run build)\neffort: max\n', 'tools: Read, Edit, Write, Bash\ndisallowedTools: SendMessage\nallowedTools: Edit(**)\neffort: low\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
   const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;
@@ -1890,6 +1940,56 @@ test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a s
     const brief = b.tasks.get(readRun(b.run.id).steps.implement!.taskId!)!.spec.brief;
     assert.ok(brief.includes(told), `${word}: the try is told ${told}`);
   }
+});
+
+test("UNSIGNED is the orchestrator's word since stage 4a, at shipped defaults: a task whose job ended `done` with `stated: false` settled `succeeded`, and the step reads `unsigned`; the run nudges its session once to sign off, and a nudge that ends the same leaves it on you — an end with no `stated` key is not nudged", async () => {
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const first = `${run.id}-implement`;
+  // As the runtime records it now: the harness said `done`, no statement came, and the runtime judges nothing — the task succeeded.
+  b.stated.set(first, false);
+  b.settle(first, 'succeeded');
+  const views = new Map([[first, await b.e.view(first)]]);
+  assert.deepEqual([phaseOfView(views.get(first)), closeoutAsked(views)(first)], ['succeeded', 'unsigned']);
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'unsigned');
+
+  // The run's one nudge, continuing the session that did not sign off and told so in the owner's words.
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.tried, pass.filed], [['implement'], []], 'nothing after implement is filed');
+  const nudge = readRun(run.id).steps.implement!;
+  assert.equal(nudge.tries?.at(-1)?.then, 'signoff');
+  const spec = b.tasks.get(nudge.taskId!)!.spec;
+  assert.equal(spec.resumeFrom, `native-${first}`, 'the session that ended unsigned is continued');
+  assert.ok(spec.brief.includes(SIGNOFF), spec.brief);
+
+  // It ends the same: the nudge is spent, and the step waits on a person — REFUSED a second nudge by the run.
+  b.stated.set(nudge.taskId!, false);
+  b.settle(nudge.taskId!, 'succeeded');
+  const again = await advance(b.e, readRun(run.id));
+  assert.deepEqual([again.tried, again.filed], [[], []], 'a second nudge is not filed');
+  const l = await list(b.e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['unsigned', ['implement']]);
+  const { decision: d } = await decide(b.e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed }, { outcome: 'blocked', unsigned: ['implement'], failed: [] });
+
+  // A `done` with no `stated` key — every journal written before stage 4a — is not read as a missing statement, and is not nudged:
+  // the step still reads `unsigned` (nothing said), as it always did, and waits on a person.
+  const before = board();
+  const old = started(folder());
+  await advance(before.e, readRun(old.id));
+  before.settle(`${old.id}-implement`, 'succeeded');
+  const oldViews = new Map([[`${old.id}-implement`, await before.e.view(`${old.id}-implement`)]]);
+  assert.equal(closeoutAsked(oldViews)(`${old.id}-implement`), true);
+  assert.deepEqual((await advance(before.e, readRun(old.id))).tried, [], 'no nudge on an end that says nothing of a statement');
+  // And one that stated, with nothing the run can read, is not nudged either: a statement came.
+  const garbled = board();
+  const said = started(folder());
+  await advance(garbled.e, readRun(said.id));
+  garbled.stated.set(`${said.id}-implement`, true);
+  garbled.settle(`${said.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
+  assert.equal((await list(garbled.e, readRun(said.id))).steps[0]!.status, 'unsigned · closeout unreadable');
+  assert.deepEqual((await advance(garbled.e, readRun(said.id))).tried, [], 'a statement given is not nudged for');
 });
 
 test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose attempt 1 went quiet and whose nudge was `lost` reads `failed` on `wf ls`, `wf decide` and a try's brief — and one lost, then quiet, reads `unsigned`", async () => {
@@ -2467,7 +2567,7 @@ test("a step whose job was denied a call says so — on `wf ls` beside its line 
   assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
 });
 
-test("a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `wf decide` names the rule for `allow:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on", async (t) => {
+test("a step that says `denials: fail`, denied a call, is stopped: nothing after it filed, `wf decide` names the rule for `allowedTools:` and offers `--fresh`, whose try is told what was denied — and a clean try hands on", async (t) => {
   const run = started(folder('denials: fail'));
   const b = board();
   await advance(b.e, readRun(run.id));
@@ -2486,7 +2586,7 @@ test("a step that says `denials: fail`, denied a call, is stopped: nothing after
   assert.deepEqual([listed.steps[0]!.status, listed.steps[0]!.note, listed.waitingOnYou], ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']]);
   const decided = await printedBy('decide', run.id);
   assert.match(decided, /\n {2}DENIED, waiting on you: implement {2}— its harness denied its try a call/);
-  assert.match(decided, new RegExp(`add Edit\\(//tmp/w/notes\\.md\\) to the folder's allow:, .* told to do without it: {2}wf retry ${run.id} implement --fresh {2}\\(`));
+  assert.match(decided, new RegExp(`add Edit\\(//tmp/w/notes\\.md\\) to the folder's allowedTools:, .* told to do without it: {2}wf retry ${run.id} implement --fresh {2}\\(`));
 
   await main(['retry', run.id, 'implement', '--fresh'], b.e);
   await advance(b.e, readRun(run.id));

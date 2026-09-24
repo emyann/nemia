@@ -10,7 +10,7 @@ plan → implement ⇄ review → ship
 
 `plan` runs on Claude (opus), fenced as `dev`'s review is, by machinery rather than by its brief:
 `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, and review's
-`disallow: Bash(npm run build), Bash(npm run e2e)` (`dev`'s README says what that deny closes, and what
+`disallowedTools: Bash(npm run build), Bash(npm run e2e)` (`dev`'s README says what that deny closes, and what
 it does not). Its closeout declares the plan (`plan.schema.json`): `approach`, the change in a
 paragraph; `files`, each path it would touch with one line on what changes; `steps`, in order; and
 `risks`. The paragraph is `approach` and not `summary` because every closeout already has a `summary`,

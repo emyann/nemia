@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { AgentWriteError, agentUsers, agentVersion, HOME, loadAgents, removeAgent, writeAgent, type AgentSchema } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { sourcesOf, type WorkflowSource } from './workflows.ts';
@@ -91,9 +91,11 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
     return sidecar === null ? { file: named, text: '', list } : { ...sidecar, list };
   };
   if (agent === undefined || agent instanceof Error) {
-    // Not read: its lines as written, so what is wrong can be put right in the form.
+    // Not read: its lines as written, so what is wrong can be put right in the form — a key under its former name too, as the parser reads it,
+    // which the form's save then writes under the name it has now.
+    const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
     const keys = Object.fromEntries(ROLE_KEYS.flatMap((key) => {
-      const value = frontmatterKey(source, key);
+      const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
       return value === undefined ? [] : [[key, value]];
     })) as Partial<Record<RoleKey, string>>;
     let body = '';

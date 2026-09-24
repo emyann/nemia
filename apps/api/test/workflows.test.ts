@@ -7,14 +7,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The api reads the
 // repository from HKB_REPO on each request: a git repository, since `wf start` reads its HEAD.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-workflows-'));
+const root = scratch('hkb-api-workflows-');
 process.env.WF_ROOT = root;
-const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-repo-'));
+const repo = scratch('hkb-api-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -63,7 +63,7 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], denials: null, background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -354,7 +354,7 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
 });
 
 test("this repository's workflows read as workflows: dev and dev-build are implement ⇄ review → ship with the package's reviewer on Claude, and ui is the package's, copied", () => {
-  const listed = listWorkflows(HOME_REPO, fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-no-yours-')));
+  const listed = listWorkflows(HOME_REPO, scratch('hkb-api-no-yours-'));
   for (const name of ['dev', 'dev-build', 'ui']) assert.ok(listed.some((w) => w.name === name), `workflows/${name} is listed`);
   // Every workflow the repository carries reads, with a description: a folder `wf start` would refuse fails here.
   for (const w of listed) {
@@ -373,13 +373,13 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
     assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);
     assert.deepEqual(w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })), [
       // Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role that builds.
-      { name: 'implement', spec: spec({ agent: 'implementer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, permissionMode: 'auto', check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'implement', spec: spec({ agent: 'implementer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, permissionMode: 'auto', check, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
       {
         name: 'review',
-        spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
       // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own.
-      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);

@@ -12,14 +12,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { mkdtempSync, rmSync } from 'node:fs';
-import os from 'node:os';
+import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { a2aOps } from '../src/a2a-client.ts';
 import { HarnessHandler } from '../src/a2a-handler.ts';
 import { createEngine, type PromiseRunner, type Sighting } from '../src/facade.ts';
 import { promiseOps } from '../src/runner-promise.ts';
+import { scratch } from './scratch.ts';
 
 /** The verbs a driver may be asked directly, and why: the only ones. */
 const EXEMPT = ['refuses'];
@@ -67,7 +67,7 @@ const spy = () => {
 
 /** A task taken through every verb the engine has, on `harnesses`. */
 const everyVerb = async (harnesses: Record<string, PromiseRunner>) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'ae-driver-calls-'));
+  const root = scratch('ae-driver-calls-');
   try {
     const engine = createEngine({ root, harnesses });
     const id = await engine.file({ id: 't-calls', brief: 'b', cwd: '/repo', harness: 'fake' });

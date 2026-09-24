@@ -8,7 +8,8 @@ import { Travelling } from './StateEdge';
  * `StateEdge` draws it — dashed and still, moving into a running step, solid, looping back — and the human gate. The moving
  * sample moves as a running edge does, and is as still as one where the person asked for reduced motion.
  *
- * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`).
+ * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`) — started `--after` it, or held
+ * until it ships (`wf hold`), which are both a wait on that run and drawn alike; the card itself says which.
  */
 export function CanvasLegend({ className = '', cards = false }: { className?: string; cards?: boolean }) {
   return (

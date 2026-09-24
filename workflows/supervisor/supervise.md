@@ -27,7 +27,7 @@ remote: true
 # (agent-runtime's open issue 28, M11). Unlike a job's, a background session's denials are not read (open issue 28): a
 # command it needs and was not given shows as a stall, not as a line on `wf ls`.
 permissionMode: dontAsk
-allow: Bash(wf:*), Bash(npx wf:*), Bash(claude agents:*), Bash(ae ls:*), Bash(ps:*), Bash(kill:*), Bash(sleep:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git add:*), Bash(git commit:*), Read, Grep, Glob, Skill, Edit(CLAUDE.md), Edit(docs/**), Edit(packages/*/docs/**)
+allowedTools: Bash(wf:*), Bash(npx wf:*), Bash(claude agents:*), Bash(ae ls:*), Bash(ps:*), Bash(kill:*), Bash(sleep:*), Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git add:*), Bash(git commit:*), Read, Grep, Glob, Skill, Edit(CLAUDE.md), Edit(docs/**), Edit(packages/*/docs/**)
 # Denied by name what no step needs and an unattended session otherwise has, as implement is: messaging other
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.
 #
@@ -40,7 +40,7 @@ allow: Bash(wf:*), Bash(npx wf:*), Bash(claude agents:*), Bash(ae ls:*), Bash(ps
 # more ways to write than any list of prefixes names. What the bookkeeping below needs is untouched — `git add
 # <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. It is a prefix fence, not a sandbox: `git -C
 # <dir> merge` is not `git merge`, and no deny list makes a session trustworthy that is not.
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git pull:*), Bash(git checkout:*), Bash(git switch:*), Bash(git restore:*), Bash(git rebase:*), Bash(git reset:*), Bash(git stash:*), Bash(git cherry-pick:*), Bash(git revert:*), Bash(git clean:*), Bash(git push:*)
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git pull:*), Bash(git checkout:*), Bash(git switch:*), Bash(git restore:*), Bash(git rebase:*), Bash(git reset:*), Bash(git stash:*), Bash(git cherry-pick:*), Bash(git revert:*), Bash(git clean:*), Bash(git push:*)
 ---
 Watch this repository's runs, and put what needs a person in front of the person.
 
@@ -115,7 +115,7 @@ change>"`, which is what that folder's own screen offers.
 **Never type git for a run.** Not `git merge`, not `git branch -D`, not a push, not a checkout of its
 branch. A run's result is merged by its own workflow's ending step, which a person approves and which runs
 that folder's whole check first; a branch is dropped by a person. If a folder has no ending step, say so in
-your brief and leave the commands to them. This one is not only asked of you: your `disallow:` refuses `git
+your brief and leave the commands to them. This one is not only asked of you: your `disallowedTools:` refuses `git
 merge`, `git pull`, `git checkout`, `git switch`, `git restore`, `git rebase`, `git reset`, `git stash`, `git
 cherry-pick`, `git revert`, `git clean` and `git push` by name, so a command you should not have typed is refused
 rather than run.
@@ -123,7 +123,7 @@ rather than run.
 ## When nothing needs a person
 
 Wait, and read again. A foreground wait that ends by itself: `sleep 60`, then another `wf ls`. Nothing else
-waits: your `allow:` lets `sleep` through and not a shell loop. **Never a background loop**: one that outlived the command that started it held a session
+waits: your `allowedTools:` lets `sleep` through and not a shell loop. **Never a background loop**: one that outlived the command that started it held a session
 for seventy-seven minutes with nothing running in it, and nothing settled the step (CLAUDE.md;
 agent-runtime's open issue 24). End anything you start before you sign off.
 

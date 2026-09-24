@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as its module loads: set first.
-process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-quota-'));
+process.env.WF_ROOT = scratch('hkb-api-quota-');
 
 const { app } = await import('../src/app.ts');
 const {
@@ -303,7 +304,7 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
   assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
   assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
-  assert.equal(ran.cwd, fs.realpathSync(os.tmpdir()));
+  assert.equal(ran.cwd, fs.realpathSync(os.tmpdir())); // not a root: where askUsage runs its claude
   // Started without the user's settings — their plugins, hooks and skills' sync — without MCP servers, and writing no session.
   const started = fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('-p ')).pop();
   assert.equal(started, '-p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ');
@@ -320,7 +321,7 @@ test('an answered ask closes its stdin, and the process ends of its own', async 
 
 test('REFUSED: no claude on PATH is no-claude', async () => {
   fresh();
-  const env = { ...process.env, PATH: path.join(os.tmpdir(), 'hkb-no-such-dir') };
+  const env = { ...process.env, PATH: path.join(scratch('hkb-api-nowhere-'), 'no-such-dir') };
   assert.deepEqual(await askUsage({ env }), { kind: 'no-claude' });
   assert.equal((await readQuota({ env })).state, 'no-claude');
 });

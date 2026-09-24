@@ -13,7 +13,7 @@ what it reads is the store and the runs' own branches, and the little it writes 
 `CLAUDE.md`, a section in `packages/agent-orchestrator/docs/features.md`. It carries implement's denies and no
 `check:`: there is nothing to verify, because it produces nothing but questions and approvals.
 
-**Its `disallow:` denies git by name.** "Never type git for a run" is a sentence in `supervise.md`, and prose
+**Its `disallowedTools:` denies git by name.** "Never type git for a run" is a sentence in `supervise.md`, and prose
 is not a constraint. `.claude/settings.json` refuses `git push` and `git branch -D` for every session in this
 checkout, and that is where those two live; it cannot refuse `git merge`, because `ship.md` runs in the same
 checkout and merging is its whole job. So the step's own fence is the only place the rest of the refusal can
@@ -28,13 +28,13 @@ not a session that means to get round it.
 **It is the one background session among the shipped steps** (`background: true`). Every other shipped step runs as
 a job — `claude -p`, which runs its brief, exits, and asks nobody in any mode — and this one runs as `claude --bg`, which
 outlives each brief, is listed in `claude agents`, and can be attached to, said words to and bridged. So it is fenced as
-the planner and the reviewer are: `permissionMode: dontAsk` with an `allow:` list of what its prose asks of it — the `wf`
+the planner and the reviewer are: `permissionMode: dontAsk` with an `allowedTools:` list of what its prose asks of it — the `wf`
 verbs, `claude agents`, `ae ls`, `ps` and `kill` to diagnose a stall, `sleep` to wait, the git it reads and the `git add` and
 `git commit` its bookkeeping needs, `Read`, `Grep` and `Glob` anywhere (the store and the runs' worktrees are outside this
 checkout), the look skill, and `Edit` of `CLAUDE.md` and the `docs/` folders only. A background session in a mode that
 asks would wait on a prompt nobody is there to answer; in `dontAsk` a call it was not given is denied and it carries on.
 A job's denials are read and put on `wf ls`; a background session's are not (agent-runtime's open issue 28), so a command
-it needs and was not given shows as a stall, and the fix is a line in its `allow:`. It keeps no `budget:`: a background
+it needs and was not given shows as a stall, and the fix is a line in its `allowedTools:`. It keeps no `budget:`: a background
 session has no spend cap to keep, and the parser refuses one beside `background: true`.
 
 `slot: none` keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`). The cap holds the work this

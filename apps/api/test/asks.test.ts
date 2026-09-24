@@ -11,11 +11,11 @@ import { observations, registry, stops } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-asks-${label}-`));
+const tmp = (label: string) => scratch(`hkb-api-asks-${label}-`);
 
 // agent-orchestrator locates its store, and the Claude runner where transcripts are, as their modules load: both are set first.
 const root = tmp('root');

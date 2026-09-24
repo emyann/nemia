@@ -10,10 +10,10 @@ import { stops } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-gate-${label}-`));
+const tmp = (label: string) => scratch(`hkb-api-gate-${label}-`);
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = tmp('root');

@@ -18,6 +18,12 @@
  * (`inputAt`), written before each line is, so a worker started again on the run file writes no word twice: at most once,
  * never twice. What it cannot give a harness it starts again is the words the one before heard (open issue 29).
  *
+ * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
+ * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
+ * from under it for a stop — it ends the harness's group, SIGKILLs it if it is still there `GONE_KILL_MS` later, and
+ * writes nothing again, so the file is never made anew — and exits. It notices at its next write: the heartbeat, within
+ * five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine is what it is for.
+ *
  * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, nativeIdPattern?, input?, inputAt? }
  */
 import fs from 'node:fs';
@@ -37,11 +43,38 @@ let status = {
   // A harness started here has closed nothing yet, whatever the one before it did.
   inputClosed: undefined as true | undefined,
 };
+/** How long a harness whose run file is gone has to end on SIGTERM before its group is killed. */
+const GONE_KILL_MS = 5_000;
+let spawned = false;
+let gone = false;
 const write = (patch: Partial<typeof status> = {}) => {
+  if (gone) return;
   status = { ...status, ...patch, heartbeatAt: new Date().toISOString() };
-  // Written via a temp file and renamed, so a reader never sees half a JSON object.
-  fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));
-  fs.renameSync(`${runFile}.tmp`, runFile);
+  // Looked for first: renamed into place, a write would make again the file that was taken away.
+  if (!fs.existsSync(runFile)) return vanished();
+  try {
+    // Written via a temp file and renamed, so a reader never sees half a JSON object.
+    fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));
+    fs.renameSync(`${runFile}.tmp`, runFile);
+  } catch (e) {
+    // The directory went with it: the store removed.
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return vanished();
+    throw e;
+  }
+};
+/**
+ * The run file is gone: the session was taken away. Before the harness is started, nothing is; after, it is ended. Every
+ * write after the first is heard on the event loop, once this start has run to its end, so `beat`, `inbox` and `child`
+ * below are set by then.
+ */
+const vanished = () => {
+  gone = true;
+  if (!spawned) process.exit(0);
+  stopping = true;
+  clearInterval(beat);
+  clearInterval(inbox);
+  killGroup();
+  setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } }, GONE_KILL_MS).unref();
 };
 // Heard before the pid is published: a stop is sent to the pid on disk, and a worker that met SIGTERM before
 // it had a handler would die of it, leaving its harness running under a run file that says `working` until the
@@ -61,6 +94,7 @@ write();
 // otherwise, and an orphaned build still holds the worktree the next attempt wants.
 const input = plan.input;
 const child = spawn(plan.cmd, plan.args, { cwd: plan.cwd, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'], detached: true });
+spawned = true;
 const log = fs.createWriteStream(plan.logFile, { flags: 'a' });
 // Heard: output that arrives after the log is closed (a child still holding a pipe) must not crash
 // the one process that says how the run ended.

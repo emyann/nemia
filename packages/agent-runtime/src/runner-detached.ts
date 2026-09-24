@@ -159,6 +159,9 @@ const sizeOf = (p: string) => { try { return fs.statSync(p).size; } catch { retu
  * a process that is running. So no detached session reaches the engine's `needs-human`, and none carries a
  * `Sighting.waitingFor`: there is nothing to carry, not something dropped. Only a harness with a registry that
  * says a session is waiting, and says what for — Claude Code's `claude agents --json` — can fill that field.
+ *
+ * The file is the session: `stop` finds the worker by it. Removed, alone or with the store it is in, the worker takes it
+ * for a stop, ends its harness and exits, and never writes the file again (open issue 30).
  */
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string; startedAt?: string;

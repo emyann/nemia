@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
 import type { Sighting } from '../src/domain.ts';
-import { scratch } from './scratch.ts';
+import { runningIn, scratch } from './scratch.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
@@ -128,6 +128,55 @@ test('a stop that lands the moment the worker has published its pid is heard, no
     // Only a worker that did not hear the stop is still there to take away.
     if (pid > 0 && !heard) for (const sig of ['SIGCONT', 'SIGKILL'] as const) try { process.kill(pid, sig); } catch { /* gone */ }
   }
+});
+
+/** Alive: in the process table, and not a zombie waiting on its parent. */
+const alive = (pid: number) => {
+  try { return !execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('Z'); } catch { return false; }
+};
+/** Until `ok` holds, under a bound of seconds: past one heartbeat of the worker, and its drain. */
+const within = async (ok: () => boolean, what: string) => {
+  for (const bound = performance.now() + 15_000; !ok();) {
+    if (performance.now() > bound) assert.fail(`${what}, in 15s`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+};
+
+for (const [what, takeAway] of [
+  ['its run file', (_dir: string, file: string) => fs.rmSync(file)],
+  ['the whole store', (dir: string) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 })],
+] as const) {
+  test(`a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`, async () => {
+    // Nobody could stop it otherwise: `stop` finds a worker by its run file, and a store removed under a running
+    // session left the worker beating into nothing and its harness running for as long as it liked.
+    const dir = root();
+    const cwd = scratch('ae-harness-');
+    const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
+    await Effect.runPromise(ops.spawn(req('ae/g1/1', cwd)));
+    const file = path.join(dir, 'runs', 'sh', 'ae_g1_1.json');
+    let worker = 0;
+    let harness = 0;
+    await within(() => {
+      try { worker = (JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number }).pid; } catch { /* mid-write */ }
+      try { harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8')); } catch { /* not yet */ }
+      return worker > 0 && harness > 0;
+    }, 'the worker and its harness started');
+
+    takeAway(dir, file);
+    await within(() => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+    assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+  });
+}
+
+test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
+  await within(() => heardIn(dir).length === 1, 'the brief read');
+  assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
+  fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
+  await within(() => runningIn([dir]).length === 0, 'the worker and the listener ended');
+  assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
 });
 
 test('THE LEASE: a run file whose heartbeat stopped is reported dead, not running', async () => {

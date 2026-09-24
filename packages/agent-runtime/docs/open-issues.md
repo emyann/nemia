@@ -740,6 +740,25 @@ before each line, and a run spawned under the name starts at the inbox's end as 
 - **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
   and a `--bg` session's words are refused past it; a job's are not refused on length.
 
+### 30. A run file removed is a stop (2026-09-23)
+
+A detached worker's run file is its session: `stop` and `observe` find the worker by it. Until 2026-09-23 a worker whose run
+file was removed wrote it again at its next heartbeat and ran on, and one whose whole store was removed crashed on its next
+write and left its harness running, which nothing could find to stop. The runtime's own tests showed it: a test that failed
+before it stopped its worker left the worker, and a harness that reads its stdin for ever, running for hours, and 12,583
+`ae-detached-*` folders piled up under `/tmp`. Now the worker takes a run file gone, alone or with its store, for a stop.
+It sends SIGTERM to the harness's process group, SIGKILLs the group five seconds later if it is still there, writes nothing
+again, and exits (`bin/ae-worker.ts`, `test/detached.test.ts`). What that leaves:
+
+- **It is noticed at the worker's next write**: the heartbeat, within five seconds, or sooner at a word written on or an id.
+- **A removal in the instant between the worker's look and its rename is undone.** The worker looks for the file, then
+  renames its new copy into place, so a file removed in between is written again and the worker runs on as before. The
+  window is a few microseconds on each write. Nothing in the runtime removes a run file; a person or a test does.
+- **The parent going is not a stop.** The worker is detached to outlive the engine that started it, and an engine restarted
+  adopts it by its run file. A test that starts a worker stops it itself: every test root comes from `test/scratch.ts`,
+  whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that
+  nothing is left.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

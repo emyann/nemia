@@ -108,14 +108,14 @@ test('implement declares the screenshots it looked at and the pages they show, a
 });
 
 test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk, denied build and e2e — and implement has every tool', () => {
-  const { harness, after, input, tools, disallow, permissionMode, output, loop, rounds } = steps.review!;
-  assert.deepEqual({ harness, after, input, tools, disallow, permissionMode, output: output?.file, loop, rounds }, {
+  const { harness, after, input, tools, disallowedTools, permissionMode, output, loop, rounds } = steps.review!;
+  assert.deepEqual({ harness, after, input, tools, disallowedTools, permissionMode, output: output?.file, loop, rounds }, {
     harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'],
-    disallow: REVIEW_DENIED, permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3,
+    disallowedTools: REVIEW_DENIED, permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3,
   });
   assert.deepEqual(tools?.filter((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t)), [], 'nothing that edits');
   assert.equal(steps.implement?.tools, undefined);
-  assert.deepEqual(steps.implement?.disallow, IMPLEMENT_DENIED);
+  assert.deepEqual(steps.implement?.disallowedTools, IMPLEMENT_DENIED);
 });
 
 /** What the settings allow for implement's check, and write into the workspace: a reviewer is denied both by name. */
@@ -136,10 +136,10 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
     const ship = byName.ship!;
     assert.ok(ship, `${folder} has an ending step`);
-    const { after, workspace, gate, harness, model, disallow, check: own, tools, output, loop } = ship;
-    assert.deepEqual({ after, workspace, gate, harness, model, disallow, check: own, tools, output, loop }, {
+    const { after, workspace, gate, harness, model, disallowedTools, check: own, tools, output, loop } = ship;
+    assert.deepEqual({ after, workspace, gate, harness, model, disallowedTools, check: own, tools, output, loop }, {
       after: ['review'], workspace: 'main', gate: true, harness: 'claude', model: 'opus',
-      disallow: IMPLEMENT_DENIED, check: undefined, tools: undefined, output: undefined, loop: undefined,
+      disallowedTools: IMPLEMENT_DENIED, check: undefined, tools: undefined, output: undefined, loop: undefined,
     }, folder);
     assert.deepEqual(terminalSteps(loadWorkflows(dir)).map((s) => s.name), ['ship'], `${folder} ends there`);
 
@@ -194,18 +194,18 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
 
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
   // The deny is what keeps review from them: the settings allow both, so in dontAsk nothing else would.
-  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { allow: string[] } };
+  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { allowedTools: string[] } };
   for (const rule of REVIEW_DENIED) assert.ok(settings.permissions.allow.includes(rule), `${rule} is allowed by the settings, word for word`);
 
   const folders = [WORKFLOWS, path.join(WORKFLOWS, 'ui'), ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'].map((d) => path.join(REPO, 'workflows', d))];
   for (const dir of folders) {
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
-    assert.deepEqual(byName.implement?.disallow, IMPLEMENT_DENIED, `${dir}: implement`);
+    assert.deepEqual(byName.implement?.disallowedTools, IMPLEMENT_DENIED, `${dir}: implement`);
     const review = byName.review!;
     if (review.harness === 'codex') {
-      assert.deepEqual([review.permissionMode, review.disallow], ['read-only', undefined], `${dir}: codex has no tool list, and its sandbox writes nothing`);
+      assert.deepEqual([review.permissionMode, review.disallowedTools], ['read-only', undefined], `${dir}: codex has no tool list, and its sandbox writes nothing`);
     } else {
-      assert.deepEqual([review.permissionMode, review.disallow], ['dontAsk', REVIEW_DENIED], `${dir}: review`);
+      assert.deepEqual([review.permissionMode, review.disallowedTools], ['dontAsk', REVIEW_DENIED], `${dir}: review`);
     }
   }
 });

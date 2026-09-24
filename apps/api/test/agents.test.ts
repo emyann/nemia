@@ -85,6 +85,29 @@ test('an agent that does not read is listed with its refusal, and its lines as w
   }
 });
 
+test('an agent that writes a list under its former name — `disallow:`, `allow:` — is listed under the name it has now, read or not; a save writes that name, and a page from before that sends the former one is refused', async () => {
+  fs.writeFileSync(path.join(AGENTS, 'former.md'), '---\ndescription: Writes under the old names.\ndisallow: SendMessage\nallow: Edit(**)\n---\nDo it.\n');
+  fs.writeFileSync(path.join(AGENTS, 'former-broken.md'), '---\ndisallow: SendMessage\nallow: Edit(**)\ncheck: npm test\n---\nDo it.\n');
+  try {
+    const agents = await listed();
+    const former = agents.find((a) => a.name === 'former')!;
+    assert.equal(former.error ?? null, null);
+    assert.deepEqual(former.keys, { disallowedTools: 'SendMessage', allowedTools: 'Edit(**)' });
+    const broken = agents.find((a) => a.name === 'former-broken')!;
+    assert.match(broken.error ?? '', /`check` is wiring/);
+    assert.deepEqual(broken.keys, { disallowedTools: 'SendMessage', allowedTools: 'Edit(**)' }, 'its lines as written, as the parser reads them, so the form can put it right');
+
+    await refused(send('PUT', '/api/agents/yours/former', { name: 'former', description: former.description, keys: { disallow: 'SendMessage', allow: 'Edit(**)' }, body: former.body, version: former.version }), 422,
+      /^agents\/former\.md: `disallow` is `disallowedTools`'s former name, .* reload it, and save again\.$/);
+    const put = await send('PUT', '/api/agents/yours/former', { name: 'former', description: former.description, keys: former.keys, body: former.body, version: former.version });
+    assert.equal(put.status, 200, await put.clone().text());
+    assert.equal(fs.readFileSync(path.join(AGENTS, 'former.md'), 'utf8'), '---\ndescription: Writes under the old names.\ndisallowedTools: SendMessage\nallowedTools: Edit(**)\n---\nDo it.\n');
+  } finally {
+    fs.rmSync(path.join(AGENTS, 'former.md'), { force: true });
+    fs.rmSync(path.join(AGENTS, 'former-broken.md'), { force: true });
+  }
+});
+
 test('an agent that is a link is listed with its refusal alone: nothing of what it points at, outside the folder, is read', async () => {
   const outside = path.join(root, 'outside-agent.md');
   fs.writeFileSync(outside, '---\nmodel: opus\n---\nA secret from outside.\n');

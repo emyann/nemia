@@ -448,7 +448,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
           // A gated step that signed off was sent back from its gate.
           status: tried, ...(refusal ? { refusal } : {}),
-          // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allow:` denies again.
+          // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allowedTools:` denies again.
           ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
           // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
           ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
@@ -466,8 +466,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           permissionMode: step.permissionMode,
           // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
           tools: step.tools,
-          disallowedTools: step.disallow,
-          allowedTools: step.allow,
+          disallowedTools: step.disallowedTools,
+          allowedTools: step.allowedTools,
           // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
           background: step.background,
           remoteControl: step.remote,
@@ -525,8 +525,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           contextTokens: sessionContext(target, steps),
           permissionMode: target.permissionMode,
           tools: target.tools,
-          disallowedTools: target.disallow,
-          allowedTools: target.allow,
+          disallowedTools: target.disallowedTools,
+          allowedTools: target.allowedTools,
           background: target.background,
           remoteControl: target.remote,
         },
@@ -633,8 +633,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
         tools: step.tools,
         // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
-        disallowedTools: step.disallow,
-        allowedTools: step.allow,
+        disallowedTools: step.disallowedTools,
+        allowedTools: step.allowedTools,
         // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
         background: step.background,
         // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.

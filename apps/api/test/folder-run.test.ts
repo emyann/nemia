@@ -24,7 +24,7 @@ process.env.HKB_REPO = notARepo;
 // A folder team of the store's own, as `workflows/note` is: every step says `workspace: folder`, so it looks at no repository.
 const team = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(team, { recursive: true });
-fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nWrite the note.\n');
+fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n');
 // And one that works on a repository, to hold the two apart.
 const onRepo = path.join(root, 'workflows', 'change');
 fs.mkdirSync(onRepo, { recursive: true });

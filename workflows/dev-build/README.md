@@ -13,7 +13,7 @@ same build and e2e when git says the work touched the web app (its README says w
 for the person who wants them run regardless. The build regenerates the web app's
 route tree, which a new route needs before it typechecks, and the e2e builds the app, serves it
 against a seeded store and visits every page in a light and a dark theme. `review` is `dev`'s, and
-is denied both by name by its `disallow:` line: both write into the workspace. By those names only — `dev`'s
+is denied both by name by its `disallowedTools:` line: both write into the workspace. By those names only — `dev`'s
 README says which of the settings' allows still reach them.
 
 `ship` is `dev`'s, with this folder's check in its prose: the trial merge is run against

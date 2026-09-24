@@ -13,7 +13,7 @@ import { StatusChip } from './StatusChip';
  * `index` is the step's place in the run's order, which is the order `wf ls` lists it in. `waitingOnYou` is whether the
  * run's `waitingOnYou` names the step: the api's word, which leaves out a step a person has already asked something of.
  */
-export type StepNodeData = { step: RunDetail['steps'][number]; index: number; runCancelled: boolean; waitingOnYou: boolean };
+export type StepNodeData = { step: RunDetail['steps'][number]; index: number; runCancelled: boolean; runHeld: boolean; waitingOnYou: boolean };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
 /**
@@ -22,12 +22,12 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
  */
 export function StepNode({
-  data: { step, index, runCancelled, waitingOnYou },
+  data: { step, index, runCancelled, runHeld, waitingOnYou },
   selected,
   sourcePosition = Position.Right,
   targetPosition = Position.Left,
 }: NodeProps<StepFlowNode>) {
-  const state = stepState(step.status, runCancelled);
+  const state = stepState(step.status, runCancelled, runHeld);
   const live = isLive(state);
   // Every second while the attempt's time is counting; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
@@ -83,7 +83,7 @@ export function StepNode({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
-        <StatusChip status={step.status} runCancelled={runCancelled} note={step.note} />
+        <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
           {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
         </span>

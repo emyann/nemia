@@ -16,8 +16,9 @@ export const decidableRun = (run: Pick<RunSummary, 'status' | 'cancelledAt' | 'w
 export const isDecidable = (decision: RunDecision | undefined): decision is Decidable => Boolean(decision && 'touched' in decision);
 
 /**
- * The run's state for the decision's cache: where the run stands, who it waits on, and each step's task and settled word. A
- * decision is read again only when one of those moves.
+ * The run's state for the decision's cache: where the run stands, who it waits on, what a hold on it says, and each step's task and
+ * settled word. A decision is read again only when one of those moves: a hold written, lifted, or whose runs have shipped.
+ * `holding` is read tolerantly, for an api older than the hold.
  *
  * A filed step still in flight is one word, whatever the engine calls it: `running (working)`, `working (quiescent)`,
  * `starting`, `between attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
@@ -25,13 +26,15 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * settles, a try filed (a new task) all move it.
  */
 export const decisionStamp = (
-  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>> },
+  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>> },
 ): string =>
   JSON.stringify([
     run.status,
     run.waitingOnYou,
+    run.holding?.word ?? null,
     run.steps.map((s) => {
-      const state = stepState(s.status, run.cancelledAt !== null);
+      // Unheld on purpose: a gate in flight or not is one stamp either way, and the hold is stamped on its own, above.
+      const state = stepState(s.status, run.cancelledAt !== null, false);
       const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
       return [s.name, s.taskId, inFlight ? 'in flight' : s.status];
     }),

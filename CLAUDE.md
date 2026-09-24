@@ -264,6 +264,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api/workflows.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A key renamed in `STEP_KEYS` is still read under its old name, and written under it on a record.** Folders on disk and frozen run records say
+  the old name, so the old name goes into `FORMER_KEYS` (`workflow.ts`), which `readKeys` reads as the new one (and refuses when both
+  are written). `asNamed` renames a frozen step in `readRun`, since a record never goes back through the parser, and the api's
+  fallback for an agent whose file does not load reads the old name too (`formerOf` in `apps/api/src/agents.ts`). And `renderStep`
+  and `renderAgent` refuse the old name with a message saying to reload (`formerKeyWritten`), because a board page opened before the
+  rename sends it back. And a record is *written* under both names (`withFormerNames`, in `store.ts`'s `recordText`): a `wf up` started
+  before the rename keeps its code, and its tick, reading only the old field, would file every step with no rule list and say nothing.
+  Nothing migrates a file: `wf start` names each line to rename (`formerKeyLines`). Learned by the run that
+  renamed `disallow:` and `allow:` to `disallowedTools:` and `allowedTools:` (renamed on 2026-09-23, Claude Code's names).
 - **A new line in `wf decide`'s offers is parsed by the api, or handed to a person as a paragraph to run.** `ONCE_MORE` in
   `apps/api/src/decision.ts` pulls the command out of each offer the package words, and `commandsOf` falls back to `?? said` — the whole
   English sentence — for a verb it does not know. Nothing fails: the board draws a `once more` button that copies
@@ -377,13 +386,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   alone, whatever tool made it, and an `Edit` rule covers Write and NotebookEdit with it. Given
   `--allowedTools 'Write(**)'` it warns on a stderr nobody reads — *"is not matched by file permission checks — only
   Edit(path) rules are"* — and denies the write: the shipped note writer, fenced by `dontAsk`, could not write its
-  own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
-  and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
+  own `note.md` and the run learned why from nothing. Write `allowedTools: Edit(**)`; a bare `Write` (no path) is matched,
+  and allows a write anywhere. `allowedTools:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
 - **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
   denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
   which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own
-  directory from it and this run's id as `*`, and a call the step's own `disallow:` may have denied is offered no allow at all, since a deny
+  directory from it and this run's id as `*`, and a call the step's own `disallowedTools:` may have denied is offered no allow at all, since a deny
   beats every allow (`disallowedBy`). A fixture for a path the run makes is a path the run makes (learned in review of that run).
 - **A path a fenced step's brief names must be inside the step's own folder.** A folder team runs in `dontAsk`, so a read
   outside its directory is denied with no prompt and the session carries on: the brief is the only thing that says the path
@@ -391,7 +400,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   run started with `--input`. Neither fails, and the shipped chain meets neither. The fix is to copy what the brief names
   into the folder (`givenPlan` in `run.ts` words the brief and `folderPlace.make` does the copy, off the same plan), and the
   test is the one that refuses drift: in a real run, no brief names a path under the store, and every path a brief does name
-  is on disk under that step's own cwd. A read inside cwd needs no `allow:` rule on any harness (measured by
+  is on disk under that step's own cwd. A read inside cwd needs no `allowedTools:` rule on any harness (measured by
   `note-reviewer`); a write needs `Edit(**)`. Reaching out instead would be a new field on the engine's task and a fresh live
   measurement (learned by the run that gave a folder step its `given/`).
 - **A key one function refuses is refused by every function that writes it, not by the one the comment names.**
@@ -488,6 +497,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   key beyond `run` as a run that will not ship, so, read for a hold, it would take a run that has shipped for one only a person can lift.
   A hold is read by `holdNeedsYou`, which asks the three facts by name (`missing`, `cancelledAt`, `gone`): read a `Wait` by the key you
   mean, never by what else is on it (learned by the run that put the hold on the api).
+- **A held run is `running` whatever its steps say, even one only a person can lift.** `assess` returns early for a held run with
+  `status: 'running'` (`run.ts`), and the api passes that status through. So the board's `status === 'running'` keeps every held run
+  in flight, and the one that waits on a person has to be taken out by name: `inFlight` excludes `holding.onYou` as it excludes
+  `waiting.onYou`, and `waitsOnYou` reads it (`apps/web/src/lib/factory.ts`). A board fixture for a held run has `status: 'running'`.
+  The first round wrote it `failed`, from a belief about the api that nobody had read off `assess`. It then added a clause the api never
+  needed, tested on a state the board is never given (learned by the run that drew the hold on the board, round 2).
+- **An e2e page's own screenshot named `<name>-<theme>.png` is overwritten.** `visit.ts` takes that name for the picture it takes after
+  `expect` returns, so a picture the page took mid-read under the same name shows the page's end state, and reads as a wrong picture.
+  Name a page's own shots `<name>-<what>-<theme>.png` (same run).
 - **The engine can say a task waits before its harness has let the session go.** `closedOut` (`agent-runtime/src/engine.ts`)
   ends an attempt on a statement on disk while the session is `working` and not busy, and Codex writes `-o` before it exits:
   for that moment `view` says `input-required` and `getTask` still answers the harness's `WORKING`, with the process alive. A

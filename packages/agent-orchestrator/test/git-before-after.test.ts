@@ -10,7 +10,8 @@
  * branch was in flight, and the ship step's check refused the merged tree. Done again on 2026-09-23, when the packages were renamed: the
  * package's `ui` copy moved folder, and the supervisor's brief names both packages' docs by their folders. And once more the same day,
  * when the supervisor became a background session in `dontAsk`: its wait is `sleep 60` alone, as its `allow:` lets no shell loop through.
- * And when `denials: fail` gave the decision a list of its own, `denied`: the diff was that key, empty, beside every `budgetExhausted`.)
+ * And when `denials: fail` gave the decision a list of its own, `denied`: the diff was that key, empty, beside every `budgetExhausted`.
+ * And again when `disallow:` and `allow:` took Claude Code's names, `disallowedTools:` and `allowedTools:`: the supervisor's brief names both.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -38,7 +38,7 @@ export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Acceptance, Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, Spend, SpendOf, TaskSpend, Wait } from './run.ts';
 export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry.ts';
-export { agentUsers, agentVersion, loadAgents, loadWorkflows, workflowDescription, workflowFolder, workflowsIn } from './workflow-store.ts';
+export { agentUsers, agentVersion, formerKeyLines, loadAgents, loadWorkflows, workflowDescription, workflowFolder, workflowsIn } from './workflow-store.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';

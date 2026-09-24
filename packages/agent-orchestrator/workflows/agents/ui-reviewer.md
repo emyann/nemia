@@ -18,7 +18,7 @@ permissionMode: dontAsk
 # only. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach both, as `npx turbo run test build`
 # and `node --test apps/web/test/e2e/run.ts`, and no deny closes an allow that runs any task or any file (`node --test`
 # takes a glob). Narrowing those two allows is the settings' to do; until then the brief keeps review from them.
-disallow: Bash(npm run build), Bash(npm run e2e)
+disallowedTools: Bash(npm run build), Bash(npm run e2e)
 # No `output:` here: ui's review.schema.json is not the reviewer's, since a finding names a page and a theme as well as
 # a file and a line. The step that names this agent names its schema, beside itself (ui/review.md).
 ---

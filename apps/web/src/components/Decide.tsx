@@ -150,7 +150,7 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
     case 'try-again':
       return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
     case 'denied':
-      return `signed off having been denied a call${offer.calls ? ` (${offer.calls})` : ''}, and says denials: fail. This run's allow: is frozen, so a try is denied the same again: a new session is told to do without it`;
+      return `signed off having been denied a call${offer.calls ? ` (${offer.calls})` : ''}, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it`;
   }
 }
 

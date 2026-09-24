@@ -266,7 +266,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   ]);
 });
 
-test("a step `denials: fail` stopped is offered the bare `wf retry <run> <step> --fresh`, labelled once more — the rule for `allow:` stays in what `wf decide` said — and reads `denied`, waited on by a person", async () => {
+test("a step `denials: fail` stopped is offered the bare `wf retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `wf decide` said — and reads `denied`, waited on by a person", async () => {
   const denying = [{ ...workflow[0], harness: 'claude', denials: 'fail' }, { ...workflow[1], harness: 'claude' }];
   journal('t-d11-implement', [
     { ...filed('t-d11-implement'), harness: 'claude' },
@@ -283,7 +283,7 @@ test("a step `denials: fail` stopped is offered the bare `wf retry <run> <step> 
   assert.equal(status, 200);
   const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
   assert.deepEqual(once.map(({ label, command }: DecideCommand) => ({ label, command })), [{ label: 'once more', command: 'wf retry r-d11 implement --fresh' }]);
-  assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allow:/);
+  assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
 });
 
 test("a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers", async () => {

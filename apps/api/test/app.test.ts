@@ -2,11 +2,13 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-'));
+const root = scratch('hkb-api-');
+/** A folder nothing is made in: a path under it names a workflow folder that is not there. */
+const NOWHERE = scratch('hkb-api-nowhere-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
 const { engine, list, readRun } = await import('agent-orchestrator');
@@ -67,7 +69,7 @@ const detachedSession = (harness: string, taskId: string, attempt: number, outpu
 const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) => detachedSession('codex', taskId, attempt, output);
 
 const workflowFolder = (files: Record<string, string>) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-workflow-'));
+  const dir = scratch('hkb-api-workflow-');
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
   return dir;
 };
@@ -277,7 +279,7 @@ test('the api words a step as list does — `unknown` for a task the engine has 
 });
 
 test('a run whose workflow folder is gone still answers, from its record', async () => {
-  const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+  const gone = path.join(NOWHERE, 'no-such-workflow');
   writeRun({ ...r2, id: 'r-3', workflowDir: gone });
 
   const res = await app.request('/api/runs/r-3');
@@ -417,7 +419,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), run.steps[0].told);
 
   // And with no folder at all: the same page.
-  writeRun({ ...r2, id: 'r-41', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'), workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({ ...r2, id: 'r-41', workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
   const gone = await (await app.request('/api/runs/r-41')).json();
   assert.match(gone.warning, /is gone\. Nothing here is read from it/);
   assert.deepEqual(gone.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
@@ -662,7 +664,7 @@ function seedChecks() {
   checkTask('r-21-build-check', { settled: 'succeeded', exitCode: 0 });
   settledTask('t-21-docs', done);
   writeRun({
-    ...r2, id: 'r-21', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    ...r2, id: 'r-21', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
     workflow: [{ name: 'build', after: [], body: 'Build it.', check: 'npm run build' }, { name: 'docs', after: ['build'], body: 'Write it down.' }],
     steps: { build: { taskId: 't-21-build', check: { taskId: 'r-21-build-check' } }, docs: { taskId: 't-21-docs' } },
   });
@@ -723,7 +725,7 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
 });
 
 test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
-  const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+  const gone = path.join(NOWHERE, 'no-such-workflow');
 
   // The review's case: one root's check refused while its sibling's session still runs, and what waits on both
   // never will be filed. `assess` calls it failed; it is not finished.
@@ -781,7 +783,7 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
 });
 
 test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {
-  const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+  const gone = path.join(NOWHERE, 'no-such-workflow');
   const retried = [{ name: 'a', after: [], body: 'A.', check: 'npm test', retries: 1 }, { name: 'b', after: ['a'], body: 'B.' }];
   // Refused: the check ran to its end and exited 1, and `retries: 1` leaves a try for the next tick to file.
   settledTask('t-27-a', done);
@@ -836,7 +838,7 @@ function seedLoop(id: string, round: number, again: boolean) {
   const replies = [{ finding: 'src/flag.ts:12', answer: 'fixed', why: 'parsed before it is read' }];
   settledTask(`t-${id}-implement-${round}`, round > 1 ? { ...done, replies } : done);
   settledTask(`t-${id}-review-${round}`, { ...done, again });
-  writeRun({ ...r2, id, workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'), workflow: looped, steps });
+  writeRun({ ...r2, id, workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: looped, steps });
 }
 
 /** A person's ask, as `wf retry` and `wf round` leave one: a file of its own beside the run's record, named for what it asks. */
@@ -892,7 +894,7 @@ test('a round the loop asked for, and a try a person asked for, read as the tick
   // Signed off blocked, and a person asked for another try with `wf retry r-33 implement`.
   settledTask('t-33-implement', blocked);
   writeRun({
-    ...r2, id: 'r-33', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    ...r2, id: 'r-33', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
     workflow: [{ name: 'implement', after: [], body: 'Implement it.' }, { name: 'review', after: ['implement'], body: 'Review it.' }],
     steps: { implement: { taskId: 't-33-implement' }, review: { taskId: null } },
   });
@@ -942,7 +944,7 @@ test("a refused check whose output cannot be read still answers, and says how to
   checkTask('r-22-test-check', { settled: 'failed', exitCode: 2 });
   detachedSession('check', 'r-22-test-check', 1, { unreadable: true }, 2);
   writeRun({
-    ...r2, id: 'r-22', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    ...r2, id: 'r-22', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
     workflow: [{ name: 'test', after: [], body: 'Test it.', check: 'npm test' }],
     steps: { test: { taskId: 't-22-test', check: { taskId: 'r-22-test-check' } } },
   });
@@ -960,7 +962,7 @@ test("a refused check whose output cannot be read still answers, and says how to
 
 test('the list of runs observes the engine once, however many runs and steps are filed', async (t) => {
   // A `claude` ahead of the real one on PATH, which notes each call and sees no sessions of ours.
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-bin-'));
+  const bin = scratch('hkb-api-bin-');
   const calls = path.join(bin, 'calls');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
   const before = process.env.PATH;
@@ -991,7 +993,7 @@ test('the list of runs observes the engine once, however many runs and steps are
  * many times a request observed the harnesses.
  */
 function countingObservations(t: { after: (fn: () => void) => void }): () => number {
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-bin-'));
+  const bin = scratch('hkb-api-bin-');
   const calls = path.join(bin, 'calls');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
   const before = process.env.PATH;
@@ -1002,7 +1004,7 @@ function countingObservations(t: { after: (fn: () => void) => void }): () => num
   return () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
 }
 
-const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+const gone = path.join(NOWHERE, 'no-such-workflow');
 
 test('a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation', async (t) => {
   // implement's check refused its first try, and `retries: 1` filed a second, which passed; review asked for another round, and
@@ -1214,7 +1216,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   // The engine's Effect surface, where its runners are: the Promise one has none.
   const { claudeOps } = await import('agent-runtime/effect');
   const { Effect } = await import('effect');
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-claude-'));
+  const bin = scratch('hkb-api-claude-');
   const argsFile = path.join(bin, 'args');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
   const before = process.env.PATH;

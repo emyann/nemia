@@ -12,11 +12,11 @@
  * under parallel turbo (plan §4b).
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 /** Where the fake `claude` is, first on PATH. */
-export const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-'));
+export const bin = scratch('hkb-api-harness-');
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
 /** Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each with its pid. */
@@ -57,7 +57,7 @@ fs.writeFileSync(path.join(bin, 'claude'), [
   '',
 ].join('\n'), { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
-process.env.CLAUDE_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-claude-'));
+process.env.CLAUDE_CONFIG_DIR = scratch('hkb-api-harness-claude-');
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

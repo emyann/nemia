@@ -5,7 +5,7 @@
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
- * enable, whatever its tools; the settings' deny rules and its own `disallow:`; the settings' ask rules; Claude Code's read-only commands, which
+ * enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's read-only commands, which
  * ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what the settings allow of what asks.
  * What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that says `background: true`), which asks
  * nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
@@ -40,7 +40,7 @@ export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permi
 };
 
 /** Where a step's own deny rules are read from. */
-export const DISALLOW = 'disallow:';
+export const DISALLOW = 'disallowedTools:';
 
 /** A tool taken from a step by a deny rule: the tool, the rule and where it was read — and the family the set names it in, for one taken from `Cron*`. */
 export type RemovedTool = { name: string; rule: string; source: string; of: string | null };
@@ -93,7 +93,7 @@ export type StepReach = {
   /** Whether it runs on Claude Code, whose set was measured. Every field below that says null says it is not. */
   claudeCode: boolean;
   /** The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has. */
-  fence: { tools: string[] | null; disallow: string[]; allow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  fence: { tools: string[] | null; disallowedTools: string[]; allowedTools: string[]; permissionMode: string | null; effort: string | null; mcp: null };
   /**
    * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes. `inferred`
    * are those of the measured set no measurement named (`MEASURED_TOOLS.inferred`); none for a step that declares its tools.
@@ -208,7 +208,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   const askDenier = CLAUDE_CODE.has(harness) ? askDenierOf(harness, spec) : null;
   const reach = {
     workflow: workflow.name, from: workflow.from, step, harness,
-    fence: { tools: spec.tools, disallow: spec.disallow, allow: spec.allow, permissionMode: spec.permissionMode, effort: spec.effort, mcp: null },
+    fence: { tools: spec.tools, disallowedTools: spec.disallowedTools, allowedTools: spec.allowedTools, permissionMode: spec.permissionMode, effort: spec.effort, mcp: null },
   };
   if (!CLAUDE_CODE.has(harness)) {
     return {
@@ -217,7 +217,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
     };
   }
 
-  const denied = [...capabilities.denied, ...spec.disallow.map((rule) => ({ rule, source: DISALLOW }))];
+  const denied = [...capabilities.denied, ...spec.disallowedTools.map((rule) => ({ rule, source: DISALLOW }))];
   const deny = denied.map((d) => d.rule);
   const { asked } = capabilities;
   const ask = asked.map((a) => a.rule);

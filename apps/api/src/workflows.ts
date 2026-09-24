@@ -48,10 +48,10 @@ export type WorkflowStepSpec = {
   agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
-  /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
-  disallow: string[];
-  /** What the session may do without being asked, in the same rules (`allow:`): empty where the step allows nothing beyond its mode. */
-  allow: string[];
+  /** What the session may not have, in Claude Code's permission rules (`disallowedTools:`): empty where the step denies nothing. */
+  disallowedTools: string[];
+  /** What the session may do without being asked, in the same rules (`allowedTools:`): empty where the step allows nothing beyond its mode. */
+  allowedTools: string[];
   /** `background:` as written, `true` or `false`: null where the step has no line, and runs as a job (`claude -p`). */
   background: boolean | null;
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
@@ -247,8 +247,8 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   agent: step.agent?.name ?? null,
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
-  disallow: step.disallow ?? [],
-  allow: step.allow ?? [],
+  disallowedTools: step.disallowedTools ?? [],
+  allowedTools: step.allowedTools ?? [],
   background: step.background ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,

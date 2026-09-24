@@ -91,7 +91,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -243,6 +243,28 @@ test("versionOf reads `agent:` as the parser does — indented, or with a space 
     write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' }, line: { type: 'number' } }, required: ['verdict', 'line'], additionalProperties: false }));
     assert.notEqual(versionOf(dir), again, `${folder}: an edit of the schema its agent declares`);
   }
+});
+
+test("a folder that writes a list under its former name — `disallow:`, `allow:` — is listed under the name it has now, and a save of the step writes that name; a page from before, which sends the former name, is refused and nothing written", async () => {
+  const dir = path.join(STORE, 'former');
+  write(path.join(dir, 'write.md'), '---\npermissionMode: dontAsk\ndisallow: SendMessage\nallow: Edit(**)\n---\nWrite the note.\n');
+  const [step] = await listedSteps('former') as [ListedStep];
+  assert.deepEqual([step.spec.disallowedTools, step.spec.allowedTools], [['SendMessage'], ['Edit(**)']]);
+  assert.equal(Object.hasOwn(step.spec, 'allow') || Object.hasOwn(step.spec, 'disallow'), false, 'the listing has one name for each list');
+
+  // A page open since before the rename sends the lists under the names it knew: refused in words that say to reload, and the file kept.
+  const before = snapshot(dir);
+  const { disallowedTools, allowedTools, ...rest } = step.spec;
+  const stale = await put('former', { steps: [{ ...step, spec: { ...rest, disallow: disallowedTools, allow: allowedTools } }] });
+  const refusal = await stale.json() as BuildRefused;
+  assert.equal(stale.status, 422, JSON.stringify(refusal));
+  assert.match(refusal.error, /^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\./);
+  assert.deepEqual(snapshot(dir), before, 'nothing written');
+
+  // A save of the step from today's page writes the names the keys have now.
+  const saved = await put('former', { steps: [{ ...step, spec: { ...step.spec, allowedTools: ['Edit(notes/**)'] } }] });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  assert.equal(fs.readFileSync(path.join(dir, 'write.md'), 'utf8'), '---\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n');
 });
 
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {

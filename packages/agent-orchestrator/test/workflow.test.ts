@@ -4,7 +4,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription, workflowFolder } from '../src/workflow-store.ts';
@@ -14,6 +13,7 @@ import { loadAgents } from '../src/workflow-store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 import { asNamed, FORMER_KEYS, formerKeyLine, formerKeysIn, parseAgent, renderAgent } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -93,14 +93,14 @@ test('the review step runs on the other harness, after the implementation', () =
 });
 
 test('an empty or missing folder says so', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-'));
+  const dir = scratch('wf-');
   assert.throws(() => loadWorkflows(dir), /no \.md steps/);
   assert.throws(() => loadWorkflows(path.join(dir, 'nope')), /no workflow folder/);
 });
 
 /** A folder holding `files`, by name. */
 const folder = (files: Record<string, string>): string => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-readme-'));
+  const dir = scratch('wf-readme-');
   for (const [name, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     fs.writeFileSync(path.join(dir, name), text);
@@ -136,7 +136,7 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
   // No README, or one with only a title: no description.
   assert.equal(workflowDescription(folder({ 'implement.md': 'Implement it.\n' })), null);
   assert.equal(workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': 'Implement it.\n' })), null);
-  assert.equal(workflowDescription(path.join(os.tmpdir(), 'wf-no-such-folder')), null);
+  assert.equal(workflowDescription(path.join(scratch('wf-none-'), 'no-such-folder')), null);
 });
 
 test('REFUSED: a folder with a README and no step, as a folder with no step is — saying the README is not one', () => {
@@ -230,7 +230,7 @@ test('the shipped workflow is implement ⇄ review: two steps, and the review lo
 test('REFUSED at shipped defaults: the shipped review with its loop pointed at a step it does not wait on, with `again` gone from its schema, or beside another step', () => {
   const shipped = path.join(import.meta.dirname, '..', 'workflows');
   const copy = () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-shipped-'));
+    const dir = scratch('wf-shipped-');
     for (const f of fs.readdirSync(shipped).filter((f) => /\.(md|json)$/.test(f))) fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
     return dir;
   };
@@ -404,7 +404,7 @@ test('a key a step does not have is refused by name, with the keys it does have'
 
 test('`afer: implement` is refused — accepted, it made the reviewer a root that starts beside the implementer', () => {
   const shipped = path.join(import.meta.dirname, '..', 'workflows');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-'));
+  const dir = scratch('wf-');
   for (const f of fs.readdirSync(shipped).filter((f) => f.endsWith('.md'))) fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
   const review = path.join(dir, 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace(/^after:/m, 'afer:'));
@@ -800,7 +800,7 @@ test('frontmatter that never closes is refused; a file saved on Windows keeps it
  * `files` add or replace — by file name, text or a schema object; `null` leaves the file out.
  */
 const outputFolder = (files: Record<string, string | object | null> = {}) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-output-'));
+  const dir = scratch('wf-output-');
   const all: Record<string, string | object | null> = {
     'implement.md': 'implement it\n',
     'review.md': '---\nafter: implement\noutput: review.schema.json\n---\nreview it\n',
@@ -851,7 +851,7 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
 });
 
 test('REFUSED at load: an `output:` naming a file outside the workflow folder — up and out, or absolute — though the file is there and strict', () => {
-  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-outside-')), 'review.schema.json');
+  const outside = path.join(scratch('wf-outside-'), 'review.schema.json');
   fs.writeFileSync(outside, JSON.stringify(FINDINGS));
   const naming = (file: string) => ({ 'review.md': `---\nafter: implement\noutput: ${file}\n---\nreview it\n` });
   const fix = 'names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — `output: review.schema.json` — or delete the line, and the step declares no output.';
@@ -1278,7 +1278,7 @@ test('REFUSED at load: a loop a round could not file again as it was — a step 
 
 /** A repository whose workflows/ holds `dev` and `ui`, each a folder of one step, and `notes`, a folder of none. */
 const withWorkflows = (): { repo: string; workflows: string } => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-named-'));
+  const repo = scratch('wf-named-');
   const workflows = path.join(repo, 'workflows');
   for (const name of ['dev', 'ui']) {
     fs.mkdirSync(path.join(workflows, name), { recursive: true });
@@ -1312,7 +1312,7 @@ test('REFUSED at shipped defaults: `workflowFolder` on a name the repository doe
   assert.throws(() => workflowFolder('workflows/dev', plans, repo), refused(`no workflow folder at ${path.join(plans, 'workflows', 'dev')}. ${theirs}`));
   fs.writeFileSync(path.join(repo, 'brief.md'), 'a brief\n');
   assert.throws(() => workflowFolder('brief.md', repo, repo), refused(`no workflow folder at ${path.join(repo, 'brief.md')}, nor a workflow named brief.md in ${workflows}. ${theirs}`));
-  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-bare-'));
+  const bare = scratch('wf-bare-');
   assert.throws(() => workflowFolder('dev', bare, bare),
     refused(`no workflow folder at ${path.join(bare, 'dev')}, nor a workflow named dev in ${path.join(bare, 'workflows')}. Give the path to a workflow folder, or the name of a folder of steps under ${path.join(bare, 'workflows')}.`));
 });

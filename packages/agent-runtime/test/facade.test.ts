@@ -9,9 +9,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createEngine, nameFor, type Event, type FeedEntry, type PromiseJournal, type PromiseRunner, type Sighting } from '../src/facade.ts';
+import { scratch } from './scratch.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */
 const memoryJournal = (): PromiseJournal => {
@@ -95,7 +95,7 @@ test('the ceiling, the stop and the list all work through the facade', async () 
 });
 
 test('the file-backed default needs no configuration at all', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-facade-'));
+  const root = scratch('ae-facade-');
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
 
@@ -269,7 +269,7 @@ test('a watcher starting at 0 replays history, and stop() stops', async () => {
 });
 
 test('the file store pushes: a watcher hears about a write it did not poll for', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-watch-'));
+  const root = scratch('ae-watch-');
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
 
@@ -296,7 +296,7 @@ test('the file store pushes: a watcher hears about a write it did not poll for',
 import { spawn } from 'node:child_process';
 
 const survives = (body: string) => new Promise<boolean>((resolve) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-alive-'));
+  const root = scratch('ae-alive-');
   const child = spawn(process.execPath, ['--input-type=module', '-e', `
     import { createEngine } from '${path.resolve('src/facade.ts')}';
     const engine = createEngine({ root: ${JSON.stringify(root)} });
@@ -657,7 +657,7 @@ test('a harness brought as a runner is asked nothing of remoteControl, and is ha
 test('a usage whose key has no value is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
   // Found in review: `{ costUsd: undefined }` type-checks, the files journal drops the key as it writes, and the key was
   // then missing from the record on every pass — a `measured` entry each tick, for as long as the session was listed.
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-measured-'));
+  const root = scratch('ae-measured-');
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
   const id = await engine.file({ brief: 'b', cwd: '/repo' });

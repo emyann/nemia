@@ -4,7 +4,7 @@ import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import type { RunGraph } from './graph.ts';
-import type { RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
+import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
 import type { PlaceKind } from './runs.ts';
 import type { StepArtifact, StepAttempts, StepCheck, StepCloseout, StepTry, StepUnreadable } from './tries.ts';
 import type { RunRead, StepUsed } from './usage.ts';
@@ -112,6 +112,10 @@ export type RunDetail = {
   /** Where it came from, in `wf decide`'s words (`fromNote` in agent-orchestrator): absent with `from`. */
   fromNote?: string;
   waiting: RunWaiting | null;
+  /** As on `RunSummary`. */
+  heldUntil: string[];
+  /** As on `RunSummary`. */
+  holding: RunHolding | null;
   status: RunStatus;
   moving: boolean;
   /** As on `RunSummary`. */

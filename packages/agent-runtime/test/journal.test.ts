@@ -6,12 +6,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Journal } from '../src/journal.ts';
 import type { Event } from '../src/domain.ts';
+import { scratch } from './scratch.ts';
 
-const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-journal-'));
+const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
 const run = <A, E>(dir: string, e: Effect.Effect<A, E, Journal>) =>
   Effect.runPromise(e.pipe(Effect.provide(Journal.files(dir))));

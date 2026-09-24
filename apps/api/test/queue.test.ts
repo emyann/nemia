@@ -8,14 +8,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store, and so its inbox, when the module loads: point it at a scratch directory first. No cap from this shell.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-queue-'));
+const root = scratch('hkb-api-queue-');
 process.env.WF_ROOT = root;
 delete process.env.WF_MAX_RUNS;
-const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-queue-repo-'));
+const repo = scratch('hkb-api-queue-repo-');
 process.env.HKB_REPO = repo;
 const git = (...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
@@ -154,7 +154,7 @@ test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it wa
 
 test("DELETE /api/inbox/:name/queue takes back a queued card whose repository is gone, as `--off` does without the check — and the listing keeps its place until then", async () => {
   clear();
-  const about = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-queue-gone-'));
+  const about = scratch('hkb-api-queue-gone-');
   const { card } = addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about });
   queueInInbox(card.name);
   fs.rmSync(about, { recursive: true, force: true });

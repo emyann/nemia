@@ -16,7 +16,7 @@ import { BRIEF_KEYS } from '../src/cli.ts';
 
 const pkg = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => fs.readFileSync(path.join(pkg, p), 'utf8');
-const filesIn = (...dirs: string[]) => dirs.flatMap((d) => fs.readdirSync(path.join(pkg, d)).map((f) => `${d}/${f}`));
+const filesIn = (...dirs: string[]) => dirs.flatMap((d) => fs.readdirSync(path.join(pkg, d), { withFileTypes: true }).filter((f) => f.isFile()).map((f) => `${d}/${f.name}`));
 const unique = (xs: string[]) => [...new Set(xs)];
 
 /** `AE_…` variables the README names that no code reads. */

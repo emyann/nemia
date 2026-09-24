@@ -9,15 +9,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRIEF_KEYS, parseBrief, type BriefKey } from '../src/cli.ts';
 import { HARNESS_ARGS } from '../src/facade.ts';
+import { scratch } from './scratch.ts';
 
 const brief = (front: string, body = 'do the thing') => `---\n${front}\n---\n${body}`;
 const parse = (text: string) => parseBrief(text, '/fallback');
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-brief-'));
+const tmp = () => scratch('ae-brief-');
 
 /** Refused with exit code 2 and a message that matches — never a raw exception, never a default. */
 const refuses = (text: string, says: RegExp) =>

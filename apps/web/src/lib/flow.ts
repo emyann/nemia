@@ -66,8 +66,8 @@ const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
 /** A run's steps as its flow reads them, off the list's record of it: each one's name, its state and its note. */
-export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'>): EdgeStep[] =>
-  run.steps.map((step) => ({ name: step.name, state: stepState(step.status, run.cancelledAt !== null), note: step.note }));
+export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
+  run.steps.map((step) => ({ name: step.name, state: stepState(step.status, run.cancelledAt !== null, run.holding != null), note: step.note }));
 
 /**
  * The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. The same for a run listed with no

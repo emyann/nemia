@@ -13,12 +13,12 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Sighting, TranscriptEvent } from '../src/facade.ts';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-find-${label}-`));
+const tmp = (label: string) => scratch(`ae-find-${label}-`);
 
 // Where Claude Code keeps registrations is read when a runner is made, and transcripts when it is loaded: set first.
 const config = tmp('config');

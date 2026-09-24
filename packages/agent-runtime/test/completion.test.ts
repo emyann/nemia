@@ -17,11 +17,11 @@ import { createEngine } from '../src/facade.ts';
  * fake `claude` on PATH is the honest way to exercise the real code path.
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 const withFakeClaude = (json: string) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const dir = scratch('fake-claude-');
   fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${json}\nJSON\n`, { mode: 0o755 });
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
@@ -354,7 +354,7 @@ test('a finished session is read once while its transcript is unchanged — agai
 });
 
 test('Claude Code is handed the schema as --json-schema, and the prompt still comes last', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');
   fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
   const prev = process.env.PATH;
@@ -376,7 +376,7 @@ import type { SpawnRequest } from '../src/runner.ts';
 
 /** The argv `claudeOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
 const argvOf = async (r: Partial<SpawnRequest>) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');
   fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
   const prev = process.env.PATH;
@@ -426,7 +426,7 @@ test('remoteControl reaches Claude Code as --remote-control, and a flag follows 
 });
 
 test('at shipped defaults, a background task filed with remoteControl: true is spawned with --remote-control, and one filed without it never is', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const dir = scratch('fake-claude-');
   const registry = path.join(dir, 'registry.json');
   const runs = path.join(dir, 'runs.jsonl');
   fs.writeFileSync(registry, '[]');
@@ -445,7 +445,7 @@ if (args[0] === '--bg') {
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'ae-remote-')) });
+    const engine = createEngine({ root: scratch('ae-remote-') });
     await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, remoteControl: true } });
     await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
     await engine.tick();
@@ -565,10 +565,10 @@ test('claude that could not even be launched says nothing started; one that ran 
     Effect.as(undefined),
     Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
   ));
-  const missing = await caught(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ae-nocwd-')), 'gone'));
+  const missing = await caught(path.join(scratch('ae-nocwd-'), 'gone'));
   assert.equal(missing?.refused, true, 'the OS refused the process: no session can exist');
 
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const dir = scratch('fake-claude-');
   fs.writeFileSync(path.join(dir, 'claude'), '#!/bin/sh\necho "something went wrong" >&2\nexit 1\n', { mode: 0o755 });
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;

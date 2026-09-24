@@ -5,23 +5,17 @@
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { after, test } from 'node:test';
+import { test } from 'node:test';
 import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles } from './e2e/pages.ts';
-
-const temps: string[] = [];
-after(() => {
-  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
-});
+import { scratch } from './scratch.ts';
 
 /**
  * A directory of pages: each file's name and what it holds — a page named as given, or any text. And a NAMES naming each file that is named
  * as a page is, unless `files` gives one of its own.
  */
 function dirOf(files: Record<string, string>): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-pages-'));
-  temps.push(dir);
+  const dir = scratch('hkb-e2e-pages-');
   const names = Object.keys(files).flatMap((file) => /^\d{3}-(.+)\.ts$/.exec(file)?.[1] ?? []);
   for (const [name, text] of Object.entries({ [NAMES]: names.map((name) => `${name}\n`).join(''), ...files })) fs.writeFileSync(path.join(dir, name), text);
   return dir;
@@ -87,8 +81,7 @@ test('a page deleted by mistake is refused: its line in NAMES is still there', a
 
 test('the shipped pages are refused with one of theirs deleted', () => {
   // The real NAMES, over a copy of the real pages less one: the list is what knows it is gone.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-pages-'));
-  temps.push(dir);
+  const dir = scratch('hkb-e2e-pages-');
   fs.cpSync(PAGES_DIR, dir, { recursive: true });
   const gone = pageFiles(dir)[0]!;
   fs.rmSync(path.join(dir, gone));

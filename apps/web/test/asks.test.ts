@@ -207,3 +207,15 @@ test('REFUSED: a step\'s section offers its gate only for the words `wf ls` asks
   assert.equal(gateOffered({ approve: '' }, false), false);
   assert.equal(gateOffered({ approve: 'approve plan' }, true), false, 'nobody waits for an approval on a run called off');
 });
+
+test('REFUSED: nothing is offered on a run a person holds — not Continue for a session the harness blocked, which the api names whatever waits on you, nor anything the api would still name — since the package refuses every one of these verbs on a held run', () => {
+  const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 ships', advice: 'wf hold r --off', onYou: false };
+  const held = step('held', 'needs-human', { blockedByHarness: true });
+  const blocked = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
+  // Unheld, each is offered: the hold is the only thing refusing them.
+  assert.equal(offersOf(run([held, blocked], ['implement'])).length, 2);
+  assert.deepEqual(offersOf({ ...run([held, blocked], ['implement']), holding }), []);
+  assert.deepEqual(answersOf({ ...run([held, blocked], ['implement']), holding }), []);
+  // An api older than the hold sends no `holding` at all, and a run it does not hold `null`: both are offered as before.
+  assert.equal(offersOf({ ...run([held], []), holding: null }).length, 1);
+});

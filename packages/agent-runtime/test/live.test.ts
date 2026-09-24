@@ -64,10 +64,11 @@ import { clientOf } from '../src/a2a-client.ts';
 import { codex } from '../src/runner-codex.ts';
 import { codexRolloutFile } from '../src/runner-codex-transcript.ts';
 import { detachedOps } from '../src/runner-detached.ts';
+import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-live-${label}-`));
+const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
 /**
  * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
@@ -152,7 +153,7 @@ const WRITTEN = ['BUILT', 'E2E'];
 
 /**
  * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
- * Made inside this package, not in `os.tmpdir()`, whose directories Claude Code does not trust.
+ * Made inside this package, not under the machine's temp directory, whose directories Claude Code does not trust.
  */
 const allowingCheckout = (label: string) => {
   const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));

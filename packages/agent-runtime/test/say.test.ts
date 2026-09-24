@@ -13,13 +13,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Engine, Event, FeedEntry, PromiseJournal, PromiseRunner, Sighting, TaskSpec } from '../src/facade.ts';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-say-${label}-`));
+const tmp = (label: string) => scratch(`ae-say-${label}-`);
 
 // Where Claude Code keeps its registrations is read when a runner is made, and its transcripts when the runner
 // is loaded, so both are pointed here before the import.

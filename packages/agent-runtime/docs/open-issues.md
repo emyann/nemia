@@ -815,6 +815,29 @@ read per read of a running session.
 
 The `claude -p` job, which shares the worker, is stage 2's and unchanged here: its stdin (issue 29) is what Codex lacks.
 
+### 32. A run file removed is a stop (2026-09-23)
+
+A detached worker's run file is its session: `stop` and `observe` find the worker by it. Until 2026-09-23 a worker whose run
+file was removed wrote it again at its next heartbeat and ran on, and one whose whole store was removed crashed on its next
+write and left its harness running, which nothing could find to stop. The runtime's own tests showed it: a test that failed
+before it stopped its worker left the worker, and a harness that reads its stdin for ever, running for hours, and 12,583
+`ae-detached-*` folders piled up under `/tmp`. Now the worker takes a run file gone, alone or with its store, for a stop.
+It sends SIGTERM to the harness's process group, SIGKILLs the group five seconds later if anything of it is still there,
+writes nothing again, and exits — only once the group is empty or killed, since a harness can die on SIGTERM and leave a
+child that ignores it holding its output, and the worker's drain gives up on that at two seconds: exited then, it left the
+child running with nothing to find it by (review, round 1). An ordinary stop left the same child the same way, and takes the
+same path now: the worker gives what it signalled five seconds, then kills what is left of the group, and exits only once
+the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `test/detached.test.ts`):
+
+- **It is noticed at the worker's next write**: the heartbeat, within five seconds, or sooner at a word written on or an id.
+- **A removal in the instant between the worker's look and its rename is undone.** The worker looks for the file, then
+  renames its new copy into place, so a file removed in between is written again and the worker runs on as before. The
+  window is a few microseconds on each write. Nothing in the runtime removes a run file; a person or a test does.
+- **The parent going is not a stop.** The worker is detached to outlive the engine that started it, and an engine restarted
+  adopts it by its run file. A test that starts a worker stops it itself: every test root comes from `test/scratch.ts`,
+  whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that
+  nothing is left.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

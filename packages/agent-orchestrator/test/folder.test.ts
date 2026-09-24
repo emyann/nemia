@@ -6,10 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-folder-'));
+const ROOT = scratch('wf-folder-');
 const NOT_A_REPO = path.join(ROOT, 'somewhere');
 const TEAM = path.join(ROOT, 'workflows', 'note');
 const GIT_ASKED = path.join(ROOT, 'git-asked');

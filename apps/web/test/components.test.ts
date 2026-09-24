@@ -2129,3 +2129,41 @@ test('REFUSED at shipped defaults: no such note on a team that works on a reposi
   assert.doesNotMatch(await startMarkup(false, '/code/app'), /data-ignored-repo|is not looked at/);
   assert.doesNotMatch(await startMarkup(true), /data-ignored-repo|is not looked at/, 'a card that names no repository has nothing to say');
 });
+
+// ─── a run a person holds ────────────────────────────────────────────────────
+
+const HOLDING = {
+  at: '2026-09-23T07:00:00.000Z', runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], shipped: false }],
+  word: 'held until p-1 ships', advice: 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has shipped; to go on before then: wf hold r-1 --off', onYou: false,
+};
+
+test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — in its own words, and a step at work is drawn at work', () => {
+  // As the api gives a held run: nobody is waited on, and no step offers its approval.
+  for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED']) {
+    const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] });
+    assert.equal(gateDrawn(held), false, `${status}, held: ${held}`);
+    assert.match(held, /data-state="held"/, status);
+    assert.ok(held.includes(`>${status}</span>`), `${status} keeps its words: ${held}`);
+    // The same step on the run unheld is its gate's state, not held: the hold is the one fact that differs.
+    assert.doesNotMatch(nodeMarkup(runOf(status, { waitingOnYou: [] })), /data-state="held"/, status);
+  }
+  assert.match(nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] }), /data-state="working"/);
+});
+
+test("a held run's rail draws its gate and the steps not filed held, and its work at work", () => {
+  const held = { ...summaryRun(), waitingOnYou: [], onYou: [], toDecide: null, heldUntil: ['p-1'], holding: HOLDING } as unknown as RunSummary;
+  const html = railMarkup(held);
+  const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
+  assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
+});
+
+test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed', () => {
+  const card = (id: string, heldUntil: string[]) => ({
+    id, after: [], heldUntil, steps: [{ name: 'plan', taskId: `t-${id}`, branch: null, status: 'awaiting approval', note: null, needs: null, blockedByHarness: false }],
+  });
+  const edges = afterEdges([card('p', []), card('h', ['p'])]);
+  assert.deepEqual(edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })), [
+    { id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } },
+  ]);
+  assert.match(edgeMarkup(edges[0]!), /stroke-dasharray:5 4/);
+});

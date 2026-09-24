@@ -120,6 +120,17 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               {run.waiting.word}
             </p>
           )}
+          {/* A person's hold on it (`wf hold`), in `wf ls`'s word — amber once only a person lifts it — and what to do, on hover. It is what the
+              card says instead of a gate: while it stands, nothing of the run is asked of anyone, and no Approve would be taken. */}
+          {run.holding && (
+            <p
+              data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
+              title={run.holding.advice}
+              className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.holding.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-violet-800 dark:text-violet-300'}`}
+            >
+              {run.holding.word}
+            </p>
+          )}
         </div>
 
         <StepRail run={run} flow={rail} />
@@ -200,6 +211,9 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             )}
             {waitsOnYou(run) && (
               <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>
+            )}
+            {run.holding && !cancelled && (
+              <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">held</Badge>
             )}
             {cancelled && <Badge variant="outline">cancelled</Badge>}
           </span>

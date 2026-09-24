@@ -13,15 +13,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
 import { claudeOps } from '../src/runner.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
 import { codex } from '../src/runner-codex.ts';
 import { codexMcpServerNames } from '../src/runner-mcp.ts';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-mcp-${label}-`));
+const tmp = (label: string) => scratch(`ae-mcp-${label}-`);
 
 /** A fake `claude` and `codex`: each writes its argv, one line per argument, to `<bin>/<name>.argv`. */
 const fakeBin = () => {

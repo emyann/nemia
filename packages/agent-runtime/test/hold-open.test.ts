@@ -8,7 +8,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +18,7 @@ import {
 import { createEngine, type PromiseJournal, type PromiseRunner } from '../src/facade.ts';
 import { fold } from '../src/domain.ts';
 import { parseBrief, taskLine } from '../src/cli.ts';
+import { scratch } from './scratch.ts';
 
 /** Sign the session `name` off: done, with a closeout given after its attempt started. */
 const signed = (sessions: Map<string, Sighting>, name: string, summary: string) => sessions.set(name, {
@@ -27,7 +27,7 @@ const signed = (sessions: Map<string, Sighting>, name: string, summary: string) 
 });
 
 test('the Effect door: signed, it waits with its session released; answered after a restart, it resumes; closed, it settles', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-hold-open-'));
+  const root = scratch('ae-hold-open-');
   try {
     const sessions = new Map<string, Sighting>();
     const spawned: SpawnRequest[] = [];
@@ -242,7 +242,7 @@ test('file refuses a holdOpen that is not true', async () => {
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
 test('ae answer prints the line it journalled, the words being everything after the id but --budget; ae close; each refusal exits 2', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-hold-open-cli-'));
+  const root = scratch('ae-hold-open-cli-');
   try {
     const engine = createEngine({ root });
     const waiting = async () => {

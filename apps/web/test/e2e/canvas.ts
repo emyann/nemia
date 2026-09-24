@@ -147,6 +147,8 @@ export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number
 export const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
 export const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
 export const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
+/** The edge from a run into a card held until it ships (`wf hold`), which `runEdges` names apart from an `--after` one. */
+export const holdEdgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
 
 /**
  * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` — or,

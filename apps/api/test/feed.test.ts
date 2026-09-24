@@ -9,13 +9,13 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as it loads: WF_ROOT is set first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-feed-'));
+const root = scratch('hkb-api-feed-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

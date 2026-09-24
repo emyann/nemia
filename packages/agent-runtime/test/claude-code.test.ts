@@ -8,10 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-claude-code-${label}-`));
+const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 
 // Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
 const config = tmp('config');

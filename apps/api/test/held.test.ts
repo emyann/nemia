@@ -72,6 +72,23 @@ fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-answered-plan.jsonl'), [
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
+// Filed before tasks were held open: its check rechecked (`wf retry --recheck`, the same task and turn), then nudged, a task of its own.
+writeRun('h-rechecked');
+journal('h-rechecked-plan', [
+  { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+  { kind: 'starting', at: at(1), attempt: 1 },
+  { kind: 'spawned', at: at(1), attempt: 1 },
+  { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ae/h-rechecked-plan/1', observed: 'done', reason: 'harness', closeout: DONE },
+  { kind: 'settled', at: at(9), outcome: 'succeeded' },
+]);
+journal('h-rechecked-plan-try3', [{ kind: 'filed', at: at(40), brief: 'Do it again.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' }]);
+{
+  const file = path.join(root, 'runs', 'h-rechecked.json');
+  const run = JSON.parse(fs.readFileSync(file, 'utf8'));
+  run.steps.plan = { ...run.steps.plan, taskId: 'h-rechecked-plan-try3', tries: [{ taskId: 'h-rechecked-plan', then: 'recheck' }, { taskId: 'h-rechecked-plan', then: 'nudge' }] };
+  fs.writeFileSync(file, JSON.stringify(run));
+}
+
 type Step = { name: string; status: string; needs: string | null };
 const detail = async (id: string) => (await app.request(`/api/runs/${id}`)).json();
 const summary = async (id: string) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
@@ -113,4 +130,13 @@ test("each try of a held task a person answered is its own turn: the try answere
   const [answered, going] = plan.tries as Try[];
   assert.deepEqual([answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs], ['succeeded', 1, 'done', BLOCKED.needs], 'the turn answered, as it signed');
   assert.deepEqual([going.attempts.count, going.attempts.latest?.ended, going.closeout], [1, null, null], 'the turn going on: its own attempt, still running, and no sign-off yet');
+});
+
+test("a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did", async () => {
+  const plan = (await detail('h-rechecked')).steps[0];
+  type Try = { try: number; taskId: string; attempts: { count: number; latest: { ended: string | null } | null }; closeout: { summary: string } | null };
+  assert.deepEqual(plan.tries.map((t: Try) => [t.try, t.taskId]), [[1, 'h-rechecked-plan'], [2, 'h-rechecked-plan'], [3, 'h-rechecked-plan-try3']]);
+  for (const t of plan.tries.slice(0, 2) as Try[]) {
+    assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'done', DONE.summary], `try ${t.try}`);
+  }
 });

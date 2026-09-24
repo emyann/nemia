@@ -37,6 +37,16 @@
  */
 export const CHECK_DEADLINE_SECONDS = 1200;
 
+/**
+ * The niceness a check starts at, over the orchestrator's own: `nice -n 10`, and where `ionice` works, the idle IO class
+ * (`checkScript`'s first line). On 2026-09-24 the owner's Windows desktop froze for moments — video, typing — while several
+ * runs' checks ran at once in WSL: vmmemWSL at up to 401% of a core, the System process at up to 82%, in bursts that were the
+ * checks (turbo across five packages, the vite build, the e2e's software-GL Chromium). A check is a batch job nobody watches
+ * while it runs, so it yields to what someone does: the agent sessions, which are never niced, and a person's own work in the
+ * same Linux. It ranks processes inside the VM only: with nothing else busy there, a niced check still uses every CPU it can.
+ */
+export const CHECK_NICENESS = 10;
+
 /** How many lines of each stream `wf decide` shows for a check that refused. */
 export const CHECK_TAIL_LINES = 20;
 
@@ -105,8 +115,13 @@ const TRAILER = '[wf check] exit';
  *   printed. It is for the person reading: the engine's own `succeeded`/`failed` — the worker's reading
  *   of the process's exit — is what the run gates on, so a command that prints a trailer of its own
  *   changes a number on a screen and nothing else.
+ * - **The idle IO class first, where the machine has it.** The shell puts itself in `ionice -c3`, which every process it
+ *   starts inherits (turbo, the build, the e2e's browser and servers). The shell decides rather than this file, since this
+ *   file is pure and the machine that runs the check is the one that knows whether it has `ionice`: one without it
+ *   (macOS), or one that refuses it (a container), runs the check as before, and says nothing.
  */
 export const checkScript = (command: string): string => [
+  'if command -v ionice >/dev/null 2>&1; then ionice -c3 -p $$ >/dev/null 2>&1 || :; fi',
   'wf_check() {',
   '(',
   command,
@@ -128,8 +143,10 @@ export const CHECK = {
   name: 'check',
   command: (r: { brief: string }): { cmd: string; args: string[] } => {
     const { command, env } = readCheckBrief(r.brief);
-    // `env NAME=value … sh -c script`: values reach the shell without being quoted by anyone.
-    return { cmd: 'env', args: [...Object.entries(env).map(([k, v]) => `${k}=${v}`), 'sh', '-c', checkScript(command)] };
+    // `nice -n 10 env NAME=value … sh -c script`: values reach the shell without being quoted by anyone. `nice` execs
+    // `env`, which execs `sh`, so the pid, the process group a stop ends and the exit status are the command's own.
+    const pairs = Object.entries(env).map(([k, v]) => `${k}=${v}`);
+    return { cmd: 'nice', args: ['-n', String(CHECK_NICENESS), 'env', ...pairs, 'sh', '-c', checkScript(command)] };
   },
 };
 

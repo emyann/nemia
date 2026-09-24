@@ -78,6 +78,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
+  `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
+  the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'
+  checks at once (turbo, the web build, the e2e's software-GL Chromium) froze the owner's Windows desktop for moments, with vmmemWSL
+  at up to 401% of a core. Agent sessions stay at normal priority, and so does an `npm test` or `npm run e2e` you run inside yours:
+  a niced process cannot be un-niced by its child, so niceing `package.json`'s scripts would nice them there too. `nice` ranks
+  processes inside the VM only; with nothing else busy in WSL, a niced check still uses every CPU it has.
 - **A step's check logs its stdout alone, and a person is shown the tail of its stderr.** The whole stderr is on disk at the check's
   `WF_STDERR` (`~/.agent-workflows/checks/<run>-<step>-check.stderr`), named on the check's record beside its `.log`. The e2e said why a
   page failed once, first, on stderr, and then thirty lines of the servers' output: the check read as an exit 1 after

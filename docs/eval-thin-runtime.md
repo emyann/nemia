@@ -325,6 +325,13 @@ orchestrator's calls to the runtime change.
    learn `input-required` beside `needs-human`, never in it — and a step's tries and rounds as attempts of one task (4c, or
    folded into part 5).
 
+   **Part 4b done, 2026-09-24: a gate and a blocked sign-off are the step's held task.** A Claude Code job is filed
+   `holdOpen`; the run closes it once nothing waits on a person's word, and a person's answer to a blocked sign-off, or a
+   send-back from a gate, is `answer` on it: the next turn, in the session that signed, under the same id. Rounds and every
+   other try stay `-try<n>` tasks. `wf ls` reads `input-required` as a signed session, beside the run's word
+   (`input-required · BLOCKED`), never in `needs-human`; the board draws it as one. Turns are derived — the record's tries on
+   the current task id against the runtime's answers — so no field was added (agent-orchestrator's features.md).
+
    **Part 5a done, the same day: a Task in A2A's shape.** A Task's `contextId` is the harness's id for the conversation —
    the sighting's or the attempt's `nativeId`, empty until one is seen — so attempts that continued one conversation list
    under one context, and a spawn sends the session it continues as its message's `contextId` rather than `resumeFrom` in

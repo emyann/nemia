@@ -272,6 +272,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the printed status, and the api carries it as a field of its own (`StepNeeds.waitingFor`) rather than lengthening the status the
   chip reads. Decorating the phase itself turns every one of those four comparisons off, and the tests that check them pass on the
   undecorated fixtures (learned by the run that said what a blocked step's harness waits for).
+- **A new engine phase is read in two places in the orchestrator, and the second is not `phaseOfView`.** `listing` (`run.ts`) is handed the
+  engine's word as text and narrows it itself (`settledOf`), since it prints that word; `phaseOfView` (`views.ts`) narrows the view for the
+  tick. Taught `input-required` in `phaseOfView` alone, `assess` held a gated step at its gate while `wf ls` printed `input-required · done`
+  and never `awaiting approval`, and every pure test passed, since they hand `listing` the settled words. Teach both, and the board's
+  `stepState` (learned by the run that held a gate on the step's own task).
 - **A new step status is a word the board draws as `working` until it knows it.** `stepState` (`apps/web/src/lib/status.ts`) falls
   through to `working` for any word it does not match, so a status added to `StepStatus` in `run.ts` passes every orchestrator and api
   test and shows on the board as a step still running — the one surface that says nothing is wrong. Add the word to `stepState`, its

@@ -1067,6 +1067,14 @@ retries: 1
 - **A step at its gate is sent back with `--message`.** A gated step that signed off, and waits for a person's approval — or
   was approved and nothing after it is filed yet — takes `--nudge` or `--fresh` with the objection, and is refused without
   words or with `--recheck` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)).
+- **An answer to a Claude Code job is its task's next turn.** A `claude` step (not `background: true`) is filed held open: when it
+  signs, the engine's task waits for a word with nothing running, and `wf ls` prints the engine's `input-required` beside the run's
+  word (`input-required · BLOCKED`). A `--nudge` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
+  `answer` to that task — the same task id, in the session that signed, with what is left of the step's cap — and the record gains
+  the try as any other. Any other try (`--fresh`, `--model`, `--recheck`, `retries:`, the run's sign-off nudge) closes the waiting
+  task and files `-try<n>`. The run closes a task nobody is to answer on the pass that reads it waiting — an ungated step that signed,
+  a gate approved, a run called off or pruned — and a close the engine refuses is a note on the pass. A task filed before this, and a
+  step on another harness, settles at its sign-off, and its tries are `-try<n>` tasks, as they were.
 - **A step past its budget needs `--budget <amount>`.** A step `over budget` or `budget exhausted` waits on you like a refused
   check, and `retries:` never tries it. `wf decide` offers `wf retry <run> <step> --budget <amount>` for those two statuses,
   with what the step has cost and the cap; a step whose check did not finish past its budget is offered `--recheck` first, which
@@ -1666,6 +1674,8 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the words are theirs.
 - **`wf decide`** prints the gate under the step's name: `gate  approved 23:10Z — "Ship the second reading."`, or `gate  awaiting
   approval:` with the `wf approve` to give and the `wf retry --message` that sends it back.
+- **The session waits with the gate.** A Claude Code job at its gate is the engine's held task (*Trying again*): nothing runs, a
+  send-back is its next turn in the session that signed, and `wf approve` has the tick close it as it files what follows.
 - **`wf cancel` calls a run at its gate off**, as any run: it is not finished, since an approval would file what follows.
   **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `wf round` on a
   loop whose step waits at its gate says to approve it or send it back.

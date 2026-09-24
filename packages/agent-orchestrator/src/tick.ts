@@ -473,7 +473,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           remoteControl: step.remote,
         },
         deadlineSeconds: step.deadlineSeconds,
-        maxAttempts: step.maxAttempts,
         // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
         // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it.
         budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf)),
@@ -531,7 +530,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           remoteControl: target.remote,
         },
         deadlineSeconds: target.deadlineSeconds,
-        maxAttempts: target.maxAttempts,
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         priority: MOMENTUM,
         resumeFrom,
@@ -568,11 +566,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           WF_ARTIFACTS: files,
         }),
         cwd: workspace,
+        // One attempt, as every task is (the runtime makes one a start): a check that refused has said what it has to say, and running
+        // a suite until it passes would let a flaky suite decide what ships.
         deadlineSeconds: CHECK_DEADLINE_SECONDS,
-        // One attempt, never resumed: a check that refused has said what it has to say, and running a
-        // suite until it passes would let a flaky suite decide what ships.
-        maxAttempts: 1,
-        resume: 'never',
         // In its own pool, before a newer run's check: what follows the step waits on it.
         priority: MOMENTUM,
       });
@@ -581,11 +577,10 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     checked.push(name);
   }
 
-  /** The harness's own id for a step's session — what `--resume` takes. */
+  /** The harness's own id for a step's session — what `--resume` takes (`sessionIn`). */
   const sessionOf = (stepName: string): string | undefined => {
     const taskId = run.steps[stepName]?.taskId;
-    const attempts = taskId ? views.get(taskId)?.state.attempts : undefined;
-    return attempts?.at(-1)?.nativeId ?? undefined;
+    return taskId ? sessionIn(views, taskId) : undefined;
   };
 
   // A run that waited on runs starts from its base branch as it stands now, with their work on it — not as it stood at `wf start`,
@@ -641,7 +636,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         remoteControl: step.remote,
       },
       deadlineSeconds: step.deadlineSeconds,
-      maxAttempts: step.maxAttempts,
       // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
       // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
       // budget beside it.

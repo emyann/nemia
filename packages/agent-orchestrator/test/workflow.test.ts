@@ -338,7 +338,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   // Claude Code's alone and keeps no `budget:`: read below too.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**), Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**), Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -376,7 +376,6 @@ test("every key a step has has one line of meaning, in the keys' order — a cou
   assert.equal(meaningsRefusal(STEP_KEYS, STEP_KEY_MEANINGS), null);
   // The counts' lines are the words `countOf` refuses a value with.
   assert.equal(STEP_KEY_MEANINGS.deadlineSeconds, 'the seconds the engine lets the step run before stopping it');
-  assert.equal(STEP_KEY_MEANINGS.maxAttempts, 'how many attempts the engine may make at the step');
   assert.equal(STEP_KEY_MEANINGS.retries, 'how many times the run re-files the step after its check refuses it');
   assert.equal(STEP_KEY_MEANINGS.rounds, 'how many rounds `loop:` may run, the first included');
   assert.throws(() => fm('review', 'retries: -1'), (e: Error) => e.message.includes(`\`retries\` is ${STEP_KEY_MEANINGS.retries}:`));
@@ -392,7 +391,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -416,6 +415,20 @@ test('`afer: implement` is refused — accepted, it made the reviewer a root tha
 
 test('guide is refused by name, never silently dropped', () => {
   assert.throws(() => fm('implement', 'guide: CLAUDE.md'), /implement: a step may not set `guide` — the harness reads CLAUDE\.md/);
+});
+
+test('REFUSED: `maxAttempts`, retired with the runtime\'s own — at 1, what it was at by default, and at any count — pointing at `retries:` and `wf retry`', () => {
+  for (const value of ['1', '2']) {
+    assert.throws(() => fm('implement', `maxAttempts: ${value}`), (e: unknown) => {
+      assert.ok(e instanceof WorkflowError);
+      assert.equal(e.exitCode, 2);
+      assert.match(e.message, /^implement: a step may not set `maxAttempts` — the runtime makes one attempt at a session and tries nothing again on its own/);
+      assert.match(e.message, /`retries: N` files the step again after its check refuses it, and `wf retry <run> <step>` asks for a try of one that failed, was lost or could not start/);
+      assert.match(e.message, /Delete the line\.$/);
+      return true;
+    });
+  }
+  assert.equal((STEP_KEYS as readonly string[]).includes('maxAttempts'), false, 'no longer a step\'s key');
 });
 
 /** Refused with exit 2 and a message that matches `pattern` — the message itself, not `String(err)`. */
@@ -727,15 +740,11 @@ test('REFUSED: a budget: that is not an amount above zero — 0, a negative, a w
   refusedAs('   ', /`budget` has no value/);
 });
 
-test('maxAttempts and retries are whole counts; retries may be 0, which is what absent means', () => {
-  for (const bad of ['0', 'two', '1.5', '-1']) {
-    assert.throws(() => fm('x', `maxAttempts: ${bad}`), /`maxAttempts: .*` is not a count\. .*above zero/, bad);
-  }
+test('retries is a whole count, and may be 0, which is what absent means', () => {
   for (const bad of ['-1', '1.5', 'once']) {
     assert.throws(() => fm('x', `retries: ${bad}`), /`retries: .*` is not a count\. .*zero or more/, bad);
   }
   assert.equal(fm('x', 'retries: 0').retries, 0);
-  assert.equal(fm('x', 'maxAttempts: 3').maxAttempts, 3);
 });
 
 test("harness: banana is refused with the harnesses there are; harness: check is the run's own", () => {
@@ -1368,7 +1377,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   // `agent:` renders in test/agents.test.ts, which has agents to resolve it with, and `background:`, which keeps no `budget:`, below.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
-    tools: 'Read, Grep,Glob , Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**),Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
+    tools: 'Read, Grep,Glob , Bash', disallowedTools: 'Bash(npm run build), SendMessage', allowedTools: 'Edit(**),Bash(npm test)', denials: 'fail', remote: 'true', deadlineSeconds: '900', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
@@ -1390,7 +1399,6 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'denials: fail',
     'remote: true',
     'deadlineSeconds: 900',
-    'maxAttempts: 2',
     'budget: 2.5',
     'check: npm test && node -e "console.log(1 ? 2 : 3)"',
     'retries: 0',
@@ -1464,6 +1472,7 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   assert.equal(message({ ...step, afer: ['implement'] }), parsersWords('afer: implement'), 'a key no step has: the parser\'s sentence');
   assert.match(message({ ...step, afer: ['implement'] }), /^review: `afer` is not a key a step has\. A step's keys are: after, /);
   assert.equal(message({ ...step, guide: 'CLAUDE.md' }), parsersWords('guide: CLAUDE.md'));
+  assert.equal(message({ ...step, maxAttempts: 2 }), parsersWords('maxAttempts: 2'), 'a draft from a page open since before it was retired');
   assert.throws(() => renderStep({ ...step, colour: 'red' } as StepDraft), refused({ ...step, colour: 'red' }));
   assert.doesNotThrow(() => renderStep({ ...step, colour: undefined, shade: null } as unknown as StepDraft), 'a key set to nothing is not set');
 

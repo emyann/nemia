@@ -57,7 +57,7 @@ test('the role keys are the keys a step has, but for wiring, the description and
 });
 
 test('REFUSED at shipped defaults: every wiring key in an agent file, by name, saying it belongs on the step', () => {
-  const wiring = ['after', 'resume', 'input', 'workspace', 'slot', 'denials', 'background', 'check', 'retries', 'gate', 'loop', 'rounds', 'budget', 'maxAttempts', 'deadlineSeconds'];
+  const wiring = ['after', 'resume', 'input', 'workspace', 'slot', 'denials', 'background', 'check', 'retries', 'gate', 'loop', 'rounds', 'budget', 'deadlineSeconds'];
   assert.deepEqual(STEP_KEYS.filter((k) => !(AGENT_KEYS as readonly string[]).includes(k) && k !== ('agent' as string)).sort(), [...wiring].sort(), 'every key an agent may not set is wiring');
   for (const key of wiring) {
     const said = refusal(() => agent('implementer', `---\n${key}: something\n---\nImplement it.\n`));
@@ -75,6 +75,10 @@ test('REFUSED at shipped defaults: `agent:` inside an agent file, a key no agent
 
   const guide = refusal(() => agent('reviewer', '---\nguide: CLAUDE.md\n---\nReview it.\n'));
   assert.ok(guide.startsWith('agents/reviewer.md: an agent may not set `guide`'), guide);
+
+  const attempts = refusal(() => agent('reviewer', '---\nmaxAttempts: 1\n---\nReview it.\n'));
+  assert.ok(attempts.startsWith('agents/reviewer.md: an agent may not set `maxAttempts` — the runtime makes one attempt at a session'), attempts);
+  assert.ok(attempts.includes('`wf retry <run> <step>`'), attempts);
 
   const effort = refusal(() => agent('reviewer', '---\neffort: loud\n---\nReview it.\n'));
   assert.ok(effort.startsWith('agents/reviewer.md: `effort: loud` is not an effort claude has'), effort);

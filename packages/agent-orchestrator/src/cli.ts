@@ -135,7 +135,7 @@ No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measur
 tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
 \`denials\` holds one whose try the harness denied a call, \`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
 and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
-permissionMode, tools, disallowedTools, allowedTools, background, remote, deadlineSeconds, maxAttempts, budget) say who does the work, with
+permissionMode, tools, disallowedTools, allowedTools, background, remote, deadlineSeconds, budget) say who does the work, with
 what, who may drive it, for how long and for how much. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)

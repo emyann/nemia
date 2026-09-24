@@ -23,7 +23,7 @@
  *
  * `loop` is the one edge that points backwards, and it is still not a condition: whether the work goes
  * round again is the looping step's agent's word — `again`, in its closeout, the way `blocked` is — and
- * the run only files the round and counts, the way `maxAttempts` is a count.
+ * the run only files the round and counts, the way `retries` is a count.
  *
  * **The keys are a closed list.** A key the parser does not know is refused by name, and a value
  * it cannot use is refused with the fix, before anything is spent. Accepting and ignoring is what
@@ -159,7 +159,6 @@ export type Workflow = {
    */
   background?: boolean;
   deadlineSeconds?: number;
-  maxAttempts?: number;
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
@@ -252,14 +251,13 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
 /** The keys that are counts: what each counts, the least that means anything, and an example. */
 const COUNTS = {
   deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
-  maxAttempts: { least: 1, counts: 'how many attempts the engine may make at the step', example: 1 },
   retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
   rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
 } as const;
@@ -288,7 +286,6 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
   remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
-  maxAttempts: COUNTS.maxAttempts.counts,
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,
@@ -315,6 +312,10 @@ export const outputFields = (step: Workflow): string[] => Object.keys(step.outpu
 const REFUSED: Record<string, string> = {
   guide: 'the harness reads CLAUDE.md or AGENTS.md from the step\'s workspace on its own. Standing rules belong'
     + ' in that file, and what only this step needs to know belongs in the body',
+  // Retired on 2026-09-23 (thin runtime, stage 4a part 2), with the runtime's own `maxAttempts` and `resume`.
+  maxAttempts: 'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing'
+    + ' to count. Trying again is the run\'s: `retries: N` files the step again after its check refuses it, and `wf retry <run> <step>`'
+    + ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
 };
 
 /** The harness a step runs on when it names none. */
@@ -476,7 +477,6 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
-    maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
     budget: budgetOf(name, meta.budget, harness, background),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),

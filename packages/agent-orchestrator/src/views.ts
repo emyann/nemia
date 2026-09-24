@@ -14,6 +14,7 @@ import { parseCloseout, type Closeout } from './closeout.ts';
 import { taskUsage } from './timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './store.ts';
 import { parentRecord, shippedOf } from './branches.ts';
+import { continuesFrom } from './retry.ts';
 
 /**
  * The engine's task phases, narrowed to what a run cares about.
@@ -156,9 +157,12 @@ export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => 
   return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
 };
 
-/** The harness's own id for a task's last session — what `--resume` takes. */
+/**
+ * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
+ * refused to start that one, the session it was filed to continue (`continuesFrom`).
+ */
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
-  views.get(taskId)?.state.attempts.at(-1)?.nativeId ?? undefined;
+  continuesFrom(views.get(taskId)?.state.attempts);
 
 /**
  * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:

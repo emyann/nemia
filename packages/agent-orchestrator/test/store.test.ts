@@ -329,9 +329,10 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
 
   const spec = tasks.get(id)!.spec;
   assert.deepEqual(
-    { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, maxAttempts: spec.maxAttempts, resume: spec.resume, closeoutSchema: spec.closeoutSchema },
-    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
+    { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, closeoutSchema: spec.closeoutSchema },
+    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, closeoutSchema: undefined },
   );
+  assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'one attempt, as every task is: the runtime refuses a count or a policy');
   assert.deepEqual(readCheckBrief(spec.brief), {
     command: 'npm test && npm run typecheck',
     env: {
@@ -1992,12 +1993,11 @@ test("UNSIGNED is the orchestrator's word since stage 4a, at shipped defaults: a
   assert.deepEqual((await advance(garbled.e, readRun(said.id))).tried, [], 'a statement given is not nudged for');
 });
 
-test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose attempt 1 went quiet and whose nudge was `lost` reads `failed` on `wf ls`, `wf decide` and a try's brief — and one lost, then quiet, reads `unsigned`", async () => {
+test("UNSIGNED is read off the LAST attempt: a task whose journal, from before stage 4a part 2, has attempt 1 quiet and attempt 2 `lost` reads `failed` on `wf ls`, `wf decide` and a try's brief — and one lost, then quiet, reads `unsigned`", async () => {
   const through = async (reasons: string[]) => {
     const b = board();
-    const run = started(folder('maxAttempts: 2'));
+    const run = started(folder());
     await advance(b.e, readRun(run.id));
-    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.maxAttempts, 2, 'filed with two attempts');
     b.settle(`${run.id}-implement`, 'failed', undefined, undefined, reasons);
     if (reasons.at(-1) === 'unsigned') await nudgedUnsigned(b, run.id);
     return { ...b, run };
@@ -2023,6 +2023,50 @@ test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose at
     const now = readRun(b.run.id).steps.implement!.taskId!;
     assert.ok(b.tasks.get(now)!.spec.brief.includes(told), `${word}: the try is told ${told}`);
   }
+});
+
+test('a run frozen before stage 4a part 2 with a step of `maxAttempts: 2` still loads, lists and files — with no count, which the runtime would refuse', async () => {
+  const run = started(folder());
+  const file = path.join(ROOT, 'runs', `${run.id}.json`);
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+  record.workflow = record.workflow.map((s: { name: string }) => (s.name === 'implement' ? { ...s, maxAttempts: 2 } : s));
+  fs.writeFileSync(file, JSON.stringify(record));
+  assert.equal(readRun(run.id).workflow!.find((s) => s.name === 'implement')!.maxAttempts, 2, 'the key is on the frozen step');
+
+  const b = board();
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['implement']);
+  const spec = b.tasks.get(`${run.id}-implement`)!.spec;
+  assert.equal('maxAttempts' in spec, false, 'filed without it');
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'pending');
+  b.settle(`${run.id}-implement`, 'failed');
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'failed');
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement'], 'and a try of it is filed as any is');
+  assert.equal('maxAttempts' in b.tasks.get(`${run.id}-implement-try2`)!.spec, false);
+});
+
+test("open issue 5, the orchestrator's now: a `--nudge` of a try whose session could not start continues the session that try was filed to continue — the runtime no longer does", async () => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'failed');
+  await retry(b.e, run.id, 'implement', { mode: 'nudge' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  const first = `native-${run.id}-implement`;
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.resumeFrom, first);
+
+  // try 2's `--resume` was refused before a session ran: its one attempt is `unstartable`, with no id of its own.
+  const view = b.e.view;
+  (b.e as { view: typeof view }).view = async (id) => {
+    const v = await view(id);
+    if (id !== `${run.id}-implement-try2`) return v;
+    const attempt = { n: 1, ended: 'failed', reason: 'unstartable', nativeId: null, resumeFrom: first, exitCode: null, usage: null };
+    return { ...v, state: { ...v.state, attempts: [attempt] } } as typeof v;
+  };
+  b.settle(`${run.id}-implement-try2`, 'failed');
+  await retry(b.e, run.id, 'implement', { mode: 'nudge' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  assert.equal(b.tasks.get(`${run.id}-implement-try3`)!.spec.resumeFrom, first, 'the chain try 2 was filed to continue, not a new session');
 });
 
 test("`wf retry --message` writes the answer on the person's ask and nothing else; the tick carries it into the try's brief as `## Your answer`, once, and `wf ls` says the try was answered", async () => {

@@ -91,9 +91,39 @@ export async function launch(): Promise<Browser> {
   }
 }
 
+/** The longest a line of the headline runs: a locator, or the element Playwright says is in the way, can run to hundreds of characters. */
+const HEADLINE_WIDTH = 300;
+
+/** What Playwright's call log says of itself while it tries again: none of it says why it tries again. */
+const RETRYING = /^(?:\d+ × )?(?:retrying \w+ action|waiting \d+ms|waiting for element to be |element is visible, enabled and stable$|scrolling into view|done scrolling|attempting \w+ action)/;
+
+/**
+ * A failure in a few lines: its first; for an error Playwright threw, the element it waited for and the last thing its call log says
+ * that is not it trying again — what was in the way; and the picture. The whole of it runs to dozens of lines of call log, and each
+ * server's last lines follow it.
+ */
+export function headlineOf(message: string): string[] {
+  // Playwright dims its call log in colour, whether or not a terminal reads it.
+  const lines = message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+  const clip = (line: string) => (line.length > HEADLINE_WIDTH ? `${line.slice(0, HEADLINE_WIDTH - 1)}…` : line);
+  const said = [lines[0]!];
+  const from = lines.findIndex((line) => line.trim() === 'Call log:');
+  if (from >= 0) {
+    const log = lines.slice(from + 1).map((line) => line.trim().replace(/^- /, '')).filter((line) => line && !line.startsWith('what it looked like:'));
+    const waited = log.find((line) => /^waiting for (?!element )/.test(line));
+    const last = [...log].reverse().find((line) => line !== waited && !RETRYING.test(line));
+    for (const line of [waited, last]) if (line) said.push(line);
+  }
+  const picture = lines.find((line) => line.trim().startsWith('what it looked like:'));
+  if (picture) said.push(picture.trim());
+  return said.map(clip);
+}
+
 /**
  * The process ends with `main`: exit 0 once it resolves; exit 1 once it rejects, saying what failed and
- * then whatever `explain` adds. `cleanUp` runs before either.
+ * then whatever `explain` adds — and then, last, what failed again in a few lines (`headlineOf`), on stderr and on stdout both. A check
+ * shows the tail of what it printed and logs its stdout alone: said once, first, on stderr, the reason was under thirty lines of the
+ * servers' output and in no log, and the check read as an exit 1 with nothing printed.
  */
 export function exitOn(main: Promise<void>, cleanUp: () => void, explain: () => string = () => ''): void {
   main.then(
@@ -102,7 +132,11 @@ export function exitOn(main: Promise<void>, cleanUp: () => void, explain: () => 
       process.exit(0);
     },
     (err: unknown) => {
-      console.error(`\ne2e: FAILED — ${err instanceof Error ? err.message : String(err)}${explain()}`);
+      const why = err instanceof Error ? err.message : String(err);
+      console.error(`\ne2e: FAILED — ${why}${explain()}`);
+      const headline = `\ne2e: FAILED — ${headlineOf(why).join('\n  ')}`;
+      console.error(headline);
+      console.log(headline);
       cleanUp();
       process.exit(1);
     },

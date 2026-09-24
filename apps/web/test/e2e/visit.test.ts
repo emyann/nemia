@@ -1,8 +1,8 @@
 /**
- * `npm run e2e` made to refuse, whole: a page with a console error, and one with a failed request, each put
- * through the code run.ts puts the app's pages through (visit.ts) in a process of its own — which must exit
- * non-zero, naming the page. checks.test.ts proves the watch hears each problem; this proves hearing one
- * fails the run. Needs Chromium, like checks.test.ts.
+ * `npm run e2e` made to refuse, whole: a page with a console error, one with a failed request, and one whose button
+ * something lies over, each put through the code run.ts puts the app's pages through (visit.ts) in a process of its
+ * own — which must exit non-zero, naming the page, and end both its streams saying so. checks.test.ts proves the
+ * watch hears each problem; this proves hearing one fails the run. Needs Chromium, like checks.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,11 +31,30 @@ async function e2eOn(how: string): Promise<Ended> {
 
 const said = (ended: Ended) => `exit ${ended.code}\n--- stdout\n${ended.stdout}\n--- stderr\n${ended.stderr}`;
 
+/** The lines a stream ends with, from the last `e2e: FAILED` on: what a check that shows a tail, or logs stdout alone, reads. */
+const lastSaid = (stream: string): string[] => {
+  const lines = stream.trimEnd().split('\n');
+  const from = lines.map((line) => line.startsWith('e2e: FAILED — ')).lastIndexOf(true);
+  return from < 0 ? [] : lines.slice(from);
+};
+
+/** Stdout and stderr both end with the same few lines, naming the failure: `first`, then `more`, then the picture of `shot`. */
+function endsSaying(ended: Ended, first: RegExp, more: RegExp[], shot: string): void {
+  for (const stream of [ended.stdout, ended.stderr]) {
+    const last = lastSaid(stream);
+    assert.match(last[0] ?? '', first, said(ended));
+    assert.equal(last.length, 2 + more.length, said(ended));
+    more.forEach((line, i) => assert.match(last[1 + i]!, line, said(ended)));
+    assert.match(last.at(-1)!, new RegExp(`^  what it looked like: \\S+/${shot}$`), said(ended));
+  }
+}
+
 test('a page with a console error makes the e2e exit non-zero, naming the page, the theme and the error', { timeout: 60_000 }, async () => {
   const ended = await e2eOn('console-error');
   assert.equal(ended.code, 1, said(ended));
   assert.match(ended.stderr, /^e2e: FAILED — the console-error page \(\/console-error\) in the light theme: no console error and no failed request — \d+ seen:$/m, said(ended));
   assert.match(ended.stderr, /^\s+console error: the graph did not draw$/m, said(ended));
+  endsSaying(ended, /^e2e: FAILED — the console-error page \(\/console-error\) in the light theme: no console error and no failed request — \d+ seen:$/, [], 'console-error-light-failed.png');
   // Stopped at the first failure, with a picture of it, and no screenshot claiming the page passed.
   assert.deepEqual(ended.shots, ['console-error-light-failed.png'], said(ended));
 });
@@ -46,9 +65,20 @@ test('a page with a failed request makes the e2e exit non-zero, naming the page,
   assert.match(ended.stderr, /^e2e: FAILED — the failed-request page \(\/failed-request\) in the light theme: no console error and no failed request — \d+ seen:$/m, said(ended));
   assert.match(ended.stderr, /^\s+request failed: GET http:\/\/127\.0\.0\.1:\d+\/api\/dropped — /m, said(ended));
   assert.deepEqual(ended.shots, ['failed-request-light-failed.png'], said(ended));
+  endsSaying(ended, /^e2e: FAILED — the failed-request page \(\/failed-request\) in the light theme: no console error and no failed request — \d+ seen:$/, [], 'failed-request-light-failed.png');
 });
 
-test('the same page without the break passes in both themes — or the two above would fail for the page, not the break', { timeout: 60_000 }, async () => {
+test("a press on a button something lies over makes the e2e exit non-zero, and its last lines on stdout and on stderr say the page, the theme, the button and what lay over it — not the call log's retries", { timeout: 60_000 }, async () => {
+  const ended = await e2eOn('covered');
+  assert.equal(ended.code, 1, said(ended));
+  assert.deepEqual(ended.shots, ['covered-light-failed.png'], said(ended));
+  endsSaying(ended, /^e2e: FAILED — the covered page \(\/covered\) in the light theme: could not be checked: locator\.click: Timeout 2000ms exceeded\.$/, [
+    /^  waiting for getByRole\('button', \{ name: 'Press' \}\)$/,
+    /^  <div data-cover="">…<\/div> intercepts pointer events$/,
+  ], 'covered-light-failed.png');
+});
+
+test('the same page without the break passes in both themes — or the refusals above would be of the page, not the break', { timeout: 60_000 }, async () => {
   const ended = await e2eOn('none');
   assert.equal(ended.code, 0, said(ended));
   assert.match(ended.stdout, /the none page \(\/none\) in the light theme ✓/, said(ended));

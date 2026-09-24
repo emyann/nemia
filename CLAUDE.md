@@ -421,6 +421,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and `a2aRunner` passed that to `Runner.layer(ops: RunnerOps)`: an optional key absent and an extra key present both type-check,
   so the Effect door's `Runner.transcript` read `undefined` — a harness with no conversation — and no test called it through
   that door. Keep the old verb beside the new one, and test each door by calling the verb through it (learned in review, round 1).
+- **A stop between two processes that share only files: each writes its half before it reads the other's.** A detached
+  run's stop signalled the pid on the run file, and the worker publishes its pid as it starts: a stop in between did nothing,
+  and the A2A handler answered `CANCELED` to it, so a direct caller's harness ran on (open issue 30). Now the stop writes a
+  marker and then reads the pid again, and the worker publishes its pid and then reads the marker, so one of the two always
+  sees the other; each order is made to happen with the worker frozen before its first rename (`detached.test.ts`). An
+  answer that says something happened — `CANCELED` — is a claim about the world, and a level-triggered loop that asks again
+  does not make it true for a caller that asks once (learned in review of the run that made Codex an A2A agent).
 - **Node's type stripping refuses a parameter property.** `constructor(private readonly ops: RunnerOps)` fails the
   file at load with *"TypeScript parameter property is not supported in strip-only mode"*, and `tsc` passes it. Declare
   the field and assign it in the constructor (`HarnessHandler`, learned by the run that put the A2A seam in the runtime).

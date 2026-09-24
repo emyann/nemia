@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DEFAULT_PORT, portOf } from '../src/port.ts';
+import { scratch } from './scratch.ts';
 
 const API = path.join(import.meta.dirname, '..');
 
@@ -26,7 +27,7 @@ test('a PORT that is not a port is refused with the fix, not read as 8787', () =
 
 /** `node src/main.ts` with `PORT`, in a store of its own: what it printed, and how it ended if it did. */
 function startApi(port: string) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-main-'));
+  const root = scratch('hkb-api-main-');
   const child = spawn(process.execPath, ['src/main.ts'], { cwd: API, env: { ...process.env, PORT: port, WF_ROOT: root } });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));

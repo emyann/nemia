@@ -8,17 +8,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-decision-'));
+const root = scratch('hkb-api-decision-');
 process.env.WF_ROOT = root;
 
 // Ahead of the real one on PATH, beside the harness's `claude`: a `git` that notes each call and runs the real one, so a test can count
 // what the route asked of git.
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
-const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-decision-bin-'));
+const bin = scratch('hkb-api-decision-bin-');
 const gitCalls = path.join(bin, 'git-calls');
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;

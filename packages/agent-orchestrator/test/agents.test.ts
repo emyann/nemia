@@ -5,13 +5,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { AGENT_KEYS, agentsDir, parseAgent, parseWorkflow, renderStep, STEP_KEYS, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
 import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-agents-'));
+const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { start, writeWorkflow } = await import('../src/runner.ts');
 

@@ -12,14 +12,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CHECK, checkBrief } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-web-check-'));
+const ROOT = scratch('wf-web-check-');
 
 const checkOf = (folder: string): string => {
   const check = loadWorkflows(path.join(REPO_ROOT, 'workflows', folder)).find((s) => s.name === 'implement')?.check;

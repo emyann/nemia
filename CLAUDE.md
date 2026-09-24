@@ -226,6 +226,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   faster than its interval proves no overlap guard: the old test passed with `start()`'s guard deleted. Run a mutant of a
   loop under `timeout`: one whose `stop()` no longer clears its interval holds `node --test` open for ever (learned by the
   run that made the timer test pass under load).
+- **A test's temporary folder comes from `scratch(prefix)`, never from `os.tmpdir()`.** A test that failed before it stopped its
+  detached worker left the worker, and a fake that reads its stdin for ever, running for hours, and roots nobody removed piled up
+  to 12,583 `ae-detached-*` folders in `/tmp`. `test/scratch.ts` is the same byte for byte in every package whose tests make
+  folders. After each test it stops what still runs in that test's roots (a worker by SIGTERM, then the rest killed with its
+  group). After the file it removes every root and fails the file if a process or a root is left. A process counts as in a root
+  when its arguments, its cwd or its environment name one. Each package's `scratch.test.ts` refuses a `tmpdir(` call anywhere
+  else under `test/`; a line that makes no root there says `// not a root` and why. It also holds the copy to the runtime's, so a
+  change to the helper is made in `packages/agent-runtime/test/scratch.ts` and copied. `agent-runtime/test/leaks.test.ts` runs a
+  failing fixture file under `timeout` with a TMPDIR of its own and requires that nothing is left, and one that leaves a root
+  it cannot remove, which must fail the file. A fake harness that reads stdin
+  bounds its own life all the same. The worker itself also ends its harness and exits when its run file or store is removed
+  (open issue 32). To measure a leak, run with `TMPDIR=$(mktemp -d)`: other worktrees' suites write to `/tmp` too (learned by
+  the run that found the leak).
 - **A test that fails only under load is a race until shown otherwise, and it is made to happen on demand before it is fixed.**
   Of the three a loaded suite failed on 2026-09-23, two were races in the code. The detached worker published its pid and only
   then installed its SIGTERM handler, so a stop sent in between killed it by the signal's default action and its harness ran on

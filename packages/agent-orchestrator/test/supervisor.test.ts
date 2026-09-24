@@ -10,15 +10,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { terminalSteps } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-supervisor-'));
+const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.

@@ -10,11 +10,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { claudeDetached, codex, createEngine, type Engine, type HarnessSpec } from '../src/facade.ts';
+import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-pool-${label}-`));
+const tmp = (label: string) => scratch(`ae-pool-${label}-`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**

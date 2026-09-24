@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-root-'));
+process.env.WF_ROOT = scratch('hkb-api-harness-root-');
 const { app } = await import('../src/app.ts');
 const { engine } = await import('agent-orchestrator');
 
@@ -43,7 +43,7 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
 
   // A task filed on the engine's Claude harness, and read: through the package's engine, and through the api's own.
   const e = engine();
-  await e.file({ id: 't-harness', brief: 'Read me.', cwd: os.tmpdir(), harness: 'claude' });
+  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('hkb-api-cwd-'), harness: 'claude' });
   let before = observations();
   // A list observes every harness; a view of a task with no attempt in flight reads its record alone since `find` (E7).
   await e.list();

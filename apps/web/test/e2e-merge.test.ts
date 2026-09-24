@@ -7,17 +7,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { after, test } from 'node:test';
+import { test } from 'node:test';
 import { NAMES, namesIn, PAGES_DIR, pageFiles } from './e2e/pages.ts';
+import { scratch } from './scratch.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
-
-const temps: string[] = [];
-after(() => {
-  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
-});
 
 const git = (cwd: string, ...args: string[]): string =>
   execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
@@ -36,8 +31,7 @@ const writeAll = (root: string, files: Record<string, string>): void => {
  * `one`, as a person merges main into a branch. Answers the repository, and whether the merge was clean.
  */
 function mergeOf(base: Record<string, string>, one: Record<string, string>, other: Record<string, string>): { repo: string; clean: boolean; said: string } {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-merge-'));
-  temps.push(repo);
+  const repo = scratch('hkb-e2e-merge-');
   git(repo, 'init', '-q', '-b', 'main');
   writeAll(repo, base);
   git(repo, 'add', '-A');

@@ -4,8 +4,8 @@
  * judge a stub `fetch` and a stub environment of its own.
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from './scratch.ts';
 
 for (const name of Object.keys(process.env)) if (name.startsWith('TYPESAFE_')) delete process.env[name];
 
@@ -20,7 +20,8 @@ globalThis.fetch = (async (input: unknown) => {
 export const KEY = 'ts-test-key-7c1f9d2e0b';
 export const ENV = { TYPESAFE_API_KEY: KEY };
 
-export const tmp = (name = 'judge') => fs.mkdtempSync(path.join(os.tmpdir(), `agent-judge-${name}-`));
+/** A root of the test's own, taken away before its file ends (`scratch.ts`). */
+export const tmp = (name = 'judge') => scratch(`agent-judge-${name}-`);
 
 export type Call = { url: string; headers: Record<string, string>; body: any; signal?: AbortSignal };
 

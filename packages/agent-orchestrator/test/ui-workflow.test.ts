@@ -10,13 +10,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Ajv } from 'ajv';
 import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
 import { closeoutSchemaOf, outputLines, type Closeout } from '../src/closeout.ts';
 import { loopSpan, terminalSteps } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
@@ -287,7 +287,7 @@ function differences(ours: string, theirs: string): string[] {
 
 test("the repository's workflows/ui/ is the package's, file for file — and a copy that is not is caught", () => {
   const shipped = path.join(WORKFLOWS, 'ui');
-  const drifted = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-ui-copy-'));
+  const drifted = scratch('wf-ui-copy-');
   fs.cpSync(shipped, drifted, { recursive: true });
   fs.appendFileSync(path.join(drifted, 'review.md'), '\nAlso check the spelling.\n');
   fs.writeFileSync(path.join(drifted, 'look.md'), '---\nafter: implement\n---\nLook.\n');

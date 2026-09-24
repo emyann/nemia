@@ -7,12 +7,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { scratch } from './scratch.ts';
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-'));
+const ROOT = scratch('wf-write-');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { writeWorkflow } = await import('../src/runner.ts');
@@ -122,22 +122,22 @@ test('the README is written only when it is given, to the name the README alread
 });
 
 test("written where the board lists workflows from — the store's workflows/ and a repository's — and anywhere else with `{ anywhere: true }`", () => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-repo-'));
+  const repo = scratch('wf-write-repo-');
   fs.mkdirSync(path.join(repo, '.git'));
   assert.deepEqual(writeWorkflow(path.join(repo, 'workflows', 'dev'), [step('implement')]).written, ['implement.md'], "a repository's");
   // A worktree's .git is a file, and a worktree is a repository all the same.
-  const worktree = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-worktree-'));
+  const worktree = scratch('wf-write-worktree-');
   fs.writeFileSync(path.join(worktree, '.git'), 'gitdir: /elsewhere\n');
   assert.deepEqual(writeWorkflow(path.join(worktree, 'workflows', 'dev'), [step('implement')]).written, ['implement.md'], "a worktree's");
 
-  const elsewhere = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-elsewhere-')), 'dev');
+  const elsewhere = path.join(scratch('wf-write-elsewhere-'), 'dev');
   assert.deepEqual(writeWorkflow(elsewhere, [step('implement')], undefined, { anywhere: true }).written, ['implement.md']);
   assert.deepEqual(loadWorkflows(elsewhere).map((s) => s.name), ['implement']);
 });
 
 test("REFUSED at shipped defaults, with the folder as it was: a folder outside the store's workflows/ and a repository's — or the workflows/ itself, or one below a workflow", () => {
   const fix = (at: string) => `${at} is not a workflow in the store's workflows/ (${path.join(STORE, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-outside-'));
+  const outside = scratch('wf-write-outside-');
   fs.writeFileSync(path.join(outside, 'old.md'), 'a step nobody meant to remove\n');
   assert.equal(refusal(outside, () => writeWorkflow(outside, [step('implement')])), fix(outside));
   const notYet = path.join(outside, 'workflows', 'dev');
@@ -258,7 +258,7 @@ test('a step renamed by case keeps its file where the filesystem does not tell c
 test("REFUSED at shipped defaults, with the folder as it was: a step's file that is a link, and a README that is one when a README is given", () => {
   const dir = devIn('linked');
   const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
-  const away = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-linked-'));
+  const away = scratch('wf-write-linked-');
   /** A file of the folder moved out of it and linked back in, as a person keeping a step beside another workflow would. */
   const link = (file: string): string => {
     const to = path.join(away, file);

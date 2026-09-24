@@ -212,6 +212,9 @@ has ever taken. It is the price of not having somebody else's registry to read, 
 price of running more than one harness. It is a handful of lines, because the engine already had a
 journal and a seam.
 
+The other way round, the run file removed is a stop: `stop` finds the worker by it, so a worker whose run file is gone,
+alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
+
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
 optionally the words it refuses, a reader of what it prints, where it keeps its conversation, and
 the pool it is counted in under the ceiling:

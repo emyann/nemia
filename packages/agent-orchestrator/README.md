@@ -927,7 +927,7 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   workspace, that the run executes it afterwards, and not to weaken it.
 - **It is an engine task,** on a `check` harness the run hands the engine (`src/check.ts`): `sh -c` with
   the command in a subshell, stderr to a file of its own, and the exit code printed last. So a check
-  outlives a tick that dies, is stopped by `wf cancel`, ends at a ten-minute deadline, runs once and is
+  outlives a tick that dies, is stopped by `wf cancel`, ends at a twenty-minute deadline, runs once and is
   never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
   `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the

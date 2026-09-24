@@ -1528,7 +1528,8 @@ What it leaves:
 - **The cap is per step.** Nothing sets a budget for a run or a workflow: the run's total is shown, and held to nothing.
 - **`maxAttempts:` on a `claude-detached` step hands each attempt what is left.** The engine starts an attempt that failed under its cap
   again within one filing, with the same `budgetUsd`, and counts no spend of its own. So `maxAttempts: 3` can spend nearly three times
-  what was left. The run's own default is one attempt.
+  what was left. The run's own default is one attempt. (Gone on 2026-09-23: the runtime makes one attempt per start, and a step
+  that says `maxAttempts:` is refused.)
 - **Only what was measured counts.** An attempt killed before its harness wrote a cost, or run on a model it could not price, adds
   nothing to what a step has spent. `wf ls` marks such a step's cost `≥`, and a step that such an attempt took past its cap is not
   held.

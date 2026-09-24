@@ -497,6 +497,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
   A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
   (learned by the run that moved the judgement up).
+- **A test that slices a source file between two names reads to its end once the second name is gone.** "`decide` never reads
+  a harness argument" in `agent-runtime/test/engine.test.ts` took `decide`'s text as `slice(indexOf('export function decide('),
+  indexOf('function resumeTarget('))`; with `resumeTarget` deleted, `indexOf` gave -1 and the slice ran on through `endOf` and the
+  rest of `domain.ts`. It failed, on words that are not `decide`'s; one asserting an absence the rest also lacks would have passed
+  over code it never meant to read. When you delete a function, grep the tests for its name in a string, and end such a slice on a
+  name that must be there (learned by the run that retired `maxAttempts:`).
 
 ## Rules the code keeps
 

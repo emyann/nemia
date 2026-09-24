@@ -31,8 +31,8 @@ Definition of done — a closed list, and it is closed:
 - [x] a person's words into a session while it runs, on the record (`say`)
 - [x] concurrency ceiling, per pool — one subscription is one pool, however many harnesses run on it
 - [x] the feed — a cursored stream of everything that happened
-- [x] resume — an attempt continues the one before it, by policy
-- [x] deadline — wall clock across attempts; also the only thing that ends a `blocked` session,
+- [x] resume — a task filed with `resumeFrom` continues that session; one attempt per start, and nothing tried again here
+- [x] deadline — wall clock of an attempt, or of a held-open turn's; also the only thing that ends a `blocked` session,
       which waits on a person forever — and holds no slot while it waits
 - [x] isolation — `--worktree`, declared per task, cut by the harness
 
@@ -45,28 +45,28 @@ the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runne
 `test/core-reads.test.ts` refuses either the day it reads one. `budgetUsd` is the task's own, read by a runner; `priority` is
 read by the pass that orders the board.
 
-### The one real decision in here: resume policy
+### One attempt per start
 
-`resume:` on a task, default `interrupted`:
+The engine starts one attempt at a task, and whatever ends it settles the task: `succeeded` when its harness ended it done,
+`failed` when it failed, was lost, could not start, spent its budget or ran out of time, `stopped` when it was asked to stop.
+Nothing here tries again. Whether to — and whether to continue the session or start clean — is a judgement about the work,
+so it is the caller's: file the task again, with `resumeFrom` the session's id to continue it. In a workflow the orchestrator
+does it, as `retries:` after a check refuses a step and as `wf retry` for a try that failed, was lost or could not start.
 
-| | continues when |
-|---|---|
-| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating |
-| `always` | any failure, including one the harness reported — but a session that spent its budget |
-| `never` | nothing; every attempt starts clean |
+`EndReason` is recorded on the `ended` event rather than inferred later, because by the time anyone decides, the evidence is
+gone, and *lost* and *failed* are different facts: a lost session's transcript is real work nobody judged, and a failed one is
+a conclusion that dropping a model back into its context tends to reproduce. An attempt the harness refused before a session
+ran (`unstartable`) keeps the `resumeFrom` it was filed with on its record, so a caller that continues it continues that chain
+(open issue 5).
 
-The default distinguishes *lost* from *failed* because they are different facts. A lost session's
-transcript is real work that nobody judged. A failed one is a conclusion — and dropping a model
-back into the context that produced a conclusion tends to reproduce it. `EndReason` is recorded on
-the `ended` event rather than inferred later, because by the time the next attempt starts, the
-evidence is gone.
+Until stage 4a part 2 the engine decided this itself: `maxAttempts` counted attempts and a `resume` policy (`interrupted`,
+`always`, `never`) chose between continuing and starting clean. Nobody used it — the orchestrator filed every task
+`maxAttempts: 1` — and both are retired: `file()` and `ae start` refuse either, at any value, saying where trying again went. A
+journal written before still folds, and one with several attempts reads as it did.
 
-An attempt its harness ended at its spend cap — reason `budget`, below — is followed by no attempt under any policy: its
-task settles `failed`. A budget spent is spent.
-
-Verified against the live harness: attempt 2 resumed attempt 1 under **its own name**, got a fresh
-session id from the harness, and genuinely continued the conversation (`COUNT.txt` came back
-`1\n2`). Two rows on the board, one thread of work.
+Verified against the live harness, when the engine still continued attempts itself: attempt 2 resumed attempt 1 under
+**its own name**, got a fresh session id from the harness, and genuinely continued the conversation (`COUNT.txt` came back
+`1\n2`). Two rows on the board, one thread of work — which a filing with `resumeFrom` does the same way.
 
 ## The model
 
@@ -304,9 +304,7 @@ after a space starts a comment. The keys are a closed list:
 | `harness` | `claude` (default), `codex`, `claude-detached` |
 | `model` | the harness's model name |
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
-| `maxAttempts` | a whole number from 1; default 1 |
-| `deadlineSeconds` | wall clock across all attempts — of a turn, when held open — above 0; absent, no deadline |
-| `resume` | `interrupted` (default), `always`, `never` — the retry policy |
+| `deadlineSeconds` | wall clock of the attempt — of a turn, when held open — above 0; absent, no deadline |
 | `resumeFrom` | a session id to continue, instead of starting cold |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
@@ -324,14 +322,14 @@ A brief writes each key on a line of its own, and `ae start` files the harness's
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` or a `holdOpen` that is not `true` or `false`, a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` or a `holdOpen` that is not `true` or `false`, `maxAttempts` or `resume` at any value (retired: one attempt per start, above), a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
 `config`, where a key that is no harness argument is refused by name, and one filed beside `config` instead of in it is
 refused saying where it goes:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
-it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
+it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
 is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `priority` that is not a finite number (below), and a word the
@@ -498,13 +496,12 @@ no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg
 open issue 17.
 
 **A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
-spent its budget`, and no attempt follows — resumed or clean, whatever `maxAttempts` and `resume` say. To run it again,
+spent its budget`, and no attempt follows, as none follows any end. To run it again,
 file the task again with a larger budget; to continue that session, with `resumeFrom` its id: a cap on `claude -p --resume` bounds
 only its own process's spend (measured on 2.1.280: a resume capped at half of what its session had spent finished). What it
 prints is not its own: on 2.1.280 a resume's `total_cost_usd` and `duration_api_ms` carry its parent's on (2.1.272 printed
-its own), so the runner takes off what the run it continues printed (`resumeCostCarried`, open issue 4). The harness counts one session's spend, and the engine counts none: an attempt that fails *under* its cap —
-the harness's verdict, or lost — is retried under the same cap, so `maxAttempts: 3` can still spend nearly three caps
-before one is reached.
+its own), so the runner takes off what the run it continues printed (`resumeCostCarried`, open issue 4). The harness counts one session's spend, and the engine counts none: a task filed again is handed its cap anew,
+so what a chain of filings spends together is the caller's to count (the orchestrator's `budget:`).
 
 `ae start` takes `budgetUsd: 0.25` in a brief, digits only.
 
@@ -745,7 +742,7 @@ runner reports how long a session has been quiet, and `decide` records what came
 a failure, and whether its session is told to sign off, is the workload's question, so it is the layer above's: the
 orchestrator reads `stated: false` as `unsigned`, and continues the session once a round with a sign-off nudge
 (`closeoutAsked` and `endWords` in `agent-orchestrator/src/views.ts`, `retriesDue` in its `run.ts`). The task here settles
-as its harness ended it, whatever attempts it has left: it is not retried, not continued, and nobody is nudged. `ae show`
+as its harness ended it: it is not retried, not continued, and nobody is nudged. `ae show`
 and `ae feed` print such an end `done (no statement)`. The key is written only on an end read off a sighting of a task
 that asked for a statement; an end with no `stated` key — a journal written before, or a task that asked for nothing — is
 not read as unsigned by anyone.
@@ -1172,14 +1169,11 @@ reads the three, and nothing else about them: the task waits while its current t
 after it starts the next turn; a `closed` settles it. Level-triggered like the rest — a restarted engine reads the wait,
 the answer or the close off the record.
 
-**A turn is its own run of attempts.** `maxAttempts` counts the current turn's attempts, `deadlineSeconds` runs from the
-current turn's first, and the budget is the answer's if it gave one, the filing's if not. So a task may wait on a person
-for as long as they take — the deadline times work, not reading — and a turn that fails is retried as a first turn is:
-continuing its own session where `resume` says so, and where it would start cold, the session the turn continued, since
-cold would lose the conversation the answer is about. On Claude Code that is not quite where the turn began: `-p --resume`
-keeps the session's id (M12), so the conversation the retry continues holds the failed attempt too, and a later turn's
-retry reads as `resume: 'always'` whatever the task says (open issue 28). A turn that runs out of attempts settles the task
-`failed`. A later turn continues only the session that signed the turn before it: where its harness recorded none, an
+**A turn is one attempt.** `deadlineSeconds` runs from the current turn's attempt, and the budget is the answer's if it gave
+one, the filing's if not. So a task may wait on a person for as long as they take — the deadline times work, not reading —
+and a turn whose attempt fails, is lost or cannot start settles the task `failed`, noting the turn, as a first turn's does;
+nothing is retried within the task. A caller that wants the conversation to go on files a task again with `resumeFrom`: on
+Claude Code that holds the failed attempt too, since `-p --resume` keeps the session's id (M12, open issue 28). A later turn continues only the session that signed the turn before it: where its harness recorded none, an
 answer is refused, and one journalled all the same settles the task `failed` rather than start a session cold on it.
 Two answers journalled before the next turn starts are told to it both, in order, and the last budget given is its own:
 nothing serialises two writers of one journal, so the record says both and the turn reads both. A `stop` settles a
@@ -1428,7 +1422,6 @@ cat > brief.md <<'MD'
 ---
 cwd: /path/to/repo
 permissionMode: acceptEdits
-maxAttempts: 2
 ---
 Fix the failing parser test. Do not change the test.
 MD

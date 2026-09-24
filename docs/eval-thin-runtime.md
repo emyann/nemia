@@ -363,5 +363,14 @@ orchestrator's calls to the runtime change.
    written before keeps its words: an end recorded `reason: 'unsigned'` settles `failed` with its old note, attempts left or
    not, and is read `unsigned` above; an end with no `stated` key is never read as unsigned. **Part 2 is the rest:** retiring
    the runtime's `maxAttempts:` and `resume:`, so a retry is the orchestrator's filing alone.
+   **Stage 4a, part 2 done, 2026-09-23: one attempt per start.** `decide` starts one attempt at a task, and any end but
+   `done` settles it `failed` — a held-open task's turn included — noting the attempts; nothing is tried again inside a
+   task. `file()` and `ae start` refuse `maxAttempts` and `resume` at any value, the sentence naming `resumeFrom`, `retries:`
+   and `wf retry`; a journal filed with them still folds. The orchestrator files neither, refuses the `maxAttempts:` step key
+   in a step or an agent (the run's own `resume:`, which continues another step's session, stays), and still loads a run
+   frozen with it; the board's *max attempts* row is gone. Open issue 5's case — continue what an `unstartable` attempt was
+   filed to continue — is the orchestrator's `continuesFrom` now. Not covered here: a held-open step, which the orchestrator
+   does not file until stage 2 part 4b lands; whichever of the two lands second makes a held turn that fails, is lost or
+   cannot start fall back to `retries:` / `wf retry` as a new `-tryN`.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

@@ -231,8 +231,8 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs">
         {([
           ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
-          ['disallow', fence.disallow.join(', ') || 'nothing'],
-          ['allow', fence.allow.join(', ') || 'nothing'],
+          ['disallowed tools', fence.disallowedTools.join(', ') || 'nothing'],
+          ['allowed tools', fence.allowedTools.join(', ') || 'nothing'],
           ['permission mode', fence.permissionMode ?? OWN],
           ['effort', fence.effort ?? OWN],
           ['mcp', 'none named: a step has no mcp: key'],

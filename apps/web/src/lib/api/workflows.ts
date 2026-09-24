@@ -18,10 +18,10 @@ export type WorkflowStepSpec = {
   agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
-  /** What the session may not have (`disallow:`): empty where the step denies nothing. */
-  disallow: string[];
-  /** What the session may do without being asked (`allow:`): empty where the step allows nothing beyond its mode. */
-  allow: string[];
+  /** What the session may not have (`disallowedTools:`): empty where the step denies nothing. */
+  disallowedTools: string[];
+  /** What the session may do without being asked (`allowedTools:`): empty where the step allows nothing beyond its mode. */
+  allowedTools: string[];
   /** `background:` as written: null where the step has no line, and runs as a job. */
   background: boolean | null;
   /** `remote:` as written: null where the step has no line. */

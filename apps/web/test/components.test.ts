@@ -634,7 +634,7 @@ async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; re
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 

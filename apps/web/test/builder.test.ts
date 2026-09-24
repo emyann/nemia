@@ -7,7 +7,7 @@ import {
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
-const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({ ...UNSET, after: [], input: [], disallow: [], ...fields });
+const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({ ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [], ...fields });
 const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({ name, spec: spec(fields), body, own: null });
 
 /** implement ⇄ review, as the listing has a folder of yours. */
@@ -188,7 +188,7 @@ test("an agent attached to a step makes what it has its own; taken away, the ste
 
 /** What the api says each agent gives a step: `coder` as `attached` has it, and `reviewer`, which sets a model and nothing else. */
 const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
-  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'output'],
+  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
   agents: { coder: { harness: 'claude', model: 'opus', effort: 'high' }, reviewer: { model: 'sonnet' } },
 };
 

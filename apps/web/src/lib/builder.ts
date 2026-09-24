@@ -14,7 +14,7 @@ export const DEFAULT_ROUNDS = 3;
 
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallow: [], allow: [], background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
@@ -22,7 +22,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
 export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =>
   workflow.steps.map(({ name, spec, body, own }) => ({
     name,
-    spec: { ...spec, after: [...spec.after], input: [...spec.input], disallow: [...spec.disallow], allow: [...spec.allow], tools: spec.tools && [...spec.tools] },
+    spec: { ...spec, after: [...spec.after], input: [...spec.input], disallowedTools: [...spec.disallowedTools], allowedTools: [...spec.allowedTools], tools: spec.tools && [...spec.tools] },
     body,
     own: own && { keys: [...own.keys], body: own.body },
     schema: null,
@@ -91,7 +91,7 @@ export function nameRefusal(steps: readonly DraftStep[], name: string): string |
 /** A step added: its name and what it is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
 export function addStep(steps: readonly DraftStep[], name: string, body: string): DraftStep[] {
   if (nameRefusal(steps, name)) return [...steps];
-  return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallow: [], allow: [] }, body, own: null, schema: null }];
+  return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [] }, body, own: null, schema: null }];
 }
 
 /** A step removed, and every key of another step that names it: `after`, `input`, `resume`, and `loop` with its rounds. */

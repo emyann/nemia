@@ -14,7 +14,7 @@ const UNSET = '(unset)';
 /** What a key's field says beneath it where the package's line for a step's key would not fit an agent. */
 const HINTS: Partial<Record<AgentRoleKey, string>> = {
   tools: 'The tools its sessions may use, comma-separated: Read, Grep, Bash(npm test). Unset, the harness decides.',
-  disallow: 'The tools its sessions may never use, comma-separated, whatever `tools` allows.',
+  disallowedTools: 'The tools its sessions may never use, comma-separated, whatever `tools` allows.',
   context: 'The context window its sessions are capped at, in tokens: 200k, say.',
   model: 'A model its harness knows: opus, sonnet, gpt-5-codex.',
 };
@@ -135,7 +135,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
           {choice('permissionMode')}
           {choice('remote')}
           {text('tools')}
-          {text('disallow')}
+          {text('disallowedTools')}
         </div>
       </fieldset>
 

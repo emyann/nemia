@@ -1,7 +1,7 @@
 import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 
 /** The role keys, in the package's order (`AGENT_KEYS` without the description): the order an agent's file writes them. */
-export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'output'];
+export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'];
 
 /** What each role key is called on the form. */
 export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
@@ -11,8 +11,8 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
   context: 'Context',
   permissionMode: 'Permission mode',
   tools: 'Tools',
-  disallow: 'Denied tools',
-  allow: 'Allowed without asking',
+  disallowedTools: 'Denied tools',
+  allowedTools: 'Allowed without asking',
   remote: 'Remote',
   output: 'Result schema',
 };

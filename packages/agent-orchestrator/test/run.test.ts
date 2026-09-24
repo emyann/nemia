@@ -4,6 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { holdsOpen, holdsOpenOn } from '../src/run.ts';
 import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, deniedOffer, deniedWords, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, parseCloseout, placeText, REPLIES_SCHEMA, type Closeout } from '../src/closeout.ts';
 import { answerOf, dueNote, messageRefusal, nextTry, retriesSpent, sessionModel, signoffsSpent, spentAsks, tryOf, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry.ts';
@@ -737,6 +738,16 @@ test('a cancelled run is waiting on nobody, though its step still says it signed
   const l = listing(STEPS, finished(CANCELLED), shown({ t1: 'succeeded', t2: 'stopped' }), signedOff({ implement: said('blocked') }));
   assert.deepEqual(statuses(l), ['succeeded · BLOCKED', 'stopped']);
   assert.deepEqual(l.waitingOnYou, [], '`wf decide` has nothing to decide for it');
+});
+
+test("a task held open that waits for a word — the engine's `input-required` — is read as it signed: blocked waits on you, a gated one is at its gate, and the word is still the engine's", () => {
+  const waiting = shown({ t1: 'input-required', t2: 'input-required' });
+  const blocked = listing(STEPS, finished(), waiting, signedOff({ implement: said('done'), review: said('blocked') }));
+  assert.deepEqual(statuses(blocked), ['unverified · done', 'input-required · BLOCKED']);
+  assert.deepEqual(blocked.waitingOnYou, ['review']);
+  const gated = listing([step('implement'), { ...step('review', ['implement']), gate: true }], finished(), waiting, signedOff({ implement: said('done'), review: said('done') }));
+  assert.deepEqual(statuses(gated), ['unverified · done', 'awaiting approval']);
+  assert.deepEqual(gated.waitingOnYou, ['review']);
 });
 
 // ─── the check ──────────────────────────────────────────────────────────────
@@ -3544,6 +3555,34 @@ test('`hasGate` and `gatesOf`: a step is gated by its own `gate: true` or by the
   const sentBack = atPlan({ steps: { plan: { taskId: 't1-try2', tries: [{ taskId: 't1', then: 'nudge' }] }, implement: { taskId: null }, review: { taskId: null } }, approvals: [approval('plan', 1)] });
   assert.equal(approvalOf(sentBack, 'plan'), undefined, 'try 2 is not approved by try 1\'s approval');
   assert.equal(approvalOf(atPlan({ approvals: [approval('plan', 2)] }), 'plan'), undefined, 'nor try 1 by an approval of try 2');
+});
+
+test('`holdsOpen`: a step keeps its task open while a word from a person is what moves it — signed off blocked, or at its gate unapproved, or checked on the way there — and REFUSES every other standing, and every step of a run called off or pruned', () => {
+  const holds = (w: Workflow, r: Run, phase: TaskPhase, closeout: Closeout | undefined, checkPhase?: TaskPhase) =>
+    holdsOpen(w, r, phases({ t1: phase, ...(checkPhase ? { c1: checkPhase } : {}) }), () => closeout, asked, [w, step('implement', [w.name])]);
+  const plan = step('plan');
+  const at = (extra: Partial<Run> = {}) => run({ plan: 't1', implement: null }, extra);
+  assert.equal(holds(plan, at(), 'succeeded', said('blocked')), true, 'signed off blocked');
+  assert.equal(holds(plan, at({ gates: ['plan'] }), 'succeeded', signedDone()), true, 'at its gate');
+  const checked = { ...plan, check: 'npm test' };
+  const checking = at({ gates: ['plan'], steps: { plan: { taskId: 't1', check: { taskId: 'c1' } }, implement: { taskId: null } } });
+  assert.equal(holds(checked, checking, 'succeeded', signedDone(), 'running (working)'), true, 'gated, its check running: the gate is where it goes next');
+
+  assert.equal(holds(plan, at(), 'succeeded', signedDone()), false, 'ungated, signed off done');
+  assert.equal(holds(plan, at({ gates: ['plan'], approvals: [approval('plan', 1)] }), 'succeeded', signedDone()), false, 'approved');
+  assert.equal(holds(checked, { ...checking, gates: undefined }, 'succeeded', signedDone(), 'running (working)'), false, 'ungated, its check running');
+  assert.equal(holds(checked, checking, 'succeeded', signedDone(), 'failed'), false, 'gated, its check refused: a try of it is its own task');
+  assert.equal(holds(plan, at({ gates: ['plan'] }), 'succeeded', undefined), false, 'unsigned');
+  assert.equal(holds(plan, at({ ...CANCELLED }), 'succeeded', said('blocked')), false, 'a run called off');
+  assert.equal(holds(plan, at({ gates: ['plan'], pruned: { at: '2026-01-02T00:00:00Z', worktrees: [] } }), 'succeeded', signedDone()), false, 'a run pruned');
+});
+
+test('`holdsOpenOn`: a Claude Code job is filed held open; REFUSED for a background session, a codex step and a `claude-detached` one', () => {
+  assert.equal(holdsOpenOn({}), true, 'the default harness, claude');
+  assert.equal(holdsOpenOn({ harness: 'claude' }), true);
+  assert.equal(holdsOpenOn({ harness: 'claude', background: true }), false);
+  assert.equal(holdsOpenOn({ harness: 'codex' }), false);
+  assert.equal(holdsOpenOn({ harness: 'claude-detached' }), false);
 });
 
 test('REFUSED by the gate at shipped defaults, pass after pass: a gated step that signed off reads `awaiting approval`, and nothing after it is ready — whatever its closeout says — until the try it is on is approved', () => {

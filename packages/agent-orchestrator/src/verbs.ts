@@ -12,7 +12,7 @@ import { tryOf, type RetryAsk, type RetryHow } from './retry.ts';
 import { acceptFile, acceptanceIn, approvalFile, approvalIn, askFile, askIn, holdFile, listRuns, lstatOf, markCancelled, readAsks, readRun, removeHold, roundAskFile, roundAskIn, runFile, stepsOf, writeAsk, writeHold } from './store.ts';
 import { standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, phaseOfView, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries } from './tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from './tick.ts';
 
 export type Cancelled = { run: Run; plan: CancelPlan };
 
@@ -53,6 +53,9 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
+  // A task held open that waits for a person's word — a gate, a blocked sign-off — runs nothing, so it is closed, not stopped: settled as it
+  // signed. A close the engine refuses is the next pass's to make again, as the mark is what every pass enforces.
+  await closeWaitingTasks(e, run, views);
   if (plan.kind === 'already-cancelled') return { run, plan };
 
   return { run: { ...run, cancelledAt: markCancelled(id) }, plan };

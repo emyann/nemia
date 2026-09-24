@@ -32,9 +32,33 @@ import { parentRecord, shippedOf } from './branches.ts';
 export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
+  // A task held open whose turn signed waits on a person with no process running (`input-required`): the step's session is over, as a
+  // settled one's is, and the run reads it so — its closeout, its check, its gate. And one closed after it signed, which the engine settles
+  // `succeeded` on its next pass: read as that already, or it would read `running` for the pass between.
+  if (v.phase === 'input-required' || (v.state.closed && v.state.attempts.at(-1)?.ended === 'done')) return 'succeeded';
   if (v.state.attempts.length) return 'running';
   return v.state.brief ? 'pending' : 'unknown';
 };
+
+/**
+ * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
+ * person gave it (`answer`). What says how the step's session stands now — its closeout, whether it signed, what it was denied — since an
+ * answered task keeps the attempts of the turns before it, and the turn it answered signed `blocked`.
+ */
+const currentTurn = (state: TaskView['state']): TaskView['state']['attempts'] =>
+  state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
+
+/**
+ * Whether a task held open waits for a person's word now — `input-required`: its turn signed, nobody closed it, and nothing runs. What the
+ * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
+ */
+export const waitsForWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'input-required';
+
+/**
+ * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
+ * What tells a turn a pass started and died before writing down (`adoptTries`) from one the record already holds.
+ */
+export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? view.state.inputs?.length ?? 0 : 0);
 
 /**
  * The engine's word on every task this run has filed, read once.
@@ -76,7 +100,7 @@ export async function taskPhases(e: Engine, run: Run, { earlierTries = true }: {
 export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): CloseoutAsked => {
   const state = views.get(taskId)?.state;
   if (!state?.closeoutSchema) return false;
-  return state.attempts.at(-1)?.reason === 'unsigned' ? 'unsigned' : true;
+  return currentTurn(state).at(-1)?.reason === 'unsigned' ? 'unsigned' : true;
 };
 
 /**
@@ -104,12 +128,15 @@ export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: stri
  *
  * Every attempt of the task, not only its last: an attempt the engine started again within one filing is the same try, and what the first
  * was denied is still what the step could not do. A try is a task of its own (`checkTaskId`, `sessionTasks`), so the current try's task
- * says the current try's denials, and a try filed after them starts with none.
+ * says the current try's denials, and a try filed after them starts with none. A try that answers a task held open is a turn of that task
+ * (`currentTurn`), and says the denials of its own attempts: what the turn it answered was denied was that try's.
  *
  * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in run.ts.
  */
-export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string[] =>
-  [...new Set((views.get(taskId)?.state.attempts ?? []).flatMap((a) => (a.denials ?? []).map(denialText)))];
+export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string[] => {
+  const state = views.get(taskId)?.state;
+  return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
+};
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
@@ -224,7 +251,9 @@ function tailOf(file: string, bytes = 64_000): string {
  */
 export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
   const taskId = run.steps[stepName]?.taskId;
-  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+  // The current turn's: a task held open and answered keeps the closeout of the turn it answered until the next turn signs.
+  const state = taskId ? views.get(taskId)?.state : undefined;
+  const said = state ? currentTurn(state).at(-1)?.closeout : undefined;
   return said === undefined ? undefined : parseCloseout(said);
 }
 

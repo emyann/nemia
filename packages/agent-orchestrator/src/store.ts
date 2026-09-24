@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Hold, type Pruned, type RoundAsk, type Run } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { asRan, orderSteps, type Workflow } from './workflow.ts';
+import { asNamed, asRan, orderSteps, type Workflow } from './workflow.ts';
 import { loadWorkflows } from './workflow-store.ts';
 import { inputsRoot } from './places.ts';
 
@@ -125,7 +125,9 @@ export const readRun = (id: string): Run => {
   // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
-  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...run } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...read } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  // A run frozen before a step key was renamed is read under the names the keys have now, and written back so (`asNamed`).
+  const run = read.workflow ? { ...read, workflow: read.workflow.map(asNamed) } : read;
   const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);

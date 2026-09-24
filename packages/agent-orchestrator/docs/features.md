@@ -4188,6 +4188,27 @@ reviewers' fences rest on.
 api and the board say them: a `denied:` note beside the status, never in it. Nothing is decided on them yet — `denials: fail`,
 §10. The supervisor's `allow:` list is what its brief runs today: a command off it is denied with no prompt, unread.
 
+## Shipped: the rule lists under Claude Code's names — `disallowedTools:` and `allowedTools:`
+
+A step's two rule lists were `disallow:` and `allow:` until 2026-09-23; they are `disallowedTools:` and `allowedTools:` now, the names
+Claude Code gives the flags they become (`--disallowedTools`, `--allowedTools`), and the names the runtime's task already carried
+them under. The sections above keep the words they were written in.
+
+- **The former names are accepted, not migrated.** `readKeys` reads `disallow:` and `allow:` as the new keys (`FORMER_KEYS`), in a step
+  and in an agent, so a folder written before still starts; every refusal of the list quotes the line as it was written and says the
+  name is the former one. The same list under both names is refused, naming both lines and the one to keep. `wf start` prints a line for
+  each file and key to rename (`formerKeyLines`), after the run is started, which it does not stop. Nothing rewrites a folder by
+  itself; `renderStep` and `renderAgent` write the new names, so a step or an agent saved from the board is renamed.
+- **A run frozen with the former names loads.** `readRun` reads each frozen step through `asNamed` — its fields, and the agent's `keys`
+  and `given` — so the tick, `wf ls`, `wf decide` and the api see the new names, and the tick's next write of the record saves them.
+  `resolved-before.json`, which is never regenerated, is read the same way.
+- **Outside the package**, as CLAUDE.md's `STEP_KEYS` obligations say: the builder's `KINDS`, `WorkflowStepSpec` and `specOf`, the
+  board's mirror with `UNSET`, the agent form's role keys, and the capabilities page, which names the lists as a step writes them.
+
+**What it leaves.** The note is printed by `wf start` alone: a run started from a card by the daemon, or from the board, starts under
+the former names silently. A board page opened before the change sends `disallow`/`allow` on a save, and the api refuses them as keys it
+does not know. And a record the tick rewrote holds only the new names, so a `wf` from before the change reads its lists as absent.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

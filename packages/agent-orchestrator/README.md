@@ -181,9 +181,16 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallow`, `allow`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
+`permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
+
+`disallowedTools:` and `allowedTools:` are Claude Code's names for its two rule lists, and the keys took them on 2026-09-23;
+until then they were `disallow:` and `allow:`. The former names are still read, in a step and in an agent, as the new ones —
+a folder written before goes on starting, and `wf start` prints a line naming each file and key to rename — and a run frozen
+with them is read under the new names and written back so (`asNamed`, on every read of a run record). A list set under both
+names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
+the new name.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.
@@ -233,7 +240,7 @@ rounds: 3
 ---
 ```
 
-Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallow`, `remote`,
+Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
 `output` — and two of its own, `description:` and `skills:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
@@ -368,7 +375,7 @@ cached prompt, so keeping it costs nothing there (`test/session-cache.test.ts` w
 it stops the session: Claude Code says the autocompact is thrashing, and the session waits, `blocked` (agent-runtime's open
 issue 26, measured on a 100k window with 22k-token reads).
 
-### What a step may not have: `disallow:`
+### What a step may not have: `disallowedTools:`
 
 ```md
 ---
@@ -376,15 +383,15 @@ after: implement
 tools: Read, Grep, Glob, Bash
 permissionMode: dontAsk
 # The settings allow both for implement's check, and both write into the workspace. A deny beats an allow.
-disallow: Bash(npm run build), Bash(npm run e2e)
+disallowedTools: Bash(npm run build), Bash(npm run e2e)
 ---
 Review the change in this workspace as a second engineer would.
 ```
 
-`disallow:` is Claude Code's permission rules, comma-separated: a tool, `SendMessage`, or a tool and what
+`disallowedTools:` is Claude Code's permission rules, comma-separated: a tool, `SendMessage`, or a tool and what
 it may not run, `Bash(npm run build)`. The engine gives Claude Code the list as `--disallowedTools` on every
 filing of the step (the first, each try and each round), and a deny beats every allow: the checkout's
-`.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallow:`
+`.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallowedTools:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
 for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
 `npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace — those two
@@ -393,7 +400,7 @@ commands, and not the build and the e2e by another name (below). Every
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
 would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule
-(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallow:` on codex, which has
+(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallowedTools:` on codex, which has
 no tool list, so its fence is `permissionMode`. A Bash rule matches as Claude Code matches it:
 `Bash(npm run build)` is that command, as the settings' allow of the same words is.
 
@@ -560,7 +567,7 @@ after: implement
 input: implement
 tools: Read, Grep, Glob, Bash
 permissionMode: dontAsk
-disallow: Bash(npm run build), Bash(npm run e2e)
+disallowedTools: Bash(npm run build), Bash(npm run e2e)
 output: review.schema.json      # findings, and again: boolean
 loop: implement
 rounds: 3
@@ -1427,7 +1434,7 @@ end of a run is the last step of its workflow, in prose**, like every other step
 after: review
 workspace: main
 gate: true
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger
 ---
 Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.
 …
@@ -1655,7 +1662,7 @@ workspace: main       # the repository's own checkout: it reads the store and th
 slot: none            # not one of the runs the cap holds — it watches them
 harness: claude
 remote: true          # bridged to claude.ai, so the person it asks can answer from a phone
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), …
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), …
 ---
 Watch this repository's runs, and put what needs a person in front of the person.
 ```
@@ -1668,7 +1675,7 @@ screenshots through the look skill, and prepares the brief a person decides from
 itself, and it never types git for a run**: on a yes it says `wf approve <run> <step>`, and the run's own
 ending step does the shipping, in its folder's words, with the person's words on its brief.
 
-**Its `disallow:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`
+**Its `disallowedTools:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`
 and `git pull`, which merges too, then `checkout`, `switch`, `restore`, `rebase`, `reset`, `stash`,
 `cherry-pick`, `revert`, `clean` and `push`, as `Bash(git merge:*)` rules — a named list of the ordinary
 commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` holds `git push` and `git branch
@@ -2365,7 +2372,7 @@ what was denied (agent-runtime's open issue 28, M1). So a mode no longer decides
 only what it may do. The shipped agents choose by role: the planner and the reviewers run `dontAsk`,
 fenced by this repository's `.claude/settings.json` allow list, which a job honours as a `--bg` session
 does (M11); the implementers and the shipper run `auto`; and the supervisor, the one background session,
-runs `dontAsk` with an `allow:` of its own, since a `--bg` session in a mode that asks would wait.
+runs `dontAsk` with an `allowedTools:` of its own, since a `--bg` session in a mode that asks would wait.
 
 Whichever you pick, the engine makes the consequence visible rather than mysterious: a session
 waiting on a person is reported as `needs-human`, and a step's `deadlineSeconds` is what stops one

@@ -1484,9 +1484,9 @@ test("a step that continues another's session (`resume:`) is filed with that ses
   assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.config?.contextTokens, 200_000, 'its nudge, continuing the same chain');
 });
 
-test('a step with `disallow:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+test('a step with `disallowedTools:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'];
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallow: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallowedTools: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
   assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.disallowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
@@ -1503,9 +1503,30 @@ test('a step with `disallow:` reaches `e.file` with exactly those rules as `disa
   assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.config?.disallowedTools, undefined, "the check is the run's own, and denied nothing");
 });
 
-test('a step with `allow:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under them', async () => {
+  const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
+  // The record as a `wf` from before 2026-09-23 froze it: the same step, its lists under the former names.
+  const at = path.join(ROOT, 'runs', `${run.id}.json`);
+  const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+  record.workflow = record.workflow.map(({ disallowedTools, allowedTools, ...step }) => ({ ...step, ...(disallowedTools ? { disallow: disallowedTools } : {}), ...(allowedTools ? { allow: allowedTools } : {}) }));
+  fs.writeFileSync(at, JSON.stringify(record, null, 2));
+  assert.match(fs.readFileSync(at, 'utf8'), /"disallow": \[/, 'the fixture is the old record');
+  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.deepEqual([read.disallowedTools, read.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'read under the names the keys have now');
+  assert.equal(Object.hasOwn(read, 'allow') || Object.hasOwn(read, 'disallow'), false);
+  assert.deepEqual(listRuns().find((r) => r.id === run.id)!.workflow, readRun(run.id).workflow, 'and listed the same way the tick reads it');
+  const { e, tasks } = board();
+  await advance(e, readRun(run.id));
+  const config = tasks.get(`${run.id}-implement`)!.spec.config as { disallowedTools?: string[]; allowedTools?: string[] } | undefined;
+  assert.deepEqual([config?.disallowedTools, config?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'the frozen rules reach the engine: none is dropped');
+  const written = fs.readFileSync(at, 'utf8');
+  assert.doesNotMatch(written, /"(dis)?allow":/, 'the pass that filed it wrote the record back under the new names');
+  assert.match(written, /"allowedTools": \[/);
+});
+
+test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallow: Edit(**), Bash(npm test)', 'failed', 1);
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallowedTools: Edit(**), Bash(npm test)', 'failed', 1);
   assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.config?.allowedTools, RULES, 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
@@ -1533,7 +1554,7 @@ test("at shipped defaults a step names neither, and is filed with neither: the h
 test("a round files its target with the target's tools, deny list and effort, and the looping step — a new session each round — with its own", async () => {
   const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
   const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
-  const run = started(looped('tools: Read, Grep, Glob, Bash\ndisallow: Bash(npm run build)\neffort: max\n', 'tools: Read, Edit, Write, Bash\ndisallow: SendMessage\nallow: Edit(**)\neffort: low\n'));
+  const run = started(looped('tools: Read, Grep, Glob, Bash\ndisallowedTools: Bash(npm run build)\neffort: max\n', 'tools: Read, Edit, Write, Bash\ndisallowedTools: SendMessage\nallowedTools: Edit(**)\neffort: low\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
   const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;

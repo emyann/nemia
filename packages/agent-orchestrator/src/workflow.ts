@@ -105,30 +105,30 @@ export type Workflow = {
    */
   tools?: string[];
   /**
-   * What the session may not have, in Claude Code's permission rules — `disallow: Bash(npm run build), SendMessage`.
+   * What the session may not have, in Claude Code's permission rules — `disallowedTools: Bash(npm run build), SendMessage`.
    * Absent: nothing denied beyond the checkout's settings. Claude Code is given the list as `--disallowedTools`, and a
    * deny beats an allow, so a step is kept from a command `.claude/settings.json` allows for another step's sake by
    * machinery, not by its brief. Refused on codex, which has no tool list: its fence is the sandbox `permissionMode` names.
    */
-  disallow?: string[];
+  disallowedTools?: string[];
   /**
-   * What the session may do without being asked, in Claude Code's permission rules — `allow: Edit(**)`.
+   * What the session may do without being asked, in Claude Code's permission rules — `allowedTools: Edit(**)`.
    * Absent: only what `permissionMode` allows by itself. Claude Code is given the list as `--allowedTools`, and a
-   * deny beats it, so `disallow:` still holds.
+   * deny beats it, so `disallowedTools:` still holds.
    *
    * The key a fenced step in a fresh folder needs. `dontAsk` never asks a person who is not there — it denies, and the
    * session reads the refusal and carries on — but it never allows a write either, in the session's own directory or
-   * anywhere (measured on Claude Code 2.1.278). `allow: Edit(**)` gives back the writes inside the directory the
+   * anywhere (measured on Claude Code 2.1.278). `allowedTools: Edit(**)` gives back the writes inside the directory the
    * session was started in and no others: the glob is resolved against its `cwd`, a write outside it is still denied
    * with no prompt, and unscoped (`Edit`) it would write anywhere on the machine.
    *
    * `Edit(…)` is the rule for every file-editing tool, Write and NotebookEdit with it: Claude Code matches a file
    * permission check against `Edit` rules alone, warns on stderr that a `Write(…)` rule is not matched, and denies
-   * the write — measured on 2.1.278, where `allow: Write(**)` left the shipped note writer unable to write its own
+   * the write — measured on 2.1.278, where `Write(**)` on the allow list left the shipped note writer unable to write its own
    * note, and said so nowhere the run could read. So a path rule on a file-editing tool that is not `Edit` is refused
    * (`fileRuleRefusal`). Refused on codex too, which has no tool list: its fence is the sandbox.
    */
-  allow?: string[];
+  allowedTools?: string[];
   /**
    * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
@@ -241,7 +241,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'background', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -271,8 +271,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   context: "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
   permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
-  disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
-  allow: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
+  disallowedTools: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
+  allowedTools: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
   background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
   remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
@@ -400,17 +400,19 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  */
 export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
-  const { agent: attached, ...meta }: Partial<Record<StepKey, string>> = block === null ? {} : readKeys(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  const { meta: { agent: attached, ...meta }, spelled } = block === null
+    ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
+    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
-    return stepFrom(name, meta, own, read);
+    return stepFrom(name, meta, own, read, spelled);
   }
   const agent = agentOf(name, attached, agents);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
   if (!body) throw new WorkflowError(`${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`);
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
-  const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read);
+  const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read, spelled);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
     const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
@@ -431,8 +433,11 @@ function agentOf(step: string, name: string, agents: Agents | undefined): Agent 
       : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or delete the line.`));
 }
 
-/** A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. */
-function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: string, read: ((file: string) => string | undefined) | undefined): Workflow {
+/**
+ * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
+ * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it.
+ */
+function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: string, read: ((file: string) => string | undefined) | undefined, spelled: Spelled = {}): Workflow {
   const after = (meta.after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
@@ -453,8 +458,8 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     context: contextOf(name, meta.context, harness),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     tools: toolsOf(name, meta.tools, harness),
-    disallow: rulesOf(name, 'disallow', meta.disallow, harness),
-    allow: rulesOf(name, 'allow', meta.allow, harness),
+    disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, harness, spelled.disallowedTools),
+    allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, harness, spelled.allowedTools),
     background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
@@ -478,7 +483,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
 export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
 /** The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to one person. */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow', 'allow'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools', 'allowedTools'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as
@@ -576,9 +581,28 @@ const unknownKey = (step: string, key: string): string => (Object.hasOwn(REFUSED
   ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
   : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
 
-/** The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. */
-function readKeys<K extends string>(step: string, block: string, refusal: (key: string) => string | undefined): Partial<Record<K, string>> {
+/**
+ * A key's former name, and the name it has now: what a step or an agent file written before a key was renamed still says. Claude Code's
+ * `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:` — were `disallow:` and `allow:` here until
+ * 2026-09-23. A former name is read as the key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files
+ * still use one (`formerKeyLine`); nothing writes one (`renderStep`, `renderAgent`); and a run frozen before, whose steps hold the former
+ * fields, is read under the new ones (`asNamed`). A key renamed later adds its line here, and `asNamed` carries it.
+ */
+export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disallow: 'disallowedTools', allow: 'allowedTools' };
+
+/** The name a key was written under, for a key read under a former one (`FORMER_KEYS`), by the key it is now. */
+type Spelled = Partial<Record<string, string>>;
+
+/** The key a frontmatter line names: its own, or the one its former name is now (`FORMER_KEYS`). */
+const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written]! : written);
+
+/**
+ * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A line
+ * under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as written.
+ */
+function readKeys<K extends string>(step: string, block: string, refusal: (key: string) => string | undefined): { meta: Partial<Record<K, string>>; spelled: Spelled } {
   const meta: Partial<Record<K, string>> = {};
+  const spelled: Spelled = {};
   for (const raw of block.split('\n')) {
     const line = raw.trim();
     // Blank lines group a long frontmatter; `#` is the comment character every reader expects.
@@ -587,7 +611,8 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
     if (i <= 0) {
       refuse(`${step}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`);
     }
-    const key = line.slice(0, i).trim();
+    const written = line.slice(0, i).trim();
+    const key = keyNamed(written);
     const value = line.slice(i + 1).trim();
 
     const refused = refusal(key);
@@ -595,24 +620,29 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
     // Refused rather than last-one-wins: both values are something the author meant, and picking
     // one silently is how a step ends up waiting on half of what it was written to wait on.
     if (Object.hasOwn(meta, key)) {
-      refuse(`${step}: \`${key}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`);
+      const first = spelled[key] ?? key;
+      if (first !== written) {
+        refuse(`${step}: \`${key}\` is set twice, as \`${first}:\` and as \`${written}:\` — \`${first === key ? written : first}:\` is its former name, and reads as \`${key}:\`. Keep the \`${key}:\` line and delete the other.`);
+      }
+      refuse(`${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`);
     }
     if (!value) {
       refuse(key === 'check'
         ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
         : key === 'tools'
           ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
-          : key === 'disallow'
-            ? `${step}: \`disallow\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
-          : key === 'allow'
-            ? `${step}: \`allow\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
+          : key === 'disallowedTools'
+            ? `${step}: \`${written}\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
+          : key === 'allowedTools'
+            ? `${step}: \`${written}\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
             : key === 'budget'
               ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
               : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
     }
     meta[key as K] = value;
+    if (written !== key) spelled[key] = written;
   }
-  return meta;
+  return { meta, spelled };
 }
 
 function harnessOf(step: string, harness: string | undefined): string | undefined {
@@ -677,8 +707,8 @@ function toolsOf(step: string, tools: string | undefined, harness: string | unde
   return names;
 }
 
-const DISALLOW_EXAMPLE = '`disallow: Bash(npm run build), SendMessage`';
-const ALLOW_EXAMPLE = '`allow: Edit(**), Bash(npm test)`';
+const DISALLOW_EXAMPLE = '`disallowedTools: Bash(npm run build), SendMessage`';
+const ALLOW_EXAMPLE = '`allowedTools: Edit(**), Bash(npm test)`';
 
 /**
  * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses. The engine's
@@ -688,7 +718,7 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
 
 /** What each rule list is, in the words its refusals use: the two halves of Claude Code's permission rules. */
 const RULE_LIST = {
-  disallow: {
+  disallowedTools: {
     is: 'a deny list',
     has: 'no tool list to deny from',
     example: DISALLOW_EXAMPLE,
@@ -698,7 +728,7 @@ const RULE_LIST = {
     absent: 'the step is denied nothing beyond the checkout\'s settings',
     two: 'Two commands are two rules: `Bash(git push), Bash(git reset)`.',
   },
-  allow: {
+  allowedTools: {
     is: 'an allow list',
     has: 'no tool list to allow from',
     example: ALLOW_EXAMPLE,
@@ -711,7 +741,7 @@ const RULE_LIST = {
 } as const;
 
 /**
- * `disallow:` and `allow:` as the rules the harness is given to deny and to permit, refused unless each entry is one rule.
+ * `disallowedTools:` and `allowedTools:` as the rules the harness is given to deny and to permit, refused unless each entry is one rule.
  * One function for both: the two keys are the same list in Claude Code's own grammar, and a rule the deny list refuses is
  * not a rule the allow list should take.
  *
@@ -720,10 +750,11 @@ const RULE_LIST = {
  * — and `tools:`'s quote check fired on such a rule whenever another entry followed it. A list written in brackets or quotes
  * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list at all.
  */
-function rulesOf(step: string, key: 'disallow' | 'allow', written: string | undefined, harness: string | undefined): string[] | undefined {
+function rulesOf(step: string, key: 'disallowedTools' | 'allowedTools', written: string | undefined, harness: string | undefined, spelled?: string): string[] | undefined {
   if (written === undefined) return undefined;
   const w = RULE_LIST[key];
-  const named = `${step}: \`${key}: ${written}\``;
+  // A line under the key's former name is quoted as written, and said to be the key.
+  const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
   const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
   if (harness === 'codex') {
     refuse(`${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`);
@@ -755,7 +786,7 @@ const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
 /**
  * A path rule on a file-editing tool that is not `Edit`, which Claude Code accepts, warns about on stderr and never matches.
  *
- * Measured on Claude Code 2.1.278, on the allow list. The shipped note writer was given `allow: Write(**)` and could not write its
+ * Measured on Claude Code 2.1.278, on the allow list. The shipped note writer was given `Write(**)` to allow and could not write its
  * own `note.md` — `Permission to use Write has been denied because Claude Code is running in don't ask mode` — while the harness
  * said, on a stderr nobody reads, `Write(**) is not matched by file permission checks — only Edit(path) rules are`. With `Edit(**)`
  * it wrote inside its folder and was denied outside it, which is the fence.
@@ -765,8 +796,8 @@ const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
  * inert deny is worse, since the step is fenced by nothing while its file reads as fenced. The fix is the same rule on `Edit`, which
  * covers the file-editing tools whichever list it is in.
  */
-const fileRuleRefusal = (named: string, rule: string, key: 'disallow' | 'allow'): string =>
-  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${key === 'allow'
+const fileRuleRefusal = (named: string, rule: string, key: 'disallowedTools' | 'allowedTools'): string =>
+  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${key === 'allowedTools'
     ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
     : 'allows the write anyway — so the step would be fenced by nothing while its file reads as fenced'}. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
 
@@ -1267,7 +1298,7 @@ export function parseFolder(files: ReadonlyArray<readonly [name: string, text: s
  * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent
  * file that sets one is refused by name.
  */
-export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'output'] as const;
+export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
  * The keys a step takes from its agent: every agent key but the two that describe the agent itself — its `description:` and the `skills:` it
@@ -1316,9 +1347,10 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
-  const meta: Partial<Record<AgentKey, string>> = block === null ? {} : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
-  const { description, skills: named, ...keys } = meta;
-  stepFrom(file, keys, body, read);
+  const { meta: { description, skills: named, ...keys }, spelled } = block === null
+    ? { meta: {} as Partial<Record<AgentKey, string>>, spelled: {} }
+    : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
+  stepFrom(file, keys, body, read, spelled);
   const skills = skillsOf(file, named, read);
   return { name, ...(description !== undefined && { description }), ...(skills !== undefined && { skills }), keys, body, read: read ?? (() => undefined) };
 }
@@ -1452,6 +1484,26 @@ export function frontmatterKey(text: string, key: string): string | undefined {
   }
   return undefined;
 }
+
+/** The former key names (`FORMER_KEYS`) a file's frontmatter still uses, in the order it uses them — none for a file whose frontmatter never closes. */
+export function formerKeysIn(text: string): string[] {
+  let block: string | null;
+  try {
+    block = splitFrontmatter('', text).block;
+  } catch {
+    return [];
+  }
+  return (block ?? '').split('\n').flatMap((raw) => {
+    const line = raw.trim();
+    const i = line.indexOf(':');
+    const key = i > 0 && !line.startsWith('#') ? line.slice(0, i).trim() : '';
+    return Object.hasOwn(FORMER_KEYS, key) ? [key] : [];
+  });
+}
+
+/** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
+export const formerKeyLine = (file: string, former: string): string =>
+  `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
 /**
  * What a workflow is for, in its author's words, from the text of its folder's README: the first paragraph, its lines joined into one.
@@ -1596,7 +1648,7 @@ const DEFAULT_MODE = 'auto';
  *
  * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
- * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allow:` gives back, scoped to the
+ * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped to the
  * step's own folder (`Edit(**)`).
  */
 function validateFolderMode(steps: readonly Workflow[]): void {
@@ -1610,7 +1662,7 @@ function validateFolderMode(steps: readonly Workflow[]): void {
     `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}`
     + ' — a read or a write outside the folder can, and an unattended background session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
     + ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.`
-    + " A step in `dontAsk` that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
+    + " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }
 
@@ -1669,6 +1721,34 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
  */
 export const asRan = (step: Workflow): Workflow =>
   step.remote && step.background === undefined && (step.harness ?? 'claude') === 'claude' ? { ...step, background: true } : step;
+
+/**
+ * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen before a key was renamed holds the step's
+ * field under its former name, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
+ * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
+ * a former name, and the next pass that writes the record back writes the new ones. A field under both names keeps the new one's value. A
+ * step with no former name is returned as it is. Pure.
+ */
+export function asNamed(step: Workflow): Workflow {
+  const fields = Object.keys(step);
+  const agent = step.agent;
+  const given = agent?.given ? Object.keys(agent.given) : [];
+  if (![...fields, ...(agent?.keys ?? []), ...given].some((key) => keyNamed(key) !== key)) return step;
+  const renamed = Object.fromEntries(Object.entries(step)
+    .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(step, keyNamed(key)))
+    .map(([key, value]) => [keyNamed(key), value])) as Workflow;
+  if (!agent) return renamed;
+  return {
+    ...renamed,
+    agent: {
+      ...agent,
+      keys: [...new Set(agent.keys.map((key) => keyNamed(key) as StepKey))],
+      ...(agent.given ? { given: Object.fromEntries(Object.entries(agent.given)
+        .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(agent.given, keyNamed(key)))
+        .map(([key, value]) => [keyNamed(key), value])) } : {}),
+    },
+  };
+}
 
 /** Every step `name` waits on, directly or through another. */
 export function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {

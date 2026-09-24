@@ -56,13 +56,13 @@ test('dev-planned loads, at shipped defaults, as plan → implement ⇄ review �
 });
 
 test('REFUSED by machinery: plan has no tool that writes — read-only tools and Bash in dontAsk, denied the build and the e2e by name, as review is', () => {
-  const { harness, model, tools, permissionMode, disallow, output } = steps.plan!;
-  assert.deepEqual({ harness, model, tools, permissionMode, disallow, output: output?.file }, {
+  const { harness, model, tools, permissionMode, disallowedTools, output } = steps.plan!;
+  assert.deepEqual({ harness, model, tools, permissionMode, disallowedTools, output: output?.file }, {
     harness: 'claude', model: 'opus', tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], permissionMode: 'dontAsk',
-    disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], output: 'plan.schema.json',
+    disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'], output: 'plan.schema.json',
   });
   assert.deepEqual(writesBy(steps.plan!), []);
-  assert.deepEqual([tools, permissionMode, disallow], [steps.review!.tools, steps.review!.permissionMode, steps.review!.disallow], "review's fence, word for word");
+  assert.deepEqual([tools, permissionMode, disallowedTools], [steps.review!.tools, steps.review!.permissionMode, steps.review!.disallowedTools], "review's fence, word for word");
 
   // The guard refuses: a plan given a tool that writes, every tool, or a mode that does not deny.
   assert.deepEqual(writesBy({ ...steps.plan!, tools: [...tools!, 'Edit'] }), ['Edit writes']);
@@ -108,7 +108,7 @@ test("implement is dev's, after the plan and reading it: the plan reaches it und
   const { after, input, body, agent, ...keys } = steps.implement!;
   const { after: _after, input: _input, body: devBody, agent: devAgent, ...devKeys } = dev.implement!;
   assert.deepEqual([after, input], [['plan'], ['plan']]);
-  assert.deepEqual(keys, devKeys, "harness, model, check and disallow as dev's");
+  assert.deepEqual(keys, devKeys, "harness, model, check and disallowedTools as dev's");
   assert.deepEqual([agent?.name, devAgent?.name], ['implementer', 'implementer'], 'the same agent does the work');
   for (const paragraph of devBody.split('\n\n')) assert.ok(said(body).includes(said(paragraph)), paragraph);
   for (const file of ['review.md', 'ship.md']) {

@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, readmeDescription, stepFiles, WorkflowError, type Agent, type Workflow } from './workflow.ts';
+import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, formerKeyLine, formerKeysIn, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, readmeDescription, stepFiles, WorkflowError, type Agent, type Workflow } from './workflow.ts';
 
 /**
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
@@ -28,6 +28,28 @@ export function loadWorkflows(dir: string): Workflow[] {
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
   return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, loadAgents(agentsDir(dir)));
+}
+
+/**
+ * A line for each file of the workflow in `dir` that still writes a key under its former name (`formerKeyLine`): its step files, then each
+ * agent a step names, once. What `wf start` prints after it has started the run, which the former names do not stop. None for a folder that
+ * is not there, and a file that cannot be read says nothing here: the load has said why.
+ */
+export function formerKeyLines(dir: string): string[] {
+  const read = (at: string): string => {
+    try { return fs.readFileSync(at, 'utf8'); } catch { return ''; }
+  };
+  let files: string[];
+  try { files = stepFiles(fs.readdirSync(dir)); } catch { return []; }
+  const steps = files.map((file) => [file, read(path.join(dir, file))] as const);
+  const agents = [...new Set(steps.flatMap(([, text]) => frontmatterKey(text, 'agent') ?? []))].sort();
+  return [
+    ...steps.flatMap(([file, text]) => formerKeysIn(text).map((former) => formerKeyLine(path.join(dir, file), former))),
+    ...agents.flatMap((agent) => {
+      const at = path.join(agentsDir(dir), `${agent}.md`);
+      return formerKeysIn(read(at)).map((former) => formerKeyLine(at, former));
+    }),
+  ];
 }
 
 /**

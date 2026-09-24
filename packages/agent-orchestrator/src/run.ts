@@ -4683,7 +4683,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So two things the run has always written into a
  * folder brief — the run's `inputs/`, and the folders of the steps this one waits on but did not continue — were paths no session could
  * read. Copying is what makes them true: a read inside the session's own directory needs no permission of any harness, which is what the
- * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allow:`) measured live when it read `note.md` in its
+ * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allowedTools:`) measured live when it read `note.md` in its
  * cwd. Reaching out instead would mean a new field on the engine's task, a per-harness argument for it, and a fresh live measurement;
  * `artifactsContract`'s folder branch already chose the same way round, and this follows it.
  *

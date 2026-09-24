@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, formerKeyLines, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
 import { agentCard, dollarsOf } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -135,7 +135,7 @@ No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measur
 tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
 \`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
 and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
-permissionMode, tools, disallow, allow, background, remote, deadlineSeconds, maxAttempts, budget) say who does the work, with
+permissionMode, tools, disallowedTools, allowedTools, background, remote, deadlineSeconds, maxAttempts, budget) say who does the work, with
 what, who may drive it, for how long and for how much. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
@@ -642,6 +642,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (held.length) console.log(`gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`);
         if (ends.length) console.log(`ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`);
         console.log(`run 'wf tick' (or 'wf up') to start it`);
+        // A folder written before a key was renamed runs as written, and is told the key's name now.
+        for (const line of formerKeyLines(run.workflowDir)) console.log(line);
       };
       // A card of the inbox starts out of it, and leaves it. Its brief is its body, or --brief; its workflow and repository are the flags', else its own.
       const inboxName = inboxNameAt(arg);

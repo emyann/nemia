@@ -337,9 +337,10 @@ orchestrator's calls to the runtime change.
    resumed thread keeps its id and its rollout, and remembered what only the signed thread was told. What Codex cannot do is
    said rather than faked: no words while it runs (its card says `say: false`, and an A2A follow-up is refused naming a
    spawn in the session's context as the way on — the only handler change; `wf` and the board keep their words), never
-   `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way: a cancel landing before
-   the worker has written its pid is answered `CANCELED` and sends nothing, harmless under the engine's re-issuing tick and
-   misleading to a direct A2A caller (open issue 30). **The `claude -p` driver stays with stage 2**, unchanged: it shares
+   `INPUT_REQUIRED` mid-run, only between a held task's turns, and no spend cap. Found on the way, and fixed in review: a
+   cancel landing before the worker had written its pid was answered `CANCELED` and sent nothing, harmless under the
+   engine's re-issuing tick and false to a direct A2A caller; the stop is now left on disk for the worker, which starts no
+   harness (open issue 30). **The `claude -p` driver stays with stage 2**, unchanged: it shares
    the worker, but its Task shape, its stdin (issue 29) and M12 were stage 2's, and nothing in it moved. **Still deferred**,
    as the owner decided at stage 2's gate: the stream (`SubscribeToTask`).
 4. **Policy up, in three cards:** retries, the signed statement and its nudge; budgets; pools and priority.

@@ -280,7 +280,7 @@ follow-up is refused in A2A's own terms, naming a spawn in the session's context
 the harness's own words (`noChannel`); **it never asks mid-run** — the worker has no `blocked` to write, so a running Codex
 Task is never `INPUT_REQUIRED`, only a held one between turns; **it keeps no spend cap**, so a budget is refused at `file`
 and at `answer`; and **its context is empty until its first line** is printed. As for every detached run, a cancel that
-lands before the worker has published its pid is answered `CANCELED` and sends nothing (open issue 30). The `claude -p` job shares the worker and is stage 2's, unchanged.
+lands before the worker has published its pid is left on disk, and the worker starts no harness (open issue 30, fixed). The `claude -p` job shares the worker and is stage 2's, unchanged.
 
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the

@@ -741,7 +741,7 @@ before each line, and a run spawned under the name starts at the inbox's end as 
 - **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
   and a `--bg` session's words are refused past it; a job's are not refused on length.
 
-### 30. A cancel before the worker's pid is on disk is answered `CANCELED` and sends nothing
+### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
 
 A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
 (`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
@@ -749,9 +749,21 @@ group — so a stop in that window does nothing, and the next pass issues it aga
 `stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
 answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
 told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
-re-issuing tick. The fix would be the handler answering the Task as it stands (`WORKING`) when the listing does not yet say
-`stopped`, a change to every harness's cancel; not made. `test/codex-agent.test.ts` cancels only once the Task has a context,
-which the worker publishes after its pid.
+re-issuing tick.
+
+**Fixed** (2026-09-23, in review of stage 3). The stop is left on disk before the pid is read: `stop` writes a marker of its own
+(`<name>.stop`, so the run file keeps one writer, the worker) and then reads the run file again, signalling the pid it finds
+there. The worker looks for the marker once its pid is published and before it starts the harness, and on finding it writes
+`stopped` and starts nothing — the worker `spawn` launched, whose run file had no pid, alone: one started again by hand on a
+run file its worker left (issue 29) has a pid there already, and was not what an earlier stop was asked of. Whichever of the two came first, one sees the other: a worker that found no marker published
+its pid before the marker was written, so the stop's second read finds it. So `CANCELED` is true whenever it is answered, the
+engine's stop is heard on its first pass, and nothing waits or is held in memory. `spawn` clears a marker left under the
+name, so a run spawned again after a stop starts. Each order is made to happen on demand in `test/detached.test.ts`, the
+worker frozen before its first rename: stopped while frozen, the harness never runs; stopped with the marker's write held
+until the harness has started, the second read signals it. Each test fails with its half of the fix taken out, and
+`test/codex-agent.test.ts` cancels a Task the moment it is sent, which fails every time without the worker's check. A
+handler answering `WORKING` until the listing says `stopped`, the other way considered, would have changed every
+harness's cancel and still left a direct caller to ask again.
 
 ### 31. Codex as an A2A agent: what maps, and what `codex exec` cannot do
 

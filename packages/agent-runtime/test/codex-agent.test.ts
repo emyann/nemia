@@ -174,7 +174,8 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
   const cwd = workdir({ grandchild: true, sleepMs: 30_000 });
   const client = agent(root);
   await send(client, { name: 'ae/c-stop/1', brief: 'b', cwd, harness: 'codex' });
-  // A context means the worker has published its pid: a cancel before that is answered and sends nothing (open issue 30).
+  // A context means the harness is running, so this cancel ends a running process. One sent the moment the Task exists is
+  // below; the window before the worker's pid is on disk is made to happen on demand in `detached.test.ts` (open issue 30).
   await until(async () => (await get(client, 'ae/c-stop/1')).contextId === THREAD, 'the thread printed');
   const harness = pidIn(cwd, 'pid');
   const grandchild = pidIn(cwd, 'grandchild');
@@ -193,6 +194,14 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
   await assert.rejects(client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
     (e: Error) => e.constructor.name === 'TaskNotCancelableError' && e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.');
   assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
+
+  // Canceled as soon as it is sent, whether or not its worker has published a pid: it ends CANCELED, and no harness runs on.
+  const early = workdir({ sleepMs: 30_000 });
+  await send(client, { name: 'ae/c-stop/3', brief: 'b', cwd: early, harness: 'codex' });
+  assert.equal((await client.cancelTask({ tenant: '', id: 'ae/c-stop/3', metadata: undefined })).status!.state, TaskState.TASK_STATE_CANCELED);
+  await until(() => stateIs(client, 'ae/c-stop/3', TaskState.TASK_STATE_CANCELED), 'a cancel sent at once read CANCELED');
+  const started = pidIn(early, 'pid');
+  assert.ok(!(started > 0 && alive(started)), 'and no harness is left running');
 });
 
 test('a held Codex task is INPUT_REQUIRED between turns, with no process; its answer resumes the same thread, in the same context — and no running attempt is ever INPUT_REQUIRED', async () => {

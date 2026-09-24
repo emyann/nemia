@@ -110,7 +110,7 @@ test('a QUIET session that was asked for no statement is done — quiet is all s
 
 test('a QUIET session asked for a statement that gave none ends UNSIGNED: failed, not done', () => {
   assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet(), now(5)),
-    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined });
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined, stated: false });
   const said = decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5));
   assert.equal(said.do === 'record-end' && said.observed, 'done', 'with a statement, done');
 });
@@ -119,10 +119,10 @@ test("the HARNESS'S `done` without a statement ends UNSIGNED too, for a task tha
   // The second door (open issue 25's neighbour, measured 2026-09-19: 5 of 344 schema'd tasks settled `succeeded` this way).
   const done = (extra: Partial<Sighting> = {}): Map<string, Sighting> => new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'done' as const, ...extra }]]);
   assert.deepEqual(decide(fold(TASK, inFlight(true)), done(), now(5)),
-    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined });
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined, stated: false });
   // The controls: a statement given, and a task that asked for none, end `done` on the harness's word as they did.
   assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ closeout: { payload: { ok: true }, at: 3 } }), now(5)),
-    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: { ok: true } });
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: { ok: true }, stated: true });
   assert.deepEqual(decide(fold(TASK, inFlight(false)), done(), now(5)),
     { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined });
   // A harness's `failed` is its verdict, statement or not, and a budget spent keeps its own reason.

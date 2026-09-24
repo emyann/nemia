@@ -317,7 +317,7 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
+        closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}), usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
       });
       break;
     }

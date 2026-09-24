@@ -302,9 +302,12 @@ export type Event =
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
   /**
    * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode` and `denials`
-   * come from the same sighting, when its runner measured them; `decide` reads none of them.
+   * come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
+   * read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict —
+   * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
+   * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -360,6 +363,12 @@ export type Attempt = {
   nudge?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
   closeout?: unknown;
+  /**
+   * Whether the closing statement its task asked for came, as its end reported it: `false` is a session its harness
+   * let go with none. Absent where its task asked for none, where no sighting ended it, and on every end written
+   * before stage 4a. Carried, never read: whether that is a failure is the caller's judgement, not the runtime's.
+   */
+  stated?: boolean;
   /** What this attempt consumed; `null` when its runner measured nothing, never zeros. Carried, never read. */
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
@@ -438,7 +447,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
+        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; if (e.stated !== undefined) a.stated = e.stated; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
         break;
       }
       case 'measured': {
@@ -498,7 +507,7 @@ export type Action =
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
   /** The harness says this attempt is over. Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown }
+  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -628,7 +637,9 @@ function endOf(state: State, last: Attempt, sighting: Sighting): Action {
   const unsigned = (quiet || sighting.state === 'done') && !sighting.budgetSpent && state.closeoutSchema !== undefined && sighting.closeout === undefined;
   // A spent budget is `failed` whatever state the harness left it in: cut off, not concluded — `done` would settle it succeeded.
   return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned || sighting.budgetSpent ? 'failed' : quiet ? 'done' : sighting.state,
-    reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
+    reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
+    // Whether the statement its task asked for came: a fact for the layer above, which judges it.
+    ...(state.closeoutSchema !== undefined ? { stated: sighting.closeout !== undefined } : {}) };
 }
 
 /**

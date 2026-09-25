@@ -391,6 +391,9 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   check: 'is a command the run executes in the step\'s workspace, and a remote agent works on another party\'s machine: nothing it does reaches the workspace, and a check would judge work nobody did there',
 };
 
+/** The keys a step on a remote A2A agent may not set (`REMOTE_REFUSED`), in `STEP_KEYS`' order: what the board's form leaves off such a step. */
+export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
+
 /**
  * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: main`, whose
  * checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading assumes a harness of ours.

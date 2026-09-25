@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, parseFolder, parseWorkflow, WorkflowError, type Agents } from '../src/workflow.ts';
+import { parseAgent, parseFolder, parseWorkflow, REMOTE_REFUSED_KEYS, STEP_KEYS, WorkflowError, type Agents } from '../src/workflow.ts';
 import { envNameOf, readRemoteAgents } from '../src/a2a-agents.ts';
 import { scratch } from './scratch.ts';
 
@@ -139,6 +139,8 @@ test('each key that tells a harness of ours how to run is refused on a remote st
   }
   assert.match(loadRefusal(() => parseWorkflow('ask', '---\nharness: a2a:reviewer\nloop: plan\n---\nx\n')), /^ask: `loop: plan` .*remote A2A agent/);
   assert.match(loadRefusal(() => parseWorkflow('ask', '---\nharness: a2a:reviewer\nworkspace: main\n---\nx\n')), /^ask: `workspace: main` runs the step in the repository's own checkout/);
+  // What the board's form leaves off a remote step is what the load refuses there, key for key, in the package's order.
+  assert.deepEqual(REMOTE_REFUSED_KEYS, STEP_KEYS.filter((key) => key in LOCAL_ONLY || key === 'loop'));
   // What a remote step may say: where it sits, its gate, its tries, its deadline, what it reads.
   const ok = parseWorkflow('ask', '---\nharness: a2a:reviewer\nafter: plan\ninput: plan\ngate: true\nretries: 1\ndeadlineSeconds: 600\n---\nReview the plan.\n');
   assert.equal(ok.harness, 'a2a:reviewer');

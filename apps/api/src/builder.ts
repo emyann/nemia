@@ -20,8 +20,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { agentsFor, HOME, loadAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
+import { agentsFor, HOME, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
+import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, REMOTE_PREFIX, REMOTE_REFUSED_KEYS, renderStep, SANDBOXES, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
@@ -63,8 +63,15 @@ export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: 
  *
  * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to one
  * on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
+ *
+ * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves off
+ * it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local harnesses;
+ * `byHarness` has none of them, since a remote agent takes none of those words.
  */
-export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>> };
+export type KeyForm = {
+  keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>>;
+  remote: { prefix: string; refuses: StepKey[] };
+};
 
 /**
  * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, the skills it is given
@@ -96,17 +103,33 @@ function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
   return values;
 }
 
+/**
+ * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read afresh).
+ * A file refused as it stands offers none of its agents — the form is still drawn, a step already naming one keeps its word, and `wf start`
+ * and `wf up` say what is wrong with the file.
+ */
+function harnessChoices(): readonly string[] {
+  let names: string[];
+  try {
+    names = [...remoteAgents().keys()];
+  } catch {
+    names = [];
+  }
+  return [...HARNESSES, ...names.map((name) => `${REMOTE_PREFIX}${name}`)];
+}
+
 export const keyForm = (home: string = HOME): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'denials' ? DENIALS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
+    choices: key === 'harness' ? harnessChoices() : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'denials' ? DENIALS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
     byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : key === 'sandbox' ? SANDBOXES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],
   agents: agentValues(home),
+  remote: { prefix: REMOTE_PREFIX, refuses: [...REMOTE_REFUSED_KEYS] },
 });
 
 /** What a write answers: the folder read back from disk, as the listing has it, and its files by name — written, left as they were, removed. */

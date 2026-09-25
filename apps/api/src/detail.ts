@@ -1,7 +1,7 @@
 /** One run in full, for a person reading it (`GET /api/runs/:id`): the spec, and per step what it was told and how it went. */
-import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, phaseOfView, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
+import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, phaseOfView, remoteAgents, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
 import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-orchestrator/run';
-import { loopSpan, type Workflow } from 'agent-orchestrator/workflow';
+import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
@@ -115,6 +115,12 @@ export type StepFiled = {
    * `read-only` because `tools` has none that writes, whatever was named (`tools`). Null for a harness the api cannot ask.
    */
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
+  /**
+   * The remote A2A agent the try was sent to, for a step that says `harness: a2a:<name>` (`remoteOf`): its name, and its address as the
+   * store's `a2a-agents.json` gives it now — origin and path, never a query or a secret, which is never in the file — or null where the file
+   * no longer declares it or cannot be read. Null for a local harness, whose mode is `runsIn`.
+   */
+  remote: { name: string; address: string | null } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
 };
@@ -537,6 +543,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
     contextTokens: contextTokens ?? null,
     permissionMode: permissionMode ?? null,
     runsIn: runsInOf(view.state),
+    remote: remoteOf(view.state.harness),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
   };
@@ -551,6 +558,28 @@ function askedModelOf(record: StepRecord | undefined): string | null {
   let i = tries.length - 1;
   while (i >= 0 && tries[i]!.then === 'recheck') i--;
   return tries[i]?.model ?? null;
+}
+
+/**
+ * The remote A2A agent a task was filed on (`StepFiled.remote`), or null for a local harness. Its address is read from the store's
+ * `a2a-agents.json` on each request (`remoteAgents`), as the base URL given or, for an agent given by its card, the card's first interface:
+ * origin and path alone, so a query string that carries a key is never shown. A file that no longer declares the name, or that is refused
+ * as it stands, gives no address — the run's page is still drawn, and `wf up` says what is wrong with the file.
+ */
+function remoteOf(harness: string | undefined): StepFiled['remote'] {
+  const name = remoteNameOf(harness);
+  if (name === undefined) return null;
+  let agent: Record<string, unknown> | undefined;
+  try {
+    agent = remoteAgents().get(name);
+  } catch {
+    return { name, address: null };
+  }
+  const interfaces = (agent?.card as { supportedInterfaces?: Array<{ url?: unknown }> } | undefined)?.supportedInterfaces;
+  const given = agent?.url ?? interfaces?.[0]?.url;
+  if (typeof given !== 'string' || !URL.canParse(given)) return { name, address: null };
+  const url = new URL(given);
+  return { name, address: `${url.origin}${url.pathname === '/' ? '' : url.pathname}` };
 }
 
 /** The flags a harness's command gives its session's permission mode by: Claude Code's mode, and Codex's sandbox. */

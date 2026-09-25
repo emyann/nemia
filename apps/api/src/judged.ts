@@ -4,7 +4,7 @@
  */
 import { answerIn, type BranchReader, branchReader, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord, wordOfView } from 'agent-orchestrator';
 import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
-import type { Workflow } from 'agent-orchestrator/workflow';
+import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -102,7 +102,7 @@ export type RunHolding = {
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
  * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
  * the wait a card or a node says (`waiting for a permission prompt`), `advice` what a person does about it, naming the
- * session `claude agents` lists it under (`answerIn`). Said under the wait, never with it — one sentence between them, and
+ * session `claude agents` lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under the wait, never with it — one sentence between them, and
  * a surface with room for both. Null where the harness said nothing, and for a step nothing blocked — read afresh on every
  * request, so a session that stops waiting stops carrying it.
  *
@@ -400,7 +400,7 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
-    waitingFor: word ? { words: waitingWords(word), advice: answerIn(attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt)) } : null,
+    waitingFor: word ? { words: waitingWords(word), advice: answerIn(attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt), isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined) } : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
     denied: calls.length ? { words: deniedWords(calls), calls } : null,
   };

@@ -165,10 +165,10 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   assert.deepEqual(windowed.keys, rows({ context: '150k' }));
   fs.rmSync(path.join(mine, 'notes.md'));
 
-  // A step that names an agent: what that agent says it can do, read from the file its `skills:` names, is on the step's page beside its keys.
+  // A step that names an agent: what that agent says it can do, its card generated from the skills it gives, is on the step's page beside its keys.
   const said = [{ id: 'take-notes', name: 'Take notes', description: 'Writes down what was decided.', tags: ['notes', 'writing'] }];
-  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.md'), '---\ndescription: Writes things down.\nskills: scribe.skills.json\nharness: claude\n---\nWrite it down.\n');
-  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.skills.json'), `${JSON.stringify(said, null, 2)}\n`);
+  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.md'), '---\ndescription: Writes things down.\nskills: take-notes\ntools: Read, Skill\nharness: claude\n---\nWrite it down.\n');
+  write(path.join(root, 'workflows', 'skills', 'take-notes', 'SKILL.md'), '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n');
   write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
   const attached: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
   assert.deepEqual(attached.agentSkills, said);
@@ -176,6 +176,12 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   // The same step with the line taken off: the agent is not named, so the page says nothing it can do.
   write(path.join(mine, 'notes.md'), 'Take notes.\n');
   assert.equal(((await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills, null);
+  fs.rmSync(path.join(mine, 'notes.md'));
+  // A card that cannot be made — the skill gone — says nothing on the page, and the page is still served.
+  write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
+  fs.rmSync(path.join(root, 'workflows', 'skills'), { recursive: true });
+  const lost = await stepPage('yours', 'mine', 'notes');
+  assert.equal(((await lost.json()) as WorkflowStepPage).agentSkills ?? null, null);
   fs.rmSync(path.join(mine, 'notes.md'));
   fs.rmSync(path.join(root, 'workflows', AGENTS_FOLDER), { recursive: true });
 

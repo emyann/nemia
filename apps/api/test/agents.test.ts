@@ -233,104 +233,79 @@ test("refusals carry the package's words: a key, a value, a name, a name taken, 
   await refused(send('DELETE', '/api/agents/yours/reviewer', {}), 400, /takes the `version` the agent was read at/);
 });
 
-test('an agent is listed with what it says it can do: the card its `card:` names, its text, and the A2A skills read out of it', async () => {
+test('an agent is listed with what it says it can do: its card, generated from its skills, one entry each, read off its SKILL.md', async () => {
   const reviewer = (await listed()).find((a) => a.from === 'repo' && a.name === 'reviewer')!;
-  assert.equal(reviewer.card?.file, 'reviewer.skills.json');
-  assert.equal(reviewer.card?.text, fs.readFileSync(path.join(repo, 'workflows', 'agents', 'reviewer.skills.json'), 'utf8'));
-  assert.ok((reviewer.card?.list ?? []).length >= 1, 'the skills read out of it');
-  for (const skill of reviewer.card!.list!) {
-    assert.deepEqual(Object.keys(skill).filter((k) => ['id', 'name', 'description', 'tags'].includes(k)).sort(), ['description', 'id', 'name', 'tags']);
-  }
-  // An agent with no `card:` line says nothing it can do, and the field is null rather than an empty list.
+  assert.equal(reviewer.cardError, null);
+  assert.deepEqual(reviewer.card?.map((s) => s.id), ['review-a-change', 'send-work-round-again'], 'one entry for each skill the agent gives, in its order');
+  assert.deepEqual(reviewer.card?.[0], {
+    id: 'review-a-change',
+    name: 'Review a change',
+    description: 'Reads the diff read-only as a second engineer would and reports each finding by file and line, saying concretely what would go wrong.',
+    tags: ['code', 'review'],
+    examples: ['Use this when a change is written and nobody has read it yet.'],
+  });
+  // An agent given no skills says one thing it can do: its own description, as one entry.
   fs.writeFileSync(path.join(AGENTS, 'mute.md'), '---\ndescription: Says nothing.\n---\nDo it.\n');
   try {
-    assert.equal((await listed()).find((a) => a.name === 'mute')!.card, null);
+    const mute = (await listed()).find((a) => a.name === 'mute')!;
+    assert.deepEqual(mute.card, [{ id: 'mute', name: 'mute', description: 'Says nothing.', tags: ['mute'] }]);
+    assert.equal(mute.cardError, null);
   } finally {
     fs.rmSync(path.join(AGENTS, 'mute.md'));
   }
 });
 
-test('an agent whose card does not read is listed with the parser’s refusal, and the file’s text all the same, so the form can fix it', async () => {
-  fs.writeFileSync(path.join(AGENTS, 'wrong.md'), '---\ndescription: Tries.\ncard: wrong.skills.json\n---\nDo it.\n');
-  fs.writeFileSync(path.join(AGENTS, 'wrong.skills.json'), '[{"id":"Shouting","name":"x","description":"y","tags":["z"]}]\n');
+test("a skill in the repository's .claude/skills is on the card of an agent of yours, its SKILL.md moves the agent's version, and one gone is the card's refusal, not the agent's", async () => {
+  const skill = path.join(repo, '.claude', 'skills', 'pass-a-note');
+  fs.mkdirSync(skill, { recursive: true });
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ntitle: Pass a note\ndescription: Hands a note on.\n---\nHand it on.\n');
+  fs.writeFileSync(path.join(AGENTS, 'courier.md'), '---\ndescription: Carries notes.\nskills: pass-a-note\ntools: Read, Skill\n---\nCarry it.\n');
   try {
-    const wrong = (await listed()).find((a) => a.name === 'wrong')!;
-    assert.match(wrong.error ?? '', /^agents\/wrong\.md: `card: wrong\.skills\.json`, skill `Shouting` is not an id/);
-    assert.equal(wrong.card?.file, 'wrong.skills.json');
-    assert.match(wrong.card?.text ?? '', /Shouting/);
-    assert.equal(wrong.card?.list, null, 'nothing was read out of it');
+    const courier = (await listed()).find((a) => a.name === 'courier')!;
+    assert.deepEqual(courier.card, [{ id: 'pass-a-note', name: 'Pass a note', description: 'Hands a note on.', tags: ['pass-a-note'] }]);
+
+    fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ntitle: Pass a note on\ndescription: Hands a note on.\ntags: ["note"]\n---\nHand it on.\n');
+    const edited = (await listed()).find((a) => a.name === 'courier')!;
+    assert.deepEqual(edited.card?.map((s) => [s.name, s.tags]), [['Pass a note on', ['note']]]);
+    assert.notEqual(edited.version, courier.version, 'the SKILL.md is digested with the agent');
+    await refused(send('PUT', '/api/agents/yours/courier', { name: 'courier', description: 'Carries notes.', skills: 'pass-a-note', keys: { tools: 'Read, Skill' }, body: 'Carry it.', version: courier.version }), 409, /changed since it was read/);
+
+    fs.rmSync(skill, { recursive: true });
+    const lost = (await listed()).find((a) => a.name === 'courier')!;
+    assert.equal(lost.error, null, 'the agent still reads: a step that names it is refused where its skill is loaded, not here');
+    assert.equal(lost.card, null);
+    assert.match(lost.cardError ?? '', /^agents\/courier\.md gives the skill `pass-a-note`, and no skills folder has it/);
+    await refused(app.request('/api/agents/yours/courier/card'), 422, /^agents\/courier\.md gives the skill `pass-a-note`, and no skills folder has it/);
   } finally {
-    for (const f of ['wrong.md', 'wrong.skills.json']) fs.rmSync(path.join(AGENTS, f));
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
+    fs.rmSync(path.join(AGENTS, 'courier.md'), { force: true });
   }
 });
 
-test('an agent whose card is not there keeps the line all the same: the form shows the name it holds, and a save is refused rather than taking the line off', async () => {
-  fs.writeFileSync(path.join(AGENTS, 'gone.md'), '---\ndescription: Named a file that is not there.\ncard: gone.skills.json\nmodel: opus\n---\nDo it.\n');
+test('an agent with a leftover `card:` line is listed with the refusal saying what replaced it, and a save of it without the line reads', async () => {
+  fs.writeFileSync(path.join(AGENTS, 'old.md'), '---\ndescription: Had a card file.\ncard: old.skills.json\n---\nDo it.\n');
+  fs.writeFileSync(path.join(AGENTS, 'old.skills.json'), '[{"id":"a","name":"A","description":"Does a.","tags":["note"]}]\n');
   try {
-    const gone = (await listed()).find((a) => a.name === 'gone')!;
-    assert.match(gone.error ?? '', /^agents\/gone\.md: `card: gone\.skills\.json` is not there/);
-    assert.equal(gone.card?.file, 'gone.skills.json', 'the file the agent names is what the form edits, there or not');
-    assert.equal(gone.card?.text, '', 'with nothing in it, for there is nothing to read');
-    assert.equal(gone.card?.list, null);
-
-    // The draft the form sends for an untouched save: the line as read, and no text to write. The package refuses it by name, saying what
-    // to do — and the line is still in the file. Read as no skills at all, this save would have written the agent back without it.
-    const draft = { name: gone.name, description: gone.description, card: gone.card?.file ?? null, keys: gone.keys, body: gone.body };
-    await refused(send('PUT', '/api/agents/yours/gone', { ...draft, version: gone.version }), 422, /^agents\/gone\.md: `card: gone\.skills\.json` is not there\. It is a list of A2A skills/);
-    assert.match(fs.readFileSync(path.join(AGENTS, 'gone.md'), 'utf8'), /^card: gone\.skills\.json$/m);
-
-    // What the form is for: the card pasted, the file written, and the agent reads.
-    const said = [{ id: 'write-a-note', name: 'Write a note', description: 'Writes it.', tags: ['note'] }];
-    const put = await send('PUT', '/api/agents/yours/gone', { ...draft, cardText: `${JSON.stringify(said, null, 2)}\n`, version: gone.version });
-    const fixed = (await put.json()) as AgentSaved;
-    assert.equal(put.status, 200, JSON.stringify(fixed));
-    assert.deepEqual(fixed.agent.card?.list, said);
-    assert.equal(fixed.agent.error, null);
+    const old = (await listed()).find((a) => a.name === 'old')!;
+    assert.match(old.error ?? '', /^agents\/old\.md: `card` names a card file, which is retired: since agents card 2 an agent's card is generated from its `skills:`/);
+    assert.equal(old.card, null, 'nothing generated for an agent that does not read');
+    const put = await send('PUT', '/api/agents/yours/old', { name: 'old', description: 'Had a card file.', keys: {}, body: 'Do it.', version: old.version });
+    const saved = (await put.json()) as AgentSaved;
+    assert.equal(put.status, 200, JSON.stringify(saved));
+    assert.doesNotMatch(fs.readFileSync(path.join(AGENTS, 'old.md'), 'utf8'), /card:/);
+    assert.deepEqual(saved.agent.card, [{ id: 'old', name: 'old', description: 'Had a card file.', tags: ['old'] }]);
+    assert.deepEqual(saved.removed, [], 'a save never deletes what a person wrote: the json stays for them to remove');
   } finally {
-    for (const f of ['gone.md', 'gone.skills.json']) fs.rmSync(path.join(AGENTS, f), { force: true });
+    for (const f of ['old.md', 'old.skills.json']) fs.rmSync(path.join(AGENTS, f), { force: true });
   }
 });
 
-test('a new agent is written with its card beside it, and a save that changes the card writes that file and moves the version', async () => {
-  const skills = [{ id: 'write-a-note', name: 'Write a note', description: 'Writes it.', tags: ['note'], examples: ['Use this when a note is wanted.'] }];
-  const made = await send('POST', '/api/agents/yours', { ...scribe, card: 'scribe.skills.json', cardText: `${JSON.stringify(skills, null, 2)}\n` });
-  const saved = (await made.json()) as AgentSaved;
-  assert.equal(made.status, 201, JSON.stringify(saved));
-  assert.deepEqual(saved.written.sort(), ['scribe.md', 'scribe.skills.json']);
-  assert.match(fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'), /^card: scribe\.skills\.json$/m);
-  assert.deepEqual(saved.agent.card?.list, skills);
-
-  // The card is digested with the agent, so a save against the version before it is refused.
-  const was = saved.agent.version;
-  const more = [...skills, { id: 'read-a-note', name: 'Read a note', description: 'Reads it.', tags: ['note'] }];
-  const put = await send('PUT', `/api/agents/yours/scribe`, { ...scribe, version: was, card: 'scribe.skills.json', cardText: `${JSON.stringify(more, null, 2)}\n` });
-  const again = (await put.json()) as AgentSaved;
-  assert.equal(put.status, 200, JSON.stringify(again));
-  assert.deepEqual(again.agent.card?.list?.map((s) => s.id), ['write-a-note', 'read-a-note']);
-  assert.notEqual(again.agent.version, was, 'the card is digested with the agent');
-  await refused(send('PUT', '/api/agents/yours/scribe', { ...scribe, version: was }), 409, /changed since it was read/);
-
-  // The line taken off — the board's Card field cleared, and saved — leaves the file: a save never deletes what a person wrote.
-  const off = await send('PUT', '/api/agents/yours/scribe', { ...scribe, version: again.agent.version });
-  const bare = (await off.json()) as AgentSaved;
-  assert.equal(off.status, 200, JSON.stringify(bare));
-  assert.equal(bare.agent.card, null);
-  assert.deepEqual(bare.removed, []);
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), true);
-  fs.rmSync(path.join(AGENTS, 'scribe.skills.json'));
-  await send('DELETE', '/api/agents/yours/scribe', { version: bare.agent.version });
-});
-
-test('REFUSED at shipped defaults: a card that is not a file name, text with no file to write it to, and a card the package will not read', async () => {
-  await refused(send('POST', '/api/agents/yours', { ...scribe, card: 42 }), 400, /`card` is the file beside the agent that says what it can do/);
-  await refused(send('POST', '/api/agents/yours', { ...scribe, cardText: '[]' }), 400, /`cardText` is the text of the file `card` names, and this request named no `card` file/);
-  await refused(send('POST', '/api/agents/yours', { ...scribe, card: 'scribe.skills.txt', cardText: '[]' }), 422, /^`scribe\.skills\.txt` is not a card's name: it is a \.json file beside the agent/);
-  await refused(send('POST', '/api/agents/yours', { ...scribe, card: 'scribe.skills.json', cardText: '[]' }), 422, /is an empty list, and an agent with no skills says nothing it can do/);
-  await refused(send('POST', '/api/agents/yours', { ...scribe, card: 'scribe.skills.json', cardText: '[{"id":"a","name":"A"}]' }), 422, /skill 1 has no `description`/);
-  // What a page drawn before the card had its own line sends: the card as `skills`, its text as `skillsText`. Neither is taken as something
-  // else, and neither is dropped: each is refused, saying to reload.
-  await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'scribe.skills.json', skillsText: '[]' }), 400, /`skillsText` is `cardText` since 2026-09-25[^]*reload it, and save again/);
-  await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'scribe.skills.json' }), 422, /`skills: scribe\.skills\.json` names a card, which is `card:` since 2026-09-25[^]*reload it, and save again/);
+test('REFUSED at shipped defaults: a card file sent by a page drawn before the card was generated, under any of its names, and a card file as `skills:`', async () => {
+  for (const sent of [{ card: 'scribe.skills.json' }, { card: null }, { cardText: '[]' }, { card: 'scribe.skills.json', cardText: '[]' }, { skillsText: '[]' }]) {
+    const keys = Object.keys(sent).map((k) => `\`${k}\``).join(' and ');
+    await refused(send('POST', '/api/agents/yours', { ...scribe, ...sent }), 400, new RegExp(`^POST /api/agents/yours: ${keys} named the card file beside the agent, which is retired[^]*reload it, and save again`));
+  }
+  await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'scribe.skills.json' }), 422, /`skills: scribe\.skills\.json` names a card file, which is retired[^]*reload it, and save again/);
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
 });
 
@@ -344,7 +319,7 @@ test('an agent is written and listed with the skills it is given and its system 
     assert.match(text, /^systemPrompt: no-coding$/m);
     assert.equal(saved.agent.skills, 'review-a-change, write-a-note', 'listed as the parser read it');
     assert.equal(saved.agent.systemPrompt, 'no-coding');
-    assert.equal(saved.agent.card, null);
+    assert.deepEqual(saved.agent.card?.map((s) => s.id), ['review-a-change', 'write-a-note'], 'the card is the skills it gives');
     // Neither is a role key: a step has no skills and no system prompt of its own.
     assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false);
     assert.equal(Object.hasOwn(saved.agent.keys, 'systemPrompt'), false);
@@ -374,23 +349,23 @@ test('an agent is answered as an A2A Agent Card, with what it leaves out said be
   // A2A's required fields, but the interfaces nothing here has: the card is the card, and the sentence about it is not in it.
   assert.deepEqual(Object.keys(answer.card).sort(), ['capabilities', 'defaultInputModes', 'defaultOutputModes', 'description', 'name', 'skills', 'version']);
   assert.deepEqual(answer.card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
-  assert.ok(answer.card.skills.length >= 1);
   const listing = (await listed()).find((a) => a.from === 'repo' && a.name === 'reviewer')!;
   assert.equal(answer.card.version, listing.version, 'the version is the one a save is held to');
-  assert.deepEqual(answer.card.skills, listing.card?.list);
+  assert.deepEqual(answer.card.skills, listing.card, 'the entries the page lists');
+  assert.deepEqual(answer.card.skills.map((s) => s.id), ['review-a-change', 'send-work-round-again']);
 });
 
-test('REFUSED at shipped defaults: a card for an agent that is not there, one with no skills, and one whose name is not an agent’s', async () => {
+test('REFUSED at shipped defaults: a card for an agent that is not there, one with no description, and one whose name is not an agent’s', async () => {
   await refused(app.request('/api/agents/yours/nobody/card'), 404, /^Yours has no agent named 'nobody'/);
   await refused(app.request('/api/agents/yours/..%2Fdev%2Fplan/card'), 400, /is not an agent's name/);
-  fs.writeFileSync(path.join(AGENTS, 'mute.md'), '---\ndescription: Says nothing.\n---\nDo it.\n');
-  fs.writeFileSync(path.join(AGENTS, 'nameless.md'), '---\ncard: nameless.skills.json\n---\nDo it.\n');
-  fs.writeFileSync(path.join(AGENTS, 'nameless.skills.json'), '[{"id":"a","name":"A","description":"Does a.","tags":["note"]}]\n');
+  fs.writeFileSync(path.join(AGENTS, 'nameless.md'), '---\nmodel: opus\n---\nDo it.\n');
   try {
-    await refused(app.request('/api/agents/yours/mute/card'), 422, /^agents\/mute\.md has no `card:`, and the A2A protocol marks a card's skills REQUIRED/);
     await refused(app.request('/api/agents/yours/nameless/card'), 422, /^agents\/nameless\.md has no `description:`, and the A2A protocol marks a card's description REQUIRED/);
+    const nameless = (await listed()).find((a) => a.name === 'nameless')!;
+    assert.equal(nameless.card, null);
+    assert.match(nameless.cardError ?? '', /^agents\/nameless\.md has no `description:`/);
   } finally {
-    for (const f of ['mute.md', 'nameless.md', 'nameless.skills.json']) fs.rmSync(path.join(AGENTS, f));
+    fs.rmSync(path.join(AGENTS, 'nameless.md'));
   }
 });
 

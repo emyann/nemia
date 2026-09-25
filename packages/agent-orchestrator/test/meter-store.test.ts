@@ -20,6 +20,8 @@ const STATS = path.join(ROOT, 'tick-stats.json');
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
+// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
+process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { lastPassCost, listRuns, readRun, start, tick } = await import('../src/runner.ts');
 const { metered, within } = await import('../src/tally.ts');

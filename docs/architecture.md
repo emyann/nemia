@@ -28,6 +28,14 @@ refused and reported on the pass, never guessed at. In the orchestrator, the
 core is `assess` (`packages/agent-orchestrator/src/run.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
 data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
 
+Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
+next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
+it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,
+its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest.ts`, `restMemo` in
+`src/tick.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
+restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
+(`WF_VERIFY_REST`).
+
 ## The rules
 
 **1. Between packages, only the public contract.** Code outside packages/agent-runtime reaches it through
@@ -46,7 +54,7 @@ Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestra
 `packages/agent-orchestrator/test/boundary.test.ts`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: check, closeout, daemon, deps, feed, inbox, meter, plan, radius, retry, run, timeline, workflow.
+  kinds: admission, check, closeout, daemon, deps, feed, inbox, meter, plan, radius, rest, retry, run, timeline, workflow.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client: places,
   workflow-store, store, worktree, branches, artifacts, authoring, daemon-store, feed-store, inbox-store, tally. They load as a
   tree. At the bottom are places.ts, workflow-store.ts and tally.ts (the pass's meter), which import no store file. store.ts

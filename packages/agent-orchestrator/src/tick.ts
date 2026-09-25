@@ -8,6 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { refusedText, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { modeOf, sessionContext, type Workflow } from './workflow.ts';
@@ -18,16 +19,17 @@ import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen
 import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
-import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
+import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
-import { refsOf, resultBranches } from './branches.ts';
+import { headsOf, refsOf, resultBranches } from './branches.ts';
+import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
 import { momentumOf, toAdmit } from './admission.ts';
-import { addRuntime, aside, metered, within, type Tallies } from './tally.ts';
+import { addRuntime, aside, countRested, metered, within, type Tallies } from './tally.ts';
 import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
 /**
@@ -281,6 +283,15 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
  * free, and the first pass that holds it writes when (`slotHeldAt`). Left out, nothing holds it.
  */
 export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
+  return (await advanceRun(e, run, slot)).advanced;
+}
+
+/**
+ * `advance`, and whether the run is at rest once the pass is done (`atRest`): `blockers` names each clause that holds it out (`restBlockers`),
+ * and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`), which is all of git a pass asks of a
+ * run at rest.
+ */
+async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
   const steps = stepsOf(run);
 
   // Every try's session, or only the current ones: what the earlier ones cost is read by nothing here unless a cap is in force
@@ -337,8 +348,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
   // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
   let markedHandedOff = false;
-  // A pruned run owed no hand-off when its worktrees went (`pruneRefusal`), and has nowhere to hand one off from since.
-  const collected = within('act', () => (run.pruned ? [] : handOffDue(steps, run, phaseOf)).flatMap((name) => {
+  // Only where there is somewhere to hand one off from (`handOffOwed`).
+  const collected = within('act', () => handOffOwed(steps, run, phaseOf).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
     const record = run.steps[name]!;
     let handed: ReturnType<typeof handOff>;
@@ -750,19 +761,42 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
-  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff || landing.landed) rewriteRun(run);
+  const wrote = Boolean(filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff || landing.landed);
+  if (wrote) rewriteRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
 
-  return {
+  const advanced: Advanced = {
     run, filed, checked, tried, looped, status, blocked, notes, waiting,
     // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
     inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
     feed,
   };
+  // Whether the next pass, its inputs unchanged, would read the same and do nothing: what `tick` may answer from its memo (`rest.ts`).
+  const ending = steps.find((s) => s.workspace === 'main');
+  const facts: RestFacts = {
+    run, status, due: assessed, notes, waiting, inFlight: advanced.inFlight, held: Boolean(held),
+    settled: [...views.values()].every((v) => Boolean(v.state.settled)),
+    acted: wrote || closed.size > 0,
+    handOffDue: handOffOwed(steps, run, phaseOf),
+    landingOwed: steps.some((s) => landsOnCheck(s, run) && Boolean(run.steps[s.name]?.taskId) && !run.steps[s.name]?.landed),
+    checkoutAsked: Boolean(ending && !run.cancelledAt && endingAsked(run, ending, asks) !== undefined),
+  };
+  const blockers = restBlockers(facts);
+  return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped } }) };
 }
+
+/**
+ * The steps a pass hands off now (`handOffDue`), where there is somewhere to hand one off from: none of a pruned run, which owed none when
+ * its worktrees went (`pruneRefusal`), and no step whose workspace is no longer on disk — removed by hand, or before `wf prune` was there to
+ * write it down — since what the step left went with it. A hand-off tried there fails on every pass and says nothing, and kept the run out of
+ * the tick's memo of runs at rest for good (70 of the owner's 195 runs on 2026-09-25, two git processes each a pass), and `wf prune` refused
+ * the run as still owed one. What the pass hands off, what its memo judges, and what `wf prune` waits for, read off this one function.
+ */
+export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
+  run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name]!.workspace!));
 
 /**
  * The commit each of a run's result branches is at, as git has it — or, for one git no longer has, the tip the run last saw (`tipsSeen`):
@@ -957,12 +991,21 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  * is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started. Nothing is carried
  * between passes: the next one counts again.
  *
+ * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
+ * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
+ *
  * Metered as it goes (`tally.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a test
  * that meters its own — is counted as part of that one and carries no cost of its own.
+ *
+ * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
+ * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and throws
+ * where the two differ — the tests' (`WF_VERIFY_REST=1`), never the daemon's, since it spends all that the memo saves.
  */
-export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string } = {}): Promise<Pass> {
+export async function tick(e: Engine, { repo = process.cwd(), memo = restMemo(e), verifyRest = process.env.WF_VERIFY_REST === '1' }: {
+  repo?: string; memo?: RestMemo; verifyRest?: boolean;
+} = {}): Promise<Pass> {
   const io0 = ioOf(e);
-  const { value, ms, tallies } = await metered(() => pass(meteredEngine(e), repo));
+  const { value, ms, tallies } = await metered(() => pass(meteredEngine(e), repo, memo, verifyRest));
   if (!tallies) return value;
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, ioOf(e));
@@ -971,24 +1014,33 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 }
 
-async function pass(e: Engine, repo: string): Promise<Pass> {
+async function pass(e: Engine, repo: string, memo: RestMemo, verify: boolean): Promise<Pass> {
   const report = await e.tick();
+  // After the runtime's pass, so what it appended on it — a settled task's `measured` — is read on this one. What is appended after is
+  // read on the next, and a run the memo answers on this pass in between was read at rest before it: nothing is lost, only a pass later.
+  const resting = await restingPass(e, memo, verify);
   const ran = ceilings();
   // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
   within('act', () => recordCeilings(ran));
   const cap = ran.runs;
   const runs = listRuns();
+  // A run `wf rm` forgot is forgotten here too.
+  if (resting) {
+    const listed = new Set(runs.map((r) => r.id));
+    for (const id of memo.runs.keys()) if (!listed.has(id)) memo.runs.delete(id);
+  }
   // Which queued tasks start, off the views the runtime's pass built from its one observation: a read of `e.list()` or `e.view` here would
   // ask each harness again (`admission.ts`). The runtime starts what is admitted on its next pass.
   // A word with nothing in it is not said: a call to the engine is counted, in `act`, with two reads of its totals.
   const admitting = toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions });
   if (admitting.length) await e.admit(admitting);
   const done = new Map<string, Advanced>();
-  // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
-  for (const run of runs.filter(hasStarted)) done.set(run.id, await advance(e, run));
+  // A finished run is judged as every other is, on every pass — from the memo while nothing it was judged by has changed (`advanceResting`).
+  for (const run of runs.filter(hasStarted)) done.set(run.id, await advanceResting(e, run, resting));
   let counted = [...done.values()].filter((a) => a.inFlight).length;
+  // A run with nothing filed as well, with its slot: one called off before it started rests like a finished one.
   for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
-    const advanced = await advance(e, run, { inFlight: counted, cap });
+    const advanced = await advanceResting(e, run, resting, { inFlight: counted, cap });
     done.set(run.id, advanced);
     if (advanced.inFlight) counted++;
   }
@@ -1003,6 +1055,113 @@ async function pass(e: Engine, repo: string): Promise<Pass> {
   // An engine's report from before the runtime reported refusals — a test's fake — carries none.
   const refused = report.refused ?? [];
   return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}), ...(refused.length ? { refused } : {}) };
+}
+
+// ─── runs at rest ───────────────────────────────────────────────────────────
+
+/**
+ * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
+ * inputs it answered on — its files in the store (`restStamps`), its record as read, and the result branches whose tips it would read. And
+ * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
+ * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed.
+ *
+ * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and judges
+ * every run afresh, and no verb, `wf ls` or the api reads it.
+ */
+export type RestMemo = {
+  cursor?: number;
+  runs: Map<string, { stamp: string; record: string; tipped: string[]; advanced: Omit<Advanced, 'run'> }>;
+};
+
+/** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
+export const freshRestMemo = (): RestMemo => ({ runs: new Map() });
+
+/** Each engine's memo: one engine is one daemon's (`wf up` makes one for all its passes), and one a test builds starts with none. */
+const memos = new WeakMap<Engine, RestMemo>();
+const restMemo = (e: Engine): RestMemo => {
+  let memo = memos.get(e);
+  if (!memo) memos.set(e, memo = freshRestMemo());
+  return memo;
+};
+
+/** What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository. */
+type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: string) => Record<string, string>; verify: boolean };
+
+/**
+ * The memo brought up to the engine's feed — every run a task of which appended since takes it out — and the store stamped, before the pass
+ * reads a record. Undefined, and nothing answered from memory, for an engine with no feed: without it nothing says a task moved.
+ *
+ * A memo that has read nothing reads the feed from its end: it holds no run a line before could concern. A feed that went back — a journal
+ * replaced or cut — or cannot be read empties the memo, and the next pass reads it from its end again.
+ */
+async function restingPass(e: Engine, memo: RestMemo, verify: boolean): Promise<RestingPass | undefined> {
+  if (typeof e.feed !== 'function') return undefined;
+  try {
+    if (memo.cursor === undefined) {
+      memo.runs.clear();
+      const { cursor } = await e.feed(Number.MAX_SAFE_INTEGER);
+      // A journal with no feed yet answers with the cursor it was given: nothing has been written, so the next pass reads from the start.
+      memo.cursor = cursor >= Number.MAX_SAFE_INTEGER ? 0 : cursor;
+    } else {
+      const { entries, cursor } = await e.feed(memo.cursor);
+      if (cursor < memo.cursor) memo.runs.clear();
+      else for (const id of evictedBy(entries.map((f) => f.taskId), new Set(memo.runs.keys()))) memo.runs.delete(id);
+      memo.cursor = cursor;
+    }
+  } catch {
+    memo.runs.clear();
+    memo.cursor = undefined;
+    return undefined;
+  }
+  const heads = new Map<string, Record<string, string>>();
+  return {
+    memo, verify, stamps: restStamps(),
+    heads: (repo) => {
+      const at = path.resolve(repo);
+      if (!heads.has(at)) heads.set(at, headsOf(at));
+      return heads.get(at)!;
+    },
+  };
+}
+
+/**
+ * One run's pass, answered from the memo where the run was at rest on its last full pass and nothing it was judged by has changed:
+ * its files in the store stamp the same, its record reads the same, nothing of its tasks is on the feed since (`restingPass`), and every
+ * result branch it would read the tip of is where its record says (`tipsSeen`, off one `for-each-ref` a repository). Otherwise a full pass
+ * (`advanceRun`), kept in the memo if the run is at rest after it.
+ *
+ * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
+ * judged in full as well, and a difference throws: a change the memo missed is a bug in what it watches.
+ *
+ * `slot` is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like
+ * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a step
+ * ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
+ */
+async function advanceResting(e: Engine, run: Run, resting: RestingPass | undefined, slot?: RunSlot): Promise<Advanced> {
+  if (!resting) return (await advanceRun(e, run, slot)).advanced;
+  const { memo, stamps, heads, verify } = resting;
+  const stamp = stamps.get(run.id);
+  const record = JSON.stringify(run);
+  const kept = memo.runs.get(run.id);
+  if (kept && stamp !== undefined && kept.stamp === stamp && kept.record === record
+    && (!kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined)) {
+    countRested();
+    if (verify) {
+      const { advanced: { run: _, ...judged }, blockers, rest } = await advanceRun(e, run, slot);
+      if (!rest || !isDeepStrictEqual(judged, kept.advanced) || JSON.stringify(run) !== record) {
+        throw new Error(`the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: `
+          + `an input of the run changed that the memo does not watch (rest.ts) — memo ${JSON.stringify(kept.advanced)}, pass ${JSON.stringify(judged)}`);
+      }
+    }
+    return { ...kept.advanced, run };
+  }
+  memo.runs.delete(run.id);
+  const { advanced, rest } = await advanceRun(e, run, slot);
+  if (rest && stamp !== undefined) {
+    const { run: _, ...answered } = advanced;
+    memo.runs.set(run.id, { stamp, record, tipped: rest.tipped, advanced: answered });
+  }
+  return advanced;
 }
 
 /** Each run with its workflow's steps, for `momentumOf`; a run whose workflow no longer reads names no task. */
@@ -1067,7 +1226,7 @@ const meteredEngine = (e: Engine): Engine => new Proxy(e, {
 
 /** A pass's cost from its counts and the runtime's totals before and after it. */
 const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined): PassCost =>
-  passCost({ at: new Date().toISOString(), ms, phases: t.kinds, harnesses: observedBetween(before, after), records: t.records, overheadMs: t.overheadMs });
+  passCost({ at: new Date().toISOString(), ms, phases: t.kinds, harnesses: observedBetween(before, after), records: t.records, rested: t.rested, overheadMs: t.overheadMs });
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between

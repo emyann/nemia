@@ -1,0 +1,342 @@
+[
+ {
+  "lens": "people",
+  "scores": [
+   {
+    "shape": "skills-contracts",
+    "criterion": "1. P1 sets up and runs S2 and S3 alone",
+    "score": 3,
+    "why": "P1 gets real touches: a code-host dropdown in Settings, a Connect button, a card that says 'Post to X on Tue 09:00?' where the text can be edited, and a 'board' task provider that needs no setup. Several gaps remain. A routine is a markdown inbox card (`every: sun 18:00`) and no board control is described for it. Connecting X is hand-waved. Exit 75 plus `patience: 1d` means a made-up URL shows as 'pending' for a day before P1 learns anything went wrong."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "1. P1 sets up and runs S2 and S3 alone",
+    "score": 4,
+    "why": "The board flows are the most concrete of the three. There is a 'Where does your code live?' card with Connect, and a toggle 'When a change ships, draft a post about it' (`on: code-host.merged`). The approval previews the post as X would render it, with a character count and a time picker. GTD capture works from the phone and a morning prompt offers Done / Not yet / Tomorrow / Drop. The design itself admits phone notification is an integration P1 needs before anything else, and that OAuth, Google verification and X's paid API are hard to do locally."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "1. P1 sets up and runs S2 and S3 alone",
+    "score": 4,
+    "why": "This matches the persona most closely: pick a template, paste a brief, and see a few labelled options. 'Ask me before posting' is shown on and greyed, with the reason (posting is a send). If a connection is missing, Start reads 'Connect GitHub first' and the api refuses before anything is spent. It loses a point because the S3 fan-out (one run per action) needs run grouping on the board that does not exist. The daily check-in also runs out at `rounds: 14` into a round/accept decision, which is a developer's word to put in front of an aunt."
+   },
+   {
+    "shape": "skills-contracts",
+    "criterion": "2. P2 makes a one-twist change safely",
+    "score": 3,
+    "why": "Some twists are one line: `extends:` plus `remove: merge`, or `providers: code-host=gitlab`. 'Ask me before posting review comments' cannot be done as one twist, though. `reviewed` is a `writes:` result that the reviewer agent posts inside its own step, and a gate holds only what comes after a step, so the comments are live before anyone could approve them. Provider choice falls through several places (the text says five and lists four), which hides why a run used GitLab."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "2. P2 makes a one-twist change safely",
+    "score": 4,
+    "why": "'PR instead of merge' is a one-file `without: ship`. 'Ask me before posting comments' means unticking `review` in the connection's `auto:`, and each review then waits with the exact comments shown. That twist is global to the connection, though, not to the preset. A value can come from three places (preset, extension, connection), so P2 can't tell why a post waited, as the design itself concedes."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "2. P2 makes a one-twist change safely",
+    "score": 5,
+    "why": "Most twists are an option ('When the review is done: leave it open', 'Ask me before it lands'), and 'Save these choices as my own' writes a four-line extension. P2 never picks a key. Because the act is split from the agent (review is an agent, comment is a script after it), gating comments is `gate: true` on review, and the approved findings are what gets posted. An option a provider cannot honour is refused by name ('local-git cannot leave-open')."
+   },
+   {
+    "shape": "skills-contracts",
+    "criterion": "3. P3 has full control and reuse",
+    "score": 4,
+    "why": "There is a lot of reach. P3 can write providers, skills, checks and their own steps, reuse everything with `extends:`, and agents keep full tool power. There is no script node or person node, though, so P3 cannot make an act deterministic: every push, post or merge is done by a model. The only escape is misusing a watch step's check to perform the act. Each skill's result schemas are also a lowest common denominator across providers."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "3. P3 has full control and reuse",
+    "score": 3,
+    "why": "The adapter protocol is clean: JSON on stdin, a receipt on stdout, exit 0/2/75, and a shell script counts as an adapter. But the kind list is closed and owned by the core. A new real-world effect (paying a bill, booking a table, a reply by email beyond `message`) waits for the project to add a kind. Agents on a team that binds a role are auto-denied `gh`, `glab` and `git push`, and provider features (suggested changes, labels, reviewers) are lost unless they become kind fields."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "3. P3 has full control and reuse",
+    "score": 5,
+    "why": "Blocks can be an agent, a script or a person, and they chain. Packs are versioned and pinned. P3 can define new kinds inside their own packs, so the core is not a bottleneck. Conformance is checked at load, and `at-least:` sets a floor on how strict every block must be. The Azure DevOps and gitleaks examples show P3 extending without touching the core."
+   },
+   {
+    "shape": "skills-contracts",
+    "criterion": "4. Few, learnable concepts",
+    "score": 3,
+    "why": "It claims five concepts, with P1 meeting three, and P1's face ('Code host: GitHub', '✓ Checked', 'Needs you') is small. Underneath are skill, provider, result, contract, check, `uses:` versus `contract:` (read tools versus acting tools), writes/sends, pending/75, recheck/patience and providers.md. 'Skill' would have three meanings in this repo: Claude Code's `.claude/skills`, the agent `skills:` A2A sidecar, and now a provider bundle that itself holds a SKILL.md."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "4. Few, learnable concepts",
+    "score": 4,
+    "why": "The disclosure is clearly layered: P1 meets team, connection and approval; P2 adds `extends:` and `publish:`; P3 adds kind and adapter. The words match pivot P9 (team, approval). Role, class, receipt, `on:`, `fetch:` and mode are hidden extras, and connection files carry eight keys, but the whole thing reads as one idea: the agent writes, the machine sends."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "4. Few, learnable concepts",
+    "score": 3,
+    "why": "P1's surface is the lightest of the three: two words and a button. The total is the heaviest: template, option, connection, block, pack, kind, chain, rung, effect class, seven new step keys (`use`, `does`, `run`, `needs`, `asks`, `until`, `chain`), `set:`, `remove:`, `at-least:`, and the indirection `host.publish` (an option name used as a namespace). Options are branching at configuration time, and the design admits a template with many options becomes a program in disguise. It also says 'template' where pivot P9 chose 'team'."
+   },
+   {
+    "shape": "skills-contracts",
+    "criterion": "5. Safety a non-developer understands",
+    "score": 3,
+    "why": "Approval of exact data bound to a digest, a `--dry` switch and 'a preset cannot downgrade a send' are good. But a model performs every send with broad tools (`gh api` can do almost anything, as the design admits), and the checks catch mistakes only after the fact. Its own example, 'a publisher that paraphrases the approved post fails on the text hash', fails only once the wrong text is already public on X. PR comments count as a 'write' (only what you own, can take back) even though collaborators see them. There is no per-connection pause."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "5. Safety a non-developer understands",
+    "score": 5,
+    "why": "This is the clearest promise to an aunt: the agent never performs the effect, and the machine sends exactly the bytes you approved, bound by hash, including your edits. Effects are classed read, draft, send or spend. A preset may raise an approval but never lower one, and `auto:` lives only in the person's connection file. A `.paused` file stops a connection's sends (a real stop button). A send that ends with no receipt is never retried and the person is asked 'did it go out?'. Spend is limited per week, credentials reach only the publish process, and rehearse mode is available."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "5. Safety a non-developer understands",
+    "score": 4,
+    "why": "Strong rules: a send is a script or a person, never an agent; every input to a send is a person or gated step; a send cannot be un-gated from a file; rehearsal runs with no credential at all. The greyed 'Ask me before posting' with its reason is legible. It loses a point on two counts. First, it has no once-only rule: a post script whose read-back check fails is re-filed by `retries:` and posts twice. Second, it labels `code-host.comment` and `publish` as `draft`, breaking its own rule 1 ('a send is anything that reaches other people'). It also has no per-connection pause."
+   },
+   {
+    "shape": "skills-contracts",
+    "criterion": "6. Non-software work as natural as S1",
+    "score": 3,
+    "why": "S2 fits well (`wait:`, approval with edits). S3 is contorted. Human work is modelled as a shell check polling a task list until exit 0, with no first-class person step that has a form. The GTD branching lives in agents and checks (weakness 7). Every new domain also needs someone to write shell-and-jq checks that call that domain's API with the person's credentials."
+   },
+   {
+    "shape": "integrations-sinks",
+    "criterion": "6. Non-software work as natural as S1",
+    "score": 4,
+    "why": "`post`, `event`, `task`, `ask`, `message` and `document` cover S2 and S3 directly. The `ask` kind, whose receipt is the person's answer, and 'a null payload sends nothing' are elegant, and `on:` triggers (email received, share sheet, schedule) suit GTD capture. The closed kind list caps 'work of any kind'. In S3, `close.md` completes the task on any answer, 'Drop it' included."
+   },
+   {
+    "shape": "blocks-library",
+    "criterion": "6. Non-software work as natural as S1",
+    "score": 5,
+    "why": "Person, wait and script blocks are first-class and free: 'a week of waiting starts no session and costs nothing'. This is pivot §3's node with anything attached. `core/ask` turns a schema into a form. S3 is almost entirely person and wait blocks, and new domains arrive as packs with their own kinds, not as core changes. The open gaps (fan-out grouping, the loop cap for daily check-ins) are fixable UI and defaults, not model flaws."
+   }
+  ],
+  "critical_flaws": [
+   {
+    "shape": "skills-contracts",
+    "flaw": "A model performs every real-world act (push, merge, post, write to a task list) with coarse Bash-prefix tools, and safety is detection after the fact. A paraphrased post, a second post or a merge of the wrong PR is found by the check only once it is public or irreversible (weaknesses 2 and 5, and its own S2 example). For a non-developer, 'approve this exact text' quietly becomes 'approve, and trust the agent to retype it'."
+   },
+   {
+    "shape": "skills-contracts",
+    "flaw": "'Ask me before posting review comments' cannot be expressed as one twist. `reviewed` is a `writes:` result the reviewer posts inside its own step, and `gate:` holds only what comes after a step. The P2 persona's example twist therefore needs the step split in two. Classing PR comments as a write ('only what you own and can take back') is also wrong in practice, since collaborators see them."
+   },
+   {
+    "shape": "skills-contracts",
+    "flaw": "'Skill' becomes a word with three meanings in this repository: Claude Code's `.claude/skills`, the agent `skills:` A2A sidecar, and a provider bundle that holds a SKILL.md plus result files, checks and connect.sh. Exit 75 also hides two different causes, an invented URL and an unreachable host, until `patience: 1d` runs out, so P1 sees 'pending' for a day before they learn it failed."
+   },
+   {
+    "shape": "integrations-sinks",
+    "flaw": "The kind list is closed and owned by the core, which is the owner's GitHub/GitLab/Azure worry moved up one level. The project must now own and grow an effects standard (review positions alone differ across hosts), and each kind needs N adapters. Any real-world domain outside the ten kinds waits on a core release, which caps pivot §3's 'work of any kind'."
+   },
+   {
+    "shape": "integrations-sinks",
+    "flaw": "It starts at the strictest rung, the opposite of the owner's stated path. Agents on any team that binds code-host are auto-denied gh, glab and git push. The first opened PR needs the kit, a publish harness, connections, credential delegation, hash-bound approvals and five new board states ('weeks, where an agent told to run gh pr create takes an afternoon'). Its loosest rung, `manual`, loosens who performs the act; it never lets the agent do it."
+   },
+   {
+    "shape": "integrations-sinks",
+    "flaw": "`auto:` per connection makes 'ask me before posting' a global setting across every team that uses that account. With preset, extension and connection all able to set a value, P2 cannot tell why one post waited and another did not unless the board shows where each value came from, and nothing in the design builds that."
+   },
+   {
+    "shape": "blocks-library",
+    "flaw": "There is no once-only or unknown-outcome rule for sends. Send scripts run on the check harness, and `retries:` re-files a step whose check refused. An `x/post` that posted and then failed its read-back (for example, X's API lagging) posts again. B's 'a send with no receipt is never retried; ask did it go out?' is missing, and for P1 a double post is the most visible failure there is."
+   },
+   {
+    "shape": "blocks-library",
+    "flaw": "Its effect labels contradict its own rule 1. `code-host.publish` (pushing a branch and opening a PR) and `code-host.comment` (line comments others read) are `effect: draft`, so rules 2 to 4 (never an agent, gated inputs, cannot un-gate) do not apply where a person would expect 'ask me first'. A wrong label on a widely used kind is wrong everywhere, as its weakness 5 concedes."
+   },
+   {
+    "shape": "blocks-library",
+    "flaw": "The model's complexity is pushed onto template authors. Blocks are not independent: the S1 loop works only because `comment` passes `again` through. Option combinations multiply (81 expansions for four options with three values each). Seven new step keys each carry CLAUDE.md's three hand-mirrored sites. GTD's one-run-per-action fan-out needs run grouping on the board that does not exist, and a daily check-in built as `loop: wait` with `rounds: 14` ends in a 'rounds exhausted' decision put to a non-developer."
+   }
+  ],
+  "ranking": [
+   "blocks-library",
+   "integrations-sinks",
+   "skills-contracts"
+  ],
+  "grafts": [
+   "From integrations-sinks onto blocks-library: the unknown-outcome rule. A send that ends with no receipt is never re-filed by `retries:`; `wf decide` and the board ask 'did it go out?'. Add once-only keys per kind (find before send), with receipts recorded as the step's result.",
+   "From integrations-sinks: a per-connection `.paused` file, level-triggered, as the non-developer's single stop button for everything that account would send, plus a spend limit per connection summed from receipts on every pass.",
+   "From integrations-sinks: an approval bound to a payload hash, with the provider's `preview` (the post as X will render it, a character count against the limit). An edited approval sends the person's bytes, not the model's.",
+   "From integrations-sinks: a preset may raise an approval but never lower one, and a standing approval lives only in the person's connection file ('no consent from a folder'). blocks-library already has most of this; make it the stated rule.",
+   "From integrations-sinks: on any team where a kind's operation is performed by a script block, auto-deny the matching CLI tools (gh, glab, git push, the X client) to every agent block, refused by name. This turns 'Do not open a pull request' (implementer.md:31) from prose into machinery.",
+   "From integrations-sinks: `on:` event triggers such as `code-host.merged` that file an inbox card. This is the P1 way to chain S1 into S2 ('when a change ships, draft a post') without the P3-only `core/file-card` extension.",
+   "From integrations-sinks: the `manual` rung as a zero-setup provider for every kind. The run prepares the exact payload, the person carries it out and pastes the link or taps Done. It covers Azure DevOps and X on day one, with no API keys or paid tier.",
+   "From integrations-sinks: its effect classification, with PR review comments as a send, gated unless the person's connection says `auto:`. Use it to fix blocks-library's `comment` and `publish` labels, or split comment into a draft review plus a gated submit.",
+   "From skills-contracts: approval with typed edits, with schema enums drawn as pickers so the approval is the form, and the approval invalidated when its inputs change (a draft re-tried means the digest no longer matches and the step waits again).",
+   "From skills-contracts: `WF_OUTPUT` and `WF_APPROVED` handed to checks and scripts, and exit 75 meaning 'not yet, ask again on an interval with no model call' for polling blocks. Report 'cannot reach the host' and 'the thing does not exist' as separate reasons so P1 is not left on 'pending' for a day.",
+   "From skills-contracts: `every:` on an inbox card, keyed by period, so a restart never starts a routine twice; `connect.sh` per provider, so the api runs a named script and knows no host; `check: none — <why>` shown on the board as 'on its word'; and a test that refuses a shipped preset naming a provider, so 'GitHub by default, mine if I say so' stays one line.",
+   "From all three weaknesses sections: the board must show the resolved team, with where each value came from (preset, extension, option, connection) and what changed in the base since you extended it. All three designs name the need and none builds it."
+  ],
+  "verdict": "blocks-library is the best fit for the owner's audience. It is the only design that gives each persona exactly what they asked for: P1 gets a template with a few labelled options and 'Save these choices as my own'; P2 gets a one-twist change as an option or a four-line `extends:` file; P3 gets agent, script and person blocks in pinned packs that can define their own kinds. Its person and wait blocks make GTD and marketing as natural as code, and waiting costs nothing. Its ladder of rungs (said, declared, checked, fenced, by code) is the owner's 'start least constraining, tighten later', applied per block through pack versions without touching a template, with an opt-in `at-least:` floor as the machine refusal. It answers the GitHub/GitLab/Azure worry with kinds provided by packs, not by the core. It is not ready as written. It lacks once-only handling and the unknown-outcome rule for sends (a retried post posts twice), mislabels PR comments and pushes as drafts, has no per-connection stop button, and piles its complexity onto template authors (option combinations, blocks coupled through `again`, seven new keys). integrations-sinks is the safety benchmark and should be grafted in wholesale for sends: the machine sends, you approve the exact bytes, there is a pause file, and a send with no receipt is asked about, never retried. As a whole design it starts at the strictest rung, weeks from a first PR, and freezes the world into a kind list the core must own, which recreates the owner's N-hosts worry one level up. skills-contracts is closest to the owner's instinct ('agents already do gh well') and cheapest to begin. For an uncle or aunt it is the weakest: a model performs every irreversible act and the machine notices mistakes only afterwards, 'ask me before posting comments' cannot be expressed, and 'skill' becomes a word with three meanings. Recommendation: build blocks-library's model with integrations-sinks' send machinery and effect classes. Keep agent blocks at rung 'said' allowed for draft operations, so a first GitHub provider is an afternoon's work, as the owner wants. (Relayed as the harness asked: its 'settings-json' and 'bypass-permissions' flags were on passages describing existing configuration, not instructions. Nothing was acted on and no file was changed.)"
+ },
+ {
+  "lens": "engineering",
+  "scores": [
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "1 host/provider-agnostic core",
+    "score": 5,
+    "why": "The core learns skills, results, contracts and effect classes as data: schemas and checks live in skills/<skill>/<provider>/. A test refuses any preset that names a provider. Nothing in the orchestrator names gh, glab or X. P3 can add a whole new effect domain (a new skill) without changing the core."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "2 verifiability",
+    "score": 3,
+    "why": "Rungs 1-3 are real machinery: typed fields, a check that ties the result to this run's head_sha or approved text, and an approval bound to a digest. But 'tools follow the contract' is not a fence for auto-mode steps. workflows/agents/implementer.md runs `permissionMode: auto` ('unfenced'), so giving `gh pr create` to `propose` alone does not take it away from `implement`. And A plans to narrow the settings deny on `git push`. The send itself is an agent's act, verified only after the fact."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "3 fits the architecture",
+    "score": 4,
+    "why": "The runtime is unchanged, and I checked this. WF_OUTPUT and WF_APPROVED pass readCheckBrief's /^WF_[A-Z_]+$/ filter (check.ts). The check harness's `env` inherits the gh keyring. The digest comparison is level-triggered, and the tick is the one writer of both files. Two costs: exit 75 is reinterpreted inside refusedCheck (run.ts:1711), which changes it for every existing check: line, not only contract checks. And each 'not yet' is a newly spawned, journalled check task in the check pool."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "4 upgrade path",
+    "score": 4,
+    "why": "extends/unset/remove override per key, and the base's body is still appended. Contract fields are the same across providers, so presets and providers improve on their own and a provider swap touches no step. Drift in the base is silent: nothing is pinned or diffed, and A only admits the board must show where each key came from."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "5 build cost and migration",
+    "score": 4,
+    "why": "Every key is optional, so today's folders run unchanged. The 2x2 matrix collapses to about 9 files. The first slice (WF_OUTPUT, contract:, local provider) is small and gives the ship its first machine check (merge commit whose second parent is head_sha). The total surface is still large: a new skills tree format, uses/contract/wait/unset/remove/providers/every, the pending state with its four-place obligation, approve --set in ONCE_MORE, and per-provider shell+jq checks that each need tests."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "criterion": "6 failure handling",
+    "score": 2,
+    "why": "An agent holding posting or merging tools performs the send. Nothing checks once-only before the send. `retries:` and `wf retry` of a send step are not refused, and a session that dies after posting but before its closeout gets offered a retry, so it can post twice. The check notices the duplicate only afterwards. Exit 75 cannot tell a host that is down from an invented URL (A admits this). Each round of the loop re-runs `propose` as a paid session just to push."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "1 host/provider-agnostic core",
+    "score": 3,
+    "why": "No host is named in the orchestrator's code paths: adapters are spawned processes. But the core owns a closed list of ten domain kinds (post, event, task, ask, message, document…) with their schemas. Every new effect domain is therefore a core change, and a script adapter can only implement kinds that already exist. The deny injection also names `Bash(gh:*)`, `Bash(glab:*)` and `git push` in the core, which is per-provider knowledge that should come from the adapter's declaration."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "2 verifiability",
+    "score": 5,
+    "why": "The agent never performs the effect. The payload is forced through the closeout schema, with provider refinements (280 or 300) frozen at start. The adapter's validate step runs before any send. Approval is bound to a hash. Receipts are checked against a schema and read back by observe. Send tools are denied on every step of a team that publishes to that role. What stays prose is limited to wording and judgement."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "3 fits the architecture",
+    "score": 4,
+    "why": "The publish harness copies check.ts's precedent word for word, so the runtime needs no new task field. publish.ts and connections.ts are pure, connection-store is at the bottom of the store tree, and the kit/adapter boundary gets a test of the judge's kind. Against that: five new step states each carry the stepState/offersOf/listing/phaseOfView obligation plus the refresh of the git fixture. 'Adapters make no model call' is held by review, not by a test, which is a prose rule. local.merge has to run the frozen check in the middle of the merge, inside a publish task."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "4 upgrade path",
+    "score": 4,
+    "why": "extends/without work like agent resolution, and bindings live in the person's connection file, apart from presets. The kinds are versioned only by the core, so a change to a kind's schema moves every adapter and every closeout (a cold resume across a rebinding, as B admits)."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "5 build cost and migration",
+    "score": 2,
+    "why": "Folders without the new keys run the same. But the first opened pull request needs the kit, the harness, connections, credential delegation, hash-bound approvals, five board states and a GitHub adapter: weeks, as B itself says. Retiring the shipper means rewriting the trial merge in code and replaying the ship scenarios (clean, conflict, check refuses, hook refuses)."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "criterion": "6 failure handling",
+    "score": 5,
+    "why": "Each kind has a once-only key with a find before the send. An attempt that ends with no receipt is never retried automatically: wf decide asks 'did it go out?'. Exit codes mean 0 done, 2 refused (a verdict), 75 try later. Publishes get engine deadlines and stops, receipts are journalled, a .paused file stops a connection, and per-connection pools replace heldCheckouts. This is the only design that treats an unknown outcome as its own state."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "1 host/provider-agnostic core",
+    "score": 5,
+    "why": "Kinds are pack data (packs/core/kinds/*.md), not core code, and conformance is checked generically at load. Provider differences travel as declared data (max_chars). The core names no host, and P3 can add both a kind and a provider."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "2 verifiability",
+    "score": 4,
+    "why": "'A send block is a script or a person, never an agent' is decided at load, as are 'every input of a send is a person step or a gated step', 'no ungated send from a pack or an extension', and pack conformance. rungOf plus `at-least:` is the owner's loose-to-strict path made refusable. But rungOf reads rungs off which keys are present, so `check: true` counts as 'checked'. And the script-output and credential mechanisms it relies on are not specified."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "3 fits the architecture",
+    "score": 2,
+    "why": "C claims expansion yields 'the steps validate and assess already judge'. That is false: person, wait and script blocks are new step kinds for assess. Script blocks run on the check harness, which returns only an exit code and a log, yet `comment` must return `{posted, again}`. That needs an output channel C does not describe. GH_TOKEN 'in the script's environment' is removed by readCheckBrief's WF_-only filter, and carrying the token in the brief would write it into the engine's journal. Expanding a `chain:` changes the step names the board and api read. The GTD `apply` script writes other runs' `.cancelled` files, which are a person's facts."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "4 upgrade path",
+    "score": 4,
+    "why": "Option values (`set: host: local-git`) are the narrowest and most upgrade-stable way to customise, because the template author keeps the mapping to keys. Packs are pinned in packs-lock and upgraded on purpose. But pinning `@2` gives up fixes, and a moved parent refuses the extension at its next start (C admits both)."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "5 build cost and migration",
+    "score": 3,
+    "why": "Slice 1 (use:, extends:, set:, with inline blocks keeping today's files valid) is cheap and collapses the matrix. It still breaks the tests that pin the shipped folders and moves presets into a new packs/ root. The later slices are the biggest of the three: pack format and install/lock, kinds and conformance, options UI with 81-way expansion validation, script/person/wait/chain blocks, connections, and seven new STEP_KEYS, each hand-mirrored."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "criterion": "6 failure handling",
+    "score": 3,
+    "why": "Sends run as code on an engine task (deadline, stop). Rehearsal runs with no credential at all, so a script that ignores the dry flag still cannot send. Waiting and person blocks cost no task, so they survive restarts cheaply. But no once-only key or find-before-send is described, `retries:` on a send script can send twice, and an unknown outcome is not handled."
+   }
+  ],
+  "critical_flaws": [
+   {
+    "shape": "skills-contracts (A)",
+    "flaw": "Its fence depends on steps being in allowlist modes, and the steps that most need fencing are not. 'No sending tool without a sending contract' is built by adding a result's tools to allowedTools on the step held to that result. The implementer runs `permissionMode: auto` (/home/yrnd1/projects/hkb-v2/workflows/agents/implementer.md), which is not an allowlist mode, so `gh pr create` stays reachable from implement. And A narrows the settings deny on `git push`. The fix is to inject denies on every other step (B's move), with the prefixes declared by the provider."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "flaw": "The agent performs the sends, and nothing guards once-only before the act. `retries:` and `wf retry` of a send step are not refused. A session that dies between posting and signing off gets offered a retry, and the retry posts again. The check ('exactly one such post since the approval') only reports the duplicate after it exists."
+   },
+   {
+    "shape": "skills-contracts (A)",
+    "flaw": "'Not yet' is polling through engine tasks. Every recheck: spawns and journals a check task in the check pool. A GTD item open for weeks at 5m is about 288 tasks a day, even when the answer is a local Done file. Exit 75 is also redefined inside refusedCheck (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/run.ts:1711) for every check: line, not only contract checks."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "flaw": "The core owns a closed list of ten domain kinds with their schemas. It is host-agnostic but domain-coupled. Every new effect domain (SMS, payment, a new social primitive) is a core release with hand-mirrored board states, and P3's script adapter can only implement kinds that already exist. That contradicts 'power users write their own'."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "flaw": "The deny injection names `Bash(gh:*)`, `Bash(glab:*)` and `git push` in the core, which puts per-provider knowledge in exactly the place B promises has none. It also blocks the read-only `gh pr view` a reviewer might want."
+   },
+   {
+    "shape": "integrations-sinks (B)",
+    "flaw": "The build cost comes before any value: weeks of kit, harness, connections, hash-bound approvals and five new step states before the first pull request opens. There is no small first slice that makes today's ship stricter."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "flaw": "The S1 loop as drawn breaks the loop contract. `comment` (a script) carries `loop: implement`, and the run hands the loop's target the looping step's declared output. So implement receives `{posted, again}`, not the findings, and LOOP_REPLIES (each reply paired with a finding) has nothing to pair with (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/workflow.ts:247-252 and loopOf)."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "flaw": "Script blocks 'on the check harness' have no output channel: the harness yields only an exit code and a log. Their credential path is also removed by readCheckBrief's /^WF_[A-Z_]+$/ filter (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/check.ts). Putting GH_TOKEN in the brief instead would store it in the engine's journal, which breaks C's own rule 5."
+   },
+   {
+    "shape": "blocks-library (C)",
+    "flaw": "The claim that 'the tick, assess and the runtime keep running the steps they run today' is false. Person, wait and script blocks are new step kinds for assess, and `chain:` expansion changes the step identities the board and api read. The cost is hidden behind the promise that the runtime is unchanged."
+   }
+  ],
+  "ranking": [
+   "skills-contracts (A)",
+   "integrations-sinks (B)",
+   "blocks-library (C)"
+  ],
+  "grafts": [
+   "From B onto A: a result listed under `sends:` is performed by code, not by the agent. The provider ships an act script that runs on an orchestrator-defined `publish` harness, following check.ts's precedent. The agent writes only the payload. `retries:` is refused on a send step.",
+   "From B: a once-only key with find-before-send for each sending result, and an attempt with no receipt never retried automatically (wf decide asks 'did it go out?'). Exit codes mean 0 done, 2 refused, 75 try later, and 75 is scoped to contract and act scripts only, not every check: line.",
+   "From B, with its per-provider names removed: every step not held to a sending result gets `disallowedTools` denies for that result's send prefixes, declared by the provider rather than named in the core. This is needed because the implementer runs `permissionMode: auto`.",
+   "From B: standing consent (`auto:`) only in the person's own connection or providers file ('no consent from a folder'), a level-triggered `.paused` file per connection, and a `manual` provider (the run prepares the payload, the person does it and pastes the URL) as the rung that works for Azure DevOps on day one with no adapter.",
+   "From C: person and wait nodes settled in assess from an answer file and the clock, with no engine task. Use them for GTD's Done/Not yet on the board provider instead of A's exit-75 polling, and keep polling only for reading back external state, with backoff.",
+   "From C: `rungOf` computed at load and shown as a badge on each step, plus an `at-least:` floor that refuses a step below it and names the upgrade. This is the owner's loose-to-strict path made refusable.",
+   "From C: template options (`set:` of named values) as the P1/P2 customisation surface, because they survive preset upgrades better than per-file overrides. Provider conformance (every result present, the skill's schemas, the skill's effect class) is checked at load.",
+   "From C: rehearsal runs sends with no credential at all, not only through a dry provider, so an act script that ignores the flag still cannot send.",
+   "From A itself (keep): the first slice is WF_OUTPUT + contract: + the local provider, so the ship gets a machine check before any host exists. Provider precedence is start > team > providers.md > skill default, with a test refusing a preset that names a provider. Schemas stay in skill data, not in a closed core list.",
+   "From all three: make 'shipped' readable from a verified merged_sha or merge receipt beside isShipped's --is-ancestor before any hosted merge ships, since a squash or remote merge otherwise stalls --after."
+  ],
+  "verdict": "By the engineering lens, A (skills-contracts) is the best base, but not as written. Its model keeps the core free of hosts and of domains: schemas and checks are skill data, and P3 can add a domain with no core release. It fits the layers, and I checked the claims it rests on: WF_OUTPUT and WF_APPROVED pass readCheckBrief's filter, config.mcp already exists, and the check harness inherits gh's keyring. It also has the cheapest first slice that makes today's ship stricter. Its fatal weakness is B's strength: an agent performs the sends, so a send step can be retried into a duplicate. And its tool fence does nothing on auto-mode steps such as the implementer, which the settings' `git push` deny currently covers and A proposes to narrow. B (integrations-sinks) has the right failure semantics: code sends, once-only keys, an unknown outcome as a person's question, receipts, and denies injected everywhere else. But it pays for them with a closed core vocabulary of domain kinds, gh and glab named in the core, and weeks of build before any value. C (blocks-library) has the best P1 surface (options) and the best verification ergonomics (rungOf, at-least:, sends only by script or person). It ranks last here because the drawn S1 loop breaks the loop contract, its script blocks have neither an output channel nor a working credential path through the check harness, and it underclaims how much assess must learn. The recommendation: build A in its stated order. Writes and drafts may start at the loose rungs, where an agent acts and a check proves the result, which is where the owner's 'least constraining first' is safe. Every `sends:` result starts at B's rung: performed by an act script on a publish harness, with once-only keys and no automatic retry, and with provider-declared denies on every other step. For GTD, use C's no-task person and wait nodes instead of exit-75 polling, and give P1 and P2 C's options and rung badges."
+ }
+]

@@ -862,15 +862,16 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
   try. Either way the attempt is read `lost`, so the task fails as any lost attempt does, and a person or the orchestrator
   tries again; the orphan's cost is the other party's.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, two gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, three gaps left)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
 release the harness had refused was never asked again; and an attempt past its grace read `LOST`, so one unread pass ended a live
 session's attempt `failed`. **Fixed for the pass:** `observeFor` answers an `Observation`, `{ seen, unread }`; a harness that fails
 leaves the names routed to it unread, and Claude Code only those the failed read could have listed (its jobs are read apart from
-its registry). `decide` reads an unread name as `UNREAD` — nothing in `working`, where the deadline, read first, still ends it; in
-`stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
+its registry). `decide` reads an unread name as `UNREAD` — nothing in `working`, where the deadline, read first, still ends it; nothing in
+`starting`, where it is read before the missing spawn, so an intent a crash left with a session under its name is not spawned twice
+(found in review); in `stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
 finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
 `test/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
@@ -881,6 +882,15 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 - **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
   no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
   stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
+- **The deadline ends an unread attempt without stopping what may run under it.** Past its deadline, an attempt whose harness could
+  not be read gets `DEADLINE_PASSED` with no sighting, so `live` is false and the edge records the end, `failed`, `deadline`, with no
+  `stop`: the session was unread, not gone. A `--bg` session is let go by `release` on the next pass that reads it, since the memo
+  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`runner-claude-code.ts`), so a job past
+  its deadline on a pass that could not read it runs on to its own end, in its worktree, after its attempt is recorded ended. This
+  predates the change (a failed read was an empty map, and read the same). Neither fix is small: a stop needs the session's id, which
+  for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
+  to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
+  gap above already leaves too wide. Found in review of the run that made a failed observe say so.
 
 ## Verified live, once
 

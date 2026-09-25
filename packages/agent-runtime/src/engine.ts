@@ -313,10 +313,34 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 
+/** A `step` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
+export class StepRefused extends Schema.TaggedError<StepRefused>()('StepRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * Why `step` refuses what it was handed past the task and the observation. Until stage 4c part 2 (2026-09-25) its third
+ * argument was the ceiling's `slots`, and a caller built against that door would have had it dropped without a word.
+ */
+export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
+  extra.length === 0 ? undefined
+    : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+
+/**
+ * Why `settleTask` refuses its `maxSteps`: a count of steps is a whole number above nought. Its third argument was the
+ * ceiling's `slots` until stage 4c part 2, and a `{ used, max }` in `maxSteps`'s place compares false and settles nothing.
+ */
+export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
+  Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0 ? undefined
+    : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+
 export const step = Effect.fn('step')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
 ) {
+  // Typed to take two, and asked all the same: a caller built against the old door still passes the ceiling's slots.
+  const refused = stepRefusalOf([...arguments].slice(2));
+  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
   const journal = yield* Journal;
   const runner = yield* Runner;
 
@@ -415,6 +439,8 @@ export const settleTask = Effect.fn('settleTask')(function* (
   observed: ReadonlyMap<string, Sighting>,
   maxSteps = 8,
 ) {
+  const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
+  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
   const taken: Action[] = [];
   for (let i = 0; i < maxSteps; i++) {
     const action = yield* step(taskId, observed);

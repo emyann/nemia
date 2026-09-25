@@ -415,7 +415,8 @@ orchestrator's calls to the runtime change.
    session counts while its attempt is open and it is `working` or not yet seen. `DEFAULT_MAX_CONCURRENT`, `poolsOf`, `pool?`,
    `CLAUDE_POOL`, `State.priority` and the runtime's `admissionOrder` are gone. Each retired input is refused by name, exit 2,
    each with a test shown to fail without its refusal: `priority` at any value (both doors), `maxConcurrent` on `createEngine`,
-   a harness naming a `pool`, any argument to `tick()` (both doors; the Effect door fails `TickRefused`), and `AE_MAX_CONCURRENT`
+   a harness naming a `pool`, any argument to `tick()` (both doors; the Effect door fails `TickRefused`), the old `slots` handed to `step` or `settleTask`
+   (`StepRefused`, found in review), and `AE_MAX_CONCURRENT`
    in `ae`, empty too. Each says what to do instead: file `queued: true` and `admit`, which `ae start` can now do (`queued:` is a
    brief key). The client builds its engine with no ceiling. The pass's meter (`TickReport.ms`, `observed`) is unchanged.
    *On a restart.* A `wf up` started before this keeps its old engine until it is restarted. Restarted, it builds none of the

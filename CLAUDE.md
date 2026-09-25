@@ -641,7 +641,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A parameter taken away is refused, or a caller that still passes it is obeyed by nobody.** A JavaScript function ignores an
   argument it does not declare, so `tick(3)` after the ceiling left would have started every task and said nothing; an object key the
   type no longer has is the same, `createEngine({ maxConcurrent })` or a harness's `pool`. Stage 4c part 2 refuses each by
-  `Object.hasOwn` (an own `undefined` too) and the pass by its argument count (`tickRefusalOf`). An `Effect.fn` generator that must see
+  `Object.hasOwn` (an own `undefined` too) and the pass by its argument count (`tickRefusalOf`). A parameter taken from the middle moves the next one into its place: `settleTask`'s
+  `slots` went and `maxSteps` became third, so an old `settleTask(id, observed, slots)` compared a step count with an object, ran no
+  step and returned `[]` — refused now, as `step`'s third argument is (`StepRefused`, found in review of the same run). An `Effect.fn` generator that must see
   its arguments cannot declare `...args: never[]` (TS2769 at the call site); it declares none and reads `[...arguments]` (`tick` in
   `agent-runtime/src/engine.ts`, learned by the run that retired the runtime's ceiling).
 

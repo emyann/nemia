@@ -608,6 +608,9 @@ ceiling taken and ignored would start every task at once and say nothing:
 - `maxConcurrent` on `createEngine`, at any value, and a harness — a `HarnessSpec` or a `PromiseRunner` — that names a
   `pool` (exit 2, naming the harness);
 - any argument to `tick()`, at both doors, which took the ceiling and the pools (the Effect door fails `TickRefused`);
+- a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought, on the Effect door:
+  each took the ceiling's `slots` third, and an old `settleTask(id, observed, slots)` would have settled nothing and said so
+  nowhere (`StepRefused`);
 - `AE_MAX_CONCURRENT` in `ae`'s environment, set to anything, empty too (exit 2, before anything is read or written).
 
 Each names what to do instead: file `queued: true`, and `admit` each task when it may start (`ae admit <id>`). A journal

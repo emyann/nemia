@@ -353,6 +353,30 @@ test('the pass refuses any argument — an old ceiling, pools, anything — and 
   assert.equal(b.sessions.size, 0, 'nothing started by a refused pass');
 });
 
+test('step and settleTask refuse the ceiling\'s old slots — neither drops them, nor settles nothing on them — and journal nothing', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  const journalOf = async () => (await b.run(view(id, new Map()))).state.attempts.length;
+  // Untyped, as a caller built against the old door calls them: `step(id, observed, slots)`, `settleTask(id, observed, slots, maxSteps)`.
+  const oldStep = step as (...a: unknown[]) => ReturnType<typeof step>;
+  for (const extra of [[{ used: 0, max: 3 }], [undefined], [{ used: 0, max: 3 }, 8]]) {
+    const refused = await b.run(Effect.flip(oldStep(id, new Map(), ...extra)));
+    assert.equal(refused._tag, 'StepRefused');
+    assert.match(refused.message, new RegExp(`^step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots`));
+  }
+  const oldSettle = settleTask as (...a: unknown[]) => ReturnType<typeof settleTask>;
+  for (const args of [[{ used: 0, max: 3 }], [{ used: 0, max: 3 }, 8], [0], [-1], [1.5], [Number.NaN], ['8'], [null], [8, 'more']]) {
+    const refused = await b.run(Effect.flip(oldSettle(id, new Map(), ...args)));
+    assert.equal(refused._tag, 'StepRefused', `settleTask(id, observed, ${String(args)})`);
+    assert.match(refused.message, /^settleTask takes a task, an observation and a number of steps above nought, and was handed .+: its third argument was the ceiling's slots/);
+  }
+  assert.equal(await journalOf(), 0, 'no attempt journalled by a refused step');
+  assert.equal(b.sessions.size, 0, 'and nothing started');
+  // The door as it is: two arguments step, and settleTask's own default or a count settles.
+  assert.equal((await b.run(settleTask(id, new Map(), 1))).length, 1);
+  assert.ok((await b.run(settleTask(id, new Map()))).length >= 1);
+});
+
 // ─── isolation ──────────────────────────────────────────────────────────────
 
 test('worktree is declared by the task and passed to the harness untouched', async () => {

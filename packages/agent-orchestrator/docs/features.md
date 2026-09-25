@@ -4479,7 +4479,8 @@ orchestrator's, and nothing beneath it to lift. The number §12 had is left behi
   `test/pool.test.ts` hold. The orchestrator's own `admissionOrder`, the runs in flight under `WF_MAX_RUNS`, is another thing and stays.
 - **Each is refused by name, never dropped** (exit 2, each with a test that makes it refuse at shipped defaults, each shown to fail with
   its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `createEngine`; a harness that names a `pool`; any
-  argument to `tick()`, at both doors (the Effect door fails `TickRefused`); and `AE_MAX_CONCURRENT` in `ae`'s environment, empty too.
+  argument to `tick()`, at both doors (the Effect door fails `TickRefused`); the ceiling's old `slots` handed to `step` or `settleTask`,
+  which took them third (`StepRefused`: in `settleTask` they sat where `maxSteps` is now, and settled nothing; found in review); and `AE_MAX_CONCURRENT` in `ae`'s environment, empty too.
   Each names what to do instead: file `queued: true`, and `admit`.
 - **`queued:` is a brief key.** The refusals send a person to `queued: true`, and `ae start` could not file it: it can now, and a value
   that is not true or false is refused. Not in the plan; without it `ae` had no way to hold a task back.

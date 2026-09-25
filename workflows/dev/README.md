@@ -38,6 +38,21 @@ from, and narrowing those allows is the settings' to do. `implement` is denied `
 (`review.schema.json`), and its `again: true` sends the change round again: implement's own session is
 continued with the findings, then a new review. After the third round, a person decides.
 
+**What git a fenced step may run.** The settings allow review, and dev-planned's plan, git's read-only verbs:
+`diff`, `log`, `show`, `status`, `branch` and `branch --list`, `merge-tree`, `merge-base`, `ls-tree`, `ls-files`,
+`rev-parse`, `rev-list`, `blame`, `shortlog` and `describe` — the reads the steps' recorded denials showed them
+reaching for, a reviewer asking whether the branch still merges into main above all. `git merge-tree
+--write-tree` writes tree objects into the object store, and moves no ref, no index and no file. Left out on
+purpose: `git -C <dir>`, because an allow rule matches by prefix, so `Bash(git -C:*)` would admit `git -C <dir>
+commit` and `git -C <dir> push`, and the deny `Bash(git push:*)` does not match that spelling — git runs from the
+step's own directory; `git grep`, whose `-O<cmd>` (`--open-files-in-pager=<cmd>`) runs a program, and the Grep tool
+does the search; and `git fetch`, which changes refs and goes to the network. Nothing that writes, runs a program
+or moves a ref is on the list, and `packages/agent-orchestrator/test/git-reads.test.ts` fails on a `Bash(git …)`
+allow that is not one of these reads. One way to write is on it, as it was before this list grew: `diff`, `log`,
+`show`, `rev-list`, `shortlog` and `blame` take `--output=<file>` and create or truncate that file, anywhere the
+session may write, and no prefix rule can refuse an option written anywhere on the line. Only the brief keeps a
+fenced step from it.
+
 `ship` is the run's ending, and the run stops at it: `gate: true`, so nothing of it is filed until a person
 says `wf approve <run> ship`. It runs in the repository's own checkout (`workspace: main`) rather than a
 worktree, since the base branch is checked out there. The shipper stages the merge — `git merge --no-ff

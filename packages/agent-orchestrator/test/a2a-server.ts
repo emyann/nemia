@@ -5,7 +5,7 @@
  *
  * It serves its card, and JSON-RPC through the SDK's express handler; with `token`, the card asks for a bearer scheme named `token` and a
  * request without it is refused 401. Each message it is sent makes a Task, which `answer` completes at once with one artifact, a text part or
- * a data part, or fails. What it was sent and the headers it was sent with are kept for the test.
+ * a data part, fails, or leaves waiting on a question (`input-required`). What it was sent and the headers it was sent with are kept for the test.
  */
 import express from 'express';
 import http from 'node:http';
@@ -14,8 +14,8 @@ import { AgentCard, Role, TaskState, type Artifact, type Message, type Part } fr
 import { AgentEvent, DefaultRequestHandler, InMemoryTaskStore, type AgentExecutor } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 
-/** How the agent ends a Task it is sent: completed with a text or a data part, or failed. */
-export type Answer = { text: string } | { data: Record<string, unknown> } | { failed: string };
+/** How the agent ends a Task it is sent: completed with a text or a data part, failed, or left waiting on an answer to a question. */
+export type Answer = { text: string } | { data: Record<string, unknown> } | { failed: string } | { asks: string };
 
 export type A2AServer = {
   /** The agent's base URL: its card at `/.well-known/agent-card.json` beneath it. */
@@ -44,9 +44,11 @@ export async function a2aServer(o: { token?: string; answer?: (text: string) => 
       const now = () => new Date().toISOString();
       bus.publish(AgentEvent.task({ id: taskId, contextId, status: { state: TaskState.TASK_STATE_WORKING, message: undefined, timestamp: now() }, artifacts: [], history: [ctx.userMessage], metadata: undefined }));
       const said = answer(text);
-      if ('failed' in said) {
-        const message: Message = { messageId: `m-${taskId}`, contextId, taskId, role: Role.ROLE_AGENT, parts: [textPart(said.failed)], metadata: undefined, extensions: [], referenceTaskIds: [] };
-        bus.publish(AgentEvent.statusUpdate({ taskId, contextId, status: { state: TaskState.TASK_STATE_FAILED, message, timestamp: now() }, metadata: undefined }));
+      if ('failed' in said || 'asks' in said) {
+        const words = 'failed' in said ? said.failed : said.asks;
+        const message: Message = { messageId: `m-${taskId}`, contextId, taskId, role: Role.ROLE_AGENT, parts: [textPart(words)], metadata: undefined, extensions: [], referenceTaskIds: [] };
+        const state = 'failed' in said ? TaskState.TASK_STATE_FAILED : TaskState.TASK_STATE_INPUT_REQUIRED;
+        bus.publish(AgentEvent.statusUpdate({ taskId, contextId, status: { state, message, timestamp: now() }, metadata: undefined }));
         return;
       }
       const artifact: Artifact = {

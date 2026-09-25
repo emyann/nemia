@@ -4118,13 +4118,17 @@ export function deniedWords(denied: readonly string[]): string {
  *
  * The advice assumes the wait is something a person can answer in the harness, which is true of the one value measured. A `waitingFor`
  * naming something nobody can answer would carry advice that misleads: if that ever shows up, the fix is to word the advice off the word.
+ *
+ * A step on a remote A2A agent (`harness: a2a:<name>`, given as `remote`) is in no Claude Code: its Task waits on its caller, and the
+ * answer is a follow-up message on it, which `wf say` sends; the question is the Task's last message, which `wf logs` prints.
  */
-export const answerIn = (session: string | null): string =>
-  `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
+export const answerIn = (session: string | null, remote?: { run: string; step: string }): string =>
+  remote ? `read its question with wf logs ${remote.run} ${remote.step}, and answer it with wf say ${remote.run} ${remote.step} "<your answer>"`
+  : `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
 
 /** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
-export const harnessWaitLine = (waitingFor: string, session: string | null): string =>
-  `${waitingWords(waitingFor)} — ${answerIn(session)}`;
+export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
+  `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
 
 /**
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to

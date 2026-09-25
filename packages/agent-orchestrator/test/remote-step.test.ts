@@ -126,3 +126,34 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
 });
+
+test('a Task the agent leaves waiting on a question reads as waiting on you: wf logs prints the question, and wf say answers it', async () => {
+  const server = await a2aServer({ answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }) });
+  try {
+    declare({ asker: { url: server.url } });
+    const id = await started(team('asker-team', 'asker'));
+    const e = engine();
+    const until = Date.now() + 60_000;
+    while ((await e.view(`${id}-ask`)).phase !== 'needs-human') {
+      assert.ok(Date.now() < until, JSON.stringify(await e.view(`${id}-ask`)));
+      await tick(e, { repo: ROOT });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    await tick(e, { repo: ROOT });
+    const listed = (await printed(['ls'], e)).join('\n');
+    assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
+    const decided = (await printed(['decide', id], e)).join('\n');
+    // Where a person answers it is `wf say`, not a Claude Code session a remote agent is not in.
+    assert.match(decided, new RegExp(`ask: waiting for an input — read its question with wf logs ${id} ask, and answer it with wf say ${id} ask "<your answer>"`), decided);
+    assert.equal(decided.includes('claude agents'), false, decided);
+    assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
+
+    await printed(['say', id, 'ask', 'Brest, please.'], e);
+    await settle(e, id);
+    assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
+    assert.equal((await e.view(`${id}-ask`)).phase, 'succeeded');
+    assert.match((await printed(['ls'], e)).join('\n'), /^\s+ask\s+unverified\s+· said to 1×\s*$/m);
+  } finally {
+    await server.close();
+  }
+});

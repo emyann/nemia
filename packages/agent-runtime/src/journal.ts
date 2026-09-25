@@ -46,6 +46,11 @@ export class JournalError extends Schema.TaggedError<JournalError>()('JournalErr
  * dependency runs one way only — the implementor imports the engine, never the reverse.
  */
 export type JournalOps = {
+  /**
+   * Write `event` to the task's record, and to the feed: every append, by every writer. An engine's pass skips a settled
+   * task it has folded until the feed names it (`tick-memo.ts`), so an entry that reaches the record and not the feed is
+   * not read by a running engine — only by the next one made.
+   */
   readonly append: (taskId: string, event: Event) => Effect.Effect<void, JournalError>;
   readonly read: (taskId: string) => Effect.Effect<Event[], JournalError>;
   readonly list: Effect.Effect<string[], JournalError>;

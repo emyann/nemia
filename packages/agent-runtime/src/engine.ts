@@ -8,11 +8,12 @@
 import { Context, Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
+import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
 import { transition, type Move, type Refusal } from './lifecycle.ts';
+import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './tick-memo.ts';
 
 /**
  * The lifecycle `step` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
@@ -488,8 +489,11 @@ export const settleTask = Effect.fn('settleTask')(function* (
  * Claude Code writes a session's cost only as its process exits, which is after its end was written, so the read a
  * release takes once it has stopped the session is the first to have it — or, for a session left listed, the
  * sighting's. Written once: a session left listed is seen on every pass, and the second read says nothing new.
+ *
+ * It reads a task's settling, its config and each attempt's end, session and usage, and no more (`Releasable`): a settled
+ * task a pass skips is released off what the pass's memo kept of it.
  */
-const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, observed: ReadonlyMap<string, Sighting>) {
+const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasable, observed: ReadonlyMap<string, Sighting>) {
   const runner = yield* Runner;
   const journal = yield* Journal;
   if (!runner.release) return;
@@ -534,6 +538,24 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
   return seen === undefined || seen.state === 'working';
 };
 
+/** Read the feed on from the memo's cursor, and forget every task it names: each is folded again on this pass. */
+const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
+  const { entries, cursor } = yield* (yield* Journal).feed(memo.cursor ?? 0);
+  for (const e of entries) memo.settled.delete(e.taskId);
+  memo.cursor = cursor;
+});
+
+/**
+ * The memo's proof, in `verify` alone: a skipped task folded all the same, and decided, as the pass would have without the
+ * memo. A difference fails the pass, naming the task, rather than being mended quietly.
+ */
+const verifyKept = Effect.fn('verifyKept')(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>) {
+  const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
+  const decided = decide(fresh, closedOut(fresh, observed), { at: new Date(), graceMs: GRACE_MS }, yield* Lifecycle);
+  const why = divergence(kept, fresh, decided);
+  if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
+});
+
 /**
  * One pass over every task on the board. This is the whole daemon.
  *
@@ -549,6 +571,11 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  * event it was handed. Such a task does nothing and is asked again on the next pass, where the same refusal comes back
  * for as long as its journal and its session say the same — so it is reported on every pass it persists, off the steps
  * this pass took, and never stalls quietly. A settled task is never asked (`settledQuiet`) and is never on it.
+ *
+ * With a memo (`TickMemo`, which `createEngine` gives each engine), a settled task already folded is not read again until
+ * the feed names it: the pass reads the feed on from where the last one stopped, and folds only the tasks not settled, the
+ * tasks it names, and those the memo has never folded — which, on an engine's first pass, is every task. Its finished
+ * sessions are still let go off what the memo kept (`releaseFinished`). Without one, every task is folded on every pass.
  */
 export const tick = Effect.fn('tick')(function* () {
   // Typed to take nothing, and asked all the same: an untyped caller, or one built against the old door, still passes a ceiling.
@@ -556,7 +583,12 @@ export const tick = Effect.fn('tick')(function* () {
   if (refused) return yield* Effect.fail(new TickRefused({ message: refused }));
   const journal = yield* Journal;
   const runner = yield* Runner;
+  const memo = yield* TickMemo;
 
+  // The feed first, before anything else of the board is read: whatever is appended while this pass reads is past the
+  // cursor, and named on the next. A task it names is folded again; each is forgotten before any is folded, so a pass
+  // that fails part way leaves nothing kept that the feed has since named.
+  if (memo) yield* forgetNamed(memo);
   const observed = yield* runner.observe;
   const ids = yield* journal.list;
 
@@ -565,6 +597,12 @@ export const tick = Effect.fn('tick')(function* () {
   const running: Record<string, number> = {};
   const stalled: RefusedMove[] = [];
   for (const id of ids) {
+    const kept = memo?.settled.get(id);
+    if (kept) {
+      if (memo!.verify) yield* verifyKept(kept, observed);
+      yield* releaseFinished(kept, observed);
+      continue;
+    }
     const before = fold(id, yield* journal.read(id));
     const actions = yield* settleTask(id, observed);
     taken.push(...actions);
@@ -573,11 +611,17 @@ export const tick = Effect.fn('tick')(function* () {
     // only when the pass wrote to it.
     const after = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
     yield* releaseFinished(after, observed);
+    if (memo && settledQuiet(after)) memo.settled.set(id, releasableOf(after));
     // The board as this pass left it, off its one observation and the fold it already made: what the layer above
     // admits by (stage 4c), with no second look at any harness.
     if (after.settled) continue;
     views.push(viewOfState(after, observed));
     if (atWork(after, observed)) running[after.harness ?? 'default'] = (running[after.harness ?? 'default'] ?? 0) + 1;
+  }
+
+  if (memo) {
+    const listed = new Set(ids);
+    for (const id of memo.settled.keys()) if (!listed.has(id)) memo.settled.delete(id);
   }
 
   return {

@@ -43,10 +43,12 @@ costs. A person answers with `wf retry`, and the answer comes back to you in the
 to wait for approval of the plan is answered the same way: sign off `blocked` with the plan, and say in
 `needs` that it waits for approval.
 
-You work read-only: write nothing into the workspace. You may run the suite: `npm test` and `npm run
-typecheck` from the workspace root, `npx turbo run test --filter=<package>`, or `cd packages/<package>
-&& node --test test/<file>.test.ts`; and read git: `git diff`, `git log`, `git show`, `git status`. Any
-other command is denied without a prompt, and you have no tool that writes. Do not run `npm run build`
-or `npm run e2e`: they write into the workspace. Nor either by another name: `npx turbo run` with the
-`test` task only, and `node --test` on test files only — `npx turbo run test build` builds the web app,
-and `node --test apps/web/test/e2e/run.ts` runs the e2e.
+You work read-only: write nothing into the workspace. You may run the suite: `npm test` and
+`npm run typecheck` from the workspace root, `npx turbo run test --filter=<package>`, or
+`cd packages/<package> && node --test test/<file>.test.ts`; and read git: `git diff`, `git log`, `git show`,
+`git status`, `git merge-tree`, `git merge-base`, `git ls-tree`, `git ls-files`, `git rev-parse`,
+`git rev-list`, `git blame`, `git shortlog` and `git describe`, from your own directory: `git -C` and a `cd`
+elsewhere are denied. Any other command is denied without a prompt, and you have no tool that writes. Do not
+run `npm run build` or `npm run e2e`: they write into the workspace. Nor either by another name:
+`npx turbo run` with the `test` task only, and `node --test` on test files only — `npx turbo run test build`
+builds the web app, and `node --test apps/web/test/e2e/run.ts` runs the e2e.

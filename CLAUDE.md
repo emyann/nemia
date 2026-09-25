@@ -811,6 +811,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   load, so a throw there stops `wf ls`, `wf up`, `wf rm` and the api for runs that never touch what was refused. A bad `a2a-agents.json`
   is left out of the engine and said on stderr (`readRemote`), and `wf start` refuses only a step that names what was left out;
   `test/remote-refused.test.ts` runs `wf ls` and `wf tick` through `main`'s own engine on a bad file (found in review, round 1).
+  And what is left out must be left out of the tasks already filed on it, not only of `wf start`: the runtime ran a task whose harness it
+  did not have on its first harness, so a queued remote step was spawned as a Claude Code job in its workspace and one at work was looked
+  for in Claude Code's listing, to be ended `lost`. The composite routes such a task to none now — names unread, spawn refused — and
+  `test/remote-left-out.test.ts` files one of each before the file goes bad and counts every call of a fake `claude` (round 3).
 
 ## Rules the code keeps
 

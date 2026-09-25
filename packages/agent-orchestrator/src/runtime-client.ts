@@ -54,6 +54,8 @@ export const HARNESSES = {
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
  * `wf ls`, `wf up`, `wf rm`, the api — works on as before. It is `wf start` that refuses a step naming what was left out, in the file's words.
+ * A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at work
+ * on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  */
 export const engine = (): Engine => {
   const read = readRemote();
@@ -64,7 +66,7 @@ export const engine = (): Engine => {
 };
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
-const LEFT_OUT = 'It is left out: a step that names it is refused by `wf start`, and filed on nothing until the file is fixed and this process restarts.';
+const LEFT_OUT = 'It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held, and one not yet started is refused its start.';
 
 /**
  * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in

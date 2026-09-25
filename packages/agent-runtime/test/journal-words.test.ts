@@ -70,7 +70,7 @@ const spawnAsked = {
 const filed = {
   kind: 'filed', at: '<at>', brief: 'write the words down', cwd: '/repo', harness: 'fake',
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, deadlineSeconds: undefined,
-  resumeFrom: undefined, closeoutSchema: { type: 'object' }, priority: undefined, holdOpen: undefined,
+  resumeFrom: undefined, closeoutSchema: { type: 'object' }, priority: undefined, holdOpen: undefined, queued: false,
 };
 
 test('a session that signs off: spawned, ended with its statement and usage, settled succeeded', async () => {

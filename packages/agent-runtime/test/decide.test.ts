@@ -17,8 +17,16 @@ const N2 = nameFor(TASK, 2);
 const seen = (...pairs: Array<[string, Observed]>): Map<string, Sighting> =>
   new Map(pairs.map(([name, state], i) => [name, { sessionId: `s${i}`, state }]));
 
+/** A filing as `file` writes one since stage 4c: not queued, so the pass starts it with no word from above. */
 const filed = (): Event =>
+  ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', queued: false });
+
+/** The same filing as a journal written before stage 4c has it: no `queued` key, which reads as queued (`admit.test.ts`). */
+const keyless = (): Event =>
   ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo' });
+
+/** The layer above's word that a queued task may start: what a journal from before stage 4c needs before it starts. */
+const admitted = (ms = 0): Event => ({ kind: 'admitted', at: at(ms) });
 
 /**
  * A `filed` entry as a journal written before stage 4a part 2 has it: with `maxAttempts` and a `resume` policy, which
@@ -331,8 +339,8 @@ test('a journal from before stage 4a part 2, filed with attempts to spare and `r
     assert.equal('maxAttempts' in s || 'resume' in s, false, `${reason}: the retired keys are folded unread`);
     assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' }, reason);
   }
-  // And it folds to the state the same filing without them does.
-  assert.deepEqual(fold(TASK, [legacyFiled()]), fold(TASK, [filed()]));
+  // And it folds to the state the same filing without them does — one as old, with no `queued` key either.
+  assert.deepEqual(fold(TASK, [legacyFiled()]), fold(TASK, [keyless()]));
 });
 
 // ─── the ceiling, in the pure layer ─────────────────────────────────────────
@@ -350,12 +358,14 @@ test('a finished task settles even when the board is full', () => {
 });
 
 test('a task filed AGAINST a session continues it on the first attempt', () => {
-  const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1' }]);
+  const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1', queued: false }]);
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
 
 test('...a journal from before stage 4a part 2 that said `resume: never` included: that was a retry policy, and this is what the work is', () => {
-  const s = fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' })]);
+  // Older than stage 4c too, so it waits to be admitted, and starts once it is.
+  assert.equal(decide(fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' })]), seen(), now()).do, 'nothing');
+  const s = fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' }), admitted()]);
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
 
@@ -511,7 +521,7 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
 const N3 = nameFor(TASK, 3);
 /** A task held open whose first attempt signed at 3 s; `extra` on the filing. */
 const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'draft the plan', cwd: '/r', closeoutSchema: { type: 'object' }, holdOpen: true, ...extra },
+  { kind: 'filed', at: at(0), brief: 'draft the plan', cwd: '/r', closeoutSchema: { type: 'object' }, holdOpen: true, queued: false, ...extra },
   { kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 },
   { kind: 'ended', at: at(3_000), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'native-1', closeout: { plan: 'v1' } },
 ];

@@ -231,7 +231,7 @@ export const attemptLine = (a: Attempt): string => {
 };
 
 /**
- * One task, for `ae ls`: its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
+ * One task, for `ae ls`: `queued` while it waits for `ae admit` (stage 4c), its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
  * turns — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
  * Code writes a session's cost as its process exits. A task held open and answered says which turn it is on — `turn 1`.
  */
@@ -239,9 +239,10 @@ export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
   const tries = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
+  const queued = v.admission === 'queued' ? '  queued' : '';
   const priority = v.state.priority !== undefined ? `  priority ${v.state.priority}` : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
 /**
@@ -251,7 +252,7 @@ export const taskLine = (v: TaskView) => {
 const KINDS: Record<string, string> = {
   filed: 'filed', starting: 'starting', spawned: 'started',
   ended: 'ended', measured: 'measured', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
-  input: 'answered', closed: 'closed',
+  input: 'answered', closed: 'closed', admitted: 'admitted',
 };
 
 export const entryLine = (taskId: string, event: Event) => {
@@ -280,6 +281,8 @@ const HELP = `ae — an engine for agent sessions
                                answer a task held open that waits (input-required): its
                                next turn resumes the session that signed, told the words
   ae close <id>                settle a task held open that waits: succeeded
+  ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
+                               tick starts them — one a store filed before stage 4c too
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae watch [cursor]            the same, followed
 
@@ -384,6 +387,14 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       await engine.close(arg);
       return console.log(`${arg}  closed: the next tick settles it`);
+
+    case 'admit': {
+      if (!arg) return console.log(HELP);
+      const ids = argv.slice(1);
+      const admitted = new Set(await engine.admit(ids));
+      for (const id of ids) console.log(`${id}  ${admitted.has(id) ? 'admitted: the next tick starts it' : 'waits for no admission: left as it is'}`);
+      return;
+    }
 
     case 'tick': {
       const r = await engine.tick();

@@ -8,7 +8,7 @@
 import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
+import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
@@ -45,6 +45,13 @@ export type TaskView = {
    * session that stops waiting loses it on the next.
    */
   waitingFor?: string;
+  /**
+   * Where a task filed `queued` stands with the layer above (stage 4c): `queued` while its current turn waits for the word
+   * to start, `admitted` once given and until the next pass starts it. Beside the phase, never in it: the phase of either is
+   * `pending` — or `between attempts`, for a later turn of a task held open — as it was before there was a word to wait for.
+   * Absent for a task not filed queued, and once its turn has started. Off the record alone.
+   */
+  admission?: 'queued' | 'admitted';
 };
 
 /** What `file` journals: a task as a person files it. */
@@ -54,6 +61,8 @@ export type Filing = {
   closeoutSchema?: object; priority?: number; id?: string;
   /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
+  /** Wait for `admit` before each turn starts, rather than start under the pass's ceiling (stage 4c). See the `filed` event. */
+  queued?: boolean;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -105,6 +114,9 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.holdOpen !== undefined && spec.holdOpen !== true) {
     return `\`holdOpen: ${JSON.stringify(spec.holdOpen)}\` is not a yes. Give true to have the task wait for an answer when an attempt signs, or leave it out to settle it then.`;
   }
+  if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
+    return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
+  }
   if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
     return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
   }
@@ -126,8 +138,48 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     harness: spec.harness, config: spec.config,
     deadlineSeconds: spec.deadlineSeconds, resumeFrom: spec.resumeFrom,
     closeoutSchema: spec.closeoutSchema, priority: spec.priority, holdOpen: spec.holdOpen,
+    // Always written, `false` too: a filing with no key is from before stage 4c, and reads as queued.
+    queued: spec.queued === true,
   });
   return id;
+});
+
+/** An `admit` the runtime would not journal, and why, in words that say what to do instead. Nothing was written. */
+export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefused', {
+  message: Schema.String,
+}) {}
+
+/** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
+export const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (state.settled) return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  return undefined;
+};
+
+/**
+ * The layer above's word that queued tasks may start (stage 4c): journals `admitted` for each whose current turn waits for
+ * it (`awaitsAdmission`), and returns those ids. The next pass starts them, under its own ceiling. Reads each task's
+ * record and nothing else — no harness is asked — so it is a message, and can cross a seam. Idempotent: a task already
+ * admitted, not filed queued, or whose turn has started is left as it is. Refused, and nothing written for any of them,
+ * when one is not on the board or has settled.
+ */
+export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
+  const journal = yield* Journal;
+  const states: State[] = [];
+  for (const id of new Set(taskIds)) {
+    const events = yield* journal.read(id);
+    const state = events.length ? fold(id, events) : undefined;
+    const refused = admitRefusalOf(id, state);
+    if (refused) return yield* Effect.fail(new AdmitRefused({ message: refused }));
+    states.push(state!);
+  }
+  const admitted: string[] = [];
+  for (const state of states) {
+    if (!awaitsAdmission(state)) continue;
+    yield* journal.append(state.taskId, { kind: 'admitted', at: new Date().toISOString() });
+    admitted.push(state.taskId);
+  }
+  return admitted;
 });
 
 export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
@@ -494,6 +546,7 @@ export const tick = Effect.fn('tick')(function* (
   }
 
   const taken: Action[] = [];
+  const views: TaskView[] = [];
   for (const id of [...ids].sort((a, b) => admissionOrder(states.get(a)!, states.get(b)!))) {
     const pool = poolOf(states.get(id)!);
     const before = used.get(pool) ?? 0;
@@ -503,20 +556,30 @@ export const tick = Effect.fn('tick')(function* (
     if (actions.some((a) => a.do === 'start')) used.set(pool, before + 1);
     // Against the journal as this pass left it — so an end written just now is let go now — read again
     // only when the pass wrote to it.
-    yield* releaseFinished(actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : states.get(id)!, observed);
+    const after = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : states.get(id)!;
+    yield* releaseFinished(after, observed);
+    // The board as this pass left it, off its one observation and the fold it already made: what the layer above
+    // admits by (stage 4c), with no second look at any harness.
+    if (!after.settled) views.push(viewOfState(after, observed));
   }
 
   return {
     tasks: ids.length,
     actions: taken.filter((a) => a.do !== 'nothing').length,
     running: Object.fromEntries(used),
+    views,
   };
 });
 
 /** What a person wants to see. Derived, never stored. */
 export const view = Effect.fn('view')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
-  const state = fold(taskId, yield* journal.read(taskId));
+  return viewOfState(fold(taskId, yield* journal.read(taskId)), observed);
+});
+
+/** A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the fold it made. */
+export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>): TaskView {
+  const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
   const live = last && last.ended === null ? sighting?.state : undefined;
@@ -538,5 +601,6 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
   // Only where the phase this pass computed is `needs-human`: the word answers "waiting for what?", and there is no
   // question to answer about a session nobody is waiting on. Carried, not judged — `decide` never saw it.
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage, ...(waitingFor ? { waitingFor } : {}) };
-});
+  const admission = admissionOf(state);
+  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage, ...(waitingFor ? { waitingFor } : {}), ...(admission ? { admission } : {}) };
+}

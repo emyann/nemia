@@ -265,6 +265,13 @@ export type Event =
        */
       priority?: number;
       /**
+       * Filed to wait for the layer above's word (stage 4c): each turn starts only once an `admitted` entry names it, and a
+       * task not queued starts under the pass's own ceiling as ever. Written on every filing since, `false` when not asked
+       * for; a journal written before has no key and reads as queued, so a store an older daemon filed into is held for
+       * the admission the upper layer now does rather than started all at once past its ceiling. A Job's `suspend: true`.
+       */
+      queued?: boolean;
+      /**
        * Held open (R1): an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
        * running — rather than settled. Their answer (`input`) is a new turn, an attempt continuing the session; a `closed`
        * settles it. Absent on every task filed before, which settles on its first signed end as ever.
@@ -315,6 +322,12 @@ export type Event =
   | ({ kind: 'input' } & Input)
   /** A person's word that a task held open is finished with: it settles once no attempt of it runs. Read by `decide`. */
   | { kind: 'closed'; at: string }
+  /**
+   * The layer above's word that a queued task's current turn may start (stage 4c): the next pass starts it, under the
+   * pass's own ceiling. Names no turn: it admits the turn current when it is written, and a later turn — a person's
+   * answer to a task held open — waits for one of its own. Written by `admit`, and only while the task waits for it.
+   */
+  | { kind: 'admitted'; at: string }
   /**
    * Terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open —
    * stopped by a person, or past its deadline, with no `ended` to carry it — as the harness still
@@ -396,6 +409,10 @@ export type State = {
   said: Said[];
   /** Filed to be held open (R1): a signed end waits on a person. See the `filed` event. */
   holdOpen?: true;
+  /** Filed to wait for the layer above's word: absent on a journal from before stage 4c, which reads as queued. See the `filed` event. */
+  queued?: boolean;
+  /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
+  admitted?: number;
   /** A person's answers to a task held open, in the order given. Each starts a turn; the current turn is how many there are. */
   inputs: Input[];
   /** A person closed a task held open: it settles once no attempt of it runs. */
@@ -421,7 +438,9 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.config = e.config; s.closeoutSchema = e.closeoutSchema;
         s.priority = e.priority;
         if (e.holdOpen) s.holdOpen = true;
+        if (e.queued !== undefined) s.queued = e.queued;
         break;
+      case 'admitted': s.admitted = s.inputs.length; break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null, ...(s.inputs.length ? { turn: s.inputs.length } : {}) });
         break;
@@ -481,6 +500,31 @@ export function turnOf(state: State, n = state.inputs.length) {
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
   return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
+}
+
+/**
+ * Whether the task waits for the layer above's word to start its current turn (stage 4c): queued — or filed before the
+ * key, which reads as queued — not settled, not asked to stop, no attempt in flight, its turn not yet started, not
+ * waiting on a person and not closed, and no `admitted` entry for this turn. The one reading of it: `decide` holds the
+ * start on it, `admit` writes an entry only while it holds, and a view says `queued` by it.
+ */
+export function awaitsAdmission(state: State): boolean {
+  return admissionOf(state) === 'queued';
+}
+
+/**
+ * Where a queued task stands with the layer above, for a view (stage 4c): `queued` while it waits for its word, `admitted`
+ * once given and until the turn starts — a slot the upper layer has handed out — and nothing for a task not queued, or
+ * one whose turn has started or has nothing left to start, which the phase says.
+ */
+export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
+  if (state.queued === false || state.settled || state.stopRequested) return undefined;
+  const last = state.attempts.at(-1);
+  if (last && last.ended === null) return undefined;
+  if (state.holdOpen && (state.closed || waitsForInput(state))) return undefined;
+  const turn = turnOf(state);
+  if (turn.attempts.length > 0) return undefined;
+  return state.admitted === turn.n ? 'admitted' : 'queued';
 }
 
 // ─── the decision ───────────────────────────────────────────────────────────
@@ -584,6 +628,9 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     if (ended) return { do: 'settle', outcome: 'failed', note: none };
     // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
     if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
+    // A queued turn waits for the layer above's word, and is started by the pass after the one that wrote it (stage 4c).
+    // Checked after every terminal answer, as the ceiling is, so a queued task can still settle.
+    if (awaitsAdmission(state)) return { do: 'nothing', why: 'queued — waits to be admitted' };
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {

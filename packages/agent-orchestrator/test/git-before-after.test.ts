@@ -14,7 +14,9 @@
  * And again when `disallow:` and `allow:` took Claude Code's names, `disallowedTools:` and `allowedTools:`: the supervisor's brief names both.
  * And on 2026-09-25, when the e2e left every round's check for the merged tree: what moved is each implement check, as implement's brief
  * and the ship's *Where to look* print it, and the sentences of the implementer, ui implementer, ui reviewer, shipper and build ships that
- * say so.)
+ * say so. And later that day, when both ui folders gained the build folders' gated ship: only their two entries moved, each written from
+ * `pin()` — ship's brief and plan, `ship` beside `review` where implement's brief names who worked in its workspace, and the decisions and
+ * listings ending on `ship`, which waits for approval once the loop has succeeded, where they ended on the result branches.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CHECK, checkBrief } from '../src/check.ts';
+import { composeBrief, type Run } from '../src/run.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
 
@@ -275,4 +276,36 @@ test('REFUSED by hand: no WF_BASE_REF and no merge in progress fails loudly, and
   assert.notEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stderr, /cannot tell what the work touched, since git diff --name-only HEAD\.\.\.MERGE_HEAD failed/);
   assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
+});
+
+test("ui ends in a gated ship, like the build folders, and the check its brief names runs the e2e by the shipper's hand on the merged tree, and none in a round", () => {
+  for (const folder of ['workflows/ui', 'packages/agent-orchestrator/workflows/ui']) {
+    const dir = path.join(REPO_ROOT, folder);
+    const workflow = loadWorkflows(dir);
+    const ship = workflow.find((s) => s.name === 'ship');
+    assert.ok(ship, `${folder} has a ship`);
+    assert.deepEqual({ gate: ship.gate, workspace: ship.workspace, after: ship.after, check: ship.check }, { gate: true, workspace: 'main', after: ['review'], check: undefined }, folder);
+
+    // The line the shipper is told to run, taken off its brief as the shipper reads it.
+    const run: Run = {
+      id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Make the Factory darker',
+      workflowDir: dir, createdAt: '2026-09-25T00:00:00Z',
+      steps: Object.fromEntries(workflow.map((s) => [s.name, s.name === 'ship' ? { taskId: null } : { taskId: `t-${s.name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
+    };
+    const brief = composeBrief(ship, run, workflow, undefined, '/wf/runs/r-1/artifacts/ship');
+    const named = /This workflow's check, which its work was judged by: `([^\n]*)`/.exec(brief)?.[1];
+    assert.equal(named, checkOf(folder), `${folder}: the ship is told implement's check\n\n${brief}`);
+
+    const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
+    const r = byHand(repo, named);
+    assert.equal(r.status, 0, `${folder}\n${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, BUILT, `${folder}\n${r.stdout}`);
+    assert.match(r.stdout, E2E, `${folder}: the e2e runs at the ship\n${r.stdout}`);
+
+    const { repo: round, base } = branched(['apps/web/src/routes/runs.tsx']);
+    const c = asCheck(round, named, base);
+    assert.equal(c.status, 0, `${folder}\n${c.stdout}\n${c.stderr}`);
+    assert.doesNotMatch(c.stdout, E2E, `${folder}: and in no round\n${c.stdout}`);
+    assert.ok(c.stdout.includes(HELD), `${folder}\n${c.stdout}`);
+  }
 });

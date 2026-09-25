@@ -3855,6 +3855,7 @@ What it leaves:
 
 - **`ui` has no ship, so no check the run executes runs its e2e.** It rests on the implementer's own run, which is a brief's words,
   and on whoever merges running the folder's line by hand. A gated `ship.md` for `ui` would give it the dev folders' guarantee.
+  Closed the same day: *Shipped: `ui` ends in a gated ship*, below.
 - **A web break the e2e would have caught in a round surfaces at the ship**, as an aborted merge and a `wf retry` late rather than a
   failed round early.
 - **The ship's e2e depends on the shipper's shell having no `WF_BASE_REF`.** A daemon started from a shell that carries one would skip
@@ -4387,6 +4388,27 @@ by `renderStep` and `renderAgent`, and by `writeWorkflow` where the codex harnes
 file that changes nothing keeps the file, former line and all. Restart `wf up` once this merges: an old daemon parses the shipped
 `review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted. The copies under
 `permissionMode` go when `withFormerNames` does.
+
+## Shipped: `ui` ends in a gated ship
+
+Review's finding on the run that moved the e2e to the merged tree (2026-09-25): `ui` had no ship, so no check the run executes ever ran
+the e2e for a ui run, and the change reached main tested by the implementer's own run and whatever the person merging ran by hand.
+
+- **Both ui folders end in `ship`, a copy of `workflows/dev-build/ship.md`**: `after: review`, `workspace: main`, `agent: shipper`,
+  `gate: true`, and the build folders' note on why the build and the e2e matter on the merged tree, which holds for `ui` word for word
+  since its implement check is theirs. No code changed: `composeBrief` already names the folder's check under *Where to look*, and the
+  shipper runs it mid-merge with nothing set, so the e2e runs there. A ui run now waits at the gate once the loop is done, for
+  `wf approve <run> ship`, and the ship's check runs the build and the e2e (3-4 min) in the repository's checkout.
+- **The package's `ui` copy names the shipper too**, so `packages/agent-orchestrator/workflows/agents/` holds `shipper.md` and
+  `shipper.skills.json`, byte for byte the repository's, held by the ui copy test.
+- **Tests.** `test/web-check.test.ts` takes the line off the ui ship's composed brief, in both folders, and runs it by the shipper's hand
+  mid-merge (the build and the e2e) and as a round's check (no e2e). `test/ui-workflow.test.ts` holds ui to three steps ending in a gated
+  ship equal to dev-build's. The pins moved on purpose: `agents-before-after.test.ts` gained `STEPS_ADDED`, each added step keyed by its
+  full path and held to the step it copies, and absent from the snapshot; `git-runs-before.json`'s two ui entries were written again from
+  `pin()`, and nothing else in it moved; the api's picture of the shipped folders lists ui's ship.
+
+**What it leaves.** Runs started before keep their frozen folder and end at review, to be merged by hand. The ship's e2e still depends on
+the shipper's shell having no `WF_BASE_REF` (*Shipped: the e2e runs once*, above).
 
 ## 1. A run that grows steps from a plan
 

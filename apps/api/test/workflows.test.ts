@@ -353,7 +353,7 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
   assert.deepEqual(Object.keys(run.steps), ['implement']);
 });
 
-test("this repository's workflows read as workflows: dev and dev-build are implement ⇄ review → ship with the package's reviewer on Claude, and ui is the package's, copied", () => {
+test("this repository's workflows read as workflows: dev and dev-build are implement ⇄ review → ship with the package's reviewer on Claude, and ui is the package's, copied, ending in the same ship", () => {
   const listed = listWorkflows(HOME_REPO, scratch('hkb-api-no-yours-'));
   for (const name of ['dev', 'dev-build', 'ui']) assert.ok(listed.some((w) => w.name === name), `workflows/${name} is listed`);
   // Every workflow the repository carries reads, with a description: a folder `wf start` would refuse fails here.
@@ -369,6 +369,8 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   // it against real git). dev-build's builds whatever was touched, and leaves the e2e to the merged tree the same way.
   const atMerge = "if [ -n \"${WF_BASE_REF:-}\" ]; then echo \"wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set\"; else npm run e2e; fi";
   const devCheck = "npm test && npm run typecheck && { if [ -n \"${WF_BASE_REF:-}\" ]; then range=\"$WF_BASE_REF...HEAD\"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only \"$range\" --) || { echo \"wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess\" >&2; false; }; } && if printf '%s\\n' \"$touched\" | grep -Eq '^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)'; then npm run build && " + atMerge + "; else echo \"wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e\"; fi";
+  // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own. ui ends in it too.
+  const ship = { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) };
   for (const [name, check] of [['dev', devCheck], ['dev-build', `npm test && npm run typecheck && npm run build && ${atMerge}`]] as const) {
     const w = listed.find((x) => x.name === name)!;
     // Each step with its body as the loader read it, which the builder puts back.
@@ -380,8 +382,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
         name: 'review',
         spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
-      // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own.
-      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      ship,
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);
@@ -393,6 +394,10 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
 
   const files = (dir: string) => fs.readdirSync(dir).filter((f) => !isReadme(f)).sort();
   const ui = path.join(HOME_REPO, 'workflows', 'ui');
+  const listedUi = listed.find((x) => x.name === 'ui')!;
+  assert.deepEqual(listedUi.steps.map((s) => s.name), ['implement', 'review', 'ship']);
+  assert.deepEqual(listedUi.steps.map((s) => s.body), loadWorkflows(ui).map((s) => s.body), 'ui');
+  assert.deepEqual((({ name, spec: keys }) => ({ name, spec: keys }))(listedUi.steps.find((s) => s.name === 'ship')!), ship, "ui's ship is dev-build's");
   assert.deepEqual(files(ui), files(path.join(shipped, 'ui')));
   for (const f of files(ui)) assert.equal(fs.readFileSync(path.join(ui, f), 'utf8'), fs.readFileSync(path.join(shipped, 'ui', f), 'utf8'), `workflows/ui/${f} is the package's`);
 });

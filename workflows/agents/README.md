@@ -12,7 +12,7 @@ who it is — `description:` and `skills:`, then the keys of a role (`harness`, 
 | `implementer` | `implement` in `dev`, `dev-build`, `dev-planned`, `dev-planned-build` |
 | `reviewer` | `review` in the same four |
 | `planner` | `plan` in `dev-planned`, `dev-planned-build` |
-| `shipper` | `ship` in the same four as `implementer` |
+| `shipper` | `ship` in the same four as `implementer`, and in `ui` |
 | `ui-implementer` | `implement` in `ui` |
 | `ui-reviewer` | `review` in `ui` |
 | `note-writer` | `write` in `note` |
@@ -30,9 +30,9 @@ description, not machinery: nothing reads a skill to decide anything, so it is n
 REQUIRED but `supportedInterfaces`, because nothing here serves an agent over A2A.
 
 A step may still write words of its own under its frontmatter: a team's note to its agent (*in this team, also check
-…*), told after the agent's instructions. It is an escape hatch, not the normal case. Two shipped steps have one: `ship` in `dev-build` and
-`dev-planned-build`, whose check builds the web app and runs its e2e on the merged tree alone, tell the shipper why that
-matters there. The shipper's own instructions name no check, and serve every dev folder.
+…*), told after the agent's instructions. It is an escape hatch, not the normal case. Three shipped steps have one: `ship` in `dev-build`,
+`dev-planned-build` and `ui`, whose check builds the web app and runs its e2e on the merged tree alone, tell the shipper why that
+matters there. The shipper's own instructions name no check, and serve every folder that ships.
 
 The package's README, *Agents*, says the rules: which keys an agent may carry, what refuses, and why a step's
 note comes after the instructions and never replaces them.

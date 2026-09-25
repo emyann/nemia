@@ -2,17 +2,17 @@
 
 For a change a person will see in the web app: implement it and look at every page it changed, then a
 second engineer reads the diff and looks at the pages beside it, round again while the review finds
-something worth another round, three rounds at most.
+something worth another round, three rounds at most. Then, once a person approves it, the ship merges it and
+runs the check on the merged tree.
 
 ```
-implement ⇄ review
+implement ⇄ review → ship
 ```
 
 `implement` carries `dev-build`'s check: `npm test && npm run typecheck && npm run build` every round, and
 `npm run e2e` only where no `WF_BASE_REF` is set, which a round's check never is. The screenshots review reads
 are the implementer's own run of the e2e, into the directory the run made for its files, again after its last
-commit each round; its brief says so, and the check no longer takes them. This team has no ship, so the check
-the run executes never runs the e2e: whoever merges runs the line by hand, on the merged tree, where it does.
+commit each round; its brief says so, and the check no longer takes them. The e2e runs once, at the ship.
 `implement` uses the look skill (`.claude/skills/look/SKILL.md`) on every page it changed before it signs off, and declares the
 screenshots it read and the pages they show (`implement.schema.json`). `review` runs on Claude with
 `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it has no tool that
@@ -30,12 +30,17 @@ naming a file and a line or a page and a theme, and `again: true` sends the chan
 implement's own session is continued with the findings, then a new review. After the third round, a
 person decides.
 
+`ship` is `dev-build`'s, file for file: gated (`gate: true`), so nothing of it is filed until a person approves it
+with `wf approve <run> ship`, it runs in the repository's own checkout (`workspace: main`), where the shipper trial
+merges the run's branch, runs implement's check whole with no `WF_BASE_REF` — the build and the e2e, on the merged
+tree — and commits the merge, or aborts it and says why.
+
 Looking is a skill rather than a step, so any step may do it: a step of its own could only look at
 pictures another step took, and could not send the change round again.
 
-The two steps name `ui-implementer` and `ui-reviewer`, in `workflows/agents/` with `implement.schema.json`: the role
+The steps name `ui-implementer`, `ui-reviewer` and `shipper`, in `workflows/agents/` with `implement.schema.json`: the role
 keys above and the instructions are theirs, and the step files keep the wiring. Every file but this README is a
-copy of the package's `packages/agent-orchestrator/workflows/ui/`, and its two agents of `packages/agent-orchestrator/workflows/agents/`,
+copy of the package's `packages/agent-orchestrator/workflows/ui/`, and its three agents of `packages/agent-orchestrator/workflows/agents/`,
 which stay the package's shipped example, and a test holds the copy to them; the package README,
 *`workflows/ui/`: a change a person will see*, says more.
 

@@ -449,3 +449,48 @@ is the length of the operator's own agent body.
     namespaced and cannot clash (F4).
   - What HKB does with a haiku agent and no mode. `auto` quietly becomes `default`, and every call that needs approval is then denied (F20).
     The choice is between an explicit mode for such an agent and a refusal of `auto` at load. The models that support `auto` were not measured.
+
+## 8. Measured by card 1a (2026-09-25)
+
+Three findings the build of card 1a needed, taken on Claude Code 2.1.282 in `/tmp/f21-b5ms`, outside every worktree and outside
+`~/.claude/`.
+
+### F21. Which models run `auto`
+
+One job per model, each asked for one Write in its cwd:
+
+```
+claude -p "Use the Write tool to create the file probe-<m>.txt containing the word OK. …" --model <m> --permission-mode auto \
+  --output-format stream-json --verbose --permission-prompts none --strict-mcp-config --debug-file <m>.debug < /dev/null
+```
+
+| `--model` | the model the job ran | its `permissionMode` lines | the Write |
+|---|---|---|---|
+| `haiku` | `claude-haiku-4-5-20251001` | `auto`, then `default` | denied |
+| `claude-haiku-4-5-20251001` | the same | `auto`, then `default` | denied |
+| `claude-haiku-4-5` | `claude-haiku-4-5` | `default`, `default` | denied |
+| `claude-sonnet-4-5` | `claude-sonnet-4-5` | `default`, `default` | denied |
+| `sonnet`, `claude-sonnet-5` | `claude-sonnet-5` | `auto` | written |
+| `opus`, `claude-opus-5-5` | `claude-opus-5-5` | `auto` | written |
+| `fable`, `claude-fable-5-1` | `claude-fable-5-1` | `auto` | written |
+| `claude-opus-4-1` | `claude-opus-5-5` | `auto` | written |
+
+Every job exited 0. Each denied one wrote, in its debug file only, *"auto mode disabled: model <id> does not support auto mode"*, and its
+result listed the Write under `permission_denials`; nothing on stdout or stderr said the mode had changed. `claude-opus-4-1` ran as
+`claude-opus-5-5`, so the id was taken as an alias. So `auto` runs on the current sonnet, opus and fable, and is dropped to `default`
+on haiku, by alias or id, and on `claude-sonnet-4-5`.
+
+*For the design:* the load refuses `auto`, written or left to the runtime's default, on the four names measured to drop it and on
+their dated forms (`AUTO_UNSUPPORTED` in `agent-orchestrator/src/workflow.ts`), naming `acceptEdits` or `dontAsk` with rules. A model
+not measured is let through: the refusal is for what is known to fail.
+
+### F22. A flag the CLI does not have
+
+```
+claude -p x --frobnicate < /dev/null                                             # exit 1, stderr: error: unknown option '--frobnicate'
+claude -p x --append-system-prompt-file /nonexistent/x.md --output-format json  # exit 1, stderr: Error: Append system prompt file not found: /nonexistent/x.md
+```
+
+Nothing on stdout in either case, and no session. *For the design:* the owner chose no new path for it (plan gate, try 3): such a job is
+an ordinary `failed` end with its exit code, and the detached worker already writes the harness's stderr into the attempt's log, which
+`logs` reads (`agent-runtime/test/claude-code.test.ts` proves it with a fake that answers as the CLI does).

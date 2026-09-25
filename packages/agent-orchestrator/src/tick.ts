@@ -525,9 +525,10 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
           background: step.background,
           remoteControl: step.remote,
+          // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
+          budgetUsd,
         },
         deadlineSeconds: step.deadlineSeconds,
-        budgetUsd,
         // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
         priority: MOMENTUM,
         resumeFrom,
@@ -593,9 +594,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           allowedTools: target.allowedTools,
           background: target.background,
           remoteControl: target.remote,
+          budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         },
         deadlineSeconds: target.deadlineSeconds,
-        budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         priority: MOMENTUM,
         resumeFrom,
         ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -700,12 +701,13 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         background: step.background,
         // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
         remoteControl: step.remote,
+        // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
+        // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
+        // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
+        // over is this package's (`ownStatus`, `held`).
+        budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
       },
       deadlineSeconds: step.deadlineSeconds,
-      // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
-      // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
-      // budget beside it.
-      budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
       // None on a run's first steps, and `MOMENTUM` on a step after another: a run in flight goes before a newer run's first step.
       priority: priorityOf(step),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
@@ -780,10 +782,13 @@ export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<
   return refused;
 }
 
-/** Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one: undefined once answered, as `closeHeld`. */
+/**
+ * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
+ * the filing's by the runtime: undefined once answered, as `closeHeld`.
+ */
 async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: number | undefined): Promise<string | undefined> {
   try {
-    await e.answer(taskId, text, budgetUsd === undefined ? {} : { budgetUsd });
+    await e.answer(taskId, text, budgetUsd === undefined ? {} : { config: { budgetUsd } });
     return undefined;
   } catch (err) {
     if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;

@@ -133,6 +133,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     effort: meta.get('effort'),
     contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
     background: background !== undefined ? background === 'true' : undefined,
+    budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
   }).filter(([, value]) => value !== undefined));
   return {
     brief,
@@ -142,15 +143,14 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     // Which session to CONTINUE: the task's one attempt starts from it rather than cold.
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
-    budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
     ...(holdOpen === 'true' ? { holdOpen: true as const } : {}),
     ...(Object.keys(config).length ? { config } : {}),
   };
 }
 
 /** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
-export const limitLines = (state: Pick<State, 'budgetUsd' | 'config'>): string[] => [
-  ...(state.budgetUsd !== undefined ? [`budget: $${state.budgetUsd} an attempt`] : []),
+export const limitLines = (state: Pick<State, 'config'>): string[] => [
+  ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
   ...(state.config?.contextTokens !== undefined ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`] : []),
 ];
 
@@ -221,7 +221,8 @@ export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
   if (a.ended === null) return `attempt ${a.n}  running ${when}`;
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
-  const how = `${a.ended}${a.reason === 'lost' || a.reason === 'budget' ? ` (${a.reason})` : unstated(a.stated)}`;
+  // A session its harness ended at its spend cap says so as it did when the runtime judged the cap: `failed (budget)`.
+  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
   // What the harness denied the session, as the rules a person would write to allow it: the calls it went on without.
@@ -256,10 +257,10 @@ const KINDS: Record<string, string> = {
 export const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
     : event.kind === 'measured' ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
-    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+    : event.kind === 'ended' ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
-    : event.kind === 'input' ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.budgetUsd !== undefined ? `  (budget $${event.budgetUsd})` : ''}`
+    : event.kind === 'input' ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
@@ -374,7 +375,7 @@ export async function main(argv: string[]): Promise<void> {
         throw Object.assign(new Error(`answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`), { exitCode: 2 });
       }
       const words = (at === -1 ? rest : [...rest.slice(0, at), ...rest.slice(at + 2)]).join(' ');
-      const input = await engine.answer(arg, words, budget !== undefined ? { budgetUsd: Number(budget) } : {});
+      const input = await engine.answer(arg, words, budget !== undefined ? { config: { budgetUsd: Number(budget) } } : {});
       console.log(entryLine(arg, { kind: 'input', ...input }));
       return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);
     }

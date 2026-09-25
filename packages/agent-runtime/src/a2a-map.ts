@@ -81,7 +81,7 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
   messageId, contextId: r.resumeFrom ?? '', taskId: r.name, role: Role.ROLE_USER,
   parts: [textPart(r.brief)],
   metadata: clean({
-    cwd: r.cwd, harness: r.harness, config: r.config, closeoutSchema: r.closeoutSchema, budgetUsd: r.budgetUsd,
+    cwd: r.cwd, harness: r.harness, config: r.config, closeoutSchema: r.closeoutSchema,
   }),
   extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
 });
@@ -158,7 +158,7 @@ export const spawnOf = (m: Message): SpawnRequest => {
   const brief = m.parts[0]!.content as { $case: 'text'; value: string };
   return {
     name: m.taskId, brief: brief.value, cwd: md.cwd, harness: md.harness,
-    config: md.config, closeoutSchema: md.closeoutSchema, budgetUsd: md.budgetUsd, resumeFrom: m.contextId || undefined,
+    config: md.config, closeoutSchema: md.closeoutSchema, resumeFrom: m.contextId || undefined,
   };
 };
 

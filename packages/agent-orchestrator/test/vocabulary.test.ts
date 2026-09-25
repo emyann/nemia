@@ -119,13 +119,13 @@ test('a codex step\'s `sandbox:` reaches Codex as its `-s`, every sandbox, and t
 
 test("REFUSED at load in the engine's words: a `budget:` on a codex step, which `codex exec` has no spend cap to keep", async () => {
   const { parseWorkflow } = await import('../src/workflow.ts');
-  const engine = codex.refuses!({ brief: 'b', cwd: '/w', budgetUsd: 5 });
+  const engine = codex.refuses!({ brief: 'b', cwd: '/w', config: { budgetUsd: 5 } });
   assert.ok(engine, 'the engine refuses a budget on codex');
   const reason = /^`budgetUsd: 5` (.*?)\. Leave/.exec(engine)?.[1];
   assert.ok(reason, engine);
   assert.throws(() => parseWorkflow('review', '---\nharness: codex\nbudget: 5\n---\nreview it\n'), (e: Error) => e.message.startsWith(`review: \`budget: 5\` ${reason}.`));
   // The harnesses a budget is taken on: `claude`, run as a job, and `claude-detached`, whose `claude -p` each ends a session at the cap.
-  assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/w', budgetUsd: 5 }), undefined);
+  assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/w', config: { budgetUsd: 5 } }), undefined);
   for (const harness of ['claude', 'claude-detached']) assert.equal(parseWorkflow('x', `---\nharness: ${harness}\nbudget: 5\n---\ndo it\n`).budget, 5, harness);
 });
 
@@ -133,7 +133,7 @@ test("REFUSED at load in the engine's words: a `budget:` beside `background: tru
   const { parseWorkflow } = await import('../src/workflow.ts');
   const engine = createEngine({ root: scratch('wf-vocabulary-'), harnesses: { claude: 'claude' } });
   const refusal = async (config: { background?: boolean }): Promise<string | undefined> => {
-    try { await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', budgetUsd: 5, config }); return undefined; } catch (e) { return (e as Error).message; }
+    try { await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: { ...config, budgetUsd: 5 } }); return undefined; } catch (e) { return (e as Error).message; }
   };
   const said = await refusal({ background: true });
   const reason = /^file: `budgetUsd: 5` is a spend cap, and (.*?)\. Leave `config\.background` off/.exec(said ?? '')?.[1];

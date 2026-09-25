@@ -56,14 +56,30 @@ test('the check refuses every way of opening config, and is not refused by carry
     'harness: spec.harness, config: spec.config,',
     'config: state.config, closeoutSchema: state.closeoutSchema,',
     'const released = yield* runner.release(session, state.config ?? {}).pipe(',
+    'config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),',
     '// a comment about the model is not a read of one',
   ];
   for (const line of CARRIED) assert.deepEqual(reads(codeOf(line)), [], `refused, and it only carries: ${line}`);
 });
 
 test('engine.ts hands the whole config to every spawn, so a runner is given what the task was filed with', () => {
-  // The other half of passing it on: were the spawn to drop it, no read would show, and every harness would run bare.
+  // The other half of passing it on: were the spawn to drop it, no read would show, and every harness would run bare. A
+  // turn's own (an answer's `config`) is laid over it by `configForTurn`, in `harness-args.ts`, never here.
   const code = codeOf(fs.readFileSync('src/engine.ts', 'utf8'));
-  assert.match(code, /runner\.spawn\(\{[^}]*\bconfig: state\.config\b/s);
+  assert.match(code, /runner\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s);
   assert.match(code, /runner\.release\(session, state\.config\b/);
+});
+
+test('domain.ts and engine.ts know no budget: the cap is a harness argument, and a spend is a fact they carry', () => {
+  // Stage 4b: the runtime measures and reports, and the orchestrator decides over budget. A `budget` in the core's code —
+  // a field, an end reason, a comparison of a `limit` — is the judgement coming back, and none of the checks above sees
+  // one that names no harness argument (`limit === 'budget'`).
+  const BUDGET = /budget/i;
+  for (const file of CORE) {
+    const lines = codeOf(fs.readFileSync(file, 'utf8')).split('\n').flatMap((line, i) => (BUDGET.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+    assert.deepEqual(lines, [], `${file} judges a budget`);
+  }
+  for (const line of ["if (sighting.limit === 'budget') return settle('failed');", 'budgetSpent?: boolean;', "reason: 'budget',"]) {
+    assert.ok(BUDGET.test(codeOf(line)), `not refused: ${line}`);
+  }
 });

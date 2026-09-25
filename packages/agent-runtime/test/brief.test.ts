@@ -82,7 +82,7 @@ test('a budgetUsd that is not dollars above 0, in digits, is refused', () => {
   for (const bad of ['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)]) {
     refuses(brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/);
   }
-  assert.equal(parse(brief('budgetUsd: .5')).budgetUsd, 0.5);
+  assert.equal(parse(brief('budgetUsd: .5')).config?.budgetUsd, 0.5, 'filed under `config`, where the harness\'s arguments go');
 });
 
 test('a contextTokens that is not a whole number of tokens, in digits, is refused — and `200k` is written back as its digits', () => {

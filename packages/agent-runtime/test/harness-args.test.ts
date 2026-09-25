@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { argsRefusalOf, HARNESS_ARGS, type HarnessArgs } from '../src/harness-args.ts';
+import { argsRefusalOf, configForTurn, HARNESS_ARGS, TURN_ARGS, turnArgsRefusalOf, type HarnessArgs } from '../src/harness-args.ts';
 import { Runner, testOps, type RunnerOps } from '../src/runner.ts';
 import { composite } from '../src/runner-composite.ts';
 import { sdkRunner } from '../src/runner-sdk.ts';
@@ -24,16 +24,16 @@ type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
 const refusedBy = (ops: RunnerOps, t: Asked) =>
   Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(Runner.layer(ops))));
 
-test('HARNESS_ARGS is the eleven arguments a harness takes', () => {
+test('HARNESS_ARGS is the twelve arguments a harness takes — the spend cap among them since stage 4b', () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'allowedTools', 'background', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
+    'allowedTools', 'background', 'budgetUsd', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
   ]);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the eleven', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the twelve', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus', permissionMode: 'auto', effort: 'high', tools: ['Read'], allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
-    mcp: {}, contextTokens: 200000, remoteControl: false, background: true, worktree: true,
+    mcp: {}, contextTokens: 200000, remoteControl: false, background: true, worktree: true, budgetUsd: 5,
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);
@@ -58,8 +58,47 @@ test('a key in config that is no harness argument is refused by name, with the l
   const says = argsRefusalOf({ ...task, config: { model: 'opus', modle: 'haiku' } } as never) ?? '';
   assert.ok(says.startsWith('`config.modle` is not a harness argument.'), says);
   for (const key of HARNESS_ARGS) assert.ok(says.includes(key), `the list names ${key}`);
-  // The task's own fields do not belong in it either: a budget is the task's, not the harness's.
-  assert.match(argsRefusalOf({ ...task, config: { budgetUsd: 1 } } as never) ?? '', /^`config\.budgetUsd` is not a harness argument\./);
+  // The task's own fields do not belong in it either: a priority is the task's, not the harness's.
+  assert.match(argsRefusalOf({ ...task, config: { priority: 1 } } as never) ?? '', /^`config\.priority` is not a harness argument\./);
+});
+
+test('a spend cap is dollars above 0, under config: anything else is refused, and saying what one is', () => {
+  // The runtime's own check until stage 4b, in its words; it moved beside the argument it checks.
+  for (const bad of [0, -1, Number.NaN, Infinity, 'five', '5', null]) {
+    const says = argsRefusalOf({ ...task, config: { budgetUsd: bad } } as never) ?? '';
+    assert.ok(says.startsWith(`\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars. Give dollars above 0`), says);
+    assert.ok(says.endsWith('or leave it out for no cap.'), says);
+  }
+  for (const good of [0.01, 5, 250]) assert.equal(argsRefusalOf({ ...task, config: { budgetUsd: good } }), undefined, String(good));
+});
+
+test('a turn gives its own spend cap and nothing else of the configuration: each refused, at shipped defaults', () => {
+  assert.deepEqual([...TURN_ARGS], ['budgetUsd']);
+  assert.equal(turnArgsRefusalOf(undefined), undefined, 'none: the task\'s own');
+  assert.equal(turnArgsRefusalOf({}), undefined);
+  assert.equal(turnArgsRefusalOf({ budgetUsd: 0.5 }), undefined);
+  for (const bad of [null, 'opus', 7, ['budgetUsd']]) {
+    const says = turnArgsRefusalOf(bad) ?? '';
+    assert.ok(says.startsWith(`\`config: ${JSON.stringify(bad)}\` is not a turn's configuration.`), says);
+  }
+  // A harness argument a turn cannot change — the session it continues was started with it — and a key that is none.
+  for (const key of ['model', 'permissionMode', 'worktree', 'modle']) {
+    const says = turnArgsRefusalOf({ [key]: 'x' }) ?? '';
+    assert.ok(says.startsWith(`\`config.${key}\` cannot be given to one turn`) && says.includes('(`resumeFrom`)'), says);
+  }
+  for (const bad of [0, -2, Number.NaN, 'lots']) {
+    const says = turnArgsRefusalOf({ budgetUsd: bad }) ?? '';
+    assert.ok(says.startsWith(`\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars.`) && says.endsWith("or leave it out for the task's own."), says);
+  }
+});
+
+test("a turn's configuration is laid over the task's own, which it leaves unchanged", () => {
+  const own: HarnessArgs = { model: 'opus', budgetUsd: 2 };
+  assert.equal(configForTurn(own, undefined), own, 'no turn of its own: the filing\'s, as it is');
+  assert.equal(configForTurn(undefined, undefined), undefined);
+  assert.deepEqual(configForTurn(own, { budgetUsd: 0.5 }), { model: 'opus', budgetUsd: 0.5 });
+  assert.deepEqual(configForTurn(undefined, { budgetUsd: 0.5 }), { budgetUsd: 0.5 });
+  assert.deepEqual(own, { model: 'opus', budgetUsd: 2 }, 'the filing is not written through');
 });
 
 test('where a key is and whether it is one are said before what its value is', () => {
@@ -100,7 +139,8 @@ const UNUSABLE: [Record<string, unknown>, RegExp][] = [
   [{ config: { tools: ['Read,Grep'] } }, /^`tools: \["Read,Grep"\]` is not a list of tool names\./],
   [{ model: 'opus' }, /^`model` is the harness's configuration/],
   [{ config: 'opus' }, /^`config: "opus"` is not a harness's configuration\./],
-  [{ config: { budgetUsd: 5 } }, /^`config\.budgetUsd` is not a harness argument\./],
+  [{ config: { priority: 5 } }, /^`config\.priority` is not a harness argument\./],
+  [{ config: { budgetUsd: 0 } }, /^`budgetUsd: 0` is not an amount of dollars\./],
 ];
 
 /** `file` through the Effect door over `runner`, and what it journalled. */

@@ -3,10 +3,11 @@
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
  * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `nameFor` and `denialText`), which they import from here and never from the runtime.
  *
- * It passes the runtime's surface through, and wraps none of it. What the orchestrator does with the runtime — file a task, view one, tick,
+ * It passes the runtime's surface through, and wraps one method of it: `file`, so that every task the orchestrator files is `queued` and
+ * starts only once the tick admits it (`admission.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
  * stop one, read its logs, say something to it, read the feed — are already the methods of the runtime's `Engine`, which every controller
  * takes as it is and every test hands a fake of. A wrapper would be a second surface to keep in step with the first, and a place for
- * behaviour to grow; this file holds none.
+ * behaviour to grow; this file holds none but that one.
  *
  * It uses `agent-runtime` — the Promise API — not `agent-runtime/effect`. Nothing here imports Effect, which is the point: a consumer of
  * the engine should need to learn three functions, not a library.
@@ -41,8 +42,12 @@ export const HARNESSES = {
   check: CHECK,
 } as const;
 
-export const engine = (): Engine => createEngine({
-  root: path.join(HOME, 'engine'),
-  maxConcurrent: Number(process.env.WF_MAX_CONCURRENT) || 2,
-  harnesses: HARNESSES,
-});
+/**
+ * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
+ * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted, and the runtime's own
+ * ceiling is lifted so it never binds a second time. The runtime keeps that ceiling for `ae` until thin runtime stage 4c part 2 retires it.
+ */
+export const engine = (): Engine => {
+  const e = createEngine({ root: path.join(HOME, 'engine'), maxConcurrent: Infinity, harnesses: HARNESSES });
+  return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+};

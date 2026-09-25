@@ -12,9 +12,9 @@ import { runCapOf } from './run.ts';
 import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding, type Identity } from './daemon.ts';
 
 /**
- * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the engine's: sessions
- * per harness at once, counted apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with
- * another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `runCapOf`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the tick's admission's
+ * (`toAdmit` in `admission.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of its own,
+ * and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `runCapOf`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
  */
 export const ceilings = (): { sessions: number; runs: number } => ({
   sessions: Number(process.env.WF_MAX_CONCURRENT) || 2,

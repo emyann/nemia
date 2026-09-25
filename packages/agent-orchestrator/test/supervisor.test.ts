@@ -100,7 +100,8 @@ const board = () => {
     stop: async (id: string) => { stopped.push(id); },
     logs: async () => '(no output yet)',
     feed: async () => ({ entries: [], cursor: 0 }),
-    tick: async () => {},
+    tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }),
+    admit: async () => [],
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, costUsd?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, costUsd });

@@ -50,7 +50,9 @@ const board = () => {
         if (t && !settledPhase(t.phase)) t.phase = 'stopped';
       }
       stopping.clear();
+      return ({ tasks: 0, actions: [], running: {}, views: [] });
     },
+    admit: async () => [],
     view: async (id: string) => {
       const t = tasks.get(id);
       return {
@@ -277,7 +279,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
   emptyStore(undefined);
   const b = board();
   const stop = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
-  (b.e as { tick: () => Promise<void> }).tick = async () => { throw stop; };
+  (b.e as { tick: () => Promise<unknown> }).tick = async () => { throw stop; };
   const concurrent = process.env.WF_MAX_CONCURRENT;
   process.env.WF_MAX_CONCURRENT = '4';
   const printed: string[] = [];
@@ -365,7 +367,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   let passes = 0;
   const stop = new Error('the test stops the daemon');
   const inner = up.e.tick.bind(up.e);
-  (up.e as { tick: () => Promise<void> }).tick = async () => { if (++passes > 1) throw stop; await inner(); };
+  (up.e as { tick: () => Promise<unknown> }).tick = async () => { if (++passes > 1) throw stop; return inner(); };
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
   try {
@@ -591,7 +593,7 @@ test("a queued card whose start fails without a refusal — its repository no gi
   let passes = 0;
   const stop = new Error('the test stops the daemon');
   const inner = up.e.tick.bind(up.e);
-  (up.e as { tick: () => Promise<void> }).tick = async () => { if (++passes > 2) throw stop; await inner(); };
+  (up.e as { tick: () => Promise<unknown> }).tick = async () => { if (++passes > 2) throw stop; return inner(); };
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
   try {
@@ -654,10 +656,10 @@ test("a `wf up` at a cap of 1 names the card its queue is stuck on once a slot f
   let passes = 0;
   const stop = new Error('the test stops the daemon');
   const inner = b.e.tick.bind(b.e);
-  (b.e as { tick: () => Promise<void> }).tick = async () => {
+  (b.e as { tick: () => Promise<unknown> }).tick = async () => {
     if (++passes > 2) throw stop;
     if (passes === 2) b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
-    await inner();
+    return inner();
   };
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });

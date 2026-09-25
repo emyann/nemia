@@ -17,6 +17,7 @@ import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
 import { scratch } from './scratch.ts';
 import { SIGNOFF } from '../src/run.ts';
+import { momentumOf, toAdmit } from '../src/admission.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -1641,13 +1642,21 @@ test("a round files its target with the target's tools, deny list and effort, an
   assert.deepEqual([review2.config?.tools, review2.config?.disallowedTools, review2.config?.effort, review2.resumeFrom], [REVIEWS, ['Bash(npm run build)'], 'max', undefined], "round 2's review");
 });
 
-// ─── a run in flight keeps its momentum: `priority` ─────────────────────────
+// ─── a run in flight keeps its momentum: `momentumOf` ───────────────────────
 
-/** The `priority` each task of a run was filed with, by the name the run gives it: `implement`, `implement-check`, `review-try2`. */
-const prioritiesOf = (b: ReturnType<typeof board>, id: string) =>
-  Object.fromEntries([...b.tasks].filter(([task]) => task.startsWith(`${id}-`)).map(([task, t]) => [task.slice(id.length + 1), t.spec.priority]));
+/**
+ * The momentum admission gives each task of a run (`momentumOf`, off the run's record as the tick reads it), by the name the run gives it:
+ * `implement`, `implement-check`, `review-try2`. Every one is filed with no `priority`: the runtime is told nothing of it since stage 4c.
+ */
+const momentaOf = (b: ReturnType<typeof board>, id: string) => {
+  const run = readRun(id);
+  const m = momentumOf([{ run, steps: stepsOf(run) }]);
+  const tasks = [...b.tasks].filter(([task]) => task.startsWith(`${id}-`));
+  assert.deepEqual(tasks.filter(([, t]) => 'priority' in t.spec).map(([task]) => task), [], 'filed with no priority');
+  return Object.fromEntries(tasks.map(([task]) => [task.slice(id.length + 1), m(task)]));
+};
 
-test('a run in flight keeps its momentum: its first step is filed with no `priority`, and everything after it — its check, a step after another, a round, a try `retries:` files and one `wf retry` asks for — with `priority: 1`', async () => {
+test('a run in flight keeps its momentum: its first step has none, and everything after it — its check, a step after another, a round, a try `retries:` files and one `wf retry` asks for — has 1', async () => {
   // implement → its check → review, looping back: round 2's implement, continued, its check, and a new session of review.
   const run = started(looped());
   const b = board();
@@ -1655,8 +1664,8 @@ test('a run in flight keeps its momentum: its first step is filed with no `prior
   await toReview(b, run.id, 1, true);
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
   await toReview(b, run.id, 2, false);
-  assert.deepEqual(prioritiesOf(b, run.id), {
-    implement: undefined, 'implement-check': 1, review: 1, 'implement-try2': 1, 'implement-try2-check': 1, 'review-try2': 1,
+  assert.deepEqual(momentaOf(b, run.id), {
+    implement: 0, 'implement-check': 1, review: 1, 'implement-try2': 1, 'implement-try2-check': 1, 'review-try2': 1,
   });
 
   // A try `retries:` files, its check, and a try `wf retry` asks for.
@@ -1667,12 +1676,12 @@ test('a run in flight keeps its momentum: its first step is filed with no `prior
   tried.settle(`${tried.run.id}-implement-try2-check`, 'failed', undefined, 1);
   await retry(tried.e, tried.run.id, 'implement', { mode: 'fresh' });
   assert.deepEqual((await advance(tried.e, readRun(tried.run.id))).tried, ['implement']);
-  assert.deepEqual(prioritiesOf(tried, tried.run.id), {
-    implement: undefined, 'implement-check': 1, 'implement-try2': 1, 'implement-try2-check': 1, 'implement-try3': 1,
+  assert.deepEqual(momentaOf(tried, tried.run.id), {
+    implement: 0, 'implement-check': 1, 'implement-try2': 1, 'implement-try2-check': 1, 'implement-try3': 1,
   });
 });
 
-test('a run\'s first steps are every step that waits on nothing: two roots filed with no `priority`, and the step that joins them with `priority: 1`', async () => {
+test('a run\'s first steps are every step that waits on nothing: two roots with no momentum, and the step that joins them with 1', async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'left.md'), 'the left half\n');
   fs.writeFileSync(path.join(dir, 'right.md'), 'the right half\n');
@@ -1683,7 +1692,7 @@ test('a run\'s first steps are every step that waits on nothing: two roots filed
   b.settle(`${run.id}-left`, 'succeeded', SIGNED);
   b.settle(`${run.id}-right`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['join']);
-  assert.deepEqual(prioritiesOf(b, run.id), { left: undefined, right: undefined, join: 1 });
+  assert.deepEqual(momentaOf(b, run.id), { left: 0, right: 0, join: 1 });
 });
 
 /** The engine's store, in memory, as its own tests keep one. */
@@ -1706,7 +1715,7 @@ const startsInOrder = (sessions: Map<string, Sighting>): PromiseRunner => ({
   async logs() { return ''; },
 });
 
-test("REFUSED without the momentum: at a ceiling of one, the engine's own admission gives the slot to a run's next step before a newer run's first step filed ahead of it — and, filed with no `priority`, to the newer run", async () => {
+test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits a run's next step before a newer run's first step filed ahead of it — and, with no momentum, the newer run", async () => {
   // Run a's implement has ended; run b starts, and files its implement; then a's review is filed — after it, a pass later.
   const a = started(folder());
   const b = started(folder());
@@ -1717,21 +1726,27 @@ test("REFUSED without the momentum: at a ceiling of one, the engine's own admiss
   assert.deepEqual((await advance(filedBy.e, readRun(a.id))).filed, ['review']);
   const newer = filedBy.tasks.get(`${b.id}-implement`)!.spec;
   const next = filedBy.tasks.get(`${a.id}-review`)!.spec;
-  assert.deepEqual([newer.priority, next.priority], [undefined, 1]);
+  const runs = [readRun(a.id), readRun(b.id)].map((run) => ({ run, steps: stepsOf(run) }));
 
-  /** The two filings, handed to an engine with one slot in the order the run filed them, and the session its first pass starts. */
-  const admitted = async (strip: boolean) => {
+  /**
+   * The two filings, queued as the client files them, on a runtime with no ceiling of its own, in the order the run filed them; the
+   * admission of one slot off its first pass's views, and the session its next pass starts.
+   */
+  const admitted = async (momentum: (id: string) => number) => {
     const sessions = new Map<string, Sighting>();
-    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude', maxConcurrent: 1 });
-    const as = (spec: typeof next) => ({ ...spec, harness: 'claude', ...(strip ? { priority: undefined } : {}) }) as Parameters<Engine['file']>[0];
+    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude', maxConcurrent: Infinity });
+    const as = (spec: typeof next) => ({ ...spec, harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
     await e.file(as(newer));
     await new Promise((r) => setTimeout(r, 5));
     await e.file(as(next));
+    const report = await e.tick();
+    assert.deepEqual([...sessions.keys()], [], 'nothing starts before it is admitted');
+    await e.admit(toAdmit({ views: report.views, momentum, ceiling: 1 }));
     await e.tick();
     return [...sessions.keys()];
   };
-  assert.deepEqual(await admitted(false), [nameFor(`${a.id}-review`, 1)], "the run in flight's next step, filed later");
-  assert.deepEqual(await admitted(true), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
+  assert.deepEqual(await admitted(momentumOf(runs)), [nameFor(`${a.id}-review`, 1)], "the run in flight's next step, filed later");
+  assert.deepEqual(await admitted(() => 0), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
 });
 
 // ─── a step reachable from a phone: `remote:` ───────────────────────────────

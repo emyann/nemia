@@ -39,7 +39,8 @@ const board = () => {
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
   const e = {
-    tick: async () => {},
+    tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }),
+    admit: async () => [],
     view: async (id: string) => {
       views++;
       const t = tasks.get(id);

@@ -53,14 +53,17 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  * settled; the feed has each filing.
  */
 const board = () => {
-  type Filed = { id: string; closeoutSchema?: object; priority?: number; config?: { remoteControl?: boolean } };
+  type Filed = { id: string; closeoutSchema?: object; config?: { remoteControl?: boolean } };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; filedAt: number }>();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
   /** How many times each task was viewed: every view is a harness observe. */
   const viewed = new Map<string, number>();
-  /** Whether a view's record carries the fields the task was filed with that no screen reads — `priority`, `remoteControl` — as the engine's does. */
+  /**
+   * Whether a view carries what no screen reads — the task's admission (`queued`, `admitted`, and the view's `admission` while it waits) and
+   * the `remoteControl` it was filed with — as the engine's does.
+   */
   const carries = { on: true };
   const e = {
     view: async (id: string) => {
@@ -69,9 +72,10 @@ const board = () => {
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        ...(t && carries.on && t.phase === 'pending' ? { admission: 'queued' } : {}),
         state: {
           brief: t ? 'filed' : '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
-          ...(t && carries.on ? { priority: t.spec.priority, config: t.spec.config } : {}),
+          ...(t && carries.on ? { queued: true, ...(t.phase === 'pending' ? {} : { admitted: 0 }), config: t.spec.config } : {}),
           attempts: !t || t.phase === 'pending' ? [] : [{
             n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
             endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? t.reason ?? 'harness' : null,
@@ -208,10 +212,11 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
-test("`wf decide` and `wf ls` say nothing of a run's momentum or a step's Remote Control: the same screens, line for line, whether the engine's record carries the `priority` and `remoteControl` the run's filings were made with or not", async (t) => {
+test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
-  assert.deepEqual(ids.map((id) => [filed(id)?.priority, filed(id)?.config?.remoteControl]), [[undefined, true], [1, undefined], [1, undefined]], 'filed with them');
+  // Momentum is the orchestrator's (`momentumOf`), read off the run's record: no filing carries a `priority` since thin runtime stage 4c.
+  assert.deepEqual(ids.map((id) => ['priority' in filed(id)!, filed(id)?.config?.remoteControl]), [[false, true], [false, undefined], [false, undefined]], 'filed with them');
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();
   carries.on = false;

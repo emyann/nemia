@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Response } from 'playwright';
 import { fed, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
-import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -32,6 +32,22 @@ export default {
     await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="awaiting-approval"][title^="${gated}: awaiting approval"]`), `and ${gated}'s pill on its rail, awaiting approval`);
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), fullPage: true });
+
+    // The card links to what is being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's
+    // inspector, on Output, with the plan's approach in it. Then back to the floor, as the page began.
+    const read = card.locator(`a[data-read="${gated}"]`, { hasText: /^Read the plan$/ });
+    await expectVisible(read, `the card's gate offers Read the plan`);
+    await expectClearOfEachOther(page);
+    await read.click();
+    await page.waitForURL((url) => url.pathname === `/runs/${id}` && url.searchParams.get('step') === gated, { timeout: WAIT_MS });
+    const inspector = page.locator(`aside[aria-label="Step ${gated}"]`);
+    await expectVisible(inspector.getByRole('tab', { name: 'Output', selected: true }), `Read the plan lands on ${gated}'s inspector, open on Output`);
+    await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), 'with the plan\'s approach in it');
+    await settled(page);
+    await page.screenshot({ path: path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`), fullPage: true });
+    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');
 
     // Approved on the card, where it is: a press a person can make, clear of the legend, then the popover's.
     try {

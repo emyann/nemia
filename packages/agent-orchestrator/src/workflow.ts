@@ -239,7 +239,20 @@ export type Workflow = {
  * other keys (`after:` from `resume:`, `rounds:` from `loop:`). A key whose value is no longer its given one was changed on the step since
  * it was read, and is the step's own from then on (`renderStep`).
  */
-export type StepAgent = { name: string; keys: StepKey[]; body: string; given: Partial<Record<StepKey, string>> };
+export type StepAgent = {
+  name: string;
+  keys: StepKey[];
+  body: string;
+  given: Partial<Record<StepKey, string>>;
+  /**
+   * The agent's own instructions, its skills and its system prompt, as the step was resolved: what `wf start` renders for a Claude Code step,
+   * which is then told its instructions in its system prompt and its note alone in its brief (`renderedFor`). Absent on a record written
+   * before 2026-09-25, whose steps are told both in the brief, as before.
+   */
+  instructions?: string;
+  skills?: string[];
+  systemPrompt?: SystemPrompt;
+};
 
 /** The rounds a `loop:` runs when its step does not say. */
 export const DEFAULT_ROUNDS = 3;
@@ -440,7 +453,7 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
  * parser sees the resolved step; `agent` on it says what was the step's own.
  */
-export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents): Workflow {
+export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents, skills?: SkillsFound): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
   let { meta: { agent: attached, ...meta }, spelled } = block === null
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
@@ -461,12 +474,34 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
+  const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.systemPrompt, step);
+  if (composed !== undefined) refuse(composed);
+  if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
     const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
     return value === undefined ? [] : [[key, value]];
   }));
-  return { ...step, agent: { name: agent.name, keys, body: own, given } };
+  return {
+    ...step,
+    agent: {
+      name: agent.name,
+      keys,
+      body: own,
+      given,
+      ...(agent.body && { instructions: agent.body }),
+      ...(agent.skills?.length && { skills: agent.skills }),
+      ...(agent.systemPrompt !== undefined && { systemPrompt: agent.systemPrompt }),
+    },
+  };
+}
+
+/** The folder of the skill `skill` that step `step`'s agent names, or why not: none of the places has it, or two of one repository do. */
+export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound): string {
+  const found = skills.at.get(skill);
+  if (found instanceof WorkflowError) refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, which cannot be used — ${found.message}`);
+  if (found !== undefined) return found;
+  return refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, and no skills folder has it — looked in ${skills.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`);
 }
 
 /** The fence a step's lines write, under either name: Claude Code's permission mode or Codex's sandbox. */
@@ -501,6 +536,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
   const harness = harnessOf(name, meta.harness);
   const background = backgroundOf(name, meta.background, harness);
   const output = outputOf(name, meta.output, read);
+  autoRefusal(name, harness, meta.model, meta.permissionMode);
 
   return {
     name,
@@ -531,6 +567,21 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
   };
+}
+
+/**
+ * Refused: a Claude Code step that runs in `auto` — named, or the mode it is filed with when it names none — on a model that drops it
+ * (`keepsAuto`, F21). Such a session says `default` from its first turn, and a job denies every call `default` would ask about, which no
+ * line of the step says: the refusal names the modes that keep what the step is for. Codex has sandboxes, not modes, and is not asked.
+ */
+function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined): void {
+  if (harness === 'codex' || keepsAuto(model)) return;
+  const mode = permissionMode ?? DEFAULT_PERMISSION_MODE;
+  if (mode !== 'auto') return;
+  const asked = permissionMode === undefined
+    ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
+    : 'says `permissionMode: auto`';
+  refuse(`${step}: \`model: ${model}\` ${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about (F21, Claude Code 2.1.282, measured). Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`);
 }
 
 /**
@@ -1327,28 +1378,29 @@ export type AgentSkill = {
   outputModes?: string[];
 };
 
-/** The skills an agent's `skills:` names: the file, beside the agent, and what it holds in the order it holds them. */
+/** The card an agent's `card:` names: the file, beside the agent, and the skills it holds in the order it holds them. */
 export type AgentSkills = { file: string; list: AgentSkill[] };
 
-/** The keys an A2A `AgentSkill` has that this package writes and reads. `securityRequirements` is the one it refuses — see `skillsOf`. */
+/** The keys an A2A `AgentSkill` has that this package writes and reads. `securityRequirements` is the one it refuses — see `cardOf`. */
 const SKILL_KEYS = ['id', 'name', 'description', 'tags', 'examples', 'inputModes', 'outputModes'] as const;
 /** Of those, the ones whose value is a list of words. */
 const SKILL_LISTS = ['tags', 'examples', 'inputModes', 'outputModes'] as const;
 
 /**
- * The skills an agent's `skills:` names, read and refused unless every one of them is an A2A `AgentSkill`.
+ * The card an agent's `card:` names — or its `skills:`, which named it until 2026-09-25 (`key`) — read and refused unless every skill on it
+ * is an A2A `AgentSkill`. A card says what the agent can do; the skills a session is given are `skills:` by name, and are not these.
  *
  * Strict for the same reason `outputOf` is strict: what is written here is printed as a card (`agentCard`) and shown on the board as what
  * the agent can do, so a skill missing a field the protocol marks REQUIRED would be a card nobody could read and a line on the board saying
  * nothing. Refused where it is written, by name, with the fix in the message.
  */
-function skillsOf(agent: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): AgentSkills | undefined {
+function cardOf(agent: string, file: string | undefined, key: 'card' | 'skills', read: ((file: string) => string | undefined) | undefined): AgentSkills | undefined {
   if (file === undefined) return undefined;
-  const named = `${agent}: \`skills: ${file}\``;
+  const named = `${agent}: \`${key}: ${file}\``;
   const beside = agent.endsWith('.md') ? agent : `${agent}.md`;
   const suggest = `${path.basename(beside, '.md')}.skills.json`;
   if (path.isAbsolute(file) || /[\\/]/.test(file) || file.startsWith('.') || !file.endsWith('.json')) {
-    refuse(`${named} is not a skills file's name. It is a .json file beside the agent, named with no folder — \`skills: ${suggest}\` — or delete the line, and the agent says nothing of what it can do.`);
+    refuse(`${named} is not a card's name. It is a .json file beside the agent, named with no folder — \`card: ${suggest}\` — or delete the line, and the agent says nothing of what it can do.`);
   }
   if (!read) refuse(`${named} names a file beside the agent, and this agent was read without its folder. Load it with \`loadAgents(<folder>)\`, which reads the file.`);
   const text = read(file);
@@ -1506,8 +1558,17 @@ export const AGENTS_FOLDER = 'agents';
 /** Where the agents a workflow's steps name are: `agents/`, beside the workflow's folder — `workflows/agents` for `workflows/dev`. */
 export const agentsDir = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), AGENTS_FOLDER);
 
-/** Why `dir` is not a workflow because it is the folder of agents, or `undefined` for a folder with another name. */
+/**
+ * The folder of skills, beside the agents that give them: `skills/`, each skill a folder of its own holding a `SKILL.md`. No workflow has its
+ * name either (`agentsFolderRefusal`).
+ */
+export const SKILLS_FOLDER = 'skills';
+
+/** Why `dir` is not a workflow because it is the folder of agents or of skills, or `undefined` for a folder with another name. */
 export function agentsFolderRefusal(dir: string): string | undefined {
+  if (path.basename(path.resolve(dir)) === SKILLS_FOLDER) {
+    return `${dir} is ${SKILLS_FOLDER}/, the folder of the skills the agents beside it give — each folder in it is a skill, not a step, so no workflow has its name. Name a workflow beside it, or give yours another name.`;
+  }
   if (path.basename(path.resolve(dir)) !== AGENTS_FOLDER) return undefined;
   return `${dir} is ${AGENTS_FOLDER}/, the folder of the agents the workflows beside it name — its files are agents, not steps, so no workflow has its name. Name a workflow beside it, or give yours another name.`;
 }
@@ -1530,28 +1591,65 @@ export const stepFiles = (entries: readonly string[]): string[] => entries.filte
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a folder
  * written is refused for what a folder read would be, in the same words.
  */
-export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined, agents?: Agents): Workflow[] {
+export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined, agents?: Agents, skills?: SkillsFound): Workflow[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
-  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents));
+  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills));
   validate(steps);
   return orderSteps(steps);
 }
 
 /**
- * The keys an agent file sets: what it is for, in a line; what it can do, in the file its `skills:` names; and who does the work and how. A
- * step that names the agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins. Everything else a step
- * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent
- * file that sets one is refused by name.
+ * The keys an agent file sets: what it is for, in a line; what it says it can do, in the card its `card:` names; the skills it is given
+ * (`skills:`) and what becomes of Claude Code's own system prompt (`systemPrompt:`); and who does the work and how. A step that names the
+ * agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins. Everything else a step sets is wiring — where
+ * the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is
+ * refused by name.
  */
-export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
+export const AGENT_KEYS = ['description', 'card', 'skills', 'systemPrompt', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The keys a step takes from its agent: every agent key but the two that describe the agent itself — its `description:` and the `skills:` it
- * says it has. A step has neither, so neither is a `STEP_KEY`, and code outside the package that reads the role keys leaves both out
- * (`apps/api/src/builder.ts`'s `ROLE_KEYS`, `apps/api/src/agents.ts`'s).
+ * The agent keys that are the agent's own and no step's: what it is for, the card that says what it can do, the skills it is given and its
+ * system prompt. A step has none of them, so none is a `STEP_KEY`, and code outside the package that reads the role keys leaves them out
+ * (`apps/api/src/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by hand).
  */
-export type RoleKey = Exclude<AgentKey, 'description' | 'skills'>;
+export const AGENT_OWN_KEYS = ['description', 'card', 'skills', 'systemPrompt'] as const;
+export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];
+/** The keys a step takes from its agent: every agent key but its own (`AGENT_OWN_KEYS`). */
+export type RoleKey = Exclude<AgentKey, AgentOwnKey>;
 const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly string[]).includes(key);
+const isOwnKey = (key: string): key is AgentOwnKey => (AGENT_OWN_KEYS as readonly string[]).includes(key);
+
+/**
+ * What becomes of Claude Code's own system prompt for an agent's steps (`systemPrompt:`): `default` keeps it and appends the agent's
+ * instructions after it (`--append-system-prompt-file`, F1); `no-coding` keeps it less its coding instructions, through an output style
+ * that says `keep-coding-instructions: false`, and appends them the same (F16, F17); `own` replaces it with them (`--system-prompt-file`,
+ * F15). Absent is `default`. Claude Code's alone: codex is handed its instructions in the brief.
+ */
+export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
+export type SystemPrompt = (typeof SYSTEM_PROMPTS)[number];
+
+/** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as Claude Code names one. */
+const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Where the skills a workflow's agents name were found: each name, the folder it is (`<place>/skills/<name>`, holding `SKILL.md`) or why it
+ * cannot be used — a name two places of one repository both have — and the places looked in, in order, for the refusal of a name none has.
+ * `skillsFor` in `workflow-store.ts` reads them.
+ */
+export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
+
+/**
+ * The models Claude Code runs in `default` when asked for `auto` (F21, 2.1.282, measured in `docs/spike-2026-09-25-agents-skills.md`): the
+ * session starts in `auto`, says `default` from its first turn, and a job denies every call `default` would ask about. Each name as written
+ * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not measured is let through: this is what is known to fail.
+ */
+export const AUTO_UNSUPPORTED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
+
+/** Whether Claude Code keeps `auto` on `model`: false for one measured to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
+export const keepsAuto = (model: string | undefined): boolean => model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
+
+/** The permission mode a Claude Code step is filed with when it names none: the runtime's own (`--permission-mode auto`). */
+export const DEFAULT_PERMISSION_MODE = 'auto';
 
 /**
  * An agent: a file in `agents/`, its frontmatter the role keys it sets (`AGENT_KEYS`) and its body its instructions — what every step that
@@ -1561,7 +1659,12 @@ const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly str
 export type Agent = {
   name: string;
   description?: string;
-  skills?: AgentSkills;
+  /** What it says it can do, in the A2A protocol's words: the card its `card:` names, beside it (`agentCard`). */
+  card?: AgentSkills;
+  /** The skills its steps are given, by name (`skills:`), each a folder in a `skills/` the load finds (`SkillsFound`). */
+  skills?: string[];
+  /** What becomes of Claude Code's system prompt, as written (`SYSTEM_PROMPTS`); absent is `default`. */
+  systemPrompt?: SystemPrompt;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   read: (file: string) => string | undefined;
@@ -1572,7 +1675,8 @@ export type Agents = ReadonlyMap<string, Agent | WorkflowError>;
 
 /** Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. */
 function agentKeyRefusal(file: string, key: string): string | undefined {
-  if (isAgentKey(key)) return undefined;
+  // Claude Code's own agent files say their name, and one in `.claude/agents/` is read as it is written (`parseAgent` holds it to the file's).
+  if (isAgentKey(key) || key === 'name') return undefined;
   if (key === 'agent') {
     return `${file}: \`agent\` is a step's key, which attaches an agent to the step, and an agent does not name another. Write here what this agent is told and runs with, or give the step the other agent.`;
   }
@@ -1592,45 +1696,146 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
-  const { meta: { description, skills: named, ...written }, spelled } = block === null
-    ? { meta: {} as Partial<Record<AgentKey, string>>, spelled: {} }
-    : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
-  const keys = codexSandboxNamed(file, written, written.harness);
-  stepFrom(file, keys, body, read, spelled);
-  const skills = skillsOf(file, named, read);
-  return { name, ...(description !== undefined && { description }), ...(skills !== undefined && { skills }), keys, body, read: read ?? (() => undefined) };
+  const { meta: { description, card: carded, skills: listed, systemPrompt: prompt, name: said, ...written }, spelled } = block === null
+    ? { meta: {} as Partial<Record<AgentKey | 'name', string>>, spelled: {} }
+    : readKeys<AgentKey | 'name'>(file, block, (key) => agentKeyRefusal(file, key));
+  if (said !== undefined && said !== name) {
+    refuse(`${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`);
+  }
+  // `skills:` named the card until 2026-09-25, a .json file beside the agent, and a file written before still says so: read as `card:`.
+  const legacy = listed !== undefined && isCardFile(listed);
+  if (legacy && carded !== undefined) {
+    refuse(`${file}: \`skills: ${listed}\` names a card, as \`skills:\` did until 2026-09-25, and \`card: ${carded}\` names one too. The card is \`card:\` now, and \`skills:\` the skills the agent is given by name: keep the \`card:\` line and delete the other.`);
+  }
+  const keys = codexSandboxNamed(file, written as Partial<Record<RoleKey, string>>, written.harness);
+  const step = stepFrom(file, keys, body, read, spelled);
+  const card = legacy ? cardOf(file, listed, 'skills', read) : cardOf(file, carded, 'card', read);
+  const skills = legacy ? undefined : skillNamesOf(file, listed);
+  const systemPrompt = systemPromptOf(file, prompt);
+  if (systemPrompt === 'own' && !body.trim()) {
+    refuse(`${file}: \`systemPrompt: own\` puts the agent's instructions in place of Claude Code's system prompt, and this agent has none: its sessions would start with no system prompt at all. Write its instructions below the frontmatter, or delete the line.`);
+  }
+  const composed = composedRefusal(file, skills, systemPrompt, step);
+  if (composed !== undefined) refuse(composed);
+  return {
+    name,
+    ...(description !== undefined && { description }),
+    ...(card !== undefined && { card }),
+    ...(skills !== undefined && { skills }),
+    ...(systemPrompt !== undefined && { systemPrompt }),
+    keys,
+    body,
+    read: read ?? (() => undefined),
+  };
+}
+
+/** Whether a `skills:` value is a card's file, as the line named one until 2026-09-25: one `.json` file. No skill's name ends so. */
+export const isCardFile = (value: string): boolean => !value.includes(',') && /\.json$/i.test(value.trim());
+
+/**
+ * The file an agent's own line names beside it, read off its text as the parser reads it: `output:`'s schema, or the card — `card:`, or a
+ * `skills:` line written before 2026-09-25 that names one (`isCardFile`). What the writer, the remover and the versions read, so a file
+ * written before names its card to each of them.
+ */
+export function besideFile(text: string, key: 'card' | 'output'): string | undefined {
+  if (key === 'output') return frontmatterKey(text, 'output');
+  const legacy = frontmatterKey(text, 'skills');
+  return frontmatterKey(text, 'card') ?? (legacy !== undefined && isCardFile(legacy) ? legacy : undefined);
+}
+
+/** `skills:` as the names it lists, refused unless each is a skill's name (`SKILL_NAME`), once. */
+function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const named = `${file}: \`skills: ${written}\``;
+  const shape = 'Each is a skill\'s name — its folder in skills/, lowercase words joined by dashes — comma-separated: `skills: review-a-change, write-a-note`.';
+  const names = written.split(',').map((s) => s.trim()).filter(Boolean);
+  if (!names.length) refuse(`${named} names no skill. ${shape}`);
+  const odd = names.find((n) => !SKILL_NAME.test(n));
+  if (odd) refuse(`${named} has \`${odd}\`, which is not a skill's name. ${shape}`);
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
+  return names;
+}
+
+/** `systemPrompt:` as one of `SYSTEM_PROMPTS`, refused otherwise. */
+function systemPromptOf(file: string, written: string | undefined): SystemPrompt | undefined {
+  if (written === undefined) return undefined;
+  if ((SYSTEM_PROMPTS as readonly string[]).includes(written)) return written as SystemPrompt;
+  return refuse(`${file}: \`systemPrompt: ${written}\` is not one of ${SYSTEM_PROMPTS.join(', ')}. \`default\` keeps Claude Code's system prompt and appends the agent's instructions after it; \`no-coding\` keeps it less its coding instructions; \`own\` replaces it with the agent's instructions. Without the line, it is \`default\`.`);
+}
+
+/**
+ * Why an agent's skills or system prompt cannot reach the sessions of a step that runs as `step` does — its harness, tools and deny list —
+ * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`), and
+ * again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or `harness:`
+ * can take away what the agent's allowed.
+ */
+function composedRefusal(named: string, skills: readonly string[] | undefined, systemPrompt: SystemPrompt | undefined, step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>): string | undefined {
+  const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
+  // A session continued keeps the system prompt it was started with, and the plugins with it (F13): what this agent gives would reach nothing.
+  if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
+    return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with (F13): it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
+  }
+  if (step.harness === 'codex') {
+    if (listed) return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
+    if (systemPrompt !== undefined && systemPrompt !== 'default') return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
+    return undefined;
+  }
+  if (!listed) return undefined;
+  const why = 'the tool a session loads a skill with: Claude Code gives a session only what its tools allow, and a skill it cannot load is a name in its prompt and nothing more (F11, measured)';
+  if (step.tools !== undefined && !step.tools.includes('Skill')) {
+    return `${named}: ${listed} gives the agent skills, and \`tools: ${step.tools.join(', ')}\` has no \`Skill\`, ${why}. Add \`Skill\` to \`tools:\`, or delete \`skills:\`.`;
+  }
+  if (step.disallowedTools?.includes('Skill')) {
+    return `${named}: ${listed} gives the agent skills, and \`disallowedTools: ${step.disallowedTools.join(', ')}\` denies \`Skill\`, ${why}. Take \`Skill\` off the deny list, or delete \`skills:\`.`;
+  }
+  return undefined;
 }
 
 /**
  * An agent as it is written back: what `renderAgent` takes, and what `parseAgent` reads — its name, the file's, its description, its keys as
  * written (`200k`, `Read, Grep`), and its instructions. A key unset is left out, or `null`.
  */
-export type AgentDraft = { name: string; description?: string | null; skills?: string | null; keys: Partial<Record<RoleKey, string | null>>; body: string };
+export type AgentDraft = {
+  name: string;
+  description?: string | null;
+  /** The card's file beside the agent, `<name>.skills.json`. */
+  card?: string | null;
+  /** The skills it is given, as written: `review-a-change, write-a-note`. */
+  skills?: string | null;
+  systemPrompt?: string | null;
+  keys: Partial<Record<RoleKey, string | null>>;
+  body: string;
+};
 
 /**
- * An agent as its file: the frontmatter, `description:` first and then each role key it sets in `AGENT_KEYS`' order, as written; then its
+ * An agent as its file: the frontmatter, its own lines first (`AGENT_OWN_KEYS`) and then each role key it sets, in `AGENT_KEYS`' order, as written; then its
  * instructions. The inverse of `parseAgent`: an agent it read renders to a file it reads back as the same agent, which
  * `test/write-agent.test.ts` holds over every shipped agent. Pure. A file's comments are not on the agent, so a render has none.
  *
  * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what it
  * rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one no
- * agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; `description` among the
- * keys, where it would be written twice; and a line break in a value, which would make what follows it a line of its own — a key, even.
+ * agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; one of its own lines
+ * among the keys, where it would be written twice; a card sent as `skills:`; and a line break in a value, which would make what follows it a line of its own — a key, even.
  */
 export function renderAgent(draft: AgentDraft): string {
   const file = `${AGENTS_FOLDER}/${draft.name}.md`;
   const keys = (draft.keys ?? {}) as Record<string, string | null | undefined>;
   for (const key of Object.keys(keys)) {
     if (keys[key] == null) continue;
-    if (key === 'description') refuse(`${file}: \`description\` is the agent's own line, not one of its role keys — give it as the description, once.`);
-    if (key === 'skills') refuse(`${file}: \`skills\` is the agent's own line — the file beside it that says what it can do — not one of its role keys. Give it as the skills, once.`);
+    if (key === 'name') refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
+    if (isOwnKey(key)) refuse(`${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${key === 'description' ? 'description' : key === 'card' ? 'card' : key === 'skills' ? 'skills' : 'system prompt'}, once.`);
     if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
   if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined) refuse(codexModeWritten(file, keys.permissionMode));
-  const own: ReadonlyArray<'description' | 'skills'> = ['description', 'skills'];
-  const values: Array<[string, string | null | undefined]> = [['description', draft.description], ['skills', draft.skills], ...AGENT_KEYS.filter((key) => !(own as readonly string[]).includes(key)).map((key) => [key, keys[key]] as [string, string | null | undefined])];
+  // A card sent as `skills:` is what a page drawn before 2026-09-25 sends, and written so it would be read back as the card, under the line's old name.
+  if (draft.skills != null && isCardFile(String(draft.skills))) {
+    refuse(`${file}: \`skills: ${draft.skills}\` names a card, which is \`card:\` since 2026-09-25, and \`skills:\` the skills the agent is given by name. Send it as the card — a page open since before then sends the former name: reload it, and save again.`);
+  }
+  const own: Record<AgentOwnKey, string | null | undefined> = { description: draft.description, card: draft.card, skills: draft.skills, systemPrompt: draft.systemPrompt };
+  const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const lines = values.flatMap(([key, value]) => {
     if (value == null) return [];
     const text = String(value);
@@ -1654,7 +1859,7 @@ export function renderAgent(draft: AgentDraft): string {
  *
  * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here
  * fills them honestly. `capabilities` in A2A are protocol features, not reach: streaming, push notifications, an extended card. None of the
- * three exists here, so all three are false. What an agent can do is its `skills`.
+ * three exists here, so all three are false. What an agent can do is its card's `skills`, which are not the skills `skills:` gives its sessions.
  */
 export type AgentCardShape = {
   name: string;
@@ -1674,15 +1879,15 @@ export type AgentCardShape = {
  * closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema — there
  * is no field for it, so it contributes the media type and nothing more.
  *
- * Refused, rather than printed hollow: an agent with no `description:` and one with no `skills:`, both of which the protocol marks REQUIRED.
+ * Refused, rather than printed hollow: an agent with no `description:` and one with no `card:`, both of which the protocol marks REQUIRED.
  */
 export function agentCard(agent: Agent, version: string): AgentCardShape {
   const named = `${AGENTS_FOLDER}/${agent.name}.md`;
   if (!agent.description?.trim()) {
     refuse(`${named} has no \`description:\`, and the A2A protocol marks a card's description REQUIRED. Write one line saying when to attach this agent to a step.`);
   }
-  if (!agent.skills?.list.length) {
-    refuse(`${named} has no \`skills:\`, and the A2A protocol marks a card's skills REQUIRED: a card with none says nothing the agent can do. Write ${agent.name}.skills.json beside it, a JSON array of \`{ "id", "name", "description", "tags" }\`, and name it with \`skills: ${agent.name}.skills.json\`.`);
+  if (!agent.card?.list.length) {
+    refuse(`${named} has no \`card:\`, and the A2A protocol marks a card's skills REQUIRED: a card with none says nothing the agent can do. Write ${agent.name}.skills.json beside it, a JSON array of \`{ "id", "name", "description", "tags" }\`, and name it with \`card: ${agent.name}.skills.json\`.`);
   }
   return {
     name: agent.name,
@@ -1691,7 +1896,7 @@ export function agentCard(agent: Agent, version: string): AgentCardShape {
     capabilities: { streaming: false, pushNotifications: false, extendedAgentCard: false },
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['application/json'],
-    skills: agent.skills.list,
+    skills: agent.card.list,
   };
 }
 

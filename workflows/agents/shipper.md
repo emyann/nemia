@@ -1,6 +1,6 @@
 ---
 description: Ends a run in the repository's own checkout: stages the merge of its result and writes its commit message, which the run commits on its check.
-skills: shipper.skills.json
+card: shipper.skills.json
 harness: claude
 model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,

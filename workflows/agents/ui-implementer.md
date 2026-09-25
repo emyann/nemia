@@ -1,6 +1,6 @@
 ---
 description: Implements a change a person will see in the web app, and looks at every page it changed, in both themes, before it signs off.
-skills: ui-implementer.skills.json
+card: ui-implementer.skills.json
 harness: claude
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings).
 # Every token a session writes it reads again on each later call, so a higher effort is paid for many times over.

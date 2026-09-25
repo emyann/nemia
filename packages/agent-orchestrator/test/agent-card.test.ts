@@ -25,7 +25,7 @@ const of = (text: string, skills: string): Agent =>
   parseAgent('scribe', text, (file) => (file === 'scribe.skills.json' ? skills : undefined));
 
 const SKILLS = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"],"examples":["Use this when a change needs its notes written."]}]';
-const SCRIBE = '---\ndescription: Use this when a change needs its notes written.\nskills: scribe.skills.json\n---\nWrite the notes.\n';
+const SCRIBE = '---\ndescription: Use this when a change needs its notes written.\ncard: scribe.skills.json\n---\nWrite the notes.\n';
 
 test('a card carries every field A2A marks REQUIRED but the interfaces, which nothing here serves', () => {
   const card = agentCard(of(SCRIBE, SKILLS), 'abc123');
@@ -63,11 +63,11 @@ test('REFUSED at shipped defaults: a card for an agent with no skills, or with n
   const noSkills = '---\ndescription: Use this when a change needs its notes written.\n---\nWrite the notes.\n';
   assert.throws(() => agentCard(of(noSkills, SKILLS), 'abc123'), (e: Error) => {
     assert.ok(e instanceof WorkflowError, String(e));
-    assert.match(e.message, /^agents\/scribe\.md has no `skills:`, and the A2A protocol marks a card's skills REQUIRED/);
-    assert.match(e.message, /skills: scribe\.skills\.json/);
+    assert.match(e.message, /^agents\/scribe\.md has no `card:`, and the A2A protocol marks a card's skills REQUIRED/);
+    assert.match(e.message, /card: scribe\.skills\.json/);
     return true;
   });
-  const noDescription = '---\nskills: scribe.skills.json\n---\nWrite the notes.\n';
+  const noDescription = '---\ncard: scribe.skills.json\n---\nWrite the notes.\n';
   assert.throws(() => agentCard(of(noDescription, SKILLS), 'abc123'), (e: Error) => /^agents\/scribe\.md has no `description:`/.test(e.message));
 });
 
@@ -91,10 +91,10 @@ test('every shipped agent has a card, and every skill on it the fields A2A marks
   assert.ok(ids.size >= 10, 'the shipped agents say what they can do');
 });
 
-test("a shipped agent's skills file is JSON beside it, named by its `skills:` line", () => {
+test("a shipped agent's card is JSON beside it, named by its `card:` line", () => {
   for (const [name, agent] of loadAgents(SHIPPED)) {
-    const file = (agent as Agent).skills!.file;
-    assert.equal(file, `${name}.skills.json`, `${name} names its skills after itself`);
+    const file = (agent as Agent).card!.file;
+    assert.equal(file, `${name}.skills.json`, `${name} names its card after itself`);
     const text = fs.readFileSync(path.join(SHIPPED, file), 'utf8');
     assert.ok(Array.isArray(JSON.parse(text)), `${file} is a JSON array`);
   }

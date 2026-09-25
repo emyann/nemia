@@ -19,6 +19,7 @@ import { budgetWord, dollars, durationWord, readWords, type Consumed } from './r
 export { durationWord };
 import { allowRuleOf, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
+import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
 import { answerOf, dueNote, messageRefusal, modeWord, retriesSpent, signoffsSpent, spentAsks, tryOf, type EarlierTry, type Retry, type RetryAsk, type RetryHow, type RetryMode } from './retry.ts';
 
@@ -4317,7 +4318,7 @@ export function composeBrief(
   // pointing it at the workspace would be telling someone what they spent an hour doing. What it reads
   // is new to it all the same, and so is a tree the run installed. A new session for a step tried again,
   // or for a round, continues nothing, and is told what any step starting cold is.
-  if (step.resume && !retry && !round) return step.body + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
+  if (step.resume && !retry && !round) return briefBody(step) + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -4326,13 +4327,15 @@ export function composeBrief(
   // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
-  const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
+  // A rendered agent's instructions are in the system prompt, and a step with no note of its own then opens on what was asked for.
+  const opening = briefBody(step) ? [briefBody(step), ''] : [];
+  const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
   // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged,
   // or in a folder, where nothing is either (`folderPlace`): a folder step is told where the steps before it worked, below.
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
-      step.body, '', '## What was asked for', '', ...request, ...handed, '',
+      ...opening, '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',

@@ -7,13 +7,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { AGENT_KEYS, agentsDir, parseAgent, parseWorkflow, renderStep, STEP_KEYS, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
+import { AGENT_KEYS, AGENT_OWN_KEYS, agentsDir, parseAgent, parseWorkflow, renderStep, STEP_KEYS, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
 import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { start, writeWorkflow } = await import('../src/runner.ts');
+const { agentFilesDir } = await import('../src/store.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
 function workflows(files: Record<string, string>): string {
@@ -47,11 +48,13 @@ test('an agent is its role keys as written, its description, and its body as its
   assert.equal(agent('quiet', '---\nmodel: opus\n---\n').body, '', 'an agent may set only how its steps run');
 });
 
-// `description` and `skills` describe the agent itself — who it is, and what it says it can do — and a step has neither: a step's work is
-// the workflow's, not the agent's. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
-const AGENT_OWN = ['description', 'skills'];
+// `description`, `card`, `skills` and `systemPrompt` describe the agent itself — who it is, what it says it can do, what it is given and how its
+// sessions are told — and a step has none: a step's work is the workflow's, not the agent's. Every other agent key is a key a step may set for
+// itself, and takes from its agent when it does not.
+const AGENT_OWN = ['description', 'card', 'skills', 'systemPrompt'];
 
-test('the role keys are the keys a step has, but for wiring, the description and the skills', () => {
+test('the role keys are the keys a step has, but for wiring, the agent\'s own keys', () => {
+  assert.deepEqual([...AGENT_OWN_KEYS], AGENT_OWN, 'the package names the same keys as its own');
   for (const key of AGENT_KEYS) if (!AGENT_OWN.includes(key)) assert.ok((STEP_KEYS as readonly string[]).includes(key), key);
   for (const key of AGENT_OWN) assert.ok(!(STEP_KEYS as readonly string[]).includes(key), `${key} describes the agent, and is no step's key`);
 });
@@ -166,7 +169,8 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   assert.deepEqual(build.agent, {
     name: 'implementer', keys: ['after', 'model', 'check'], body: 'Build the parser first.',
     given: { harness: 'claude', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
-  }, 'the keys the step set, its note, and what each key it did not set read as');
+    instructions: 'Implement what you are asked.',
+  }, 'the keys the step set, its note, what each key it did not set read as, and the agent\'s instructions, which a Claude Code step is told in its system prompt');
 
   const bare = parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents);
   assert.equal(bare.body, 'Implement what you are asked.', "no note of its own: the agent's words alone");
@@ -329,7 +333,9 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   const [build] = run.workflow;
   assert.equal(build!.model, 'opus');
   assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
-  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' } });
+  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' }, instructions: 'Implement what you are asked.' });
+  // And the agent as the run renders it for Claude Code, frozen with it: the edit reaches neither.
+  assert.equal(fs.readFileSync(path.join(agentFilesDir(run, 'build'), 'prompt.md'), 'utf8'), 'Implement what you are asked.\n');
 });
 
 test("`wf start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {
@@ -355,54 +361,54 @@ test("`wf start` names each node's agent beside it — by the agent's name, not 
   assert.equal(said, '3 step(s): build (coder) → judge (critic) → wrap');
 });
 
-/** An agent whose `skills:` names a file the reader is handed: what `loadAgents` hands `parseAgent` for a file beside it. */
+/** An agent whose `card:` names a file the reader is handed: what `loadAgents` hands `parseAgent` for a file beside it. */
 const withSkills = (name: string, json: string, line = `${name}.skills.json`): Agent =>
-  agent(name, `---\ndescription: Does the work\nskills: ${line}\n---\nDo it.\n`, (file) => (file === `${name}.skills.json` ? json : undefined));
+  agent(name, `---\ndescription: Does the work\ncard: ${line}\n---\nDo it.\n`, (file) => (file === `${name}.skills.json` ? json : undefined));
 
 const ONE_SKILL = '[{"id":"review-a-change","name":"Review a change","description":"Read a branch against its brief.","tags":["code","review"],"examples":["Use this when a change needs a second pair of eyes."]}]';
 
-test('an agent says what it can do in the A2A protocol\'s words: the skills its `skills:` names, beside it', () => {
+test('an agent says what it can do in the A2A protocol\'s words: the skills its `card:` names, beside it', () => {
   const a = withSkills('reviewer', ONE_SKILL);
-  assert.equal(a.skills?.file, 'reviewer.skills.json');
-  assert.deepEqual(a.skills?.list, [{
+  assert.equal(a.card?.file, 'reviewer.skills.json');
+  assert.deepEqual(a.card?.list, [{
     id: 'review-a-change',
     name: 'Review a change',
     description: 'Read a branch against its brief.',
     tags: ['code', 'review'],
     examples: ['Use this when a change needs a second pair of eyes.'],
   }]);
-  assert.equal(agent('quiet', '---\ndescription: Does the work\n---\nDo it.\n').skills, undefined, 'an agent may say nothing of what it can do');
-  // `skills` is the agent's own line, as `description` is: no step takes it, so it never reaches a step's keys.
-  assert.equal((a.keys as Record<string, unknown>).skills, undefined);
+  assert.equal(agent('quiet', '---\ndescription: Does the work\n---\nDo it.\n').card, undefined, 'an agent may say nothing of what it can do');
+  // `card` is the agent's own line, as `description` is: no step takes it, so it never reaches a step's keys.
+  assert.equal((a.keys as Record<string, unknown>).card, undefined);
 });
 
 test("an agent's skills are read with the optional A2A fields it writes, and without the ones it does not", () => {
   const a = withSkills('coder', '[{"id":"a","name":"A","description":"d","tags":["t"],"inputModes":["text/plain"],"outputModes":["application/json"]}]');
-  assert.deepEqual(a.skills?.list[0], { id: 'a', name: 'A', description: 'd', tags: ['t'], inputModes: ['text/plain'], outputModes: ['application/json'] });
-  assert.ok(!('examples' in a.skills!.list[0]!), 'a field the file does not write is not on the skill');
+  assert.deepEqual(a.card?.list[0], { id: 'a', name: 'A', description: 'd', tags: ['t'], inputModes: ['text/plain'], outputModes: ['application/json'] });
+  assert.ok(!('examples' in a.card!.list[0]!), 'a field the file does not write is not on the skill');
 });
 
-test('REFUSED at shipped defaults: a `skills:` that is not a .json file beside the agent', () => {
+test('REFUSED at shipped defaults: a `card:` that is not a .json file beside the agent', () => {
   for (const line of ['../elsewhere.skills.json', 'sub/skills.json', '/etc/skills.json', 'skills.yaml', '.hidden.json']) {
     const said = refusal(() => withSkills('reviewer', ONE_SKILL, line));
-    assert.ok(said.startsWith(`agents/reviewer.md: \`skills: ${line}\` is not a skills file's name.`), said);
-    assert.ok(said.includes('`skills: reviewer.skills.json`'), said);
+    assert.ok(said.startsWith(`agents/reviewer.md: \`card: ${line}\` is not a card's name.`), said);
+    assert.ok(said.includes('`card: reviewer.skills.json`'), said);
   }
 });
 
-test('REFUSED at shipped defaults: a skills file that is not there, not JSON, not a list, or empty', () => {
-  const missing = refusal(() => agent('reviewer', '---\nskills: reviewer.skills.json\n---\nDo it.\n', () => undefined));
-  assert.ok(missing.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not there.'), missing);
+test('REFUSED at shipped defaults: a card that is not there, not JSON, not a list, or empty', () => {
+  const missing = refusal(() => agent('reviewer', '---\ncard: reviewer.skills.json\n---\nDo it.\n', () => undefined));
+  assert.ok(missing.startsWith('agents/reviewer.md: `card: reviewer.skills.json` is not there.'), missing);
   assert.ok(missing.includes('write it beside agents/reviewer.md'), missing);
 
-  const unread = refusal(() => agent('reviewer', '---\nskills: reviewer.skills.json\n---\nDo it.\n'));
+  const unread = refusal(() => agent('reviewer', '---\ncard: reviewer.skills.json\n---\nDo it.\n'));
   assert.ok(unread.includes('this agent was read without its folder'), unread);
 
   const notJson = refusal(() => withSkills('reviewer', '[{'));
-  assert.ok(notJson.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not JSON ('), notJson);
+  assert.ok(notJson.startsWith('agents/reviewer.md: `card: reviewer.skills.json` is not JSON ('), notJson);
 
   const notList = refusal(() => withSkills('reviewer', '{"id":"a"}'));
-  assert.ok(notList.startsWith('agents/reviewer.md: `skills: reviewer.skills.json` is not a list.'), notList);
+  assert.ok(notList.startsWith('agents/reviewer.md: `card: reviewer.skills.json` is not a list.'), notList);
 
   const none = refusal(() => withSkills('reviewer', '[]'));
   assert.ok(none.includes('is an empty list, and an agent with no skills says nothing it can do'), none);
@@ -413,7 +419,7 @@ test('REFUSED at shipped defaults: a skill missing a field the protocol marks RE
     const entry: Record<string, unknown> = { id: 'a-skill', name: 'A skill', description: 'What it does.', tags: ['t'] };
     delete entry[key];
     const said = refusal(() => withSkills('reviewer', JSON.stringify([entry])));
-    assert.ok(said.startsWith(`agents/reviewer.md: \`skills: reviewer.skills.json\`, skill 1 has no \`${key}\`, and the A2A protocol marks it REQUIRED.`), said);
+    assert.ok(said.startsWith(`agents/reviewer.md: \`card: reviewer.skills.json\`, skill 1 has no \`${key}\`, and the A2A protocol marks it REQUIRED.`), said);
     const blank = refusal(() => withSkills('reviewer', JSON.stringify([{ ...entry, [key]: '  ' }])));
     assert.ok(blank.includes(`has no \`${key}\``), blank);
   }
@@ -456,7 +462,7 @@ test('REFUSED at shipped defaults: tags missing or empty, a list that is not one
 
 test("a broken skills file is the agent's refusal, thrown only at a step that names it", () => {
   const dir = workflows({
-    'agents/reviewer.md': '---\ndescription: Reviews\nskills: reviewer.skills.json\n---\nReview it.\n',
+    'agents/reviewer.md': '---\ndescription: Reviews\ncard: reviewer.skills.json\n---\nReview it.\n',
     'agents/reviewer.skills.json': '[]',
     'agents/implementer.md': IMPLEMENTER,
     'dev/implement.md': '---\nagent: implementer\n---\n',

@@ -4,10 +4,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PassCost } from '../src/lib/api.ts';
 import { bytesWord, msWord, PASS_PHASES, passLine, passTitle } from '../src/lib/pass.ts';
+import { REPO } from './e2e/world.ts';
+import { scratch } from './scratch.ts';
 
 const phase = (ms: number, over: Partial<PassCost['phases']['act']> = {}) => ({ ms, calls: 1, bytes: 0, reads: 0, spawned: 0, ...over });
 
@@ -45,9 +48,24 @@ test('the title is the breakdown: the pass, every phase in the package\'s order,
   assert.match(passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'), /^The daemon's last pass, at Fri 10:00: /, 'a pass of another day says its day');
 });
 
+/**
+ * The phases as the package words them: `wf up --stats` over a store holding this pass, its CLI. The web imports nothing of the package, and
+ * reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. A phase the
+ * package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or moved.
+ */
+function packagePhases(pass: PassCost): string[] {
+  const store = scratch('web-pass-');
+  fs.writeFileSync(path.join(store, 'tick-stats.json'), JSON.stringify(pass));
+  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'up', '--stats'], {
+    env: { ...process.env, WF_ROOT: store }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const lines = out.split('\n');
+  const head = lines.findIndex((l) => /^ {2}phase +ms +calls/.test(l));
+  assert.ok(head > 0, `wf up --stats read the pass as one: ${out}`);
+  const rows = lines.slice(head + 1);
+  return rows.slice(0, rows.findIndex((l) => !l.startsWith('  '))).map((l) => l.trim().split(/ +/)[0]!);
+}
+
 test('the phases are the package\'s, in its order: a phase added there is drawn here', () => {
-  const meter = fs.readFileSync(path.resolve(import.meta.dirname, '../../../packages/agent-orchestrator/src/meter.ts'), 'utf8');
-  const declared = /export const PHASES = \[([^\]]*)\] as const;/.exec(meter);
-  assert.ok(declared, 'the package declares its phases as one list');
-  assert.deepEqual([...declared[1]!.matchAll(/'([a-z]+)'/g)].map((m) => m[1]), [...PASS_PHASES]);
+  assert.deepEqual(packagePhases(PASS), [...PASS_PHASES]);
 });

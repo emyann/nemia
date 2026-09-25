@@ -422,7 +422,8 @@ where the other harnesses are, by name, and a task picks it by that name, as it 
 ```ts
 const engine = createEngine({
   harnesses: { reviewer: { url: 'https://agents.example/reviewer' } },
-  credentials: (scheme, agentUrl) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
+  credentials: (scheme, agentUrl, harness) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
+  missingCredential: (scheme) => `set REVIEWER_TOKEN for \`${scheme}\``, // optional: the end of the refusal's words
 });
 await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema });
 ```
@@ -451,23 +452,32 @@ no words. What the in-process seam's extension answers — `findSession`, `sessi
 `transcript`.
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
-written whole and renamed. The intent — the name, the harness it went through, the message's id and when — is on disk
-before the message is sent, and the Task's id and context are written as the answer comes back, before the spawn returns.
-So a spawn asked again for a name that has an entry never sends a second message: an entry with a Task adopts it, and
-the next pass reads it by GetTask; an entry without one is a send whose answer never came back, so whether a Task exists
-is not known, and the spawn fails in words that are no refusal, which the grace window reads `lost` with nothing sent
-again. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A Task that has ended
+written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
+sending it with the time it gives up (`sending: { pid, until }`) — is on disk before the message is sent, and the Task's
+id and context are written as the answer comes back. So a spawn asked again for a name that has an entry never sends a
+second message: an entry with a Task adopts it, and the next pass reads it by GetTask; an entry still being sent by a
+process that lives is left to it; any other is a send whose answer never came back, so whether a Task exists is not
+known, and the spawn fails in words that are no refusal, which the grace window reads `lost` with nothing sent again. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A Task that has ended
 is written into its entry and read from there, with no call, and a session let go of moves to `remote/done/`, so a pass
 asks nothing about a settled task. A GetTask that fails reads the session as it was last seen: an agent unreachable for a
 moment is not a session gone, and a deadline bounds one gone for good. The entry names the harness, never the address.
 
 **A request is bounded.** A pass waits on every harness's observe, so an agent that holds a request would hold the whole
 runtime: each request, the card's included, is given up after `REQUEST_MS` (10 s). A GetTask given up reads the session as
-last seen; a send given up is in doubt, as one that failed on the way is, and ends `lost` past the grace window; a card not
-read refuses the spawn. The send has the same bound, since a spawn runs inside the pass as an observe does: an agent must
-answer a send within 10 s, with a Task as the send's `returnImmediately` asks or with its reply. One that works before it
-answers — a reply in a Message after thirty seconds — is read in doubt on every try, and each try's work is lost to the
-runtime (open issue 34).
+last seen; a card not read refuses the spawn.
+
+**The send leaves the pass** (stage 6 part 2). A spawn runs inside the pass, task by task, so a send it awaited held every
+other task as long. The card and the auth are still read in the pass, so what can refuse before anything is sent still
+does; then the spawn waits `SPAWN_WAIT_MS` (1 s) for the answer. An agent that answers by then is recorded before the spawn
+returns, and its refusal — a 401, a redirect, a content type it does not take — is still `unstartable`. One that has not is
+left to answer within `SEND_MS` (15 minutes), in this process: until it does, every process reads its entry as a Task
+`submitted` (the view's `running (working)`) while the sending process lives, and the answer is written as before — its
+Task, or its reply ended. A refusal that comes after the spawn returned ends the session `rejected`, a `harness` end, its
+words on `logs`; a send that fails on the way, is not answered within `SEND_MS`, or whose process died is in doubt, never
+sent twice, and `lost` past the grace window. A `stop` of a session still being sent cuts the send in the process that makes
+it, and the task settles `stopped`; a Task the agent makes of a send let go of is cancelled when its answer comes. A
+one-shot process that exits at once after its pass (`process.exit`) cuts its sends with it: in doubt, never sent twice. What
+is left of open issue 34 is the crash: a process that dies while a send is under way leaves a Task nobody owns.
 
 **Which binding.** The card's interfaces are read in its order, and the first one this runtime speaks is used for every
 call: JSON-RPC (`JSONRPC`) or REST (`HTTP+JSON`), at A2A 1.0. A card that offers only gRPC, or only a version before 1.0,
@@ -478,7 +488,7 @@ its interfaces elsewhere ends the attempt `unstartable` with nothing sent, since
 Give such an agent by its card, whose interfaces are the caller's own word.
 
 **Auth, and where a secret lives.** As the card declares it: of its security requirements, the first whose every scheme
-the caller's secrets meet, each asked of `credentials` by the scheme's name on the card and the agent's address, on every
+the caller's secrets meet, each asked of `credentials` by the scheme's name on the card, the agent's address and the harness's name, on every
 request, and sent as a header — HTTP `Bearer`, HTTP `Basic` (the secret as `user:password`), an OAuth 2 or OpenID Connect
 token as a bearer (the runtime runs no flow), and an API key in a header. An API key in a query or a cookie, mutual TLS,
 another HTTP scheme, or a secret `credentials` does not give refuses the spawn before any request, the attempt ending
@@ -490,8 +500,9 @@ the caller's function alone: it is on no filing, journal, registry entry or feed
 reads one observe of the harness per pass, `listed` the open sessions (`test/remote-agent.test.ts` prints what it
 measured).
 
-**Not done yet.** A workflow step naming a remote agent (part 2: the orchestrator's harness key, and how a remote step
-signs off); the gRPC binding (part 3); streaming and SubscribeToTask, relayed to the transcript and the feed, and a
+**A workflow step on a remote agent** is agent-orchestrator's (part 2): its README's *A remote A2A agent as a step*.
+
+**Not done yet.** The gRPC binding (part 3); streaming and SubscribeToTask, relayed to the transcript and the feed, and a
 restarted runtime resubscribing (part 4). Later: the runtime's own adapters mounted over HTTP.
 
 ## What a task may say, and what is refused

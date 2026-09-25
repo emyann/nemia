@@ -35,9 +35,9 @@ export type StateWord = 'working' | 'input-required' | 'auth-required' | 'comple
  * One thing the agent does: an artifact published (`data`, or `text`), then a move to `state` with `words` as its status
  * message. A first turn whose first step is a `reply` makes no Task: the agent answers with that Message, `data` beside it.
  * A turn's first step with `after` is taken that many milliseconds late, and nothing of the turn is answered before it:
- * an agent slow to answer a message.
+ * an agent slow to answer a message. With `until`, it is taken once that promise settles: an agent held until the test says.
  */
-export type Step = { state?: StateWord; words?: string; data?: unknown; text?: string; reply?: string; after?: number };
+export type Step = { state?: StateWord; words?: string; data?: unknown; text?: string; reply?: string; after?: number; until?: Promise<unknown> };
 
 /** A message the agent was sent, as its script is handed it: the turn is 1 for the message that made the task, then 2, 3… */
 export type Turn = { taskId: string; contextId: string; text: string; turn: number; metadata: Record<string, unknown> | undefined };
@@ -64,6 +64,8 @@ export type ServerOptions = {
   interfacesAt?: string;
   /** Every request to the A2A routes is answered 307 to this base, its path kept, and reaches no handler. */
   redirectTo?: string;
+  /** Every request to the A2A routes waits this many milliseconds before it is looked at: an agent slow to answer, or to refuse. */
+  slowMs?: number;
 };
 
 export type RemoteServer = {
@@ -178,6 +180,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       });
       const late = steps[0]?.after;
       if (late) await new Promise((resolve) => setTimeout(resolve, late));
+      if (steps[0]?.until) await steps[0].until;
       const reply = turn === 1 ? steps[0]?.reply : undefined;
       if (reply !== undefined) {
         const first = steps[0]!;
@@ -246,10 +249,11 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
     if (hanging.card) return;
     res.json(o.cardForm === 'sdk' ? JSON.parse(JSON.stringify(card())) : AgentCard.toJSON(card()));
   });
-  app.use(`${prefix}/a2a`, (req, res, go) => {
+  app.use(`${prefix}/a2a`, async (req, res, go) => {
     headers.push({ ...req.headers });
     paths.push(req.originalUrl);
     if (hanging.a2a) return;
+    if (o.slowMs) await new Promise((resolve) => setTimeout(resolve, o.slowMs));
     if (o.redirectTo) {
       res.redirect(307, `${o.redirectTo}${req.originalUrl.slice(prefix.length)}`);
       return;

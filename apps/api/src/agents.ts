@@ -306,7 +306,7 @@ export const agents = new Hono()
     if ('status' in place) return c.json({ error: place.error }, place.status);
     const given = draftOf(read.body, read.body.name, route, POST_SHAPE);
     if ('status' in given) return c.json({ error: given.error }, given.status);
-    const answer = saved(place.dir, given.draft, { version: null, schema: given.schema }, 201);
+    const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo: repoOf() }, 201);
     return c.json(answer.body, answer.status);
   })
   // An agent of yours put back — and renamed, when the body names it otherwise — against the version it was read at.

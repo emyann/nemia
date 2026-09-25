@@ -270,6 +270,18 @@ test("a skill in the repository's .claude/skills is on the card of an agent of y
     assert.notEqual(edited.version, courier.version, 'the SKILL.md is digested with the agent');
     await refused(send('PUT', '/api/agents/yours/courier', { name: 'courier', description: 'Carries notes.', skills: 'pass-a-note', keys: { tools: 'Read, Skill' }, body: 'Carry it.', version: courier.version }), 409, /changed since it was read/);
 
+    // At the version just listed, a save and a removal go through: the writer reads the version with the skills the listing found it with.
+    const put = await send('PUT', '/api/agents/yours/courier', { name: 'courier', description: 'Carries notes on.', skills: 'pass-a-note', keys: { tools: 'Read, Skill' }, body: 'Carry it.', version: edited.version });
+    assert.equal(put.status, 200, await put.clone().text());
+    const saved = (await put.json()) as { agent: { version: string } };
+    const relisted = (await listed()).find((a) => a.name === 'courier')!;
+    assert.equal(relisted.description, 'Carries notes on.');
+    assert.equal(saved.agent.version, relisted.version);
+    const gone = await send('DELETE', '/api/agents/yours/courier', { version: relisted.version });
+    assert.equal(gone.status, 200, await gone.clone().text());
+    assert.equal(fs.existsSync(path.join(AGENTS, 'courier.md')), false);
+
+    fs.writeFileSync(path.join(AGENTS, 'courier.md'), '---\ndescription: Carries notes.\nskills: pass-a-note\ntools: Read, Skill\n---\nCarry it.\n');
     fs.rmSync(skill, { recursive: true });
     const lost = (await listed()).find((a) => a.name === 'courier')!;
     assert.equal(lost.error, null, 'the agent still reads: a step that names it is refused where its skill is loaded, not here');

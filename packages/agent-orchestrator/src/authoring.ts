@@ -194,7 +194,8 @@ const inUseByRepo = (name: string, users: readonly string[], repo: string, does:
  * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's
  * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent no longer there or changed
  * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
- * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words.
+ * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words. With `repo`, the
+ * version is read with the skills a start on `repo` finds (`agentSkillsFound`), as the board lists it; without, with those beside the folder.
  *
  * `schema` is the result schema the agent's `output:` names, written beside it with it: a
  * `.json` file's name with no folder, the one that key names, and not a file another agent names — that one is its agent's to change.
@@ -217,10 +218,11 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   const linkWhy = "an agent's file is its own: a write follows a link, and would write into whatever it points at, outside the folder.";
   for (const target of new Set([file(name), file(old)])) if (linked(target)) refuse(linkRefusal(target, linkWhy));
   const renamed = old !== name;
+  const versionOf = (n: string) => agentVersion(at, n, skillsAt(at, repo));
   if (version === null) {
     if (fs.existsSync(file(name))) refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
   } else {
-    const now = agentVersion(at, old);
+    const now = versionOf(old);
     if (now === null) refuse(`${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`, 'missing');
     if (now !== version) refuse(`${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`, 'stale');
   }
@@ -282,7 +284,7 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
   // the board by mistake must not cost a person the schema they wrote: a file nothing names is harmless, and a person
   // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
-  return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
+  return { dir: at, agent, version: versionOf(name)!, written, removed };
 }
 
 /**
@@ -300,7 +302,7 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
   refuse(agentNameRefusal(name));
   const file = path.join(at, `${name}.md`);
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
-  const now = agentVersion(at, name);
+  const now = agentVersion(at, name, skillsAt(at, repo));
   if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, 'missing');
   if (now !== version) refuse(`${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`, 'stale');
   const users = agentUsers(path.dirname(at), name);
@@ -335,6 +337,13 @@ export function placesAround(workflowDir: string): Places {
  * card names the skills a run would be given and its version moves with them.
  */
 export const agentSkillsFound = (dir: string, repo: string): SkillsFound => skillsFor(path.join(path.dirname(path.resolve(dir)), '_'), { repo: path.resolve(repo), home: HOME });
+
+/**
+ * The skills a write's or a removal's version is read with: found as `repo`'s start finds them, as the board's listing reads the version the
+ * write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
+ * repository's `.claude/skills/` would be refused as changed since it was read on every save.
+ */
+const skillsAt = (at: string, repo: string | undefined): SkillsFound | undefined => (repo === undefined ? undefined : agentSkillsFound(at, repo));
 
 /** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
 export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [

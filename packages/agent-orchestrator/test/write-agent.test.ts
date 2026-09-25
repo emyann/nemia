@@ -15,7 +15,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-agent-');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { AgentWriteError, removeAgent, writeAgent } = await import('../src/runner.ts');
+const { AgentWriteError, agentSkillsFound, removeAgent, writeAgent } = await import('../src/runner.ts');
 
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const STORE = path.join(ROOT, 'workflows');
@@ -110,6 +110,27 @@ test('an edit carries the version it read, and a stale one is refused', () => {
   assert.equal((loadAgents(AGENTS).get('scribe') as Agent).keys.effort, 'high');
   refused(() => writeAgent(AGENTS, scribe, { version }), /^agents\/scribe\.md changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)/, 'stale');
   refused(() => removeAgent(AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'stale');
+});
+
+test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
+  fresh();
+  const repo = scratch('wf-agent-repo-');
+  const skill = path.join(repo, '.claude', 'skills', 'pass-a-note');
+  fs.mkdirSync(skill, { recursive: true });
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ndescription: Hands a note on.\n---\nHand it on.\n');
+  const courier: AgentDraft = { name: 'courier', description: 'Carries notes.', skills: ['pass-a-note'], keys: { tools: 'Read, Skill' }, body: 'Carry it.' };
+  const made = writeAgent(AGENTS, courier, { version: null, repo });
+  const listed = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo));
+  assert.equal(made.version, listed, 'the version a write answers is the one the listing reads');
+  assert.notEqual(listed, agentVersion(AGENTS, 'courier'), 'the skill is found only in the repository, so the two readings differ');
+  // Read one way and checked the other, the save is refused as stale though nothing changed.
+  refused(() => writeAgent(AGENTS, courier, { version: agentVersion(AGENTS, 'courier')!, repo }), /^agents\/courier\.md changed since it was read/, 'stale');
+  const saved = writeAgent(AGENTS, { ...courier, description: 'Carries notes on.' }, { version: listed!, repo });
+  // An edit of the SKILL.md between the read and the write is a change, and refused.
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ndescription: Hands a note along.\n---\nHand it on.\n');
+  refused(() => removeAgent(AGENTS, 'courier', { version: saved.version, repo }), /^agents\/courier\.md changed since it was read/, 'stale');
+  const now = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo))!;
+  assert.deepEqual(removeAgent(AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
 });
 
 test('a new agent over one that is there, and an edit of one that is not, are refused', () => {

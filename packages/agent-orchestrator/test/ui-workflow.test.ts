@@ -1,9 +1,10 @@
 /**
  * `workflows/ui/`, the workflow for a change a person will see, held to its shape — so an edit that drops
- * the build check, the screenshots, the look or the loop fails the suite rather than a run. The e2e is the
- * implementer's own run, for the screenshots, and the check's on the merged tree only (since 2026-09-25).
+ * the build check, the screenshots, the look, the loop or the ship fails the suite rather than a run. The e2e is the
+ * implementer's own run, for the screenshots, and the check's on the merged tree only (since 2026-09-25), which the gated ship
+ * runs, as the dev folders' does (since 2026-09-25 too).
  *
- *   implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
+ *   implement ⇄ review → ship   (review: the diff, and implement's screenshots and the pages beside it)
  *
  * Looking is the look skill (`.claude/skills/look/SKILL.md`), which both steps use. It was a step of its own, with a
  * respond to answer both reviewers, until the reviewer ran on Claude and the loop gave the edge back (plan §4 U2).
@@ -50,12 +51,12 @@ function unreachableSkills(step: { body: string; tools?: string[] }): string[] {
   return [...problems];
 }
 
-test('the ui workflow loads as two steps and the loop between them — every declared schema strict, or it would not', () => {
-  assert.deepEqual(ui.map((s) => s.name), ['implement', 'review']);
+test('the ui workflow loads as two steps, the loop between them and the ship after it — every declared schema strict, or it would not', () => {
+  assert.deepEqual(ui.map((s) => s.name), ['implement', 'review', 'ship']);
   assert.deepEqual(ui.filter((s) => s.output).map((s) => [s.name, s.output!.schema.additionalProperties]), [['implement', false], ['review', false]]);
   assert.deepEqual([steps.review?.loop, steps.review?.rounds], ['implement', 3]);
   assert.deepEqual(loopSpan(ui, steps.review!), ['implement', 'review']);
-  assert.deepEqual(terminalSteps(ui).map((s) => s.name), ['review']);
+  assert.deepEqual(terminalSteps(ui).map((s) => s.name), ['ship']);
   // A chain: review works in implement's workspace, so each round it reads the change as it stands.
   assert.deepEqual(workspacePlan(ui, steps.review!), { kind: 'inherit', from: 'implement' });
 });
@@ -78,7 +79,8 @@ test('REFUSED: a step told to use the look skill that could not reach it — no 
   // review has the Skill tool, and its body names the file too. The guard is exercised on a copy without the tool.
   assert.equal(steps.review?.tools?.includes('Skill'), true);
   const fenced = { ...steps.review!, tools: steps.review!.tools!.filter((t) => t !== 'Skill') };
-  for (const step of ui) {
+  // The ship looks at nothing: it merges, and runs the check.
+  for (const step of ui.filter((s) => s.name !== 'ship')) {
     assert.match(said(step.body), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
     assert.deepEqual(unreachableSkills(step), [], step.name);
   }
@@ -125,7 +127,7 @@ const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
 /** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
-test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
+test("every dev* folder, and ui, ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
   const CHECKS: Record<string, string> = {
     // The suite and the types, then the build when git says the work touched the web app, and the e2e on the merged tree alone
     // (web-check.test.ts runs both).
@@ -133,6 +135,9 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
     'dev-planned': DEV_CHECK,
     'dev-build': BUILD,
     'dev-planned-build': BUILD,
+    // ui's is the build folders' line, and so its ship is theirs, note and all; the package's copy is shipped too.
+    ui: BUILD,
+    [path.relative(path.join(REPO, 'workflows'), path.join(WORKFLOWS, 'ui'))]: BUILD,
   };
   for (const [folder, check] of Object.entries(CHECKS)) {
     const dir = path.join(REPO, 'workflows', folder);
@@ -187,6 +192,8 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
   const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
   assert.equal(shipIn('dev-planned'), shipIn('dev'), 'dev-planned');
   assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'), 'dev-planned-build');
+  assert.equal(shipIn('ui'), shipIn('dev-build'), 'ui');
+  assert.equal(fs.readFileSync(path.join(WORKFLOWS, 'ui', 'ship.md'), 'utf8'), shipIn('ui'), "the package's ui");
   assert.ok(shipIn('dev-build').startsWith(shipIn('dev')), 'dev-build is the same wiring, then its note');
   const WHY = ["`npm run build` regenerates the web app's route tree", '`npm run e2e` visits every page in both themes', 'the merged tree is the first tree either has seen'];
   for (const folder of Object.keys(CHECKS)) {
@@ -303,17 +310,20 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
   assert.deepEqual(differences(repository, shipped), []);
   assert.ok(fs.existsSync(path.join(repository, 'README.md')), 'the repository copy says what it is');
 
-  // And the agents its steps name, beside it: the package's agents/ holds ui's two with their skills and their schema, each the repository's byte for byte.
+  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their skills and their schema,
+  // each the repository's byte for byte.
   const agents = path.join(WORKFLOWS, 'agents');
   const theirs = path.join(REPO, 'workflows', 'agents');
-  assert.deepEqual(fs.readdirSync(agents).sort(), ['implement.schema.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json']);
+  assert.deepEqual(fs.readdirSync(agents).sort(), [
+    'implement.schema.json', 'shipper.md', 'shipper.skills.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json',
+  ]);
   for (const file of fs.readdirSync(agents)) assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
 });
 
 test("review is handed implement's screenshots and pages, and not its summary, beside the loop's contract", () => {
   const run: Run = {
     id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Make the Factory darker',
-    workflowDir: path.join(WORKFLOWS, 'ui'), createdAt: '2026-09-13T00:00:00Z', steps: { implement: { taskId: 't1' }, review: { taskId: null } },
+    workflowDir: path.join(WORKFLOWS, 'ui'), createdAt: '2026-09-13T00:00:00Z', steps: { implement: { taskId: 't1' }, review: { taskId: null }, ship: { taskId: null } },
   };
   const shot = '/wf/runs/r-1/artifacts/implement/factory-dark.png';
   const told: Closeout = { outcome: 'done', summary: 'IMPLEMENTER-ACCOUNT', artifacts: [shot], output: { screenshots: [shot], pages: ['/'] } };

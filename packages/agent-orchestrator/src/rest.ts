@@ -25,7 +25,11 @@ export type RestFacts = {
   acted: boolean;
   /** Its notes, which `wf up` prints on every pass that has them. */
   notes: readonly string[];
-  /** Steps whose hand-off is still due: one git refused is tried again on the next pass, with no note. */
+  /**
+   * Steps whose hand-off is still due (`handOffOwed`): one git refused is tried again on the next pass, with no note. Never one whose workspace
+   * is gone, which nothing hands off from: whether a workspace is on disk is read by the pass and not watched by the memo, since nothing but
+   * a filing, which writes the record, makes a step's workspace again.
+   */
   handOffDue: readonly string[];
   /** Whether an ending that lands on its check has not written down how it landed: a merge in the checkout that is not its own waits. */
   landingOwed: boolean;
@@ -47,10 +51,30 @@ const FINAL: ReadonlySet<Assessment['status']> = new Set(['succeeded', 'failed',
  * watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is another
  * run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
  */
-export const atRest = (f: RestFacts): boolean =>
-  (FINAL.has(f.status) || Boolean(f.run.pruned)) && Boolean(f.run.workflow) && !f.run.hold && f.settled && !f.acted
-  && !f.due.ready.length && !f.due.check.length && !f.due.retry.length && !f.due.round.length && !f.due.held.length
-  && !f.notes.length && !f.handOffDue.length && !f.landingOwed && !f.checkoutAsked && !f.waiting.length && !f.inFlight && !f.held;
+export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
+
+/**
+ * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
+ * none for a run at rest. What the tick's check of its memo names when a full pass finds a run not at rest, and what a count of a store's
+ * runs by clause is made of. Pure.
+ */
+export function restBlockers(f: RestFacts): string[] {
+  const out: string[] = [];
+  if (!FINAL.has(f.status) && !f.run.pruned) out.push('status');
+  if (!f.run.workflow) out.push('workflow');
+  if (f.run.hold) out.push('hold');
+  if (!f.settled) out.push('settled');
+  if (f.acted) out.push('acted');
+  for (const key of ['ready', 'check', 'retry', 'round', 'held'] as const) if (f.due[key].length) out.push(`due.${key}`);
+  if (f.notes.length) out.push('notes');
+  if (f.handOffDue.length) out.push('handOffDue');
+  if (f.landingOwed) out.push('landingOwed');
+  if (f.checkoutAsked) out.push('checkoutAsked');
+  if (f.waiting.length) out.push('waiting');
+  if (f.inFlight) out.push('inFlight');
+  if (f.held) out.push('held');
+  return out;
+}
 
 /**
  * The runs among `ids` whose tasks the engine's feed names: a task's id is its run's id and a dash, then the step (`stepTaskId`,

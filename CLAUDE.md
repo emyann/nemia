@@ -406,6 +406,16 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   role key on every step form. And a key that names a file beside the agent is digested twice — `agentVersion` in the package, `versionOf` in
   `apps/api/src/workflows.ts` — or an edit of that file moves the agent's version and not the folder's (learned by the run that added
   `skills:`).
+- **A folder is loaded with the places a start reads, or it is refused where the start accepts it.** Since 2026-09-25 an agent's
+  `skills:` are looked for in the workflow's own root, the repository's `.claude/` and the store's `workflows/` (`lookupRoots`), so
+  `loadWorkflows(dir)` alone refuses a step whose skill is in the repository's `.claude/skills/`, and `agentVersion` without them does not
+  digest it. Every reader outside `wf start` passes `Places` — the api's listing, version and save take `placesOf(repo)` — and a test of a
+  reader puts a skill in `.claude/skills/` to prove it (`apps/api/test/builder.test.ts`, learned by the run that rendered an agent for
+  Claude Code).
+- **A Claude Code step's brief no longer opens with its agent's instructions.** A rendered step's instructions are in
+  `runs/<id>/agents/<step>/prompt.md`, appended to Claude Code's system prompt, and its brief is its own note (`briefBody` in
+  `rendering.ts`); codex, and a step that says `resume:`, still read them in the brief. A test or a fixture that looks for the instructions
+  in a filed brief reads the prompt file for a claude step, and the brief pin of the shipped chain moved with it (same run).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
   there. The package's `workflows/ui` copy has its three agents in the package's `workflows/agents`, held byte for byte by the ui copy

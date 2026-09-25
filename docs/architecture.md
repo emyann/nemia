@@ -54,7 +54,7 @@ Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestra
 `packages/agent-orchestrator/test/boundary.test.ts`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: admission, check, closeout, daemon, deps, feed, inbox, meter, plan, radius, rest, retry, run, timeline, workflow.
+  kinds: admission, check, closeout, daemon, deps, feed, inbox, meter, plan, radius, rendering, rest, retry, run, timeline, workflow.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client: places,
   workflow-store, store, worktree, branches, artifacts, authoring, daemon-store, feed-store, inbox-store, tally. They load as a
   tree. At the bottom are places.ts, workflow-store.ts and tally.ts (the pass's meter), which import no store file. store.ts

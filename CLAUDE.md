@@ -25,7 +25,18 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   live `claude agents` registry and died under contention (plan §4b). Every api test file now imports
   `apps/api/test/harness.ts` first — a fake `claude` first on PATH, the harness the api's engine runs — and
   `harness.test.ts` refuses a file that does not, so a new api test file imports it first. Measured parallel three
-  times in a row with `npx turbo run test --force`: without `--force` turbo replays a cached pass and measures nothing.
+  times in a row with `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass and measures nothing.
+- **A file `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.** Turbo's default,
+  `--continue=never`, kills every task still running when one fails, and `node --test` reports each file it was in the middle of as
+  failed, *Promise resolution is still pending but the event loop has already resolved*, under `Interrupted while running:`. The
+  longest file is nearly always the one in flight, so three checks were read as `detached.test.ts` failing under load, at 20 to 31 s
+  of its 48: the api had failed in one, and a flaky wall-clock bound in `meter-store.test.ts` in two, each named only on the summary's
+  `Failed:` line. `npm test` passes `--continue` (`suite.test.ts` pins it) so every package runs to its end; to measure, type
+  `npx turbo run test --force --continue` (`npm test -- --force` is denied a `dontAsk` step), and read `Failed:` first. It was made to happen on demand by a `--import` hook
+  that ends one web test file 15 s in (learned by the run that looked for a race in the detached worker and found none).
+- **A time measured on a machine is a floor, never a ceiling.** `meter-store.test.ts` spun 30 ms in its fake and wanted the runtime's
+  share under 30: a process parked for 21 ms after the spin failed it at 30.8. Assert what a meter moves as an identity — the phases
+  add up to no more than the pass — and force the park with a load hook that adds the time after the spin (same run).
 - `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite
@@ -33,7 +44,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)
   though three tests pin those folders: the round trip in `agent-orchestrator/test/workflow.test.ts`, the package's `ui`
   copy, file for file, and the api's picture of `dev` and `dev-build` (`apps/api/test/workflows.test.ts`). After touching
-  `workflows/`, run `npx turbo run test --force`, and copy a `workflows/ui` change into
+  `workflows/`, run `npx turbo run test --force --continue`, and copy a `workflows/ui` change into
   `packages/agent-orchestrator/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
 - **A package's former name is refused outside history, and turbo can replay that refusal's pass.** `packages/agent-orchestrator/test/names.test.ts`
   reads every file git lists, tracked or not yet added, and fails on a line naming either package by the name it had before 2026-09-23,
@@ -41,7 +52,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   names a former package fails without the mark and that note in its first five lines), in a store's path
   (`~/.agent-workflows`, `~/.agent-engine`, whose names stay), or on a line that says `renamed on 2026-09-23`. New dated writing that
   quotes the old names joins `HISTORY`. Turbo caches the package's pass by the package's own files, so a change only to a doc or to
-  another package replays it: run `npx turbo run test --force` after such a change (learned by the run that renamed the packages).
+  another package replays it: run `npx turbo run test --force --continue` after such a change (learned by the run that renamed the packages).
 - **Another project is described, never named, history included.** Before the repository went public the owner chose to say what
   two groups of other projects do, in a few words, with no name and no link (an agent kanban; a Go agent SDK, its sandbox runtime and
   an A2A adapter for Claude Code). `packages/agent-orchestrator/test/others.test.ts` reads every file but `package-lock.json` and the

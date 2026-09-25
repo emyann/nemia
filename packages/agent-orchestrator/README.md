@@ -2187,6 +2187,21 @@ up — every 4000ms, ^C to stop
   `workflow:` and no `--workflow` — `--workflow <w>` writes both; a card already queued, with its place, and `--off` to take it
   back first; a card a run was started from; and `--off` beside `--workflow`. `--off` on a card not queued says so, exit 0.
 
+## A task the runtime cannot move: `stalled`
+
+The runtime moves a task only along an edge of its lifecycle (`packages/agent-runtime/README.md`), and an event it has no edge
+for is refused: nothing is done to the task, and it is asked again on every pass. The shipped machine has an edge for every move a
+pass makes, so a refusal means the runtime has met a state its machine does not know — a bug to report, never a step's fault. It is
+not quiet: the runtime's pass reports each (`TickReport.refused`), and `wf up` logs it, stamped beside its other lines, once while it
+lasts and again if it clears and comes back (`refusalLines`), rather than every 4 s:
+
+```text
+14:02:11  add-a-flag-k2q9-implement  stalled: its lifecycle has no edge from working on SESSION_LIVE, so nothing is done; it is asked again each pass
+```
+
+`wf tick` prints every refusal of its one pass. Nothing is observed for it that the pass did not already observe, and a settled
+task is never refused, however many passes read it.
+
 ## One `wf up` per store: `daemon.json`
 
 The tick keeps one writer per file, and two ticks are two writers. So `wf up` takes the store for itself, through a file of its own,

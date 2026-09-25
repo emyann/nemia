@@ -39,6 +39,8 @@
     "auto",
     "--strict-mcp-config",
     "--no-chrome",
+    "--setting-sources",
+    "project,local",
     "--model",
     "opus",
     "--effort",

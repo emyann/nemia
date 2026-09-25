@@ -38,6 +38,11 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   '--permission-mode', r.config?.permissionMode ?? 'auto',
   // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
+  // The checkout's settings and never the operator's: a job reads `.claude/settings.json` and `settings.local.json` of
+  // its cwd, and nothing of `~/.claude/` — the user's mode, allow rules, plugins, skills, hooks, model and effort — so
+  // it does the same on any machine, and an agent's own skills do not share the listing's budget with a person's (F9,
+  // F24; the owner's decision of 2026-09-25). `--settings`, `--plugin-dir` and `--mcp-config` still reach it. One value.
+  '--setting-sources', 'project,local',
   ...(r.config?.model ? ['--model', r.config?.model] : []),
   ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
   // The context window, as for `claude --bg`: `claude -p` compacts past it and still gives its `structured_output` (2.1.278).

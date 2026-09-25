@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, ROLE_KEYS, schemaFileFor, SYSTEM_PROMPTS } from '../src/lib/agents.ts';
+import { choicesOf, deniedWithoutSkill, draftOf, edited, formOf, hasKey, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -16,6 +16,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   cardError: null,
   skills: null,
   systemPrompt: null,
+  given: [],
   source: '',
   version: 'v1',
   usedBy: [],
@@ -141,4 +142,50 @@ test("the skills an agent gives and its system prompt are its own lines: read as
 test('no key that describes the agent itself is a role key the form sends among its keys', () => {
   for (const own of ['description', 'skills', 'systemPrompt']) assert.equal((ROLE_KEYS as readonly string[]).includes(own), false, own);
   assert.deepEqual(SYSTEM_PROMPTS, ['default', 'no-coding', 'own']);
+});
+
+test("the skills line is edited as a list and sent as the line the package reads: in its order, each once, trimmed", () => {
+  assert.deepEqual(skillList(' review-a-change,, write-a-note ,'), ['review-a-change', 'write-a-note']);
+  assert.equal(skillLine(['a', 'b']), 'a, b');
+  assert.equal(withSkill('', 'write-a-note'), 'write-a-note');
+  assert.equal(withSkill('review-a-change', 'write-a-note'), 'review-a-change, write-a-note', 'added last');
+  assert.equal(withSkill('write-a-note ', 'write-a-note'), 'write-a-note ', 'a name given already leaves the line as it was: no edit');
+  assert.equal(withoutSkill('review-a-change, write-a-note', 'review-a-change'), 'write-a-note');
+  assert.equal(withoutSkill('write-a-note', 'write-a-note'), '');
+  // Added and removed through the form, the draft is what the typed line was.
+  const form = formOf(listing());
+  form.skills = withSkill(withSkill(form.skills, 'review-a-change'), 'write-a-note');
+  assert.equal(draftOf(form).skills, 'review-a-change, write-a-note');
+  form.skills = withoutSkill(withoutSkill(form.skills, 'write-a-note'), 'review-a-change');
+  assert.equal(draftOf(form).skills, null, 'every skill removed is the line unset');
+  assert.equal(edited(form, listing()), false);
+});
+
+test("REFUSED before the save is: skills given with tools that leave out Skill, or deny it, as the package reads a tool list", () => {
+  const form = (skills: string, tools = '', disallowedTools = '') => ({ skills, keys: { ...formOf(listing()).keys, tools, disallowedTools } });
+  assert.equal(skillToolGap(form('write-a-note', 'Read, Grep')), 'tools');
+  assert.equal(skillToolGap(form('write-a-note', 'Read, Skill(look)')), 'tools', 'a Skill rule is not the Skill tool: the package wants the entry itself');
+  assert.equal(skillToolGap(form('write-a-note', '', 'Bash, Skill')), 'disallowedTools');
+  assert.equal(skillToolGap(form('write-a-note', 'Read, Skill')), null);
+  assert.equal(skillToolGap(form('write-a-note')), null, 'tools unset: the harness decides');
+  assert.equal(skillToolGap(form('', 'Read')), null, 'no skills, nothing to load');
+  assert.equal(toolsWithSkill('Read, Grep '), 'Read, Grep, Skill');
+  assert.equal(deniedWithoutSkill('Bash, Skill'), 'Bash');
+});
+
+test("the system prompt drawn unset is the default, and picking the default writes it only where the file said it", () => {
+  assert.deepEqual(SYSTEM_PROMPT_CHOICES.map((c) => c.value), [...SYSTEM_PROMPTS], "one choice for each word, in the package's order");
+  assert.deepEqual(SYSTEM_PROMPT_CHOICES.filter((c) => c.expert).map((c) => c.value), ['own'], 'only the one that drops the safety rules is for experts');
+  assert.equal(systemPromptShown(''), 'default');
+  assert.equal(systemPromptShown('no-coding'), 'no-coding');
+  assert.equal(pickSystemPrompt('no-coding', ''), 'no-coding');
+  assert.equal(pickSystemPrompt('default', ''), '', 'unset and back is unset: no systemPrompt: default is written');
+  assert.equal(pickSystemPrompt('default', 'default'), 'default', 'a file that said default keeps saying it');
+  assert.equal(pickSystemPrompt('default', 'own'), '', 'moved to the default, the line is left out');
+  const read = listing();
+  const form = formOf(read);
+  form.systemPrompt = pickSystemPrompt('own', '');
+  assert.equal(draftOf(form).systemPrompt, 'own');
+  form.systemPrompt = pickSystemPrompt('default', '');
+  assert.equal(edited(form, read), false, 'picked and put back is no edit');
 });

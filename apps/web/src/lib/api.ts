@@ -16,6 +16,7 @@ export * from './api/capabilities.ts';
 export * from './api/workflows.ts';
 export * from './api/builder.ts';
 export * from './api/agents.ts';
+export * from './api/skills.ts';
 export * from './api/inbox.ts';
 export * from './api/ceilings.ts';
 export * from './api/daemon.ts';

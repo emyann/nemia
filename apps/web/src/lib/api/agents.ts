@@ -2,6 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { SchemaFile } from './builder.ts';
+import type { GivenSkill } from './skills.ts';
 
 /**
  * Mirrors `AgentSkill` in the package: one thing an agent says it can do, in the A2A protocol's words — `id`, `name`, `description` and
@@ -48,6 +49,8 @@ export type AgentListing = {
   skills: string | null;
   /** `default`, `no-coding` or `own`, as written; null for none, which is `default`. */
   systemPrompt: string | null;
+  /** The skills it gives, one row each in its order: where a start finds it and what it costs a turn, or why none is found. */
+  given: GivenSkill[];
   source: string;
   version: string;
   usedBy: AgentUser[];

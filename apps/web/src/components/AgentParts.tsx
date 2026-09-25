@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import { Link as AriaLink } from 'react-aria-components';
-import type { AgentListing, AgentSkill, AgentUser } from '../lib/api';
+import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
+import { costWords, SOURCE_BADGES } from '../lib/skills';
 import { cn } from '../lib/utils';
 import { routeLink } from './routeLink';
 
@@ -113,5 +115,49 @@ export function AgentRefused({ message, users, from }: { message: string; users:
         </p>
       )}
     </div>
+  );
+}
+
+/** Where a skill an agent is given is found: your library, the repository, what HKB ships — or nowhere, which the package refuses on save. */
+export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
+  return (
+    <span
+      data-skill-from={from ?? 'none'}
+      className={cn(
+        'shrink-0 rounded-full px-2 py-0.5 text-[11px] leading-none font-medium',
+        from === 'yours' && 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
+        from === 'repo' && 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+        from === 'shipped' && 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+        from === null && 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+      )}
+    >
+      {from ? SOURCE_BADGES[from] : 'not found'}
+    </span>
+  );
+}
+
+/**
+ * The skills an agent gives, one row each in its order: its name, where it is found, what it is for, and what it costs a turn — or why no
+ * session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove); read-only, nothing.
+ */
+export function GivenSkills({ rows, action, none }: { rows: readonly GivenSkill[]; action?: (row: GivenSkill) => ReactNode; none: ReactNode }) {
+  if (!rows.length) return <p data-given-none className="text-xs text-neutral-500">{none}</p>;
+  return (
+    <ul data-given-skills className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+      {rows.map((row) => (
+        <li key={row.name} data-given-skill={row.name} className="flex items-start gap-3 px-3 py-2">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200">{row.name}</span>
+              <SkillSourceBadge from={row.from} />
+            </p>
+            {row.entry && <p className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.description}</p>}
+            {row.error !== null && <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">{row.error}</p>}
+            {row.cost && <p data-skill-cost className="text-[11px] text-muted-foreground">{costWords(row.cost)}</p>}
+          </div>
+          {action?.(row)}
+        </li>
+      ))}
+    </ul>
   );
 }

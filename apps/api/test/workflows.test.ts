@@ -364,10 +364,12 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
 
   const shipped = path.join(HOME_REPO, 'packages', 'agent-orchestrator', 'workflows');
   const reviewer = loadWorkflows(shipped).find((s) => s.name === 'review')!;
-  // dev's check: the suite and the types, then the build and the e2e when, and only when, git says the work touched the web app
-  // (packages/agent-orchestrator/test/web-check.test.ts runs it against real git). dev-build's runs them whatever was touched.
-  const devCheck = "npm test && npm run typecheck && { if [ -n \"${WF_BASE_REF:-}\" ]; then range=\"$WF_BASE_REF...HEAD\"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only \"$range\" --) || { echo \"wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess\" >&2; false; }; } && if printf '%s\\n' \"$touched\" | grep -Eq '^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)'; then npm run build && npm run e2e; else echo \"wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e\"; fi";
-  for (const [name, check] of [['dev', devCheck], ['dev-build', 'npm test && npm run typecheck && npm run build && npm run e2e']] as const) {
+  // dev's check: the suite and the types, then the build when, and only when, git says the work touched the web app, and the e2e only
+  // where the run set no WF_BASE_REF — the merged tree, in the shipper's hands (packages/agent-orchestrator/test/web-check.test.ts runs
+  // it against real git). dev-build's builds whatever was touched, and leaves the e2e to the merged tree the same way.
+  const atMerge = "if [ -n \"${WF_BASE_REF:-}\" ]; then echo \"wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set\"; else npm run e2e; fi";
+  const devCheck = "npm test && npm run typecheck && { if [ -n \"${WF_BASE_REF:-}\" ]; then range=\"$WF_BASE_REF...HEAD\"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only \"$range\" --) || { echo \"wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess\" >&2; false; }; } && if printf '%s\\n' \"$touched\" | grep -Eq '^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)'; then npm run build && " + atMerge + "; else echo \"wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e\"; fi";
+  for (const [name, check] of [['dev', devCheck], ['dev-build', `npm test && npm run typecheck && npm run build && ${atMerge}`]] as const) {
     const w = listed.find((x) => x.name === name)!;
     // Each step with its body as the loader read it, which the builder puts back.
     assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);

@@ -974,12 +974,14 @@ test("a step with a `check:` carries its command, and once its check refused, th
       unreadable: null,
     },
   });
-  // Stopped before it printed: no number, no stderr file, and the engine's word that there is no session to read.
+  // Stopped before it printed: no number, no stderr file, and its harness's word that the session it ended as printed nothing.
+  // Read by the id its end was recorded under, with no observe (settled since 2026-09-25): before, this fixture, which has no run
+  // file, read `(no session yet)` off an observe that found none; a real check's worker writes one, and read the same as now.
   assert.deepEqual(checkOf('e2e'), {
     command: 'npm run e2e',
     taskId: 'r-20-e2e-check',
     verdict: 'unfinished',
-    refused: { exit: 'unfinished', stdout: { lines: ['(no session yet)'], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: null },
+    refused: { exit: 'unfinished', stdout: { lines: ['(no output yet)'], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: null },
   });
   // No `check:` in the workflow the run froze.
   for (const name of ['docs', 'notes', 'plan', 'ship']) assert.equal(checkOf(name), null, name);

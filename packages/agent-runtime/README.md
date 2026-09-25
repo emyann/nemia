@@ -1273,9 +1273,16 @@ a loop of twenty reads each against that machine's board (236 tasks), before and
 
 So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks
 `claude agents` only for the Claude Code steps still running. Every read asks the task's own harness and no other —
-`view` as `transcript` and `logs` do — so a view of a `check` or a Codex task, whose harnesses cannot `find`, observes
-that harness's run files and never runs `claude agents`. Until plan §6 item 27 such a view observed every harness, and
-so cost a `claude agents` call and a Codex listing on every read, settled or not. `find` itself took about 2 ms to find
+`view` as `transcript` and `logs` do — so a view of a `check` or a Codex task still running, whose harnesses cannot
+`find`, observes that harness's run files and never runs `claude agents`. Until plan §6 item 27 such a view observed
+every harness, and so cost a `claude agents` call and a Codex listing on every read, settled or not.
+
+A settled task is viewed off its record on every harness, since 2026-09-25: its phase is its outcome, and the one thing a
+sighting gave it — its session's id — is on the record too, the handle its harness reported when the attempt ended, which
+a check's `logs` (its verdict) are read by. Before, a harness that cannot `find` was observed on every view of a task settled
+days ago: with 192 runs in the store, a pass of the tick made 183 observes, 171 of them the `check` harness listing about
+300 run files each — 52,497 listings and about 1.5 s every 4 s. A pass now observes the `check` harness once, and once
+more for each check in flight (`test/settled-view.test.ts`). `find` itself took about 2 ms to find
 a session and 6 ms to find none among the 21 registrations there.
 
 **A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user

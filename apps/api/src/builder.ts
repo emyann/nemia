@@ -20,11 +20,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { HOME, loadAgents, writeWorkflow } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
+import { agentsFor, HOME, loadAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
+import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
@@ -67,10 +67,10 @@ export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: 
 export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /**
- * The keys a step may take from its agent: the agent's keys but the two that describe the agent itself — its description and the skills it
- * says it can do, neither of which a step has. A key added to `AGENT_KEYS` that is not a role key is left out here too, or the cast fails.
+ * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, its card, the skills it is given
+ * and its system prompt, none of which a step has. A key added to `AGENT_KEYS` that is not a role key joins that list, or the cast fails.
  */
-const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, 'description' | 'skills'> => key !== 'description' && key !== 'skills');
+const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, (typeof AGENT_OWN_KEYS)[number]> => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 /** The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in its words. */
 const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
@@ -280,7 +280,7 @@ const namingSchema = (steps: readonly StepDraft[], file: string): string[] => st
  * the folder parsed in memory as `writeWorkflow` parses it, with the schemas read as given and every other file as it is on disk. The package's
  * words, naming the steps. A step's name `writeWorkflow` refuses first is left to it (`unnamed`), which writes nothing on it either.
  */
-function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly SchemaFile[]): BuildRefused | null {
+function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly SchemaFile[], places: Places): BuildRefused | null {
   for (const { file, text } of schemas) {
     let schema: unknown;
     try {
@@ -297,7 +297,7 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
   try {
-    parseFolder(steps.map((step) => [step.name, renderStep(step)] as const), read, loadAgents(agentsDir(dir)));
+    parseFolder(steps.map((step) => [step.name, renderStep(step)] as const), read, agentsFor(dir, places), skillsFor(dir, places));
     return null;
   } catch (err) {
     if (!(err instanceof WorkflowError)) throw err;
@@ -342,11 +342,11 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
  * disk refuses a schema itself, whether it refuses the open (a file read-only among them) or the write after it (the disk full), which leaves
  * the save no more written than a refusal does.
  */
-function write(name: string, dir: string, steps: readonly StepDraft[], readme: string | undefined, schemas: readonly SchemaFile[] = []): WorkflowSaved | BuildRefused {
+function write(name: string, dir: string, places: Places, steps: readonly StepDraft[], readme: string | undefined, schemas: readonly SchemaFile[] = []): WorkflowSaved | BuildRefused {
   const refused = (message: string): BuildRefused => ({ error: message, steps: stepsNamed(message, steps.map((s) => (typeof s.name === 'string' ? s.name : ''))) });
   const writing = unnamed(steps) ? [] : schemas;
   if (writing.length) {
-    const judged = judgedWith(dir, steps, writing);
+    const judged = judgedWith(dir, steps, writing, places);
     if (judged) return judged;
   }
   const before: SchemaWas[] = writing.map(({ file }) => {
@@ -362,7 +362,7 @@ function write(name: string, dir: string, steps: readonly StepDraft[], readme: s
       written.push(before[i]!);
       fs.writeFileSync(path.join(dir, file), text);
     }
-    result = writeWorkflow(dir, steps, readme);
+    result = writeWorkflow(dir, steps, readme, { places });
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -370,7 +370,7 @@ function write(name: string, dir: string, steps: readonly StepDraft[], readme: s
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
   return {
-    workflow: listed(name, 'yours', dir),
+    workflow: listed(name, 'yours', dir, places),
     written: [...result.written, ...schemasWritten].sort(),
     kept: [...result.kept, ...kept].sort(),
     removed: result.removed,
@@ -421,7 +421,7 @@ export const builder = new Hono()
             : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
         }, 409);
       }
-      const saved = write(name, dir, [step], readme.readme);
+      const saved = write(name, dir, placesOf(repo), [step], readme.readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);
     } catch (err) {
@@ -466,14 +466,14 @@ export const builder = new Hono()
         return c.json({ error: `${folder.error}${make}` }, folder.status);
       }
       // What the draft was read from, against what the folder holds now: a step edited, added or removed since would be written over.
-      const now = versionOf(folder.dir);
+      const now = versionOf(folder.dir, placesOf(repo));
       if (now !== body.version) {
         return c.json({
           error: `${folder.dir} has changed since it was read at version ${body.version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
           steps: [],
         }, 409);
       }
-      const saved = write(name, folder.dir, steps, readme.readme, schemas);
+      const saved = write(name, folder.dir, placesOf(repo), steps, readme.readme, schemas);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     } catch (err) {

@@ -3,7 +3,7 @@
  * its id, its workflow and the steps it is judged by, and the feed's filing times — read on from where the last read stopped.
  */
 import fs from 'node:fs';
-import { engine, listRuns, loadWorkflows, readFilings } from 'agent-orchestrator';
+import { engine, HOME, listRuns, loadWorkflows, readFilings } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
@@ -63,7 +63,8 @@ export const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) 
  */
 export function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   try {
-    return { steps: loadWorkflows(run.workflowDir), warning: null };
+    // Its agents and skills looked for where the start looked: the run's repository's `.claude/`, then yours.
+    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home: HOME }), warning: null };
   } catch (err) {
     const why = fs.existsSync(run.workflowDir)
       ? `The workflow folder ${run.workflowDir} no longer reads as a workflow: ${(err as Error).message}.`

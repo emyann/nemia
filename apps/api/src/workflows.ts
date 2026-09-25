@@ -18,8 +18,8 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { HOME, inboxDir, inboxNameRefusal, listRuns, loadAgents, loadWorkflows, start, startFromInbox, workflowDescription } from 'agent-orchestrator';
-import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
+import { agentsFor, agentVersion, HOME, inboxDir, inboxNameRefusal, listRuns, loadWorkflows, lookupRoots, skillsFor, start, startFromInbox, workflowDescription, type Places } from 'agent-orchestrator';
+import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, SKILLS_FOLDER, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -149,17 +149,24 @@ export const sourcesOf = (repo: string, home: string = HOME): Array<{ from: Work
 
 /** Every workflow `repo` and `home` have: each folder in each source, by name. Loads every folder, so each can say whether it reads. */
 export function listWorkflows(repo: string, home: string = HOME): WorkflowListing[] {
-  return sourcesOf(repo, home).flatMap(({ from, dir }) => foldersIn(dir).map((name) => listed(name, from, path.join(dir, name))));
+  return sourcesOf(repo, home).flatMap(({ from, dir }) => foldersIn(dir).map((name) => listed(name, from, path.join(dir, name), { repo, home })));
 }
 
+/**
+ * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the repository's
+ * `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so the board shows a
+ * folder as a start would read it.
+ */
+export const placesOf = (repo: string, home: string = HOME): Places => ({ repo, home });
+
 /** One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. */
-export function listed(name: string, from: WorkflowSource, dir: string): WorkflowListing {
+export function listed(name: string, from: WorkflowSource, dir: string, places: Places): WorkflowListing {
   const description = workflowDescription(dir);
   const schemas = schemasIn(dir);
-  const version = versionOf(dir);
+  const version = versionOf(dir, places);
   let steps: Workflow[];
   try {
-    steps = loadWorkflows(dir);
+    steps = loadWorkflows(dir, places);
   } catch (err) {
     return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, folderTeam: false, version, error: messageOf(err) };
   }
@@ -179,11 +186,12 @@ const listedStep = (step: Workflow): ListedStep => ({
  * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
  * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
  * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder, and each file that agent names
- * beside it — the schema of its `output:`, the skills of its `skills:`: what the board shows a step with an agent is the agent's keys, words,
- * declared fields and skills as much as the step's, and an agent edited since is a step the board no longer shows as it is.
+ * changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its file, where the load
+ * finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill folder its `skills:` gives:
+ * what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as the step's, and an agent edited
+ * since is a step the board no longer shows as it is.
  */
-export function versionOf(dir: string): string {
+export function versionOf(dir: string, places: Places): string {
   let names: string[];
   try {
     names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
@@ -199,10 +207,10 @@ export function versionOf(dir: string): string {
   };
   const files = names.map((name) => [name, read(path.join(dir, name))] as const);
   const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
-  const agents = named.flatMap((agent) => {
-    const text = read(path.join(agentsDir(dir), `${agent}.md`));
-    const beside = typeof text === 'string' ? (['output', 'skills'] as const).flatMap((key) => frontmatterValue(text, key)) : [];
-    return [[`${AGENTS_FOLDER}/${agent}.md`, text], ...beside.map((file) => [`${AGENTS_FOLDER}/${file}`, read(path.resolve(agentsDir(dir), file))])];
+  const skills = named.length ? skillsFor(dir, places) : undefined;
+  const agents = named.map((agent) => {
+    const root = lookupRoots(dir, places).find((at) => fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }));
+    return [agent, root === undefined ? { missing: agent } : { at: root, version: agentVersion(path.join(root, AGENTS_FOLDER), agent, skills) }];
   });
   return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
 }
@@ -212,7 +220,7 @@ export function versionOf(dir: string): string {
  * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
  * closes (the load refuses it). A name with a slash names no file of agents/.
  */
-function frontmatterValue(text: string, key: 'agent' | 'output' | 'skills'): string[] {
+function frontmatterValue(text: string, key: 'agent'): string[] {
   let block: string | null;
   try {
     block = splitFrontmatter('', text).block;
@@ -224,7 +232,7 @@ function frontmatterValue(text: string, key: 'agent' | 'output' | 'skills'): str
     const i = line.indexOf(':');
     if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
     const value = line.slice(i + 1).trim();
-    return value && (key !== 'agent' || !/[\\/]/.test(value)) ? [value] : [];
+    return value && !/[\\/]/.test(value) ? [value] : [];
   }
   return [];
 }
@@ -270,7 +278,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
 /**
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a
  * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
- * can name it; nor is `agents/`, whose files are the agents the workflows beside it name.
+ * can name it; nor is `agents/`, whose files are the agents the workflows beside it name, nor `skills/`, the skills those agents give.
  */
 export function foldersIn(dir: string): string[] {
   let names: string[];
@@ -281,7 +289,7 @@ export function foldersIn(dir: string): string[] {
     throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`);
   }
   return names.filter((name) => {
-    if (name.startsWith('.') || name === AGENTS_FOLDER) return false;
+    if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
     try {
       return fs.statSync(path.join(dir, name)).isDirectory();
     } catch {
@@ -410,7 +418,7 @@ export const workflows = new Hono()
       if ('status' in folder) return c.json({ error: folder.error }, folder.status);
       let steps: Workflow[];
       try {
-        steps = loadWorkflows(folder.dir);
+        steps = loadWorkflows(folder.dir, placesOf(repoOf()));
       } catch (err) {
         // The loader's refusal, word for word: the folder is listed with it, and has no step to show.
         return c.json({ error: messageOf(err) }, 422);
@@ -420,9 +428,10 @@ export const workflows = new Hono()
         return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` }, 404);
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      // The step's resolved agent carries its keys and words, not its skills: those are read from the agent's own file, beside the folder.
-      const attached = found.agent ? loadAgents(agentsDir(folder.dir)).get(found.agent.name) : undefined;
-      const agentSkills = attached instanceof Error || attached === undefined ? null : attached.skills?.list ?? null;
+      // The step's resolved agent carries its keys and words, not what its card says it can do: that is read from the agent's own file, where
+      // the load found it. `agentSkills` are the card's A2A skills, not the Claude Code skills its `skills:` gives a session.
+      const attached = found.agent ? agentsFor(folder.dir, placesOf(repoOf())).get(found.agent.name) : undefined;
+      const agentSkills = attached instanceof Error || attached === undefined ? null : attached.card?.list ?? null;
       return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found), agentSkills } satisfies WorkflowStepPage);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);

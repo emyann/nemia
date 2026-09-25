@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
-import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, skillsFileFor, type AgentForm as Form } from '../lib/agents';
+import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, cardFileFor, SYSTEM_PROMPTS, type AgentForm as Form } from '../lib/agents';
 
 /** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
 const UNSET = '(unset)';
@@ -104,20 +104,20 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
         <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What it can do</legend>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
-            label="Skills file"
-            hint={`skills: — a list of A2A skills beside the agent. Pasting one with no file names it ${skillsFileFor(form.name)}.`}
-            value={form.skillsFile}
-            onChange={(skillsFile) => setForm((f) => ({ ...f, skillsFile }))}
+            label="Card file"
+            hint={`card: — a list of A2A skills beside the agent. Pasting one with no file names it ${cardFileFor(form.name)}.`}
+            value={form.cardFile}
+            onChange={(cardFile) => setForm((f) => ({ ...f, cardFile }))}
             readOnly={readOnly}
             mono
-            placeholder={listing ? undefined : skillsFileFor(form.name)}
+            placeholder={listing ? undefined : cardFileFor(form.name)}
           />
           <Field
             className="sm:col-span-2"
-            label="Its skills"
+            label="Its card"
             hint='Each one { "id", "name", "description", "tags" } — the A2A Agent Card’s skills, which describe what it can do and fence nothing.'
-            value={form.skillsText}
-            onChange={(skillsText) => setForm((f) => ({ ...f, skillsText }))}
+            value={form.cardText}
+            onChange={(cardText) => setForm((f) => ({ ...f, cardText }))}
             readOnly={readOnly}
             mono
             area="min-h-24"
@@ -166,9 +166,33 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
         </div>
       </fieldset>
 
+      <fieldset className="space-y-3">
+        <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What its sessions are told</legend>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field
+            className="sm:col-span-2"
+            label="Skills"
+            hint="skills: — the skills its Claude Code sessions are given, by name, comma-separated: each a folder with a SKILL.md under skills/ beside agents/, or the repository's .claude/skills/. Its tools must include Skill."
+            value={form.skills}
+            onChange={(skills) => setForm((f) => ({ ...f, skills }))}
+            readOnly={readOnly}
+            mono
+            placeholder={listing ? undefined : 'review-a-change, write-a-note'}
+          />
+          <Choice
+            label="System prompt"
+            hint="Claude Code's own prompt with the instructions after it (default), the same less its coding instructions (no-coding), or the instructions alone (own)."
+            value={form.systemPrompt}
+            choices={SYSTEM_PROMPTS}
+            onChange={(systemPrompt) => setForm((f) => ({ ...f, systemPrompt }))}
+            readOnly={readOnly}
+          />
+        </div>
+      </fieldset>
+
       <Field
         label="Instructions"
-        hint="What every node that names it is told first, in markdown; a node's own note follows."
+        hint="What every node that names it is told, in markdown: on Claude Code, after its system prompt, and a node's own note is its brief; on codex, first in its brief, before the node's own note."
         value={form.body}
         onChange={(body) => setForm((f) => ({ ...f, body }))}
         readOnly={readOnly}

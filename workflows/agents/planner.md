@@ -1,6 +1,6 @@
 ---
 description: Plans a change read-only before anyone makes it — approach, files, steps and risks — and asks when the request reads two ways.
-skills: planner.skills.json
+card: planner.skills.json
 harness: claude
 model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,

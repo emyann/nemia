@@ -98,6 +98,11 @@ export type HarnessSpec = {
    */
   contextTokens?: { least: number; most: number };
   /**
+   * The harness is Claude Code, and `command` hands a task's `config.claude` to it as flags (`claudeFlagsOf`). Absent: the
+   * harness has no such flags, and `file()` refuses a task that carries any rather than start a session without them.
+   */
+  claudeFlags?: true;
+  /**
    * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
    * `claude -p --resume` since 2.1.278 (open issue 4). Set, the run file keeps the id it resumed, and `observe` takes the
    * parent's printed totals off — the latest run started before it under that id, as its own output read them. Where

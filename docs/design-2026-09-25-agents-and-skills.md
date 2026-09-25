@@ -37,7 +37,11 @@ it, with the fix in the message.
 
 ## At spawn, for Claude Code
 
-Nothing changes but two flags; the runtime's other flags and `--resume` behave the same (F12, F13).
+Nothing changes but two flags; the runtime's other flags and `--resume` behave the same (F12, F13). They travel on the engine's task as
+`config.claude`, Claude Code's own flags keyed in camelCase (`{ appendSystemPromptFile, pluginDir, settings }`), which the runtime
+hands over directly before `--permission-mode` and reads nothing of; a flag the runtime gives itself is refused there, and so is the
+bag on a harness that is not Claude Code. What the step is given is rendered at `wf start` into `runs/<id>/agents/<step>/`, outside
+every worktree and outside `~/.claude/`, and frozen with the run.
 
 - The body → `--append-system-prompt-file <file>` (F1). Today it is a paragraph of the brief, a user message.
 - The composed skills → one plugin directory HKB writes for the step, `hkb-<agent>/skills/<name>/SKILL.md`, passed as `--plugin-dir`
@@ -69,11 +73,15 @@ Nothing changes but two flags; the runtime's other flags and `--resume` behave t
 
 | | agents | skills |
 |---|---|---|
-| store (user level) | `~/.agent-workflows/agents/` | `~/.agent-workflows/skills/` |
-| repository | `workflows/agents/` (and `.claude/agents/`, read) | `.claude/skills/` |
+| store (user level) | `~/.agent-workflows/workflows/agents/` | `~/.agent-workflows/workflows/skills/` |
+| repository | `workflows/agents/` (and `.claude/agents/`, read) | `workflows/skills/` (and `.claude/skills/`, read) |
 
-A name found in both: the repository's wins, as Claude Code's project level beats its user level. The rendering resolves the clash
-before it writes the step's plugin directory, so the session sees one skill per name.
+The store's are beside the store's workflows, where its agents already were (`~/.agent-workflows` is `WF_ROOT`). A name is looked for
+in the workflow folder's own root first (`workflows/`, beside the folder), then in the repository's `.claude/`, then in the store: for
+a workflow of a repository, the repository's wins, as Claude Code's project level beats its user level. A store workflow's own root is
+the store, so its agents and skills are the store's first. A skill found in both `workflows/skills/` and `.claude/skills/` of one
+repository is refused, naming both: a session in that repository would be offered the project skill and HKB's copy of the other. The
+rendering resolves the order before it writes the step's plugin directory, so the session sees one skill per name.
 
 ## Codex
 
@@ -96,8 +104,12 @@ out until Codex has a place for them, and the load says so for a codex agent tha
 
 ## Build cards, in order
 
-1. **Render an agent for Claude Code**: `--append-system-prompt-file`, the per-step `--plugin-dir`, `systemPrompt`, the `Skill` guard,
-   the store and repository lookup of agents and skills; the shipped agents' procedures moved into `SKILL.md` skills.
+1. **Render an agent for Claude Code**, cut in two by the plan of 2026-09-25:
+   - **1a, the machinery**: `config.claude` in the runtime; `skills:` as names, `card:` for today's `.skills.json` (a legacy
+     `skills: <x>.json` line is still read as `card:`, and `wf start` names it); `systemPrompt`; the `Skill` guard, the `auto` guard
+     and the codex refusal at load; the store and repository lookup; `--append-system-prompt-file`, the per-step `--plugin-dir` and
+     the `no-coding` output style, rendered at `wf start`. The shipped agents change one line each, `skills:` to `card:`.
+   - **1b, the shipped agents**: their procedures moved into `SKILL.md` skills, their bodies cut to the role and its limits.
 2. **The card from the skills**: the A2A card generated from composed skills; the `.skills.json` files retired.
 3. **The board**: compose skills on an agent from a list, write a new skill, try an agent on a short brief.
 4. **Jobs without user settings**, if open question 1 is decided that way.

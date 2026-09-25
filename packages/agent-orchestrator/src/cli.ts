@@ -117,7 +117,8 @@ const HELP = `wf — run a workflow of agent steps
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
   wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
-                               for, and what it says it can do (its skills:)
+                               for, what it says it can do (its card:), and the skills it is
+                               given (its skills:)
   wf agents card <name> [--repo .] [--from repo|yours]
                                that agent in the shape of an A2A Agent Card, JSON on stdout and
                                nothing else — every field the protocol marks REQUIRED but
@@ -1397,8 +1398,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (const { from, name, agent } of agents) {
         if (agent instanceof Error) { console.log(`${name}  ${from}  does not read: ${agent.message.split('\n')[0]}`); continue; }
         console.log(`${name}  ${from}  ${agent.description ?? 'no description:'}`);
-        for (const skill of agent.skills?.list ?? []) console.log(`   ${skill.id}  ${skill.name} — ${skill.description}`);
-        if (!agent.skills) console.log(`   says nothing it can do — give it a skills: file beside it`);
+        for (const skill of agent.card?.list ?? []) console.log(`   ${skill.id}  ${skill.name} — ${skill.description}`);
+        if (!agent.card) console.log(`   says nothing it can do — give it a card: file beside it`);
+        if (agent.skills?.length) console.log(`   given the skills ${agent.skills.join(', ')}`);
+        if (agent.systemPrompt !== undefined && agent.systemPrompt !== 'default') console.log(`   system prompt: ${agent.systemPrompt}`);
       }
       console.log(`\none in A2A's shape: wf agents card <name>`);
       return;

@@ -36,7 +36,7 @@ const SKILL = { id: 'read-a-thing', name: 'Read a thing', description: 'Reads it
 /** An agent in a `<workflows>/agents`, with its skills beside it. */
 const anAgent = (at: string, name: string, description: string, skills: unknown[] = [SKILL]) => {
   fs.mkdirSync(at, { recursive: true });
-  fs.writeFileSync(path.join(at, `${name}.md`), `---\ndescription: ${description}\nskills: ${name}.skills.json\n---\nDo the thing.\n`);
+  fs.writeFileSync(path.join(at, `${name}.md`), `---\ndescription: ${description}\ncard: ${name}.skills.json\n---\nDo the thing.\n`);
   fs.writeFileSync(path.join(at, `${name}.skills.json`), `${JSON.stringify(skills, null, 2)}\n`);
 };
 
@@ -66,7 +66,7 @@ test('wf agents says so of an agent with no skills, rather than leaving it looki
   const repo = repoAt('bare');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'mute.md'), '---\ndescription: Says nothing.\n---\nDo it.\n');
   const { out } = await printedBy(t as Mock, 'agents', '--repo', repo);
-  assert.match(out, /says nothing it can do — give it a skills: file beside it/);
+  assert.match(out, /says nothing it can do — give it a card: file beside it/);
 });
 
 test('wf agents card prints the card alone on stdout, and what it is not on stderr', async (t) => {
@@ -109,7 +109,7 @@ test('REFUSED at shipped defaults: a card for an agent whose skills file does no
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.skills.json'), '[]\n');
   await assert.rejects(() => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo), (err: Error) => {
-    assert.match(err.message, /^agents\/scribe\.md: `skills: scribe\.skills\.json` is an empty list, and an agent with no skills says nothing it can do\./);
+    assert.match(err.message, /^agents\/scribe\.md: `card: scribe\.skills\.json` is an empty list, and an agent with no skills says nothing it can do\./);
     return true;
   });
 });

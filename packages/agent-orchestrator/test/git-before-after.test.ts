@@ -27,7 +27,11 @@
  * each ship's check became its implement's new line, and the shipper's fourth item and the build ships' note say that check runs the
  * e2e no round's check ran. Past the briefs, the ui folders' `succeeded` pins moved to `checking` and `running`, as the dev folders' had.
  * And when planners and reviewers were given git's other read-only verbs (2026-09-25): every plan and review brief names them, from the
- * step's own directory, and the diff was that sentence, sixteen times — and nothing past the briefs.)
+ * step's own directory, and the diff was that sentence, sixteen times — and nothing past the briefs.
+ * And when an agent was rendered for Claude Code (2026-09-25, card 1 of the agents-and-skills design): a step whose agent has instructions
+ * is told them in its system prompt (`--append-system-prompt-file`), and its brief opens on its own note, or on *What was asked for* when it
+ * has none. Every one of the forty briefs moved, each exactly by its agent's instructions and the blank line after them, checked by
+ * script — old brief = instructions, a blank line, new brief — and nothing past the briefs: plans, phases and forget lines stand.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

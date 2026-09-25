@@ -29,7 +29,7 @@ import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-s
 import type { Observed, Sighting, Usage } from './domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './runner-claude-transcript.ts';
-import { worktreeName } from './runner-claude-vocabulary.ts';
+import { claudeFlagsOf, worktreeName } from './runner-claude-vocabulary.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
@@ -383,6 +383,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt
       // taken as its name — so it goes here, where the `--permission-mode` that always follows cannot be taken for one.
       ...(r.config?.remoteControl ? ['--remote-control'] : []),
+      // The caller's own flags (`config.claude`), as a job is given them: after the variadic lists, before the mode.
+      ...claudeFlagsOf(r.config?.claude),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
       // session that wants to run its own tests stops and waits for a person who is not there.

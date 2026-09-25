@@ -42,7 +42,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `remoteControl`, `worktree`, `budgetUsd` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+`contextTokens`, `remoteControl`, `worktree`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -503,7 +503,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `priority` at any value, which is retired (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` at any value, which is retired (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -738,6 +738,25 @@ the prompt as the session's name. So it goes before `--permission-mode`, which a
 Claude Code names the session itself. `remoteControl: false` asks for nothing and is filed on any harness; a value that
 is not true or false is refused. It is not a key a brief has. What it leaves open — nothing reads whether a session was
 bridged, and what a person types into it from the web is not journalled — is open issue 23.
+
+## Claude Code's own flags: `claude`
+
+`config: { claude: { appendSystemPromptFile: '/…/prompt.md', pluginDir: ['/…/hkb-note'] } }` hands Claude Code flags as they
+are written: a key is the long flag in camelCase (`--append-system-prompt-file`), `true` the flag alone, a string or a number
+the flag and its value, and a list the flag once per entry. They go after the variadic lists and directly before
+`--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The four
+agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings` — are typed
+(`ClaudeFlags`), and any other the CLI has is taken. It is how an agent's body reaches the system prompt and its skills a
+plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
+
+`file()` refuses a `claude` that is not an object of camelCase keys, two letters or more, whose values each say one thing
+on the command line (`false`, `null`, `''`, an object and an empty list do not); a flag the runtime gives itself
+(`CLAUDE_OWNED_FLAGS`: `model`, `permissionMode`, `tools`, `resume`, `jsonSchema` and the rest, which are harness arguments
+of their own or the runtime's to give — every spawn's argv is held to that list by `test/claude-code.test.ts`); and the
+bag on a harness that is not Claude Code — `codex`, or a `HarnessSpec` that does not say `claudeFlags: true` — whose
+session would start without it. There is no `codex` bag: `config.codex` is no harness argument. A flag the CLI does not
+have is not refused here: Claude Code 2.1.282 exits 1 at its start with `error: unknown option '--frobnicate'` on its
+stderr, the attempt ends `failed` with that exit code, and the words are in the attempt's `logs`.
 
 ## Queued and admitted: `queued`, `admit`
 

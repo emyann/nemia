@@ -942,6 +942,29 @@ test('`retries: 1` re-files a step its check refused, once, continuing its sessi
   assert.deepEqual([l.waitingOnYou, l.steps[0]!.note], [['implement'], 'try 2, by retries: 1']);
 });
 
+test('`wf retry --model haiku` on a Claude Code step in `auto` is refused and writes no ask — named or by default; another mode, a model that keeps it, or codex, is asked (F21)', async () => {
+  // Shipped defaults: a step that names no mode is filed in `auto`, and Claude Code runs haiku in `default` there.
+  const { run, e } = await throughCheck('check: npm test', 'failed', 1);
+  for (const model of ['haiku', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
+    const said = await refusal(retry(e, run.id, 'implement', { mode: 'fresh', model }));
+    assert.ok(said.startsWith(`\`--model ${model}\`: implement names no \`permissionMode:\`, so it is filed in \`auto\`, the runtime's default, and Claude Code drops \`auto\``), said);
+    assert.match(said, /F21/);
+    assert.match(said, new RegExp(`wf retry ${run.id} implement --model sonnet`));
+  }
+  assert.deepEqual(asksOf(run.id), [], 'nothing written');
+
+  const named = await throughCheck('check: npm test\npermissionMode: auto', 'failed', 1);
+  assert.match(await refusal(retry(named.e, named.run.id, 'implement', { mode: 'fresh', model: 'haiku' })), /^`--model haiku`: implement says `permissionMode: auto`/);
+  assert.deepEqual(asksOf(named.run.id), []);
+
+  // What keeps what the step asked for is asked, and written.
+  assert.equal((await retry(e, run.id, 'implement', { mode: 'fresh', model: 'sonnet' })).ask.model, 'sonnet');
+  const fenced = await throughCheck('check: npm test\npermissionMode: dontAsk', 'failed', 1);
+  assert.equal((await retry(fenced.e, fenced.run.id, 'implement', { mode: 'fresh', model: 'haiku' })).ask.model, 'haiku');
+  const codex = await throughCheck('check: npm test\nharness: codex', 'failed', 1);
+  assert.equal((await retry(codex.e, codex.run.id, 'implement', { mode: 'fresh', model: 'haiku' })).ask.model, 'haiku');
+});
+
 test("`wf retry` writes a person's ask, and the tick honours it once: a second pass files nothing, and the ask is consumed whole, never edited", async () => {
   const { run, e, tasks, filings } = await throughCheck('check: npm test', 'failed', 1);
   const { ask, file } = await retry(e, run.id, 'implement', { mode: 'fresh', model: 'opus' });

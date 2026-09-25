@@ -20,7 +20,9 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
 const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/builder.ts');
-const { listWorkflows, versionOf } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf: versionIn } = await import('../src/workflows.ts');
+/** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
+const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 const { loadWorkflows, writeWorkflow } = await import('agent-orchestrator');
 const { AGENT_KEYS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type KeyForm = import('../src/builder.ts').KeyForm;
@@ -123,10 +125,13 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  // The role keys are the agent keys a step has too: what the builder may set on the node. `description` and `skills` say what the agent is
-  // and what it can do, and belong to no step, so neither is on the step form and neither is ever written into a step file.
-  assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => k !== 'description' && k !== 'skills'));
-  for (const own of ['description', 'skills']) assert.equal(form.roleKeys.includes(own as never), false, own);
+  // The role keys are the agent keys a step has too: what the builder may set on the node. `description`, `card`, `skills` and `systemPrompt`
+  // say what the agent is, what it can do, what it is given and what becomes of its system prompt, and belong to no step, so none is on the
+  // step form and none is ever written into a step file. Written out, so a key added to AGENT_KEYS is decided here, not inherited.
+  const OWN = ['description', 'card', 'skills', 'systemPrompt'];
+  assert.deepEqual(form.roleKeys, ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output']);
+  assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => !OWN.includes(k)));
+  for (const own of OWN) assert.equal(form.roleKeys.includes(own as never), false, own);
 
   // The kinds held to the parser. A count is what the parser refuses as "not a count", and nothing else is: in a folder where every key can be
   // read — `b` waits on `a`, loops to it, and declares `again` — each key set to a word that is not a number.
@@ -249,6 +254,44 @@ test("versionOf reads `agent:` as the parser does — indented, or with a space 
     const again = versionOf(dir);
     write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' }, line: { type: 'number' } }, required: ['verdict', 'line'], additionalProperties: false }));
     assert.notEqual(versionOf(dir), again, `${folder}: an edit of the schema its agent declares`);
+  }
+});
+
+test("a folder whose agent's skill is in the repository's `.claude/skills/` is listed, versioned and saved as a start reads it — and one no place has is the package's 422", async () => {
+  const skill = path.join(repo, '.claude', 'skills', 'mind-the-cache', 'SKILL.md');
+  write(skill, '---\nname: mind-the-cache\ndescription: Use this when a change touches the cache.\n---\nRead the cache first.\n');
+  write(path.join(STORE, 'agents', 'cacher.md'), '---\ntools: Read, Skill\nskills: mind-the-cache\n---\nYou mind the cache.\n');
+  const dir = path.join(STORE, 'skilled');
+  write(path.join(dir, 'build.md'), '---\nagent: cacher\n---\n');
+  try {
+    // Read with its own place alone, the skill is not there; the board reads with the repository's and yours, as `wf start --repo` does.
+    assert.throws(() => loadWorkflows(dir), (e: Error) => /gives the skill `mind-the-cache`, and no skills folder has it/.test(e.message));
+    const listing = listWorkflows(repo, root).find((w) => w.name === 'skilled' && w.from === 'yours');
+    assert.equal(listing?.error, null, JSON.stringify(listing?.error));
+    const [build] = await listedSteps('skilled');
+    // Its version moves with the skill's folder: the board would otherwise save over an edit it never read.
+    const at = versionOf(dir);
+    fs.appendFileSync(skill, 'And say so.\n');
+    const edited = versionOf(dir);
+    assert.notEqual(edited, at, 'an edit of the skill the agent names');
+    write(path.join(path.dirname(skill), 'notes.md'), 'A file beside SKILL.md.\n');
+    assert.notEqual(versionOf(dir), edited, 'a file added to the skill');
+    // Saved as listed: judged and written with the same places, so a folder that reads on the board saves.
+    let res = await put('skilled', { steps: [build] });
+    assert.equal(res.status, 200, await res.clone().text());
+    // The skill gone from every place: the package's refusal, naming where it looked, and nothing written.
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true });
+    const before = snapshot(dir);
+    res = await put('skilled', { steps: [build] });
+    assert.equal(res.status, 422);
+    const refused = (await res.json()) as BuildRefused;
+    assert.match(refused.error, /^build: `agent: cacher` gives the skill `mind-the-cache`, and no skills folder has it — looked in /);
+    assert.ok(refused.error.includes(path.join(repo, '.claude', 'skills')), refused.error);
+    assert.deepEqual(snapshot(dir), before);
+  } finally {
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(path.join(STORE, 'agents', 'cacher.md'));
   }
 });
 

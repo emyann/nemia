@@ -9,12 +9,12 @@ import path from 'node:path';
 import { HARNESSES } from './runtime-client.ts';
 import { refusalLines } from './deps.ts';
 import { fansOut, isFolderTeam, WorkflowError, type Workflow } from './workflow.ts';
-import { loadWorkflows, workflowFolder, workflowsIn } from './workflow-store.ts';
+import { loadWorkflows, skillsFor, workflowFolder, workflowsIn, type Places } from './workflow-store.ts';
 import { inboxListing, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxCard, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { workRoot } from './places.ts';
 import { afterRefusal, gateRefusal, inputRefusal, isGitRun, type InputFile, type Run } from './run.ts';
-import { inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, writeRun } from './store.ts';
+import { HOME, inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, writeAgentFiles, writeRun } from './store.ts';
 import { makeWorkspace, readInclude } from './worktree.ts';
 import { parentRecord } from './branches.ts';
 import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
@@ -53,8 +53,8 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
  * (`loadWorkflows`), one that can run two steps at once where they would share a directory (`isolate: false`), and a step named for another
  * step's check or try. What `startPlan` asks of every card before the first run is started.
  */
-function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
-  const steps = loadWorkflows(workflowDir);   // validated before anything is spent
+function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
+  const steps = loadWorkflows(workflowDir, places);   // validated before anything is spent
   // A team that says `workspace: folder` (every step or none: `validate`) works in folders the run makes, where there is no base branch to
   // work on in place: --no-worktree would name one, so it is refused rather than read as nothing.
   if (!isolate && isFolderTeam(steps)) {
@@ -127,7 +127,9 @@ function refuseInclude(repo: string, isolate: boolean): void {
  */
 export function start(opts: { brief: string; repo: string; repoNamed?: boolean; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string }; gates?: readonly string[] }): Run {
   const isolate = opts.isolate ?? true;
-  const steps = stepsToStart(opts.workflowDir, isolate);
+  // Where the steps' agents and skills are looked for, beside the folder's own: the repository the run was started on, then the store.
+  const places = placesOf(opts.repo);
+  const steps = stepsToStart(opts.workflowDir, isolate, places);
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) {
     throw Object.assign(new Error(
@@ -193,9 +195,19 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
       throw Object.assign(new Error(`--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
     }
   }
+  // Rendered before the record is written too, for the same reason; a render that fails takes the run's directory back with it.
+  try {
+    writeAgentFiles(run, steps, skillsFor(opts.workflowDir, places));
+  } catch (err) {
+    fs.rmSync(path.join(runsDir(), run.id), { recursive: true, force: true });
+    throw Object.assign(new Error(`the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
+  }
   writeRun(run);
   return run;
 }
+
+/** Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store. */
+export const placesOf = (repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home: HOME });
 
 /**
  * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it
@@ -240,7 +252,7 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
   for (const card of cards) {
     try {
       const folder = workflowFolder(card.workflow, opts.dir, opts.repo);
-      stepsToStart(folder, true);
+      stepsToStart(folder, true, placesOf(opts.repo));
       folders.set(card.name, folder);
     } catch (err) {
       throw Object.assign(new Error(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`), { exitCode: 2 });
@@ -343,7 +355,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   // The card's own gate is refused in the card's words; a `--gate` beside it, by `start()` in its own.
   const flags = opts.gates ?? [];
   if (card.gate !== undefined) {
-    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir), (step) => `${card.file}: \`gate: ${step}\``);
+    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir, placesOf(repo)), (step) => `${card.file}: \`gate: ${step}\``);
     if (refusedGate) throw new WorkflowError(`${refusedGate} Correct the line, or delete it.`);
   }
   const gates = [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];

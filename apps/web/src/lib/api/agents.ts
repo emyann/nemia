@@ -18,12 +18,15 @@ export type AgentSkill = {
 };
 
 /**
- * Mirrors `ListedSkills` in apps/api/src/agents.ts: the file an agent's `skills:` names, its text as the form edits it, and the skills the
+ * Mirrors `ListedCard` in apps/api/src/agents.ts: the file an agent's `card:` names, its text as the form edits it, and the A2A skills the
  * package read out of it — null where the file does not read, and the listing's `error` says why.
  */
-export type SkillsFile = { file: string; text: string; list: AgentSkill[] | null };
+export type CardFile = { file: string; text: string; list: AgentSkill[] | null };
 
-/** The keys an agent sets on the steps that name it: every agent key but its description. Mirrors `RoleKey` in the package. */
+/**
+ * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, its card, the
+ * skills its sessions are given and its system prompt (`AGENT_OWN_KEYS`). Mirrors `RoleKey` in the package.
+ */
 export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'sandbox' | 'tools' | 'disallowedTools' | 'allowedTools' | 'remote' | 'output';
 
 /** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
@@ -31,8 +34,8 @@ export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string
 
 /**
  * Mirrors `AgentListing` in apps/api/src/agents.ts: one agent — its keys as its file writes them, its instructions, the result schema its
- * `output:` names and the skills its `skills:` names, its file as written, the version a write carries, the nodes that name it, and the
- * parser's refusal of a file that does not read.
+ * `output:` names and the card its `card:` names, the skills its sessions are given and its system prompt as its lines write them (null
+ * for none), its file as written, the version a write carries, the nodes that name it, and the parser's refusal of a file that does not read.
  */
 export type AgentListing = {
   name: string;
@@ -43,7 +46,11 @@ export type AgentListing = {
   keys: Partial<Record<AgentRoleKey, string>>;
   body: string;
   schema: SchemaFile | null;
-  skills: SkillsFile | null;
+  card: CardFile | null;
+  /** The skills its sessions are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
+  skills: string | null;
+  /** `default`, `no-coding` or `own`, as written; null for none, which is `default`. */
+  systemPrompt: string | null;
   source: string;
   version: string;
   usedBy: AgentUser[];
@@ -64,18 +71,20 @@ export const agentQuery = (from: string, name: string) =>
   });
 
 /**
- * An agent as a write sends it: its name, description, the skills file it names — null for none — the role keys it sets, one unset as null,
- * its instructions, and a result schema or a skills file pasted for it. `skills` is the agent's own line, as `description` is; `skillsText`
- * is what that file holds, and travels only when it changed.
+ * An agent as a write sends it: its name, description, the card it names, the skills it gives and its system prompt — each null for none —
+ * the role keys it sets, one unset as null, its instructions, and a result schema or a card pasted for it. `card`, `skills` and
+ * `systemPrompt` are the agent's own lines, as `description` is; `cardText` is what the card's file holds, and travels only when it changed.
  */
 export type AgentDraft = {
   name: string;
   description: string | null;
+  card: string | null;
   skills: string | null;
+  systemPrompt: string | null;
   keys: Partial<Record<AgentRoleKey, string | null>>;
   body: string;
   schema?: SchemaFile;
-  skillsText?: string;
+  cardText?: string;
 };
 
 /** Mirrors `AgentSaved` in apps/api/src/agents.ts: the agent as it now reads, and its files by name. */

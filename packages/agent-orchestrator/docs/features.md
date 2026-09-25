@@ -4467,6 +4467,31 @@ the shipper's shell having no `WF_BASE_REF` (*Shipped: the e2e runs once*, above
 itself (*Shipped: the run checks the ending's merge and lands it*, above): the ui ships carry implement's line as `check:`, the tick
 sets no `WF_BASE_REF` on it, and the shipper stages the merge and signs off its message.
 
+## Shipped: the runtime's ceiling, pools and priority retired (thin runtime stage 4c, part 2)
+
+Shipped 2026-09-25. Part 1 moved admission up; this part took the runtime's own out, so there is one ceiling on sessions, the
+orchestrator's, and nothing beneath it to lift. The number §12 had is left behind rather than renumbering the rest.
+
+- **The runtime keeps no ceiling, no pools and no order.** `decide` has no ceiling branch and `Now` is the time and the grace; a pass
+  walks the board in the order the store lists it, starts every task not queued, and reports `running`, the sessions at work per
+  harness. `DEFAULT_MAX_CONCURRENT`, `poolsOf`, `pool?` on a harness, `CLAUDE_POOL`, `State.priority` and the runtime's `admissionOrder`
+  are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `test/admission.test.ts` and
+  `test/pool.test.ts` hold. The orchestrator's own `admissionOrder`, the runs in flight under `WF_MAX_RUNS`, is another thing and stays.
+- **Each is refused by name, never dropped** (exit 2, each with a test that makes it refuse at shipped defaults, each shown to fail with
+  its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `createEngine`; a harness that names a `pool`; any
+  argument to `tick()`, at both doors (the Effect door fails `TickRefused`); and `AE_MAX_CONCURRENT` in `ae`'s environment, empty too.
+  Each names what to do instead: file `queued: true`, and `admit`.
+- **`queued:` is a brief key.** The refusals send a person to `queued: true`, and `ae start` could not file it: it can now, and a value
+  that is not true or false is refused. Not in the plan; without it `ae` had no way to hold a task back.
+- **The client builds its engine with no ceiling**, and `priorityOf` is `stepMomentum`, returning 0 rather than nothing, since there is no
+  `priority` left for the name to recall.
+- **Words unchanged.** `wf up`'s ceiling lines, `/api/ceilings`, the Factory's cap line, `phaseOfView`'s `pending` for a queued task,
+  the timeline's queued time (filed → spawned) and `wf decide`/`wf ls` line for line (`test/decide.test.ts`).
+- **A restart.** A `wf up` started before this keeps its engine until restarted. Restarted, it builds no `maxConcurrent`, folds an old
+  filing's `priority` unread and admits by momentum off the run records, as part 1 did. An `ae` from before applies its own ceiling to
+  the tasks filed without `queued`; one from after refuses to run with `AE_MAX_CONCURRENT` set, so a person who relied on it is told
+  to queue and admit.
+
 ## Shipped: pools and priority are the orchestrator's (thin runtime stage 4c, part 1)
 
 Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`maxConcurrent`), pools by subscription, and an order by
@@ -4493,8 +4518,8 @@ Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`max
   later turn). `momentumOf` takes each run with its workflow's steps, since a pure file reads no folder. `POOLS` lives in
   `admission.ts` and is not re-exported from `runtime-client.ts`, which only wraps the runtime.
 
-**What it leaves.** The runtime's ceiling, pools and `priority` still hold for `ae` and anything built without the client; part 2
-retires them (§12). `advance` still views each task in flight on its own, so a pass that advances claude runs makes more than one
+**What it leaves.** The runtime's ceiling, pools and `priority` still held for `ae` and anything built without the client; part 2
+retired them (*Shipped: the runtime's ceiling, pools and priority retired*, below). `advance` still views each task in flight on its own, so a pass that advances claude runs makes more than one
 `claude agents` call; having it read the same report is a card of its own.
 ## Shipped: planners and reviewers read git with its other read-only verbs
 
@@ -4838,13 +4863,6 @@ held open: `wf approve` its close, and the words a person sends back with it (`-
 and rounds as attempts of one task — which may fold into part 5. Its trap is known: `input-required` is a phase four places
 compare exactly, so it goes beside `needs-human` on every surface, never into it (CLAUDE.md).
 
-## 12. The runtime's ceiling, pools and priority retired (thin runtime stage 4c, part 2)
-
-**Next**, after part 1. Delete `decide`'s ceiling branch and the runtime's pools, `maxConcurrent`, `admissionOrder`, `priority`,
-`DEFAULT_MAX_CONCURRENT` and `CLAUDE_POOL`; refuse `priority`, `maxConcurrent` and `AE_MAX_CONCURRENT` (exit 2), each with a test at
-shipped defaults; drop `maxConcurrent: Infinity` from the client and the runtime's ceiling tests and `pool.test.ts`, whose cases pass in
-the orchestrator now. `ae tick` then starts everything filed unqueued: anyone who relied on `AE_MAX_CONCURRENT` queues and admits.
-
 ## Engine-side work
 
 Not agent-orchestrator features, listed so nothing is lost:
@@ -4861,7 +4879,7 @@ Not agent-orchestrator features, listed so nothing is lost:
 - ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
   pool with its own name as the default. The workflow layer's README, banner and `wf --help` say pools since `00d4c06`'s follow-up;
 - ~~**admission in filing order, and a task's priority.**~~ *done, engine `92d6783`; and in the workflow layer: every filing after a run's
-  first steps — a step after another, a try, a round, a check — carries `priority: 1` (`MOMENTUM`, `priorityOf` in `run.ts`), its first
+  first steps — a step after another, a try, a round, a check — carries `priority: 1` (`MOMENTUM`, `priorityOf` — `stepMomentum` since stage 4c part 2 — in `run.ts`), its first
   steps none, and the run cap unchanged.* The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is

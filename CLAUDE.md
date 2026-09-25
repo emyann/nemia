@@ -306,7 +306,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping
   deleted. Give the fixture the opposite order, or another name, and check the test fails without the rule
-  (learned by the run that closed engine issues 24 and 25).
+  (learned by the run that closed engine issues 24 and 25; both rules are the orchestrator's since stage 4c, `toAdmit` and `POOLS`
+  in `admission.ts`, and the runtime's were deleted in part 2).
 - **An e2e page run against the old code proves only its first failing assertion.** The page stops at the first `Refused`, so
   the Factory page's card drags failing on the old canvas said nothing of its step drag further down. To prove each new assertion
   fails without the change, skip the earlier ones in a throwaway edit (`if (0) await …`), run again, and put the page back
@@ -637,6 +638,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` still views each task in flight on its own; moving it onto the same report is a card of
   its own. And an admitted task starts on the runtime's *next* pass, so a test that files and wants a start ticks twice (learned by
   thin runtime stage 4c, part 1).
+- **A parameter taken away is refused, or a caller that still passes it is obeyed by nobody.** A JavaScript function ignores an
+  argument it does not declare, so `tick(3)` after the ceiling left would have started every task and said nothing; an object key the
+  type no longer has is the same, `createEngine({ maxConcurrent })` or a harness's `pool`. Stage 4c part 2 refuses each by
+  `Object.hasOwn` (an own `undefined` too) and the pass by its argument count (`tickRefusalOf`). An `Effect.fn` generator that must see
+  its arguments cannot declare `...args: never[]` (TS2769 at the call site); it declares none and reads `[...arguments]` (`tick` in
+  `agent-runtime/src/engine.ts`, learned by the run that retired the runtime's ceiling).
 
 ## Rules the code keeps
 

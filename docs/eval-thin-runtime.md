@@ -410,5 +410,18 @@ orchestrator's calls to the runtime change.
    engine reads the new store as before. **Part 2 retires** the runtime's ceiling (`maxConcurrent`, `decide`'s branch, `Now.used/max`),
    its pools (`poolsOf`, `pool?`, `CLAUDE_POOL`), `priority`, `AE_MAX_CONCURRENT`, `DEFAULT_MAX_CONCURRENT` and `admissionOrder`, each
    refused with a test, and the client's `maxConcurrent: Infinity`.
+   **Stage 4c, part 2 done, 2026-09-25: the runtime keeps no ceiling.** `decide` has no ceiling branch, and `Now` is the time and
+   the grace. A pass walks the board in the store's order, starts every task not queued, and reports `running` per harness: a
+   session counts while its attempt is open and it is `working` or not yet seen. `DEFAULT_MAX_CONCURRENT`, `poolsOf`, `pool?`,
+   `CLAUDE_POOL`, `State.priority` and the runtime's `admissionOrder` are gone. Each retired input is refused by name, exit 2,
+   each with a test shown to fail without its refusal: `priority` at any value (both doors), `maxConcurrent` on `createEngine`,
+   a harness naming a `pool`, any argument to `tick()` (both doors; the Effect door fails `TickRefused`), and `AE_MAX_CONCURRENT`
+   in `ae`, empty too. Each says what to do instead: file `queued: true` and `admit`, which `ae start` can now do (`queued:` is a
+   brief key). The client builds its engine with no ceiling. The pass's meter (`TickReport.ms`, `observed`) is unchanged.
+   *On a restart.* A `wf up` started before this keeps its old engine until it is restarted. Restarted, it builds none of the
+   ceiling, folds an old filing's `priority` unread, and admits by momentum off the run records, as part 1 did. An `ae` from
+   before applies its own ceiling to the tasks filed without `queued`. One from after starts them all and refuses to run with
+   `AE_MAX_CONCURRENT` set. A tree only half merged fails where the engine is built, exit 2: a client that still passes
+   `maxConcurrent`, or a harness that still names a `pool`. It does not run with a ceiling nobody keeps.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

@@ -4467,6 +4467,36 @@ the shipper's shell having no `WF_BASE_REF` (*Shipped: the e2e runs once*, above
 itself (*Shipped: the run checks the ending's merge and lands it*, above): the ui ships carry implement's line as `check:`, the tick
 sets no `WF_BASE_REF` on it, and the shipper stages the merge and signs off its message.
 
+## Shipped: pools and priority are the orchestrator's (thin runtime stage 4c, part 1)
+
+Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`maxConcurrent`), pools by subscription, and an order by
+`priority`, then filing time, then id. The orchestrator now decides what starts, and the runtime keeps the wait and the word.
+
+- **The runtime, additive.** A task filed `queued: true` starts only once `admit` names it, on the runtime's next pass; `view` says
+  `admission: 'queued' | 'admitted'`, `tick()` reports the view of every task it left unsettled (`TickReport.views`, `viewOfState`), and
+  `ae admit` gives the word by hand. A filing with no `queued` key, from before, reads as queued (`packages/agent-runtime/README.md`,
+  *Queued and admitted*).
+- **The orchestrator admits** (`src/admission.ts`, pure). The client files every task `queued` and builds its engine with no ceiling
+  (`runtime-client.ts`). After the engine's pass the tick takes the report's views, counts per pool what holds a slot (`holdsSlot`: at
+  work, starting, or admitted and not yet started; a blocked session or one held for an answer none), orders the waiting by momentum,
+  filing time and id (`momentumOf` off the run records, since no filing carries `priority` any more), and admits under
+  `WF_MAX_CONCURRENT` (`toAdmit`), with no look at a harness of its own: one pass makes one `claude agents` call for it
+  (`test/pool.test.ts` counts them, and fails with admission reading `e.list()` or `e.view`).
+- **A start is a pass later.** A filing is admitted on the pass after it and started on the one after that, and a freed slot is taken a
+  pass later than when the runtime admitted and started in one: about 4 s under `wf up`.
+- **A restart.** A daemon restarted onto a store the old engine left starts nothing it has not admitted, counts the sessions at work
+  first, and admits in the old order, per pool (`test/restart.test.ts`, at the shipped ceiling and at 5); an old engine reads a store
+  this one wrote as it did.
+- **Words unchanged.** `wf up`'s ceiling lines, `/api/ceilings`, the Factory's cap line and the queue's words say what they said.
+- **Departures from the plan.** The owner replaced the plan's `tick({ admission })` callback with the report's views and `e.admit`, so
+  admission running inside the runtime's pass, and its throw, are gone. The word is per turn (a held-open task waits for one before each
+  later turn). `momentumOf` takes each run with its workflow's steps, since a pure file reads no folder. `POOLS` lives in
+  `admission.ts` and is not re-exported from `runtime-client.ts`, which only wraps the runtime.
+
+**What it leaves.** The runtime's ceiling, pools and `priority` still hold for `ae` and anything built without the client; part 2
+retires them (§12). `advance` still views each task in flight on its own, so a pass that advances claude runs makes more than one
+`claude agents` call; having it read the same report is a card of its own.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -4772,6 +4802,13 @@ answer is a new task filed with `resumeFrom`; with 4b a gated step, or a sign-of
 held open: `wf approve` its close, and the words a person sends back with it (`--message`) its answer. **Waits on the owner's reading**, with 4c — a step's tries
 and rounds as attempts of one task — which may fold into part 5. Its trap is known: `input-required` is a phase four places
 compare exactly, so it goes beside `needs-human` on every surface, never into it (CLAUDE.md).
+
+## 12. The runtime's ceiling, pools and priority retired (thin runtime stage 4c, part 2)
+
+**Next**, after part 1. Delete `decide`'s ceiling branch and the runtime's pools, `maxConcurrent`, `admissionOrder`, `priority`,
+`DEFAULT_MAX_CONCURRENT` and `CLAUDE_POOL`; refuse `priority`, `maxConcurrent` and `AE_MAX_CONCURRENT` (exit 2), each with a test at
+shipped defaults; drop `maxConcurrent: Infinity` from the client and the runtime's ceiling tests and `pool.test.ts`, whose cases pass in
+the orchestrator now. `ae tick` then starts everything filed unqueued: anyone who relied on `AE_MAX_CONCURRENT` queues and admits.
 
 ## Engine-side work
 

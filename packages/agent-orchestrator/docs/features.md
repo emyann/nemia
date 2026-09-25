@@ -3991,7 +3991,8 @@ is the account.
 - **Effect** is inside the package only. The facade is plain Promises.
 - **`judge card <file>`** asks four properties of a card: web, plan, clear and size. It prints the shipped `dev*` folder they
   map to, or why the card stays in the inbox.
-- **Tried live** on 2026-09-19 against two real cards, each asked twice, with the record in a job's temp directory; the
+- **Tried live** on 2026-09-19 against two real cards (from the pivot's Jev experiments, kept outside the repository since
+  2026-09-25), each asked twice, with the record in a job's temp directory; the
   second asking made 0 requests. `card-p06.md` stayed in the inbox, unsure about planning first (P 0.74).
   `card-agents-board.md` mapped to `dev-planned-build`. The thresholds have not been measured on held-out cards.
 ## Shipped: a run with no repository — `workspace: folder` (P2, its first slice)

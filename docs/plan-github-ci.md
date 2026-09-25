@@ -50,9 +50,12 @@ log, evaluation and experiment, and every commit's metadata. Audited on 2026-09-
   main: every finished run would read as not shipped, and every `--after` chain on one would wait for ever.
 - **Local paths.** 28 files at HEAD name `/home/yrnd1` or `/mnt/c/Users/renau` (the evaluation reports, `plan-hold-the-bar.md`,
   the Jev experiments' scripts and datasets, one judge test). Harmless, but a username; they can be generalised in the rename.
+  With the Jev experiments out of the tree (below), 7 files are left, this one among them.
 - **Recorded agent output.** The Jev experiments under `docs/pivot-2026-09-18/experiments/` keep real closeouts, needs and
   judgements from this repository's runs (`e5-closeouts.json`, `judge-runs-2026-09-19.json`, the design dataset, 0.6 MB). They
-  describe this repository only. *Decision:* publish, or move them out of the tree before the push.
+  describe this repository only. **Decided 2026-09-25: moved out of the tree** — `jev/`, `jev-design/` and `jev-split/` are kept
+  outside the repository since then, and the docs that cite them keep the results' words. The history is not rewritten, so the
+  commits before then still hold them. `cost/` stays.
 - **Nothing large.** The biggest blob is 0.6 MB; the only tracked images are the shadcn skill's two PNGs.
 
 ## 4. GitHub
@@ -109,14 +112,14 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 
 1. The project's new name.
 2. ~~The 11 commits with the personal email~~ — decided: left as they are, no history rewrite.
-3. The Jev experiments' recorded run data: publish, or move out first.
+3. ~~The Jev experiments' recorded run data~~ — decided: moved out of the tree, history kept.
 4. Round checks: local (as now) or in CI on each push.
 
 ## Cards, once the name is chosen
 
 1. Rename the project in the repository (the name, the README, the root package, the board's title, the docs), with the names
    test taught the old project name the way it knows the old package names.
-2. Generalise local paths in the files that name them; move the experiments' data out if so decided.
+2. Generalise local paths in the files that name them (the experiments' data is already out).
 3. The owner, by hand: tag and branch the old main, rename the repository, push, protect main, CODEOWNERS.
 4. The Actions workflow with the e2e and the secret scan, proven on a first PR.
 5. The ship through a pull request and the merge queue, with the run reading CI's result.

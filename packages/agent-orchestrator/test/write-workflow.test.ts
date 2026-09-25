@@ -22,6 +22,7 @@ const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'd
 
 /** The repository's agents, beside the store's workflows as beside its own: dev's steps name them. */
 fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
+fs.cpSync(path.join(SHIPPED, '..', 'skills'), path.join(STORE, 'skills'), { recursive: true });
 
 /** A copy of the repository's `dev` — README, comments and all — as a workflow of the store's, named `name`. */
 function devIn(name: string): string {

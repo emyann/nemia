@@ -16,6 +16,7 @@ import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
 import { closeoutSchemaOf, type Closeout } from '../src/closeout.ts';
 import { loopSpan, terminalSteps, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { toldIn } from './told.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const PLANNED = path.join(REPO, 'workflows', 'dev-planned');
@@ -94,7 +95,8 @@ test("plan's closeout is the plan, strict — approach, files with a line each, 
 });
 
 test("plan's brief says when to sign off done and when blocked with the question in needs, and that the answer comes back as `## Your answer`", () => {
-  const body = said(steps.plan!.body);
+  // Told by the planner's skill `ask-when-it-reads-two-ways`, given whole after its instructions (since agents card 1b).
+  const body = said(toldIn(PLANNED, steps.plan!));
   for (const sentence of [
     'When what was asked for reads one way, sign off `done` with the plan.',
     'When it admits two materially different readings',

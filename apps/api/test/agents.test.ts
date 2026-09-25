@@ -28,8 +28,10 @@ const AGENTS = path.join(STORE, 'agents');
 
 // The repository's: the shipped agents and `dev`, whose steps name them. Yours: the same agents, and `dev` beside them.
 fs.cpSync(path.join(SHIPPED, 'agents'), path.join(repo, 'workflows', 'agents'), { recursive: true });
+fs.cpSync(path.join(SHIPPED, 'skills'), path.join(repo, 'workflows', 'skills'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, 'dev'), path.join(repo, 'workflows', 'dev'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, 'agents'), AGENTS, { recursive: true });
+fs.cpSync(path.join(SHIPPED, 'skills'), path.join(STORE, 'skills'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 
 const json = { 'content-type': 'application/json' };

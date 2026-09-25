@@ -62,6 +62,12 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  *
  * The planners' bodies moved when planners and reviewers were given git's other read-only verbs (2026-09-25): the planner, the reviewer
  * and the ui reviewer name them, and that `git -C` and a `cd` elsewhere are denied. The reviews were on the list already.
+ *
+ * Every agent's body moved when its procedures left it for the skills its card describes (agents card 1b, 2026-09-25): each keeps its
+ * role and its limits — what it may run, that a job's turn is its last — and names its skills, which say how (`workflows/skills/`). What
+ * left each body is in a skill, word for word but where a sentence named the body it sat in; `ui-workflow.test.ts` and
+ * `planned-workflow.test.ts` read the sentences they pin in the body and its skills together (`toldIn`). Every step naming an agent was
+ * on the list already, so the list is the same; the note folder's two, which also moved, are not in the snapshot.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),

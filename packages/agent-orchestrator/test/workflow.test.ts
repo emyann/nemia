@@ -1430,7 +1430,7 @@ const shippedFolders = (): string[] => {
   const pkg = path.join(import.meta.dirname, '..');
   const examples = path.join(pkg, 'wf-examples');
   return [
-    ...fs.readdirSync(root).filter((name) => name !== 'agents').map((name) => path.join(root, name)),
+    ...fs.readdirSync(root).filter((name) => name !== 'agents' && name !== 'skills').map((name) => path.join(root, name)),
     path.join(pkg, 'workflows'),
     path.join(pkg, 'workflows', 'ui'),
     ...fs.readdirSync(examples).map((name) => path.join(examples, name)),

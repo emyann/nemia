@@ -64,10 +64,14 @@ export const agentsQuery = queryOptions({
 });
 
 /** One agent, for its page. */
+/** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */
+export const readAgent = (from: string, name: string): Promise<AgentListing> =>
+  get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`);
+
 export const agentQuery = (from: string, name: string) =>
   queryOptions({
     queryKey: ['agents', from, name],
-    queryFn: () => get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
+    queryFn: () => readAgent(from, name),
   });
 
 /**

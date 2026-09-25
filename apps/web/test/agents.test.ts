@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, deniedWithoutSkill, draftOf, edited, formOf, hasKey, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
+import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -188,4 +188,20 @@ test("the system prompt drawn unset is the default, and picking the default writ
   assert.equal(draftOf(form).systemPrompt, 'own');
   form.systemPrompt = pickSystemPrompt('default', '');
   assert.equal(edited(form, read), false, 'picked and put back is no edit');
+});
+
+test("a copy that moves only the version keeps the form's key for that version alone, and anything else read after it remounts the form", () => {
+  const was = listing({ source: 'scribe file', version: 'v1', schema: { type: 'object' } });
+  const kept = keptAfterCopy(was, { ...was, version: 'v2' }, 'v1');
+  assert.deepEqual(kept, { key: 'v1', version: 'v2' }, 'the file is the same: the draft stays, and the save sends v2');
+  assert.equal(formKeyOf('v2', kept), 'v1', 'the version the copy moved to keeps the mounted form');
+  assert.equal(formKeyOf('v3', kept), 'v3', 'a version moved again, by a save or an edit elsewhere, remounts');
+  assert.equal(formKeyOf('v1', null), 'v1', 'with nothing kept the key is the version');
+});
+
+test("REFUSED to keep the draft over a copy: the agent's file or its schema changed meanwhile, as another writer's edit would", () => {
+  const was = listing({ source: 'scribe file', version: 'v1', schema: { type: 'object' } });
+  assert.equal(keptAfterCopy(was, { ...was, source: 'edited elsewhere', version: 'v2' }, 'v1'), null, 'the file changed: the form is read again');
+  assert.equal(keptAfterCopy(was, { ...was, schema: { type: 'string' }, version: 'v2' }, 'v1'), null, 'the schema changed: the form is read again');
+  assert.equal(keptAfterCopy(was, { ...was, schema: null, version: 'v2' }, 'v1'), null, 'the schema went: the form is read again');
 });

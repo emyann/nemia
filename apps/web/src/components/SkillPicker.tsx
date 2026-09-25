@@ -15,12 +15,14 @@ import { GivenSkills, SkillSourceBadge } from './AgentParts';
  * Adding and removing edit the form's `skills:` line, saved with the agent. The copy does not wait for Save: it writes your library at once,
  * and the sheet says so.
  */
-export function SkillPicker({ skills, given, onSkills }: {
+export function SkillPicker({ skills, given, onSkills, onCopied }: {
   /** The form's `skills:` line. */
   skills: string;
   /** The skills as the agent was read, each where a start found it: what a row shows until the list is read. */
   given: readonly GivenSkill[];
   onSkills: (line: string) => void;
+  /** Called once a copy is written, before anything is read again. */
+  onCopied?: () => Promise<void>;
 }) {
   const { data: places, error } = useQuery(skillsQuery);
   const names = skillList(skills);
@@ -53,7 +55,7 @@ export function SkillPicker({ skills, given, onSkills }: {
               {error && <p className="text-xs text-red-600">Could not list the skills: {error.message}</p>}
               {!places && !error && <p className="text-xs text-neutral-500">Reading the skills…</p>}
               {places?.map((place) => (
-                <Place key={place.from} place={place} given={names} onAdd={(name) => onSkills(withSkill(skills, name))} />
+                <Place key={place.from} place={place} given={names} onAdd={(name) => onSkills(withSkill(skills, name))} onCopied={onCopied} />
               ))}
             </div>
           </Sheet>
@@ -68,11 +70,12 @@ export function SkillPicker({ skills, given, onSkills }: {
 }
 
 /** One place of skills in the sheet: its name, its folder, and each skill in it with what it offers. */
-function Place({ place, given, onAdd }: { place: SkillPlace; given: readonly string[]; onAdd: (name: string) => void }) {
+function Place({ place, given, onAdd, onCopied }: { place: SkillPlace; given: readonly string[]; onAdd: (name: string) => void; onCopied?: () => Promise<void> }) {
   const queryClient = useQueryClient();
   const copy = useMutation({
     mutationFn: (name: string) => copySkill(name),
     onSuccess: async (added) => {
+      await onCopied?.();
       await invalidateSkills(queryClient);
       onAdd(added.skill.name);
     },

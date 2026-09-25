@@ -21,6 +21,9 @@ export default {
   // and `Doesn't write code` picked, with Only my instructions behind For experts. The sheet lists your library, this repository's and HKB's in
   // that order, the repository's `scratch` refused with its reason and nothing to press. Saved, the file gives the skill and says
   // `systemPrompt: no-coding`. The agent and the copy are both taken back, so the next visit, in either theme, reads the store as seeded.
+  // Before the sheet opens, `scribe`'s file is made to name that skill already — as one copied from a repository would — so its row reads
+  // not found, and its description is edited and left unsaved: the copy moves the agent's version (it digests the skills its file names),
+  // and the form keeps the edit and the sheet stays open, and the save sends the version the copy moved to and is not refused as stale.
   name: 'skills',
   route: `/agents/yours/${AGENTS.seeded.name}`,
   expect: async (page) => {
@@ -34,10 +37,21 @@ export default {
     if (!shipped) throw new Refused(`HKB ships a skill neither your library nor the repository has — ${shippedDir} holds ${fs.readdirSync(shippedDir).join(', ')}`);
     const copied = path.join(library, shipped);
     const was = fs.readFileSync(agentFile, 'utf8');
+    const naming = was.replace(/^---\n/, `---\nskills: ${shipped}\n`);
+    const drafted = 'Use this when a change needs its notes written, drafted and not yet saved.';
 
     const form = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(form, `${seeded.name}'s form`);
     try {
+      // Its file names the shipped skill already, found nowhere an agent of yours looks: its row says so.
+      if (naming === was) throw new Refused(`agents/${seeded.name}.md opens with its frontmatter — it holds ${JSON.stringify(was)}`);
+      fs.writeFileSync(agentFile, naming);
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
+      await expectVisible(form.locator(`[data-given-skill="${shipped}"] [data-given-error]`, { hasText: 'No skills folder has' }), `${shipped}, named and found nowhere, is said not found`);
+      const description = form.getByRole('textbox', { name: 'Description', exact: true });
+      await description.fill(drafted);
+
       // The system prompt, unset: drawn as the default, with the choice that drops the safety rules folded away.
       const prompt = form.getByRole('radiogroup', { name: 'System prompt' });
       await expectVisible(prompt.getByRole('radio', { name: /^Works on code or files/, checked: true }), 'unset, the system prompt reads as the default: Works on code or files');
@@ -69,9 +83,12 @@ export default {
       await expectVisible(offered.locator('[data-skill-from="yours"]'), `the shipped ${shipped} now says it is in your library, and offers no second copy`);
       await expectCount(offered.getByRole('button'), 0, 'nothing to press on it');
       await expectVisible(sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${shipped}"]`, { hasText: 'given' }), 'and your library lists it, given');
-      if (fs.readFileSync(agentFile, 'utf8') !== was) throw new Refused(`the copy writes no agent: agents/${seeded.name}.md is as it was until Save`);
+      if (fs.readFileSync(agentFile, 'utf8') !== naming) throw new Refused(`the copy writes no agent: agents/${seeded.name}.md is as it was until Save`);
+      await expectVisible(sheet.getByRole('heading', { name: 'Add a skill' }), "the copy moved the agent's version, and the sheet stays open");
       await sheet.getByRole('button', { name: 'Close', exact: true }).click();
       await expectCount(sheet, 0, 'the sheet closes');
+      if ((await description.inputValue()) !== drafted) throw new Refused(`the description edited before the copy is kept — it reads ${JSON.stringify(await description.inputValue())}`);
+      await expectCount(form.locator(`[data-given-skill="${shipped}"] [data-given-error]`), 0, `${shipped} is found now`);
 
       const given = form.locator(`[data-given-skill="${shipped}"]`);
       await expectVisible(given.locator('[data-skill-from="yours"]'), `${shipped} is given, from your library`);
@@ -97,7 +114,7 @@ export default {
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
       const written = fs.readFileSync(agentFile, 'utf8');
-      for (const line of [`skills: ${shipped}`, 'systemPrompt: no-coding', 'tools: Read, Skill']) {
+      for (const line of [`skills: ${shipped}`, 'systemPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
         if (!written.split('\n').includes(line)) throw new Refused(`agents/${seeded.name}.md says ${line} — it holds ${JSON.stringify(written)}`);
       }
       await expectVisible(form.locator(`[data-card] [data-agent-skill="${shipped}"]`), `saved, its card is generated from ${shipped}`);

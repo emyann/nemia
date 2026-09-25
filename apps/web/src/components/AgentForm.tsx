@@ -45,13 +45,15 @@ const HINTS: Partial<Record<AgentRoleKey, string>> = {
  *
  * `onSave` is handed the draft and resolves once written, or rejects with the refusal; the form keeps what was typed either way.
  */
-export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal, onSave, footer }: {
+export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal, onSave, onSkillCopied, footer }: {
   listing: AgentListing | null;
   keyForm: KeyForm | undefined;
   readOnly?: boolean;
   saving: boolean;
   refusal: ReactNode;
   onSave: (draft: ReturnType<typeof draftOf>) => void;
+  /** Called once a skill is copied into your library, before the board reads anything again: an agent that names it moves its version. */
+  onSkillCopied?: () => Promise<void>;
   footer?: ReactNode;
 }) {
   const [form, setForm] = useState<Form>(() => formOf(listing));
@@ -172,7 +174,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
             <GivenSkills rows={listing?.given ?? []} none="It gives no skills." />
           </div>
         ) : (
-          <SkillPicker skills={form.skills} given={listing?.given ?? []} onSkills={(skills) => setForm((f) => ({ ...f, skills }))} />
+          <SkillPicker skills={form.skills} given={listing?.given ?? []} onSkills={(skills) => setForm((f) => ({ ...f, skills }))} onCopied={onSkillCopied} />
         )}
         {!readOnly && <SkillToolNote form={form} setKey={setKey} />}
         <SystemPrompt value={form.systemPrompt} onChange={(picked) => setForm((f) => ({ ...f, systemPrompt: pickSystemPrompt(picked, listing?.systemPrompt ?? '') }))} readOnly={readOnly} />

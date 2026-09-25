@@ -162,3 +162,23 @@ export function pickSystemPrompt(picked: string, was: string): string {
   if (picked !== 'default') return picked;
   return was.trim() === 'default' ? was : '';
 }
+
+/** The form an agent's page kept across a copy of a skill: the key it is drawn under, and the version the copy moved the agent to. */
+export type KeptForm = { key: string; version: string };
+
+/**
+ * The key an agent's form is drawn under. It is the agent's version, so a save, or a change made elsewhere, draws the file as it now reads,
+ * and a save goes back against that version. The one exception is the version the page's own copy of a skill moved it to (`kept`): an agent
+ * whose `skills:` names the copied skill is versioned by that skill too, and the form a person is typing in stays, to be saved against it.
+ */
+export const formKeyOf = (version: string, kept: KeptForm | null): string => (kept && kept.version === version ? kept.key : version);
+
+/**
+ * What the page keeps once its copy of a skill is written: the form under `key`, at the version the agent reads at now (`now`) — but only when
+ * its file and its schema read as they did when the form was drawn (`was`). A change to either since is someone else's, and the form is drawn
+ * again from it, as for any other change, rather than saved over it.
+ */
+export function keptAfterCopy(was: Pick<AgentListing, 'source' | 'schema'>, now: Pick<AgentListing, 'source' | 'schema' | 'version'>, key: string): KeptForm | null {
+  if (now.source !== was.source || JSON.stringify(now.schema ?? null) !== JSON.stringify(was.schema ?? null)) return null;
+  return { key, version: now.version };
+}

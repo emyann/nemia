@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { AgentForm } from '../components/AgentForm';
 import { AgentRefused, FromBadge, UsedBy } from '../components/AgentParts';
 import { AsWritten } from '../components/FilePage';
-import { agentQuery, AgentRefusal, keyFormQuery, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
+import { agentQuery, AgentRefusal, keyFormQuery, readAgent, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
+import { formKeyOf, keptAfterCopy, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
@@ -38,12 +39,15 @@ function AgentPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const mine = agent.from === 'yours';
+  const [kept, setKept] = useState<KeptForm | null>(null);
+  const formKey = formKeyOf(agent.version, kept);
 
   const save = useMutation({
     mutationFn: (draft: AgentDraft) => saveAgent(agent.name, agent.version, draft),
     onSuccess: async (saved) => {
       // Renamed, the page moves first: the old name, read again, is gone.
       if (saved.agent.name !== agent.name) await navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } });
+      setKept(null);
       await invalidateAgents(queryClient);
     },
   });
@@ -57,11 +61,17 @@ function AgentPage() {
   const error = save.error ?? remove.error;
   const form = (
     <AgentForm
-      // A new version is a new form: what was saved, as it now reads.
-      key={agent.version}
+      // A new version is a new form: what was saved, as it now reads — but for the version this page's own copy of a skill moved it to.
+      key={formKey}
       listing={agent}
       keyForm={keyForm}
       readOnly={!mine}
+      onSkillCopied={async () => {
+        // Read before the copy's invalidation lands, past the cache, so the form is kept before the page sees the version move. A read that
+        // fails keeps nothing: the page reads the agent again, as after any write.
+        const now = await readAgent(from, name).catch(() => null);
+        setKept(now && keptAfterCopy(agent, now, formKey));
+      }}
       saving={save.isPending || remove.isPending}
       refusal={error && <AgentRefused message={error.message} users={error instanceof AgentRefusal ? error.users : []} from="yours" />}
       onSave={(draft) => {

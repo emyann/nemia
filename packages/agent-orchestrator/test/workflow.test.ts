@@ -788,7 +788,7 @@ test('retries is a whole count, and may be 0, which is what absent means', () =>
 });
 
 test("harness: banana is refused with the harnesses there are; harness: check is the run's own", () => {
-  assert.throws(() => fm('review', 'harness: banana'), /review: `harness: banana` is not a harness a step can run on\. The harnesses are: claude, codex, claude-detached\./);
+  assert.throws(() => fm('review', 'harness: banana'), /review: `harness: banana` is not a harness a step can run on\. The harnesses are: claude, codex, claude-detached, and `a2a:<name>` for a remote A2A agent the store's `a2a-agents\.json` declares\./);
   assert.throws(() => fm('review', 'harness: check'), /`harness: check` is the run's own harness .*Put the command in `check:`/);
   assert.throws(() => fm('review', 'harness: Codex'), /not a harness a step can run on/, 'names are exact');
   for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);

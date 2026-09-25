@@ -765,6 +765,8 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.ts';
+/** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
+export { remoteConfigRefusal } from './a2a-remote.ts';
 export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';

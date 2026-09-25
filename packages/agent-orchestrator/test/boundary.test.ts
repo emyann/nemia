@@ -27,7 +27,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const PURE = ['admission', 'check', 'closeout', 'daemon', 'deps', 'feed', 'inbox', 'meter', 'plan', 'radius', 'rendering', 'rest', 'retry', 'run', 'timeline', 'workflow'].map((f) => `src/${f}.ts`);
 
 /** The I/O beneath the controllers: no runtime, never a controller or the client, and a tree (`STORE_BOTTOM`, `STORE_SHARED`). */
-const STORE = ['places', 'workflow-store', 'store', 'worktree', 'branches', 'artifacts', 'authoring', 'daemon-store', 'feed-store', 'inbox-store', 'tally'].map((f) => `src/${f}.ts`);
+const STORE = ['places', 'workflow-store', 'a2a-agents', 'store', 'worktree', 'branches', 'artifacts', 'authoring', 'daemon-store', 'feed-store', 'inbox-store', 'tally'].map((f) => `src/${f}.ts`);
 
 /** What uses the runtime, through the client: the root, the controllers it re-exports, and the CLI above them. */
 const CONTROLLER = [...['runner', 'views', 'start', 'tick', 'verbs', 'forget', 'decide', 'cli'].map((f) => `src/${f}.ts`), 'bin/wf.ts'];

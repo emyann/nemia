@@ -301,7 +301,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent: "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
-  harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
+  harness: "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
   context: "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
@@ -348,6 +348,61 @@ const REFUSED: Record<string, string> = {
 
 /** The harness a step runs on when it names none. */
 const DEFAULT_HARNESS = 'claude';
+
+/**
+ * How a step names a remote A2A agent, one another party runs: `harness: a2a:<name>`, the name one the store's `a2a-agents.json` declares
+ * (`a2a-agents.ts`), which the runtime client hands the engine as a harness of that name. The parser checks the shape and what such a step
+ * may not set (`REMOTE_REFUSED`); `wf start` checks the name is declared (`undeclaredRefusal` in start.ts).
+ */
+export const REMOTE_PREFIX = 'a2a:';
+
+/** A remote agent's name, as `a2a-agents.json` declares it and `harness:` names it after the prefix: lowercase words joined by dashes. */
+export const REMOTE_NAME = /^[a-z][a-z0-9-]*$/;
+
+/** Whether a step's harness is a remote A2A agent (`REMOTE_PREFIX`). Pure. */
+export const isRemoteHarness = (harness: string | undefined): boolean => harness?.startsWith(REMOTE_PREFIX) ?? false;
+
+/** The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure. */
+export const remoteNameOf = (harness: string | undefined): string | undefined => (isRemoteHarness(harness) ? harness!.slice(REMOTE_PREFIX.length) : undefined);
+
+const RUNS_AS_CONFIGURED = "is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one";
+const FENCED_THERE = "fences a session on this machine, and a remote agent runs on another party's, under their fence: nothing here would hold it";
+
+/**
+ * The keys a step on a remote A2A agent may not set, and why: each tells a harness of ours something, and a remote agent is not one. Refused
+ * rather than dropped, since a line the run does not read is a constraint nobody enforces — `permissionMode: plan` would read as a fence.
+ */
+const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
+  model: RUNS_AS_CONFIGURED,
+  effort: RUNS_AS_CONFIGURED,
+  context: RUNS_AS_CONFIGURED,
+  background: 'chooses how Claude Code runs the session, and a remote agent is not Claude Code',
+  remote: 'bridges a Claude Code session to claude.ai, and a remote agent is not Claude Code',
+  permissionMode: FENCED_THERE,
+  sandbox: FENCED_THERE,
+  tools: FENCED_THERE,
+  disallowedTools: FENCED_THERE,
+  allowedTools: FENCED_THERE,
+  denials: 'stops the step on a call its harness denied, and a remote agent reports none',
+  budget: 'is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost',
+  output: 'declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step\'s sign-off, and a data part on its reply is what it says',
+  loop: 'goes round again on the `again` its `output:` declares, and a step on a remote agent declares no `output:`',
+  resume: 'continues a session a harness of ours kept, and the run keeps none of a remote agent\'s: a new Task is sent',
+  check: 'is a command the run executes in the step\'s workspace, and a remote agent works on another party\'s machine: nothing it does reaches the workspace, and a check would judge work nobody did there',
+};
+
+/**
+ * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: main`, whose
+ * checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading assumes a harness of ours.
+ */
+function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
+  const said = (key: string, why: string) => refuse(`${step}: \`${key}: ${meta[key as StepKey]}\` ${why}, and \`harness: ${harness}\` is a remote A2A agent. Delete the line — from the step, or from the agent it names if the agent gives it.`);
+  for (const key of STEP_KEYS) {
+    const why = REMOTE_REFUSED[key];
+    if (why !== undefined && meta[key] !== undefined) said(key, why);
+  }
+  if (meta.workspace?.trim() === 'main') said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
+}
 
 /*
  * The words each harness takes, copied from the engine — which is the source. agent-runtime exports them:
@@ -534,6 +589,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
+  if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
   const background = backgroundOf(name, meta.background, harness);
   const output = outputOf(name, meta.output, read);
   // What Claude Code's `/agents` wizard writes for "the parent's model" (`.claude/agents/`, 2.1.282), and a run's session has no parent.
@@ -591,7 +647,7 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
  * refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
  */
 export function autoDropped(harness: string | undefined, model: string | undefined, permissionMode: string | undefined): string | undefined {
-  if (harness === 'codex' || keepsAuto(model)) return undefined;
+  if (harness === 'codex' || isRemoteHarness(harness) || keepsAuto(model)) return undefined;
   if ((permissionMode ?? DEFAULT_PERMISSION_MODE) !== 'auto') return undefined;
   const asked = permissionMode === undefined
     ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
@@ -815,10 +871,15 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
 
 function harnessOf(step: string, harness: string | undefined): string | undefined {
   if (harness === undefined || HARNESSES.includes(harness)) return harness;
+  if (isRemoteHarness(harness)) {
+    const name = remoteNameOf(harness)!;
+    if (REMOTE_NAME.test(name)) return harness;
+    refuse(`${step}: \`harness: ${harness}\` names a remote A2A agent, and \`${name}\` is not a name one is declared under: lowercase words joined by dashes, as \`a2a-agents.json\` in the store declares them — \`harness: a2a:reviewer\`.`);
+  }
   if (harness === 'check') {
     refuse(`${step}: \`harness: check\` is the run's own harness — it executes a step's \`check:\` command, and no step runs on it. Put the command in \`check:\` and run the step on one of: ${HARNESSES.join(', ')}.`);
   }
-  return refuse(`${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}. Without the line, the step runs on ${DEFAULT_HARNESS}.`);
+  return refuse(`${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}, and \`a2a:<name>\` for a remote A2A agent the store's \`a2a-agents.json\` declares. Without the line, the step runs on ${DEFAULT_HARNESS}.`);
 }
 
 const VOCABULARY = {
@@ -1819,6 +1880,11 @@ function composedRefusal(named: string, skills: readonly string[] | undefined, s
   if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
     return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with (F13): it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
   }
+  if (isRemoteHarness(step.harness)) {
+    if (listed) return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and \`harness: ${step.harness}\` is a remote A2A agent, which has the skills its operator gave it — its card says which — and loads none of ours. Delete the line, or run the step on claude.`;
+    if (systemPrompt !== undefined) return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
+    return undefined;
+  }
   if (step.harness === 'codex') {
     if (listed) return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
     if (systemPrompt !== undefined && systemPrompt !== 'default') return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
@@ -2378,6 +2444,10 @@ function validateLoops(steps: readonly Workflow[]): void {
     }
     const producer = steps.find((x) => x.name === target);
     if (!producer) throw new WorkflowError(`${named} names a step that is not here. Correct the name, or delete the line.`);
+    // A loop's target is continued each round, in the session it kept (`resumeFrom`), and the run keeps none of a remote agent's.
+    if (isRemoteHarness(producer.harness)) {
+      throw new WorkflowError(`${named}, and ${target} runs on \`harness: ${producer.harness}\`, a remote A2A agent: a loop's target is continued each round in the session it kept, and the run keeps none of a remote agent's. Loop back to a step on a harness of ours, or delete the line.`);
+    }
     if (!upstreamOf(steps, s.name).has(target)) {
       throw new WorkflowError(`${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`);
     }

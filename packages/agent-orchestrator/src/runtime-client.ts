@@ -13,9 +13,11 @@
  * the engine should need to learn three functions, not a library.
  */
 import path from 'node:path';
-import { claudeDetached, codex, createEngine, type Engine } from 'agent-runtime';
+import { claudeDetached, codex, createEngine, remoteConfigRefusal, type Credentials, type Engine, type MissingCredential, type RemoteAgent } from 'agent-runtime';
+import { envNameOf, readRemoteAgents, remoteAgentsFile } from './a2a-agents.ts';
 import { CHECK } from './check.ts';
 import { HOME } from './store.ts';
+import { REMOTE_PREFIX, remoteNameOf } from './workflow.ts';
 
 export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
@@ -50,6 +52,37 @@ export const HARNESSES = {
  * ceiling of its own since thin runtime stage 4c part 2, and refuses a `maxConcurrent` handed to it.
  */
 export const engine = (): Engine => {
-  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: HARNESSES });
+  const remote = Object.fromEntries([...remoteAgents()].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
+  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential });
   return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+};
+
+/**
+ * The remote A2A agents the store's `a2a-agents.json` declares, by name (`a2a-agents.ts`), each address judged by the runtime's own rule
+ * (`remoteConfigRefusal`) and refused in the file's words, naming the file: what `engine()` gives the engine as `a2a:<name>` harnesses, what
+ * `wf start` checks a step's name against, and what the api offers a step. Read afresh on each call.
+ */
+export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
+  const file = remoteAgentsFile(HOME);
+  const agents = readRemoteAgents(file);
+  for (const [name, agent] of agents) {
+    const refused = remoteConfigRefusal(`${REMOTE_PREFIX}${name}`, agent);
+    if (refused) throw Object.assign(new Error(`${file}: \`${name}\`: ${refused}`), { exitCode: 2 });
+  }
+  return agents as ReadonlyMap<string, RemoteAgent>;
+}
+
+/**
+ * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request, so a
+ * variable set for a running `wf up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local harness.
+ */
+export const credentials: Credentials = (scheme, _agentUrl, harness) => {
+  const name = remoteNameOf(harness);
+  return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
+};
+
+/** What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it. */
+export const missingCredential: MissingCredential = (scheme, _agentUrl, harness) => {
+  const name = remoteNameOf(harness) ?? harness;
+  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of \`wf up\` (and of the api, which reads a run through the same engine), and restart it; then \`wf retry\` the step. The secret is read from there on every request, and never written to disk.`;
 };

@@ -4429,6 +4429,45 @@ export function composeBrief(
 }
 
 /**
+ * The brief of a step on a remote A2A agent (`harness: a2a:<name>`): its note, what was asked for, what the runs this one waited on concluded,
+ * what a person approved or accepted before it, what the steps it reads declared, and, on a try, which try it is and what a person said with it.
+ *
+ * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts directory,
+ * the run's inputs, a workspace — names nothing it can open, and none is said: files given with `wf start --input` are named, never located.
+ * Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in workflow.ts), and it is done when its
+ * Task completes. A try is a new Task, never a turn of the last one, so it is told what any first try is, and then which try it is.
+ */
+export function remoteBrief(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  retry?: RetryBriefing,
+  parents?: readonly ParentCloseout[],
+): string {
+  const opening = briefBody(step) ? [briefBody(step), ''] : [];
+  const inputs = run.inputs?.length
+    ? ['', `Files were given with it (\`wf start --input\`): ${run.inputs.map((n) => `\`${n}\``).join(', ')}. They stay on the machine that runs this workflow and are not sent to you.`]
+    : [];
+  const handed = [...(parents ?? []).map(fromRunSection), approvedSection(step, run, steps), acceptedSection(step, run, steps, closeoutOf)].filter(Boolean);
+  const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf));
+  return [...opening, '## What was asked for', '', run.brief, ...inputs, ...handed, ...given, ...(retry ? [remoteTrySection(step, retry)] : [])].join('\n');
+}
+
+/** `## Try <n>` of a step on a remote A2A agent: who asked for it, how the last try ended, and what a person said with it, fenced as data. */
+function remoteTrySection(step: Workflow, r: RetryBriefing): string {
+  const who = r.by === 'retries'
+    ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
+    : r.by === 'signoff' ? 'The run filed this try itself.'
+    : `A person asked for this try (\`wf retry\`)${r.message !== undefined ? ', with what they said below' : ''}.`;
+  return [
+    '', `## Try ${r.try}`, '',
+    `The last try of this step ended \`${r.status}\`. ${who} This is a new task: nothing of the last one is continued, so do the work asked for above.`,
+    ...(r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : []),
+  ].join('\n');
+}
+
+/**
  * For a new session of a loop's target within a round past the first — a fresh try, or a nudge with no session left to continue — the
  * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them

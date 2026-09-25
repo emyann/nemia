@@ -22,7 +22,7 @@ import { claudeOps, type ClaudeOptions, type Observation, type RunnerOps } from 
 import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from './runner-claude-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudeRefuses } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudePrintRefuses } from './runner-claude-vocabulary.ts';
 import { claudeStreamOutput } from './runner-detached-output.ts';
 
 /**
@@ -53,7 +53,7 @@ export const claudeJob: HarnessSpec = {
   nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
   prepare: claudePrepare,
-  refuses: claudeRefuses,
+  refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
   // `claude -p --resume` prints its parent's cost and API time on in its own (2.1.280, open issue 4).

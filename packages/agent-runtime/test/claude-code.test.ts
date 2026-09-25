@@ -317,10 +317,13 @@ test('a job resumed from a background session is a job — and, its parent not o
 
 test('what the default Claude Code refuses depends on the mode: a job refuses a bridge, a background session a spend cap — each naming the other', () => {
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
-  assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background: true, remoteControl: true } }), undefined);
+  assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background: true, claude: { remoteControl: true } } }), undefined);
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r' }), undefined);
-  const bridge = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
-  assert.ok(bridge && /^`remoteControl: true` bridges a session to claude\.ai/.test(bridge) && bridge.includes('`config.background: true`'), bridge);
+  // In Claude Code's flags since 2026-09-25, and a name for the bridge (`--remote-control <name>`) asks for one as `true` does.
+  for (const remoteControl of [true, 'phone'] as const) {
+    const bridge = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { claude: { remoteControl } } });
+    assert.ok(bridge && /^`claude\.remoteControl` bridges a session to claude\.ai/.test(bridge) && bridge.includes('`config.background: true`'), bridge);
+  }
   const cap = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 0.5, background: true } });
   assert.ok(cap && /^`budgetUsd: 0\.5` is a spend cap/.test(cap) && cap.includes('Leave `config.background` off'), cap);
   for (const background of [undefined, true]) {
@@ -360,6 +363,27 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
   assert.deepEqual(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } }).args, claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args);
 });
 
+test('a bridge asked in `config.claude` reaches a background session as --remote-control, first of the bag and directly before the mode when it is written first', async () => {
+  const f = fake();
+  let bg: string[];
+  try {
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'b', cwd: f.dir, config: { background: true, tools: ['Read'], claude: { remoteControl: true, appendSystemPromptFile: '/a/p.md' } } }));
+    bg = f.read('bg-args')!;
+  } finally { f.restore(); }
+  const at = bg.indexOf('--remote-control');
+  assert.deepEqual(bg.slice(at, at + 4), ['--remote-control', '--append-system-prompt-file', '/a/p.md', '--permission-mode']);
+  assert.equal(bg.filter((a) => a === '--remote-control').length, 1, 'once: the runtime gives it no other way');
+});
+
+test('REFUSED at shipped defaults: a bridge in `config.claude` on the claude -p specs, which would spell it onto a prompt that runs and exits — the Effect door asks them alone', async () => {
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  for (const [what, spec] of [['a job', claudeJob], ['claude-detached', claudeDetached]] as const) {
+    const says = spec.refuses?.({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } }) ?? '';
+    assert.ok(says.startsWith('`claude.remoteControl` asks for a session bridged to claude.ai, and `claude -p` runs a prompt and exits'), `${what}: ${says}`);
+    assert.equal(spec.refuses?.({ brief: 'b', cwd: '/r', config: { claude: { appendSystemPromptFile: 'p.md' } } }), undefined, `${what}: the rest of the bag is taken`);
+  }
+});
+
 test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, in `config.claude` — and every flag a spawn gives is on that list', async () => {
   const { CLAUDE_OWNED_FLAGS } = await import('../src/runner-claude-vocabulary.ts');
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');
@@ -368,7 +392,7 @@ test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, 
   const f = fake();
   let bg: string[];
   try {
-    await Effect.runPromise(opsIn(tmp('root')).spawn({ ...request, name: 'ae/b/1', cwd: f.dir, config: { ...EVERYTHING, budgetUsd: undefined, background: true, remoteControl: true } }));
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ ...request, name: 'ae/b/1', cwd: f.dir, config: { ...EVERYTHING, budgetUsd: undefined, background: true } }));
     bg = f.read('bg-args')!;
   } finally { f.restore(); }
   for (const [what, args] of [['a job', claudeJob.command(request, io).args], ['claude-detached', claudeDetached.command(request, io).args], ['a background session', bg]] as const) {

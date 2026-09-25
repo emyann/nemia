@@ -4,7 +4,7 @@
 import type { SpawnRequest } from './runner.ts';
 import type { HarnessIO, HarnessSpec } from './runner-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeFlagsOf, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeFlagsOf, claudePrintRefuses, worktreeName } from './runner-claude-vocabulary.ts';
 import { claudeResultOutput } from './runner-detached-output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
 
@@ -73,7 +73,7 @@ export const claudeDetached: HarnessSpec = {
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
   noChannel: "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
   prepare: claudePrepare,
-  refuses: claudeRefuses,
+  refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
 };

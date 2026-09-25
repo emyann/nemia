@@ -1075,3 +1075,27 @@ test('a pass that could not read the harness does not end an attempt `lost`, its
   assert.equal(v.state.attempts[0]!.ended, null);
   assert.equal(v.phase, 'running (working)', 'followed as it runs');
 });
+
+test('a pass that could not read the harness does not spawn again an intent a crash left with no spawn on the record: the next good read adopts the session', async () => {
+  const sessions = new Map<string, Sighting>();
+  const spawns: string[] = [];
+  let failing = true;
+  const flaky = flakyHarness(sessions, () => failing);
+  const claude = { ...flaky, spawn: (r: Parameters<typeof flaky.spawn>[0]) => Effect.suspend(() => { spawns.push(r.name); return flaky.spawn(r); }) };
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude }, 'claude')), tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ ...spec, harness: 'claude' }));
+  // The intent journalled and the session started, and the engine gone before its `spawned` line.
+  await run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'starting', at: new Date().toISOString(), attempt: 1 })));
+  sessions.set(nameFor(id, 1), { sessionId: 'kept', state: 'working', nativeId: 'kept' });
+  await run(tick());
+  assert.deepEqual(spawns, [], 'not spawned a second time under its name on a read that failed');
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  assert.equal(events.some((e) => e.kind === 'ended' || e.kind === 'settled'), false, 'nor ended');
+  failing = false;
+  await run(tick());
+  assert.deepEqual(spawns, [], 'the next good read finds the session under the name');
+  const v = await run(view(id, new Map(sessions)));
+  assert.equal(v.state.attempts[0]!.ended, null);
+  assert.equal(v.phase, 'running (working)', 'adopted, and followed as it runs');
+});

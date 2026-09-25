@@ -235,3 +235,20 @@ test("UNREAD in `stopping`: a person's stop waits for a read before the deadline
   const after = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1), stop, ...journalled(cut as Action, 45 * S)]);
   assert.deepEqual(decide(after, new Map(), read(46 * S)), { do: 'settle', outcome: 'stopped', note: 'operator' });
 });
+
+test('UNREAD before the missing spawn: an intent with no spawn on the record whose harness could not be read is neither spawned again nor cut by a stop, until a read or its deadline', () => {
+  const unread = new Set([nameFor(TASK, 1)]);
+  const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
+  const nothing = { do: 'nothing', why: 'its harness could not be read this pass' };
+  // A crash between the spawn and its entry: a session may run under the name, which an unread harness cannot rule out.
+  const intent = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1)]);
+  assert.equal(lifecycleOf(intent), 'starting');
+  assert.deepEqual(observe(intent, new Map(), read(2 * S)), { type: 'UNREAD', attempt: 1, overdue: false });
+  assert.deepEqual(decide(intent, new Map(), read(2 * S)), nothing, 'not spawned a second time');
+  assert.deepEqual(decide(intent, new Map(), { at: new Date(T0.getTime() + 2 * S), graceMs: 30_000 }), { do: 'spawn', attempt: 1, name: nameFor(TASK, 1) }, 'read, and not there: spawned');
+  assert.deepEqual(decide(intent, new Map(), read(45 * S)).do, 'record-end', 'the deadline, read first, still ends it');
+  // A person's stop on it waits for a read as a spawned one does, and is cut once the deadline has passed.
+  const stopped = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), { kind: 'stop-requested', at: at(2 * S) }]);
+  assert.deepEqual(decide(stopped, new Map(), read(30 * S)), nothing, 'not cut on a read that failed');
+  assert.deepEqual(decide(stopped, new Map(), read(45 * S)), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'stopped', reason: 'operator', nativeId: undefined, closeout: undefined });
+});

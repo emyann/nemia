@@ -704,11 +704,13 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
       if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
       return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
     }
-    if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
-    // Spawned, and its harness could not be read this pass: nothing is known of the session, and an absence read off a
-    // failed look is no absence — before 2026-09-25 it counted toward `lost`, and one unread pass past the grace ended a
-    // live session's attempt. The deadline, read above, still bounds it; for a person's stop, the edge reads `overdue`.
+    // Its harness could not be read this pass: nothing is known of the session, and an absence read off a failed look is no
+    // absence — before 2026-09-25 it counted toward `lost`, and one unread pass past the grace ended a live session's attempt.
+    // Read before our own `spawnedAt`, for the reason above: an intent with no spawn on the record may be a session the crash
+    // left running, which an unread harness cannot rule out, so it is neither spawned again nor cut (found in review). The
+    // deadline, read above, still bounds it; for a person's stop, the edge reads `overdue`.
     if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
+    if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
     // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
     // race measured in seconds) or the session is gone. A grace window tells the two apart.
     return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs ? { type: 'UNSEEN_IN_GRACE', attempt: last.n } : { type: 'LOST', attempt: last.n };

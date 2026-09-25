@@ -77,7 +77,7 @@ export type LifecycleEvent =
   | { type: 'UNSPAWNED'; attempt: number; name: string }
   | { type: 'UNSEEN_IN_GRACE'; attempt: number }
   | { type: 'LOST'; attempt: number }
-  /** Spawned, and its harness could not be read this pass (`Now.unread`): neither seen nor gone. `overdue`: past its deadline. */
+  /** In flight — spawned, or only intended — and its harness could not be read this pass (`Now.unread`): neither seen nor gone. `overdue`: past its deadline. */
   | { type: 'UNREAD'; attempt: number; overdue: boolean }
   | { type: 'DEADLINE_PASSED'; attempt: number; sighting?: Sighting; live: boolean }
   /** The engine's own: the harness refused the spawn, and nothing started. Never observed, since only the spawn call knows. */
@@ -212,6 +212,9 @@ const CONFIG = {
       on: {
         ...inFlight,
         UNSPAWNED: { target: 'working', actions: act('spawn', (e: Ev<'UNSPAWNED'>) => ({ do: 'spawn', attempt: e.attempt, name: e.name })) },
+        // Its harness could not be read, so a session the crash left under the name is not ruled out: spawned by a pass that
+        // reads it, never twice. The deadline is read before this, and ends it.
+        UNREAD: { actions: nothing },
         // Nothing started: the attempt ends `failed`, `unstartable`, in the harness's words.
         SPAWN_REFUSED: { target: 'ending', actions: act('record-end', (e: Ev<'SPAWN_REFUSED'>) => ({ do: 'record-end', attempt: e.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: e.error })) },
       },

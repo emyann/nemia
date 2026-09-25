@@ -155,6 +155,7 @@ stateDiagram-v2
   starting --> starting: DEADLINE_PASSED [live] / stop
   starting --> ending: DEADLINE_PASSED / record-end
   starting --> working: UNSPAWNED / spawn
+  starting --> starting: UNREAD / nothing
   starting --> ending: SPAWN_REFUSED / record-end
   working --> working: SESSION_LIVE / nothing
   working --> working: SESSION_BLOCKED / nothing
@@ -197,7 +198,8 @@ still running is stopped rather than ended; `overdue`, a person's stop whose har
 the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
 end a task settles on. `UNREAD` is a pass that could not read the attempt's harness (`Observation.unread`): nothing is
 known of the session, so nothing is done in `working` — where the deadline, read first, still ends it — and it never
-counts toward `LOST`. XState
+counts toward `LOST`; in `starting` it is read before the missing spawn, so an intent a crash left with a session running
+under its name is neither spawned a second time nor cut until a pass reads the harness. XState
 is a dependency of this package alone, imported by `src/lifecycle.ts` alone (`test/xstate-boundary.test.ts`), and no
 entry exports the machine, as none exports `decide`.
 

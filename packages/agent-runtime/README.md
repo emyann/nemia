@@ -666,6 +666,25 @@ operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 
+### Settings: the checkout's, never the operator's
+
+A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project,local` (`claudePrintFlags`). It reads the
+`.claude/settings.json` and `.claude/settings.local.json` of its `cwd`, and nothing of the operator's `~/.claude/settings.json`: not their
+default mode, allow and deny rules, `additionalDirectories`, enabled plugins, `~/.claude/skills`, hooks, `statusLine`, `outputStyle`, `model`,
+`effortLevel`, `env`, `attribution` or `autoMode` profile. So a job does the same whoever runs the engine, and an agent's own skills do
+not share Claude Code's 8,000-character skill listing with a person's (the owner's decision of 2026-09-25). What the runtime gives on the
+command line still reaches it: `--permission-mode`, `--tools`, the allow and deny lists, `--mcp-config`, and `config.claude`'s `--settings`
+and `--plugin-dir`. Claude Code's auto memory still loads; it is keyed by the repository.
+
+A project's allow rules hold only in a directory Claude Code trusts. A worktree is trusted as its repository is. A setting a job needs goes in
+the checkout's settings or on the task, never in `~/.claude/settings.json`. For instance, a repository whose commits carry no
+`Co-Authored-By` trailer says `attribution` in its own `.claude/settings.json`. Measured on 2.1.282:
+`../../docs/spike-2026-09-25-agents-skills.md`, F24.
+
+`settingSources` is on `CLAUDE_OWNED_FLAGS`, so `config.claude` cannot give it again. A background session (`config.background`,
+`claude --bg`) is not given the flag and reads the operator's settings as before: a job is what was measured, and the supervisor, which
+runs as a background session, is a session a person may attach to. `test/claude-code.test.ts` holds both.
+
 ## What a session may spend: `budgetUsd`
 
 `config: { budgetUsd: 0.25 }` is the most one attempt's session may spend, in dollars: a harness argument like `tools`,

@@ -112,4 +112,5 @@ out until Codex has a place for them, and the load says so for a codex agent tha
    - **1b, the shipped agents**: their procedures moved into `SKILL.md` skills, their bodies cut to the role and its limits.
 2. **The card from the skills**: the A2A card generated from composed skills; the `.skills.json` files retired.
 3. **The board**: compose skills on an agent from a list, write a new skill, try an agent on a short brief.
-4. **Jobs without user settings**, if open question 1 is decided that way.
+4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
+   runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

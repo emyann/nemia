@@ -68,6 +68,8 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'permissionPrompts', 'permissionMode', 'dangerouslySkipPermissions', 'allowDangerouslySkipPermissions',
   'model', 'effort', 'tools', 'disallowedTools', 'allowedTools', 'mcpConfig', 'strictMcpConfig', 'noChrome', 'chrome',
   'autocompact', 'jsonSchema', 'worktree', 'maxBudgetUsd',
+  // Every job reads its checkout's settings and not the operator's (`claudePrintFlags`); a background session is not given it.
+  'settingSources',
 ];
 
 /** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */

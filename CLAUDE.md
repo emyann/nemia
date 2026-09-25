@@ -480,6 +480,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   either. A command on Claude Code's own read-only list (`git merge-base`) still ran, so the probe half-looked right. A run's worktree
   is trusted as its repository is. Measure a project rule in a checkout Claude Code trusts, or pass the file as `--settings <file>`,
   and read the job's stderr (learned by the run that gave planners and reviewers git's read-only verbs).
+- **A job reads no user-level settings, so what it needs is said in the checkout or on the step.** Since card 4, every `claude -p` the
+  runtime spawns passes `--setting-sources project,local`. A job reads the checkout's `.claude/settings.json` and `settings.local.json`,
+  and nothing of `~/.claude/settings.json`: not its model, effort, allow rules, plugins, skills, hooks or `attribution`. The last was
+  load-bearing. Without the owner's `attribution: {commit: ""}`, Claude Code tells the session to end every commit with `Co-Authored-By`,
+  and only this file's prose kept the trailer off. It is in `.claude/settings.json` now. The ui agents named no `model:` and ran on the
+  owner's `opus[1m]`; they say `opus` now. A hand probe that means to reproduce a job passes the same flag. A rule, model or effort a step
+  needs goes on the step, its agent or the checkout's settings, never in your own. A `--bg` session, the supervisor included, still reads
+  them (learned by agents card 4, F24 in `docs/spike-2026-09-25-agents-skills.md`).
 - **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
   denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
   which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own

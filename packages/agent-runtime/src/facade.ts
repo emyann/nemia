@@ -20,7 +20,7 @@ import {
   claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
 import { claudeCodeOps, isClaudeJob } from './runner-claude-code.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -176,8 +176,8 @@ export type Engine = {
    * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
    * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
    * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
-   * on a harness with no context window to set (`codex`); a `remoteControl` that is not true or false, or `true` on a
-   * harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
+   * on a harness with no context window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's
+   * flag in `config.claude` since 2026-09-25, and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
    * a task whose `background` is not true); a `background` that is not true or false, or `true` on any harness not
    * brought as `'claude'`; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep.
    * A harness brought as a `PromiseRunner` is asked nothing of its own.
@@ -385,7 +385,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   const h = harnesses[spec.harness]!;
   // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
   // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
-  const { contextTokens, remoteControl, background } = spec.config ?? {};
+  const { contextTokens, background } = spec.config ?? {};
   // A mode of the engine's own Claude Code, and of no other harness: dropped without a word, a task that asked for a
   // session a person can reach would run as whatever the harness runs.
   if (background && h !== 'claude') {
@@ -404,10 +404,10 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   }
   // Only Claude Code's background sessions are bridged. A spec's harness runs a prompt and exits — `claude -p` among them,
   // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
-  if (remoteControl && isSpec(h)) {
+  if (bridgeAsked(spec) && isSpec(h)) {
     const bridged = Object.keys(harnesses).filter((name) => isClaude(harnesses[name]!))
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
-    return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
+    return `\`claude.remoteControl\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`claude.remoteControl\` off.` : "Leave `claude.remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
   // Claude Code's own flags, on a harness that is not Claude Code: its session would start without them, and a body meant for
   // the system prompt would be read by nobody. A `PromiseRunner` is the consumer's own, and is handed them.

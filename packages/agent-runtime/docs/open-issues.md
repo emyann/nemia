@@ -100,7 +100,8 @@ fails with it out of either (a runner built with `Runner.of` through `file`, and
 **What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
 window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;
-`remoteControl: true` on a `HarnessSpec`; `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
+`claude.remoteControl`, and every other flag under `claude`, on `codex` or a `check` (Claude Code's own `-p` specs refuse
+the bridge there since 2026-09-25, `claudePrintRefuses`); `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
 that an unknown harness and a bad mode are still journalled there, so the day this moves, that test says so.
 
 The issue used to say `RunnerOps` has no verb for this, and so it would be a value passed to `file`. The first half is
@@ -349,7 +350,7 @@ until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read o
 and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
 run's first step waiting for as long as it lasts.
 
-### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
+### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
 (`claudeOps` in `agent-runtime/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
@@ -360,6 +361,12 @@ harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and
 the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
 retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
 `test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
+
+**What changed again** (2026-09-25). The bridge is Claude Code's own flag, `config.claude.remoteControl`, no harness argument
+of its own: the runtime grows no named field per harness flag. `config.remoteControl` is refused at both doors at any value,
+naming the new place (`FORMER_ARGS`), and a journal filed before reads as filed under `claude` (`upgrade`). The argv did not
+move (`packages/agent-orchestrator/test/argv.test.ts`, recorded before). In the bag it could reach a `claude -p` spec at the Effect
+door, which the named key never did, so `claudeJob` and `claudeDetached` refuse it there (`claudePrintRefuses`).
 
 **What is left.**
 
@@ -372,9 +379,9 @@ retry, and never for a task without it; `test/engine.test.ts`: carried to every 
   told.
 - **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
   drops a released session at once was not looked at.
-- **The Effect door refuses no harness's words** (issue 6): it refuses a `remoteControl` that is not true or false, and a
-  `remoteControl: true` that reaches `codex` or `claude-detached` through it is dropped without a word.
-- **Not a brief key**, and agent-orchestrator files none yet: a step key (`remote:`, features.md §2) is a run of its own.
+- **The Effect door refuses no harness's words** (issue 6): it refuses a `claude.remoteControl` the bag refuses of any flag
+  (`false`, `''`), and one on `claude-detached` (since 2026-09-25); one that reaches `codex` or a `check` through it is dropped without a word.
+- **Not a brief key.** agent-orchestrator files it for a step that says `remote: true` (features.md §2).
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
   fails the day the control is bridged without it, or the flagged session is not.

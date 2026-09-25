@@ -558,14 +558,14 @@ remote: true     # every session of this step is bridged to claude.ai, and can b
 Implement what was asked, in this repository.
 ```
 
-`remote: true` is carried on every filing of the step — the first, each try and each round — as the engine's `remoteControl: true`, so
-Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
+`remote: true` is carried on every filing of the step — the first, each try and each round — as Claude Code's own flag, `config.claude.remoteControl`
+(a harness argument of its own, `remoteControl`, until 2026-09-25), so Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
 from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
 phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
-`wf start`, with nothing written, on a harness the engine refuses `remoteControl` for, in the engine's words: `codex` and
+`wf start`, with nothing written, on a harness the engine refuses `claude.remoteControl` for, in the engine's words: `codex` and
 `claude-detached` run a prompt and exit, and only a Claude Code background session, `claude` with `background: true`, is bridged; and on
 a `claude` step without `background: true`, since a job opens no bridge. The words are a copy, since `start` cannot wait on the engine's
 door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`

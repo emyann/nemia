@@ -20,20 +20,20 @@ import { parentRecord } from './branches.ts';
 import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
 
 /**
- * Why the engine refuses `remoteControl: true` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
+ * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
  * `test/store.test.ts` holds this copy to by asking the engine. A copy, because `start` is synchronous and the engine's door is not; and
  * asked only at filing, the refusal would come after the run was written, on its first pass.
  */
 const NOT_BRIDGED = 'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
 
 /**
- * Why the engine refuses `remoteControl: true` on a Claude Code job, in its words (agent-runtime's `claudeCodeRefuses`), which
+ * Why the engine refuses `claude.remoteControl` on a Claude Code job, in its words (agent-runtime's `claudeCodeRefuses`), which
  * `test/store.test.ts` holds this copy to by asking the engine: a `claude` step without `background: true` runs `claude -p`.
  */
 const JOB_NOT_BRIDGED = 'only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge';
 
 /**
- * The first step that says `remote: true` where the engine refuses `remoteControl` — every one of `HARNESSES` but Claude Code's, as the
+ * The first step that says `remote: true` where the engine refuses `claude.remoteControl` — every one of `HARNESSES` but Claude Code's, as the
  * engine's own door judges (`NOT_BRIDGED`), and on Claude Code every step but a background session (`JOB_NOT_BRIDGED`) — refused by name
  * in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
  */

@@ -11,6 +11,8 @@ import { Effect } from 'effect';
 import { claudeOps, QUIESCENT_AFTER_MS } from '../src/runner.ts';
 import { lastStructuredOutput } from '../src/runner-claude-transcript.ts';
 import { createEngine } from '../src/facade.ts';
+import { Journal } from '../src/journal.ts';
+import type { Event } from '../src/domain.ts';
 
 /**
  * `observe` shells out, so these tests drive the predicate through a stub of that call. A tiny
@@ -417,7 +419,7 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
 test('a context window reaches Claude Code as --autocompact and its digits, where no variadic flag can take it and it takes nothing', async () => {
   // Beside every flag that could swallow or be swallowed: `--tools` and `--disallowedTools` are variadic, `--remote-control`
   // and `--worktree` take an optional value, and the prompt is last.
-  const args = await argvOf({ config: { contextTokens: 200000, tools: ['Read'], disallowedTools: ['SendMessage'], remoteControl: true, worktree: true, effort: 'high' } });
+  const args = await argvOf({ config: { contextTokens: 200000, tools: ['Read'], disallowedTools: ['SendMessage'], claude: { remoteControl: true }, worktree: true, effort: 'high' } });
   const i = args.indexOf('--autocompact');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], '200000', 'digits, never `200k`, and never below 1000, which the CLI reads as thousands');
@@ -427,10 +429,10 @@ test('a context window reaches Claude Code as --autocompact and its digits, wher
   assert.equal(args.filter((a) => a === '--autocompact').length, 1);
 });
 
-test('remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {
+test('claude.remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {
   // `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap: directly before the prompt it would take the
   // prompt as the session's name, and the session would run with nothing to do. `--permission-mode` always follows it.
-  const args = await argvOf({ config: { remoteControl: true, tools: ['Read'], disallowedTools: ['SendMessage'] } });
+  const args = await argvOf({ config: { claude: { remoteControl: true }, tools: ['Read'], disallowedTools: ['SendMessage'] } });
   const i = args.indexOf('--remote-control');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], '--permission-mode', 'a flag, not a value, comes next');
@@ -438,10 +440,10 @@ test('remoteControl reaches Claude Code as --remote-control, and a flag follows 
   assert.equal(args[args.indexOf('--tools') + 1], 'Read', 'the variadic lists before it keep their values');
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage');
   assert.equal(args.at(-1), 'the prompt');
-  assert.equal((await argvOf({ config: { remoteControl: false } })).includes('--remote-control'), false, 'false asks for nothing');
+  assert.equal((await argvOf({ config: { claude: {} } })).includes('--remote-control'), false, 'not asked, not given');
 });
 
-test('at shipped defaults, a background task filed with remoteControl: true is spawned with --remote-control, and one filed without it never is', async () => {
+test('at shipped defaults, a background task filed with claude.remoteControl is spawned with --remote-control, and so is one journalled with remoteControl before it moved; one filed without it never is', async () => {
   const dir = scratch('fake-claude-');
   const registry = path.join(dir, 'registry.json');
   const runs = path.join(dir, 'runs.jsonl');
@@ -461,9 +463,13 @@ if (args[0] === '--bg') {
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const engine = createEngine({ root: scratch('ae-remote-') });
-    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, remoteControl: true } });
+    const root = scratch('ae-remote-');
+    const engine = createEngine({ root });
+    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } });
     await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
+    // Filed before 2026-09-25, when the bridge was a harness argument of its own: journalled as it was then, past today's door.
+    const at = new Date().toISOString();
+    await Effect.runPromise(Journal.filesOps(root).append('t-before-the-move', { kind: 'filed', at, brief: 'bridged before', cwd: dir, queued: false, config: { background: true, remoteControl: true } } as unknown as Event));
     await engine.tick();
     // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
 
@@ -471,6 +477,8 @@ if (args[0] === '--bg') {
     const of = (brief: string) => argvs.filter((a) => a.at(-1) === brief);
     assert.equal(of('bridged').length, 1, 'its attempt');
     for (const args of of('bridged')) assert.ok(args.includes('--remote-control'), args.join(' '));
+    assert.equal(of('bridged before').length, 1, 'its attempt');
+    for (const args of of('bridged before')) assert.equal(args[args.indexOf('--remote-control') + 1], '--permission-mode', args.join(' '));
     assert.equal(of('plain').length, 1);
     for (const args of of('plain')) assert.equal(args.includes('--remote-control'), false, args.join(' '));
   } finally { process.env.PATH = prev; }

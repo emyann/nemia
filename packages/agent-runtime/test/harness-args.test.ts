@@ -24,16 +24,27 @@ type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
 const refusedBy = (ops: RunnerOps, t: Asked) =>
   Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(Runner.layer(ops))));
 
-test('HARNESS_ARGS is the thirteen arguments a harness takes — the spend cap among them since stage 4b, Claude Code\'s own flags since card 1a', () => {
+test('HARNESS_ARGS is the twelve arguments a harness takes — the spend cap among them since stage 4b, Claude Code\'s own flags since card 1a, and remoteControl gone into them', () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'allowedTools', 'background', 'budgetUsd', 'claude', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
+    'allowedTools', 'background', 'budgetUsd', 'claude', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'tools', 'worktree',
   ]);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the thirteen', () => {
+test('remoteControl, a harness argument until 2026-09-25, is refused under config and beside it at any value, naming config.claude — and taken there', () => {
+  const says = "`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: { claude: { remoteControl: true } }`, or leave it out.";
+  for (const value of [true, false, undefined]) {
+    assert.equal(argsRefusalOf({ ...task, config: { remoteControl: value } } as never), says, `config.remoteControl: ${value}`);
+    assert.equal(argsRefusalOf({ ...task, remoteControl: value } as never), says, `remoteControl: ${value} beside config`);
+    // Before any other refusal: a caller that files it with a model loose beside config is told about the move first.
+    assert.equal(argsRefusalOf({ ...task, model: 'opus', config: { remoteControl: value } } as never), says);
+  }
+  assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
+});
+
+test('a harness argument filed beside config is refused, naming where it goes — each of the twelve', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus', permissionMode: 'auto', effort: 'high', tools: ['Read'], allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
-    mcp: {}, contextTokens: 200000, remoteControl: false, background: true, worktree: true, budgetUsd: 5,
+    mcp: {}, contextTokens: 200000, background: true, worktree: true, budgetUsd: 5,
     claude: { appendSystemPromptFile: 'prompt.md' },
   };
   for (const key of HARNESS_ARGS) {

@@ -549,6 +549,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   Codex's default, `workspace-write`, which writes, and nothing says so (`vocabulary.test.ts` shows it). And a form that draws a harness
   word draws only the fence its harness has (`takes`, `hasKey` in `apps/web`), or Claude Code gets an empty Sandbox picker (learned by the
   run that named Codex's sandbox `sandbox:`).
+- **In a `claude -p` job a turn cannot end to wait for a process in the background.** The harness demands the closing
+  statement at once (`[structured-output-enforce]`), so a session that starts a suite in the background and ends its turn to
+  wait has signed off, and the suite's verdict reaches nobody. Run long work in the foreground, in pieces under the 10-minute
+  limit of a Bash call, or start it in the background and wait on it with blocking calls — `timeout 580 bash -c "while kill -0
+  <pid>; do sleep 5; done"` — never by ending the turn. The implementers' and reviewers' briefs say so (the owner's word
+  at the plan gate of the run that moved the ship's check into the run, whose shipper had waited so on a check of twenty minutes).
 
 ## Rules the code keeps
 

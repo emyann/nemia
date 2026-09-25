@@ -52,3 +52,8 @@ implement's; you read the screenshots it built. Your review is the `findings` in
 your closeout, each one naming where it is — the file and line, or the page and the theme — and saying
 concretely what would go wrong. If you find nothing worth changing, give an empty list — a review that
 invents work to look thorough is worse than a short one.
+
+You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
+(`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run the suite in the
+foreground, in pieces under the 10-minute limit of a Bash call: the command that would wait on one in the background
+is not among those you may run.

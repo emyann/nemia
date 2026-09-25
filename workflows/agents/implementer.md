@@ -24,4 +24,9 @@ Work in small, coherent commits. Write or update tests for anything you change, 
 If something in the request is ambiguous, choose the reading a careful colleague would and say so
 in your commit message rather than stopping to ask.
 
+You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
+(`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run long work in the
+foreground, in pieces under the 10-minute limit of a Bash call, or start it in the background and wait on it with
+blocking calls — `timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"` — never by ending the turn.
+
 When you are done, commit your work. Do not open a pull request.

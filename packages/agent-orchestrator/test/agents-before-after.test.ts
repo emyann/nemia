@@ -45,11 +45,17 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * The supervisor's body moved when the packages were renamed (2026-09-23): it names the runtime's open issues and the orchestrator's
  * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
  * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
+ *
+ * Every implementer and reviewer was told that a job's turn cannot end to wait for a process in the background (2026-09-25,
+ * `[structured-output-enforce]`), the lesson the owner gave at a plan gate. So each reviewer's body is on the list now, beside the
+ * implementers already there.
  */
 const BODIES_REWORDED: string[] = [
-  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
+  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),
   'workflows/ui/implement',
+  'workflows/ui/review',
   'packages/agent-orchestrator/workflows/ui/implement',
+  'packages/agent-orchestrator/workflows/ui/review',
   'workflows/supervisor/supervise',
 ];
 

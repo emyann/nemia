@@ -4608,6 +4608,50 @@ orchestrator's phases no longer grow with the store, and the `runtime` phase sti
 watches what `advance` reads today: a new input a finished run's pass reads goes into the stamp, the feed or the tips, or a daemon
 answers that run from a stale memo until it restarts, and only `WF_VERIFY_REST` in the tests says so, in the states they reach.
 
+## Shipped: pruned and cancelled runs rest too
+
+Shipped 2026-09-25. The owner's `wf up --stats` after the memo said `rested 98` of 198 records, with git at 144 processes and 533 ms
+a pass and 336 journal reads (10:25). The plan guessed that pruned and cancelled runs were kept out by a claim on the checkout or a
+retry due. **Measured first**, read-only. The live records were copied and their repositories pointed at scratch clones, and each run's
+`RestFacts` was built by a proxy engine over the copy. No pass ran on the live store. Each run was counted under the clauses of `atRest` that keep it
+out (`restBlockers`, `src/rest.ts`, which `atRest` is now written on). There were 195 records, on the second pass:
+
+| clause | runs | what they were |
+|---|---|---|
+| at rest already | 98 | 69 pruned succeeded, 2 pruned cancelled, 1 cancelled, 26 succeeded |
+| `handOffDue` | 68 | 66 succeeded, 1 failed, 1 cancelled: every step's worktree gone from disk, no `handedOff` mark (runs finished before the mark was written) |
+| `workflow` and `handOffDue` | 2 | records from before the workflow was frozen on them |
+| `settled` | 1 | `measure-what-a-tick-costs-ph-5ep5`: an earlier ship try, `then: back`, ended and never closed |
+| running | 4 | `status`, `settled`, `inFlight`, `hold`, `due.ready`, `waiting`: in flight |
+| (at rest, never asked) | 22 | cancelled before anything was filed: `atRest` said yes, but `pass()` judged them outside the memo |
+
+`checkoutAsked`, `due.retry`, `landingOwed` and `notes` held no run out, so nothing was changed for them.
+
+- **A hand-off is owed only where there is a workspace to hand it off from** (`handOffOwed` in `src/tick.ts`). `handOffDue` (pure) reads
+  a step's record and not the disk, so a step with a workspace and no `handedOff` was owed one forever. Each pass ran `git status` in a
+  directory that was gone, got `{error}` back, and tried again on the next pass, saying nothing: 70 runs and two git processes each, every
+  pass. Is re-judging right? A workspace that is gone comes back only when a step is filed, and a filing writes the record, so the
+  memo's stamp already sees it. The pass reads whether the workspace exists and the memo does not watch it. A pruned run owes nothing. `wf prune` reads the same function, so it no longer refuses a
+  run as *still to be handed off* when the only thing owed is a hand-off from a worktree already gone.
+- **A run with nothing filed goes through the memo, with its slot** (`advanceResting` in `pass()`'s unstarted loop). A run called off
+  before it started is final and settled, but it was judged outside the memo on every pass: its asks were read, and one journal each.
+  The departure: every unstarted run is routed there, not only a cancelled one, because `atRest` already judges them and the answer does
+  not depend on the slot. A run with nothing ready wants no slot.
+- **`WF_VERIFY_REST` names the clause.** A memo answer that a full pass finds not at rest throws with the clauses that hold it out
+  (`finds it not at rest (status, settled, inFlight)`).
+- **Tested** (`test/rest-store.test.ts`, `test/rest.test.ts`). Every clause alone gives its name. A run called off before it started
+  rests, and a `.pruned` marker takes it out. Three finished runs (succeeded, failed at a step, called off) whose worktrees were removed
+  owe no hand-off and rest, with the pass's cost unchanged. `wf prune` of a run with one worktree of two gone is `prunable`. The verify
+  message names the clauses. Each test was run against its mutant and failed: the unstarted routing reverted, the existence filter taken
+  out, prune back on `handOffDue`, and the verify message without its clauses.
+- **What it saves on the fixture.** Three runs whose worktrees are gone: 0 rested, 4 git processes, 6 journal reads before; 3 rested,
+  1 git, 1 journal after. Twenty runs called off before they started: 0 rested, 21 journal reads, 80 asks reads, 7.9 ms before; 20 rested,
+  1 journal read, 40 asks reads, 2.6 ms after. Over a copy of the live records, 188 of 195 are at rest after the change. The 7 left out are
+  2 unfrozen, the 1 unclosed try and 4 running.
+- **Left.** The owner's live `wf up --stats`, once `wf up` is restarted on the merged tree. The unclosed ship try of
+  `measure-what-a-tick-costs-ph-5ep5` is a finding in its own right: an ended task that never settles keeps its run out of the memo,
+  correctly, until something closes it.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

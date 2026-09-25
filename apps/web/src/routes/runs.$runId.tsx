@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
@@ -40,6 +40,38 @@ export const Route = createFileRoute('/runs/$runId')({
 
 type Step = RunDetail['steps'][number];
 
+/** How long a page opened on a step keeps that step's inspector in view while what is above it is still being read. */
+const LANDING_MS = 3_000;
+
+/**
+ * Opened on a step (`?step=`), the page is brought to its inspector, which sits under the banners and Decide, below the first screen: a
+ * person who pressed Read the plan would otherwise be reading the Decide section. Decide grows once its decision is read, after the page has
+ * drawn, so a scroll made once lands short of the inspector; this one is made again each time the page's height changes, for a few seconds,
+ * and never once the person scrolls, presses a key or touches the page themselves.
+ */
+function useLanding(target: RefObject<HTMLElement | null>, step: string | undefined) {
+  useEffect(() => {
+    const el = target.current;
+    if (!step || !el) return;
+    const bring = () => el.scrollIntoView({ block: 'start' });
+    bring();
+    const resized = new ResizeObserver(bring);
+    // The article: what grows above the inspector grows it.
+    resized.observe(el.parentElement ?? document.body);
+    const done = () => {
+      resized.disconnect();
+      clearTimeout(timer);
+      for (const kind of TAKEN_BACK) window.removeEventListener(kind, done, true);
+    };
+    const timer = setTimeout(done, LANDING_MS);
+    for (const kind of TAKEN_BACK) window.addEventListener(kind, done, true);
+    return done;
+  }, [target, step]);
+}
+
+/** What a person does to move the page themselves, which ends a landing. */
+const TAKEN_BACK = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+
 function RunPage() {
   const { runId } = Route.useParams();
   const { data: run, error } = useSuspenseQuery(runQuery(runId));
@@ -64,6 +96,8 @@ function Run({ run }: { run: RunDetail }) {
   useEffect(() => {
     if (linked) setSelected(linked);
   }, [linked]);
+  const steps = useRef<HTMLElement>(null);
+  useLanding(steps, linked);
   const close = useCallback(() => setSelected(null), []);
   // A step the folder has lost since it was clicked is off the canvas, and its panel goes with it.
   const inspected = run.steps.find((s) => s.name === selected);
@@ -111,7 +145,7 @@ function Run({ run }: { run: RunDetail }) {
           has asked for. A session the harness blocked is continued from the banner, and draws it only once its try is asked. */}
       {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
 
-      <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
+      <section ref={steps} aria-label="The run's steps as a graph" className="flex scroll-mt-4 flex-col gap-4 md:flex-row">
         <div className="min-w-0 flex-1">
           <RunCanvas run={run} selected={inspected?.name ?? null} onSelect={setSelected} />
         </div>

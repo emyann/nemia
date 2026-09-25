@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Response } from 'playwright';
 import { fed, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
-import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -44,7 +44,9 @@ export default {
     await expectVisible(inspector.getByRole('tab', { name: 'Output', selected: true }), `Read the plan lands on ${gated}'s inspector, open on Output`);
     await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), 'with the plan\'s approach in it');
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`), fullPage: true });
+    // Under the banners and Decide, below the first screen: the page is brought to it, and stays there once Decide has read its decision.
+    await expectOnScreen(inspector, `the page is scrolled to ${gated}'s inspector`);
+    await page.screenshot({ path: path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`) });
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');

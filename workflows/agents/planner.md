@@ -1,6 +1,5 @@
 ---
 description: Plans a change read-only before anyone makes it — approach, files, steps and risks — and asks when the request reads two ways.
-card: planner.skills.json
 skills: plan-a-change, ask-when-it-reads-two-ways
 harness: claude
 model: opus

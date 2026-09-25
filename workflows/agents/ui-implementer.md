@@ -1,6 +1,5 @@
 ---
 description: Implements a change a person will see in the web app, and looks at every page it changed, in both themes, before it signs off.
-card: ui-implementer.skills.json
 skills: implement-a-web-change, look-at-a-page
 harness: claude
 # Said, as every role's is: a job reads no user settings, and with none named here it ran on the owner's `opus[1m]` before

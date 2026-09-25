@@ -1,6 +1,5 @@
 ---
 description: Ends a run in the repository's own checkout: stages the merge of its result and writes its commit message, which the run commits on its check.
-card: shipper.skills.json
 skills: trial-merge-a-branch, say-why-it-aborted
 harness: claude
 model: opus

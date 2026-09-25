@@ -412,6 +412,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   digest it. Every reader outside `wf start` passes `Places` — the api's listing, version and save take `placesOf(repo)` — and a test of a
   reader puts a skill in `.claude/skills/` to prove it (`apps/api/test/builder.test.ts`, learned by the run that rendered an agent for
   Claude Code).
+- **A version is checked with the places it was listed with.** The api lists an agent's version with its skills found as a start finds
+  them (`skillsOfPlace`), and `writeAgent` and `removeAgent` read it again to refuse a stale save: read beside the folder alone, an agent
+  of yours whose skill is in the repository's `.claude/skills/` was refused as changed on every save and removal, and the test that sent
+  an old version passed either way. Both take `repo` and read the same places (`skillsAt` in `authoring.ts`); a test of a version check
+  also saves at the version just listed (learned in review of agents card 2, round 1).
 - **Who names an agent is read in every place that falls back to it, and a guard added at load is added to each verb that sets the same thing.**
   A repository's workflows are given the store's agent when the repository has none of that name (`lookupRoots`), so `removeAgent`, reading
   only the workflows beside the agent, let the board delete one a repository's step named: it reads the board's repository too now

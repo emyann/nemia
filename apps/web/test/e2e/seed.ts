@@ -665,7 +665,10 @@ export const WORKFLOWS = {
     agent: {
       name: 'implementer',
       runsOn: 'implementer · claude · opus',
-      /** What it says it can do, as an A2A skill: its `skills:` file beside it, which its step's page shows under its name. */
+      /**
+       * What it says it can do, as an A2A skill: the one skill its `skills:` gives, `skills/<id>/SKILL.md` beside `agents/`, whose frontmatter
+       * is the card's entry (`title:` its name), which its step's page shows under its name.
+       */
       skill: { id: 'implement-a-change', name: 'Implement a change', description: 'Writes the change asked for, with its tests.', tags: ['code'] },
     },
     check: 'npm test && npm run typecheck',
@@ -692,8 +695,8 @@ export const WORKFLOWS = {
 
 /**
  * The agents the Agents page lists: the checkout's `implementer` (WORKFLOWS' `dev` › implement names it), and one of yours, `scribe`, in the
- * store's `workflows/agents/`, which sets a description, two role keys, a result schema and the card that says what it can do, and which no node
- * of yours names. `made` is the agent the page creates, edits and removes; `naming` the folder of yours the refusal page writes, whose one
+ * store's `workflows/agents/`, which sets a description, two role keys and a result schema, gives no skills — so its card is one entry made
+ * from its description — and which no node of yours names. `made` is the agent the page creates, edits and removes; `naming` the folder of yours the refusal page writes, whose one
  * step names `scribe`.
  */
 export const AGENTS = {
@@ -703,9 +706,8 @@ export const AGENTS = {
     keys: { model: 'sonnet', effort: 'low', output: 'scribe.schema.json' },
     body: 'You write the notes of a change.\n\n## What they say\n\n- What changed, and why.\n- What a reader should try first.',
     schema: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }, null, 2),
-    /** The file its `card:` names, and what it holds: what it says it can do, in the A2A protocol's words. */
-    card: 'scribe.skills.json',
-    skill: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change, and what to try first.', tags: ['notes', 'release'] },
+    /** What it says it can do, given no skills: one entry, generated from its own name and description. */
+    skill: { id: 'scribe', name: 'scribe', description: 'Use this when a change needs its notes written.', tags: ['scribe'] },
   },
   made: {
     name: 'notary',
@@ -713,11 +715,13 @@ export const AGENTS = {
     // Not haiku: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused (F21).
     model: 'sonnet',
     edited: 'opus',
-    /** Typed into the Skills field, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name. */
+    /**
+     * Typed into the Skills field, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name, seeded
+     * in the store's `workflows/skills/`, whose SKILL.md is `skill`, the entry its card is generated with.
+     */
     skills: 'write-a-decision',
     tools: 'Read, Skill',
     body: 'You write down what was decided, and by whom.',
-    /** Pasted into the form with no file named: the save names it notary.skills.json, beside the agent. */
     skill: { id: 'write-a-decision', name: 'Write a decision', description: 'Writes down what was decided, and by whom.', tags: ['decision'] },
   },
   naming: 'noted',
@@ -728,8 +732,8 @@ export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
-  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), `---\ncard: ${good.agent.name}.skills.json\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`);
-  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.skills.json`), `${JSON.stringify([good.agent.skill], null, 2)}\n`);
+  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), `---\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`);
+  writeSkill(path.join(repo, 'workflows', 'skills'), good.agent.skill);
   write(path.join(dev, 'implement.md'), `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallowedTools: ${good.disallowedTools}\n---\nImplement what was asked.\n`);
   write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
@@ -740,9 +744,14 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
   const { seeded } = AGENTS;
   const keys = Object.entries(seeded.keys).map(([key, value]) => `${key}: ${value}\n`).join('');
-  write(path.join(root, 'workflows', 'agents', `${seeded.name}.md`), `---\ndescription: ${seeded.description}\ncard: ${seeded.card}\n${keys}---\n${seeded.body}\n`);
+  write(path.join(root, 'workflows', 'agents', `${seeded.name}.md`), `---\ndescription: ${seeded.description}\n${keys}---\n${seeded.body}\n`);
   write(path.join(root, 'workflows', 'agents', seeded.keys.output), `${seeded.schema}\n`);
-  write(path.join(root, 'workflows', 'agents', seeded.card), `${JSON.stringify([seeded.skill], null, 2)}\n`);
+  writeSkill(path.join(root, 'workflows', 'skills'), AGENTS.made.skill);
+}
+
+/** A skill in `skills`, its SKILL.md's frontmatter the card entry `skill` is generated as: `title:` its name, the rest as A2A has them. */
+function writeSkill(skills: string, skill: { id: string; name: string; description: string; tags: readonly string[] }): void {
+  write(path.join(skills, skill.id, 'SKILL.md'), `---\nname: ${skill.id}\ntitle: ${JSON.stringify(skill.name)}\ndescription: ${JSON.stringify(skill.description)}\ntags: ${JSON.stringify(skill.tags)}\n---\n${skill.description}\n`);
 }
 
 /**

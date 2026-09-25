@@ -67,7 +67,7 @@ export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: 
 export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /**
- * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, its card, the skills it is given
+ * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, the skills it is given
  * and its system prompt, none of which a step has. A key added to `AGENT_KEYS` that is not a role key joins that list, or the cast fails.
  */
 const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, (typeof AGENT_OWN_KEYS)[number]> => !(AGENT_OWN_KEYS as readonly string[]).includes(key));

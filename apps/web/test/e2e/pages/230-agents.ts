@@ -9,9 +9,11 @@ import { OUT, store } from '../world.ts';
 
 export default {
   // The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it, linked.
-  // Each card says what its agent can do, the skills its `card:` names in A2A's words. The repository's `implementer` read, and the node
-  // that names it followed to its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and
-  // its card, and no skills given; an agent made with a card pasted for it and a skill given by name, edited and removed, each on disk as the package writes it. And, in a page of its own, a removal refused
+  // Each says what its agent can do, its card generated from its skills in A2A's words: an entry for each skill it gives, read off its
+  // SKILL.md, or one from its description when it gives none. The repository's `implementer` read, and the node that names it followed to
+  // its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and its card shown read-only,
+  // one entry, for it gives no skills; an agent made with a skill given by name, its card that skill's entry, edited and removed, each on
+  // disk as the package writes it, and no card file anywhere. And, in a page of its own, a removal refused
   // because a node still names the agent. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
   name: 'agents',
   route: '/agents',
@@ -34,11 +36,13 @@ export default {
     await expectVisible(scribe.locator('dd', { hasText: /^sonnet$/ }), 'and the keys it sets');
     await expectTexts(scribe.locator('[data-used-by]'), ['No node names it yet.'], `and that no node names ${seeded.name}`);
     const says = (where: ReturnType<typeof card>, skill: { id: string; name: string; description: string; tags: readonly string[] }) => where.locator(`[data-agent-skill="${skill.id}"]`);
-    await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.name, { exact: true }), `${seeded.name} says what it can do: ${seeded.skill.name}`);
-    await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what that skill is for');
-    for (const tag of seeded.skill.tags) await expectVisible(says(scribe, seeded.skill).getByText(tag, { exact: true }), `and its tag ${tag}`);
+    // Given no skills, it says one thing, made from itself: its name, its description, and its name again as the tag.
+    await expectTexts(scribe.locator('[data-agent-skill]'), [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`], `${seeded.name} says what it can do, one entry made from its description`);
+    await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
     const implementer = card(page, 'repo', good.agent.name);
-    await expectVisible(says(implementer, good.agent.skill).getByText(good.agent.skill.name, { exact: true }), `${good.agent.name} says what it can do too`);
+    await expectVisible(says(implementer, good.agent.skill).getByText(good.agent.skill.name, { exact: true }), `${good.agent.name} says what it can do too, its skill's title as the entry's name`);
+    for (const tag of good.agent.skill.tags) await expectVisible(says(implementer, good.agent.skill).getByText(tag, { exact: true }), `with the skill's tag ${tag}`);
+    await expectCount(page.locator('[data-card-error]'), 0, 'and every card is made');
     const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
     await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
     if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`) throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
@@ -53,6 +57,7 @@ export default {
       if ((await repoForm.getByRole('textbox', { name: field }).getAttribute('readonly')) === null) throw new Refused(`the repository's agent is read-only: its ${field} is not`);
     }
     await expectCount(repoForm.getByRole('button', { name: 'Save' }), 0, 'and it offers no Save');
+    await expectVisible(repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }), 'its form shows its card, generated from its skill');
     await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
     await expectVisible(page.locator('[data-read-only]', { hasText: `cp ${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)} ~/.agent-workflows/workflows/agents/` }), 'and says how to start one of yours from it');
     const file = page.locator('section[aria-label="The file"]');
@@ -83,9 +88,10 @@ export default {
     await expectVisible(scribeForm, `${seeded.name}'s form`);
     if ((await scribeForm.getByRole('textbox', { name: 'Schema file' }).inputValue()) !== seeded.keys.output) throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}`);
     if ((await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue()) !== `${seeded.schema}\n`) throw new Refused(`and its fields are the schema's text — it shows ${JSON.stringify(await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue())}`);
-    if ((await scribeForm.getByRole('textbox', { name: 'Card file' }).inputValue()) !== seeded.card) throw new Refused(`${seeded.name}'s card is ${seeded.card}`);
-    const said = await scribeForm.getByRole('textbox', { name: 'Its card' }).inputValue();
-    if (said !== `${JSON.stringify([seeded.skill], null, 2)}\n`) throw new Refused(`and its card is that file's text — it shows ${JSON.stringify(said)}`);
+    // Its card, read-only where a card file was once edited: what the package generates, and no field that writes it.
+    await expectTexts(scribeForm.locator('[data-card] [data-agent-skill]'), [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`], `${seeded.name}'s form shows its card, one entry made from its description`);
+    await expectVisible(scribeForm.locator('[data-card]', { hasText: 'Generated from its skills' }), 'and says it is generated from its skills');
+    for (const gone of ['Card file', 'Its card']) await expectCount(scribeForm.getByRole('textbox', { name: gone }), 0, `and has no ${gone} field`);
     if ((await scribeForm.getByRole('textbox', { name: 'Skills', exact: true }).inputValue()) !== '') throw new Refused(`${seeded.name} gives its sessions no skills, and its Skills field is empty`);
     const instructions = await scribeForm.getByRole('textbox', { name: 'Instructions' }).inputValue();
     if (instructions.trim() !== seeded.body) throw new Refused(`and its instructions are its body — they read ${JSON.stringify(instructions)}`);
@@ -94,8 +100,6 @@ export default {
 
     // Made: the form, filled, creates agents/<name>.md as the package writes it, and opens its page.
     const madeFile = path.join(agentsDir, `${made.name}.md`);
-    const madeSkills = path.join(agentsDir, `${made.name}.skills.json`);
-    const pasted = JSON.stringify([made.skill], null, 2);
     try {
       await page.goto(new URL('/agents', page.url()).href, { waitUntil: 'load' });
       await idle(page);
@@ -107,7 +111,8 @@ export default {
       await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill(made.tools);
       await form.getByRole('textbox', { name: 'Skills', exact: true }).fill(made.skills);
-      await form.getByRole('textbox', { name: 'Its card' }).fill(pasted);
+      await expectVisible(form.locator('[data-card-generated]', { hasText: 'Shown once it is saved.' }), 'a new agent has no card to show until it is saved, and no field to write one');
+      await expectCount(form.getByRole('textbox', { name: 'Its card' }), 0, 'no card is pasted');
       await form.getByRole('textbox', { name: 'Instructions' }).fill(made.body);
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `agents-new-${await themeOf(page)}.png`), fullPage: true });
@@ -117,11 +122,14 @@ export default {
       ]);
       if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
       await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
-      const written = `---\ndescription: ${made.description}\ncard: ${made.name}.skills.json\nskills: ${made.skills}\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
+      const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
       if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written) throw new Refused(`agents/${made.name}.md is written as the package writes an agent — it holds ${fs.existsSync(madeFile) ? JSON.stringify(fs.readFileSync(madeFile, 'utf8')) : 'nothing'}`);
-      // Pasted with no file named, the card is written beside the agent, to the name the form suggested.
-      if (!fs.existsSync(madeSkills) || fs.readFileSync(madeSkills, 'utf8') !== pasted) throw new Refused(`agents/${made.name}.skills.json holds what was pasted — it holds ${fs.existsSync(madeSkills) ? JSON.stringify(fs.readFileSync(madeSkills, 'utf8')) : 'nothing'}`);
-      await expectVisible(page.locator(`[data-agent-skill="${made.skill.id}"]`), `and the page of ${made.name} says what it can do`);
+      if (filesIn(agentsDir).some(([name]) => name.endsWith('.skills.json'))) throw new Refused(`no card file is written beside ${made.name}: ${agentsDir} holds ${filesIn(agentsDir).map(([n]) => n).join(', ')}`);
+      // Its card is the skill it gives, read off that skill's SKILL.md: the title its name, and its description and tags.
+      const entry = page.locator(`[data-card] [data-agent-skill="${made.skill.id}"]`);
+      await expectVisible(entry.getByText(made.skill.name, { exact: true }), `and the page of ${made.name} says what it can do: ${made.skill.name}, the title of the skill it gives`);
+      await expectVisible(entry.getByText(made.skill.description, { exact: true }), 'with what that skill is for');
+      for (const tag of made.skill.tags) await expectVisible(entry.getByText(tag, { exact: true }), `and its tag ${tag}`);
 
       // Edited: its model changed and saved, against the version it was read at.
       const madeForm = page.locator(`form[data-agent-form="${made.name}"]`);
@@ -140,7 +148,7 @@ export default {
 
       // Removed: asked twice, then gone from disk and from the list.
       await page.getByRole('button', { name: 'Remove…' }).click();
-      await expectVisible(page.locator('[data-remove-asks]', { hasText: `${made.name}.skills.json` }), 'the ask names the file beside it that goes with it');
+      await expectTexts(page.locator('[data-remove-asks] code'), [`agents/${made.name}.md`], 'the ask names its file alone: it names no schema, and no card file goes with it');
       const [removed] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, { timeout: WAIT_MS }),
         page.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
@@ -148,9 +156,9 @@ export default {
       if (removed.status() !== 200) throw new Refused(`the api removes the agent — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
       await expectCount(card(page, 'yours', made.name), 0, `${made.name} is gone from the list`);
-      if (fs.existsSync(madeSkills)) throw new Refused(`the card of ${made.name} goes with it: agents/${made.name}.skills.json is still there`);
+      if (fs.existsSync(madeFile)) throw new Refused(`agents/${made.name}.md is removed from disk`);
     } finally {
-      for (const gone of [madeFile, madeSkills]) fs.rmSync(gone, { force: true });
+      fs.rmSync(madeFile, { force: true });
     }
 
     // Refused, in a page of its own whose one refusal is the point: scribe removed while a node of yours names it. The package's sentence,

@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
-import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, cardFileFor, SYSTEM_PROMPTS, type AgentForm as Form } from '../lib/agents';
+import { Skills } from './AgentParts';
+import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, SYSTEM_PROMPTS, type AgentForm as Form } from '../lib/agents';
 
 /** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
 const UNSET = '(unset)';
@@ -102,28 +103,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
 
       <fieldset className="space-y-3">
         <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What it can do</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field
-            label="Card file"
-            hint={`card: — a list of A2A skills beside the agent. Pasting one with no file names it ${cardFileFor(form.name)}.`}
-            value={form.cardFile}
-            onChange={(cardFile) => setForm((f) => ({ ...f, cardFile }))}
-            readOnly={readOnly}
-            mono
-            placeholder={listing ? undefined : cardFileFor(form.name)}
-          />
-          <Field
-            className="sm:col-span-2"
-            label="Its card"
-            hint='Each one { "id", "name", "description", "tags" } — the A2A Agent Card’s skills, which describe what it can do and fence nothing.'
-            value={form.cardText}
-            onChange={(cardText) => setForm((f) => ({ ...f, cardText }))}
-            readOnly={readOnly}
-            mono
-            area="min-h-24"
-            placeholder={listing ? undefined : '[{ "id": "write-a-note", "name": "Write a note", "description": "Writes the notes of a change.", "tags": ["note"] }]'}
-          />
-        </div>
+        <GeneratedCard listing={listing} />
       </fieldset>
 
       <fieldset className="space-y-3">
@@ -218,6 +198,26 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * What the agent says it can do, read-only: its card's skills, which nobody writes. The package generates them from the skills it gives, as
+ * they are on disk — an entry for each, read off its SKILL.md — or one from its description when it gives none; so a change is a change of
+ * its skills, or of a SKILL.md, and shows once saved. Where none can be made the package's refusal stands in their place.
+ */
+function GeneratedCard({ listing }: { listing: AgentListing | null }) {
+  const how = 'Generated from its skills: an entry for each, read off its SKILL.md — title, description, tags and examples — or one from its description when it gives none.';
+  if (!listing) return <p data-card-generated className="text-xs text-muted-foreground">{how} Shown once it is saved.</p>;
+  return (
+    <div data-card className="space-y-2">
+      {listing.cardError !== null ? (
+        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-red-700 dark:text-red-400">{listing.cardError}</p>
+      ) : (
+        <Skills skills={listing.card} none={listing.error !== null ? 'Nothing, while its file does not read.' : undefined} />
+      )}
+      <p className="text-xs text-muted-foreground">{how} To change it, change its skills.</p>
+    </div>
   );
 }
 

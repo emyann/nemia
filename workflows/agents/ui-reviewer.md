@@ -1,6 +1,5 @@
 ---
 description: Reviews a web-app change read-only, the diff beside the screenshots of every page it changed, in both themes.
-card: ui-reviewer.skills.json
 skills: review-a-web-change, read-a-screenshot
 harness: claude
 # Said, as every role's is: a job reads no user settings, and with none named here it ran on the owner's `opus[1m]` before

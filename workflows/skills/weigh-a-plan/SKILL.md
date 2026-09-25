@@ -1,5 +1,6 @@
 ---
 name: weigh-a-plan
+title: "Weigh a plan"
 description: "Reads a plan a step before it made against the code as it finds it, follows it where it holds and departs from it where it does not, saying why in the commit message."
 tags: ["code", "plan"]
 examples: ["Use this when a plan step ran first and its plan reaches this one as data."]

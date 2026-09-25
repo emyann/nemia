@@ -1,5 +1,6 @@
 ---
 name: read-a-screenshot
+title: "Read a screenshot"
 description: "Reads the screenshots of every page the change touched, in both themes, and names what is cut off, overlapping or unreadable — by page and by theme."
 tags: ["web", "review", "screenshots"]
 examples: ["Use this when a change is only as good as the page it draws."]

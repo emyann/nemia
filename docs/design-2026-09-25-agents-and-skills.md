@@ -27,7 +27,7 @@ Claude Code's subagent frontmatter, plus HKB's keys. A key Claude Code does not 
 |---|---|---|
 | `name`, `description` | yes | the agent's name; the card's description |
 | `tools`, `disallowedTools`, `model`, `effort`, `permissionMode` | yes | as today (`--tools`, `--disallowedTools`, `--model`, `--effort`, `--permission-mode`) |
-| `skills` | yes (preload) | **the skills composed on the agent**: a list of skill names (today: a path to a `*.skills.json` of card entries; see Migration) |
+| `skills` | yes (preload) | **the skills composed on the agent**: a list of skill names, from which the card is generated (card 2) |
 | `allowedTools` | no (a settings/CLI rule) | as today (`--allowedTools`) |
 | `harness`, `context`, `output`, `sandbox`, `remote` | no | as today |
 | `systemPrompt` | no | new: `default` (append, the default), `no-coding`, `own` (below) |
@@ -113,6 +113,10 @@ out until Codex has a place for them, and the load says so for a codex agent tha
      Built 2026-09-25: fourteen skills in `workflows/skills/`, three preloaded, ui's six copied into the package; proven live as the
      spike's F25.
 2. **The card from the skills**: the A2A card generated from composed skills; the `.skills.json` files retired.
+   Built 2026-09-25: an entry per skill off its SKILL.md (`title:`, optional, is the entry's `name`; without it the frontmatter's
+   `name`, else the id; `tags` default to `[id]`; `description` is required), one from the agent's description when it gives none; a
+   leftover `card:` line, or a `skills:` line naming a `.json`, refused at load; the board shows the entries read-only; the fourteen
+   shipped skills carry a `title:`.
 3. **The board**: compose skills on an agent from a list, write a new skill, try an agent on a short brief.
 4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
    runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

@@ -1,5 +1,6 @@
 ---
 name: trial-merge-a-branch
+title: "Trial merge a run's branch"
 description: "In the repository's own checkout, stages the merge of a run's result branch onto the base branch and writes its commit message; the run then checks the merged tree and commits it, or aborts it."
 tags: ["merge", "git", "tests"]
 examples: ["Use this when a run is finished and a person has approved what it made."]

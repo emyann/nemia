@@ -126,10 +126,10 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  // The role keys are the agent keys a step has too: what the builder may set on the node. `description`, `card`, `skills` and `systemPrompt`
-  // say what the agent is, what it can do, what it is given and what becomes of its system prompt, and belong to no step, so none is on the
+  // The role keys are the agent keys a step has too: what the builder may set on the node. `description`, `skills` and `systemPrompt`
+  // say what the agent is, what it is given (and so what its card says it can do) and what becomes of its system prompt, and belong to no step, so none is on the
   // step form and none is ever written into a step file. Written out, so a key added to AGENT_KEYS is decided here, not inherited.
-  const OWN = ['description', 'card', 'skills', 'systemPrompt'];
+  const OWN = ['description', 'skills', 'systemPrompt'];
   assert.deepEqual(form.roleKeys, ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output']);
   assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => !OWN.includes(k)));
   for (const own of OWN) assert.equal(form.roleKeys.includes(own as never), false, own);

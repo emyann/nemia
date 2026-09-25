@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { agentsFor, agentVersion, HOME, inboxDir, inboxNameRefusal, listRuns, loadWorkflows, lookupRoots, skillsFor, start, startFromInbox, workflowDescription, type Places } from 'agent-orchestrator';
+import { agentsFor, agentVersion, cardSkills, HOME, inboxDir, inboxNameRefusal, listRuns, loadWorkflows, lookupRoots, skillsFor, start, startFromInbox, workflowDescription, type Places } from 'agent-orchestrator';
 import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, SKILLS_FOLDER, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
@@ -122,7 +122,7 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
  * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds` is
  * the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can do,
- * read from beside the agent and shown here read-only — the agent's page is where it is edited; null on a step with no agent, or none.
+ * generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
  */
 export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[]; agentSkills: AgentSkill[] | null };
 
@@ -428,10 +428,15 @@ export const workflows = new Hono()
         return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` }, 404);
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      // The step's resolved agent carries its keys and words, not what its card says it can do: that is read from the agent's own file, where
-      // the load found it. `agentSkills` are the card's A2A skills, not the Claude Code skills its `skills:` gives a session.
-      const attached = found.agent ? agentsFor(folder.dir, placesOf(repoOf())).get(found.agent.name) : undefined;
-      const agentSkills = attached instanceof Error || attached === undefined ? null : attached.card?.list ?? null;
+      // The step's resolved agent carries its keys and words, not what its card says it can do: that is generated from the agent's skills,
+      // found where the load found them (`cardSkills`). `agentSkills` are the card's A2A skills, one for each Claude Code skill its `skills:`
+      // gives a session, or one made from its description; null for a card the package refuses, whose words the agent's page shows.
+      const places = placesOf(repoOf());
+      const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
+      let agentSkills: AgentSkill[] | null = null;
+      if (attached !== undefined && !(attached instanceof Error)) {
+        try { agentSkills = cardSkills(attached, skillsFor(folder.dir, places)); } catch { agentSkills = null; }
+      }
       return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found), agentSkills } satisfies WorkflowStepPage);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);

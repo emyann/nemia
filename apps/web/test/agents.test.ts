@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, ROLE_KEYS, schemaFileFor, cardFileFor, SYSTEM_PROMPTS } from '../src/lib/agents.ts';
+import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, ROLE_KEYS, schemaFileFor, SYSTEM_PROMPTS } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -13,6 +13,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   body: 'You write the notes.\n',
   schema: null,
   card: null,
+  cardError: null,
   skills: null,
   systemPrompt: null,
   source: '',
@@ -32,8 +33,6 @@ test('an agent read into the form and sent back unchanged is the draft it was: i
   assert.equal(draft.keys.effort, 'low');
   assert.equal(draft.keys.tools, null, 'a key the file does not set is sent unset');
   assert.equal('schema' in draft, false, 'a schema not touched does not travel');
-  assert.equal(draft.card, null, 'an agent that names no card says so');
-  assert.equal('cardText' in draft, false, 'and sends no text to write to a file it does not name');
   assert.equal(draft.skills, null, 'nor skills');
   assert.equal(draft.systemPrompt, null, 'and no system prompt, which is the default');
   assert.equal(edited(form, listing()), false);
@@ -111,50 +110,14 @@ test("each harness has its own fence on the form: Claude Code a permission mode,
   assert.ok(ROLE_KEYS.includes('sandbox') && KEY_LABELS.sandbox === 'Sandbox');
 });
 
-const SAID = '[{ "id": "write-a-note", "name": "Write a note", "description": "Writes the notes of a change.", "tags": ["note"] }]\n';
-const saying = () => listing({ card: { file: 'scribe.skills.json', text: SAID, list: [{ id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }] } });
+const saying = () => listing({ skills: 'write-a-note', card: [{ id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }] });
 
-test("an agent's card read into the form is the file it names and that file's text, and sent back unchanged they do not travel", () => {
-  const form = formOf(saying());
-  assert.equal(form.cardFile, 'scribe.skills.json');
-  assert.equal(form.cardText, SAID);
-  const draft = draftOf(form);
-  assert.equal(draft.card, 'scribe.skills.json', 'the line travels with every save, as the description does');
-  assert.equal('cardText' in draft, false, 'the file does not, until it changes');
-  assert.equal(edited(form, saying()), false);
-});
-
-test('a card pasted with no file is named after the agent, and travel', () => {
-  const form = formOf(listing());
-  form.cardText = SAID;
-  const draft = draftOf(form);
-  assert.equal(draft.card, 'scribe.skills.json');
-  assert.equal(draft.cardText, SAID);
-  assert.equal(cardFileFor('  '), 'agent.skills.json');
-  assert.equal(edited(form, listing()), true);
-});
-
-test('a card read with the agent travels only once its text or its file changes — one shared with another agent is otherwise left alone', () => {
-  const read = saying();
-  const moved = formOf(read);
-  moved.cardFile = 'notes.skills.json';
-  assert.equal(draftOf(moved).cardText, SAID, 'the file named otherwise is written where it now points');
-  assert.equal(draftOf(moved).card, 'notes.skills.json');
-  const typed = formOf(read);
-  typed.cardText = `${SAID.trimEnd()} `;
-  assert.equal('cardText' in draftOf(typed), false, 'spaces round it are not a change');
-  typed.cardText = '[]';
-  assert.equal(draftOf(typed).cardText, '[]', 'what the package then refuses, in its own words');
-});
-
-test('the card line emptied is sent unset, and the text emptied with it', () => {
-  const form = formOf(saying());
-  form.cardFile = '';
-  form.cardText = '';
-  const draft = draftOf(form);
-  assert.equal(draft.card, null);
-  assert.equal('cardText' in draft, false, 'there is no file to write it to');
-  assert.equal(edited(form, saying()), true);
+test("an agent's card is generated, never sent: no draft carries it, or any name a card file travelled under, and it is no edit of the form", () => {
+  const draft = draftOf(formOf(saying()));
+  for (const retired of ['card', 'cardText', 'skillsText']) assert.equal(Object.hasOwn(draft, retired), false, retired);
+  assert.equal(draft.skills, 'write-a-note', 'what it is generated from travels: the skills it gives');
+  assert.equal(edited(formOf(saying()), saying()), false);
+  assert.equal(edited(formOf(saying()), { ...saying(), card: [] }), false, 'a card generated otherwise since is not something typed');
 });
 
 test("the skills an agent gives and its system prompt are its own lines: read as written, sent trimmed, and emptied sent unset", () => {
@@ -176,6 +139,6 @@ test("the skills an agent gives and its system prompt are its own lines: read as
 });
 
 test('no key that describes the agent itself is a role key the form sends among its keys', () => {
-  for (const own of ['description', 'card', 'skills', 'systemPrompt']) assert.equal((ROLE_KEYS as readonly string[]).includes(own), false, own);
+  for (const own of ['description', 'skills', 'systemPrompt']) assert.equal((ROLE_KEYS as readonly string[]).includes(own), false, own);
   assert.deepEqual(SYSTEM_PROMPTS, ['default', 'no-coding', 'own']);
 });

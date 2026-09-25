@@ -256,7 +256,7 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
-`output` — and four of its own, `description:`, `card:`, `skills:` and `systemPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output` — and three of its own, `description:`, `skills:` and `systemPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -275,45 +275,47 @@ set itself, and its own note, never the agent's. `wf start` names each node's ag
 The repository's shipped folders are written this way (`workflows/agents/README.md` lists who does what), and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
 The board's Agents page edits the agent itself (`writeAgent`, `removeAgent`): yours only, against the version it was read at, its result
-schema and its skills with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
+schema with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
 
-#### What an agent says it can do: `card:`, in A2A's shape
+#### What an agent says it can do: its card, generated from its skills
 
-`description:` says what an agent is for in a line. `card:` says what it can do, in the shape the
-[A2A protocol](https://a2a-protocol.org/latest/specification/) gives an agent's skills, and names a `.json` file beside
-the agent — `reviewer.skills.json` — holding a list of them:
+`description:` says what an agent is for in a line. What it can do is its card's skills, in the shape the
+[A2A protocol](https://a2a-protocol.org/latest/specification/) gives an agent's `AgentSkill`, and nobody writes them: since agents card 2
+(2026-09-25) the card has an entry for each skill the agent's `skills:` gives (below), in that order, read off the skill's SKILL.md
+frontmatter (`cardSkills`, `skillEntryOf`):
 
-```json
-[
-  {
-    "id": "review-a-change",
-    "name": "Review a change",
-    "description": "Reads the diff read-only as a second engineer would and reports each finding by file and line.",
-    "tags": ["code", "review"],
-    "examples": ["Use this when a change is written and nobody has read it yet."]
-  }
-]
+```md
+---
+name: review-a-change
+title: Review a change
+description: Reads the diff read-only as a second engineer would and reports each finding by file and line.
+tags: ["code", "review"]
+examples: ["Use this when a change is written and nobody has read it yet."]
+---
 ```
 
-The line was `skills:` until 2026-09-25, when `skills:` came to name Claude Code skills. A `skills:` line naming a `.json` file is
-still read as the card, `wf start` names the line to rename, and an agent that writes both is refused; the board's save refuses a card
-sent as `skills:` from a page opened before, saying to reload.
+| entry | read from |
+| --- | --- |
+| `id` | the skill's folder name |
+| `name` | `title:`, a key Claude Code ignores and the card alone reads; else the frontmatter's `name:`; else the id |
+| `description` | `description:`, required — A2A marks it REQUIRED, and Claude Code lists a skill by it |
+| `tags` | `tags:`, a list; the id when there is none, since A2A marks tags REQUIRED |
+| `examples` | `examples:`, a list, only when given |
 
-`id`, `name`, `description` and `tags` are A2A's required fields and each is required here; `examples`, `inputModes` and
-`outputModes` are its optional ones, each a list of strings. An `id` is lowercase words joined by dashes, unique in the
-file. Anything else is refused by name — an unknown key, a blank field, a duplicate id, an empty list, a file that is not
-`.json` beside the agent, one that is not there or does not parse — and `securityRequirements`, which A2A allows on a
-skill, is refused too: nothing here serves an agent over A2A, so its card declares no security schemes and a skill
-demanding one could never be satisfied.
+An agent that gives no skills has one entry, made from its own description: its name as id and name, the description, and its
+name as its tag. An agent with no description has no card. Each key is read off one line — a plain value, one in quotes, or a
+one-line JSON list — and any other form of those keys (a block scalar, a list over several lines, an empty list, a value YAML would
+read as a map) is refused with the one-line form; `shipped-skills.test.ts` holds this reading to js-yaml's on every SKILL.md the
+repository has. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
 
-A skill is description, not machinery. Nothing reads one to decide anything: no step is routed by a tag, no tool is
-allowed or denied by a skill, and a card is *not* frozen on a run record — a run froze the keys that do the work, and
-what an agent says it can do can be corrected without touching a run in flight. `agentVersion` does digest the card
-file with the agent, so the board refuses a save against a stale read of either.
+The card was a hand-written `.json` beside the agent, named by `card:` (by `skills:` before 2026-09-25), until agents card 2. Both
+lines are refused now, at load and on the board's save, saying what replaced them: delete the line and the file.
 
-A skill on the card is also not a Claude Code skill, which `skills:` gives (below): a folder of instructions a session loads
-through the `Skill` tool — machinery a session uses. An A2A skill is a sentence about the agent that nothing loads and nothing
-reads. Two words, two meanings; where both could be meant, this README says *an A2A skill* or names the file.
+A skill on the card is description, not machinery. Nothing reads one to decide anything: no step is routed by a tag, no tool is
+allowed or denied by an entry, and a card is *not* frozen on a run record — a run froze the keys that do the work, and what an agent
+says it can do can be corrected without touching a run in flight. `agentVersion` digests each skill folder with the agent, so the
+card moves with the version, and the board refuses a save against a stale read. The Claude Code skill is the machinery: the folder a
+session loads through the `Skill` tool. The card entry is the sentence about it.
 
 `wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
 in the shape of an A2A Agent Card, JSON on stdout and nothing else:
@@ -332,7 +334,7 @@ interface is a transport and a URL, and there is no URL — nothing here answers
 and a card is left where a reader would have to be told it is only a description. That is why the last line goes to
 stderr, where a pipe does not carry it. `capabilities` in A2A is protocol features — streaming, push notifications,
 extensions — not reach, so all three are `false` and mean it. And `version` is the content digest `agentVersion` computes,
-not a semantic version: it changes when the agent's file or a file beside it does, which is what the board needs it for.
+not a semantic version: it changes when the agent's file, its result schema or one of its skills does, which is what the board needs it for.
 
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.

@@ -1,5 +1,6 @@
 ---
 name: look-at-a-page
+title: "Look at a page"
 description: "Runs the e2e, reads every screenshot it writes in a light and a dark theme, and drives the page in a browser, so a page that passes its assertions and looks wrong is fixed before it signs off."
 tags: ["web", "screenshots"]
 examples: ["Use this when what was asked for is judged by how the page looks."]

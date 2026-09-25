@@ -1,6 +1,5 @@
 ---
 description: Writes a short note, in a folder of its own, on what was asked — no repository, no web.
-card: note-writer.skills.json
 skills: write-a-note
 harness: claude
 model: sonnet

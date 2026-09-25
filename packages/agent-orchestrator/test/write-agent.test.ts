@@ -50,9 +50,9 @@ function refused(fn: () => unknown, pattern: RegExp, why?: string): InstanceType
   return caught as InstanceType<typeof AgentWriteError>;
 }
 
-// `card:` is the agent's own line, and the draft carries the file's name as the file writes it; what it holds is the file's.
-const draftOf = (agent: Agent): AgentDraft => ({ name: agent.name, description: agent.description, card: agent.card?.file, keys: agent.keys, body: agent.body });
-const plain = (agent: Agent) => ({ name: agent.name, description: agent.description, card: agent.card, keys: agent.keys, body: agent.body });
+// `skills:` is the agent's own line, and the draft carries it as the file writes it. What it says it can do is generated from it (agents card 2).
+const draftOf = (agent: Agent): AgentDraft => ({ name: agent.name, description: agent.description, skills: agent.skills?.join(', '), keys: agent.keys, body: agent.body });
+const plain = (agent: Agent) => ({ name: agent.name, description: agent.description, skills: agent.skills, keys: agent.keys, body: agent.body });
 const scribe: AgentDraft = { name: 'scribe', description: 'Use this when a change needs its notes written.', keys: { model: 'sonnet', effort: 'low', tools: 'Read, Write' }, body: 'Write the notes.' };
 
 test('every shipped agent renders to a file that reads back as the same agent', () => {
@@ -98,7 +98,7 @@ test('a new agent is written, reads back, and changes no workflow beside it', ()
   const done = writeAgent(AGENTS, scribe, { version: null });
   assert.deepEqual(done.written, ['scribe.md']);
   assert.equal(done.version, agentVersion(AGENTS, 'scribe'));
-  assert.deepEqual(plain(loadAgents(AGENTS).get('scribe') as Agent), { name: 'scribe', description: scribe.description, card: undefined, keys: scribe.keys, body: scribe.body });
+  assert.deepEqual(plain(loadAgents(AGENTS).get('scribe') as Agent), { name: 'scribe', description: scribe.description, skills: undefined, keys: scribe.keys, body: scribe.body });
   assert.deepEqual(snapshot(path.join(STORE, 'dev')), dev);
 });
 
@@ -218,84 +218,51 @@ test('a result schema travels with its agent: written with it, refused when not 
   assert.deepEqual(removeAgent(AGENTS, 'notary', { version: agentVersion(AGENTS, 'notary')! }).removed, ['notary.md', 'scribe.schema.json']);
 });
 
-test('the card travels with its agent: written with it, refused when not its own, removed with it', () => {
+test('REFUSED at shipped defaults: a card sent with its agent, which is generated from its skills since agents card 2', () => {
   fresh();
-  const text = JSON.stringify([{ id: 'write-a-note', name: 'Write a note', description: 'Write the notes of a change.', tags: ['note'] }], null, 2);
-  const withSkills = { ...scribe, card: 'scribe.skills.json' };
-  refused(() => writeAgent(AGENTS, withSkills, { version: null, card: { file: 'other.skills.json', text } }), /^the card is other\.skills\.json, and agents\/scribe\.md names scribe\.skills\.json/);
-  refused(() => writeAgent(AGENTS, withSkills, { version: null, card: { file: '../x.json', text } }), /^`\.\.\/x\.json` is not a card's name/);
-  writeAgent(AGENTS, { ...scribe, name: 'archivist', card: 'archivist.skills.json' }, { version: null, card: { file: 'archivist.skills.json', text } });
-  refused(() => writeAgent(AGENTS, { ...scribe, card: 'archivist.skills.json' }, { version: null, card: { file: 'archivist.skills.json', text } }), /^archivist\.skills\.json is the card of archivist too/);
-  refused(() => writeAgent(AGENTS, withSkills, { version: null, card: { file: 'scribe.skills.json', text: '[]' } }), /^agents\/scribe\.md: `card: scribe\.skills\.json` is an empty list/);
-  const done = writeAgent(AGENTS, withSkills, { version: null, card: { file: 'scribe.skills.json', text } });
-  assert.deepEqual(done.written, ['scribe.skills.json', 'scribe.md']);
-  assert.deepEqual((loadAgents(AGENTS).get('scribe') as Agent).card?.list.map((s) => s.id), ['write-a-note']);
-  // The card is part of the agent's version, as the result schema is: an edit of the file alone moves it, so the board catches a save over one.
-  fs.writeFileSync(path.join(AGENTS, 'scribe.skills.json'), `${text}\n`);
-  assert.notEqual(agentVersion(AGENTS, 'scribe'), done.version);
-  // A card another agent names too stays when one of them goes, and goes with the last.
-  writeAgent(AGENTS, { ...withSkills, name: 'notary' }, { version: null });
-  assert.deepEqual(removeAgent(AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed, ['scribe.md']);
-  assert.deepEqual(removeAgent(AGENTS, 'notary', { version: agentVersion(AGENTS, 'notary')! }).removed, ['notary.md', 'scribe.skills.json']);
+  const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
+  refused(() => writeAgent(AGENTS, scribe, { version: null, card: { file: 'scribe.skills.json', text } } as never), /^`card` is not written with an agent since agents card 2: its card is generated from its skills\./);
+  // An own `undefined` too: a caller that still passes the key is told, rather than obeyed by nobody.
+  refused(() => writeAgent(AGENTS, scribe, { version: null, card: undefined } as never), /^`card` is not written with an agent since agents card 2/);
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and nothing of it is written');
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);
 });
 
-test('an agent writes both the files it names, and a write that fails leaves neither behind', () => {
+test('an agent writes the file it names, and a write that fails leaves it not behind', () => {
   fresh();
-  const skills = { file: 'scribe.skills.json', text: '[{"id":"a","name":"A","description":"d","tags":["t"]}]' };
   const schema = { file: 'scribe.schema.json', text: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }) };
-  const both = { ...scribe, card: skills.file, keys: { ...scribe.keys, output: schema.file } };
-  const done = writeAgent(AGENTS, both, { version: null, card: skills, schema });
-  assert.deepEqual(done.written, ['scribe.skills.json', 'scribe.schema.json', 'scribe.md']);
-  // The agent's own file cannot be written: a folder where the file would go. Both sidecars go back to what they were — not there.
+  const withSchema = { ...scribe, keys: { ...scribe.keys, output: schema.file } };
+  const done = writeAgent(AGENTS, withSchema, { version: null, schema });
+  assert.deepEqual(done.written, ['scribe.schema.json', 'scribe.md']);
+  // The agent's own file cannot be written: a folder where the file would go. The schema goes back to what it was — not there.
   fresh();
   fs.mkdirSync(path.join(AGENTS, 'scribe.md'));
-  assert.throws(() => writeAgent(AGENTS, both, { version: null, card: skills, schema }));
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false, 'the skills it wrote are taken back');
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), false, 'and the schema');
-  // And a write that fails part-way through the files beside the agent: the second of them cannot be written, and the first is taken back
-  // all the same, so the folder holds nothing of an agent it does not hold.
-  fresh();
-  fs.mkdirSync(path.join(AGENTS, schema.file));
-  assert.throws(() => writeAgent(AGENTS, both, { version: null, card: skills, schema }));
-  assert.equal(fs.existsSync(path.join(AGENTS, skills.file)), false, 'the skills written before it failed are taken back');
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and no agent names them');
-});
-
-test('a card written through a link is refused by name, and what the link points at is left as it was', () => {
-  fresh();
-  const outside = path.join(ROOT, 'outside.skills.json');
-  fs.writeFileSync(outside, '[{"mine":true}]\n');
-  fs.symlinkSync(outside, path.join(AGENTS, 'scribe.skills.json'));
-  const text = '[{"id":"a","name":"A","description":"d","tags":["t"]}]';
-  refused(() => writeAgent(AGENTS, { ...scribe, card: 'scribe.skills.json' }, { version: null, card: { file: 'scribe.skills.json', text } }), /^\S*scribe\.skills\.json is a link, and a card is its agent's own/);
-  assert.equal(fs.readFileSync(outside, 'utf8'), '[{"mine":true}]\n');
-  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
+  assert.throws(() => writeAgent(AGENTS, withSchema, { version: null, schema }));
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), false, 'the schema it wrote is taken back');
 });
 
 test("a key's line taken off leaves the file it named: a save never deletes what a person wrote", () => {
   fresh();
-  const skills = { file: 'scribe.skills.json', text: '[{"id":"a","name":"A","description":"Does a.","tags":["t"]}]' };
   const schema = { file: 'scribe.schema.json', text: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }) };
-  const both = { ...scribe, card: skills.file, keys: { ...scribe.keys, output: schema.file } };
-  const made = writeAgent(AGENTS, both, { version: null, card: skills, schema });
-  // Both lines taken off — a field cleared on the board and saved: the agent names neither file now, and both are still there, as written.
+  const withSchema = { ...scribe, keys: { ...scribe.keys, output: schema.file } };
+  const made = writeAgent(AGENTS, withSchema, { version: null, schema });
+  // The line taken off — a field cleared on the board and saved: the agent names the file no more, and it is still there, as written.
   const bare = writeAgent(AGENTS, scribe, { version: made.version });
   assert.deepEqual(bare.removed, []);
-  assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.skills.json'), 'utf8'), skills.text);
   assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.schema.json'), 'utf8'), schema.text);
-  assert.equal(parseAgent('scribe', fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8')).card, undefined, 'and the agent no longer names its card');
+  assert.equal(parseAgent('scribe', fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8')).keys.output, undefined, 'and the agent no longer names it');
 
   // A line pointed at another file writes the new one and leaves the one it pointed at before.
   fresh();
-  writeAgent(AGENTS, both, { version: null, card: skills, schema });
-  const moved = writeAgent(AGENTS, { ...both, card: 'scribe.can-do.json' }, { version: agentVersion(AGENTS, 'scribe')!, card: { ...skills, file: 'scribe.can-do.json' } });
+  writeAgent(AGENTS, withSchema, { version: null, schema });
+  const moved = writeAgent(AGENTS, { ...withSchema, keys: { ...withSchema.keys, output: 'scribe.notes.json' } }, { version: agentVersion(AGENTS, 'scribe')!, schema: { ...schema, file: 'scribe.notes.json' } });
   assert.deepEqual(moved.removed, []);
-  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.can-do.json')));
-  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), 'the file it named before is still there');
+  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.notes.json')));
+  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the file it named before is still there');
   // Removing the agent is what takes its files: the one it names now goes with it, and the one it no longer names is not its to take.
   const gone = removeAgent(AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
-  assert.deepEqual(gone, ['scribe.can-do.json', 'scribe.md', 'scribe.schema.json']);
-  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')));
+  assert.deepEqual(gone, ['scribe.md', 'scribe.notes.json']);
+  assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')));
 });
 
 test('the workflows beside the agents still load after every write', () => {

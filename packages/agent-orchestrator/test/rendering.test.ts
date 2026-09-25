@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
-import { agentsFor, agentVersion, formerKeyLines, loadWorkflows, lookupRoots, skillsFor } from '../src/workflow-store.ts';
+import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/workflow-store.ts';
 import { briefBody, noCodingStyle, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
 
@@ -209,16 +209,15 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
   assert.equal(loadWorkflows(dir).length, 1);
 });
 
-test("the card is `card:` since 2026-09-25: a `skills:` line naming a card file is read as the card, `wf start` names it, and both at once are refused", () => {
-  const card = JSON.stringify([{ id: 'build', name: 'Build', description: 'Builds it.', tags: ['code'] }]);
-  const read = (file: string) => (file === 'builder.skills.json' ? card : undefined);
-  const legacy = parseAgent('builder', '---\nskills: builder.skills.json\n---\nx\n', read);
-  assert.equal(legacy.card?.file, 'builder.skills.json');
-  assert.equal(legacy.skills, undefined, 'the line names a card, and gives no skills');
-  const dir = team('---\nskills: builder.skills.json\n---\nYou build.\n', { 'workflows/agents/builder.skills.json': card });
-  assert.ok(formerKeyLines(dir).some((line) => /builder\.md.*`skills: builder\.skills\.json`.*`card:`/.test(line)), formerKeyLines(dir).join('\n'));
-  assert.match(refusal(() => parseAgent('builder', '---\nskills: builder.skills.json\ncard: builder.skills.json\n---\nx\n', read)), /names a card, as `skills:` did until 2026-09-25, and `card: builder\.skills\.json` names one too/);
-  assert.match(refusal(() => renderAgent({ name: 'builder', skills: 'builder.skills.json', keys: {}, body: 'x\n' })), /^agents\/builder\.md: `skills: builder\.skills\.json` names a card, which is `card:` since 2026-09-25/);
+test("a `skills:` line naming a card file, as it did until 2026-09-25, is refused where it is read and where it is written: the card file is retired", () => {
+  const legacy = refusal(() => parseAgent('builder', '---\nskills: builder.skills.json\n---\nx\n', () => '[]'));
+  assert.match(legacy, /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired: since agents card 2/);
+  const dir = team('---\nskills: builder.skills.json\n---\nYou build.\n', { 'workflows/agents/builder.skills.json': '[]' });
+  assert.match(refusal(() => loadWorkflows(dir)), /`skills: builder\.skills\.json` names a card file, which is retired/);
+  const written = refusal(() => renderAgent({ name: 'builder', skills: 'builder.skills.json', keys: {}, body: 'x\n' }));
+  assert.match(written, /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired/);
+  assert.match(written, /A page open since before then sends it: reload it, and save again\.$/);
+  assert.match(refusal(() => renderAgent({ name: 'builder', card: 'builder.skills.json', keys: {}, body: 'x\n' } as never)), /^agents\/builder\.md: `card: builder\.skills\.json` names a card file, which is retired/);
 });
 
 test("an agent's version moves with each skill it gives, and not with one it does not", () => {

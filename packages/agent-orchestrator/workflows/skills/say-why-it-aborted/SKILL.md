@@ -1,5 +1,6 @@
 ---
 name: say-why-it-aborted
+title: "Say why it aborted"
 description: "When the merge conflicts or anything else goes wrong before it signs off, aborts the merge and reports what stopped it, so the work can be sent back rather than half-shipped."
 tags: ["merge", "review"]
 examples: ["Use this when an ending must be safe to run unattended."]

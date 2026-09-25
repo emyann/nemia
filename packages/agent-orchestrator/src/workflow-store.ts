@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, besideFile, codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, isCardFile, isReadme, linkRefusal, parseAgent, parseFolder, readmeDescription, SKILLS_FOLDER, splitFrontmatter, stepFiles, WorkflowError, type Agent, type Agents, type SkillsFound, type Workflow } from './workflow.ts';
+import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, isCardFile, isReadme, linkRefusal, ownSkill, parseAgent, parseFolder, readmeDescription, skillEntryOf, SKILLS_FOLDER, splitFrontmatter, stepFiles, WorkflowError, type Agent, type Agents, type AgentSkill, type SkillsFound, type Workflow } from './workflow.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
@@ -132,17 +132,9 @@ export function formerKeyLines(dir: string): string[] {
     ...agents.flatMap((agent) => {
       const at = agentAt(agent);
       const text = read(at);
-      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, frontmatterKey(text, 'harness')), ...cardLine(at, text)];
+      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, frontmatterKey(text, 'harness'))];
     }),
   ];
-}
-
-/** The line `wf start` says of an agent whose `skills:` still names its card, as it did until 2026-09-25: read as `card:`. */
-function cardLine(at: string, text: string): string[] {
-  const legacy = frontmatterKey(text, 'skills');
-  return legacy !== undefined && isCardFile(legacy)
-    ? [`${at}: \`skills: ${legacy}\` is read as \`card: ${legacy}\`, the name the card's line took on 2026-09-25, when \`skills:\` became the skills the agent is given by name. The former line is still read; rename it, or save the agent from the board, which writes \`card:\`.`]
-    : [];
 }
 
 /**
@@ -243,11 +235,12 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
 }
 
 /**
- * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md`, of each file it names beside
- * it — the card its `card:` names and the schema its `output:` names — and of each skill its `skills:` gives, every file of the skill's
+ * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md`, of the file it names beside
+ * it — the schema its `output:` names — and of each skill its `skills:` gives, every file of the skill's
  * folder, each by name with what it holds, so a file that cannot be read counts as what it says. A write of the agent carries it, and is
  * refused when the agent no longer holds it (`writeAgent`), rather than written over what changed since it was read. The api's `versionOf`
- * digests a folder's agents through this, so an edit of a skill moves the folder's version too.
+ * digests a folder's agents through this, so an edit of a skill moves the folder's version too — and so does its card, which is read off
+ * those skills' SKILL.md files (`cardSkills`).
  *
  * `skills` are where the skills are found (`skillsFor`); without them, in the `skills/` beside `dir`. A skill found nowhere counts as missing.
  */
@@ -255,8 +248,8 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
   const at = path.join(dir, `${name}.md`);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
   const text = readForVersion(at);
-  // Every file the agent names beside it, in the order `renderAgent` writes the keys: what it can do, and what its steps declare.
-  const beside = typeof text === 'string' ? (['card', 'output'] as const).flatMap((key) => besideFile(text, key) ?? []) : [];
+  // The file the agent names beside it: what its steps declare.
+  const beside = typeof text === 'string' ? [frontmatterKey(text, 'output') ?? []].flat() : [];
   const given = typeof text === 'string' ? skillNamesIn(text) : [];
   const found = skills ?? skillsFor(path.join(path.dirname(path.resolve(dir)), '_'));
   const files = [
@@ -287,11 +280,37 @@ function folderForVersion(dir: string): Array<[string, unknown]> {
   });
 }
 
-/** The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card. */
+/** The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card file, which it refuses. */
 export function skillNamesIn(text: string): string[] {
   const line = frontmatterKey(text, 'skills');
   if (line === undefined || isCardFile(line)) return [];
   return line.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * What an agent's card says it can do (`agentCard`): an entry for each skill its `skills:` gives, in that order, read off the skill's SKILL.md
+ * (`skillEntryOf`) where `found` finds it — or, for an agent given none, one entry made from its own description (`ownSkill`). Never a list
+ * written by hand, so the card cannot say what the skills do not.
+ *
+ * Refused, naming the fix: a skill found nowhere or that cannot be used, in `skillAt`'s words for the agent, and a SKILL.md whose frontmatter
+ * the card cannot read. The card only describes — no run reads it — so nothing refuses a load or a run for it: it is refused where a card is
+ * asked for (`wf agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds skills (`skillsFor`,
+ * with the places), or a card could name a skill the run would not be given.
+ */
+export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>, found: SkillsFound): AgentSkill[] {
+  if (!agent.skills?.length) return [ownSkill(agent)];
+  const named = `${AGENTS_FOLDER}/${agent.name}.md`;
+  return agent.skills.map((skill) => {
+    const at = found.at.get(skill);
+    if (at instanceof WorkflowError) throw new WorkflowError(`${named} gives the skill \`${skill}\`, which cannot be used — ${at.message}`);
+    if (at === undefined) {
+      throw new WorkflowError(`${named} gives the skill \`${skill}\`, and no skills folder has it — looked in ${found.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`);
+    }
+    const file = path.join(at, 'SKILL.md');
+    let text: string;
+    try { text = fs.readFileSync(file, 'utf8'); } catch (err) { throw new WorkflowError(`${file} cannot be read (${(err as Error).message}), and ${named}'s card is read from it.`); }
+    return skillEntryOf(file, skill, text);
+  });
 }
 
 /**

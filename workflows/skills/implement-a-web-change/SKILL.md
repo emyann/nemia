@@ -1,5 +1,6 @@
 ---
 name: implement-a-web-change
+title: "Implement a web change"
 description: "Makes a change a person will see in the web app, in small commits with its tests, and adds an e2e page file for a page it adds."
 tags: ["web", "code", "tests"]
 examples: ["Use this when the change is to a page of the board rather than to a package."]

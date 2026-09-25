@@ -1,5 +1,6 @@
 ---
 name: plan-a-change
+title: "Plan a change"
 description: "Reads the repository read-only before anyone changes it and proposes an approach, the files it would touch, the work in order, and the risks."
 tags: ["plan", "code"]
 examples: ["Use this when a change is big enough that the shape of it should be settled first.", "Plan how an agent would say what it can do."]

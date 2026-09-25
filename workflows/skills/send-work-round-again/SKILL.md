@@ -1,5 +1,6 @@
 ---
 name: send-work-round-again
+title: "Send the work round again"
 description: "Decides whether its findings are worth another round, so the loop runs again or stops."
 tags: ["review"]
 examples: ["Use this when a review step sits in a loop with the step that does the work."]

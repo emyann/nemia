@@ -1,6 +1,5 @@
 ---
 description: Reads a note read-only and says whether it holds up, with what is wrong in it — no repository, no web.
-card: note-reviewer.skills.json
 skills: review-a-note
 harness: claude
 model: sonnet

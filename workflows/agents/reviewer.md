@@ -1,6 +1,5 @@
 ---
 description: Reviews a change read-only as a second engineer would, and sends it round again while its findings are worth another round.
-card: reviewer.skills.json
 skills: review-a-change, send-work-round-again
 harness: claude
 model: opus

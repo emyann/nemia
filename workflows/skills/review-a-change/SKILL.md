@@ -1,5 +1,6 @@
 ---
 name: review-a-change
+title: "Review a change"
 description: "Reads the diff read-only as a second engineer would and reports each finding by file and line, saying concretely what would go wrong."
 tags: ["code", "review"]
 examples: ["Use this when a change is written and nobody has read it yet."]

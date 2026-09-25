@@ -31,13 +31,14 @@ const printedBy = async (t: Mock, ...argv: string[]): Promise<{ out: string; err
   return { out: out.join('\n'), err: err.join('\n') };
 };
 
-const SKILL = { id: 'read-a-thing', name: 'Read a thing', description: 'Reads it.', tags: ['note'], examples: ['Use this when something must be read.'] };
+const SKILL = '---\nname: read-a-thing\ntitle: Read a thing\ndescription: Reads it.\ntags: ["note"]\nexamples: ["Use this when something must be read."]\n---\nRead it.\n';
 
-/** An agent in a `<workflows>/agents`, with its skills beside it. */
-const anAgent = (at: string, name: string, description: string, skills: unknown[] = [SKILL]) => {
+/** An agent in a `<workflows>/agents`, composed from one skill in the `<workflows>/skills` beside it. */
+const anAgent = (at: string, name: string, description: string, skill = SKILL) => {
   fs.mkdirSync(at, { recursive: true });
-  fs.writeFileSync(path.join(at, `${name}.md`), `---\ndescription: ${description}\ncard: ${name}.skills.json\n---\nDo the thing.\n`);
-  fs.writeFileSync(path.join(at, `${name}.skills.json`), `${JSON.stringify(skills, null, 2)}\n`);
+  fs.writeFileSync(path.join(at, `${name}.md`), `---\ndescription: ${description}\nskills: read-a-thing\ntools: Read, Skill\n---\nDo the thing.\n`);
+  fs.mkdirSync(path.join(at, '..', 'skills', 'read-a-thing'), { recursive: true });
+  fs.writeFileSync(path.join(at, '..', 'skills', 'read-a-thing', 'SKILL.md'), skill);
 };
 
 const YOURS = path.join(ROOT, 'workflows', 'agents');
@@ -59,14 +60,15 @@ test('wf agents lists both places, each agent by what it is for and what it says
   assert.ok(out.indexOf('scribe') < out.indexOf('archivist'), out);
   assert.match(out, /one in A2A's shape: wf agents card <name>/);
   fs.rmSync(path.join(YOURS, 'archivist.md'));
-  fs.rmSync(path.join(YOURS, 'archivist.skills.json'));
 });
 
-test('wf agents says so of an agent with no skills, rather than leaving it looking like one that can do nothing', async (t) => {
+test('wf agents lists an agent with no skills by the one thing its description says, and says why of one with no card', async (t) => {
   const repo = repoAt('bare');
-  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'mute.md'), '---\ndescription: Says nothing.\n---\nDo it.\n');
+  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'plain.md'), '---\ndescription: Does one thing.\n---\nDo it.\n');
+  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'mute.md'), '---\nmodel: opus\n---\nDo it.\n');
   const { out } = await printedBy(t as Mock, 'agents', '--repo', repo);
-  assert.match(out, /says nothing it can do — give it a card: file beside it/);
+  assert.match(out, /^ {3}plain {2}plain — Does one thing\.$/m);
+  assert.match(out, /^ {3}says nothing it can do — agents\/mute\.md has no `description:`/m);
 });
 
 test('wf agents card prints the card alone on stdout, and what it is not on stderr', async (t) => {
@@ -101,15 +103,19 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
   const mine = JSON.parse((await printedBy(t as Mock, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as { description: string };
   assert.equal(mine.description, 'Yours.');
   fs.rmSync(path.join(YOURS, 'twin.md'));
-  fs.rmSync(path.join(YOURS, 'twin.skills.json'));
 });
 
-test('REFUSED at shipped defaults: a card for an agent whose skills file does not read, in the parser’s own words', async (t) => {
+test('REFUSED at shipped defaults: a card for an agent whose skill says no description, or that no place has, in the reader’s own words', async (t) => {
   const repo = repoAt('broken');
-  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
-  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.skills.json'), '[]\n');
+  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.', '---\nname: read-a-thing\n---\nRead it.\n');
   await assert.rejects(() => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo), (err: Error) => {
-    assert.match(err.message, /^agents\/scribe\.md: `card: scribe\.skills\.json` is an empty list, and an agent with no skills says nothing it can do\./);
+    assert.match(err.message, /read-a-thing\/SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
+    return true;
+  });
+  // Your place has a `read-a-thing` of its own by now, so the skill that is nowhere is another.
+  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.md'), '---\ndescription: Writes it down.\nskills: gone-away\ntools: Read, Skill\n---\nDo it.\n');
+  await assert.rejects(() => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo), (err: Error) => {
+    assert.match(err.message, /gives the skill `gone-away`, and no skills folder has it — looked in /);
     return true;
   });
 });

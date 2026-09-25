@@ -1,5 +1,6 @@
 ---
 name: review-a-web-change
+title: "Review a web change"
 description: "Reads the diff read-only as a second engineer would and reports each finding by file and line."
 tags: ["web", "review", "code"]
 examples: ["Use this when a web change is written and nobody has read it yet."]

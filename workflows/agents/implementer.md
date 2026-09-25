@@ -1,6 +1,5 @@
 ---
 description: Implements what was asked in the repository, in small commits with tests, and weighs a plan when a step before it made one.
-card: implementer.skills.json
 skills: implement-a-change, weigh-a-plan
 harness: claude
 model: opus

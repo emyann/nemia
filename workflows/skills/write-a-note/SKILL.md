@@ -1,5 +1,6 @@
 ---
 name: write-a-note
+title: "Write a note"
 description: "Writes a short note in plain prose on what was asked, a page at most, in a folder of its own — no repository, no web — marking what it is not sure of."
 tags: ["note"]
 examples: ["Use this when somebody wants something explained rather than built."]

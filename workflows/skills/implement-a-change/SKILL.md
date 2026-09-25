@@ -1,5 +1,6 @@
 ---
 name: implement-a-change
+title: "Implement a change"
 description: "Makes the change that was asked in the repository, in small coherent commits, with tests written or updated for anything it touches, and runs them."
 tags: ["code", "tests", "git"]
 examples: ["Use this when a change has been settled and somebody has to write it.", "Add the `skills:` key to the agent parser, with tests."]

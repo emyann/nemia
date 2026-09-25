@@ -327,12 +327,12 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
   assert.deepEqual(differences(repository, shipped), []);
   assert.ok(fs.existsSync(path.join(repository, 'README.md')), 'the repository copy says what it is');
 
-  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their skills and their schemas,
+  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their schemas,
   // each the repository's byte for byte.
   const agents = path.join(WORKFLOWS, 'agents');
   const theirs = path.join(REPO, 'workflows', 'agents');
   assert.deepEqual(fs.readdirSync(agents).sort(), [
-    'implement.schema.json', 'shipper.md', 'shipper.schema.json', 'shipper.skills.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json',
+    'implement.schema.json', 'shipper.md', 'shipper.schema.json', 'ui-implementer.md', 'ui-reviewer.md',
   ]);
   for (const file of fs.readdirSync(agents)) assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
 

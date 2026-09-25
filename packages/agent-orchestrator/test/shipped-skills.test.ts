@@ -11,8 +11,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { splitFrontmatter, type Agent, type Workflow } from '../src/workflow.ts';
-import { loadAgents, loadWorkflows, preloads, skillsFor } from '../src/workflow-store.ts';
+import { skillEntryOf, splitFrontmatter, type Agent, type Workflow } from '../src/workflow.ts';
+import { cardSkills, loadAgents, loadWorkflows, preloads, skillsFor } from '../src/workflow-store.ts';
 import { briefBody, pluginOf, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
 
@@ -72,20 +72,43 @@ test('every shipped SKILL.md reads as YAML, its name its folder and its descript
   assert.deepEqual(Object.keys(frontmatterOf(file, text.replace(line, 'description: Reads the diff, as a second engineer would'))).includes('description'), true, 'plain words read');
 });
 
-test("each shipped agent's `skills:` is its card's ids in order, and each skill's frontmatter is its card entry — and every shipped skill is some agent's", () => {
+test("each shipped agent's card is generated from its skills' frontmatter as YAML reads it — and every shipped skill is some agent's", () => {
   for (const place of PLACES) {
     const given = new Set<string>();
+    const found = skillsFor(path.join(place, '_'));
     for (const agent of agentsIn(place)) {
-      const card = agent.card?.list ?? [];
-      assert.deepEqual(agent.skills ?? [], card.map((s) => s.id), `${agent.name}: its skills are what its card says it can do`);
+      const card = cardSkills(agent, found);
+      assert.deepEqual(card.map((s) => s.id), agent.skills, `${agent.name}: its card lists what its skills are, in order`);
       for (const entry of card) {
         const file = path.join(place, 'skills', entry.id, 'SKILL.md');
-        const { name, description, tags, examples } = frontmatterOf(file, fs.readFileSync(file, 'utf8'));
-        assert.deepEqual({ name, description, tags, examples }, { name: entry.id, description: entry.description, tags: entry.tags, examples: entry.examples }, file);
+        const { title, description, tags, examples } = frontmatterOf(file, fs.readFileSync(file, 'utf8'));
+        assert.deepEqual(entry, { id: entry.id, name: title, description, tags, examples }, file);
         given.add(entry.id);
       }
     }
     assert.deepEqual(fs.readdirSync(path.join(place, 'skills')).sort(), [...given].sort(), `${place}: no skill nobody gives`);
+  }
+});
+
+test("a card entry reads a SKILL.md's frontmatter as YAML does, on every SKILL.md the repository has, shipped or vendored", () => {
+  const files = [
+    ...PLACES.flatMap((place) => fs.readdirSync(path.join(place, 'skills')).map((name) => path.join(place, 'skills', name, 'SKILL.md'))),
+    ...fs.readdirSync(path.join(REPO, '.claude', 'skills')).map((name) => path.join(REPO, '.claude', 'skills', name, 'SKILL.md')),
+  ].filter((file) => fs.existsSync(file));
+  assert.ok(files.length >= 22, files.join('\n'));
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    const id = path.basename(path.dirname(file));
+    const keys = frontmatterOf(file, text);
+    const words = (v: unknown) => (typeof v === 'string' ? v.trim() || undefined : undefined);
+    const expected = {
+      id,
+      name: words(keys.title) ?? words(keys.name) ?? id,
+      description: (keys.description as string).trim(),
+      tags: (keys.tags as string[] | undefined) ?? [id],
+      ...(keys.examples ? { examples: keys.examples } : {}),
+    };
+    assert.deepEqual(skillEntryOf(file, id, text), expected, file);
   }
 });
 

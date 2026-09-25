@@ -1,5 +1,6 @@
 ---
 name: ask-when-it-reads-two-ways
+title: "Ask when it reads two ways"
 description: "Names where a request reads two ways and what a person has to settle, rather than choosing quietly for them."
 tags: ["plan"]
 examples: ["Use this when the brief asserts a mechanism that may not be the right one."]

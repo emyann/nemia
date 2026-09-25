@@ -182,3 +182,21 @@ export function keptAfterCopy(was: Pick<AgentListing, 'source' | 'schema'>, now:
   if (now.source !== was.source || JSON.stringify(now.schema ?? null) !== JSON.stringify(was.schema ?? null)) return null;
   return { key, version: now.version };
 }
+
+/**
+ * What the page keeps once a save has been read back: the form a copy kept is let go only when the agent reads at another version than the one
+ * the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form was drawn again from the file as it
+ * was before the save — and stayed so where the read failed.
+ */
+export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null => (kept && now !== undefined && now !== kept.version ? null : kept);
+
+/**
+ * A save settled, in the order the page must see it: moved to the new name first, when it was renamed — the old one, read again, is gone —
+ * then every read the write changes read again, and only then what the page kept for the old version let go (`release`). A form a copy of a
+ * skill kept is drawn under a key of its own until then, so the person's saved edit stays on the page rather than the file as it was.
+ */
+export async function settleSave({ rename, invalidate, release }: { rename?: () => Promise<unknown>; invalidate: () => Promise<unknown>; release: () => void }): Promise<void> {
+  if (rename) await rename();
+  await invalidate();
+  release();
+}

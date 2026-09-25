@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { agentNameRefusal, agentsDir, agentsFolderRefusal, AGENTS_FOLDER, codexModeWritten, formerSandbox, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type SkillsFound, type StepDraft, type Workflow } from './workflow.ts';
+import { agentNameRefusal, agentsDir, agentsFolderRefusal, AGENTS_FOLDER, skillEntryOf, skillNameRefusal, SKILLS_FOLDER, codexModeWritten, formerSandbox, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type SkillsFound, type StepDraft, type Workflow } from './workflow.ts';
 import { agentsFor, agentUsers, agentVersion, loadAgents, skillsFor, type Places } from './workflow-store.ts';
 import { HOME, isDirectory } from './store.ts';
 
@@ -320,6 +320,67 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
     if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(named); }
   }
   return { dir: at, removed };
+}
+
+/** A copy of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), or anything else judged. */
+export class SkillWriteError extends WorkflowError {
+  readonly why: 'missing' | 'exists' | 'refused';
+  constructor(message: string, why: SkillWriteError['why'] = 'refused') {
+    super(message);
+    this.why = why;
+  }
+}
+
+/** What `copySkill` did: the skill's folder where it now is, and its files by their path in it. */
+export type SkillCopied = { dir: string; name: string; written: string[] };
+
+/**
+ * The skill `name` of the folder of skills `from` copied whole into the folder of skills `to`, under the same name: what the board's skill
+ * picker does with a skill HKB ships, so an agent of yours can give it — an agent of the store finds skills in the store and the repository
+ * it runs on, never in the checkout HKB ships from. A write of its own, done before and apart from any save of an agent.
+ *
+ * Judged whole before a byte is written, each refusal by name: `to` is a `skills/` beside the workflows the board lists — the store's, or a
+ * repository's — unless `{ anywhere: true }`; the name is a skill's (`skillNameRefusal`); `from` has that skill, a folder holding a SKILL.md
+ * whose card entry reads (`skillEntryOf`), so a copy is never a skill no agent could be given; nothing in it is a link, since a copy would
+ * follow it and bring in whatever it points at; and `to` has no skill of that name, which a copy would write over. It is then copied into a
+ * hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be found.
+ */
+export function copySkill(from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}): SkillCopied {
+  const refuse = (why: string | undefined, kind?: SkillWriteError['why']) => { if (why) throw new SkillWriteError(why, kind); };
+  const at = path.resolve(to);
+  if (path.basename(at) !== SKILLS_FOLDER) refuse(`${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`);
+  if (!anywhere && !isWorkflowsHolder(path.dirname(at))) {
+    refuse(`${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's (<repo>/workflows/${SKILLS_FOLDER}, beside its .git). Copy it to one of the two, or pass { anywhere: true } to write ${at} all the same.`);
+  }
+  refuse(skillNameRefusal(name));
+  const source = path.join(path.resolve(from), name);
+  const linkWhy = 'a copy follows a link, and would bring in whatever it points at, outside the skill.';
+  for (const place of [at, path.dirname(at)]) if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(place, linkWhy));
+  if (fs.lstatSync(source, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(source, linkWhy));
+  const skillFile = path.join(source, 'SKILL.md');
+  if (!fs.lstatSync(skillFile, { throwIfNoEntry: false })?.isFile()) {
+    refuse(`${path.resolve(from)} has no skill named ${name}: a skill is a folder holding a SKILL.md, and ${skillFile} is not there.`, 'missing');
+  }
+  const files = (fs.readdirSync(source, { recursive: true }) as string[]).sort();
+  const linked = files.find((file) => fs.lstatSync(path.join(source, file)).isSymbolicLink());
+  if (linked !== undefined) refuse(linkRefusal(path.join(source, linked), linkWhy));
+  try { skillEntryOf(skillFile, name, fs.readFileSync(skillFile, 'utf8')); } catch (err) { refuse(err instanceof Error ? err.message : String(err)); }
+  const target = path.join(at, name);
+  if (fs.lstatSync(target, { throwIfNoEntry: false })) {
+    refuse(`${SKILLS_FOLDER}/${name} is there already, in ${at}, and a copy would write over it. Give it as it is, or remove that folder first.`, 'exists');
+  }
+
+  fs.mkdirSync(at, { recursive: true });
+  const staging = path.join(at, `.${name}.copying-${process.pid}-${Date.now()}`);
+  try {
+    fs.cpSync(source, staging, { recursive: true, errorOnExist: true, force: false });
+    fs.renameSync(staging, target);
+  } catch (err) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw err;
+  }
+  const written = files.filter((file) => fs.statSync(path.join(target, file)).isFile());
+  return { dir: target, name, written };
 }
 
 /**

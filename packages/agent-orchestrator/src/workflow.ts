@@ -1655,7 +1655,39 @@ export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
 export type SystemPrompt = (typeof SYSTEM_PROMPTS)[number];
 
 /** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as Claude Code names one. */
-const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name. */
+export function skillNameRefusal(name: unknown): string | undefined {
+  if (typeof name === 'string' && SKILL_NAME.test(name) && name.length <= 64) return undefined;
+  const shown = typeof name === 'string' ? `\`${name}\`` : JSON.stringify(name);
+  return `${shown} is not a skill's name: a skill is a folder in ${SKILLS_FOLDER}/, named in lowercase words joined by dashes, 64 characters at most, as Claude Code names one — write-a-note, say.`;
+}
+
+/**
+ * What a skill costs an agent's sessions, in tokens, estimated at four characters a token (the page says "about"): `listed`, its name and
+ * description, which Claude Code lists to every session of an agent that gives it; `body`, its SKILL.md's body, which a session reads when
+ * it loads the skill — or, for a skill that says `preload: true`, which the run appends to the system prompt, so it is carried on every turn
+ * (cached; F14). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
+ * SKILL.md that does not read costs what its text would.
+ */
+export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
+
+/** Tokens, about: four characters to a token, rounded up. */
+export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
+
+/** `SkillCost` of the skill `id`, from its SKILL.md's `text`. */
+export function skillTurnCost(id: string, text: string): SkillCost {
+  let block: string | null = null;
+  let body = text;
+  try { ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text)); } catch { /* read as all body */ }
+  const framed = `---\n${block ?? ''}---\n`;
+  const preload = block !== null && frontmatterKey(framed, 'preload') === 'true';
+  const description = block === null ? '' : (frontmatterKey(framed, 'description') ?? '').replace(/^(["'])(.*)\1$/, '$2');
+  const listed = tokensAbout(`${id}: ${description}`);
+  const told = tokensAbout(body);
+  return { preload, listed, body: told, perTurn: listed + (preload ? told : 0) };
+}
 
 /**
  * Where the skills a workflow's agents name were found: each name, the folder it is (`<place>/skills/<name>`, holding `SKILL.md`) or why it

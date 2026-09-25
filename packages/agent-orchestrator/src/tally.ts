@@ -110,10 +110,21 @@ export const addRuntime = (kind: Kind, io: { bytes: number; reads: number; spawn
   o.spawned += spawned;
 };
 
-/** Time the counting took outside `within` — a runtime's report read, say — added to the overhead. */
-export const addOverhead = (ms: number): void => {
-  if (meter) meter.overheadMs += ms;
-};
+/**
+ * `f`, counting done outside `within` — a runtime's report read, say — its time added to the overhead and charged to no kind: the time
+ * before it is charged first, and the mark moved past it after. Outside a pass, `f` itself.
+ */
+export function aside<T>(f: () => T): T {
+  const m = meter;
+  if (!m) return f();
+  const t0 = performance.now();
+  charge(m, t0);
+  try { return f(); } finally {
+    const t1 = performance.now();
+    m.overheadMs += t1 - t0;
+    m.mark = t1;
+  }
+}
 
 /** Whether a pass is being metered now. */
 export const metering = (): boolean => meter !== undefined;

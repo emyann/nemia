@@ -29,9 +29,10 @@ const busy = (ms: number) => { const until = performance.now() + ms; while (perf
 
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
- * it (`io()`) grows by that observe during the pass, as the real one's does. `withIo: false` is a fake that keeps no totals at all.
+ * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
+ * totals at all.
  */
-const fake = ({ passMs = 0, observeMs = 0, withIo = true } = {}) => {
+const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0 } = {}) => {
   const io = { bytesRead: 0, reads: 0, spawned: 0, observed: {} as Record<string, { calls: number; ms: number; listed: number; spawned: number }> };
   const e = {
     tick: async () => {
@@ -47,7 +48,7 @@ const fake = ({ passMs = 0, observeMs = 0, withIo = true } = {}) => {
     stop: async () => {},
     logs: async () => '(no output yet)',
     feed: async () => ({ entries: [], cursor: 0 }),
-    ...(withIo ? { io: () => structuredClone(io) } : {}),
+    ...(withIo ? { io: () => { busy(ioMs); return structuredClone(io); } } : {}),
   } as unknown as Engine;
   return e;
 };
@@ -92,6 +93,18 @@ test('a pass\'s phases add up to its time, less what measuring took, and the tim
     assert.ok(cost.overheadMs < cost.ms, 'measuring costs less than what it measures');
     for (const p of PHASES) assert.ok(cost.phases[p].ms >= 0, `${p} took no negative time`);
   }
+});
+
+test('what measuring took is in no phase: a runtime whose report is slow to read adds to the overhead, and the phases stay the rest', async () => {
+  emptyStore();
+  started(3);
+  // Metered from outside, so the meter's own counts are read: the pass's `overheadMs` also has what came after its time (composing, writing).
+  const { ms, tallies } = await metered(() => tick(fake({ passMs: 5, ioMs: 3 })));
+  assert.ok(tallies);
+  const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
+  const reads = 2 * (tallies.kinds.runtime.calls + tallies.kinds.journals.calls);
+  assert.ok(tallies.overheadMs >= 3 * reads, `the report read twice by each of the ${reads / 2} passes and reads, 3 ms a read, is overhead (${tallies.overheadMs} ms)`);
+  assert.ok(Math.abs(ms - sum - tallies.overheadMs) <= 0.5, `the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`);
 });
 
 test('a pass on a fixture store counts the run records it read: twice as many runs, twice as many records', async () => {

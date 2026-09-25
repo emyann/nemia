@@ -26,7 +26,7 @@ import { collectArtifacts } from './artifacts.ts';
 import { refsOf, resultBranches } from './branches.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
-import { addOverhead, addRuntime, metered, within, type Tallies } from './tally.ts';
+import { addRuntime, aside, metered, within, type Tallies } from './tally.ts';
 import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
 /**
@@ -1004,21 +1004,18 @@ const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefin
  * slowest's time; a view observes the one harness of its task.
  */
 async function engineCall<T>(e: Engine, verb: string, phase: Phase, call: () => Promise<T>): Promise<T> {
-  const t0 = performance.now();
-  const before = ioOf(e);
-  addOverhead(performance.now() - t0);
+  const before = aside(() => ioOf(e));
   try {
     return await within(phase, call);
   } finally {
-    const t1 = performance.now();
-    const after = ioOf(e);
-    if (before && after) {
+    aside(() => {
+      const after = ioOf(e);
+      if (!before || !after) return;
       const seen = Object.values(observedBetween(before, after));
       const ms = verb === 'tick' ? Math.max(0, ...seen.map((o) => o.ms)) : seen.reduce((n, o) => n + o.ms, 0);
       addRuntime(phase, { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
         { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) });
-    }
-    addOverhead(performance.now() - t1);
+    });
   }
 }
 

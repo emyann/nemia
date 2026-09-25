@@ -1,10 +1,10 @@
 /**
  * The runtime's core never opens a task's harness arguments.
  *
- * `domain.ts` decides and `engine.ts` applies; how a session is started — its model, its tools, its window — is the
+ * `domain.ts` decides, `lifecycle.ts` holds the edges it decides by, and `engine.ts` applies; how a session is started — its model, its tools, its window — is the
  * adapter's, carried on the task as one `config` (`src/harness-args.ts`) and handed to the runner at spawn and release.
  * A read of one in the core is the second workload leaking in: the day `decide` branches on a model, the engine knows
- * about a harness. So this reads the two files' code, comments left out, and refuses a harness argument named there,
+ * about a harness. So this reads the three files' code, comments left out, and refuses a harness argument named there,
  * and `config` opened — by a member, an index, a destructuring, a spread, `in` or an `Object.*` walk. Passing it on whole
  * is the one use it has.
  */
@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { HARNESS_ARGS } from '../src/harness-args.ts';
 
-const CORE = ['src/domain.ts', 'src/engine.ts'];
+const CORE = ['src/domain.ts', 'src/engine.ts', 'src/lifecycle.ts'];
 
 /** The code alone: block comments and line comments out, so a sentence about a model is not a read of one. */
 const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
@@ -31,7 +31,7 @@ const OPENED = [
 const reads = (code: string): string[] =>
   code.split('\n').flatMap((line, i) => (NAMED.test(line) || OPENED.some((re) => re.test(line)) ? [`${i + 1}: ${line.trim()}`] : []));
 
-test("domain.ts and engine.ts name no harness argument, and hand a task's config on without opening it", () => {
+test("domain.ts, lifecycle.ts and engine.ts name no harness argument, and hand a task's config on without opening it", () => {
   for (const file of CORE) assert.deepEqual(reads(codeOf(fs.readFileSync(file, 'utf8'))), [], `${file} reads a harness argument`);
 });
 
@@ -70,7 +70,7 @@ test('engine.ts hands the whole config to every spawn, so a runner is given what
   assert.match(code, /runner\.release\(session, state\.config\b/);
 });
 
-test('domain.ts and engine.ts know no budget: the cap is a harness argument, and a spend is a fact they carry', () => {
+test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness argument, and a spend is a fact they carry', () => {
   // Stage 4b: the runtime measures and reports, and the orchestrator decides over budget. A `budget` in the core's code —
   // a field, an end reason, a comparison of a `limit` — is the judgement coming back, and none of the checks above sees
   // one that names no harness argument (`limit === 'budget'`).

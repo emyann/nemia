@@ -31,7 +31,7 @@ import { a2aOps } from './a2a-client.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type TaskView,
+  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type RefusedMove, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -123,9 +123,15 @@ export type TaskSpec = {
  * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
  * layer above that decides what to `admit` reads the board without asking any harness again (stage 4c) — and what the pass
  * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
+ *
+ * `refused` is every move the task's lifecycle had no edge for in this pass (stage 5), off the same steps: the task, the state
+ * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
+ * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy board, and a settled
+ * task is never on it.
  */
 export type TickReport = {
   tasks: number; actions: number; running: Record<string, number>; views: TaskView[]; ms: number; observed: Record<string, ObserveCount>;
+  refused: RefusedMove[];
 };
 
 /**
@@ -679,10 +685,10 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { denialText, nameFor } from './domain.ts';
-export { retiredKeyRefusal } from './engine.ts';
+export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';
-export type { TaskView } from './engine.ts';
+export type { RefusedMove, TaskView } from './engine.ts';

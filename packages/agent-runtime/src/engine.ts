@@ -5,19 +5,33 @@
  * this file is the I/O that carries it out. If you find yourself adding an `if` here, it probably
  * belongs in `decide` — that is the line that keeps this engine small.
  */
-import { Effect, Schema } from 'effect';
+import { Context, Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
+import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
+import { transition, type Move, type Refusal } from './lifecycle.ts';
+
+/**
+ * The lifecycle `step` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
+ * refused edge is planted to prove the pass reports it. Exported by neither entry, as the machine is not.
+ */
+export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultValue: () => transition });
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
 export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
+
+/** A move the lifecycle refused in a pass: which task, and the state and event it had no edge for (`Refusal`). */
+export type RefusedMove = { taskId: string } & Refusal;
+
+/** A refused move as a person reads it, in a log or `ae tick`'s output: what did not move, and why nothing will until something changes. */
+export const refusedText = (m: RefusedMove): string =>
+  `${m.taskId}  stalled: its lifecycle has no edge from ${m.state} on ${m.event}, so nothing is done; it is asked again each pass`;
 
 export type TaskView = {
   id: string; state: State; phase: string;
@@ -344,8 +358,10 @@ export const step = Effect.fn('step')(function* (
   const journal = yield* Journal;
   const runner = yield* Runner;
 
+  const move = yield* Lifecycle;
+
   const state = fold(taskId, yield* journal.read(taskId));
-  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS });
+  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS }, move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -387,9 +403,14 @@ export const step = Effect.fn('step')(function* (
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
       );
-      yield* journal.append(taskId, failed?.refused
-        ? { kind: 'ended', at: at(), attempt: action.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: failed.message }
-        : { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
+      if (failed?.refused) {
+        // The lifecycle's edge for it, as for every other move: the attempt's `unstartable` end, or its refusal.
+        const end = spawnRefused(state, action.attempt, failed.message, move);
+        if (end.do !== 'record-end') return end;
+        yield* journal.append(taskId, { kind: 'ended', at: at(), attempt: end.attempt, sessionId: end.sessionId, observed: end.observed, reason: end.reason, error: end.error });
+      } else {
+        yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
+      }
       break;
     }
 
@@ -523,6 +544,11 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  *
  * `running` is a count, per harness, of the sessions at work as the pass left them (`atWork`), off the same observation
  * and the fold the pass already made: what `ae tick` prints, and no rule reads.
+ *
+ * `refused` is every move the lifecycle had no edge for this pass (stage 5): the task, the state it was read in and the
+ * event it was handed. Such a task does nothing and is asked again on the next pass, where the same refusal comes back
+ * for as long as its journal and its session say the same — so it is reported on every pass it persists, off the steps
+ * this pass took, and never stalls quietly. A settled task is never asked (`settledQuiet`) and is never on it.
  */
 export const tick = Effect.fn('tick')(function* () {
   // Typed to take nothing, and asked all the same: an untyped caller, or one built against the old door, still passes a ceiling.
@@ -537,10 +563,12 @@ export const tick = Effect.fn('tick')(function* () {
   const taken: Action[] = [];
   const views: TaskView[] = [];
   const running: Record<string, number> = {};
+  const stalled: RefusedMove[] = [];
   for (const id of ids) {
     const before = fold(id, yield* journal.read(id));
     const actions = yield* settleTask(id, observed);
     taken.push(...actions);
+    for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
     // Against the journal as this pass left it — so an end written just now is let go now — read again
     // only when the pass wrote to it.
     const after = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
@@ -557,6 +585,7 @@ export const tick = Effect.fn('tick')(function* () {
     actions: taken.filter((a) => a.do !== 'nothing').length,
     running,
     views,
+    refused: stalled,
   };
 });
 

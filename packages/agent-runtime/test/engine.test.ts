@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
-import { admit, answer, file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
+import { admit, answer, file, GRACE_MS, Lifecycle, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
+import { withoutEdge } from '../src/lifecycle.ts';
 import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
@@ -578,10 +579,15 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+  // Since stage 5 the judgement is `decide`, what it reads (`lifecycleOf`, `observe`, `spawnRefused`) and the lifecycle's
+  // edges. The slice ends on a name that must be there: a slice to a deleted name reads to the end of the file (CLAUDE.md).
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
-  const body = source.slice(source.indexOf('export function decide('), source.indexOf('function endOf('));
-  assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
+  const [from, to] = [source.indexOf('export function decide('), source.indexOf('const isLive = ')];
+  assert.ok(from >= 0 && to > from, 'found decide and the name after the judgement');
+  const body = source.slice(from, to);
+  for (const name of ['export function lifecycleOf(', 'export function observe(', 'export function spawnRefused(']) assert.ok(body.includes(name), `the slice holds ${name}`);
+  const machine = fs.readFileSync(new URL('../src/lifecycle.ts', import.meta.url), 'utf8');
+  for (const read of [body, machine]) assert.doesNotMatch(read, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
 });
 
 test('a session its harness ended at its budget ends failed, as its harness said, with the limit and what it cost on its attempt — and the task settles failed as any failure does', async () => {
@@ -772,4 +778,37 @@ test('...and when no session shows up, the grace window ends it lost, as for any
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
   const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS };
   assert.deepEqual(decide(state, new Map(), later), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' });
+});
+
+test('a move the lifecycle has no edge for is on every pass\'s report while it lasts, and off it once the task moves on', async () => {
+  const b = board();
+  const id = await b.run(file({ ...spec, id: 'held' }));
+  const other = await b.run(file({ ...spec, id: 'moving' }));
+  // The shipped machine has an edge for every move a pass makes (lifecycle.test.ts), so the missing one is planted.
+  const planted = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => b.run(Effect.provideService(e, Lifecycle, withoutEdge('working', 'SESSION_LIVE')));
+  const first = await planted(tick());
+  assert.deepEqual(first.refused, [], 'submitted → starting → working is not the missing edge');
+  for (let pass = 0; pass < 3; pass++) {
+    const report = await planted(tick());
+    assert.deepEqual(report.refused, [{ taskId: id, state: 'working', event: 'SESSION_LIVE' }, { taskId: other, state: 'working', event: 'SESSION_LIVE' }], `pass ${pass}`);
+    assert.equal(await b.run(phaseOf(id, b)), 'running (working)', 'and nothing was done to it');
+  }
+  b.sessions.set(nameFor(other, 1), { ...b.sessions.get(nameFor(other, 1))!, state: 'done' });
+  const report = await planted(tick());
+  assert.deepEqual(report.refused, [{ taskId: id, state: 'working', event: 'SESSION_LIVE' }], 'an ended session has its edge, and leaves the report');
+  assert.equal(await b.run(phaseOf(other, b)), 'succeeded');
+  assert.deepEqual((await b.run(tick())).refused, [], 'the shipped machine refuses nothing');
+});
+
+test('a store of settled tasks, ticked again and again, reports no refusal — a settled task is not observed at all', async () => {
+  const b = board();
+  for (const id of ['done', 'broke', 'stopped']) await b.run(file({ ...spec, id }));
+  await b.run(tick());
+  b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'done' });
+  b.sessions.set(nameFor('broke', 1), { ...b.sessions.get(nameFor('broke', 1))!, state: 'failed' });
+  await b.run(requestStop('stopped'));
+  for (let i = 0; i < 3; i++) await b.run(tick());
+  assert.deepEqual(await Promise.all(['done', 'broke', 'stopped'].map((id) => b.run(phaseOf(id, b)))), ['succeeded', 'failed', 'stopped']);
+  // A final state has no edge, so a settled task observed would be refused on every pass: `settledQuiet` keeps it unobserved.
+  for (let pass = 0; pass < 3; pass++) assert.deepEqual((await b.run(tick())).refused, [], `pass ${pass}`);
 });

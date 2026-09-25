@@ -29,6 +29,7 @@ import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps } from './a2a-client.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
+import { tickMemoLayer } from './tick-memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
   ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type RefusedMove, type TaskView,
@@ -36,7 +37,10 @@ import {
 
 // ─── what a consumer implements, if anything ────────────────────────────────
 
-/** A store, in Promises. Implement this to keep the engine's records in your own database. */
+/**
+ * A store, in Promises. Implement this to keep the engine's records in your own database. Every `append` goes on the `feed`
+ * too: a running engine reads a settled task's record again only once the feed names it (`Engine.tick`).
+ */
 export type PromiseJournal = {
   append(taskId: string, event: Event): Promise<void>;
   read(taskId: string): Promise<Event[]>;
@@ -173,6 +177,11 @@ export type Engine = {
    * One pass: start what may start — every task not queued, and each queued one `admit`ted — notice what ended, settle what
    * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument, since the
    * ceiling and the pools it once took are retired.
+   *
+   * An engine keeps, for as long as it lives, the settled tasks its passes have folded (`tick-memo.ts`): a pass reads the
+   * feed on from where the last stopped, and reads the journal of a task only when it is not settled, the feed has named
+   * it since, or this engine has never folded it — so an engine's first pass reads every journal and the whole feed, and
+   * the passes after it read only what changed. A store (`PromiseJournal`) must therefore put every append on its feed.
    */
   tick(): Promise<TickReport>;
   /**
@@ -416,7 +425,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
   });
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
   const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, counted(name, a2aOps(name, ops, events))]));
-  const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)));
+  // The engine's one memo of the settled tasks its passes may skip (`tick-memo.ts`): made here, once, so it lives as long as
+  // this engine and a new one folds every task on its first pass.
+  const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer());
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
   // services are shared across calls exactly as they would be inside one Effect program.
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> =>

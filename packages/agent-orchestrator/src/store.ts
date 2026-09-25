@@ -423,6 +423,40 @@ export const listRuns = (): Run[] => within('records', () =>
     : []);
 
 /**
+ * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
+ * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the record,
+ * `.cancelled`, `.pruned`, `.hold`, and whatever a later marker is called, since a name nobody listed here is still stamped — and of every
+ * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
+ * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and made again moves
+ * its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
+ *
+ * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
+ */
+export const restStamps = (): Map<string, string> => within('records', () => {
+  const stamps = new Map<string, string[]>();
+  let names: string[];
+  try { names = fs.readdirSync(runsDir()); } catch { return new Map(); }
+  const stat = (at: string, depth: number): string => {
+    const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
+    if (!s) return 'gone';
+    const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
+    if (!s.isDirectory() || depth > 1) return own;
+    let inside: string[];
+    try { inside = fs.readdirSync(at).sort(); } catch { return `${own}:gone`; }
+    return `${own}[${inside.map((n) => `${n}=${stat(path.join(at, n), depth + 1)}`).join(',')}]`;
+  };
+  for (const name of names.sort()) {
+    const dot = name.indexOf('.');
+    if (dot <= 0) continue;
+    const id = name.slice(0, dot);
+    const parts = stamps.get(id) ?? [];
+    stamps.set(id, parts);
+    parts.push(`${name}=${stat(path.join(runsDir(), name), 0)}`);
+  }
+  return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
+});
+
+/**
  * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
  * so a daemon older than the rename that ticks the run still files each step's rule lists.
  */

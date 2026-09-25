@@ -106,8 +106,9 @@ function KeyInput({ field, step, others, form, schemas, update }: {
   const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v, form));
   const harness = step.spec.harness ?? form.defaultHarness;
   // A fence the step's harness does not have — `sandbox` on Claude Code, `permissionMode` on codex — is not drawn, unless the step says it,
-  // to be taken off.
-  if (!takes(form, field, harness) && value === null && given === null) return null;
+  // to be taken off; nor is a key a remote agent does not take (`tools`, `model`, a fence), whose unset list is empty rather than null.
+  const unset = value === null || (Array.isArray(value) && value.length === 0);
+  if (!takes(form, field, harness) && unset && given === null) return null;
 
   let control: ReactNode;
   switch (kind) {

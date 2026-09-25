@@ -9,12 +9,18 @@ import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
 /**
  * Whether a step on `harness` takes the key at all: a key whose words are the harness's (`byHarness`) is taken only on a harness that has
  * some. Each harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and a form draws the other only where it is
- * written, to be taken off. A harness the form does not know is not judged here: the package judges it on save.
+ * written, to be taken off. A remote A2A agent (`harness: a2a:<name>`) takes none of the keys the package refuses on it (`remoteRefuses`),
+ * whether the form offers that agent or not. Any other harness the form does not know is not judged here: the package judges it on save.
  */
-export function takes(form: Pick<KeyForm, 'keys'>, field: Pick<KeyField, 'byHarness'>, harness: string): boolean {
+export function takes(form: Pick<KeyForm, 'keys' | 'remote'>, field: Pick<KeyField, 'key' | 'byHarness'>, harness: string): boolean {
+  if (remoteRefuses(form, field.key, harness)) return false;
   if (!field.byHarness || Object.hasOwn(field.byHarness, harness)) return true;
   return !(form.keys.find((k) => k.key === 'harness')?.choices ?? []).includes(harness);
 }
+
+/** Whether `harness` names a remote A2A agent, on which the package refuses `key` (`KeyForm.remote`). */
+export const remoteRefuses = (form: Pick<KeyForm, 'remote'>, key: keyof WorkflowStepSpec, harness: string): boolean =>
+  !!form.remote && harness.startsWith(form.remote.prefix) && form.remote.refuses.includes(key);
 
 /** A step being built: as the listing has it, and a schema pasted for its `output:`, written beside it on save — null for none. */
 export type DraftStep = ListedStep & { schema: { file: string; text: string } | null };

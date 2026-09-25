@@ -1,4 +1,5 @@
 import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
+import { remoteRefuses } from './builder.ts';
 
 /** The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: description, skills, systemPrompt): the order an agent's file writes them. */
 export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'];
@@ -96,12 +97,14 @@ export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness:
 /**
  * Whether the harness the agent names has the key at all: a key whose words are the harness's is had only on a harness that has some. Each
  * harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and the form draws the other only where it is written, as
- * free text, to be taken off. A harness the form does not know is not judged here: its keys are typed, and the package judges them on save.
+ * free text, to be taken off. A remote A2A agent has none of the keys the package refuses on it (`remoteRefuses`). Any other harness the form
+ * does not know is not judged here: its keys are typed, and the package judges them on save.
  */
 export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string): boolean {
   const field = form?.keys.find((k) => k.key === key);
+  const on = harness.trim() || (form?.defaultHarness ?? '');
+  if (form && remoteRefuses(form, key, on)) return false;
   if (!field?.byHarness) return true;
-  const on = harness.trim() || form!.defaultHarness;
   const known = form!.keys.find((k) => k.key === 'harness')?.choices ?? [];
   return Object.hasOwn(field.byHarness, on) || !known.includes(on);
 }

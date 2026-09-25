@@ -11,12 +11,12 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { refusedText, type ClaudeFlags, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
-import { modeOf, sessionContext, type Workflow } from './workflow.ts';
+import { isRemoteHarness, modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
 import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
-import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, remoteBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import { agentFilesDir, artifactsDir, cancelFile, skillsAgain, isDirectory, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
@@ -500,7 +500,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       fs.mkdirSync(files, { recursive: true });
       // A nudge continues the last try's session. With none to continue — a session the harness never
       // reported — the try starts a new one, and its brief says so.
-      const resumeFrom = r.mode === 'nudge' ? sessionIn(views, record.taskId!) : undefined;
+      const remote = isRemoteHarness(step.harness);
+      const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(views, record.taskId!) : undefined;
       // What the check said, as data in the brief: the frozen command, its exit, and both tails.
       const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
       // A new session of a loop's target within a round owes replies to the round's findings, and is handed them as its first try was:
@@ -512,7 +513,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
       const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
       const told = toldOf(run, step);
-      const brief = composeBrief(told.step, run, steps, reads, files, undefined, {
+      const brief = remote ? remoteBrief(step, run, steps, reads, { try: r.try, by: r.by, mode: r.mode, resumed: false, status: tried, ...(r.message !== undefined ? { message: r.message } : {}) })
+        : composeBrief(told.step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}),
           ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
           // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
@@ -541,33 +543,35 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         brief,
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
-        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
-        config: {
-          // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
-          // after a `--model` try continues that session as it cached it.
-          model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
-          effort: step.effort,
-          // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
-          contextTokens: sessionContext(step, steps),
-          permissionMode: modeOf(step),
-          // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
-          tools: step.tools,
-          disallowedTools: filedDenies(step, run),
-          allowedTools: step.allowedTools,
-          // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
-          background: step.background,
-          // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
-          budgetUsd,
-          // The agent `wf start` rendered for it: a try is told what the step is.
-          claude: told.claude,
-        },
+        ...localFields(step, () => ({
+          // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+          config: {
+            // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
+            // after a `--model` try continues that session as it cached it.
+            model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
+            effort: step.effort,
+            // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
+            contextTokens: sessionContext(step, steps),
+            permissionMode: modeOf(step),
+            // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
+            tools: step.tools,
+            disallowedTools: filedDenies(step, run),
+            allowedTools: step.allowedTools,
+            // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
+            background: step.background,
+            // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
+            budgetUsd,
+            // The agent `wf start` rendered for it: a try is told what the step is.
+            claude: told.claude,
+          },
+          resumeFrom,
+          // Held open when it signs, as the step's first try is (`holdsOpenOn`).
+          ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
+          // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
+          // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
+          closeoutSchema: closeoutSchemaOf(step, steps),
+        })),
         deadlineSeconds: step.deadlineSeconds,
-        resumeFrom,
-        // Held open when it signs, as the step's first try is (`holdsOpenOn`).
-        ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-        // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
-        // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
-        closeoutSchema: closeoutSchemaOf(step, steps),
       });
     }
     tried.push(r.step);
@@ -614,25 +618,28 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         }, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
-        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
-        config: {
-          // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
-          model: sessionModel(target, record),
-          effort: target.effort,
-          contextTokens: sessionContext(target, steps),
-          permissionMode: modeOf(target),
-          tools: target.tools,
-          disallowedTools: filedDenies(target, run),
-          allowedTools: target.allowedTools,
-          background: target.background,
-          budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
-          claude: told.claude,
-        },
+        // A loop's target is never a remote agent (`validateLoops`); guarded all the same, as every filing is.
+        ...localFields(target, () => ({
+          // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+          config: {
+            // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
+            model: sessionModel(target, record),
+            effort: target.effort,
+            contextTokens: sessionContext(target, steps),
+            permissionMode: modeOf(target),
+            tools: target.tools,
+            disallowedTools: filedDenies(target, run),
+            allowedTools: target.allowedTools,
+            background: target.background,
+            budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
+            claude: told.claude,
+          },
+          resumeFrom,
+          ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
+          // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
+          closeoutSchema: closeoutSchemaOf(target, steps),
+        })),
         deadlineSeconds: target.deadlineSeconds,
-        resumeFrom,
-        ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
-        // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
-        closeoutSchema: closeoutSchemaOf(target, steps),
       });
     }
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
@@ -711,46 +718,51 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
       // that waited on runs, what they concluded.
-      brief: composeBrief(told.step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
+      // A remote agent's names nothing of this machine (`remoteBrief`).
+      brief: isRemoteHarness(step.harness)
+        ? remoteBrief(step, run, steps, signedOff, undefined, step.after.length ? undefined : parents)
+        : composeBrief(told.step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
       cwd: place.workspace,
       harness: step.harness,
-      // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
-      config: {
-        model: step.model,
-        effort: step.effort,
-        // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
-        // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
-        contextTokens: sessionContext(step, steps),
-        // Left to the engine's default (`auto`) unless the step says otherwise. A job asks nobody in any mode: a call it may not make
-        // is denied, recorded, and the session carries on (agent-runtime's open issue 28, M1).
-        permissionMode: modeOf(step),
-        // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
-        tools: step.tools,
-        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings. An ending that lands on its check may
-        // not commit its merge either: the run does, on the check's word (`filedDenies`).
-        disallowedTools: filedDenies(step, run),
-        allowedTools: step.allowedTools,
-        // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
-        background: step.background,
-        // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
-        // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
-        // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
-        // over is this package's (`ownStatus`, `held`).
-        budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
-        // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`);
-        // and the bridge to claude.ai when the step says `remote: true` (`toldOf`).
-        claude: told.claude,
-      },
       deadlineSeconds: step.deadlineSeconds,
-      resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
-      // Held open when it signs, on a Claude Code job (`holdsOpenOn`): a person's answer to it — a blocked sign-off answered, a send-back from
-      // its gate — is the task's next turn, and the run closes it once nothing waits on a person's word (`holdsOpen`).
-      ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-      // The shape of the step's closing statement, with the fields its `output:` declares — from the
-      // workflow this run froze, never the folder. The engine hands it to the harness and records the
-      // answer without reading it; what the fields mean is ours — see `Closeout`.
-      // A loop's target is asked for `replies` from its first round, so every round continues its session under this same schema.
-      closeoutSchema: closeoutSchemaOf(step, steps),
+      ...localFields(step, () => ({
+        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+        config: {
+          model: step.model,
+          effort: step.effort,
+          // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
+          // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
+          contextTokens: sessionContext(step, steps),
+          // Left to the engine's default (`auto`) unless the step says otherwise. A job asks nobody in any mode: a call it may not make
+          // is denied, recorded, and the session carries on (agent-runtime's open issue 28, M1).
+          permissionMode: modeOf(step),
+          // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
+          tools: step.tools,
+          // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings. An ending that lands on its check may
+          // not commit its merge either: the run does, on the check's word (`filedDenies`).
+          disallowedTools: filedDenies(step, run),
+          allowedTools: step.allowedTools,
+          // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
+          background: step.background,
+          // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
+          // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
+          // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
+          // over is this package's (`ownStatus`, `held`).
+          budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
+          // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`);
+          // and the bridge to claude.ai when the step says `remote: true` (`toldOf`).
+          claude: told.claude,
+        },
+        resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
+        // Held open when it signs, on a Claude Code job (`holdsOpenOn`): a person's answer to it — a blocked sign-off answered, a send-back from
+        // its gate — is the task's next turn, and the run closes it once nothing waits on a person's word (`holdsOpen`).
+        ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
+        // The shape of the step's closing statement, with the fields its `output:` declares — from the
+        // workflow this run froze, never the folder. The engine hands it to the harness and records the
+        // answer without reading it; what the fields mean is ours — see `Closeout`.
+        // A loop's target is asked for `replies` from its first round, so every round continues its session under this same schema.
+        closeoutSchema: closeoutSchemaOf(step, steps),
+      })),
     });
     // The tries a round moved behind stay with it.
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
@@ -900,6 +912,14 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
     throw err;
   }
 }
+
+/**
+ * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema — for a
+ * step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured it. The
+ * runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left out, not
+ * emptied; and a try of a remote step is a new Task, never a turn of the last one.
+ */
+const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> => (isRemoteHarness(step.harness) ? {} : fields());
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`

@@ -24,8 +24,23 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
    */
   const owner = new Map<string, string>();
 
-  /** The name of the harness `pick` gives for a task's harness: where its spawn went, and so where its session is listed. */
-  const routeOf = (asked?: string) => (harnesses[asked ?? fallback] ? (asked ?? fallback) : fallback);
+  /**
+   * The harness a task's sessions are spawned on and listed by: the one it names, or the fallback for a task that names none.
+   * Undefined for a harness this engine does not have — one the task was filed on by an engine that had it, such as a remote
+   * agent whose entry was since refused or removed. Such a task is routed nowhere: sent to the fallback, it was spawned there
+   * as a session of another harness nobody asked for, and a session of it in flight was looked for there, not found, and
+   * ended `lost` (found in review of thin runtime stage 6, part 2, round 3).
+   */
+  const routeOf = (asked?: string): string | undefined => {
+    const name = asked ?? fallback;
+    return Object.hasOwn(harnesses, name) ? name : undefined;
+  };
+
+  /** A spawn on a harness this engine does not have, refused: nothing is started, and the attempt ends in these words. */
+  const notHere = (asked: string) => Effect.fail(new RunnerError({
+    verb: 'spawn', refused: true,
+    message: `\`harness: ${asked}\` is not a harness this engine has, so nothing was started: the task was filed by an engine that had it. Its harnesses are: ${Object.keys(harnesses).join(', ')}. Give the engine that harness again, then ask for the task again.`,
+  }));
 
   /**
    * Every harness observed at once, each by `look`, and merged: what `observe` and `observeFor` both are. A harness whose look
@@ -62,10 +77,17 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
   const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
 
   return {
-    spawn: (r) => pick(r.harness).spawn(r),
+    spawn: (r) => {
+      const route = routeOf(r.harness);
+      return route === undefined ? notHere(r.harness ?? fallback) : harnesses[route]!.spawn(r);
+    },
 
-    // To the harness the task names, as a spawn is: its vocabulary is its own.
-    refuses: (task) => pick(task.harness).refuses?.(task),
+    // To the harness the task names, as a spawn is: its vocabulary is its own. One this engine does not have is refused
+    // at the door that files (`harnessRefusalOf`), which names the harnesses it has.
+    refuses: (task) => {
+      const route = routeOf(task.harness);
+      return route === undefined ? undefined : harnesses[route]!.refuses?.(task);
+    },
 
     // A harness that cannot be read contributes nothing here: a full listing is read by views and verbs, which read an
     // unread harness as nothing observed, and never by the pass (`observeFor`).
@@ -74,11 +96,16 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     // Each harness told only the names routed to it, as a spawn is routed: a flat list would have Claude Code take a Codex
     // task's name for a background session it must look for. Every harness is still observed — one with nothing expected
     // is told so, and one without the verb lists everything — so a session no journal names is not hidden from a harness.
-    // A harness that could not be read leaves every name routed to it unread, whichever verb it was read by.
+    // A harness that could not be read leaves every name routed to it unread, whichever verb it was read by, and a harness this
+    // engine does not have is one nobody can read: its names are neither there nor gone, so none is spawned again or ended
+    // `lost` until the harness is back.
     observeFor: (expected) => observeAll((name, ops) => {
       const mine = expected.filter((e) => routeOf(e.harness) === name);
       return { read: ops.observeFor ? ops.observeFor(mine) : listing(ops), expected: mine.map((e) => e.name) };
-    }),
+    }).pipe(Effect.map((o): Observation => {
+      const nowhere = expected.filter((e) => routeOf(e.harness) === undefined);
+      return nowhere.length ? { seen: o.seen, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
+    })),
 
     stop: (sessionId) => pick(owner.get(sessionId)).stop(sessionId),
 

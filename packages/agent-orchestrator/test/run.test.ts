@@ -1296,6 +1296,9 @@ test('`answerIn` and `harnessWaitLine`: where a person answers it, alone and aft
   assert.equal(harnessWaitLine('permission prompt', 'ae/t1/1'),
     'waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/t1/1', 'one line, for a screen with room for it');
   assert.equal(harnessWaitLine('permission prompt', null), `waiting for a permission prompt — ${answerIn(null)}`);
+  // A step on a remote A2A agent is in no Claude Code: its Task is answered with a follow-up, which `wf say` sends.
+  assert.equal(answerIn('ae/t1/1', { run: 'r-1', step: 'ask' }), 'read its question with wf logs r-1 ask, and answer it with wf say r-1 ask "<your answer>"');
+  assert.equal(harnessWaitLine('input', 'ae/t1/1', { run: 'r-1', step: 'ask' }), `waiting for an input — ${answerIn(null, { run: 'r-1', step: 'ask' })}`);
 });
 
 test("`wf ls` says what a blocked step's harness waits for, beside the engine's word and not in it", () => {

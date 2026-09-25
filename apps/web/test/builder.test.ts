@@ -216,3 +216,16 @@ test("a step's form has its harness's fence alone: a permission mode on Claude C
   assert.equal(takes(form, sandbox, 'nowhere'), true, 'a harness the form does not know is judged on save');
   assert.equal(UNSET.sandbox, null);
 });
+
+test('a step on a remote A2A agent has none of the keys the package refuses there, whether or not the form lists the agent', () => {
+  const harness = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'a2a:reviewer'], byHarness: null } as const;
+  const form = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode', 'tools', 'check'] } } as unknown as Pick<KeyForm, 'keys' | 'remote'>;
+  const model = { key: 'model', byHarness: { claude: ['opus'], codex: ['gpt-5.5'] } } as const;
+  const tools = { key: 'tools', byHarness: null } as const;
+  const deadline = { key: 'deadlineSeconds', byHarness: null } as const;
+  assert.deepEqual([takes(form, model, 'a2a:reviewer'), takes(form, tools, 'a2a:reviewer'), takes(form, deadline, 'a2a:reviewer')], [false, false, true]);
+  assert.equal(takes(form, tools, 'a2a:gone'), false, 'a name the store no longer declares is still remote');
+  assert.deepEqual([takes(form, model, 'claude'), takes(form, tools, 'claude')], [true, true], 'a harness of ours keeps them');
+  // An api from before remote agents sends no `remote`: nothing is hidden for it.
+  assert.equal(takes({ keys: form.keys } as unknown as Pick<KeyForm, 'keys' | 'remote'>, tools, 'a2a:reviewer'), true);
+});

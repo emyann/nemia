@@ -13,6 +13,7 @@ import { readAnswers, readAsks, readRun, stepsOf } from './store.ts';
 import { branchReader, shippedOf, standingsOf, type BranchReader } from './branches.ts';
 import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, engineWord, harnessBlocked, parentsOf, saidCount, saidIn, spendReader, taskPhases, viewedOnce, waitingOf, type CheckReport } from './views.ts';
 import { checkoutHold, runSlots } from './tick.ts';
+import { isRemoteHarness } from './workflow.ts';
 
 /**
  * What `wf ls` shows for one run — the pure call, over one read of each task.
@@ -169,7 +170,8 @@ export async function decide(engine: Engine, id: string): Promise<{
     const word = record.taskId ? waitingOf(views)(record.taskId) : undefined;
     if (!record.taskId || !word) continue;
     const attempt = views.get(record.taskId)?.state.attempts.at(-1)?.n;
-    waitingOn[name] = harnessWaitLine(word, attempt === undefined ? null : nameFor(record.taskId, attempt));
+    const remote = isRemoteHarness(views.get(record.taskId)?.state.harness) ? { run: id, step: name } : undefined;
+    waitingOn[name] = harnessWaitLine(word, attempt === undefined ? null : nameFor(record.taskId, attempt), remote);
   }
   // What each step's current try was denied, off the same views: a tool it was not allowed, which a job carries on without.
   const denied: Record<string, string> = {};

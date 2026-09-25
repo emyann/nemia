@@ -28,7 +28,7 @@ import { codex } from './runner-codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps, type SeamOps } from './a2a-client.ts';
-import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type RemoteAgent } from './a2a-remote.ts';
+import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from './a2a-remote.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
 import { tickMemoLayer } from './tick-memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
@@ -75,10 +75,17 @@ export type EngineOptions = {
   /**
    * The secret for a remote agent's security scheme, asked on every request that needs one: `scheme` is the scheme's name on
    * the agent's card, `agentUrl` the agent's configured URL (for an agent given by its card, the URL of the interface it is
-   * reached on). `undefined` when there is none, and a task on an agent whose card asks for it is refused before anything is
-   * sent. A secret is sent as a header and written nowhere: not on the task, the journal, the registry or the feed.
+   * reached on), `harness` the name the agent is configured under. `undefined` when there is none, and a task on an agent
+   * whose card asks for it is refused before anything is sent. A secret is sent as a header and written nowhere: not on the
+   * task, the journal, the registry or the feed.
    */
   credentials?: Credentials;
+  /**
+   * What to do when `credentials` gives no secret for a scheme, in words: the end of the refusal a task on that agent is
+   * refused with, `unstartable`. A caller that keeps its secrets somewhere of its own names the place — the variable to
+   * set, say. Absent, the refusal says to give `createEngine` a `credentials` that answers for the scheme.
+   */
+  missingCredential?: MissingCredential;
   /*
    * `maxConcurrent`, the sessions that could be at work at once in each pool, is retired (stage 4c part 2, 2026-09-25):
    * given, `createEngine` refuses it. How many run at once is the layer above's, which files `queued` and `admit`s.
@@ -338,13 +345,13 @@ const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' &
 const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
 
 /** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
-const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string, credentials?: Credentials): Record<string, RunnerOps> =>
+const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string, credentials?: Credentials, missingCredential?: MissingCredential): Record<string, RunnerOps> =>
   Object.fromEntries(Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
     name,
     h === 'claude' ? claudeCodeOps({ root })
       : h === 'claude-bg' ? claudeOps({ root })
       : isSpec(h) ? detachedOps(h, root)
-      : isRemote(h) ? remoteOps(name, h, root, credentials)
+      : isRemote(h) ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
       : promiseOps(h),
   ]));
 
@@ -365,7 +372,10 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
     if (remote) return remote;
   }
   if (options.credentials !== undefined && typeof options.credentials !== 'function') {
-    return '`credentials` is a function, `(scheme, agentUrl) => secret | undefined`: give one, or leave it out.';
+    return '`credentials` is a function, `(scheme, agentUrl, harness) => secret | undefined`: give one, or leave it out.';
+  }
+  if (options.missingCredential !== undefined && typeof options.missingCredential !== 'function') {
+    return '`missingCredential` is a function, `(scheme, agentUrl, harness) => words`: give one, or leave it out.';
   }
   return undefined;
 };
@@ -465,7 +475,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   };
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
   // A remote agent is A2A already, spoken to by the SDK's client over HTTP: counted, and wrapped in no seam of ours.
-  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root, options.credentials))
+  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential))
     .map(([name, ops]): [string, SeamOps] => [name, counted(name, isRemote(harnesses[name]!) ? ops : a2aOps(name, ops, events))]));
   // The engine's one memo of the settled tasks its passes may skip (`tick-memo.ts`): made here, once, so it lives as long as
   // this engine and a new one folds every task on its first pass.
@@ -475,7 +485,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> =>
     Effect.runPromise(e.pipe(Effect.provide(layer)));
 
-  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has. */
+  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has, whose view asks none (`viewOf`). */
   const harnessOf = (state: State) => {
     const asked = state.harness ?? fallback;
     return Object.hasOwn(runners, asked) ? asked : fallback;
@@ -515,6 +525,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // The fold already made, never a second read of the journal: `view` reads it again, which made every view two reads (measured
     // 2026-09-25: `wf ls` read 418 journals for 209 tasks).
     const recorded = Effect.sync(() => viewOfState(state, new Map()));
+    // A harness this engine does not have is asked nothing: the record is all there is, as the pass reads it (`composite`).
+    if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;
     if (!state.settled && (!find || last?.ended === null)) return yield* observed;
     if (!last || (find && last.nativeId)) return yield* recorded;
     const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;
@@ -754,7 +766,9 @@ export { claudeDetached } from './runner-claude-detached.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
-export type { Credentials, RemoteAgent } from './a2a-remote.ts';
+export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.ts';
+/** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
+export { remoteConfigRefusal } from './a2a-remote.ts';
 export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';

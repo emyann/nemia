@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
@@ -20,7 +20,12 @@ import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { waitedMs } from '../lib/factory';
 
+/**
+ * `step` opens that step's inspector as the page loads: the Factory card's gate links here to what the step at it handed on, which the
+ * inspector opens on (its Output tab, for a step that has signed off).
+ */
 export const Route = createFileRoute('/runs/$runId')({
+  validateSearch: (search: Record<string, unknown>): { step?: string } => (typeof search.step === 'string' && search.step ? { step: search.step } : {}),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
   component: RunPage,
   errorComponent: ({ error }) => (
@@ -53,7 +58,12 @@ function RunPage() {
 
 function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
-  const [selected, setSelected] = useState<string | null>(null);
+  const { step: linked } = Route.useSearch();
+  const [selected, setSelected] = useState<string | null>(linked ?? null);
+  // A link to another step of the run while its page is open opens that one.
+  useEffect(() => {
+    if (linked) setSelected(linked);
+  }, [linked]);
   const close = useCallback(() => setSelected(null), []);
   // A step the folder has lost since it was clicked is off the canvas, and its panel goes with it.
   const inspected = run.steps.find((s) => s.name === selected);
@@ -239,13 +249,17 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         </div>
       )}
 
-      {/* At its gate, what it handed on — which is what a person approves — with Approve and Send back beside it. At an ending step's
-          gate, what it would act on instead: it has handed nothing on, and approving is what runs it. */}
+      {/* At its gate, the gate, with what it handed on — which is what a person approves, every field it declared — beside Approve and
+          Send back. At an ending step's gate, what it would act on instead: it has handed nothing on, and approving is what runs it. */}
       {atGate ? (
-        <div className="grid items-start gap-4 lg:grid-cols-2">
-          {acts ? <ActsOn run={run} step={step} /> : handedOn}
-          <Gate runId={runId} step={step.name} back={back} acts={acts} />
-        </div>
+        acts ? (
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <ActsOn run={run} step={step} />
+            <Gate runId={runId} step={step.name} back={back} acts={acts} />
+          </div>
+        ) : (
+          <Gate runId={runId} step={step.name} back={back} closeout={closeout} />
+        )
       ) : (
         handedOn
       )}

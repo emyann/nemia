@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { imagePaths, MACHINE_WORDS, MARKDOWN_AT, outcomeOf, outcomeWord, outputKind } from '../src/lib/outcome.ts';
+import { FOLD_AT, foldsAtGate, imagePaths, MACHINE_WORDS, MARKDOWN_AT, outcomeOf, outcomeWord, outputKind } from '../src/lib/outcome.ts';
 import type { StepAttempts, StepCloseout } from '../src/lib/api.ts';
 
 const none = new Set<string>();
@@ -124,4 +124,16 @@ test("with no statement and no reason — running, not filed, a harness's done �
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: { count: 0, latest: null } }, 'No closeout yet.'), nobody);
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: ended('harness', 'done') }, 'No closeout yet.'), nobody);
   assert.equal(outcomeWord(nobody as never), 'no closeout');
+});
+
+test('beside a gate a list or a table of four entries or more is folded — never the first field, never a text — and one of three is not', () => {
+  assert.equal(FOLD_AT, 4);
+  const files = ['a', 'b', 'c', 'd'].map((path) => ({ path, change: 'one line' }));
+  assert.equal(foldsAtGate(files, false), true, 'a table of four');
+  assert.equal(foldsAtGate(['a', 'b', 'c', 'd', 'e'], false), true, 'a list of five');
+  assert.equal(foldsAtGate(['a', 'b', 'c'], false), false, 'a list of three is read at a glance');
+  assert.equal(foldsAtGate([], false), false, 'an empty one says none');
+  assert.equal(foldsAtGate(files, true), false, 'the first field declared, what the step is saying, is never folded');
+  assert.equal(foldsAtGate('x'.repeat(5000), false), false, 'a text is read whole');
+  assert.equal(foldsAtGate({ a: 1, b: 2, c: 3, d: 4 }, false), false, 'an object is no list');
 });

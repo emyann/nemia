@@ -2185,3 +2185,72 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
   ]);
   assert.match(edgeMarkup(edges[0]!), /stroke-dasharray:5 4/);
 });
+
+const { HandedOn } = await import('../src/components/Closeout.tsx');
+const { Gate } = await import('../src/components/Gate.tsx');
+type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+
+/** A plan's closeout as the api gives it, its fields in the order its schema declares them: files long enough to fold, risks not. */
+const planCloseout: StepCloseout = {
+  outcome: 'done', summary: 'Parse the flag, then store it.', needs: null, artifacts: [], replies: null, missing: [], raw: {},
+  output: {
+    approach: 'Parse `--flag` in cli.ts and store it on the run record.',
+    files: ['cli.ts', 'run.ts', 'store.ts', 'README.md'].map((path) => ({ path, change: `edit ${path}` })),
+    steps: ['Parse it', 'Store it'],
+    risks: ['An old record has no flag'],
+  },
+  schema: {
+    approach: { type: 'string' },
+    files: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, change: { type: 'string' } } } },
+    steps: { type: 'array', items: { type: 'string' } },
+    risks: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+/** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */
+function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): RunDetail {
+  const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
+  const [step] = run.steps;
+  return { ...run, steps: [{ ...step!, approve: closeout ? 'approve review' : null, closeout, tries: [{ ...step!.tries[0]!, closeout }] } as RunDetail['steps'][number]] };
+}
+
+const tabSelected = (html: string): string | undefined => /aria-selected="true"[^>]*>([A-Za-z]+)</.exec(html)?.[1];
+
+test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
+  const inspect = (run: RunDetail) => withClient(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
+  const atGate = inspect(gatedRun(planCloseout));
+  assert.equal(tabSelected(atGate), 'Output');
+  assert.match(atGate, /data-field="approach"/, 'the Output tab is drawn: the approach is there without a press');
+  assert.match(atGate, /data-answer-at="Details"[^>]*>review waits at its gate on you/, 'and says the answer is under Details');
+  const done = inspect(gatedRun({ ...planCloseout, output: {}, schema: {} }, 'succeeded'));
+  assert.equal(tabSelected(done), 'Output');
+  assert.doesNotMatch(inspect({ ...gatedRun(planCloseout, 'succeeded'), waitingOnYou: [] }), /data-answer-at/, 'a step at no gate is not said to wait at one');
+  const running = inspect(gatedRun(null, 'running'));
+  assert.equal(tabSelected(running), 'Details');
+  assert.doesNotMatch(running, /data-closeout/);
+});
+
+test("what a gate approves is its summary and each field declared, a plan's approach first and drawn whole, the long ones folded with nothing drawn in them", () => {
+  const html = renderToStaticMarkup(createElement(HandedOn, { closeout: planCloseout }));
+  assert.ok(html.indexOf('Parse the flag, then store it.') < html.indexOf('data-field="approach"'), 'the summary first');
+  assert.match(html, /<h4[^>]*>approach<\/h4>/, 'the approach under its name, never folded');
+  assert.match(html, /<details data-fold="files"[^>]*><summary[^>]*><span[^>]*>files<\/span> · 4<\/summary><\/details>/, 'four files folded, and nothing drawn in the fold');
+  assert.doesNotMatch(html, /store\.ts/, 'no file of the four is in the markup while the fold is shut');
+  assert.doesNotMatch(html, /data-fold="(steps|risks)"/, 'two steps and one risk are read at a glance');
+  assert.match(html, /data-field="steps"[\s\S]*Store it[\s\S]*data-field="risks"[\s\S]*An old record has no flag/, 'steps then risks, in the order declared');
+  assert.doesNotMatch(html, /Raw/, 'no Raw switch: the statement whole is the Output tab');
+  const summaryAlone = renderToStaticMarkup(createElement(HandedOn, { closeout: { ...planCloseout, output: {}, schema: {} } }));
+  assert.doesNotMatch(summaryAlone, /data-field/, 'a step that declared nothing hands on its summary alone');
+  assert.match(summaryAlone, /Parse the flag, then store it\./);
+});
+
+test("the run page's gate draws what is being approved beside Approve and Send back; the inspector's, whose Output tab has it, does not", () => {
+  const html = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', closeout: planCloseout }));
+  const handed = html.indexOf('aria-label="What plan handed on"');
+  assert.ok(handed >= 0, html);
+  assert.ok(handed < html.indexOf('aria-label="Approve plan"'), 'what it handed on comes before the answer: read, then decided');
+  assert.match(html, /data-field="approach"/);
+  assert.match(html, /lg:grid-cols-2/, 'beside the answer where the page is wide');
+  const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', framed: false }));
+  assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
+});

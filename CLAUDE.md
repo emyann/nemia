@@ -441,6 +441,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own `note.md` and the run learned why from nothing. Write `allowedTools: Edit(**)`; a bare `Write` (no path) is matched,
   and allows a write anywhere. `allowedTools:` refuses a path rule on a file-editing tool that is not `Edit`
   (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A project's allow rules are dropped in a directory Claude Code has not trusted.** A probe repository under `/tmp` with this
+  repository's `.claude/settings.json` copied in ran `claude -p` with every allow ignored — *"Ignoring 26 permissions.allow entries …
+  this workspace has not been trusted"*, on a stderr nobody reads (2.1.282) — and a new folder under a trusted parent was not trusted
+  either. A command on Claude Code's own read-only list (`git merge-base`) still ran, so the probe half-looked right. A run's worktree
+  is trusted as its repository is. Measure a project rule in a checkout Claude Code trusts, or pass the file as `--settings <file>`,
+  and read the job's stderr (learned by the run that gave planners and reviewers git's read-only verbs).
 - **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
   denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
   which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own

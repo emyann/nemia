@@ -245,3 +245,95 @@ export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiti
     metadata: { attempt: clean(a) },
   });
 };
+
+// ─── a remote agent's Task, which the runtime did not make ─────────────────
+
+const REMOTE_STATES: ReadonlyMap<TaskState, Observed> = new Map([
+  [TaskState.TASK_STATE_SUBMITTED, 'working'],
+  [TaskState.TASK_STATE_WORKING, 'working'],
+  [TaskState.TASK_STATE_INPUT_REQUIRED, 'blocked'],
+  [TaskState.TASK_STATE_AUTH_REQUIRED, 'blocked'],
+  [TaskState.TASK_STATE_COMPLETED, 'done'],
+  [TaskState.TASK_STATE_FAILED, 'failed'],
+  [TaskState.TASK_STATE_REJECTED, 'failed'],
+  [TaskState.TASK_STATE_CANCELED, 'stopped'],
+]);
+
+/** What a remote Task in an interrupted state waits for, in A2A's word for it. */
+const WAITS: ReadonlyMap<TaskState, string> = new Map([
+  [TaskState.TASK_STATE_INPUT_REQUIRED, 'input'],
+  [TaskState.TASK_STATE_AUTH_REQUIRED, 'authentication'],
+]);
+
+/**
+ * What a remote agent's Task says of its session, as a sighting. Its id is the session's, and its context the
+ * conversation's (`nativeId`), which a later turn continues. `SUBMITTED` and `WORKING` are at work; `INPUT_REQUIRED` and
+ * `AUTH_REQUIRED` are `blocked`, waiting on the caller for what `waitingFor` names; `COMPLETED` is `done`; `FAILED` and
+ * `REJECTED` are `failed`; `CANCELED` is `stopped`. A state no version of A2A this runtime knows gives, `UNSPECIFIED`
+ * among them, says nothing has ended, and reads as at work: the deadline bounds it.
+ *
+ * The closing statement is the data part of the last Artifact that has one, and only on a Task that `COMPLETED`: an
+ * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`closedOut`).
+ * Its time is `now`, the moment it was read, since the agent's clock is not ours, and the Task was made by this attempt's
+ * message, so nothing on it was said before the attempt began. None, and the end is recorded `stated: false`.
+ */
+export const sightingOfTask = (t: Task, now: number): Sighting => {
+  const state = t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED;
+  const observed = REMOTE_STATES.get(state) ?? 'working';
+  const waiting = WAITS.get(state);
+  const payload = observed === 'done' ? statementOf(t.artifacts) : undefined;
+  return {
+    sessionId: t.id, state: observed,
+    ...(t.contextId ? { nativeId: t.contextId } : {}),
+    ...(waiting ? { waitingFor: waiting } : {}),
+    ...(payload !== undefined ? { closeout: { payload, at: now } } : {}),
+  };
+};
+
+/** The data part of the last Artifact that carries one, or `undefined`. */
+const statementOf = (artifacts: readonly Artifact[]): unknown => {
+  for (const a of [...artifacts].reverse()) {
+    const data = [...a.parts].reverse().find((p) => p.content?.$case === 'data');
+    if (data?.content?.$case === 'data') return data.content.value;
+  }
+  return undefined;
+};
+
+/**
+ * A spawn, as the message a remote agent is sent: the brief its one text part, and in the context of the session it
+ * continues, `resumeFrom`, when it continues one. No `taskId`: under A2A a message that names a task continues it, and the
+ * agent names a new one itself. The closing statement's schema rides in the metadata under the runtime's extension, for an
+ * agent that reads it; the message is not marked with the extension (`messageOf`'s spawn by name), and carries nothing of
+ * the local harnesses' (`cwd`, `config`), which a remote agent has no use for.
+ */
+export const remoteMessageOf = (r: SpawnRequest, messageId: string): Message => ({
+  messageId, contextId: r.resumeFrom ?? '', taskId: '', role: Role.ROLE_USER,
+  parts: [textPart(r.brief)],
+  metadata: r.closeoutSchema === undefined ? undefined : { [RUNTIME_EXTENSION]: { closeoutSchema: r.closeoutSchema } },
+  extensions: [], referenceTaskIds: [],
+});
+
+/** Words for a remote Task that waits on its caller, as A2A's follow-up: a user message on that Task, in its context. */
+export const remoteFollowUpOf = (taskId: string, contextId: string, text: string, messageId: string): Message => ({
+  messageId, contextId, taskId, role: Role.ROLE_USER,
+  parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
+});
+
+/** A part as a line of text: its words, its data as JSON, or what a file part is called. */
+const partText = (p: Part): string => {
+  const c = p.content;
+  if (c?.$case === 'text') return c.value;
+  if (c?.$case === 'data') return JSON.stringify(c.value);
+  return `(${c?.$case ?? 'empty'} part${p.filename ? ` ${p.filename}` : ''})`;
+};
+
+/** What a remote Task holds, as text a person reads: its messages in order, its state and status words, and its Artifacts. */
+export const logsOfTask = (t: Task): string => {
+  const said = (m: Message) => `${m.role === Role.ROLE_AGENT ? 'agent' : 'user'}: ${m.parts.map(partText).join(' ')}`;
+  const state = TaskState[t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED].replace(/^TASK_STATE_/, '');
+  return [
+    ...t.history.map(said),
+    `${state}${t.status?.message ? ` — ${t.status.message.parts.map(partText).join(' ')}` : ''}`,
+    ...t.artifacts.map((a) => `artifact ${a.name || a.artifactId}: ${a.parts.map(partText).join(' ')}`),
+  ].join('\n');
+};

@@ -8,6 +8,9 @@
  * and the only verbs asked directly must be the exemptions. The same driver behind the old shape, where the seam spread
  * the driver's own verbs beside its three, is reported by name, and so is the transcript part 3 left direct: the check
  * refuses what parts 3 and 4 moved.
+ *
+ * A remote A2A agent (stage 6) is no driver behind `HarnessHandler`: its verbs are A2A calls over HTTP to another party's
+ * agent, and `remote-agent.test.ts` proves each one reaches it by that agent's own count of the methods it answered.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

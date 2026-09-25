@@ -46,7 +46,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
-  or `$WF_ARTIFACTS` in a run). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
+  or `WF_ARTIFACTS=<your files directory> npm run e2e` in a run, whose PNGs are the screenshots the ui reviewer reads). A
+  round's check builds but runs no e2e: the shipped lines run it only where no `WF_BASE_REF` is set, so once, on the merged
+  tree, in the shipper's hands (or a person's merging a `ui` run), and your own run is the only e2e the change meets before
+  the merge (since 2026-09-25). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
   export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
   `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
   page, so a page deleted by mistake fails `npm test` (delete its line too when you mean it). The pages are
@@ -78,6 +81,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
+  every check it executes of a git run; the ship has no `check:` and its shipper runs `workChecks`' line by hand, mid-merge, with
+  nothing set, so `WF_STEP=ship` never occurs. The shipped lines read what was touched and hold the e2e for the merged tree on that
+  one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
+  runs each both ways; learned by the run that took the e2e out of the rounds).
 - **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
   `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
   the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'

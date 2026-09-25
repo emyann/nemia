@@ -8,12 +8,16 @@ something worth another round, three rounds at most.
 implement ⇄ review
 ```
 
-`implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`, uses the look
-skill (`.claude/skills/look/SKILL.md`) on every page it changed before it signs off, and declares the
+`implement` carries `dev-build`'s check: `npm test && npm run typecheck && npm run build` every round, and
+`npm run e2e` only where no `WF_BASE_REF` is set, which a round's check never is. The screenshots review reads
+are the implementer's own run of the e2e, into the directory the run made for its files, again after its last
+commit each round; its brief says so, and the check no longer takes them. This team has no ship, so the check
+the run executes never runs the e2e: whoever merges runs the line by hand, on the merged tree, where it does.
+`implement` uses the look skill (`.claude/skills/look/SKILL.md`) on every page it changed before it signs off, and declares the
 screenshots it read and the pages they show (`implement.schema.json`). `review` runs on Claude with
 `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it has no tool that
 writes and a command `.claude/settings.json` does not allow is denied without a prompt; and with `disallowedTools:
-Bash(npm run build), Bash(npm run e2e)`, the two commands the settings allow for implement's check, so it
+Bash(npm run build), Bash(npm run e2e)`, the two commands the settings allow for implement's sake, so it
 cannot run those two. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach the
 build and the e2e by other names (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), and
 narrowing those allows is the settings' to do. `implement` is denied `SendMessage`,

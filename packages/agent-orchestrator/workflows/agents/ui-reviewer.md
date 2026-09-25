@@ -13,7 +13,7 @@ context: 200k
 # are not on this line. Skill is, so the step can invoke the look skill; the body names its file too, for Read.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
-# The settings allow `npm run build` and `npm run e2e` too, for implement's check, and both write into the workspace — the
+# The settings allow `npm run build` and `npm run e2e` too, for implement's sake, and both write into the workspace — the
 # route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow — those two spellings
 # only. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach both, as `npx turbo run test build`
 # and `node --test apps/web/test/e2e/run.ts`, and no deny closes an allow that runs any task or any file (`node --test`

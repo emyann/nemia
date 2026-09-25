@@ -12,7 +12,7 @@ context: 200k
 # .claude/settings.json does not allow is denied without a prompt. A plan reads the repository and writes nothing.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
-# The settings allow `npm run build` and `npm run e2e` for implement's check, and both write into the workspace. Denied here
+# The settings allow `npm run build` and `npm run e2e` for implement's sake, and both write into the workspace. Denied here
 # by name, as on review (`--disallowedTools`) — those two spellings only; workflows/dev/README.md says which allows still reach them.
 disallowedTools: Bash(npm run build), Bash(npm run e2e)
 # The plan travels as this step's closeout — `approach`, `files`, `steps` and `risks`, in the shape plan.schema.json declares —

@@ -742,8 +742,9 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  * when it does nothing. Pure: the tick acts, and writes what it did on the step's record (`landed`), once for each try. The checkout is read
  * through `merge` (`mergeState`: a handful of git calls in a person's own checkout), and only once a landing can be due: never while the
  * step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — MERGE_HEAD is there,
- * read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing staged,
- * which lands nothing and is never `landed`, costs a pass one `stat` of the checkout and no git. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
+ * read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing staged
+ * is recorded as landing nothing on the first pass that reads it settled, with one `stat` of the checkout and no git, and the merges a
+ * person stages there after it are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
  * does the same, so a merge staged by an ending is never left staged once nothing of it runs.
  *
  * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on a merge that is not this run's
@@ -755,7 +756,7 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  *   waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
  *   step gave no message to commit it with.
- * - **record**, with no merge of the run's to act on: the step signed off done having staged none (nothing is checked or committed); the
+ * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having staged none (nothing is checked or committed); the
  *   check passed and the result is on the checkout's HEAD already (it landed there as that commit); or the check ended and the merge it
  *   judged is no longer staged.
  */
@@ -769,7 +770,13 @@ export function landingDue(
   if (busy(phaseOf(record.taskId))) return undefined;
   const check = record.check ? phaseOf(record.check.taskId) : undefined;
   if (check && busy(check)) return undefined;
-  if (own !== 'checking' && !staged) return undefined;
+  // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget — with nothing staged: written down at
+  // once, with no git, so a merge of the run's branch a person stages later in their own checkout — to resolve what stopped it by hand, or
+  // a trial merge — is theirs, and no pass takes it back. Only an ending the engine has settled (`endingStopped`'s words): a task it does not
+  // know this pass reads `running`, and waits.
+  const ended = SETTLED.has(phaseOf(record.taskId)) && (TRIED_FROM.has(own) || own === 'budget exhausted');
+  const nothing = ended ? { act: 'record' as const, landed: { untouched: `${step.name} ended ${own}, and nothing of it was staged` } } : undefined;
+  if (own !== 'checking' && !staged) return nothing;
   const { merging, conflicted, missing, head } = merge();
   if (merging === 'other') return undefined;
   const ours = merging === 'ours';
@@ -777,7 +784,7 @@ export function landingDue(
   const end = (why: string): Landing | undefined => (ours ? { act: 'abort', why } : { act: 'record', landed: { aborted: why } });
   // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget: the step's own word stands, and what it
   // left staged is taken back.
-  if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : undefined;
+  if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing;
   if (run.cancelledAt) return end('the run was called off before its merge was committed');
   if (ours && conflicted) return end('the merge it staged has conflicts');
   if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`);
@@ -812,7 +819,9 @@ export const landingOpen = (step: Workflow, run: Run, own: StepStatus, phaseOf: 
  * aborted (`retryLines`).
  */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
-  ('commit' in landed ? `the run committed its merge onto ${run.branch} as ${landed.commit.slice(0, 7)}` : `nothing landed on ${run.branch}: ${landed.aborted}`);
+  ('commit' in landed ? `the run committed its merge onto ${run.branch} as ${landed.commit.slice(0, 7)}`
+    : 'aborted' in landed ? `nothing landed on ${run.branch}: ${landed.aborted}`
+    : `${landed.untouched}: the run left the checkout as it found it`);
 
 /** The longest `landedWords` a `wf ls` line prints: the reason for an abort can be git's refusal, whole (`commitMerge`). */
 const LANDED_CAP = 160;
@@ -1830,8 +1839,12 @@ export type StepRecord = {
   landed?: Landed;
 };
 
-/** What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to commit — and why. */
-export type Landed = { commit: string } | { aborted: string };
+/**
+ * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
+ * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that
+ * what a person stages in the checkout after it is theirs.
+ */
+export type Landed = { commit: string } | { aborted: string } | { untouched: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.
@@ -3938,9 +3951,9 @@ export function listing(
     // what its current try's sessions were denied, last: a tool the step was not allowed, which it carried on without.
     const taskId = run.steps[step.name]?.taskId;
     // What the run did with the merge of an ending that lands on its check, once it has: the commit it made, or why it made none. A new try
-    // clears it (`landed`).
+    // clears it (`landed`). An ending the run found nothing staged of is said as it stopped, and nothing more: the run did nothing.
     const landed = run.steps[step.name]?.landed;
-    const landing = landed ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
+    const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
     const note = [tried, gate, landing, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : ''].filter(Boolean).join(' · ');
     return { ...row, ...(note ? { note } : {}), ...cost };
   });

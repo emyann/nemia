@@ -930,6 +930,51 @@ test("a check that refuses leaves the checkout clean: the abort the ending's pro
   assert.deepEqual([decision.outcome, decision.stuck, decision.branches], ['blocked', ['ship'], [branch]]);
 });
 
+test("REFUSED at shipped defaults: an ending that stopped on its own word is written down once — its merge left staged is taken back, and a merge a person stages after it is theirs", async () => {
+  // Blocked, its merge left staged: the pass takes it back.
+  {
+    const { repo, id, branch, e, settle, base } = await atTheGate();
+    await approve(e, id, 'ship');
+    await advance(e, readRun(id));
+    git(repo, 'merge', '--no-ff', '--no-commit', branch);
+    settle(`${id}-ship`, 'succeeded', BLOCKED);
+    const pass = await advance(e, readRun(id));
+    assert.equal(mergeHead(repo), false);
+    assert.equal(git(repo, 'status', '--porcelain'), '');
+    assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
+    assert.deepEqual(readRun(id).steps.ship!.landed, { aborted: 'ship ended blocked with its merge staged' });
+    assert.ok(pass.notes.includes('ship: ship ended blocked with its merge staged, so the run aborted its merge; nothing landed on main'), pass.notes.join('\n'));
+  }
+  // Blocked on a clean checkout, and a pass reads it: then the person resolves what stopped it by hand, in their own checkout — or a
+  // supervisor merges it on trial there. No pass after takes their merge back, and `wf rm` does not wait on it.
+  const blockedClean = async () => {
+    const at = await atTheGate();
+    await approve(at.e, at.id, 'ship');
+    await advance(at.e, readRun(at.id));
+    at.settle(`${at.id}-ship`, 'succeeded', BLOCKED);
+    const pass = await advance(at.e, readRun(at.id));
+    git(at.repo, 'merge', '--no-ff', '--no-commit', at.branch);
+    return { ...at, pass };
+  };
+  {
+    const { repo, id, e, base, pass } = await blockedClean();
+    assert.deepEqual(readRun(id).steps.ship!.landed, { untouched: 'ship ended blocked, and nothing of it was staged' });
+    assert.ok(pass.notes.includes('ship: ship ended blocked, and nothing of it was staged: the run left the checkout as it found it'), pass.notes.join('\n'));
+    // `wf ls` says the step as it stopped, and nothing of a landing the run did not make.
+    assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.note, undefined);
+    for (let i = 0; i < 2; i++) await advance(e, readRun(id));
+    assert.equal(mergeHead(repo), true, "the person's merge is still staged");
+    assert.notEqual(git(repo, 'status', '--porcelain'), '');
+    assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
+  }
+  {
+    const { repo, id, e } = await blockedClean();
+    const forgot = await forget(e, id);
+    assert.notEqual(forgot.kind, 'refused', forgot.kind === 'refused' ? forgot.refusal : '');
+    assert.equal(mergeHead(repo), true, "and the run is forgotten with the person's merge left as it is");
+  }
+});
+
 /**
  * The incident, as the record had it: `implement ⇄ review → ship`, implement verified, review done with `again: false`, ship approved at
  * try 1, filed in the repository's own checkout, and signed off blocked — the work does not hold on the base branch as it is now.

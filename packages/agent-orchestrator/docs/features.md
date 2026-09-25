@@ -4388,6 +4388,11 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   with `ls-files --unmerged`, which takes no index lock (review round 1). A merge whose heads are not this run's result branches is never touched; this run's is committed only on an exit 0 on
   record and aborted on anything else; a commit already on HEAD is recorded as landed, and a merge a person aborted by hand is recorded
   with the check's words. An abort git refuses is tried again on the next pass.
+- **A merge a person stages after the ending is theirs.** An ending that stopped on its own word — blocked, unsigned, failed, stopped,
+  denied, at its budget — with nothing staged is written down on the first pass that reads its task settled (`landed: {untouched}`, no
+  git), and `wf ls` says nothing of a landing the run did not make. Left unwritten, the landing stayed owed for good: a person's
+  `git merge --no-commit` of the run's branch to resolve the conflict by hand read as the run's, and the next pass aborted it — their
+  resolution with it — while `wf rm` refused the run on it (review round 3).
 - **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/test/decision.test.ts` asserts the bare
   command for an ending whose check did not finish.
 - **Tests that refuse**, each proven against a mutant: a commit on any settled check, another merge touched, no abort on cancel, a

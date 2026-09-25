@@ -4514,7 +4514,8 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
     'called off before its check was filed');
   for (const own of ['blocked', 'unsigned', 'failed', 'stopped', 'denied', 'budget exhausted'] as const) {
     assert.deepEqual(due(atLanding(), own, own === 'failed' || own === 'stopped' ? own : 'succeeded', undefined, STAGED), abort(`ship ended ${own} with its merge staged`), own);
-    assert.equal(due(atLanding(), own, 'succeeded', undefined, NOT_STAGED), undefined, `${own}, with nothing staged: its own word stands`);
+    assert.deepEqual(due(atLanding(), own, 'succeeded', undefined, NOT_STAGED), { act: 'record', landed: { untouched: `ship ended ${own}, and nothing of it was staged` } },
+      `${own}, with nothing staged: its own word stands, and nothing is taken back`);
   }
   assert.deepEqual(due(atLanding({ hold: { at: '2026-01-01T01:00:00Z', until: ['r-0'] } }), 'checking', 'succeeded', undefined, STAGED), abort('the run was held before its check was filed'));
 });
@@ -4529,9 +4530,13 @@ test('REFUSED: landingDue reads no git where no landing can be due — its sessi
     assert.equal(read(atLanding(), 'running', busy, undefined, true), undefined, `ship ${busy}`);
     assert.equal(read(atLanding(), 'checking', 'succeeded', busy, true), undefined, `its check ${busy}: twenty minutes of passes`);
   }
-  // Never landed, so without this every pass would read git in the person's checkout for as long as the run is kept.
+  // Written down on the first pass, with no git: a merge of the run's branch a person stages in the checkout after it is theirs, and no
+  // pass reads git in the person's checkout for as long as the run is kept.
   for (const own of ['blocked', 'unsigned', 'failed', 'stopped', 'denied', 'budget exhausted'] as const)
-    assert.equal(read(atLanding(), own, own === 'failed' || own === 'stopped' ? own : 'succeeded', undefined, false), undefined, own);
+    assert.deepEqual(read(atLanding(), own, own === 'failed' || own === 'stopped' ? own : 'succeeded', undefined, false),
+      { act: 'record', landed: { untouched: `ship ended ${own}, and nothing of it was staged` } }, own);
+  // And not of a task the engine does not know this pass: `running`, its own word, is no ending, and is never written down as one.
+  assert.equal(read(atLanding(), 'running', 'unknown', undefined, false), undefined, 'a task the engine does not know');
   assert.equal(read(atLanding({}, { landed: { commit: 'merged0' } }), 'verified', 'succeeded', 'succeeded', true), undefined, 'once landed');
   assert.throws(() => read(atLanding(), 'blocked', 'succeeded', undefined, true), /the checkout was read/, 'a merge staged is read, to be taken back');
   assert.throws(() => read(atLanding(), 'checking', 'succeeded', 'succeeded', false), /the checkout was read/, 'a settled check is read, to land');

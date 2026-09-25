@@ -566,7 +566,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the check; a deny is a prefix, so a merge without `--no-commit` still commits, and codex, which takes no deny list, is refused a
   landing at load. Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
   nothing, and its offer is `wf retry <run> ship`, never `--recheck`: the merge it checked is gone (learned by the run that moved
-  the ship's check into the run).
+  the ship's check into the run). A landing owed is closed on every way the ending can end, not only on the ways that act: an ending
+  that stopped blocked with nothing staged was never written down, so a merge a person staged there after it, by hand or on trial,
+  read as the run's, and the next pass aborted it. It is written `landed: {untouched}` on the first pass that reads it settled (same
+  run, round 3).
 
 ## Rules the code keeps
 

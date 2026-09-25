@@ -1542,7 +1542,10 @@ dropped. **Nothing in the packages knows what shipping means.**
   and a merge staged or a check to act on — and never takes its index lock (`ls-files --unmerged`, not `git diff`). A merge that is not this run's — its heads are not the result branches — is never touched. This
   run's is committed only on the word of an exit 0 already recorded, and aborted otherwise; after a restart, a commit
   already on the base branch is recorded as landed, and a merge a person aborted by hand is recorded with the
-  check's words. A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check
+  check's words. An ending that stopped on its own word — blocked, unsigned, failed — with nothing staged is written
+  down on the first pass that reads it settled (`landed: {untouched}`, with no git), so a merge a person stages there
+  after it, to resolve what stopped it or on trial, is theirs: no pass takes it back, and `wf rm` does not wait on it.
+  A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check
   and commit itself, as before.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An

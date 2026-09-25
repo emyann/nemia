@@ -4989,6 +4989,18 @@ held open: `wf approve` its close, and the words a person sends back with it (`-
 and rounds as attempts of one task — which may fold into part 5. Its trap is known: `input-required` is a phase four places
 compare exactly, so it goes beside `needs-human` on every surface, never into it (CLAUDE.md).
 
+## 12. An agent that carries its own skills, in Claude Code's own format
+
+**Measured** 2026-09-25, nothing built. [`docs/spike-2026-09-25-agents-skills.md`](../../../docs/spike-2026-09-25-agents-skills.md)
+holds the findings that the design depends on, measured on Claude Code 2.1.282:
+
+- An agent's body is appended with `--append-system-prompt-file`. `--agent` and `--system-prompt` replace the default prompt.
+- Skills are served as one `--plugin-dir`, namespaced and invocable in `dontAsk`. An agent's `skills:` preloads nothing on the main thread.
+- The fence is `--permission-mode` and `--tools`, whatever the agent file says.
+- The runtime's flags and `--resume` keep working, the appended body included.
+- The cost of each piece.
+- For an agent that does not code: replace mode, and an output style as a middle ground.
+
 ## Engine-side work
 
 Not agent-orchestrator features, listed so nothing is lost:

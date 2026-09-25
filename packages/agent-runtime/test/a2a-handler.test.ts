@@ -290,7 +290,7 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
   const t = await h.handler.sendMessage(asked, ctx);
   assert.deepEqual(h.acted(), [['spawn', {
     name: 'ae/t-1/1', brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' },
-    closeoutSchema: undefined, budgetUsd: undefined, resumeFrom: undefined,
+    closeoutSchema: undefined, resumeFrom: undefined,
   }]]);
   assert.ok('status' in t);
   assert.equal(t.id, 'ae/t-1/1');

@@ -51,12 +51,20 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  *
  * The ui reviewers' bodies moved when the e2e left every round's check for the merged tree (2026-09-25): the screenshots they read are
  * implement's own run of the e2e, no longer its check's. The implementer, ui implementer, shipper and build ships said so in the same change.
+ *
+ * Every implementer and reviewer was told that a job's turn cannot end to wait for a process in the background (2026-09-25,
+ * `[structured-output-enforce]`), the lesson the owner gave at a plan gate. So each reviewer's body is on the list now, beside the
+ * implementers already there.
+ *
+ * The four ship bodies moved again when the run began landing an ending's merge on the ending's own check (2026-09-25): the shipper
+ * stages the merge and signs off its message, and a build folder's note speaks of the check the run executes. Both ui folders' ships,
+ * added on main meanwhile as dev-build's, came in with that body when the run merged main.
  */
 const BODIES_REWORDED: string[] = [
-  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
+  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),
   'workflows/ui/implement',
-  'packages/agent-orchestrator/workflows/ui/implement',
   'workflows/ui/review',
+  'packages/agent-orchestrator/workflows/ui/implement',
   'packages/agent-orchestrator/workflows/ui/review',
   'workflows/supervisor/supervise',
 ];
@@ -105,11 +113,20 @@ const STEPS_ADDED: Record<string, string> = {
  * written by its role: `background: true`, `permissionMode: dontAsk` and an `allowedTools:` list, read here from its file rather than copied.
  * The agents that build and ship — implementer, ui-implementer, shipper — say `permissionMode: auto`, the engine's default, so the mode
  * of every role is written where the role is. Each step naming one of them gains that key and nothing else.
+ *
+ * Each dev folder's ship gained a `check:` and the shipper's `output:` when the run began landing the ending's merge on its check: the
+ * run executes the folder's check on the merge the step stages, and commits it with the `message` the step's closeout gives. The check is
+ * the folder's implement's, read here; the schema is the shipper's file, read here too.
  */
 const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allowedTools!;
+const SHIPPER_OUTPUT = { file: 'shipper.schema.json', schema: JSON.parse(fs.readFileSync(path.join(REPO, 'workflows', 'agents', 'shipper.schema.json'), 'utf8')) };
+const checkOf = (folder: string) => loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'implement')!.check!;
 const KEYS_ADDED: Record<string, Record<string, unknown>> = {
   'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allowedTools: SUPERVISOR_ALLOW },
-  ...Object.fromEntries(Object.entries(AGENTS).filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at]) => [at, { permissionMode: 'auto' }])),
+  ...Object.fromEntries(Object.entries(AGENTS).filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at, agent]) => {
+    const folder = at.slice('workflows/'.length, at.lastIndexOf('/'));
+    return [at, agent === 'shipper' ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT } : { permissionMode: 'auto' }];
+  })),
 };
 
 /**

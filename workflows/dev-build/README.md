@@ -18,9 +18,9 @@ against a seeded store and visits every page in a light and a dark theme. `revie
 is denied both by name by its `disallowedTools:` line: both write into the workspace. By those names only — `dev`'s
 README says which of the settings' allows still reach them.
 
-`ship` is `dev`'s, with a note on why this folder's check matters there: the trial merge is run against the
-whole line, the e2e included, since the merged tree is the first tree either has seen and no round's check ran
-the e2e at all. `dev`'s README says what the step is.
+`ship` is `dev`'s, with this folder's check as its `check:`: the run executes implement's line on the merge
+ship stages, the e2e included, since the merged tree is the first tree either branch has built and no round's
+check ran the e2e at all. `dev`'s README says what the step is.
 
 ```bash
 wf start "<what to do>" --workflows workflows/dev-build

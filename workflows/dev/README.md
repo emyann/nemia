@@ -19,10 +19,10 @@ words rather than skipping the build. The condition is written in the `check:` l
 the step could edit, and `packages/agent-orchestrator/test/web-check.test.ts` runs it against real repositories.
 
 A round's check runs no e2e. It was 3-4 of a round's six minutes and seldom changed a review's verdict, so the
-line runs `npm run e2e` only where no `WF_BASE_REF` is set — in the shipper's hands, on the merged tree — and in a
+line runs `npm run e2e` only where no `WF_BASE_REF` is set — in ship's check, on the merged tree — and in a
 round says `wf check: no e2e in a round's check` instead. The key is that variable, not a step's name or a key on
-`ship.md`: the run sets it on every check it executes of a git run, and never executes the ship's (the shipper
-runs the line by hand, below), so anything that runs the line without the run's environment runs the whole of it.
+`ship.md`: the run sets it on the check of every step in a worktree and never on one in the repository's checkout
+(the ship's, below), so anything that runs the line without the run's environment runs the whole of it.
 The implementer runs the e2e itself, into its files directory, when the work changes a page.
 
 `review` runs on Claude (opus), fenced by machinery rather than
@@ -40,14 +40,17 @@ continued with the findings, then a new review. After the third round, a person 
 
 `ship` is the run's ending, and the run stops at it: `gate: true`, so nothing of it is filed until a person
 says `wf approve <run> ship`. It runs in the repository's own checkout (`workspace: main`) rather than a
-worktree, since the base branch is checked out there, and it does by machinery what a person did by hand —
-trial merge `git merge --no-ff --no-commit`, this folder's check, `git commit`, and `git merge --abort` on any
-failure, with what happened in its closeout. It carries implement's denies and no `check:` of its own: the run
-would execute one in a person's checkout, and what this step is judged by is the check it runs itself. It runs
-implement's line by hand, mid-merge, where no `WF_BASE_REF` is set: there the line reads what the merge brings
-(`git diff --name-only HEAD...MERGE_HEAD`), so a merge that brings the web app is built and visited on the
-merged tree — the one time the e2e runs in the run's check — and with neither a base nor a merge in progress it
-fails loudly.
+worktree, since the base branch is checked out there. The shipper stages the merge — `git merge --no-ff
+--no-commit` — and signs off with the commit message as its closeout (`shipper.schema.json`); the run does the
+rest, as it does for any step: it executes ship's `check:`, implement's line, on the merged tree in that
+checkout — a check task, with its deadline and at low priority, its log and stderr where every check's go — and
+commits the merge with the shipper's message on exit 0, or `git merge --abort`s it on anything else, a check
+that did not finish included. Only the gate lets the step be filed, so only a person's approval lets anything
+merge. The check runs where no `WF_BASE_REF` is set: there the line reads what the merge brings (`git diff
+--name-only HEAD...MERGE_HEAD`), so a merge that brings the web app is built and visited on the merged tree —
+the one time the e2e runs in the run's checks — and with neither a base nor a merge in progress it fails
+loudly. A try of ship after a check that did not finish is `wf retry <run> ship`, which merges again:
+`--recheck` has nothing staged to judge.
 
 Each step names who does it — `implementer`, `reviewer`, `shipper`, in `workflows/agents/` — and keeps only its
 wiring: the keys above that are a role's (harness, model, tools, denies, the schema) are the agent's, and the step

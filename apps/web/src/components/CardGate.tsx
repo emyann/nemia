@@ -1,7 +1,8 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
-import { backName, gateCardLine, takenLine, type GateAsk } from '../lib/gate';
+import { backName, gateCardLine, readLink, takenLine, type GateAsk } from '../lib/gate';
 import { cn } from '../lib/utils';
+import { RouteLink } from './AgentParts';
 import { BUTTON, Refusal, TEXTAREA, useAsk } from './Decide';
 import { SECONDARY, useApprove } from './Gate';
 
@@ -36,6 +37,7 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
   const [to, setTo] = useState(gate.back[0] ?? gate.step);
   const sendBack = useAsk(runId, gate.step, () => undefined);
   const line = gateCardLine(gate);
+  const read = readLink(gate);
 
   return (
     // The stop keeps a press on the gate, or in its popovers, from toggling the card, which listens to clicks anywhere on it.
@@ -83,6 +85,16 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
             )}
           </Answer>
         )}
+        {/* What is being approved, a page away: a card has no room for a plan. */}
+        <RouteLink
+          to="/runs/$runId"
+          params={{ runId }}
+          {...('step' in read ? { search: { step: read.step } } : { hash: read.hash })}
+          data-read={gate.step}
+          className="ml-auto min-w-0 truncate rounded-sm text-[11px] font-medium text-neutral-700 underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:text-neutral-300 dark:decoration-neutral-500 dark:hover:decoration-neutral-300"
+        >
+          {read.words}
+        </RouteLink>
       </div>
     </div>
   );

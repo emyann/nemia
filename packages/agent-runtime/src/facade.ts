@@ -82,7 +82,7 @@ export type TaskSpec = {
   resumeFrom?: string;
   /**
    * How the harness starts the session — its model, permission mode, tools, effort, MCP servers, context window, Remote
-   * Control and worktree (`HarnessArgs`, each key described there). The adapter's configuration: carried on the task,
+   * Control, worktree and spend cap (`HarnessArgs`, each key described there). The adapter's configuration: carried on the task,
    * handed to the runner at every spawn, and read by nothing else — `decide` and the loop never open it. Refused, before
    * anything is journalled, when a key is no harness argument, a value is one no harness could use, or its harness does
    * not take it; and a harness argument filed beside `config` rather than in it is refused, naming where it goes.
@@ -97,14 +97,6 @@ export type TaskSpec = {
    * engine: its shape is yours.
    */
   closeoutSchema?: object;
-  /**
-   * The most one attempt's session may spend, in dollars — `0.25`, `5`. Given to Claude Code as `--max-budget-usd`:
-   * `claude -p` ends the session once a response takes it past the cap, and the attempt ends `failed`, reason `budget`,
-   * with what it cost — and the task settles `failed`, saying so. File the task again with a larger one to run it again.
-   * The harness counts one session's spend. Refused unless a positive number, and on a harness that keeps no cap:
-   * `claude`, whose `--bg` sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
-   */
-  budgetUsd?: number;
   /**
    * Which waiting task a free slot goes to first, when a pool is at its ceiling — `1`, `-1`, `0.5`. Higher first, and
    * filing order within one; absent is 0. Read by a pass when it orders the board, and nowhere else: no runner is told it,
@@ -151,9 +143,9 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
-   * a `cwd` that is not absolute; a `budgetUsd` that is not dollars above 0, or one its harness would not keep
-   * (`claude`, `codex`); a `priority` that is not a finite number. And in its `config`: a key that is no harness
-   * argument, or one filed beside `config` instead; an empty model or effort; a `tools` that is not a list of names; a
+   * a `cwd` that is not absolute; a `priority` that is not a finite number. And in its `config`: a key that is no harness
+   * argument, or one filed beside `config` instead — `budgetUsd` among them, the spend cap the runtime kept as its own
+   * until stage 4b; a `budgetUsd` that is not dollars above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
    * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
    * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
    * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
@@ -225,17 +217,20 @@ export type Engine = {
   say(taskId: string, text: string): Promise<Said>;
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
-   * `text`, and `budgetUsd` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
+   * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
    * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
-   * brief, under `budgetUsd` if given and the task's own if not. Nothing is sent to any session: none is running.
+   * brief, with `config` laid over the task's own if given. A turn gives its own spend cap and nothing else
+   * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
+   * sent to any session: none is running.
    *
-   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — for an empty `text`; a `budgetUsd`
-   * that is not dollars above 0, or one its harness would not keep (as `file` refuses one); a task this engine has no
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — for an empty `text`; a `config`
+   * with any key but `budgetUsd`, or a `budgetUsd` that is not dollars above 0, or one its harness would not keep (as
+   * `file` refuses one); a `budgetUsd` given beside `config` rather than in it, naming where it goes; a task this engine has no
    * record of; one not filed to be held open; one settled, closed or asked to stop; and one not waiting — an attempt
    * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
    * Two answers journalled before the next turn begins are told to it both, in order.
    */
-  answer(taskId: string, text: string, options?: { budgetUsd?: number }): Promise<Input>;
+  answer(taskId: string, text: string, options?: { config?: HarnessArgs }): Promise<Input>;
   /**
    * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
    * `closed`, by the next tick. Refused — an `Error` whose `exitCode` is 2, nothing journalled — as `answer` is, for a task
@@ -537,15 +532,20 @@ export function createEngine(options: EngineOptions = {}): Engine {
       }
       return said;
     },
-    answer: async (taskId, text, { budgetUsd } = {}) => {
+    answer: async (taskId, text, options = {}) => {
       const refuse = (why: string) => Object.assign(new Error(`answer: ${why}`), { exitCode: 2 });
+      // Asked of the options as handed in, untyped: a caller built before stage 4b still sends the cap as its own option.
+      if (Object.hasOwn(options, 'budgetUsd')) {
+        throw refuse('`budgetUsd` is the harness\'s configuration: give it under `config`, as `answer(id, text, { config: { budgetUsd: … } })`.');
+      }
+      const { config } = options;
       const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
       const state = events.length ? fold(taskId, events) : undefined;
-      // The budget is asked of the task's harness as a filing's is: `claude --bg` keeps none, and `codex` has none.
-      const refused = answerRefusalOf(taskId, state, text, budgetUsd)
-        ?? (state && budgetUsd !== undefined ? harnessRefusalOf({ ...filingOf(state, budgetUsd), harness: harnessOf(state) }, harnesses) : undefined);
+      // The turn's configuration is asked of the task's harness as a filing's is: `claude --bg` keeps no cap, and `codex` has none.
+      const refused = answerRefusalOf(taskId, state, text, config)
+        ?? (state && config ? harnessRefusalOf({ ...filingOf(state, config), harness: harnessOf(state) }, harnesses) : undefined);
       if (refused) throw refuse(refused);
-      return go(answer(taskId, text, budgetUsd).pipe(Effect.catchTag('InputRefused', (e) => Effect.fail(refuse(e.message)))));
+      return go(answer(taskId, text, config).pipe(Effect.catchTag('InputRefused', (e) => Effect.fail(refuse(e.message)))));
     },
     close: async (taskId) => {
       const refuse = (why: string) => Object.assign(new Error(`close: ${why}`), { exitCode: 2 });
@@ -623,7 +623,7 @@ export type { HarnessSpec } from './runner-detached.ts';
 export { denialText, nameFor } from './domain.ts';
 export { retiredKeyRefusal } from './engine.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
-export { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
+export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';

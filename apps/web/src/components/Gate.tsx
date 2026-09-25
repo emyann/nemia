@@ -1,10 +1,10 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { approveStep, decisionQuery, type RetryMode, type RunDetail, type StepApproval, type StepGate } from '../lib/api';
+import { approveStep, decisionQuery, type RetryMode, type RunDetail, type StepApproval, type StepCloseout, type StepGate } from '../lib/api';
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { Artifacts } from './Closeout';
+import { Artifacts, HandedOn } from './Closeout';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Decide';
 import { Markdown } from './Markdown';
 import { when } from './Facts';
@@ -24,14 +24,19 @@ import { when } from './Facts';
  * the checkout — and then there is no send-back at all, as `wf ls`'s own gate note prints none (`gateNote`): approving it is the only word
  * there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the words given
  * with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
+ *
+ * `closeout` is what is being approved, where the gate is drawn beside it: the step's summary and each field it declared (`HandedOn`,
+ * the Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the
+ * one thing a person must read before either. The inspector's gate has none: its Output tab is where the closeout is.
  */
-export function Gate({ runId, step, back = [step], acts = false, framed = true }: {
+export function Gate({ runId, step, back = [step], acts = false, framed = true, closeout = null }: {
   runId: string;
   step: string;
   back?: readonly string[];
   acts?: boolean;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
+  closeout?: StepCloseout | null;
 }) {
   const [words, setWords] = useState('');
   const [objection, setObjection] = useState('');
@@ -76,103 +81,119 @@ export function Gate({ runId, step, back = [step], acts = false, framed = true }
         </p>
       )}
 
-      <form
-        aria-label={`Approve ${step}`}
-        className="space-y-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (acts && !confirming) return setConfirming(true);
-          // Words go as they were typed, as `--message` takes them; none when nothing was written.
-          approval.mutate(words.trim() ? { message: words } : {});
-        }}
-      >
-        <label htmlFor={`${field}-words`} className="sr-only">
-          {`Words to approve ${step} with, if any`}
-        </label>
-        <textarea
-          id={`${field}-words`}
-          value={words}
-          onChange={(event) => setWords(event.target.value)}
-          rows={2}
-          placeholder={acts
-            ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
-            : 'Your words (optional): every step after the gate is handed them, under “Approved”.'}
-          className={TEXTAREA}
-        />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="submit" disabled={busy} className={BUTTON}>
-            {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
-          </button>
-          {confirming && !approval.isPending && (
-            <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
-              Not yet
-            </button>
-          )}
-          <p className="text-xs">
-            as <code>{`wf approve ${runId} ${step}`}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
-          </p>
-        </div>
-        {confirming && (
-          <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
-            {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
-          </p>
+      {/* What it handed on, left of the answer where the page is wide and above it where it is not: read first, then decided. */}
+      <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
+        {closeout && (
+          <section
+            aria-label={`What ${step} handed on`}
+            className="min-w-0 space-y-2 rounded border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+          >
+            <h3 className="text-xs font-medium text-neutral-500">
+              What <span className="font-semibold text-neutral-700 dark:text-neutral-300">{step}</span> handed on, which you approve
+            </h3>
+            <HandedOn closeout={closeout} />
+          </section>
         )}
-        {approval.isError && <Refusal error={approval.error} not="Not approved" />}
-      </form>
+        <div className="min-w-0 space-y-4">
+          <form
+            aria-label={`Approve ${step}`}
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (acts && !confirming) return setConfirming(true);
+              // Words go as they were typed, as `--message` takes them; none when nothing was written.
+              approval.mutate(words.trim() ? { message: words } : {});
+            }}
+          >
+            <label htmlFor={`${field}-words`} className="sr-only">
+              {`Words to approve ${step} with, if any`}
+            </label>
+            <textarea
+              id={`${field}-words`}
+              value={words}
+              onChange={(event) => setWords(event.target.value)}
+              rows={2}
+              placeholder={acts
+                ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
+                : 'Your words (optional): every step after the gate is handed them, under “Approved”.'}
+              className={TEXTAREA}
+            />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <button type="submit" disabled={busy} className={BUTTON}>
+                {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
+              </button>
+              {confirming && !approval.isPending && (
+                <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
+                  Not yet
+                </button>
+              )}
+              <p className="text-xs">
+                as <code>{`wf approve ${runId} ${step}`}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
+              </p>
+            </div>
+            {confirming && (
+              <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
+              </p>
+            )}
+            {approval.isError && <Refusal error={approval.error} not="Not approved" />}
+          </form>
 
-      {/* No send-back where there is no work to send back: an ending that waits on nothing has nothing of its own to object to, and a try
-          of the unfiled step is refused by the package. `wf ls`'s gate note prints the approval alone for it (`gateNote`). */}
-      {back.length > 0 && (
-        <form
-          aria-label={`Send ${backName} back`}
-          className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
-          onSubmit={(event) => {
-            event.preventDefault();
-            // An objection goes as it was typed, as `--message` takes it: the package refuses a send-back with none. To the step the
-            // package sends it to, which at an ending's gate is the work and not the step at the gate.
-            sendBack.mutate({ mode, message: objection, step: to });
-          }}
-        >
-          <label htmlFor={`${field}-objection`} className="sr-only">
-            {`What to change, sent back to ${backName}`}
-          </label>
-          <textarea
-            id={`${field}-objection`}
-            value={objection}
-            onChange={(event) => setObjection(event.target.value)}
-            rows={2}
-            placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
-            className={TEXTAREA}
-          />
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, SECONDARY)}>
-              {sendBack.isPending ? 'Sending back…' : 'Send back'}
-            </button>
-            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <legend className="sr-only">How to send {backName} back</legend>
-              {(['nudge', 'fresh'] as const).map((m) => (
-                <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                  <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                  {MODES[m]} <code className="text-neutral-500">--{m}</code>
-                </label>
-              ))}
-            </fieldset>
-          </div>
-          {/* Which step the objection goes to, where the ending waits on more than one: one of them is enough to hold its gate again. */}
-          {back.length > 1 && (
-            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <legend className="sr-only">Which step to send back</legend>
-              {back.map((name) => (
-                <label key={name} className="flex cursor-pointer items-center gap-1.5">
-                  <input type="radio" name={`${field}-to`} value={name} checked={to === name} onChange={() => setTo(name)} />
-                  {name}
-                </label>
-              ))}
-            </fieldset>
+          {/* No send-back where there is no work to send back: an ending that waits on nothing has nothing of its own to object to, and a try
+              of the unfiled step is refused by the package. `wf ls`'s gate note prints the approval alone for it (`gateNote`). */}
+          {back.length > 0 && (
+            <form
+              aria-label={`Send ${backName} back`}
+              className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
+              onSubmit={(event) => {
+                event.preventDefault();
+                // An objection goes as it was typed, as `--message` takes it: the package refuses a send-back with none. To the step the
+                // package sends it to, which at an ending's gate is the work and not the step at the gate.
+                sendBack.mutate({ mode, message: objection, step: to });
+              }}
+            >
+              <label htmlFor={`${field}-objection`} className="sr-only">
+                {`What to change, sent back to ${backName}`}
+              </label>
+              <textarea
+                id={`${field}-objection`}
+                value={objection}
+                onChange={(event) => setObjection(event.target.value)}
+                rows={2}
+                placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
+                className={TEXTAREA}
+              />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, SECONDARY)}>
+                  {sendBack.isPending ? 'Sending back…' : 'Send back'}
+                </button>
+                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <legend className="sr-only">How to send {backName} back</legend>
+                  {(['nudge', 'fresh'] as const).map((m) => (
+                    <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                      <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                      {MODES[m]} <code className="text-neutral-500">--{m}</code>
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+              {/* Which step the objection goes to, where the ending waits on more than one: one of them is enough to hold its gate again. */}
+              {back.length > 1 && (
+                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  <legend className="sr-only">Which step to send back</legend>
+                  {back.map((name) => (
+                    <label key={name} className="flex cursor-pointer items-center gap-1.5">
+                      <input type="radio" name={`${field}-to`} value={name} checked={to === name} onChange={() => setTo(name)} />
+                      {name}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {sendBack.isError && <Refusal error={sendBack.error} />}
+            </form>
           )}
-          {sendBack.isError && <Refusal error={sendBack.error} />}
-        </form>
-      )}
+        </div>
+      </div>
     </section>
   );
 }

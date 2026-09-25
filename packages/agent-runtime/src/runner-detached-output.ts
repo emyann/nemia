@@ -130,7 +130,7 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
     ...(Object.keys(usage).length ? { usage } : {}),
-    ...(result.subtype === 'error_max_budget_usd' ? { budgetSpent: true as const } : {}),
+    ...(result.subtype === 'error_max_budget_usd' ? { limit: 'budget' } : {}),
     ...(denials.length ? { denials } : {}),
   };
 };

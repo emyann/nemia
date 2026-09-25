@@ -238,6 +238,7 @@ const board = () => {
    * journal written before does.
    */
   const stated = new Map<string, boolean>();
+  const endOf = (reason: string) => (reason === 'budget' ? { ended: 'failed', reason: 'harness', limit: 'budget' } : { ended: 'failed', reason });
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
@@ -251,12 +252,13 @@ const board = () => {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
           // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
           // consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits. Given several reasons,
-          // one attempt ended with each, in order, and the last carries what the task settled with.
+          // one attempt ended with each, in order, and the last carries what the task settled with. `budget` is no end the runtime judges
+          // (stage 4b): its harness's cut is carried on a failed end as `limit`, as the runtime records it.
           attempts: !t || t.phase === 'pending' ? [] : reasons.map((reason, i) => (i < reasons.length - 1
-            ? { n: i + 1, ended: 'failed', reason, nativeId: `native-${id}`, exitCode: null, usage: null }
+            ? { n: i + 1, ...endOf(reason), nativeId: `native-${id}`, exitCode: null, usage: null }
             : {
               n: i + 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
-              ...(reason ? { ended: 'failed', reason } : {}), ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
+              ...(reason ? endOf(reason) : {}), ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
               ...(settled && !reason && stated.has(id) ? { ended: 'done', reason: 'harness', stated: stated.get(id) } : {}),
             })),
         },
@@ -3434,7 +3436,7 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
     assert.deepEqual([pass.tried, pass.filed, pass.checked, pass.blocked, pass.status], [[], [], [], ['review'], 'failed'], `pass ${i + 1}`);
   }
   assert.deepEqual(filings, [implement, `${implement}-check`], '`retries: 2` files nothing past the cap');
-  assert.equal(tasks.get(implement)!.spec.budgetUsd, 3, 'a claude step runs as a job, which keeps the cap: filed with it whole');
+  assert.equal(tasks.get(implement)!.spec.config?.budgetUsd, 3, 'a claude step runs as a job, which keeps the cap: filed with it whole');
   const l = await list(e, readRun(run.id));
   assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['over budget $4.25 of $3', ['implement']]);
   await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(/^implement is over budget: its tries have cost \$4\.25 of its \$3 budget, .*: wf retry \S+ implement --budget <amount>\.$/));
@@ -3453,7 +3455,7 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
   assert.ok(pass.notes.includes('implement: try 2 — wf retry --nudge --budget 10'), pass.notes.join('\n'));
   assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: implement, check: { taskId: `${implement}-check` }, then: 'nudge', budget: 10 }]);
   const spec = tasks.get(try2)!.spec;
-  assert.deepEqual([spec.resumeFrom, spec.budgetUsd], [`native-${implement}`, 5.75], 'the job resumed, handed what is left of $10 after the $4.25 its tries cost: a resume is charged its own spend');
+  assert.deepEqual([spec.resumeFrom, spec.config?.budgetUsd], [`native-${implement}`, 5.75], 'the job resumed, handed what is left of $10 after the $4.25 its tries cost: a resume is charged its own spend');
   assert.match(spec.brief, /A person asked for this try: `wf retry --nudge --budget 10`, raising this step's budget to \$10\./);
   assert.match(spec.brief, /^## Try 2\n\nAfter the last try signed off, the run executed this step's check, and it did not pass\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\n/);
 
@@ -3472,7 +3474,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   const { e, tasks, filings, settle } = board();
   await advance(e, readRun(run.id));
   const implement = `${run.id}-implement`;
-  assert.deepEqual([tasks.get(implement)!.spec.harness, tasks.get(implement)!.spec.budgetUsd], ['claude-detached', 3]);
+  assert.deepEqual([tasks.get(implement)!.spec.harness, tasks.get(implement)!.spec.config?.budgetUsd], ['claude-detached', 3]);
   // The engine settles it `failed`, naming the budget, with what the session cost.
   settle(implement, 'failed', undefined, 1, 'budget', { costUsd: 3.02 });
   for (let i = 0; i < 2; i++) {
@@ -3490,7 +3492,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   await retry(e, run.id, 'implement', { mode: 'fresh', budget: 8 });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const spec = tasks.get(`${implement}-try2`)!.spec;
-  assert.deepEqual([spec.harness, spec.budgetUsd, spec.resumeFrom], ['claude-detached', 4.98, undefined], 'what is left of $8 after the $3.02 its tries cost');
+  assert.deepEqual([spec.harness, spec.config?.budgetUsd, spec.resumeFrom], ['claude-detached', 4.98, undefined], 'what is left of $8 after the $3.02 its tries cost');
   assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
 });
 
@@ -3531,7 +3533,7 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
   assert.deepEqual(pass.looped, ['review']);
   assert.ok(pass.notes.includes('review: round 2 — wf round --budget 10; implement goes again'), pass.notes.join('\n'));
   assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: `${run.id}-implement`, check: { taskId: `${run.id}-implement-check` }, then: 'round', budget: 10 }]);
-  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.budgetUsd, 5.75, 'on claude, a job, the round is handed what is left of the raised cap');
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.config?.budgetUsd, 5.75, 'on claude, a job, the round is handed what is left of the raised cap');
   assert.equal((await list(b.e, readRun(run.id))).steps[0]!.note, 'round 2 of 3, budget $10');
 });
 
@@ -3553,12 +3555,12 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
 test("a claude-detached step's tries share its cap: `retries:` files the next try with what is left of it, not a cap of its own — and at the cap, nothing left, files none", async () => {
   const { run, e, tasks, settle, logs } = await throughCheck('harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3', 'failed', 1);
   const implement = `${run.id}-implement`;
-  assert.equal(tasks.get(implement)!.spec.budgetUsd, 3, 'the first filing: nothing spent, the whole cap');
+  assert.equal(tasks.get(implement)!.spec.config?.budgetUsd, 3, 'the first filing: nothing spent, the whole cap');
   settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 2.9 });
   logs.set(`${implement}-check`, '[wf check] exit 1\n');
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement'], '$2.90 of $3: `retries:` tries it');
   const try2 = `${implement}-try2`;
-  assert.equal(tasks.get(try2)!.spec.budgetUsd, 0.1, 'what is left of $3 after $2.90');
+  assert.equal(tasks.get(try2)!.spec.config?.budgetUsd, 0.1, 'what is left of $3 after $2.90');
 
   settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 0.1 });
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);

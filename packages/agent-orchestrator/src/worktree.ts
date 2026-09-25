@@ -14,10 +14,10 @@ import { promisify } from 'node:util';
 import { lastLines } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 import { folderPlace } from './places.ts';
-import { isGitRun, workspacePlan, type Run } from './run.ts';
+import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 import { HOME, lstatOf, runsDir } from './store.ts';
-import { countSpawn, execCounted } from './tally.ts';
+import { countSpawn, execCounted, readText } from './tally.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
@@ -358,3 +358,63 @@ function failedWords(err: unknown, lines = 4): string {
 export const gitSays = (repo: string, ...args: string[]): string | undefined => {
   try { return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
 };
+
+/**
+ * The file a merge in progress in `repo`'s checkout is named in, found with no git: `.git/MERGE_HEAD` where `.git` is a directory, and
+ * under the directory a `.git` file names (`gitdir: …`) where the checkout is a worktree. Undefined where neither reads.
+ */
+function mergeHeadFile(repo: string): string | undefined {
+  const dotGit = path.join(repo, '.git');
+  try {
+    if (fs.statSync(dotGit).isDirectory()) return path.join(dotGit, 'MERGE_HEAD');
+    const named = /^gitdir:\s*(.+)$/m.exec(readText(dotGit))?.[1]?.trim();
+    return named ? path.join(path.resolve(repo, named), 'MERGE_HEAD') : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * Whether a merge is in progress in `repo`'s checkout — MERGE_HEAD is there — read off the file system: no git is spawned and no lock is
+ * taken in a checkout a person works in, so a pass may ask it every time (`landingDue`'s `staged`, `mainClaim`).
+ */
+export const mergeInProgress = (repo: string): boolean => {
+  const file = mergeHeadFile(repo);
+  return file !== undefined && fs.existsSync(file);
+};
+
+/**
+ * The repository's own checkout as a pass reads it for an ending that lands on its check (`MergeState`, `landingDue`): whether a merge is in
+ * progress, and whose — this run's when every commit its MERGE_HEAD names is the tip of one of `tips`, the run's result branches — whether a
+ * path is unmerged, which result branches a commit now would leave out, and HEAD. Read quietly: a checkout git cannot read is merging nothing.
+ * A handful of git calls, so a pass asks only once a landing can be due (`landingDue`'s `merge`).
+ */
+export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
+  const file = mergeHeadFile(repo);
+  const heads = file && fs.existsSync(file) ? readText(file).split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  const shas = new Set(Object.values(tips));
+  const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
+  const missing = Object.entries(tips)
+    .filter(([, sha]) => !heads.includes(sha) && gitSays(repo, 'merge-base', '--is-ancestor', sha, 'HEAD') === undefined)
+    .map(([branch]) => branch);
+  const head = gitSays(repo, 'rev-parse', '--verify', '--quiet', 'HEAD')?.trim();
+  // `ls-files -u` reads the index as it is; `git diff` would refresh it, taking `index.lock` for a moment in a checkout a person commits in.
+  return { merging, conflicted: Boolean(gitSays(repo, 'ls-files', '--unmerged')?.trim()), missing, ...(head ? { head } : {}) };
+}
+
+/**
+ * Commit the merge staged in `repo` with `message`, on stdin, as the repository's own identity commits — the person's, as the step did
+ * before the run landed its merges — its hooks and signing honoured. The commit made, or git's words on why it made none.
+ */
+export function commitMerge(repo: string, message: string): { commit: string } | { error: string } {
+  try {
+    execCounted('git', ['commit', '-F', '-'], { cwd: repo, encoding: 'utf8', input: message, stdio: ['pipe', 'pipe', 'pipe'] });
+    return { commit: git(repo, 'rev-parse', 'HEAD') };
+  } catch (err) { return { error: failedWords(err) }; }
+}
+
+/** Abort the merge in progress in `repo` (`git merge --abort`): undefined once it is, or git's words on why it is not. */
+export function abortMerge(repo: string): { error: string } | undefined {
+  try {
+    git(repo, 'merge', '--abort');
+    return undefined;
+  } catch (err) { return { error: failedWords(err) }; }
+}

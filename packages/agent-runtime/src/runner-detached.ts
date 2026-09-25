@@ -138,8 +138,8 @@ export type HarnessOutput = {
   closeout?: { payload: unknown };
   /** What the session consumed, as far as the output says: every field a measurement, absent when not. */
   usage?: Usage;
-  /** The harness says it ended the session because it spent its budget. */
-  budgetSpent?: true;
+  /** A limit its configuration set that the harness says it ended the session at — `budget`, its spend cap. */
+  limit?: string;
   /** The tool calls the harness denied the session, in the order it first did. Absent when none, or when it does not say. */
   denials?: Denial[];
 };
@@ -417,7 +417,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
           ...(usage ? { usage } : {}),
-          ...(output?.read.budgetSpent ? { budgetSpent: true as const } : {}),
+          ...(output?.read.limit ? { limit: output.read.limit } : {}),
           ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
         });
       }

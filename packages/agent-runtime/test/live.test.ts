@@ -399,15 +399,15 @@ const notesIn = (label: string) => {
   return dir;
 };
 
-test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reason budget, with what it cost — and its task settles failed, with no attempt 2', {
+test('claude -p given a $0.01 budget stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2', {
   skip,
   timeout: 12 * 60_000,
 }, async (t) => {
   const engine = createEngine({ root: tmp('budget-board') });
   const ids = {
     capped: await engine.file({
-      brief: LOOP_BRIEF, cwd: notesIn('budget-p'), harness: 'claude-detached', config: { model: 'haiku', tools: ['Read'] },
-      budgetUsd: 0.01, deadlineSeconds: 480,
+      brief: LOOP_BRIEF, cwd: notesIn('budget-p'), harness: 'claude-detached', config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
+      deadlineSeconds: 480,
     }),
   };
   await settleThenCheck(engine, ids, (views) => {
@@ -415,7 +415,7 @@ test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reaso
     t.diagnostic(`settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`);
     assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
     const [first] = state.attempts;
-    assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'it ended at its cap, as the harness printed it');
+    assert.deepEqual([first?.ended, first?.reason, first?.limit, first?.exitCode], ['failed', 'harness', 'budget', 1], 'it ended at its cap, as the harness printed it');
     assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
     assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
   });
@@ -429,7 +429,7 @@ test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends 
   const root = tmp('bg-budget-board');
   const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
-  const id = await run(file({ brief: LOOP_BRIEF, cwd: notesIn('bg-budget'), config: { model: 'haiku', tools: ['Read'] }, budgetUsd: 0.01, deadlineSeconds: 480 }));
+  const id = await run(file({ brief: LOOP_BRIEF, cwd: notesIn('bg-budget'), config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 }, deadlineSeconds: 480 }));
   let v = await run(view(id, new Map()));
   try {
     const until = Date.now() + 10 * 60_000;
@@ -690,7 +690,7 @@ test('M2, M3, M5: a job resumed from a --bg session remembers it; a job resumed 
 
   // M5: a cap below the session's whole spend still lets a short resume finish — it caps the resume's own.
   const cap = Math.max(0.01, Math.round((one! + two!) * 50) / 100);
-  const capped = await settled(await engine.file({ ...common, config: { model: 'haiku' }, budgetUsd: cap, resumeFrom: last(second)!.nativeId!, brief: ask }));
+  const capped = await settled(await engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }));
   t.diagnostic(`a resume capped at $${cap}, under its session's $${(one! + two!).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`);
   assert.equal(capped.state.settled, 'succeeded', `a resume under a cap below its session's whole cost finished: ${capped.phase}`);
 });
@@ -949,8 +949,8 @@ test('M12: a job held open signs and waits with no process, an answer resumes it
   const secret = `m12-${randomUUID().slice(0, 8)}`;
   const id = await engine.file({
     brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
-    cwd: tmp('m12-work'), closeoutSchema: M12_CLOSEOUT, holdOpen: true, budgetUsd: 0.5, deadlineSeconds: 300,
-    config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'] },
+    cwd: tmp('m12-work'), closeoutSchema: M12_CLOSEOUT, holdOpen: true, deadlineSeconds: 300,
+    config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'], budgetUsd: 0.5 },
   });
   const until = async (phase: string) => {
     const by = Date.now() + 5 * 60_000;
@@ -971,7 +971,7 @@ test('M12: a job held open signs and waits with no process, an answer resumes it
   for (let i = 0; i < 2; i++) await engine.tick();
   assert.equal((await engine.view(id)).state.attempts.length, 1, 'and ticks start nothing');
 
-  await engine.answer(id, 'Call no tool but StructuredOutput. Give your closing statement with word set to the code word I gave you.', { budgetUsd: 0.3 });
+  await engine.answer(id, 'Call no tool but StructuredOutput. Give your closing statement with word set to the code word I gave you.', { config: { budgetUsd: 0.3 } });
   await engine.tick();
   const answered = await until('input-required');
   const [first, second] = answered.state.attempts;

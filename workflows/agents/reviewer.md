@@ -38,3 +38,8 @@ prompt, and you have no tool that writes. Do not run `npm run build` or `npm run
 into the workspace. Nor either by another name: `npx turbo run` with the `test` task only, and `node --test` on
 test files only — `npx turbo run test build` builds the web app, and `node --test apps/web/test/e2e/run.ts` runs
 the e2e.
+
+You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
+(`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run the suite in the
+foreground, in pieces under the 10-minute limit of a Bash call: the command that would wait on one in the background
+is not among those you may run.

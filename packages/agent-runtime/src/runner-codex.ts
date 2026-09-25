@@ -134,8 +134,8 @@ export const codex: HarnessSpec = {
     }
     // A cap would be dropped without a word: `codex exec --help` (0.154.0) has no spend cap, and its stream counts tokens,
     // not dollars — its config's budgets are token budgets.
-    if (task.budgetUsd !== undefined) {
-      return `\`budgetUsd: ${task.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: 0.154.0 has no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
+    if (task.config?.budgetUsd !== undefined) {
+      return `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: 0.154.0 has no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
     }
     const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {

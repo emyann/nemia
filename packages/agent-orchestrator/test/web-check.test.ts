@@ -4,13 +4,13 @@
  *
  * The folder is chosen before any work exists; what the work touched is git's fact by the time the check runs, so the condition is shell
  * over `git diff --name-only`, written in the `check:` line itself. It is run in two places, and both are tested here: by the run, as a
- * check, with `WF_BASE_REF` (through `CHECK`, the harness the engine is handed), and by the shipper, by hand, in the repository's own
- * checkout in the middle of a merge, where no `WF_BASE_REF` is set and what counts is what the merge brings. A condition that cannot say
- * what was touched fails with words, never reads as "nothing touched".
+ * round's check, with `WF_BASE_REF` (through `CHECK`, the harness the engine is handed), and as ship's check, which the run executes the
+ * same way in the repository's own checkout in the middle of the merge the shipper staged, where no `WF_BASE_REF` is set and what
+ * counts is what the merge brings. A condition that cannot say what was touched fails with words, never reads as "nothing touched".
  *
  * The e2e runs in the second place alone (changed 2026-09-25): a round's check is the slow part of every round, and the e2e was 3-4 of
- * its six minutes and seldom changed a review's verdict. The line tells the two apart by `WF_BASE_REF`, which the run sets on every git
- * run's check and the shipper sets nothing for, so anything that runs the line without the run's environment runs the whole of it.
+ * its six minutes and seldom changed a review's verdict. The line tells the two apart by `WF_BASE_REF`, which the run sets on the check
+ * of every step in a worktree and never on ship's, so anything that runs the line without the run's environment runs the whole of it.
  *
  * `npm` is a stand-in on PATH that prints what it was asked, so the test reads which scripts ran.
  */
@@ -39,7 +39,7 @@ const FOLDERS = ['workflows/dev', 'workflows/dev-planned', 'workflows/dev-build'
 /** The folders a person picks for the build: it runs whatever was touched. */
 const BUILD_FOLDERS = FOLDERS.filter((f) => /build|ui/.test(f));
 
-/** How each line ends its build: the e2e only where the run has not set `WF_BASE_REF` — on the merged tree, in the shipper's hands. */
+/** How each line ends its build: the e2e only where the run has not set `WF_BASE_REF` — on the merged tree, in ship's check. */
 const AT_MERGE = 'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
 const BUILD_LINE = `npm test && npm run typecheck && npm run build && ${AT_MERGE}`;
 /** A line as it was before 2026-09-25, with the e2e in every round: what each REFUSED case below must catch. */
@@ -52,7 +52,7 @@ fs.writeFileSync(path.join(BIN, 'npm'), '#!/bin/sh\necho "npm $*"\n[ "$*" = "${N
 
 /**
  * The environment every command here runs in: this machine's, with the stand-in first on PATH and no `WF_` name. This suite is itself run
- * as a check, whose `WF_BASE_REF` would otherwise reach the shipper's case and make it one it is not.
+ * as a check, whose `WF_BASE_REF` would otherwise reach the ship's case and make it one it is not.
  */
 const baseEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({
   ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('WF_') && !k.startsWith('GIT_'))),
@@ -92,7 +92,15 @@ function asCheck(repo: string, command: string, baseRef: string, extra: Record<s
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-/** The command as the shipper runs it: by hand, in bash, in the repository's checkout, with no `WF_BASE_REF`. */
+/** Ship's check as the run executes it: through `CHECK`, in the repository's checkout, with the environment the tick hands an ending — no `WF_BASE_REF`. */
+function asShipCheck(repo: string, command: string, extra: Record<string, string> = {}): Ran {
+  const brief = checkBrief(command, { WF_RUN: 'r-1', WF_STEP: 'ship', WF_WORKSPACE: repo, WF_STDERR: '', WF_ARTIFACTS: ROOT });
+  const { cmd, args } = CHECK.command({ brief });
+  const r = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', env: baseEnv(extra) });
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** The command as a person runs it by hand, in bash, in the repository's checkout: no `WF_BASE_REF` either. */
 function byHand(repo: string, command: string, extra: Record<string, string> = {}): Ran {
   const r = spawnSync('bash', ['-c', command], { cwd: repo, encoding: 'utf8', env: baseEnv(extra) });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
@@ -131,10 +139,10 @@ test('as a check, in every shipped folder: a round that touches the web app buil
   }
 });
 
-test("by the shipper's hand, in every shipped folder: a merge that brings the web app runs the build and the e2e on the merged tree", () => {
+test("as ship's check, in every shipped folder: a merge that brings the web app runs the build and the e2e on the merged tree", () => {
   for (const folder of FOLDERS) {
     const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
-    const r = byHand(repo, checkOf(folder));
+    const r = asShipCheck(repo, checkOf(folder));
     assert.equal(r.status, 0, `${folder}\n${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, BUILT, `${folder}\n${r.stdout}`);
     assert.match(r.stdout, E2E, `${folder}\n${r.stdout}`);
@@ -155,10 +163,10 @@ test('REFUSED as a check: a line with the e2e in every round, as each folder had
   assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run build && npm run e2e');
 });
 
-test("REFUSED by the shipper's hand: an e2e that fails fails the line on the merged tree; in a round, where it does not run, it cannot", () => {
+test("REFUSED as ship's check: an e2e that fails fails the line on the merged tree; in a round, where it does not run, it cannot", () => {
   for (const folder of FOLDERS) {
     const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
-    const r = byHand(repo, checkOf(folder), { NPM_FAILS: 'run e2e' });
+    const r = asShipCheck(repo, checkOf(folder), { NPM_FAILS: 'run e2e' });
     assert.notEqual(r.status, 0, `${folder}: a failing e2e fails the merge's check\n${r.stdout}`);
     assert.match(r.stdout, E2E, folder);
 
@@ -241,7 +249,7 @@ test('REFUSED as a check: an empty WF_BASE_REF, outside a merge, is not read as 
   assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
 });
 
-/** `branched`, then main moves on with `onMain`, and main is mid-merge of `work` — the shipper's step 2, `--no-ff --no-commit`. */
+/** `branched`, then main moves on with `onMain`, and main is mid-merge of `work` — the merge the shipper stages, `--no-ff --no-commit`. */
 function midMerge(files: string[], onMain: string[]): string {
   const { repo } = branched(files);
   git(repo, 'checkout', '-q', 'main');
@@ -253,18 +261,18 @@ function midMerge(files: string[], onMain: string[]): string {
   return repo;
 }
 
-test("by the shipper's hand, mid-merge with no WF_BASE_REF: a merge that brings the web app runs the build and the e2e on the merged tree", () => {
+test("as ship's check, mid-merge with no WF_BASE_REF: a merge that brings the web app runs the build and the e2e on the merged tree", () => {
   const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
-  const r = byHand(repo, DEV);
+  const r = asShipCheck(repo, DEV);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, BUILT, r.stdout);
   assert.match(r.stdout, E2E, r.stdout);
 });
 
-test("by the shipper's hand, mid-merge: what counts is what the merge brings, not what the base branch did meanwhile", () => {
+test("as ship's check, mid-merge: what counts is what the merge brings, not what the base branch did meanwhile", () => {
   // Main touched the web app after the branch left it; the branch did not. The merge brings no web change, and nothing is built.
   const repo = midMerge(['packages/agent-orchestrator/src/run.ts'], ['apps/web/src/main.tsx']);
-  const r = byHand(repo, DEV);
+  const r = asShipCheck(repo, DEV);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.doesNotMatch(r.stdout, BUILT);
   assert.ok(r.stdout.includes(SKIPPED), r.stdout);
@@ -278,26 +286,26 @@ test('REFUSED by hand: no WF_BASE_REF and no merge in progress fails loudly, and
   assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
 });
 
-test("ui ends in a gated ship, like the build folders, and the check its brief names runs the e2e by the shipper's hand on the merged tree, and none in a round", () => {
+test("ui ends in a gated ship, like the build folders, and the check the run executes on its merge, named on its brief, runs the e2e on the merged tree, and none in a round", () => {
   for (const folder of ['workflows/ui', 'packages/agent-orchestrator/workflows/ui']) {
     const dir = path.join(REPO_ROOT, folder);
     const workflow = loadWorkflows(dir);
     const ship = workflow.find((s) => s.name === 'ship');
     assert.ok(ship, `${folder} has a ship`);
-    assert.deepEqual({ gate: ship.gate, workspace: ship.workspace, after: ship.after, check: ship.check }, { gate: true, workspace: 'main', after: ['review'], check: undefined }, folder);
+    assert.deepEqual({ gate: ship.gate, workspace: ship.workspace, after: ship.after, check: ship.check }, { gate: true, workspace: 'main', after: ['review'], check: checkOf(folder) }, folder);
 
-    // The line the shipper is told to run, taken off its brief as the shipper reads it.
+    // The line the shipper is told the run executes on its merge, taken off its brief as the shipper reads it.
     const run: Run = {
       id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Make the Factory darker',
       workflowDir: dir, createdAt: '2026-09-25T00:00:00Z',
       steps: Object.fromEntries(workflow.map((s) => [s.name, s.name === 'ship' ? { taskId: null } : { taskId: `t-${s.name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
     };
     const brief = composeBrief(ship, run, workflow, undefined, '/wf/runs/r-1/artifacts/ship');
-    const named = /This workflow's check, which its work was judged by: `([^\n]*)`/.exec(brief)?.[1];
+    const named = /Once you sign off, the run executes `([^\n]*)` in this checkout, on the merge you left staged/.exec(brief)?.[1];
     assert.equal(named, checkOf(folder), `${folder}: the ship is told implement's check\n\n${brief}`);
 
     const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
-    const r = byHand(repo, named);
+    const r = asShipCheck(repo, named);
     assert.equal(r.status, 0, `${folder}\n${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, BUILT, `${folder}\n${r.stdout}`);
     assert.match(r.stdout, E2E, `${folder}: the e2e runs at the ship\n${r.stdout}`);

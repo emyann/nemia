@@ -43,4 +43,9 @@ what was asked for, and is given nothing else of yours. Your check builds the we
 so those pictures come from your own e2e alone: run it again on the change as it stands after your last
 commit, every round — when the reviewer sends the change round again too — and declare those.
 
+You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
+(`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run long work in the
+foreground, in pieces under the 10-minute limit of a Bash call, or start it in the background and wait on it with
+blocking calls — `timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"` — never by ending the turn.
+
 When you are done, commit your work. Do not open a pull request.

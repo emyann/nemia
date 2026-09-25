@@ -662,7 +662,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
   // A second attempt is a held task's next turn: one attempt per start, and a turn is a start.
-  const id = await b.run(file({ ...spec, holdOpen: true, config: { tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, contextTokens: 200000, remoteControl: true }, budgetUsd: 0.5  }));
+  const id = await b.run(file({ ...spec, holdOpen: true, config: { tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, contextTokens: 200000, remoteControl: true, budgetUsd: 0.5 } }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', busy: false, closeout: { payload: { outcome: 'done' }, at: Date.now() + 60_000 } });
   await b.run(tick());
@@ -674,7 +674,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
     assert.deepEqual(r.config?.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
     assert.equal(r.config?.effort, 'low');
     assert.deepEqual(r.config?.mcp, mcp, 'and given the same servers');
-    assert.equal(r.budgetUsd, 0.5, 'and the same cap');
+    assert.equal(r.config?.budgetUsd, 0.5, 'and the same cap');
     assert.equal(r.config?.contextTokens, 200000, 'and the same window: a continuation given none would run on the whole of it');
     assert.equal(r.config?.remoteControl, true, 'and bridged the same');
   }
@@ -686,7 +686,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
   assert.equal(plain.spawned[0]!.config?.disallowedTools, undefined, 'no deny list');
   assert.equal(plain.spawned[0]!.config?.effort, undefined);
   assert.equal(plain.spawned[0]!.config?.mcp, undefined, 'no map, no servers of its own');
-  assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
+  assert.equal(plain.spawned[0]!.config?.budgetUsd, undefined, 'no budget, no cap');
   assert.equal(plain.spawned[0]!.config?.contextTokens, undefined, "no window: the harness's own");
   assert.equal(plain.spawned[0]!.config?.remoteControl, undefined, 'no Remote Control unless asked');
 });
@@ -698,23 +698,23 @@ test('decide never reads tools, effort, MCP servers, a budget, a context window,
   assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
 });
 
-test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and the task settles failed naming it', async () => {
+test('a session its harness ended at its budget ends failed, as its harness said, with the limit and what it cost on its attempt — and the task settles failed as any failure does', async () => {
   const b = board();
-  const id = await b.run(file({ ...spec, budgetUsd: 0.01 }));
+  const id = await b.run(file({ ...spec, config: { budgetUsd: 0.01 } }));
   await b.run(tick());
   const first = [...b.sessions.keys()][0]!;
-  b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed', exitCode: 1, budgetSpent: true, usage: { costUsd: 0.018, apiMs: 718 } });
+  b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed', exitCode: 1, limit: 'budget', usage: { costUsd: 0.018, apiMs: 718 } });
   for (let i = 0; i < 3; i++) await b.run(tick());
 
   const { state } = await b.run(view(id, new Map()));
   const [a] = state.attempts;
-  assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1]);
+  assert.deepEqual([a!.ended, a!.reason, a!.limit, a!.exitCode], ['failed', 'harness', 'budget', 1], 'the limit written beside the end, off the same sighting');
   assert.deepEqual(a!.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
   assert.equal(state.settled, 'failed');
   assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
   assert.equal(b.spawned.length, 1, 'and nothing spawned for one');
   const settled = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'settled');
-  assert.match(settled?.kind === 'settled' ? settled.note ?? '' : '', /^attempt 1 spent its budget\. File the task again with a larger one/);
+  assert.equal(settled?.kind === 'settled' ? settled.note : undefined, '1 attempt(s), none succeeded', 'the runtime says nothing of a budget: the layer above reads the limit');
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────

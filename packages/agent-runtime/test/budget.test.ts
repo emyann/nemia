@@ -3,8 +3,10 @@
  *
  * Measured first, by hand and by `test/live.test.ts` (`AE_LIVE=1`): `claude -p --max-budget-usd 0.01` ended a session
  * that crossed its cap with exit 1 and a result whose `subtype` is `error_max_budget_usd`; a `claude --bg` session given
- * the same flag read a file 42 times, spent $0.19 and ended `done`. So `claude-detached` hands a task's budget to the
- * harness on every attempt and records the end it prints, and `createEngine().file()` refuses a budget on `claude`, which
+ * the same flag read a file 42 times, spent $0.19 and ended `done`. So `claude-detached` hands a task's cap
+ * (`config.budgetUsd`, one of the harness's arguments since stage 4b) to the harness on every attempt and records the end
+ * it prints — `failed`, and the limit the harness says it stopped at, as a fact: the runtime judges no budget, and the
+ * orchestrator says `budget exhausted` of it. `createEngine().file()` refuses a cap on a `claude --bg` session, which
  * would keep none. The `claude --bg` runner is still given the flag when a task reaches it with one — through the Effect
  * door, which refuses no harness's words (open issue 6).
  */
@@ -32,7 +34,7 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 const runsIn = (log: string) => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
 const valueOf = (args: string[], flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
 
-test('claude-detached at shipped defaults: a session that stops at its budget ends its attempt failed, reason budget, with what it cost — and its task settles failed, with no attempt 2', async () => {
+test('claude-detached at shipped defaults: a session that stops at its cap ends its attempt failed, at the limit `budget` its harness named, with what it cost — and its task settles failed, with no attempt 2 and no word of a budget of its own', async () => {
   const bin = tmp('bin');
   const runs = path.join(bin, 'runs.jsonl');
   // What `claude -p --output-format json` printed when a session crossed its `--max-budget-usd` (2.1.272, keys trimmed).
@@ -51,7 +53,7 @@ process.exitCode = 1;
 
   await onPath(bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', budgetUsd: 0.01 });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', config: { budgetUsd: 0.01 } });
     const until = Date.now() + 20_000;
     while (!(await engine.view(id)).state.settled && Date.now() < until) {
       await engine.tick();
@@ -62,11 +64,13 @@ process.exitCode = 1;
     assert.equal(state.settled, 'failed');
     assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     const [a] = state.attempts;
-    assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1], 'it ended at its cap');
+    assert.deepEqual([a!.ended, a!.reason, a!.limit, a!.exitCode], ['failed', 'harness', 'budget', 1], 'it ended at its cap, as its harness said');
     assert.deepEqual(a!.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
     assert.equal(a!.nativeId, result.session_id, 'a session a new filing could continue');
     const settled = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
-    assert.match(settled?.kind === 'settled' ? settled.note ?? '' : '', /spent its budget\. File the task again with a larger one/, 'and the task says why it settled');
+    const note = settled?.kind === 'settled' ? settled.note ?? '' : '';
+    assert.equal(note, '1 attempt(s), none succeeded', 'settled as any failed attempt is');
+    assert.doesNotMatch(note, /budget/, 'the runtime says nothing of a budget: whether a cap reached is the reason is the caller\'s to say');
 
     const argvs = runsIn(runs);
     assert.equal(argvs.length, 1, 'claude -p ran once');
@@ -104,7 +108,7 @@ if (args[0] === '--bg') {
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
 
   await onPath(bin, async () => {
-    await run(file({ brief: 'the prompt', cwd: tmp('cwd'), budgetUsd: 0.5 }));
+    await run(file({ brief: 'the prompt', cwd: tmp('cwd'), config: { budgetUsd: 0.5 } }));
     await run(tick());
 
     // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).

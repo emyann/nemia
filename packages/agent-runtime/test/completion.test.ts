@@ -462,7 +462,7 @@ if (args[0] === '--bg') {
 
 test('a budget reaches Claude Code as --max-budget-usd, and the prompt still comes last', async () => {
   // `file()` refuses a budget on this harness, which keeps none under `--bg`; a task that reaches the runner with one gets it.
-  const args = await argvOf({ budgetUsd: 0.5, config: { tools: ['Read'] } });
+  const args = await argvOf({ config: { tools: ['Read'], budgetUsd: 0.5 } });
   assert.equal(args[args.indexOf('--max-budget-usd') + 1], '0.5');
   assert.equal(args.at(-1), 'the prompt');
 });

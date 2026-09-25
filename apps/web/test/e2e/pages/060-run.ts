@@ -123,6 +123,9 @@ export default {
     await expectCount(timeline.locator('tr[data-total^="round-"]'), 0, "one round: the run's total alone");
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
+    // Signed off, it opens on its Output; what it used is under Details.
+    await expectVisible(inspected.getByRole('tab', { name: 'Output', selected: true }), `${FAKE.unverified}'s inspector opens on Output: it has signed off`);
+    await inspected.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
 
     await graph.locator('.react-flow__node[data-id="review"]').click();

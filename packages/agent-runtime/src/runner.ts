@@ -59,8 +59,6 @@ export type SpawnRequest = {
   resumeFrom?: string;
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
-  /** The most the session may spend, in dollars. Absent: no cap. */
-  budgetUsd?: number;
 };
 
 /**
@@ -408,7 +406,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       // The spend cap, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this harness
       // (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
-      ...(r.budgetUsd !== undefined ? ['--max-budget-usd', String(r.budgetUsd)] : []),
+      ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
       r.brief,
     ], { cwd: r.cwd, verb: 'spawn' }))).pipe(Effect.asVoid),
 

@@ -292,6 +292,19 @@ export async function expectLeftOf(left: Locator, right: Locator, assertion: str
 }
 
 /**
+ * `element` is wholly in the window, as the page is scrolled, within `timeout`: a page opened on something is scrolled to it. A top in the
+ * window is not enough — the run page's inspector starts 40 pixels above the bottom of an unscrolled 800 — so its bottom must be in it too.
+ * `boundingBox` is relative to the viewport.
+ */
+export async function expectOnScreen(element: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await until(async () => {
+    const [box, height] = await Promise.all([element.boundingBox(), element.page().evaluate(() => window.innerHeight)]);
+    if (!box) return 'not drawn';
+    return box.y >= 0 && box.y + box.height <= height ? null : `it runs from ${Math.round(box.y)} to ${Math.round(box.y + box.height)} of a window ${height} tall`;
+  }, assertion, timeout);
+}
+
+/**
  * The vertical middle of every element of `middle` lies strictly between the middles of `one` and `other`, within `timeout`: a card level
  * with the middle of the two it is joined to, as a diamond's top and bottom are with its sides. Nothing matched is refused too.
  */

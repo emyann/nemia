@@ -345,10 +345,10 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
   assert.equal(usageLine({ turns: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }), '1 turns · 0 tool calls · tokens not measured · cost not measured (a model without a price)');
 
   const base: Event[] = [
-    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', harness: 'claude-detached', budgetUsd: 0.01 },
+    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', harness: 'claude-detached', config: { budgetUsd: 0.01 } },
     { kind: 'starting', at: '2026-09-15T09:00:01Z', attempt: 1 },
   ];
-  const spent = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:00:04Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'budget', exitCode: 1, usage: { costUsd: 0.01804, apiMs: 718 } }]);
+  const spent = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:00:04Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1, usage: { costUsd: 0.01804, apiMs: 718 } }]);
   assert.equal(attemptLine(spent.attempts[0]!), 'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02');
 
   const shown = (state: ReturnType<typeof fold>, usage?: object) => taskLine({ id: 't-1', state, phase: state.settled ?? 'running (working)', sessionId: null, ...(usage ? { usage } : {}) });
@@ -392,7 +392,7 @@ test('ae show and ae feed say an end gave no statement where its task asked for 
 
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra });
-  assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000 }, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
+  assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000, budgetUsd: 0.25 } })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 

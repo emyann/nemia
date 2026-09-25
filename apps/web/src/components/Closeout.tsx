@@ -1,8 +1,8 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Switch } from '@/components/ui/switch';
 import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
-import { imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
+import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
 import { cn } from '../lib/utils';
 import { Artifacts } from './Artifacts';
 import { Markdown } from './Markdown';
@@ -170,11 +170,6 @@ function TryOutcome({ t, none }: { t: StepTry; none: string }) {
 export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; outcome: Outcome }) {
   const [raw, setRaw] = useState(false);
   const switchId = useId();
-  const images = imagePaths(closeout.artifacts);
-  const declared = Object.entries(closeout.output);
-  const field = (name: string, value: unknown) => (
-    <FieldView key={name} name={name} schema={closeout.schema[name]} value={value} artifacts={closeout.artifacts} images={images} />
-  );
   const toggle = (
     // The aria switch is a label of its own, round its input, so its word is a label beside it that names that input.
     <div className="flex shrink-0 items-center gap-1.5 text-xs text-neutral-500">
@@ -193,16 +188,68 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
         <AsItCame raw={closeout.raw} />
       ) : (
         <>
-          {declared.map(([name, value]) => field(name, value))}
-          {closeout.replies && field('replies', closeout.replies)}
-          {closeout.missing.length > 0 && (
-            <p data-missing className="text-xs text-amber-700 dark:text-amber-400">declared and not given: {closeout.missing.join(', ')}</p>
-          )}
+          <DeclaredFields closeout={closeout} />
           <div>
             <p className="text-xs text-neutral-500">artifacts</p>
             <Artifacts artifacts={closeout.artifacts} />
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Each field a closeout declared, drawn by its shape (`FieldView`), then its replies and what it declared and did not give: the Output
+ * tab's, and the gate's (`HandedOn`), which folds the long ones (`foldsAtGate`) and says what each holds on its fold.
+ */
+function DeclaredFields({ closeout, fold = false }: { closeout: StepCloseout; fold?: boolean }) {
+  const images = imagePaths(closeout.artifacts);
+  const field = (name: string, value: unknown, first = false) => {
+    const folded = fold && foldsAtGate(value, first);
+    const view = <FieldView key={name} name={name} named={!folded} schema={closeout.schema[name]} value={value} artifacts={closeout.artifacts} images={images} />;
+    return folded ? <Fold key={name} name={name} count={(value as unknown[]).length}>{view}</Fold> : view;
+  };
+  return (
+    <>
+      {Object.entries(closeout.output).map(([name, value], i) => field(name, value, i === 0))}
+      {closeout.replies && field('replies', closeout.replies)}
+      {closeout.missing.length > 0 && (
+        <p data-missing className="text-xs text-amber-700 dark:text-amber-400">declared and not given: {closeout.missing.join(', ')}</p>
+      )}
+    </>
+  );
+}
+
+/** A long field folded under its name and how many entries it holds; drawn only once opened, so a closed fold holds nothing to find. */
+function Fold({ name, count, children }: { name: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details data-fold={name} open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="rounded border border-neutral-200 dark:border-neutral-800">
+      <summary className="cursor-pointer px-2 py-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+        <span className="font-mono">{name}</span> · {count}
+      </summary>
+      {open && <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">{children}</div>}
+    </details>
+  );
+}
+
+/**
+ * What a step handed on, for the person deciding at its gate: what it needs, if it signed off blocked; its summary; each field it
+ * declared — for a plan its approach, then its files, steps and risks, a long one folded; and the files it named. The Output tab's
+ * drawing, without its outcome line and Raw switch: at a gate the step has signed off, and the statement whole is a tab away.
+ */
+export function HandedOn({ closeout }: { closeout: StepCloseout }) {
+  return (
+    <div data-handed-on className="min-w-0 space-y-3">
+      {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
+      <Markdown>{closeout.summary}</Markdown>
+      <DeclaredFields closeout={closeout} fold />
+      {closeout.artifacts.length > 0 && (
+        <div aria-label="Artifacts" className="text-xs text-neutral-500">
+          Artifacts:
+          <Artifacts artifacts={closeout.artifacts} />
+        </div>
       )}
     </div>
   );

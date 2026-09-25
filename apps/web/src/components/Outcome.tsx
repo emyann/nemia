@@ -42,12 +42,17 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
   );
 }
 
-/** A closeout's field under its name, drawn as `outputKind` says from its value and the schema it was declared by. */
-export function FieldView({ name, schema, value, artifacts, images }: { name: string; schema: unknown; value: unknown; artifacts: readonly StepArtifact[]; images: ReadonlySet<string> }) {
+/**
+ * A closeout's field under its name, drawn as `outputKind` says from its value and the schema it was declared by. `named` false where
+ * the name is said already, on the fold the field sits in.
+ */
+export function FieldView({ name, named = true, schema, value, artifacts, images }: {
+  name: string; named?: boolean; schema: unknown; value: unknown; artifacts: readonly StepArtifact[]; images: ReadonlySet<string>;
+}) {
   const kind = outputKind(schema, value, images);
   return (
     <section data-field={name} data-kind={kind} aria-label={name} className="min-w-0 space-y-1">
-      <h4 className="font-mono text-xs text-neutral-500">{name}</h4>
+      {named && <h4 className="font-mono text-xs text-neutral-500">{name}</h4>}
       <KindView kind={kind} schema={schema} value={value} artifacts={artifacts} />
     </section>
   );

@@ -266,6 +266,15 @@ engine's, not the harness's figure, and wrong the day a price changes. An engine
 running session has spent — in `claude agents`, its registration file, or a `cost-state` per turn — and 2.1.272 says it in
 none of them.
 
+**Since stage 4b (2026-09-25) the runtime keeps no budget at all.** The cap is a harness argument (`config.budgetUsd`),
+handed to a harness that keeps one as its own flag, and a cut it reports is carried on the attempt as `limit: 'budget'`,
+unjudged; whether a run went over its budget is the orchestrator's (`taskSpend`, `ownStatus` in agent-orchestrator's
+`run.ts`). That judgement reads what the runtime reported, and no harness reports a running session's spend — not `--bg`
+(above), not `claude -p`, whose one `result` is printed at its end, not `codex exec`, which reports no cost. So the
+orchestrator can say a run is over its budget only after an attempt has ended, and cannot stop a session mid-spend: the
+one live bound is still the harness's own cap, on a `claude` job alone. A harness that streamed its spend would let the
+orchestrator stop the session itself, through `stop`, with nothing in the runtime changed.
+
 ### 18. A `--bg` attempt's cost is read only once its session is let go
 
 Claude Code writes a `cost-state` pair as a session's process exits, and never per turn: every `--bg` transcript on this

@@ -266,6 +266,46 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   ]);
 });
 
+test("an ending whose check did not finish on the merge it staged is offered the bare `wf retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge", async () => {
+  const { repo, base } = aRepo();
+  const branch = 'wf/r-d20/implement';
+  branchOff(repo, branch, () => write(repo, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n'));
+  const landing = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    {
+      name: 'ship', after: ['implement'], body: 'Ship it.', harness: 'claude', workspace: 'main', gate: true, check: 'npm test',
+      output: { file: 'shipper.schema.json', schema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false } },
+    },
+  ];
+  settledTask('t-d20-implement', done);
+  settledTask('t-d20-ship', { ...done, message: 'Add sub\n\nsub beside add.' });
+  // Killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`).
+  journal('t-d20-ship-check', [
+    { kind: 'filed', at, brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: repo, maxAttempts: 1, harness: 'check' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-d20-ship-check/1', observed: 'failed', reason: 'deadline' },
+    { kind: 'settled', at, outcome: 'failed' },
+  ]);
+  writeRun({
+    id: 'r-d20', repo, baseRef: base, workflow: landing,
+    steps: {
+      implement: { taskId: 't-d20-implement', branch },
+      ship: { taskId: 't-d20-ship', workspace: repo, branch: 'main', check: { taskId: 't-d20-ship-check' }, landed: { aborted: 'its check did not finish' } },
+    },
+  });
+  const asks = path.join(root, 'runs', 'r-d20.asks');
+  fs.mkdirSync(asks, { recursive: true });
+  fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+
+  const { status, body } = await decisionOf('r-d20');
+  assert.equal(status, 200);
+  const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
+  assert.deepEqual(offered.map(({ command }: DecideCommand) => command), ['wf retry r-d20 ship'], JSON.stringify(body.commands));
+  assert.match(offered[0].said, /^ship: its check did not finish, so the run aborted the merge and nothing landed on main\. Merge and check again:  wf retry r-d20 ship$/);
+  assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
+});
+
 test("a step `denials: fail` stopped is offered the bare `wf retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `wf decide` said — and reads `denied`, waited on by a person", async () => {
   const denying = [{ ...workflow[0], harness: 'claude', denials: 'fail' }, { ...workflow[1], harness: 'claude' }];
   journal('t-d11-implement', [

@@ -53,7 +53,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
   or `WF_ARTIFACTS=<your files directory> npm run e2e` in a run, whose PNGs are the screenshots the ui reviewer reads). A
   round's check builds but runs no e2e: the shipped lines run it only where no `WF_BASE_REF` is set, so once, on the merged
-  tree, in the shipper's hands, and your own run is the only e2e the change meets before
+  tree, in ship's check, and your own run is the only e2e the change meets before
   the merge (since 2026-09-25). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
   export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
   `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
@@ -87,9 +87,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
 - **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
-  every check it executes of a git run; the ship has no `check:` and its shipper runs `workChecks`' line by hand, mid-merge, with
-  nothing set, so `WF_STEP=ship` never occurs. The shipped lines read what was touched and hold the e2e for the merged tree on that
-  one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
+  every check it executes in a step's worktree of a git run. A ship's `check:` is its implement's line, and the run executes it on the
+  merged tree in the main checkout with `WF_STEP=ship` and no `WF_BASE_REF` (the tick leaves it out for a `workspace: main` step), so
+  the line reads what the merge brings and the e2e runs there once. The shipped lines read what was touched and hold the e2e for the
+  merged tree on that one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
   runs each both ways; learned by the run that took the e2e out of the rounds).
 - **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
   `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
@@ -233,6 +234,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `wf rm` still drew the run, and said nothing. Reading a query again is not a page saying what the read found: a page that must say a
   thing is gone reads the query's `error` beside its `data`, and a query whose 404 is an answer does not retry it (`runGone` and `retryRun`
   in `apps/web/src/lib/api/detail.ts`; learned by the run that made a `removed` event read the run's record again, round 2).
+- **A scroll made as a run's page opens lands short, whether an effect or the router's hash makes it.** The router resets the scroll after
+  the first render, which undoes an effect's `scrollIntoView`, and a `#hash` is scrolled to before `Decide` has read its decision and grown,
+  which then pushes the target back under the first screen (552 of 800, measured). A page opened on a step (`?step=`) scrolls again on each
+  change of the article's height for a few seconds, until the person moves the page themselves (`useLanding` in `routes/runs.$runId.tsx`);
+  the e2e's `expectOnScreen` wants the element wholly in the window, since its top alone was in it with no scroll at all (learned by the run
+  that linked a gate's card to what it approves).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the
@@ -576,6 +583,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
   A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
   (learned by the run that moved the judgement up).
+- **A judgement moved out of the runtime leaves a fact the board still reads as the old word, through `endWords`.** Stage 4b took the
+  runtime's `budget` end away (a cut is `limit: 'budget'` beside a `harness` end now), and the plan said the api and the board read no
+  budget field: they read the attempt's `reason`, through `endWords`, and would have drawn a capped try as `failed · harness`. A fact
+  that replaces a runtime word is mapped back in `endWords`, and the api's `app.test.ts` reads a journal of each shape. And widening a
+  condition in `ownStatus` to a new phase made an untyped test that left out the required `spendOf` throw: a test's call that omits an
+  argument passes only while the code never reaches it (learned by thin runtime stage 4b).
 - **A test that slices a source file between two names reads to its end once the second name is gone.** "`decide` never reads
   a harness argument" in `agent-runtime/test/engine.test.ts` took `decide`'s text as `slice(indexOf('export function decide('),
   indexOf('function resumeTarget('))`; with `resumeTarget` deleted, `indexOf` gave -1 and the slice ran on through `endOf` and the
@@ -588,6 +601,27 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   Codex's default, `workspace-write`, which writes, and nothing says so (`vocabulary.test.ts` shows it). And a form that draws a harness
   word draws only the fence its harness has (`takes`, `hasKey` in `apps/web`), or Claude Code gets an empty Sandbox picker (learned by the
   run that named Codex's sandbox `sandbox:`).
+- **In a `claude -p` job a turn cannot end to wait for a process in the background.** The harness demands the closing
+  statement at once (`[structured-output-enforce]`), so a session that starts a suite in the background and ends its turn to
+  wait has signed off, and the suite's verdict reaches nobody. Run long work in the foreground, in pieces under the 10-minute
+  limit of a Bash call, or start it in the background and wait on it with blocking calls — `timeout 580 bash -c "while kill -0
+  <pid>; do sleep 5; done"` — never by ending the turn. The implementers', reviewers' and shipper's briefs say so (the
+  owner's word at the plan gate of the run that moved the ship's check into the run, whose shipper had waited so on a check of twenty minutes).
+- **The ending's check is the run's, and a merge left staged on the base branch is the tick's to finish.** A gated `workspace: main`
+  step with a `check:` stages its merge and signs off the message; the tick files the check and, on the pass that reads it settled,
+  commits (exit 0) or aborts (anything else). Level-triggered: `landingDue` reads `MERGE_HEAD` off disk on every pass, so a restart
+  mid-check, mid-commit or after a person aborted by hand reads the same, and a merge whose heads are not the run's result branches is
+  never touched. That checkout is a person's, so a pass spawns git there only once a landing can be due — nothing in flight, and a
+  merge staged or a check settled (`mergeInProgress` is one stat) — and reads conflicts with `ls-files --unmerged`: `git diff` refreshes
+  the index and takes `index.lock`, and a pass every few seconds would race the shipper's own git (learned in review, round 1). The
+  session is filed denied `git commit` and `git merge --continue` (`filedDenies`), since only prose kept it from committing before
+  the check; a deny is a prefix, so a merge without `--no-commit` still commits, and codex, which takes no deny list, is refused a
+  landing at load. Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
+  nothing, and its offer is `wf retry <run> ship`, never `--recheck`: the merge it checked is gone (learned by the run that moved
+  the ship's check into the run). A landing owed is closed on every way the ending can end, not only on the ways that act: an ending
+  that stopped blocked with nothing staged was never written down, so a merge a person staged there after it, by hand or on trial,
+  read as the run's, and the next pass aborted it. It is written `landed: {untouched}` on the first pass that reads it settled (same
+  run, round 3).
 
 ## Rules the code keeps
 
@@ -639,7 +673,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **Never push, never merge, never `git branch -D`.** `.claude/settings.json` refuses the first
   and the last; a person merges after a trial merge runs the suite. The one exception is a run's
   ending step — `workflows/*/ship.md`, which runs in this checkout and is filed only once a person
-  approves it at its gate — and it merges the run's own result branch, aborting on any failure.
+  approves it at its gate — and it stages the merge of the run's own result branch and signs off its message;
+  the run then executes the ship's `check:` on the merged tree and commits on exit 0, or aborts the merge on
+  anything else, a check that did not finish included (`landingDue`).
   If you are a workflow step, commit as you go all the same: the run commits only what you leave
   uncommitted, in one commit under your step's name, and a person decides what ships. (F's two steps read the old wording as
   "do not commit" and handed off 1,300 lines in one commit each.)

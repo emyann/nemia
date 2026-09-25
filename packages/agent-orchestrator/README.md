@@ -530,7 +530,7 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
 | `codex` | refused at load | — |
@@ -1043,7 +1043,7 @@ retries: 1
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
   engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
   engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
-  whole `budgetUsd`; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  whole cap; and it restarted a session the harness failed too. The runtime makes one attempt per start since
   2026-09-23, and `maxAttempts:` is refused.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
@@ -1345,7 +1345,8 @@ file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and
 `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
 names neither does not fit the closeout the step is filed with. `again: true` sends the change round
 again, at most `rounds: 3`, as in `workflows/`. `ship` is `dev-build`'s: gated, the shipper in the repository's
-own checkout, which trial merges the run's branch, runs that line with nothing set, and commits or aborts. Its agent,
+own checkout, which stages the merge of the run's branch and signs off its message; the run executes that line on it as
+ship's `check:`, with no `WF_BASE_REF`, and commits or aborts. Its agent,
 `shipper`, is copied into this package's `workflows/agents/` beside ui's two.
 
 ```bash
@@ -1505,12 +1506,14 @@ end of a run is the last step of its workflow, in prose**, like every other step
 ---
 after: review
 workspace: main
+agent: shipper
 gate: true
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger
+check: npm test && npm run typecheck && …
 ---
-Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.
-…
 ```
+
+Its words are the shipper's (`workflows/agents/shipper.md`): *Ship it: stage the merge of this run's result onto the base
+branch, and sign off with the message to commit it with.*
 
 Another repository's says "open a pull request with the closeout as its body". A research workflow's last
 step is the study itself, gated, and approving it is the acceptance: nothing is merged, and nothing is
@@ -1521,15 +1524,43 @@ dropped. **Nothing in the packages knows what shipping means.**
   is merged into it, no `node_modules` is provisioned, and **the run commits nothing there** — what a person
   leaves lying in their checkout is theirs, and the step commits its own work as they would. The step is told
   where the work is instead of being told to read its workspace: the result branch, the base branch, and the
-  `git log` and `git diff` between them. Refused by name on a step with a `check:` — the run would execute it
-  in that checkout, which is a verdict on whatever is in it, not on the step's work, so an ending step runs
-  its check itself, in its prose — on a step with a `resume:`, whose session ran in another directory — and, at
+  `git log` and `git diff` between them. A `check:` there is allowed on a gated step alone, and is the run's
+  (next bullet); refused by name on an ungated one, whose check would be a verdict on whatever a person left in
+  that checkout, and `retries:` beside it — a try of an ending is a person's word, `wf retry <run> ship`. Refused
+  on a step with a `resume:`, whose session ran in another directory — and, at
   load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
   Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
-  it is told the run's artifacts directory, and that the checkout is to be left as it was found. The shipped shipper
-  (`workflows/agents/shipper.md`) writes its merge message there and commits it with `git commit -F`: a subject of what
-  shipped, the run's own title, and a short body read off `git log` and `git diff --stat` — never git's `Merge branch '…'`.
+  it is told the run's artifacts directory, and that the checkout is to be left as it was found.
+- **The run checks the merge and lands it, not the ending's session.** A gated `workspace: main` step with a `check:`
+  stages the merge (`git merge --no-ff --no-commit`) and signs off with the commit message as its closeout's `message`
+  (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
+  `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
+  (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
+  `CHECK_DEADLINE_SECONDS`, `nice`d, its log and `WF_STDERR` where a check's go, no `WF_BASE_REF`: mid-merge,
+  `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
+  `landEnding` in `tick.ts` acts), commits the merge with the message on exit 0 (`git commit -F -`) or runs
+  `git merge --abort` on anything else: a refusal, a check that did not finish, a message left blank, a merge that
+  conflicts or leaves out a result branch, a run cancelled or held first, or the session ending any way but `done`.
+  The step reads `checking` until then, `verified ✓` once the commit is made, and `failed ✗ check (…)` or `failed`
+  once the merge is aborted, and its record keeps which (`landed: {commit}` or `{aborted}`), which `wf ls` words on the
+  step's line — the commit, or why none was made — and the board with it. The session is filed denied `git commit` and
+  `git merge --continue` beside its own `disallowedTools:` (`filedDenies`), so it cannot commit the merge before the
+  check; a deny is a prefix, and a merge run without `--no-commit` would still commit, which the pass after records as
+  committed before its check ran. The parser refuses such an ending on codex, which takes no deny list. A job cannot hold its
+  turn open for a suite that runs twenty minutes; the run can, and a check that did not finish is not a verdict, so
+  it lands nothing — `wf decide` offers `wf retry <run> ship`, which merges and checks again, never `--recheck`,
+  since the merge it checked is gone. While the landing is owed, the checkout stays the run's (next bullets) and
+  `wf rm` refuses it. **Level-triggered**: a `MERGE_HEAD` on the base branch with no ship running is read off disk
+  on each pass; git is spawned in that checkout only once a landing can be due — the session and its check settled,
+  and a merge staged or a check to act on — and never takes its index lock (`ls-files --unmerged`, not `git diff`). A merge that is not this run's — its heads are not the result branches — is never touched. This
+  run's is committed only on the word of an exit 0 already recorded, and aborted otherwise; after a restart, a commit
+  already on the base branch is recorded as landed, and a merge a person aborted by hand is recorded with the
+  check's words. An ending that stopped on its own word — blocked, unsigned, failed — with nothing staged is written
+  down on the first pass that reads it settled (`landed: {untouched}`, with no git), so a merge a person stages there
+  after it, to resolve what stopped it or on trial, is theirs: no pass takes it back, and `wf rm` does not wait on it.
+  A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check
+  and commit itself, as before.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated
@@ -1580,7 +1611,7 @@ add-sub-8imz  add sub
    implement      verified ✓            wf/add-sub-8imz/implement
    review         unverified · done     wf/add-sub-8imz/implement
    ship           awaiting approval                                 · approve it: wf approve add-sub-8imz ship — or send it back: wf retry add-sub-8imz review --message "<objection>"
-   → to decide: Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why. — wf approve add-sub-8imz ship
+   → to decide: Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with. — wf approve add-sub-8imz ship
    → result: wf/add-sub-8imz/implement  —  wf decide add-sub-8imz
 ```
 

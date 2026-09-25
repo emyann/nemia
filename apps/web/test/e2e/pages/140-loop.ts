@@ -59,6 +59,9 @@ export default {
     await expectCount(timeline.locator('tfoot tr[data-total]'), 4, "a total for each of the loop's three rounds, and the run's");
     await node(LOOPING.exhausted).click();
     const inspector = page.locator(`aside[aria-label="Step ${LOOPING.exhausted}"]`);
+    // Signed off blocked, it opens on its Output; its note is under Details, the tab kept as implement is pressed below.
+    await expectVisible(inspector.getByRole('tab', { name: 'Output', selected: true }), `${LOOPING.exhausted}'s inspector opens on Output: it has signed off`);
+    await inspector.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(inspector.locator('[data-state="exhausted"]'), `the step inspector opens on a click on ${LOOPING.exhausted}`);
     await expectVisible(inspector.locator('[data-note]', { hasText: LOOPING.notes.review }), `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`);
     await settled(page);

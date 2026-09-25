@@ -17,6 +17,8 @@ export type AttemptClock = {
   startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null; resumeFrom?: string;
   /** How it ended — `done` once it signed — and the turn of a task held open it ran, as the engine's `Attempt` keeps them. */
   ended?: string | null; turn?: number;
+  /** A limit its harness said it ended the session at — `budget`, the step's cap — carried by the runtime and judged here (`taskSpend`). */
+  limit?: string;
 };
 
 /**

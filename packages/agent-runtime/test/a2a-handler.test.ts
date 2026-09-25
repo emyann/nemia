@@ -17,13 +17,13 @@ import {
 import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/domain.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
 const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `say`, `transcript` — unless `bare`, which leaves it the four every driver has;
+ * driver may have — `find`, `release`, `say`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every driver has;
  * `noFind` takes `find` alone away.
  */
 const harness = (o: {
@@ -72,6 +72,11 @@ const harness = (o: {
       say: (session: { name: string; sessionId: string }, text: string) => Effect.suspend(() => {
         asked.push(['say', [session, text]]);
         return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
+      }),
+      // Told what is expected, it lists those alone: what a driver that reads less when told looks like.
+      observeFor: (expected: readonly ExpectedSession[]) => Effect.suspend(() => {
+        asked.push(['observeFor', expected]);
+        return Effect.succeed(new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))));
       }),
       transcript: (sessionId: string, after?: string) => Effect.suspend(() => {
         asked.push(['transcript', [sessionId, after]]);
@@ -515,7 +520,7 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
   const { extensions, ...rest } = card.capabilities!;
   assert.deepEqual(rest, { streaming: false, pushNotifications: false, extendedAgentCard: false });
   assert.deepEqual(extensions.map((e) => [e.uri, e.required, e.params]), [
-    [RUNTIME_EXTENSION, false, { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript'], say: true }],
+    [RUNTIME_EXTENSION, false, { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript', 'observeSessions'], say: true }],
   ]);
   assert.deepEqual([card.defaultInputModes, card.defaultOutputModes], [['text/plain'], ['text/plain']]);
 });
@@ -523,6 +528,28 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
 test("REFUSED on the card: a verb the driver lacks is not offered, and logs, which every driver has, always is", async () => {
   const card = await harness({ bare: true }).handler.getAgentCard();
   assert.deepEqual(card.capabilities!.extensions.map((e) => e.params), [{ methods: ['sessionLogs'], say: false }]);
+});
+
+test('observeSessions hands the driver what is expected, and answers what it listed as Tasks', async () => {
+  const h = harness();
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'done' });
+  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
+  const { tasks } = await h.handler.observeSessions({ expected }, ctx);
+  assert.deepEqual(tasks.map((t) => [t.id, t.status!.state]), [['ae/t-1/1', TaskState.TASK_STATE_WORKING]]);
+  assert.deepEqual(h.acted(), [['observeFor', expected]]);
+});
+
+test('REFUSED: observeSessions on a driver without the verb, and with a list that names no session', async () => {
+  const bare = harness({ bare: true });
+  await assert.rejects(bare.handler.observeSessions({ expected: [] }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness lists its sessions in full, told nothing: list them (listTasks).'));
+  const h = harness();
+  const malformed = '`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.';
+  for (const expected of [undefined, 'ae/t-1/1', [{ name: 'ae/t-1/0' }], [{ name: 7 }], [null]]) {
+    await assert.rejects(h.handler.observeSessions({ expected } as never, ctx), refusedWith(RequestMalformedError, malformed));
+  }
+  assert.deepEqual([...bare.asked, ...h.asked], [], 'a refused list asks the harness nothing');
 });
 
 test('words to a running session reach the harness with the id it lists, and the Task answers as it was seen', async () => {

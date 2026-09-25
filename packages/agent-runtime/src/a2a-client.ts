@@ -2,8 +2,8 @@
  * The engine's side of the A2A seam: a harness's `RunnerOps`, rebuilt as calls through the SDK's `Client` to that
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
- * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release` and the
- * transcript, which A2A has no call for, through the runtime extension's methods on the same transport. One reaches the
+ * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release`, the
+ * transcript and `observeFor`, which A2A has no call for, through the runtime extension's methods on the same transport. One reaches the
  * driver directly: `refuses`, which is no call to a session but the harness judging a task before any is filed. Nothing the engine reads changes: a harness's words come back as the same
  * `RunnerError`, `refused` where the harness vouched nothing started, and a driver's defect as the defect it is.
  */
@@ -21,7 +21,7 @@ import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
+import { Runner, RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods, type TranscriptRequest,
 } from './a2a-handler.ts';
@@ -106,6 +106,10 @@ export class InProcessTransport implements Transport {
   sessionTranscript(params: TranscriptRequest): Promise<Transcript | null> {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
+
+  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[] }> {
+    return this.handler.observeSessions(params, new ServerCallContext());
+  }
 }
 
 /** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
@@ -152,7 +156,7 @@ export type SeamOps = RunnerOps & {
  * lists every page. `stop` cancels the session by name, read off the last listing, since the engine stops by session id;
  * a session no listing has is not stopped blindly but refused in words, where a driver was handed the id to make of what
  * it would. The engine stops only a session the pass has just seen live, so it never asks for that. `say` is a follow-up
- * message on the session's Task. `find`, `logs`, `release`, `transcript` and `transcriptOf` are the extension's methods. A verb is offered as the card
+ * message on the session's Task. `find`, `logs`, `release`, `transcript`, `transcriptOf` and `observeFor` are the extension's methods. A verb is offered as the card
  * says — the verbs the harness's driver lacks are left off it — so the engine reads the same absences it read before.
  */
 export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
@@ -177,6 +181,16 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       }));
     }));
 
+  /** Each listed Task's sighting, by name, or the harness's words for one that carries none. */
+  const sightingsOf = (verb: string, tasks: readonly Task[], seen: Map<string, Sighting>): Effect.Effect<void, RunnerError> => {
+    for (const t of tasks) {
+      const s = sightingOf(t);
+      if (!s) return Effect.fail(new RunnerError({ verb, message: `the \`${harness}\` harness listed \`${t.id}\` with no sighting it could be read by.` }));
+      seen.set(t.id, s);
+    }
+    return Effect.void;
+  };
+
   const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.gen(function* () {
     const seen = new Map<string, Sighting>();
     let pageToken = '';
@@ -185,15 +199,18 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
         tenant: '', contextId: '', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: MOST_PER_PAGE, pageToken,
         historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false,
       }));
-      for (const t of page.tasks) {
-        const s = sightingOf(t);
-        if (!s) {
-          return yield* Effect.fail(new RunnerError({ verb: 'observe', message: `the \`${harness}\` harness listed \`${t.id}\` with no sighting it could be read by.` }));
-        }
-        seen.set(t.id, s);
-      }
+      yield* sightingsOf('observe', page.tasks, seen);
       pageToken = page.nextPageToken;
     } while (pageToken);
+    names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
+    return seen;
+  });
+
+  // What it lists is all `stop` has to go by, as for `observe`: a session it left out is listed in full when a stop asks for it.
+  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Map<string, Sighting>, RunnerError> => Effect.gen(function* () {
+    const seen = new Map<string, Sighting>();
+    const { tasks } = yield* call('observe', () => transport.observeSessions({ expected }));
+    yield* sightingsOf('observe', tasks, seen);
     names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
     return seen;
   });
@@ -240,6 +257,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     ...(offered.methods.includes('findSession') ? { find } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
+    ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
     ...(offered.say ? { say } : {}),
     // Direct by design, and for good: `refuses` is no call to a session (see the header).
     ...(ops.refuses ? { refuses: ops.refuses } : {}),

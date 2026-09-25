@@ -142,7 +142,8 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
   sizes.push({ finished: 200, cost: await steady() });
 
   const [none, hundred, twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
-  assert.ok(journals(none) >= 3, `the runs in flight are read (${journals(none)} reads)`);
+  // Read off the views the runtime's pass reported (`reportedEngine`): before, each run in flight cost a view of its step, and this said `>= 3`.
+  assert.ok(journals(none) < 3, `the three runs in flight are read off the runtime's pass, with no view of their own (${journals(none)} reads)`);
   assert.ok(observes(none) >= 1, `and their harness observed (${observes(none)} observes)`);
   for (const [at, c] of [[100, hundred], [200, twoHundred]] as const) {
     assert.equal(c.rested, at, `every finished run of ${at} answered from memory`);

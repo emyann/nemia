@@ -26,7 +26,7 @@ import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState,
 import { collectArtifacts } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
-import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
+import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, reportedEngine, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
 import { momentumOf, toAdmit } from './admission.ts';
 import { addRuntime, aside, countRested, metered, within, type Tallies } from './tally.ts';
@@ -1014,8 +1014,11 @@ export async function tick(e: Engine, { repo = process.cwd(), memo = restMemo(e)
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 }
 
-async function pass(e: Engine, repo: string, memo: RestMemo, verify: boolean): Promise<Pass> {
-  const report = await e.tick();
+async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolean): Promise<Pass> {
+  const report = await engine.tick();
+  // Every read of a task below takes the view the runtime's pass built of it off its one observation; one the pass did not report — settled,
+  // or changed by this pass since — is the engine's, read off its record where it is settled (`reportedEngine`).
+  const e = reportedEngine(engine, report.views ?? []);
   // After the runtime's pass, so what it appended on it — a settled task's `measured` — is read on this one. What is appended after is
   // read on the next, and a run the memo answers on this pass in between was read at rest before it: nothing is lost, only a pass later.
   const resting = await restingPass(e, memo, verify);

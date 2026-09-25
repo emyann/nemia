@@ -62,6 +62,43 @@ export const waitsForWord = (views: ReadonlyMap<string, TaskView>) => (taskId: s
 export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? view.state.inputs?.length ?? 0 : 0);
 
 /**
+ * The engine a pass's `advance` reads, whose `view` of a task the runtime's pass reported is that report's (`TickReport.views`): a view
+ * built off the pass's one observation, where `e.view` would observe the task's harness again — a `claude agents` call for a background
+ * session, on every pass, for every step in flight.
+ *
+ * A task the report does not carry is read with `e.view`, and that asks no harness in the common case. The report carries every task the
+ * runtime's pass left unsettled, so what it lacks is a task settled — read off its record, and found by name where its record lacks its
+ * session's id, never observed — or one never filed, which is read as `unknown`. And a task a verb of this pass has changed since: `file`,
+ * `admit`, `answer`, `stop`, `close` and `say` each drop the view of the tasks they name, so what `advance` reads after its own act is the
+ * engine's, never a report from before it. A verb this does not know drops every view, for the same reason.
+ */
+export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
+  const reported = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
+  return new Proxy(e, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver) as unknown;
+      if (key === 'view') return (taskId: string) => { const v = reported.get(taskId); return v ? Promise.resolve(v) : target.view(taskId); };
+      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key))) return value;
+      return (...args: unknown[]) => {
+        const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
+        if (named) for (const taskId of named(args)) reported.delete(taskId);
+        else reported.clear();
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
+}
+
+/** The engine's verbs that change no task. */
+const ENGINE_READS = new Set(['tick', 'list', 'logs', 'transcript', 'feed', 'watch', 'io', 'start']);
+
+/** The engine's verbs that change a task, each with the tasks it names: a filing names none the report could carry. */
+const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
+  file: () => [], admit: ([ids]) => (Array.isArray(ids) ? ids : []),
+  answer: ([id]) => [id], stop: ([id]) => [id], close: ([id]) => [id], say: ([id]) => [id],
+};
+
+/**
  * The engine's word on every task this run has filed, read once.
  *
  * One read per task per pass, shared by everything that then wants an answer: `advance` needs the

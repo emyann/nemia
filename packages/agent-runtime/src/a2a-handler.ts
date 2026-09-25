@@ -32,7 +32,7 @@ import {
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import { fold, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
-import { RunnerError, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   canceledTask, contextRefusal, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION,
   spawnOf, startedTask, taskOfAttempt, taskOfSighting, type SessionMethod,
@@ -77,7 +77,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
       params: {
         methods: [
           ...(ops.find ? ['findSession' as const] : []), 'sessionLogs' as const, ...(ops.release ? ['releaseSession' as const] : []),
-          ...(ops.transcript ? ['sessionTranscript' as const] : []),
+          ...(ops.transcript ? ['sessionTranscript' as const] : []), ...(ops.observeFor ? ['observeSessions' as const] : []),
         ],
         say: ops.say !== undefined,
       } satisfies RuntimeExtensionParams,
@@ -111,6 +111,12 @@ export interface SessionMethods {
    * `sessionId`, the harness reads that session, as `Runner.transcript` is asked. One of the two, never both.
    */
   sessionTranscript(params: TranscriptRequest, context: ServerCallContext): Promise<Transcript | null>;
+  /**
+   * The sessions the harness lists, each a Task as `listTasks` gives it, told which ones the journal expects: every one of
+   * those it lists, and whatever else it lists for no more (`RunnerOps.observeFor`). Answered whole, on no page: its caller
+   * is a pass in this process, which reads every task at once.
+   */
+  observeSessions(params: { expected: readonly ExpectedSession[] }, context: ServerCallContext): Promise<{ tasks: Task[] }>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -345,6 +351,17 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       ?? (await this.run(this.ops.observe).catch(() => new Map<string, Sighting>())).get(params.name)?.sessionId;
     if (!sessionId) return null;
     return this.run(this.ops.transcript(sessionId, params.after));
+  }
+
+  async observeSessions(params: { expected: readonly ExpectedSession[] }, _context: ServerCallContext): Promise<{ tasks: Task[] }> {
+    if (!this.ops.observeFor) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`);
+    }
+    if (!Array.isArray(params.expected) || !params.expected.every((e) => typeof e?.name === 'string' && nameParts(e.name))) {
+      throw new RequestMalformedError('`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.');
+    }
+    const listed = await this.run(this.ops.observeFor(params.expected));
+    return { tasks: [...listed].map(([name, s]) => taskOfSighting(name, s)) };
   }
 
   async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext): Promise<TaskPushNotificationConfig> {

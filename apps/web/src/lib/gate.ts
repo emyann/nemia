@@ -6,7 +6,7 @@
  * sentences joining them are the board's: `wf ls` prints the command, and a person asked what approving does had to know the package.
  */
 import type { Decidable, RunDetail, RunSummary, StepAsked } from './api';
-import { askedSaid, needsOf, type Need } from './asks.ts';
+import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 
 type DetailStep = RunDetail['steps'][number];
@@ -62,6 +62,17 @@ export function gateCardLine(gate: GateAsk): string {
   if (!gate.back.length) return `${approving}: it waits on no step to send back`;
   return `${approving}, or send ${gate.ends ? `${backName(gate.back)} back` : 'it back'}`;
 }
+
+/**
+ * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and where on
+ * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is: `Read the plan`
+ * for the step the shipped folders call `plan`, `Read what it handed on` for any other. An ending has handed nothing on and has no closeout
+ * of its own: its section (`hash`), where what it would act on is drawn beside its gate.
+ */
+export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>
+  (gate.ends
+    ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) }
+    : { words: gate.step === 'plan' ? 'Read the plan' : 'Read what it handed on', step: gate.step });
 
 /**
  * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve plan's hand-off`. Both name the step as

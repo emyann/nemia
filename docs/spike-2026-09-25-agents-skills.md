@@ -445,14 +445,13 @@ is the length of the operator's own agent body.
   - Whether a style in a project's `.claude/output-styles/` takes a bare name (F16). Only a plugin's style was measured.
   - Whether a job should read the owner's user-level settings, plugins and skills at all (F9).
   - Whether an edited agent should reach a resumed session. It does not by default, and it would take `--system-prompt-snapshot off` and a cache rewrite (F13).
-  - How HKB resolves a name clash between the store's skills and the repository's. Claude Code does nothing here: a plugin's skills are
-    namespaced and cannot clash (F4).
-  - What HKB does with a haiku agent and no mode. `auto` quietly becomes `default`, and every call that needs approval is then denied (F20).
-    The choice is between an explicit mode for such an agent and a refusal of `auto` at load. The models that support `auto` were not measured.
+  - ~~How HKB resolves a name clash between the store's skills and the repository's.~~ Card 1a: the repository's wins, and a name one
+    repository has in both `workflows/` and `.claude/` is refused (`lookupRoots` in `agent-orchestrator/src/workflow-store.ts`).
+  - ~~What HKB does with a haiku agent and no mode.~~ Card 1a: `auto` is refused at load on the models measured to drop it (F21).
 
 ## 8. Measured by card 1a (2026-09-25)
 
-Three findings the build of card 1a needed, taken on Claude Code 2.1.282 in `/tmp/f21-b5ms`, outside every worktree and outside
+What the build of card 1a needed, taken on Claude Code 2.1.282 in `/tmp/f21-b5ms` (F23 in `/tmp/b5ms-live.L74o`), outside every worktree and outside
 `~/.claude/`.
 
 ### F21. Which models run `auto`
@@ -494,3 +493,23 @@ claude -p x --append-system-prompt-file /nonexistent/x.md --output-format json  
 Nothing on stdout in either case, and no session. *For the design:* the owner chose no new path for it (plan gate, try 3): such a job is
 an ordinary `failed` end with its exit code, and the detached worker already writes the harness's stderr into the attempt's log, which
 `logs` reads (`agent-runtime/test/claude-code.test.ts` proves it with a fake that answers as the CLI does).
+
+### F23. A run's own step, rendered, keeps the default prompt with the agent's body after it
+
+The live proof card 1a was asked for: a real `wf start` and `wf tick`, the orchestrator of this branch, on a store and a folder team made
+for it (`mktemp -d /tmp/b5ms-live.XXXX`). The step `write` names the agent `scribe`: `model: haiku`, `permissionMode: dontAsk`,
+`allowedTools: Edit(**)`, `tools: Read, Write, Edit, Skill`, `skills: code-word`, and a body that opens `LIVE-APPEND-MARKER-4471` and
+asks it to load its skill and write the code word into `note.md`. The skill `code-word` is the store's, its body
+*"SKILL-BODY-MARKER-8812. The team's code word is OTTER-3391."*
+
+- `wf start` wrote `runs/<id>/agents/write/prompt.md` (the body, then *"Your skills, each loaded with the Skill tool by its name when you
+  need it: `hkb-scribe:code-word`."*) and the plugin `hkb-scribe/` with `.claude-plugin/plugin.json` and `skills/code-word/SKILL.md`.
+- The engine's task was filed with `config.claude` = `{ appendSystemPromptFile: …/prompt.md, pluginDir: [ …/hkb-scribe ] }`, and its brief
+  opened on the step's own note and `## What was asked for`, with no line of the body.
+- The transcript's last `prompt_snapshot` holds **16 blocks, 27,729 characters: the 15 of the default prompt, `You are an interactive
+  agent …` through `# Context management` and its two closing blocks, then the body as block 15** (304 characters, the prompt file's whole
+  text). `cliPrefix` is the appended form's, as in F1.
+- The session called `Skill` with `hkb-scribe:code-word`, then `Write`, and `note.md` holds `OTTER-3391`. It settled `done`, $0.03.
+
+*For the design:* the flags reach Claude Code as the spike measured them, from the run's own files: the default is kept, the body follows it,
+and a skill given by `skills:` loads under its plugin's namespace in a `dontAsk` job whose `tools:` allow `Skill`.

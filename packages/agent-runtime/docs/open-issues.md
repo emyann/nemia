@@ -805,6 +805,23 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
   whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that
   nothing is left.
 
+### 33. A pass reads every task's journal, settled or not (2026-09-25)
+
+`tick()` (`src/engine.ts`) lists every id in the journal and folds each on every pass, so a store's runtime phase grows
+with every task ever filed: on this machine's store, 16 MB of journals over 1,167 tasks. The orchestrator stopped paying
+for finished runs on its side (agent-orchestrator's *Shipped: a finished run costs a pass nothing unless something of it
+changed*), and the runtime's phase is what is left. Skipping a settled task is not simply `if (settled) continue`:
+
+- **A settled task can still be written to.** `releaseFinished` releases a session the observation still lists after its
+  task settled, and appends its `measured` then, since Claude Code writes a session's cost only as its process exits. So a
+  pass may skip a settled task only while no session of it is listed. The orchestrator's memo reads the feed after the
+  runtime's pass for the same reason: a `measured` appended on that pass takes the run out on the pass that wrote it.
+- **The card**, for when it is taken up: fold the tasks not settled, the tasks the runtime's own feed names since a cursor
+  kept in the process, and the settled tasks whose sessions the pass's observation still lists; fold everything on a
+  process's first pass; prove that `decide` of a settled task does nothing in every case, a task settled with its attempt
+  still open among them, and that a `stop-requested` or a second `file` leaves it settled; and meter that a second pass over
+  N settled journals reads only the feed's new bytes.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

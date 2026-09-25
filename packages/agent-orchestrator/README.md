@@ -2255,6 +2255,15 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   and said as `measuring`. On a copy of a working store's 191 run records (2026-09-25, a fake engine), a pass took 470 to 600 ms and
   measuring it 1.8 to 2.9 ms, under half a percent; git took 400 to 480 ms of the pass, in 233 processes, and the records 13 to 28 ms for
   their 2.8 MB. Outside a pass the readers count nothing, at the price of one comparison. The api serves the last pass beside the ceilings (`/api/ceilings`), and the Factory's header says `a pass takes N ms`.
+- **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
+  workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest.ts`) — is
+  answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
+  asks directory and its `done/`: `restStamps`, one `readdir` and a `stat` each), each of its tasks' journals (the runtime's feed, read
+  once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (one `git for-each-ref` a
+  repository). The breakdown says how many (`, 200 runs at rest answered from memory`); on a store of 200 finished runs and a few in
+  flight a pass reads 4 journals and starts 2 git processes, as it does with none (`test/rest-store.test.ts`). The memo lives in the
+  daemon's memory and nowhere else, and a restart rebuilds it with one full pass: it never decides what a full pass would not.
+  The tests that tick set `WF_VERIFY_REST=1`, which judges every run answered from memory in full as well and throws where the two differ.
 
 ## Calling a run off
 
@@ -2544,6 +2553,7 @@ holding a concurrency slot forever.
 | `src/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
 | `src/retry.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`tryOf`, `retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`, `retryRefusal`) stays in `run.ts` |
 | `src/admission.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`) |
+| `src/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick.ts`'s |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |

@@ -25,7 +25,8 @@ export type HarnessCost = { calls: number; ms: number; listed: number; spawned: 
 /**
  * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass. `records`
  * is the run records it read, `bytes` and `spawned` its totals, and `overheadMs` what measuring took — the counting inside the pass, and
- * composing this after it and writing it down — so that the meter's own cost is measured too.
+ * composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass answered from
+ * its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them — absent from a pass written before there was one.
  */
 export type PassCost = {
   at: string;
@@ -36,6 +37,7 @@ export type PassCost = {
   bytes: number;
   spawned: number;
   overheadMs: number;
+  rested?: number;
 };
 
 /** A pass's cost from its counts: the totals summed from the phases. */
@@ -105,7 +107,8 @@ export const breakdownLines = (c: PassCost): string[] => {
   const harnesses = Object.entries(c.harnesses).sort(([a], [b]) => a.localeCompare(b)).map(([name, h]) =>
     `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started`);
   return [
-    `the last pass, at ${c.at}: ${msWord(c.ms)} ms, ${plural(c.records, 'run record')} read, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started`,
+    `the last pass, at ${c.at}: ${msWord(c.ms)} ms, ${plural(c.records, 'run record')} read, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started` +
+      `${c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''}`,
     line(head),
     ...rows.map(line),
     ...(harnesses.length ? ['observed, by harness (at once, so their times overlap):', ...harnesses] : ['no harness was observed']),
@@ -122,6 +125,7 @@ export const parsePassCost = (text: string): PassCost | undefined => {
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const phases = r.phases as Record<string, Record<string, unknown>> | undefined;
   if (typeof r.at !== 'string' || !num(r.ms) || !num(r.records) || !num(r.bytes) || !num(r.spawned) || !num(r.overheadMs)) return undefined;
+  if (r.rested !== undefined && !num(r.rested)) return undefined;
   if (!phases || typeof phases !== 'object' || !PHASES.every((p) => phases[p] && ['ms', 'calls', 'bytes', 'reads', 'spawned'].every((k) => num(phases[p]![k])))) return undefined;
   if (!r.harnesses || typeof r.harnesses !== 'object' || Array.isArray(r.harnesses)) return undefined;
   return c as PassCost;

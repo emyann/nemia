@@ -646,6 +646,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   step and returned `[]` — refused now, as `step`'s third argument is (`StepRefused`, found in review of the same run). An `Effect.fn` generator that must see
   its arguments cannot declare `...args: never[]` (TS2769 at the call site); it declares none and reads `[...arguments]` (`tick` in
   `agent-runtime/src/engine.ts`, learned by the run that retired the runtime's ceiling).
+- **A finished run is answered from the tick's memory while what it was judged on stands, so a new input of its pass is watched or
+  missed.** The memo (`restMemo` in `agent-orchestrator/src/tick.ts`, `atRest` in `src/rest.ts`) answers a run at rest while its files in
+  the store stamp the same (`restStamps`: the record, the markers, the asks and `done/`), no task of it is on the runtime's feed since, and
+  its result branches stand at the tips it recorded. A new input `advance` reads for a finished run goes into one of the three, or a
+  daemon answers that run stale until it restarts. `WF_VERIFY_REST=1`, set by every test file that ticks a store, judges each answer in
+  full too and throws on a difference, so a new such file sets it. The feed is read after `e.tick()`, since the runtime appends a settled
+  task's `measured` on its pass. And a test that takes "a run at rest" from a store earlier tests wrote takes one none of them touched:
+  an acceptance of a step with no loop is read and never consumed, so it stays, and a run a test retried or approved is not like the rest
+  (`aResting` in `test/rest-store.test.ts`; learned by the run that made a finished run cost a pass nothing).
 
 ## Rules the code keeps
 

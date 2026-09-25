@@ -174,3 +174,18 @@ export function resultBranches(run: Run): string[] {
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 }
+
+/**
+ * Every branch of a repository and the commit it is at, in one `for-each-ref` — the tips of every finished run of that repository at once,
+ * for the tick's memo of runs at rest (`rest.ts`), which asks git once a pass for a repository rather than once for each of its runs.
+ * Nothing, where git cannot read the repository.
+ */
+export function headsOf(repo: string): Record<string, string> {
+  const listed = gitSays(repo, 'for-each-ref', '--format=%(objectname) %(refname)', 'refs/heads/') ?? '';
+  const heads: Record<string, string> = {};
+  for (const line of listed.split('\n')) {
+    const space = line.indexOf(' ');
+    if (space > 0) heads[line.slice(space + 1).replace(/^refs\/heads\//, '')] = line.slice(0, space);
+  }
+  return heads;
+}

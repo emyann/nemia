@@ -22,8 +22,11 @@ import { PHASES, type Phase, type PhaseCost } from './meter.ts';
 type Kind = Phase;
 type Tally = PhaseCost;
 
-/** A pass's counts: each kind's, the run records read, and the time the counting itself took (`overheadMs`). */
-export type Tallies = { kinds: Record<Kind, Tally>; records: number; overheadMs: number };
+/**
+ * A pass's counts: each kind's, the run records read, the runs at rest answered from the tick's memo (`rested`), and the time the counting
+ * itself took (`overheadMs`).
+ */
+export type Tallies = { kinds: Record<Kind, Tally>; records: number; rested: number; overheadMs: number };
 
 type Frame = { kind: Kind };
 type Meter = Tallies & { stack: Frame[]; mark: number };
@@ -91,6 +94,11 @@ export const countRecord = (): void => {
   if (meter) meter.records++;
 };
 
+/** One run at rest, answered from the tick's memo (`rest.ts`). */
+export const countRested = (): void => {
+  if (meter) meter.rested++;
+};
+
 /**
  * What the runtime reported of a call, added to the kind that made it — its bytes, reads and processes — with the time it spent observing
  * its harnesses and the processes those started moved from that kind to `observe` (`observed`, at most the call's own).
@@ -139,13 +147,13 @@ export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: n
     return { value: await f(), ms: performance.now() - t0 };
   }
   const t0 = performance.now();
-  const m: Meter = { kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>, records: 0, overheadMs: 0, stack: [], mark: t0 };
+  const m: Meter = { kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>, records: 0, rested: 0, overheadMs: 0, stack: [], mark: t0 };
   meter = m;
   try {
     const value = await f();
     const end = performance.now();
     charge(m, end);
-    return { value, ms: end - t0, tallies: { kinds: m.kinds, records: m.records, overheadMs: m.overheadMs } };
+    return { value, ms: end - t0, tallies: { kinds: m.kinds, records: m.records, rested: m.rested, overheadMs: m.overheadMs } };
   } finally {
     meter = undefined;
   }

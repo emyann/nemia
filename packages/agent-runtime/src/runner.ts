@@ -101,6 +101,9 @@ export type TranscriptCursor = string;
 /** A read of a session's conversation: the events from the cursor asked with, and the cursor to ask again with. */
 export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor };
 
+/** A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), and the harness its task was filed on. */
+export type ExpectedSession = { name: string; harness?: string };
+
 /**
  * The seam itself, as a plain value.
  *
@@ -110,12 +113,21 @@ export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor }
  * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
  * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
  * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
- * its state.
+ * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
   /** Every session this runner knows about, BY NAME. One call per pass, never per task. */
   readonly observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
+  /**
+   * `observe`, told which sessions the journal expects: at least every one named in `expected` that the harness lists,
+   * and whatever else it lists for no more. Optional — for a harness that can leave out a costly registry when nothing
+   * expected can be in it (Claude Code: `claude agents`, when every name expected is a job's). A runner without it is
+   * observed in full. Told names, never asked for them: the pass reads them off the journal on every pass, so a session
+   * started before a restart is expected on the first pass after it. `harness` is the harness the task was filed on, for
+   * a runner that routes (`composite`), and read by no other.
+   */
+  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Map<string, Sighting>, RunnerError>;
   /**
    * The one session running under `name`, found without observing every other: which session it is, and nothing of
    * its state. Optional — for a harness that can answer by name for less than `observe` costs (Claude Code: the

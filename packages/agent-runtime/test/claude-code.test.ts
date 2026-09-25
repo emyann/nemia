@@ -26,7 +26,7 @@ const BG_ID = '5e551011-0000-4000-8000-00000000000b';
  * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as
  * 2.1.280 does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin
  * ends. The result names its `type` last, as 2.1.280's does. `--bg` records its arguments; `agents` lists what
- * `agents.json` holds; `stop` and `rm` are recorded in order.
+ * `agents.json` holds, a line in `agents-calls` each time; `stop` and `rm` are recorded in order.
  */
 const fake = () => {
   const dir = tmp('bin');
@@ -35,7 +35,7 @@ const fake = () => {
   fs.writeFileSync(path.join(dir, 'claude'), [
     '#!/bin/sh',
     'case "$1" in',
-    `  agents) cat '${dir}/agents.json' ;;`,
+    `  agents) echo x >> '${dir}/agents-calls'; cat '${dir}/agents.json' ;;`,
     `  stop|rm) echo "$@" >> '${dir}/verbs' ;;`,
     `  --bg) printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
     `  -p) printf '%s\\n' "$@" > '${dir}/job-args.tmp'; mv '${dir}/job-args.tmp' '${dir}/job-args'`,
@@ -124,6 +124,30 @@ test('observe lists the jobs and the background sessions in one map — and a re
     const jobs = await Effect.runPromise(ops.observe);
     assert.equal(jobs.has('ae/j/1'), true, "`claude agents` failing does not hide a job");
     assert.equal(jobs.has('ae/b/1'), false);
+  } finally { f.restore(); }
+});
+
+test('observeFor asks `claude agents` only when a session expected is not a job: none for jobs alone or nothing, one for a background session', async () => {
+  const f = fake();
+  try {
+    const ops = opsIn(tmp('root'));
+    const calls = () => f.read('agents-calls')?.length ?? 0;
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([{ name: 'ae/b/1', sessionId: BG_ID, state: 'working', status: 'busy', kind: 'background' }]));
+
+    assert.equal((await Effect.runPromise(ops.observeFor!([]))).size, 1, 'nothing expected: the jobs, off their run files');
+    const jobs = await Effect.runPromise(ops.observeFor!([{ name: 'ae/j/1', harness: 'claude' }]));
+    assert.equal(jobs.get('ae/j/1')?.sessionId, 'ae/j/1');
+    assert.equal(calls(), 0, 'a pass with only jobs in flight spawns no `claude agents`');
+
+    // A background session is known by nothing on the task: its name is simply not a job's.
+    const both = await Effect.runPromise(ops.observeFor!([{ name: 'ae/j/1', harness: 'claude' }, { name: 'ae/b/1', harness: 'claude' }]));
+    assert.equal(both.get('ae/b/1')?.sessionId, BG_ID);
+    assert.equal(both.get('ae/j/1')?.sessionId, 'ae/j/1');
+    assert.equal(calls(), 1, 'one expected session that is no job: one `claude agents`');
+
+    await Effect.runPromise(ops.observe);
+    assert.equal(calls(), 2, 'observe, told nothing, still asks the registry');
   } finally { f.restore(); }
 });
 

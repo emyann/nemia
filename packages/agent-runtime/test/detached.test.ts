@@ -536,6 +536,27 @@ test('the composite merges what every harness sees into one map', async () => {
   assert.equal(merged.get('ae/y/1')?.state, 'done');
 });
 
+test('the composite tells each harness only the sessions routed to it, and lists one that cannot be told in full', async () => {
+  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'done' }]]);
+  const told: Record<string, string[]> = {};
+  const telling = (name: string, sessions: Map<string, Sighting>) => ({
+    ...testOps({ sessions }),
+    observeFor: (expected: readonly { name: string }[]) => Effect.sync(() => { told[name] = expected.map((e) => e.name); return new Map(sessions); }),
+  });
+  const plain = new Map<string, Sighting>([['ae/z/1', { sessionId: 's-c', state: 'working' }]]);
+  const ops = composite({ alpha: telling('alpha', a), beta: telling('beta', b), gamma: testOps({ sessions: plain }) }, 'alpha');
+
+  const merged = await Effect.runPromise(ops.observeFor!([
+    { name: 'ae/x/1', harness: 'alpha' }, { name: 'ae/y/1', harness: 'beta' },
+    { name: 'ae/w/1' }, { name: 'ae/v/1', harness: 'gone' },
+  ]));
+  assert.deepEqual(told, { alpha: ['ae/x/1', 'ae/w/1', 'ae/v/1'], beta: ['ae/y/1'] }, 'no harness, or one not here, is the fallback, where its spawn went');
+  assert.deepEqual([...merged.keys()].sort(), ['ae/x/1', 'ae/y/1', 'ae/z/1'], 'a harness without the verb is observed all the same');
+  await Effect.runPromise(ops.stop('s-b'));
+  assert.equal(b.get('ae/y/1')?.state, 'stopped', 'and who owns what is learned from it, as from observe');
+});
+
 test('the composite routes stop to whichever harness owns that session', async () => {
   const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
   const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'working' }]]);

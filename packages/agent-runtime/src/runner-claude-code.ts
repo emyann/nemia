@@ -80,6 +80,21 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.map(([jobs, sessions]) => new Map([...jobs, ...sessions])),
     ),
 
+    /**
+     * The jobs, off their run files, and Claude Code's registry only when a session expected is not among them: a pass
+     * with only jobs in flight spawns no `claude agents`, which took about 0.2-0.4 s of every pass (2026-09-25). Read off
+     * the world, never off a task's config: a task filed on this harness before jobs were its default runs `--bg` without
+     * saying so, and a job whose run file is not there is looked for in the registry too — once its grace is past, the
+     * pass reads it lost either way. A job listing that cannot be read this time asks the registry, as `observe` would.
+     */
+    observeFor: (expected) => job.observe.pipe(
+      Effect.map((jobs) => ({ jobs, read: true })),
+      Effect.catchCause(() => Effect.succeed({ jobs: new Map<string, Sighting>(), read: false })),
+      Effect.flatMap(({ jobs, read }) => !read || expected.some((e) => !jobs.has(e.name))
+        ? seen(bg).pipe(Effect.map((sessions) => new Map([...jobs, ...sessions])))
+        : Effect.succeed(jobs)),
+    ),
+
     // The job's own run file first — one file, never the jobs' output, which a transcript in flight would re-read on
     // every poll — and then Claude Code's registration.
     find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),

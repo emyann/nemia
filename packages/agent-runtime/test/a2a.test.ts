@@ -20,7 +20,7 @@ import {
   RUNTIME_EXTENSION, observedOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt, taskOfSighting, wordsOf,
 } from '../src/a2a-map.ts';
 import type { Attempt, Observed, Sighting } from '../src/domain.ts';
-import { Runner, RunnerError, testOps, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
+import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */
 const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)));
@@ -265,6 +265,9 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
       release: (session: Sighting, task: { worktree?: string | boolean }) =>
         answer('release', [session, task], session.state === 'done' ? { turns: 2, costUsd: 0.5 } : undefined),
       say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
+      // Told what is expected, the sessions it names alone.
+      observeFor: (expected: readonly ExpectedSession[]) =>
+        answer('observeFor', expected, new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)))),
     }),
   };
   /** A verb that answers `value`, or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect. */
@@ -419,7 +422,7 @@ test('a stop of a session that ended since the listing does nothing, as a driver
 // session's name (`transcriptOf`), so the pin is reversed here on purpose, not loosened.
 test('part 4: every verb goes through the seam, the transcript by name; refuses alone reaches the driver directly', () => {
   const d = driven();
-  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript'] as const) {
+  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript', 'observeFor'] as const) {
     assert.ok(d.runner[verb], `${verb} is offered`);
     assert.notEqual(d.runner[verb], d.ops[verb], `${verb} is the seam's, not the driver's`);
   }
@@ -434,6 +437,18 @@ test('REFUSED: a verb the driver lacks is not offered through the seam, since th
   assert.deepEqual(Object.keys(d.runner).sort(), ['logs', 'observe', 'refuses', 'spawn', 'stop', 'transcript', 'transcriptOf']);
   const none = a2aOps('fake', { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs }, async () => []);
   assert.deepEqual(Object.keys(none).sort(), ['logs', 'observe', 'spawn', 'stop']);
+});
+
+test('observeFor through the seam is the driver\'s, told what the engine expects, and stop learns its sessions from it', async () => {
+  const d = driven();
+  d.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
+  d.sessions.set('ae/t-2/1', full);
+  const expected = [{ name: 'ae/t-2/1', harness: 'fake' }];
+  const seen = await Effect.runPromise(d.runner.observeFor!(expected));
+  assert.deepEqual(seen, new Map([['ae/t-2/1', full]]), 'every key of the sighting, over the wire');
+  assert.deepEqual(d.asked, [['observeFor', expected]], 'the driver told, and never asked to list in full');
+  await Effect.runPromise(d.runner.stop(full.sessionId));
+  assert.deepEqual(d.acted().at(-1), ['stop', full.sessionId], 'a session it listed is stopped with no listing first');
 });
 
 test("find, logs and release through the seam answer as the driver does, and the driver is asked with the engine's keys", async () => {

@@ -17,7 +17,7 @@ import { fold, nameFor, type Event, type Input, type Said, type Sighting, type S
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeOps, Runner, RunnerError, type RunnerOps, type Transcript, type TranscriptCursor,
+  claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
@@ -409,20 +409,22 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
   // Every observe of a harness, a pass's and a view's alike, goes through its runner here, and is counted on the way (`ObserveCount`).
   const observed: Record<string, ObserveCount> = {};
-  const counted = <R extends RunnerOps>(name: string, ops: R): R => ({
-    ...ops,
-    observe: Effect.suspend(() => {
+  // `observeFor` is an observe too, told what to look for, and counted as one: `spawned` is what says whether it asked a registry.
+  const counted = <R extends RunnerOps>(name: string, ops: R): R => {
+    const count = (look: Effect.Effect<Map<string, Sighting>, RunnerError>) => Effect.suspend(() => {
       const t0 = performance.now();
       const spawned = ioCounts().spawned;
-      return Effect.onExit(ops.observe, (exit) => Effect.sync(() => {
+      return Effect.onExit(look, (exit) => Effect.sync(() => {
         const o = (observed[name] ??= { calls: 0, ms: 0, listed: 0, spawned: 0 });
         o.calls++;
         o.ms += performance.now() - t0;
         o.spawned += ioCounts().spawned - spawned;
         if (Exit.isSuccess(exit)) o.listed += exit.value.size;
       }));
-    }),
-  });
+    });
+    const observeFor = ops.observeFor;
+    return { ...ops, observe: count(ops.observe), ...(observeFor ? { observeFor: (expected: readonly ExpectedSession[]) => count(observeFor(expected)) } : {}) };
+  };
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
   const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, counted(name, a2aOps(name, ops, events))]));
   // The engine's one memo of the settled tasks its passes may skip (`tick-memo.ts`): made here, once, so it lives as long as
@@ -463,8 +465,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
     const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
     const state = fold(taskId, events);
     const last = state.attempts.at(-1);
-    const { find, observe } = runners[harnessOf(state)]!;
-    const observed = observe.pipe(
+    const { find, observe, observeFor } = runners[harnessOf(state)]!;
+    // Told this task's own sessions, where the harness can be: a view of a Claude Code job lists the jobs and asks no `claude agents`.
+    const look = observeFor ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))) : observe;
+    const observed = look.pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
       Effect.flatMap((o) => view(taskId, o)),
     );

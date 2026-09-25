@@ -20,6 +20,8 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-pool-');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it; the ceiling on every pass.
 process.env.WF_ROOT = ROOT;
+// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
+process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 const { engine, tick } = await import('../src/runner.ts');
 

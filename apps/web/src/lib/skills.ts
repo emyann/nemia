@@ -1,4 +1,4 @@
-import type { GivenSkill, SkillCost, SkillPlace, SkillRow, SkillSource } from './api';
+import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillSource, SkillUser } from './api';
 
 /** What each place of skills is called on the board. */
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
@@ -55,4 +55,71 @@ export function offerOf(row: SkillRow, given: readonly string[]): SkillOffer {
   if (row.error !== null || row.entry === null) return { kind: 'refused', why: row.error ?? 'Its SKILL.md does not read.' };
   if (row.from === 'shipped') return row.found ? { kind: 'found', where: row.found } : { kind: 'copy' };
   return given.includes(row.name) ? { kind: 'given' } : { kind: 'add' };
+}
+
+/**
+ * A skill's form as a person types it: its name (its folder), a title, what it does, and its instructions, each a line or a text as written;
+ * its tags and examples one a line. What the page sends is `draftOfForm`'s reading of it.
+ */
+export type SkillForm = { name: string; title: string; description: string; tags: string; examples: string; body: string };
+
+/** The form of a new skill: nothing written yet. */
+export const EMPTY_SKILL_FORM: SkillForm = { name: '', title: '', description: '', tags: '', examples: '', body: '' };
+
+/**
+ * A skill's form filled from its page: its draft as the file writes it — no title, tags or examples where the file has none, not the card's
+ * fallbacks. A skill whose SKILL.md does not read has no draft: its form holds its name and its instructions, so it can be mended.
+ */
+export function skillFormOf(detail: Pick<SkillDetail, 'skill' | 'draft' | 'body'>): SkillForm {
+  const { draft } = detail;
+  if (!draft) return { ...EMPTY_SKILL_FORM, name: detail.skill.name, body: detail.body };
+  return {
+    name: draft.name,
+    title: draft.title ?? '',
+    description: draft.description ?? '',
+    tags: (draft.tags ?? []).join('\n'),
+    examples: (draft.examples ?? []).join('\n'),
+    body: draft.body,
+  };
+}
+
+const lines = (text: string): string[] | null => {
+  const each = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  return each.length ? each : null;
+};
+
+/**
+ * What the form sends: its name and description as typed, trimmed; a blank title as none; its tags and examples one a non-blank line, or none;
+ * its instructions as written. `preload` is left out, so a save keeps the line the file has — the page's switch writes it, on its own.
+ */
+export function draftOfForm(form: SkillForm): SkillDraft {
+  return {
+    name: form.name.trim(),
+    title: form.title.trim() || null,
+    description: form.description.trim(),
+    tags: lines(form.tags),
+    examples: lines(form.examples),
+    body: form.body,
+  };
+}
+
+/** Whether the form says something other than what it was filled with: what would be written differs, not only its blank lines. */
+export function skillEdited(form: SkillForm, was: SkillForm): boolean {
+  return JSON.stringify(draftOfForm(form)) !== JSON.stringify(draftOfForm(was));
+}
+
+/**
+ * What the page says of the switch: what a turn would carry with it on — the body, about four characters a token, loaded every turn and cached
+ * as the system prompt is (F14) — or what it carries now, and that the switch is the skill's, so every agent that gives it moves with it.
+ */
+export function preloadWords(cost: SkillCost): string {
+  if (cost.preload) return `Loaded every turn: about ${cost.body.toLocaleString('en')} tokens of instructions in every turn, cached. Off, a session is only told its name and loads it when it needs it.`;
+  return `Off: a session is told its name and what it does, and loads it when it needs it. On, its instructions are loaded every turn — about ${cost.body.toLocaleString('en')} tokens more a turn, cached.`;
+}
+
+/** Who a change of the skill — its switch included — reaches: every agent that gives it, by name, from the next run started; or none yet. */
+export function reachWords(users: readonly SkillUser[]): string {
+  if (!users.length) return 'No agent gives it yet: a change reaches none.';
+  const names = users.map((user) => (user.from === 'repo' ? `${user.name} (this repository)` : user.name));
+  return `A change, this switch included, changes every agent that gives it, from its next run: ${names.join(', ')}.`;
 }

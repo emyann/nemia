@@ -1,14 +1,15 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { LinkButton } from '@/components/ui/button';
-import { FromBadge, RouteLink, Skills, UsedBy } from '../components/AgentParts';
+import { FromBadge, RouteLink, SkillLink, Skills, UsedBy } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
-import { agentsQuery, type AgentListing } from '../lib/api';
+import { agentsQuery, skillsQuery, type AgentListing, type SkillPlace } from '../lib/api';
 import { KEY_LABELS, ROLE_KEYS } from '../lib/agents';
+import { PLACE_LABELS } from '../lib/skills';
 
 export const Route = createFileRoute('/agents')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(agentsQuery),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(agentsQuery), context.queryClient.prefetchQuery(skillsQuery)]),
   component: AgentsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
@@ -22,10 +23,12 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
 
 /**
  * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of thing
- * a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it.
+ * a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it. Then the
+ * skills an agent can be given, by place, each linked to its page.
  */
 function AgentsPage() {
   const { data: agents } = useSuspenseQuery(agentsQuery);
+  const { data: skills } = useQuery(skillsQuery);
   const yours = agents.filter((a) => a.from === 'yours');
   const theirs = agents.filter((a) => a.from === 'repo');
 
@@ -38,14 +41,21 @@ function AgentsPage() {
           repository's are under {code('workflows/agents/')}, read-only. An edit changes what a later {code('wf start')} freezes, never a run
           already started.
         </p>
-        <RouterLinkButton to="/agents/new" variant="outline">
-          <Plus data-icon="inline-start" />
-          New agent
-        </RouterLinkButton>
+        <div className="flex flex-wrap gap-2">
+          <RouterLinkButton to="/agents/new" variant="outline">
+            <Plus data-icon="inline-start" />
+            New agent
+          </RouterLinkButton>
+          <RouterLinkButton to="/agents/skills/new" variant="outline">
+            <Plus data-icon="inline-start" />
+            New skill
+          </RouterLinkButton>
+        </div>
       </div>
 
       <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code('~/.agent-workflows/workflows/agents/')}.</>} />
       <Place title="This repository" agents={theirs} empty={<>None: the repository has no {code('workflows/agents/')}.</>} />
+      {skills && <SkillPlaces places={skills} />}
     </article>
   );
 }
@@ -118,6 +128,45 @@ function AgentCard({ agent }: { agent: AgentListing }) {
         )
       )}
       <UsedBy listing={agent} />
+    </section>
+  );
+}
+
+/**
+ * The skills an agent can be given, one list a place in the order an agent of yours finds a name: your library, which the board writes, the
+ * repository's and HKB's, which it reads. Each is linked to its page, which says who gives it and what it costs a turn.
+ */
+function SkillPlaces({ places }: { places: readonly SkillPlace[] }) {
+  return (
+    <section aria-label="Skills" className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold">Skills</h2>
+        <p className="text-sm text-neutral-500">
+          A skill is a folder with a {code('SKILL.md')}: instructions an agent gives its sessions, by name. Yours are under{' '}
+          {code('~/.agent-workflows/workflows/skills/')} and are written here.
+        </p>
+      </div>
+      {places.map((place) => (
+        <section key={place.from} aria-label={`Skills: ${PLACE_LABELS[place.from]}`} data-skill-place={place.from} className="space-y-2">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
+          {place.skills.length ? (
+            <ul className="grid gap-x-6 gap-y-1.5 lg:grid-cols-2">
+              {place.skills.map((skill) => (
+                <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-xs leading-snug">
+                  <SkillLink from={skill.from} name={skill.name} className="font-medium text-neutral-800 dark:text-neutral-200" />{' '}
+                  {skill.error !== null ? (
+                    <span className="text-red-700 dark:text-red-400">does not read</span>
+                  ) : (
+                    <span className="text-neutral-600 dark:text-neutral-400">{skill.entry?.description}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-neutral-500">{place.from === 'yours' ? <>None yet. New skill writes one.</> : 'None.'}</p>
+          )}
+        </section>
+      ))}
     </section>
   );
 }

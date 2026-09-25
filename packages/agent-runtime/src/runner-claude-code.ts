@@ -22,7 +22,7 @@ import { claudeOps, type ClaudeOptions, type RunnerOps } from './runner.ts';
 import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from './runner-claude-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeCodeRefuses, claudeRefuses } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudeRefuses } from './runner-claude-vocabulary.ts';
 import { claudeStreamOutput } from './runner-detached-output.ts';
 
 /**
@@ -55,7 +55,6 @@ export const claudeJob: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  pool: CLAUDE_POOL,
   // `claude -p --resume` prints its parent's cost and API time on in its own (2.1.280, open issue 4).
   resumeCostCarried: true,
 };

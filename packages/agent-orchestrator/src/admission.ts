@@ -6,12 +6,12 @@
  * returns (`e.admit`), which the runtime starts on its next pass. Nothing here reads the runtime: a second `e.list()` or `e.view` would be
  * a second `claude agents` call every pass (`pool.test.ts` counts them).
  */
-import { MOMENTUM, priorityOf, type Run } from './run.ts';
+import { MOMENTUM, stepMomentum, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 
 /**
  * The pool each harness's sessions count against. Claude Code's job and its background session are one subscription, so they share one
- * ceiling; a harness no line names is a pool of its own, as it was in the runtime.
+ * ceiling; a harness no line names is a pool of its own, as it was in the runtime until stage 4c part 2 retired the runtime's pools.
  */
 export const POOLS: Readonly<Record<string, string>> = { claude: 'claude', 'claude-detached': 'claude', codex: 'codex', check: 'check' };
 
@@ -35,8 +35,8 @@ export type AdmissionView = {
 /**
  * Whether a task holds a slot of its pool: a session at work (`running (working)`, `working (quiescent)`), one spawned and not yet in the
  * harness's registry (`starting`), and one admitted and not yet started, which the runtime's next pass starts. A session blocked on a
- * person (`needs-human`), a task held open for an answer (`input-required`), one between attempts and one settled hold none, as in the
- * runtime: nobody is working on them, and a slot they held would be a slot nobody used.
+ * person (`needs-human`), a task held open for an answer (`input-required`), one between attempts and one settled hold none, as the runtime's
+ * ceiling counted until it was retired: nobody is working on them, and a slot they held would be a slot nobody used.
  */
 export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boolean =>
   view.admission === 'admitted' || view.phase === 'starting' || view.phase === 'running (working)' || view.phase === 'working (quiescent)';
@@ -45,8 +45,8 @@ export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boo
 export type MomentumOf = { run: Pick<Run, 'steps'>; steps: ReadonlyArray<Pick<Workflow, 'name' | 'after'>> };
 
 /**
- * The momentum of each task a run names, by `tick.ts`'s filing rules, as the runtime's `priority` once carried it: a step's first task
- * `priorityOf(step)` (none, 0, for a run's first steps; `MOMENTUM` for a step after another); every later try, round and check `MOMENTUM`,
+ * The momentum of each task a run names, by `tick.ts`'s filing rules, as the runtime's `priority` carried it until stage 4c: a step's first task
+ * `stepMomentum(step)` (none, 0, for a run's first steps; `MOMENTUM` for a step after another); every later try, round and check `MOMENTUM`,
  * since none is a run's first filing. An id no run names — a store edited by hand, a run removed while its task waited — is 0.
  */
 export function momentumOf(entries: Iterable<MomentumOf>): (taskId: string) => number {
@@ -56,7 +56,7 @@ export function momentumOf(entries: Iterable<MomentumOf>): (taskId: string) => n
       const rec = run.steps[step.name];
       if (!rec) continue;
       const ids = [...(rec.tries ?? []).map((t) => t.taskId), ...(rec.taskId ? [rec.taskId] : [])];
-      ids.forEach((id, i) => of.set(id, i === 0 ? priorityOf(step) ?? 0 : MOMENTUM));
+      ids.forEach((id, i) => of.set(id, i === 0 ? stepMomentum(step) : MOMENTUM));
       for (const check of [...(rec.tries ?? []).map((t) => t.check), rec.check]) if (check) of.set(check.taskId, MOMENTUM);
     }
   }

@@ -13,7 +13,8 @@ bug 1, a quiet session with no closeout recorded a success (§6 item 18), and wh
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
 admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
-`0e7b02a`. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
+`0e7b02a`. Since thin runtime stage 4c (2026-09-25), the orchestrator admits, and the runtime keeps no ceiling, pools or
+`priority`: issues 19–21 are the orchestrator's, and 22 is retired. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
 only when its task asks with `config.background: true` (issue 28). Since stage 3 (the same day), Codex is proven as an A2A agent in the
 same shape (issue 31). Since stage 4a part 2 (the same day), the runtime makes one attempt per start, and trying again is the
 orchestrator's (*One attempt per start*, under Fixed).
@@ -77,7 +78,7 @@ configured harnesses, and so their words, are known.
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
 same sentences word for word — an empty brief, cwd, model, resumeFrom or effort; a cwd that is not absolute; attempts,
 deadline, retry policy, tool lists and permission rules, `mcp`, `budgetUsd`, `priority`, `remoteControl` and
-`contextTokens` that are not values of their kind. The Effect door fails with `FileRefused` (exported beside `file`, a
+`contextTokens` that are not values of their kind (`priority` is refused at any value since stage 4c part 2). The Effect door fails with `FileRefused` (exported beside `file`, a
 tagged error as `JournalError` is) before anything is journalled; the facade asks the same function first and then the
 harness, and throws `file: <the sentence>` as before. So `deadlineSeconds: NaN` is refused at both doors in one set of
 words. `test/refusal.test.ts`: every one of those refusals made to refuse at the Effect door, nothing journalled, and the
@@ -293,103 +294,60 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
   session has been measured end to end under the engine.
 
-### 19. A `blocked` session holds no slot, on reasoning rather than a measurement
+### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
 
-**What changed** (2026-09-16). The ceiling counts the sessions a pass observes `working`, and a `blocked` one is not
-counted (`AT_WORK` in `agent-runtime/src/engine.ts`). It used to count `LIVE` — `working` and `blocked` — so a session
-waiting on a permission prompt kept the tasks behind it queued for as long as nobody answered, and only its deadline
-freed the slot. `LIVE` still says what the engine waits on: `decide` reads a blocked session as running, and a closing
-statement ends a blocked attempt as it ends a working one (`closedOut`).
+**Where it is now** (2026-09-25). The runtime keeps no ceiling since thin runtime stage 4c part 2, so it counts no slot:
+`tick()` reports `running`, the sessions at work per harness, and a `blocked` one is not among them. The rule moved to
+agent-orchestrator in part 1: `holdsSlot` in its `src/admission.ts` counts a session at work, one starting and one
+admitted and not yet started, and not one blocked on a person (`needs-human`) or held for an answer. Its
+`test/admission.test.ts` makes each case happen, a blocked session working again counted again included.
 
-**Why.** The ceiling exists for the subscription's rate limit, and a session on a permission prompt makes no API calls, so
-it costs nothing against that limit. Reasoning, not a measurement: no blocked session's API traffic has been watched, and
-`claude agents` lists a session `blocked` for its own stalls too — a login refresh (issue 16) — whose calls are not known
-either.
+**What is left, unchanged and now the orchestrator's.** It is reasoning, not a measurement: a session on a permission
+prompt makes no API calls, so it costs nothing against the subscription's rate limit, but no blocked session's API
+traffic has been watched, and `claude agents` lists a session `blocked` for its own stalls too — a login refresh (issue
+16). Blocked sessions that all move again at once can put a pool past its ceiling until enough of them end; nothing is
+stopped for it, and nothing more is admitted while the count is at or past the ceiling.
 
-**What it costs.** A blocked session that moves again is counted again on the next pass, level-triggered, and nothing is
-stopped for it. A board at a ceiling of 2 whose two sessions block admits two more, and if both move again, four run until
-two end: nothing more is admitted while the count is at or past the ceiling. `test/engine.test.ts` makes each case happen
-at the shipped counting: two blocked at a ceiling of two and a third task starts; two working and it does not; a blocked
-session working again fills the slot another's end freed, and blocking again gives it back.
+### 20. Pools are declared, and one ceiling fits every pool (moved to the orchestrator)
 
-### 20. Pools are declared, and one ceiling fits every pool
+**Where it is now** (2026-09-25). The runtime counts no pools since stage 4c part 2: `pool` is gone from `HarnessSpec` and
+`PromiseRunner`, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
+naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/admission.ts`: `claude` and
+`claude-detached` one pool, since they are one subscription; `codex` and `check` each their own; a harness no line names
+its own. Its `test/pool.test.ts` proves it at shipped defaults, with fake `claude` and `codex`.
 
-**What changed** (2026-09-16). The ceiling is counted per pool, not per harness. A harness declares the pool it is counted
-in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and is a pool of its own, under the name it is configured under, when
-it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-runtime/src/runner-claude-vocabulary.ts`), and so is the
-engine's `claudeDetached`, which names that pool, so no caller has to: agent-orchestrator passes the engine's harnesses and a
-`check`, and names none. Before, both ran Claude Code on one subscription and were counted apart, so a ceiling of 2 let
-four Claude Code sessions run. `test/pool.test.ts`, with fake `claude` and `codex`, at `createEngine()`'s own harnesses and
-at agent-orchestrator's map: a `claude-detached` session counts against `claude`'s ceiling, and `codex` and a `check` keep
-their own. From 2026-09-17 it also configures that runner under another name — `{ cc: 'claude-bg', 'claude-detached':
-claudeDetached }` — because at the engine's own harnesses the runner is configured as `claude` and its pool is `claude`,
-so no test there could tell `poolsOf`'s mapping from a harness falling back to its own name; with the mapping taken out,
-the new test runs two Claude Code sessions at a ceiling of one and fails.
+**What is left, now the orchestrator's.**
 
-**What is left.**
+- **One number for every pool.** `WF_MAX_CONCURRENT` holds Claude Code's pool, Codex's and a `check`'s to the same count,
+  though a `check` is a shell command under no rate limit. A number per pool would be a map where the number is; nothing
+  has asked for one.
+- **A pool is a line in `POOLS`, never discovered.** A harness the orchestrator gains that drives Claude Code is a pool of
+  its own until a line says `claude`.
 
-- **One number for every pool.** `maxConcurrent` holds Claude Code's pool, Codex's and a `check`'s to the same count,
-  though a `check` is a shell command under no rate limit: agent-orchestrator's suites queue behind the number its sessions
-  do. A number per pool would be a map where the number is; nothing has asked for one.
-- **A pool is declared, never discovered.** A `PromiseRunner`, or an Effect-door `sdkRunner`, that drives Claude Code is a
-  pool of its own unless it says `claude`.
-- **A task whose harness the engine no longer has** runs on the fallback (`harnessOf`, `composite`) but is counted under
-  the name it was filed with, a pool of its own: a pass reads pools by harness name and knows no fallback. Only a board
-  whose harness map lost a harness with tasks still on it has one.
-- **The Effect door** counts per harness unless its caller passes `tick` the pools: it has no harness configs to read
-  them from. `createEngine` passes them.
+A layer other than the orchestrator that shares one ceiling between harnesses keeps its own list; the runtime starts every
+task it is given and admits a queued one on its word.
 
-### 21. A free slot goes to the oldest filing, and the filer's clock says which that is
+### 21. A free slot goes to the oldest filing, and the filer's clock says which that is (moved to the orchestrator)
 
-**What changed** (2026-09-16). A pass walks the board in filing order — the `at` of each task's `filed` entry, oldest first,
-and the ids' order only between two filed at the same instant (`admissionOrder` in `agent-runtime/src/engine.ts`; `State`
-carries `filedAt`, and `decide` never reads it). It walked `journal.list`'s order, the ids sorted, so which of two waiting
-tasks took a free slot was the alphabet of their ids. `test/engine.test.ts` makes a later filing that sorts first wait behind an
-earlier one, drains three tasks at a ceiling of one in filing order, and breaks a tie by id; `test/facade.test.ts` does
-the first with the times `file()` writes.
+**Where it is now** (2026-09-25). The runtime chooses no order since stage 4c part 2: a pass walks the board in the order
+the store lists it and starts every task not queued, and `State` carries `filedAt` for the layer above to read. The rule
+moved to agent-orchestrator in part 1: `toAdmit` in its `src/admission.ts` admits momentum first, then the earlier filing,
+then the lower id, and its `test/admission.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
 
-**The tiebreak is proven from 2026-09-17.** The equal-times test ran against a store whose `list` sorts, and a sort is
-stable, so it passed with the id comparison taken out of `admissionOrder` — it was reading the store's order, not the
-rule's. It now runs twice, over a store that lists sorted and one that lists in reverse (`journalListing` in
-`test/engine.test.ts`), and fails without the comparison.
+**What is left, now the orchestrator's.** The time is the filer's clock: `file()` stamps `new Date()` in the process that
+files, so two processes with skewed clocks filing onto one board are ordered by their clocks — one machine, one clock,
+today. A retry is a new task, filed when it is asked for, so it no longer keeps its task's place; momentum puts it before
+a newer run's first step. A time that does not parse orders its task last, never refused.
 
-**What is left.**
+### 22. A task's `priority` is read when a slot is free, and only then (retired)
 
-- **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,
-  so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-orchestrator `docs/features.md`,
-  Engine-side work): a card's run filed at 23:53:07Z took the slot a lane's implement released at 23:53:18Z, and that
-  lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same:
-  a `priority` the upper layer files is what keeps the slot with the run (issue 22).
-- **The time is the filer's clock.** `file()` stamps `new Date()` in the process that files, so two processes with skewed
-  clocks filing onto one board are ordered by their clocks. One machine, one clock, today.
-- **A retry keeps its task's place.** A task between attempts is ordered by its filing, not by when its last attempt
-  ended, so an old task's retry goes before newer work waiting on the same pool. Older work first, on purpose.
-- **A time that does not parse** — a `PromiseJournal` that stores `at` in another shape — orders its task after every task
-  whose time does, and by id among such tasks: admitted last, never refused.
-- **`ae ls` and `list()` are still in id order.** Only the pass's walk changed.
-
-### 22. A task's `priority` is read when a slot is free, and only then
-
-**What changed** (2026-09-16). `priority` is a number on the filing, 0 when absent, carried on the `filed` event and
-`State`. A pass orders the board by it before filing order: higher first, the oldest filing within one, the id between
-equal times (`admissionOrder` in `agent-runtime/src/engine.ts`). Nothing else reads it: no runner is told it (`SpawnRequest`
-has no such field), and `decide` does not — `test/engine.test.ts` reads `decide`'s body for `.priority` and `.filedAt`, and
-failed with a read planted there. `createEngine().file()` refuses one that is not a finite number (`NaN`, `Infinity`,
-`"high"`, `null`) on every harness, naming the fix, and `ae ls` prints `priority N` beside a task filed with one.
-`test/engine.test.ts`: a higher priority filed after a lower one takes a ceiling of one, and six tasks drain in the order
-priority, then filing, a negative one last; `test/facade.test.ts`: every refusal, and what is journalled.
-
-**What is left.**
-
-- **No preemption.** A higher priority waits for a slot like any task: a running session is never stopped for one.
-  Kubernetes' scheduler preempts; this does not, and nothing has asked it to.
-- **No aging.** A steady stream of higher-priority work keeps a lower one waiting for as long as the stream lasts.
-- **agent-orchestrator files none yet.** The run's momentum — every filing after a run's first step above a new run's
-  first — is the upper layer's, and a run of its own (agent-orchestrator `docs/features.md`, Engine-side work).
-- **Not a brief key.** `ae start` cannot file one; a task filed through the API shows it in `ae ls` all the same.
-- **A journal from before the refusal.** Both doors refuse a `priority` that is not a finite number (issue 6). One a
-  journal already holds — written before, or by hand; a file journal writes `NaN` back as `null` — is read as 0 when the
-  board is ordered, never as above or below every other.
+**Where it is now** (2026-09-25). `priority` is retired: a runtime that keeps no ceiling has no slot for it to choose.
+Both doors refuse it at any value, `0` and `undefined` as an own key included (exit 2, naming `queued: true` and `admit`),
+and a journal that carries one from before is folded unread; `ae ls` prints no priority. The run's momentum it carried
+until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read off the run records by the filing rules
+(`stepMomentum`, `MOMENTUM` in `src/run.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
+and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
+run's first step waiting for as long as it lasts.
 
 ### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
 
@@ -1080,6 +1038,7 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
 | a `view` of a task whose harness cannot `find` — a `check`, a Codex step — or of any attempt in flight observed every harness, so each read of one cost a `claude agents` call and a Codex listing (§6 item 27, E7's last review) | a view observes its task's own harness, the one `harnessOf` names for `logs` and `transcript`, and the fallback's for a harness the engine no longer has | engine, §6 item 27 |
 | a session waiting on a permission prompt held a concurrency slot until a person answered or its deadline came, though it makes no API calls | the ceiling counts sessions observed `working`; `LIVE`, which still has `blocked`, keeps what else it guards (issue 19) | engine, 2026-09-16 |
 | two `claude` and two `claude-detached` sessions ran at a ceiling of 2 — four Claude Code sessions on one subscription, counted as two pools | a harness declares the pool it is counted in, its own name by default; `'claude-bg'` and the engine's `claudeDetached` are both counted in `claude`, with no caller saying so (issue 20) | engine, 2026-09-16 |
+| the runtime's ceiling, pools and `priority` were a second admission beneath the orchestrator's, lifted with `maxConcurrent: Infinity` so it never bound, and `ae` kept its own | retired from the runtime: `decide` has no ceiling branch, a pass starts every task not queued and reports `running` per harness, and `priority`, `maxConcurrent`, a harness's `pool`, an argument to `tick()` and `AE_MAX_CONCURRENT` are each refused, exit 2; `queued: true` is a brief key, so `ae` can hold a task back (issues 19–22) | runtime, 2026-09-25 (stage 4c part 2) |
 | the nudge sent to a session that ended in prose asked for "your closing statement" and named no tool: twice it got no sign-off, and a person's sentence naming `StructuredOutput` got one in thirty seconds | the nudge names the tool and says the work stands, with its words pinned by a test (issue 25) | engine, 2026-09-17 |
 | a session held busy by a background shell it left running was never read: its closeout sat unread for seventy-seven minutes, and only a person killing the shell let the run go on | a busy session whose own closeout is the last word in its conversation, and whose transcript has been cold for the quiescence floor, is read as quiet: the attempt ends on that statement (issue 24) | engine, 2026-09-17 |
 | a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |

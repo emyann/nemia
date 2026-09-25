@@ -1719,7 +1719,7 @@ export const MOMENTUM = 1;
  * filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a check
  * are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  */
-export const priorityOf = (step: Pick<Workflow, 'after'>): number | undefined => (step.after.length ? MOMENTUM : undefined);
+export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.after.length ? MOMENTUM : 0);
 
 /**
  * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or the

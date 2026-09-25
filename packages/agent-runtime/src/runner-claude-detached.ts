@@ -4,7 +4,7 @@
 import type { SpawnRequest } from './runner.ts';
 import type { HarnessIO, HarnessSpec } from './runner-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
 import { claudeResultOutput } from './runner-detached-output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
 
@@ -73,6 +73,4 @@ export const claudeDetached: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  // Claude Code, as `claude --bg` is: one subscription, one ceiling, whatever either harness is called.
-  pool: CLAUDE_POOL,
 };

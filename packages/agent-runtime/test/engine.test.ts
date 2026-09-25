@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { Journal, type FeedEntry } from '../src/journal.ts';
+import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { admit, answer, file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
 import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
@@ -125,64 +125,33 @@ test('stop: one pass asks the harness, the next observes it and settles', async 
 test('a pass over many tasks starts each exactly once', async () => {
   const b = board();
   const ids = await Promise.all([...Array(12)].map((_, i) => b.run(file({ ...spec, brief: `task ${i}` }))));
-  await b.run(tick(99));
+  await b.run(tick());
   assert.equal(b.sessions.size, 12);
 
-  await b.run(tick(99));
+  await b.run(tick());
   assert.equal(b.sessions.size, 12, 'a second pass starts nothing new');
   const views = await Promise.all(ids.map((id) => b.run(phaseOf(id, b))));
   assert.ok(views.every((p) => p === 'running (working)'));
 });
 
-test('THE CEILING: a pass never admits more than the limit, however much is pending', async () => {
-  const b = board();
-  await Promise.all([...Array(10)].map((_, i) => b.run(file({ ...spec, brief: `task ${i}` }))));
-
-  await b.run(tick(3));
-  assert.equal(b.sessions.size, 3, 'three, not ten — admission is serial, so the count is true');
-
-  await b.run(tick(3));
-  assert.equal(b.sessions.size, 3, 'and a second pass does not sneak past it');
-});
-
-test('the ceiling drains: finishing a session frees exactly one slot', async () => {
-  const b = board();
-  await Promise.all([...Array(5)].map((_, i) => b.run(file({ ...spec, brief: `task ${i}` }))));
-  await b.run(tick(2));
-  assert.equal(b.sessions.size, 2);
-
-  // One finishes. The next pass settles it AND admits one more — never two.
-  const first = [...b.sessions.keys()][0]!;
-  b.sessions.set(first, { ...b.sessions.get(first)!, state: 'done' });
-  await b.run(tick(2));
-  assert.equal(b.sessions.size, 3, 'one freed, one admitted');
-});
-
-test('a finished task still settles when the board is full', async () => {
-  // The ceiling is checked after every terminal answer, so a full board can always drain.
+test('a finished task settles while another waits to be admitted — settling is not an admission', async () => {
+  // A queued task is checked after every terminal answer, so a board whose layer above admits nothing still drains.
   const b = board();
   const id = await b.run(file(spec));
-  await b.run(tick(1));
+  const waiting = await b.run(file({ ...spec, brief: 'held back', queued: true }));
+  await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' });
 
-  await b.run(tick(0)); // a ceiling of zero: nothing may START
+  await b.run(tick());
   assert.equal(await b.run(phaseOf(id, b)), 'succeeded', 'settling is not an admission');
-});
-
-test('a harness no pool names is a pool of its own — two subscriptions are two pools', async () => {
-  const b = board();
-  await Promise.all([...Array(3)].map((_, i) => b.run(file({ ...spec, brief: `c${i}`, harness: 'claude' }))));
-  await Promise.all([...Array(3)].map((_, i) => b.run(file({ ...spec, brief: `x${i}`, harness: 'codex' }))));
-
-  await b.run(tick(2));
-  // The fake runner is one map, but the COUNTS are kept per pool, and `tick` is given none: each harness admits two.
-  assert.equal(b.sessions.size, 4, 'two claude and two codex, not two in total');
+  assert.equal(await b.run(phaseOf(waiting, b)), 'pending', 'and nothing it was not told to start has started');
+  assert.equal(b.sessions.size, 1);
 });
 
 test('the feed carries every event, in order, with a cursor that resumes', async () => {
   const b = board();
   const id = await b.run(file(spec));
-  await b.run(tick(9));
+  await b.run(tick());
 
   const first = await b.run(Effect.flatMap(Journal, (j) => j.feed(0)));
   assert.deepEqual(first.entries.map((e) => e.event.kind), ['filed', 'starting', 'spawned']);
@@ -195,7 +164,7 @@ test('the feed carries every event, in order, with a cursor that resumes', async
 
   // The event a workflow layer actually waits for.
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' });
-  await b.run(tick(9));
+  await b.run(tick());
   const after = await b.run(Effect.flatMap(Journal, (j) => j.feed(first.cursor)));
   assert.deepEqual(after.entries.map((e) => e.event.kind), ['ended', 'settled']);
 });
@@ -229,7 +198,7 @@ test('ADOPTION: a session already running under our name is adopted, not duplica
 test('a LOST attempt settles the task failed, its session on the record for the layer above to continue', async () => {
   const b = board();
   const id = await b.run(file(spec));
-  await b.run(tick(9));
+  await b.run(tick());
 
   // The session vanishes from the harness entirely — nobody ever said how it ended.
   const first = [...b.sessions.keys()][0]!;
@@ -242,7 +211,7 @@ test('a LOST attempt settles the task failed, its session on the record for the 
     observed: 'failed', reason: 'lost', nativeId,
   })));
 
-  await b.run(tick(9));
+  await b.run(tick());
   const { state } = await b.run(view(id, new Map()));
   assert.equal(state.settled, 'failed');
   assert.equal(b.spawned.length, 1, 'no attempt 2, resumed or clean');
@@ -252,12 +221,12 @@ test('a LOST attempt settles the task failed, its session on the record for the 
 test('a HARNESS failure settles the task failed, and nothing is started after it', async () => {
   const b = board();
   const id = await b.run(file(spec));
-  await b.run(tick(9));
+  await b.run(tick());
   const first = [...b.sessions.keys()][0]!;
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
 
-  await b.run(tick(9));
-  await b.run(tick(9));
+  await b.run(tick());
+  await b.run(tick());
   assert.equal(b.spawned.length, 1);
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'failed');
 });
@@ -268,14 +237,14 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
   await b.run(Effect.flatMap(Journal, (j) => j.append(id,
     { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always' } as Event)));
   // Older than stage 4c too, with no `queued` key: it waits for the word, as the layer above now gives it.
-  await b.run(tick(9));
+  await b.run(tick());
   assert.equal(b.spawned.length, 0, 'a journal from before stage 4c waits to be admitted');
   await b.run(admit([id]));
-  await b.run(tick(9));
+  await b.run(tick());
   const first = [...b.sessions.keys()][0]!;
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
-  await b.run(tick(9));
-  await b.run(tick(9));
+  await b.run(tick());
+  await b.run(tick());
   assert.equal(b.spawned.length, 1);
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'failed');
 });
@@ -285,16 +254,16 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
 test('a task past its deadline is stopped and settles failed', async () => {
   const b = board();
   const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
-  await b.run(tick(9));
+  await b.run(tick());
   assert.deepEqual([...b.sessions.values()].map((s) => s.state), ['working'], 'inside the deadline, it runs');
   await pastIt();
 
   // Pass one: the deadline is past, so the live session is stopped.
-  await b.run(tick(9));
+  await b.run(tick());
   assert.deepEqual([...b.sessions.values()].map((s) => s.state), ['stopped'], 'the harness was told');
 
   // Pass two: it is no longer live, so the task settles — as failed, not as a clean stop.
-  await b.run(tick(9));
+  await b.run(tick());
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
   assert.equal(state.settled, 'failed');
 });
@@ -303,12 +272,12 @@ test('a session that finished before the pass past its deadline read it settles 
   // The 2026-09-24 check: exit 0 at 607 s of 600, recorded `ended done` and settled `failed` at the same millisecond.
   const b = board();
   const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
-  await b.run(tick(9));
+  await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', exitCode: 0 });
   await pastIt();
 
   const before = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).length;
-  await b.run(tick(9));
+  await b.run(tick());
   const events = await b.run(Effect.flatMap(Journal, (j) => j.read(id)));
   const state = fold(id, events);
   assert.equal(state.settled, 'succeeded', 'the deadline did not overrule a session that finished');
@@ -316,183 +285,96 @@ test('a session that finished before the pass past its deadline read it settles 
   assert.deepEqual(events.slice(before).map((e) => e.kind), ['ended', 'settled'], 'its end and its settle, in one pass');
 });
 
-test('a deadline ends a blocked session, which would otherwise wait on a person for ever — and the queue never waited on it', async () => {
+test('a deadline ends a blocked session, which would otherwise wait on a person for ever', async () => {
   const b = board();
-  // Ids are explicit because admission runs in sorted id order: with a ceiling of one, WHICH
-  // task gets the slot has to be a fact of the test, not of the clock.
-  await b.run(file({ ...spec, id: 'a-stuck', deadlineSeconds: SHORT_DEADLINE, brief: 'stuck' }));
-  await b.run(file({ ...spec, id: 'b-waiting', brief: 'waiting' }));
-
-  await b.run(tick(1));                       // ceiling of one: 'a-stuck' goes first
-  assert.equal(b.sessions.size, 1);
-  assert.ok(b.sessions.has(nameFor('a-stuck', 1)), 'the one with the deadline is the one running');
-  b.sessions.set(nameFor('a-stuck', 1), { ...b.sessions.get(nameFor('a-stuck', 1))!, state: 'blocked' });
-
-  await b.run(tick(1));                       // blocked holds no slot: the second task is admitted
-  assert.equal(b.sessions.size, 2, 'the queue moved before any deadline');
+  await b.run(file({ ...spec, id: 'stuck', deadlineSeconds: SHORT_DEADLINE, brief: 'stuck' }));
+  await b.run(tick());
+  b.sessions.set(nameFor('stuck', 1), { ...b.sessions.get(nameFor('stuck', 1))!, state: 'blocked' });
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf('stuck', b)), 'needs-human', 'blocked, and before its deadline nothing ends it');
   await pastIt();
 
-  await b.run(tick(1));                       // deadline stops it
-  assert.equal(b.sessions.get(nameFor('a-stuck', 1))!.state, 'stopped');
-  await b.run(tick(1));                       // and it settles
-  assert.equal(await b.run(phaseOf('a-stuck', b)), 'failed');
+  await b.run(tick());                        // deadline stops it
+  assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'stopped');
+  await b.run(tick());                        // and it settles
+  assert.equal(await b.run(phaseOf('stuck', b)), 'failed');
 });
 
-// ─── what the ceiling counts ────────────────────────────────────────────────
-// A session at work is counted, and a blocked one is not: on a permission prompt it makes no API
-// calls, so it costs nothing against the rate limit the ceiling exists for. Reasoning, not a
-// measurement. Counted afresh on every pass, from what the harness says now.
+// ─── what a pass reports, and what it no longer does ────────────────────────
+// Since stage 4c part 2 (2026-09-25) the pass keeps no ceiling, no pools and no order: which task starts, and when, is the
+// layer above's (`queued` and `admit`; the orchestrator's `toAdmit`). What was tested here — the ceiling, its pools, what a
+// slot is held by, and which task a free one went to — is `agent-orchestrator/test/admission.test.ts`'s and `pool.test.ts`'s.
 
-/** A board of tasks `ids`, filed in that order; admission runs in filing order. */
-const filed = async (ids: string[]) => {
+/** File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote. */
+const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
+  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields } as Event)));
+
+test('running counts the sessions at work on each harness as the pass left them: working, and started this pass — not blocked, ended or queued', async () => {
   const b = board();
-  for (const id of ids) await b.run(file({ ...spec, id, brief: id }));
+  for (const id of ['c-work', 'c-block', 'c-end']) await b.run(file({ ...spec, id, harness: 'claude' }));
+  await b.run(file({ ...spec, id: 'x-work', harness: 'codex' }));
+  await b.run(file({ ...spec, id: 'x-queued', harness: 'codex', queued: true }));
+  await b.run(file({ ...spec, id: 'no-harness' }));
+  const first = await b.run(tick());
+  assert.deepEqual(first.running, { claude: 3, codex: 1, default: 1 }, 'each started this pass counts, on its own harness');
+
   const set = (id: string, state: Observed) => b.sessions.set(nameFor(id, 1), { ...b.sessions.get(nameFor(id, 1))!, state });
-  return { ...b, set };
-};
-
-test('two blocked sessions at a ceiling of two, and a third task starts', async () => {
-  const b = await filed(['a', 'b', 'c']);
-  await b.run(tick(2));
-  assert.deepEqual([...b.sessions.keys()], [nameFor('a', 1), nameFor('b', 1)]);
-  b.set('a', 'blocked');
-  b.set('b', 'blocked');
-
-  const report = await b.run(tick(2));
-  assert.ok(b.sessions.has(nameFor('c', 1)), 'a session waiting on a person holds no slot');
-  assert.deepEqual(report.running, { default: 1 }, 'the pass counted the one it started, and neither blocked one');
+  set('c-block', 'blocked');
+  set('c-end', 'done');
+  b.sessions.delete(nameFor('no-harness', 1));  // spawned, and not yet in the registry: at work as far as anyone knows
+  const second = await b.run(tick());
+  assert.deepEqual(second.running, { claude: 1, codex: 1, default: 1 });
+  assert.equal(await b.run(phaseOf('c-end', b)), 'succeeded');
+  assert.equal(await b.run(phaseOf('x-queued', b)), 'pending', 'queued, and never counted');
 });
 
-test('two working sessions at a ceiling of two, and a third task does not start', async () => {
-  const b = await filed(['a', 'b', 'c']);
-  await b.run(tick(2));
-  b.set('a', 'working');
-  b.set('b', 'working');
-
-  const report = await b.run(tick(2));
-  assert.equal(b.sessions.has(nameFor('c', 1)), false, 'the ceiling refuses it');
-  assert.deepEqual(report.running, { default: 2 });
-  assert.equal(await b.run(phaseOf('c', b)), 'pending');
-});
-
-test('a blocked session that works again counts again on the next pass — level-triggered, nothing remembered', async () => {
-  const b = await filed(['a', 'b', 'c', 'd']);
-  await b.run(tick(2));                       // a and b start
-  b.set('a', 'blocked');
-  await b.run(tick(2));                       // a holds no slot: c starts, d waits
-  assert.deepEqual([...b.sessions.keys()], [nameFor('a', 1), nameFor('b', 1), nameFor('c', 1)]);
-
-  // a moves again: three at work at a ceiling of two. Nothing is stopped, and nothing more admitted.
-  b.set('a', 'working');
-  assert.deepEqual((await b.run(tick(2))).running, { default: 3 });
-  assert.equal(b.sessions.size, 3, 'past the ceiling, so nothing is admitted');
-
-  // c finishes. Had a pass remembered a as blocked, the slot c frees would go to d.
-  b.set('c', 'done');
-  await b.run(tick(2));
-  assert.equal(await b.run(phaseOf('c', b)), 'succeeded');
-  assert.equal(b.sessions.has(nameFor('d', 1)), false, 'a counts again: a and b fill the ceiling');
-
-  // a blocks again, and the next pass sees that too.
-  b.set('a', 'blocked');
-  await b.run(tick(2));
-  assert.ok(b.sessions.has(nameFor('d', 1)), 'and its slot is free again');
-});
-
-// ─── which task a free slot goes to ─────────────────────────────────────────
-// The oldest filing, and the ids' order only between two filed at the same instant. It was the ids'
-// order alone, so which of two waiting tasks started was the alphabet of their names.
-
-/** File `id` as of `at`: the entry `file` writes, with the time chosen by the test. */
-const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
-  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
-
-/** Tick at a ceiling of one until every task has run, ending each session once it is seen: the order they started in. */
-const admitted = async (b: ReturnType<typeof board>, count: number) => {
-  const order: string[] = [];
-  for (let i = 0; i < count; i++) {
-    await b.run(tick(1));
-    const started = [...b.sessions].filter(([, s]) => s.state === 'working').map(([name]) => name);
-    assert.equal(started.length, 1, `one at a time: ${started.join(', ')}`);
-    order.push(started[0]!.split('/')[1]!);
-    b.sessions.set(started[0]!, { ...b.sessions.get(started[0]!)!, state: 'done' });
-  }
-  return order;
-};
-
-test('a free slot goes to the task filed first, not the one first in the alphabet', async () => {
+test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and an old priority choose nothing', async () => {
   const b = board();
-  await fileAt(b, 'z-filed-first', '2026-09-16T23:53:07.000Z');
-  await fileAt(b, 'a-filed-last', '2026-09-16T23:54:44.000Z');
-  await b.run(tick(1));
-  assert.deepEqual([...b.sessions.keys()], [nameFor('z-filed-first', 1)], 'the earlier filing is admitted');
-  assert.equal(await b.run(phaseOf('a-filed-last', b)), 'pending', 'and the later one waits, whatever its name');
-});
-
-test('tasks are admitted oldest filing first, pass after pass — a time with or without its milliseconds is the same clock', async () => {
-  const b = board();
-  await fileAt(b, 'c', '2026-09-16T10:00:01Z');
+  // Filed by an older runtime, whose pass admitted the higher priority and then the earlier filing first under its ceiling.
   await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
-  await fileAt(b, 'b', '2026-09-16T10:00:00.500Z');
-  assert.deepEqual(await admitted(b, 3), ['b', 'c', 'a']);
+  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z', { priority: 5 });
+  await fileAt(b, 'c', '2026-09-16T09:00:00.000Z', { priority: Number.NaN });
+  const report = await b.run(tick());
+  assert.deepEqual(b.spawned.map((r) => r.name), ['a', 'b', 'c'].map((id) => nameFor(id, 1)), 'the listing order, and all three');
+  assert.deepEqual(report.running, { default: 3 });
+  assert.equal('priority' in (await b.run(view('b', new Map()))).state, false, 'the old key is folded unread: history, not state');
+  assert.equal('priority' in b.spawned[1]!, false, 'and no harness is told it');
 });
 
-/**
- * A store like `Journal.test()`, listing its tasks in the order `order` gives rather than sorted.
- *
- * A pass sorts what `list` answers, and a sort is stable, so through a listing that is already sorted a tie
- * broken by id and a tie broken by nothing at all give the same answer: the test below passed with
- * `admissionOrder`'s id comparison taken out. Listed in reverse, the two differ.
- */
-const journalListing = (order: (ids: string[]) => string[]) => {
-  const store = new Map<string, Event[]>();
-  const feed: FeedEntry[] = [];
-  return Journal.layer({
-    append: (taskId, event) => Effect.sync(() => {
-      store.set(taskId, [...(store.get(taskId) ?? []), event]);
-      feed.push({ taskId, event });
-    }),
-    read: (taskId) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
-    list: Effect.sync(() => order([...store.keys()])),
-    feed: (after) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
-  });
-};
-
-test('two tasks filed at the same instant are admitted in the order of their ids, whichever order the store lists them in', async () => {
-  const sorted = (ids: string[]) => [...ids].sort();
-  for (const [listing, order] of [['sorted', sorted], ['reversed', (ids: string[]) => sorted(ids).reverse()]] as const) {
-    const b = board(journalListing(order));
-    await fileAt(b, 'b', '2026-09-16T10:00:00.000Z');
-    await fileAt(b, 'a', '2026-09-16T10:00:00.000Z');
-    await fileAt(b, 'c', '2026-09-16T09:59:59.000Z');
-    assert.deepEqual(await admitted(b, 3), ['c', 'a', 'b'], `the time first, and the id only between equal times — listed ${listing}`);
+test('the pass refuses any argument — an old ceiling, pools, anything — and reads nothing', async () => {
+  const b = board();
+  await b.run(file(spec));
+  for (const args of [[3], [3, { claude: 'claude' }], [undefined]] as const) {
+    // Untyped, as a caller built against the old door calls it.
+    const refused = await b.run(Effect.flip((tick as (...a: unknown[]) => ReturnType<typeof tick>)(...args)));
+    assert.equal(refused._tag, 'TickRefused');
+    assert.match(refused.message, /^the pass takes no arguments, and was handed \d: it has no ceiling and no pools since stage 4c part 2\. File tasks `queued: true` and `admit` each/);
   }
+  assert.equal(b.sessions.size, 0, 'nothing started by a refused pass');
 });
 
-test('a higher priority is admitted before an older, lower one — and the priority reaches no harness', async () => {
+test('step and settleTask refuse the ceiling\'s old slots — neither drops them, nor settles nothing on them — and journal nothing', async () => {
   const b = board();
-  await b.run(file({ ...spec, id: 'older', brief: 'filed first, no priority' }));
-  await new Promise((r) => setTimeout(r, 5));
-  await b.run(file({ ...spec, id: 'newer', brief: 'filed after, above it', priority: 1 }));
-
-  await b.run(tick(1));
-  assert.deepEqual([...b.sessions.keys()], [nameFor('newer', 1)], 'the higher priority took the one slot');
-  assert.equal(await b.run(phaseOf('older', b)), 'pending', 'and the older task waits behind it');
-  assert.equal((await b.run(view('newer', new Map()))).state.priority, 1, 'on the record');
-  assert.equal('priority' in b.spawned[0]!, false, 'read at admission and nowhere else: the harness is not told');
-});
-
-test('priority first, higher before lower, then filing order within one — no priority is 0, below it is below that', async () => {
-  const b = board();
-  await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
-  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z', { priority: 0 });
-  await fileAt(b, 'c', '2026-09-16T10:00:03.000Z', { priority: 5 });
-  await fileAt(b, 'd', '2026-09-16T10:00:01.000Z', { priority: 5 });
-  await fileAt(b, 'e', '2026-09-16T09:00:00.000Z', { priority: -1 });
-  // What a journal written before `file` refused it, or by hand, can hold: read as no priority, never as above or below
-  // every other. `fileAt` appends the event itself, as such a journal did.
-  await fileAt(b, 'f', '2026-09-16T10:00:04.000Z', { priority: Number.NaN });
-  assert.deepEqual(await admitted(b, 6), ['d', 'c', 'b', 'a', 'f', 'e']);
+  const id = await b.run(file(spec));
+  const journalOf = async () => (await b.run(view(id, new Map()))).state.attempts.length;
+  // Untyped, as a caller built against the old door calls them: `step(id, observed, slots)`, `settleTask(id, observed, slots, maxSteps)`.
+  const oldStep = step as (...a: unknown[]) => ReturnType<typeof step>;
+  for (const extra of [[{ used: 0, max: 3 }], [undefined], [{ used: 0, max: 3 }, 8]]) {
+    const refused = await b.run(Effect.flip(oldStep(id, new Map(), ...extra)));
+    assert.equal(refused._tag, 'StepRefused');
+    assert.match(refused.message, new RegExp(`^step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots`));
+  }
+  const oldSettle = settleTask as (...a: unknown[]) => ReturnType<typeof settleTask>;
+  for (const args of [[{ used: 0, max: 3 }], [{ used: 0, max: 3 }, 8], [0], [-1], [1.5], [Number.NaN], ['8'], [null], [8, 'more']]) {
+    const refused = await b.run(Effect.flip(oldSettle(id, new Map(), ...args)));
+    assert.equal(refused._tag, 'StepRefused', `settleTask(id, observed, ${String(args)})`);
+    assert.match(refused.message, /^settleTask takes a task, an observation and a number of steps above nought, and was handed .+: its third argument was the ceiling's slots/);
+  }
+  assert.equal(await journalOf(), 0, 'no attempt journalled by a refused step');
+  assert.equal(b.sessions.size, 0, 'and nothing started');
+  // The door as it is: two arguments step, and settleTask's own default or a count settles.
+  assert.equal((await b.run(settleTask(id, new Map(), 1))).length, 1);
+  assert.ok((await b.run(settleTask(id, new Map()))).length >= 1);
 });
 
 // ─── isolation ──────────────────────────────────────────────────────────────
@@ -500,12 +382,12 @@ test('priority first, higher before lower, then filing order within one — no p
 test('worktree is declared by the task and passed to the harness untouched', async () => {
   const b = board();
   await b.run(file({ ...spec, config: { worktree: true } }));
-  await b.run(tick(9));
+  await b.run(tick());
   assert.equal(b.spawned.at(-1)!.config?.worktree, true);
 
   const c = board();
   await c.run(file({ ...spec, config: { worktree: 'my-branch' } }));
-  await c.run(tick(9));
+  await c.run(tick());
   assert.equal(c.spawned.at(-1)!.config?.worktree, 'my-branch');
 });
 
@@ -695,7 +577,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
   assert.equal(plain.spawned[0]!.config?.remoteControl, undefined, 'no Remote Control unless asked');
 });
 
-test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function endOf('));
   assert.ok(body.includes('return'), 'found the body of decide');
@@ -799,7 +681,7 @@ test('LIVE is exactly the states decide waits on — `busy` is not a state, so i
     { kind: 'spawned', at: t0, attempt: 1 },
   ]);
   const waitsOn = (Object.keys(STATES) as Observed[]).filter((state) =>
-    decide(inFlight, new Map([[nameFor('t', 1), { sessionId: 's', state }]]), { at: new Date(0), graceMs: GRACE_MS, used: 0, max: 1 }).do === 'nothing');
+    decide(inFlight, new Map([[nameFor('t', 1), { sessionId: 's', state }]]), { at: new Date(0), graceMs: GRACE_MS }).do === 'nothing');
   assert.deepEqual([...LIVE].sort(), waitsOn.sort());
   assert.equal((LIVE as ReadonlySet<string>).has('busy'), false);
 });
@@ -888,6 +770,6 @@ test('...and when no session shows up, the grace window ends it lost, as for any
     kind: 'spawned', at: new Date().toISOString(), attempt: 1, error: 'launcher: lost the acknowledgement',
   })));
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
-  const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS, used: 0, max: 1 };
+  const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS };
   assert.deepEqual(decide(state, new Map(), later), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' });
 });

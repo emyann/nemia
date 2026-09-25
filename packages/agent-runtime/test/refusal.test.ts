@@ -37,7 +37,7 @@ const promiseDoor = () => {
 const ok: Filing = { brief: 'b', cwd: '/r' };
 
 /** Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are cast, as a JSON caller would send them. */
-const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume', unknown>>, RegExp]> = [
+const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume' | 'priority', unknown>>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
   [{ cwd: 'repo' }, new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`)],
@@ -62,9 +62,12 @@ const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAtt
   [{ config: { budgetUsd: Number.NaN } }, /^`budgetUsd: NaN` is not an amount of dollars\./],
   [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
   [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
-  [{ priority: Number.NaN }, /^`priority: NaN` is not a number\./],
-  [{ priority: Infinity }, /^`priority: Infinity` is not a number\./],
-  [{ priority: 'high' }, /^`priority: "high"` is not a number\./],
+  // Retired in stage 4c part 2 (2026-09-25), at any value: the runtime chooses no order, and the layer above admits.
+  [{ priority: 0 }, /^`priority` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order\. File tasks `queued: true` and `admit` each when it may start \(`ae admit <id>`\)/],
+  [{ priority: 1 }, /^`priority` is retired:/],
+  [{ priority: -1 }, /^`priority` is retired:/],
+  [{ priority: Number.NaN }, /^`priority` is retired:/],
+  [{ priority: 'high' }, /^`priority` is retired:/],
   [{ config: { remoteControl: 'true' } }, /^`remoteControl: "true"` is not true or false\./],
   [{ config: { background: 'yes' } }, /^`background: "yes"` is not true or false\. Give true to run the session as `claude --bg`, or leave it out to run it as a job\.$/],
   [{ config: { background: 1 } }, /^`background: 1` is not true or false\./],
@@ -107,7 +110,7 @@ for (const [bad, says] of REFUSALS) {
 test('the Effect door journals a filing that refuses nothing, with every checked key set', async () => {
   const effect = effectDoor();
   const full: Filing = {
-    ...ok, deadlineSeconds: 60, resumeFrom: 's-1', priority: -1,
+    ...ok, deadlineSeconds: 60, resumeFrom: 's-1', queued: true, holdOpen: true,
     config: {
       model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
       allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, background: false, contextTokens: 200000,

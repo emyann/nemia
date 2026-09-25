@@ -58,7 +58,7 @@ test('a key in config that is no harness argument is refused by name, with the l
   const says = argsRefusalOf({ ...task, config: { model: 'opus', modle: 'haiku' } } as never) ?? '';
   assert.ok(says.startsWith('`config.modle` is not a harness argument.'), says);
   for (const key of HARNESS_ARGS) assert.ok(says.includes(key), `the list names ${key}`);
-  // The task's own fields do not belong in it either: a priority is the task's, not the harness's.
+  // Nor a key of the task's own: `priority` was the task's until stage 4c part 2 retired it, never the harness's.
   assert.match(argsRefusalOf({ ...task, config: { priority: 1 } } as never) ?? '', /^`config\.priority` is not a harness argument\./);
 });
 

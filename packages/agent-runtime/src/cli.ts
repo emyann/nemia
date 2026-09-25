@@ -22,7 +22,7 @@ import { createEngine, denialText, retiredKeyRefusal, type Attempt, type Engine,
 export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'deadlineSeconds',
   'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
-  'contextTokens', 'background', 'holdOpen',
+  'contextTokens', 'background', 'holdOpen', 'queued',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -91,6 +91,11 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   if (background !== undefined && background !== 'true' && background !== 'false') {
     throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`);
   }
+  // The one way to hold a task back from `ae` since the runtime's ceiling was retired (stage 4c part 2): `ae admit` starts it.
+  const queued = meta.get('queued');
+  if (queued !== undefined && queued !== 'true' && queued !== 'false') {
+    throw refuse(`\`queued: ${queued}\` is not true or false. Write \`queued: true\` to have the task wait for \`ae admit <id>\` before it starts, or leave it out to start it on the next tick.`);
+  }
   const holdOpen = meta.get('holdOpen');
   if (holdOpen !== undefined && holdOpen !== 'true' && holdOpen !== 'false') {
     throw refuse(`\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`);
@@ -144,6 +149,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
     ...(holdOpen === 'true' ? { holdOpen: true as const } : {}),
+    ...(queued !== undefined ? { queued: queued === 'true' } : {}),
     ...(Object.keys(config).length ? { config } : {}),
   };
 }
@@ -231,8 +237,8 @@ export const attemptLine = (a: Attempt): string => {
 };
 
 /**
- * One task, for `ae ls`: `queued` while it waits for `ae admit` (stage 4c), its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
- * turns — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
+ * One task, for `ae ls`: `queued` while it waits for `ae admit` (stage 4c), and its latest attempt's cost beside its turns
+ * — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
  * Code writes a session's cost as its process exits. A task held open and answered says which turn it is on — `turn 1`.
  */
 export const taskLine = (v: TaskView) => {
@@ -240,9 +246,8 @@ export const taskLine = (v: TaskView) => {
   const tries = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
-  const priority = v.state.priority !== undefined ? `  priority ${v.state.priority}` : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
 /**
@@ -304,21 +309,29 @@ const HELP = `ae — an engine for agent sessions
                      reaches either
     holdOpen         true — when a turn ends done, wait for ae answer or ae close
                      rather than settle: input-required, with nothing running
+    queued           true — wait for ae admit <id> before it starts
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
   one attempt per start: a task that fails settles failed — file it again, with
   resumeFrom to continue its session (maxAttempts and resume are retired)
 
-  AE_ROOT            a different board, the way a kubeconfig points at a different cluster
-  AE_MAX_CONCURRENT  sessions at work at once per pool: claude and claude-detached
-                     share one, codex has its own (default 3)`;
+  every task filed starts on the next tick: there is no ceiling. To hold one back,
+  file it with queued: true and start it with ae admit <id>
+
+  AE_ROOT            a different board, the way a kubeconfig points at a different cluster`;
+
+/**
+ * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: it was the runtime's ceiling until stage 4c part 2
+ * (2026-09-25), and read and dropped, a person who set it would believe in a ceiling nothing keeps.
+ */
+export const AE_MAX_CONCURRENT_RETIRED = 'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
 
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
+  if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
   const engine: Engine = createEngine({
     root: process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine'),
-    maxConcurrent: Number(process.env.AE_MAX_CONCURRENT) || undefined,
   });
 
   switch (verb) {

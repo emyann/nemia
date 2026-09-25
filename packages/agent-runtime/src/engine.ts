@@ -16,19 +16,8 @@ import { Runner } from './runner.ts';
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
-/** Sessions of one pool that may be at work at once. Your subscription's rate limit, mostly. */
-export const DEFAULT_MAX_CONCURRENT = 3;
-
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
 export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
-
-/**
- * A session that holds a slot under the ceiling: one at work. Narrower than `LIVE` on purpose. A `blocked` session is
- * live — the engine waits on it — but one on a permission prompt makes no API calls, so it costs nothing against the
- * rate limit the ceiling exists for. Reasoning, not a measurement. Counted afresh every pass, so one that moves again
- * counts again on the next.
- */
-const AT_WORK: ReadonlySet<Sighting['state']> = new Set(['working']);
 
 export type TaskView = {
   id: string; state: State; phase: string;
@@ -58,10 +47,10 @@ export type TaskView = {
 export type Filing = {
   brief: string; cwd: string;
   harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resumeFrom?: string;
-  closeoutSchema?: object; priority?: number; id?: string;
+  closeoutSchema?: object; id?: string;
   /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
-  /** Wait for `admit` before each turn starts, rather than start under the pass's ceiling (stage 4c). See the `filed` event. */
+  /** Wait for `admit` before each turn starts, rather than start on the next pass (stage 4c). See the `filed` event. */
   queued?: boolean;
 };
 
@@ -87,6 +76,16 @@ export const RETIRED_INSTEAD = 'To run the task again, file it again — with `r
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
 
 /**
+ * What to do instead of the runtime's retired ceiling, pools and priority (stage 4c part 2, 2026-09-25): the layer above
+ * chooses what starts, and when. Shared by every refusal of them — `priority` here, the pass's arguments, `createEngine`'s
+ * `maxConcurrent` and a harness's `pool` (`facade.ts`), and `AE_MAX_CONCURRENT` (`cli.ts`).
+ */
+export const ADMIT_INSTEAD = 'File tasks `queued: true` and `admit` each when it may start (`ae admit <id>`); in a workflow the orchestrator admits by pool under `WF_MAX_CONCURRENT`.';
+
+/** Why a task filed with `priority`, at any value, is refused: the runtime chooses no order since it keeps no slots. */
+export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order. ${ADMIT_INSTEAD}`;
+
+/**
  * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it that is the
  * runtime's own, and no harness's.
  *
@@ -107,6 +106,8 @@ export const refusalOf = (spec: Filing): string | undefined => {
   }
   // Asked of the spec as handed in, untyped: a caller built against the old `TaskSpec`, or from JSON, still sends them.
   for (const key of Object.keys(RETIRED_KEYS) as (keyof typeof RETIRED_KEYS)[]) if (Object.hasOwn(spec, key)) return retiredKeyRefusal(key);
+  // Present, whatever its value, as the retired keys above: taken and dropped, it would promise an order nothing keeps.
+  if (Object.hasOwn(spec, 'priority')) return PRIORITY_RETIRED;
   if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
     return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
   }
@@ -116,9 +117,6 @@ export const refusalOf = (spec: Filing): string | undefined => {
   }
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
-  }
-  if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
-    return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
   }
   return undefined;
 };
@@ -137,7 +135,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
     harness: spec.harness, config: spec.config,
     deadlineSeconds: spec.deadlineSeconds, resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema, priority: spec.priority, holdOpen: spec.holdOpen,
+    closeoutSchema: spec.closeoutSchema, holdOpen: spec.holdOpen,
     // Always written, `false` too: a filing with no key is from before stage 4c, and reads as queued.
     queued: spec.queued === true,
   });
@@ -315,16 +313,39 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 
+/** A `step` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
+export class StepRefused extends Schema.TaggedError<StepRefused>()('StepRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * Why `step` refuses what it was handed past the task and the observation. Until stage 4c part 2 (2026-09-25) its third
+ * argument was the ceiling's `slots`, and a caller built against that door would have had it dropped without a word.
+ */
+export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
+  extra.length === 0 ? undefined
+    : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+
+/**
+ * Why `settleTask` refuses its `maxSteps`: a count of steps is a whole number above nought. Its third argument was the
+ * ceiling's `slots` until stage 4c part 2, and a `{ used, max }` in `maxSteps`'s place compares false and settles nothing.
+ */
+export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
+  Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0 ? undefined
+    : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+
 export const step = Effect.fn('step')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
-  slots: { used: number; max: number } = { used: 0, max: Infinity },
 ) {
+  // Typed to take two, and asked all the same: a caller built against the old door still passes the ceiling's slots.
+  const refused = stepRefusalOf([...arguments].slice(2));
+  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
   const journal = yield* Journal;
   const runner = yield* Runner;
 
   const state = fold(taskId, yield* journal.read(taskId));
-  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS, ...slots });
+  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS });
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -416,12 +437,13 @@ const PROGRESSES = new Set(['start', 'spawn', 'record-end', 'settle']);
 export const settleTask = Effect.fn('settleTask')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
-  slots: { used: number; max: number } = { used: 0, max: Infinity },
   maxSteps = 8,
 ) {
+  const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
+  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
   const taken: Action[] = [];
   for (let i = 0; i < maxSteps; i++) {
-    const action = yield* step(taskId, observed, slots);
+    const action = yield* step(taskId, observed);
     taken.push(action);
     if (!PROGRESSES.has(action.do)) break;
   }
@@ -467,106 +489,73 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
   }
 });
 
-/** When a task was filed, in milliseconds — as a time, not a string, so `10:00:01Z` is after `10:00:00.500Z`. None that parses is after every other. */
-const filedMs = (state: State) => {
-  const ms = Date.parse(state.filedAt ?? '');
-  return Number.isNaN(ms) ? Infinity : ms;
+/** A tick that was handed an argument, and why. Nothing was read or written. */
+export class TickRefused extends Schema.TaggedError<TickRefused>()('TickRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * Why a pass refuses what it was handed: it takes nothing. Until stage 4c part 2 (2026-09-25) it took a ceiling and the
+ * pools it counted in, and an untyped caller still passing `tick(3)` would have had its ceiling dropped without a word.
+ */
+export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
+  args.length === 0 ? undefined
+    : `the pass takes no arguments, and was handed ${args.length}: it has no ceiling and no pools since stage 4c part 2. ${ADMIT_INSTEAD}`;
+
+/**
+ * Whether an unsettled task's session is at work as the pass left it: its last attempt open, and its harness listing it
+ * `working` — or not yet listing it, as one started this pass is not. A `blocked` session is waiting on a person, and is not.
+ */
+const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean => {
+  const last = state.attempts.at(-1);
+  if (!last || last.ended !== null) return false;
+  const seen = observed.get(nameFor(state.taskId, last.n));
+  return seen === undefined || seen.state === 'working';
 };
-
-/**
- * A task's priority, 0 when it has none. One that is not a finite number — which `file` refuses, so only a journal written
- * before it did, or by hand, holds one, and a file journal writes back as `null` — is read as none, never as above or
- * below every other.
- */
-const priorityOf = (state: State) => (Number.isFinite(state.priority) ? state.priority! : 0);
-
-/**
- * The order a pass walks the board in, and so which waiting task a free slot goes to: the highest `priority` first; within
- * one, the oldest filing; and between two filed at the same instant, the ids' order, as `journal.list` sorts them. A retry
- * is ordered by its task's filing, not by when its last attempt ended: older work goes first.
- */
-const admissionOrder = (a: State, b: State) =>
-  priorityOf(b) - priorityOf(a) || filedMs(a) - filedMs(b) || (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0);
 
 /**
  * One pass over every task on the board. This is the whole daemon.
  *
- * **Admission is serial, and that is deliberate.** Two tasks decided concurrently would each read
- * the same `used` count and each start, so a ceiling of 3 would admit 5. Nothing here is slow —
- * a spawn returns as soon as the harness has the work — so the pass costs a few seconds at worst
- * and buys a ceiling that is actually true.
+ * Each task is stepped in the order `journal.list` gives, against one observation of every harness. The pass chooses
+ * nothing: a task filed unqueued starts on it, and one filed `queued` starts on the pass after the layer above `admit`s it.
+ * How many run at once, in which pool, and which first is that layer's (stage 4c) — the orchestrator's `toAdmit`, off the
+ * `views` this pass returns.
  *
- * The count starts from what is OBSERVED and grows as this pass starts things, because a session
- * started a moment ago is not in the harness's registry yet (see the grace window). Our own new
- * runs are not contention to be discovered later; they are slots we have just spent.
- *
- * Observed at work, and only that: a `blocked` session is not counted, so blocked sessions that
- * move again can put a board past its ceiling. Nothing is stopped for it; nothing more is admitted
- * until the count is back under.
- *
- * Counted by POOL, because a ceiling is a rate limit and a rate limit is a subscription's, however
- * many harnesses run on it. `pools` names the pool each harness is counted in; a harness it does not
- * name is a pool of its own, under its own name. `createEngine` passes the pools its harnesses
- * declare; a caller of this door passes its own.
- *
- * **Which waiting task a free slot goes to is the order of this walk** (`admissionOrder`): the highest `priority`
- * first, then the oldest filing, and the ids' order only between two filed at the same instant. It was the ids' order
- * alone — `journal.list` sorts them — so which of two waiting tasks started was the alphabet of their names. `decide`
- * sees one task and two numbers, and never learns there is an order. Nothing running is stopped for a higher priority:
- * it is read when a slot is free, and only then.
+ * `running` is a count, per harness, of the sessions at work as the pass left them (`atWork`), off the same observation
+ * and the fold the pass already made: what `ae tick` prints, and no rule reads.
  */
-export const tick = Effect.fn('tick')(function* (
-  maxConcurrent = DEFAULT_MAX_CONCURRENT,
-  pools: Readonly<Record<string, string>> = {},
-) {
+export const tick = Effect.fn('tick')(function* () {
+  // Typed to take nothing, and asked all the same: an untyped caller, or one built against the old door, still passes a ceiling.
+  const refused = tickRefusalOf([...arguments]);
+  if (refused) return yield* Effect.fail(new TickRefused({ message: refused }));
   const journal = yield* Journal;
   const runner = yield* Runner;
 
   const observed = yield* runner.observe;
   const ids = yield* journal.list;
 
-  // Which pool each session at work is counted in — the sighting does not say, so it comes from the
-  // task that owns the name. Two small file reads per task per pass; the board is local and tiny.
-  // At work, not live: a `blocked` session holds no slot (`AT_WORK`).
-  const poolOf = (state: State) => {
-    const harness = state.harness ?? 'default';
-    return Object.hasOwn(pools, harness) ? pools[harness]! : harness;
-  };
-  const used = new Map<string, number>();
-  const states = new Map<string, State>();
-  for (const id of ids) {
-    const state = fold(id, yield* journal.read(id));
-    const pool = poolOf(state);
-    states.set(id, state);
-    const last = state.attempts.at(-1);
-    if (last && last.ended === null) {
-      const seen = observed.get(nameFor(id, last.n));
-      if (seen && AT_WORK.has(seen.state)) used.set(pool, (used.get(pool) ?? 0) + 1);
-    }
-  }
-
   const taken: Action[] = [];
   const views: TaskView[] = [];
-  for (const id of [...ids].sort((a, b) => admissionOrder(states.get(a)!, states.get(b)!))) {
-    const pool = poolOf(states.get(id)!);
-    const before = used.get(pool) ?? 0;
-    const actions = yield* settleTask(id, observed, { used: before, max: maxConcurrent });
+  const running: Record<string, number> = {};
+  for (const id of ids) {
+    const before = fold(id, yield* journal.read(id));
+    const actions = yield* settleTask(id, observed);
     taken.push(...actions);
-    // A slot is spent the moment we journal the intent, not when the harness confirms it.
-    if (actions.some((a) => a.do === 'start')) used.set(pool, before + 1);
     // Against the journal as this pass left it — so an end written just now is let go now — read again
     // only when the pass wrote to it.
-    const after = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : states.get(id)!;
+    const after = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
     yield* releaseFinished(after, observed);
     // The board as this pass left it, off its one observation and the fold it already made: what the layer above
     // admits by (stage 4c), with no second look at any harness.
-    if (!after.settled) views.push(viewOfState(after, observed));
+    if (after.settled) continue;
+    views.push(viewOfState(after, observed));
+    if (atWork(after, observed)) running[after.harness ?? 'default'] = (running[after.harness ?? 'default'] ?? 0) + 1;
   }
 
   return {
     tasks: ids.length,
     actions: taken.filter((a) => a.do !== 'nothing').length,
-    running: Object.fromEntries(used),
+    running,
     views,
   };
 });

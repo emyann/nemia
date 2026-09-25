@@ -258,17 +258,16 @@ export type Event =
        * A journal written before stage 4b (2026-09-25) carries the spend cap here too, beside `config`; it is read as one
        * of the harness's arguments, under it (`upgrade` in `journal.ts`).
        */
-      /**
-       * Which waiting task a free slot goes to first: higher first, and filing order within one; absent is 0. Read by the
-       * pass when it orders the board (`admissionOrder` in `engine.ts`), and nowhere else — not by `decide`, which is
-       * handed one task, and not by a runner, which is never told it. A pod's `priorityClassName`, without preemption.
+      /*
+       * A journal written before stage 4c part 2 (2026-09-25) may carry `priority` here: which waiting task a
+       * free slot went to first. The runtime keeps no slots now — the layer above chooses what starts and `admit`s it — so
+       * the key is history, folded unread.
        */
-      priority?: number;
       /**
        * Filed to wait for the layer above's word (stage 4c): each turn starts only once an `admitted` entry names it, and a
-       * task not queued starts under the pass's own ceiling as ever. Written on every filing since, `false` when not asked
-       * for; a journal written before has no key and reads as queued, so a store an older daemon filed into is held for
-       * the admission the upper layer now does rather than started all at once past its ceiling. A Job's `suspend: true`.
+       * task not queued starts on the next pass. Written on every filing since, `false` when not asked for; a journal
+       * written before has no key and reads as queued, so a store an older daemon filed into is held for the admission the
+       * upper layer now does rather than started all at once. A Job's `suspend: true`.
        */
       queued?: boolean;
       /**
@@ -323,8 +322,8 @@ export type Event =
   /** A person's word that a task held open is finished with: it settles once no attempt of it runs. Read by `decide`. */
   | { kind: 'closed'; at: string }
   /**
-   * The layer above's word that a queued task's current turn may start (stage 4c): the next pass starts it, under the
-   * pass's own ceiling. Names no turn: it admits the turn current when it is written, and a later turn — a person's
+   * The layer above's word that a queued task's current turn may start (stage 4c): the next pass starts it. Names no
+   * turn: it admits the turn current when it is written, and a later turn — a person's
    * answer to a task held open — waits for one of its own. Written by `admit`, and only while the task waits for it.
    */
   | { kind: 'admitted'; at: string }
@@ -347,7 +346,7 @@ export type Input = { at: string; text: string; config?: HarnessArgs };
 export type Attempt = {
   n: number;
   /** When the intent was journalled. The deadline runs from the FIRST of these, not from filing:
-   *  a task queued behind the ceiling has not started burning its time. */
+   *  a task queued for admission has not started burning its time. */
   startedAt: string;
   /** Null until the spawn call returned: the window a crash can land in. */
   spawnedAt: string | null;
@@ -402,8 +401,6 @@ export type State = {
   config?: HarnessArgs;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
-  /** Which waiting task a free slot goes to first. See the `filed` event. `decide` never reads it. */
-  priority?: number;
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
@@ -436,7 +433,6 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds;
         s.resumeFrom = e.resumeFrom;
         s.config = e.config; s.closeoutSchema = e.closeoutSchema;
-        s.priority = e.priority;
         if (e.holdOpen) s.holdOpen = true;
         if (e.queued !== undefined) s.queued = e.queued;
         break;
@@ -541,20 +537,13 @@ export type Action =
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
+/**
+ * The clock, and how long a spawned session may go unregistered before it is lost. How many sessions may be at work at
+ * once is not here: the layer above chooses what starts and `admit`s it (stage 4c), and a task it has admitted starts.
+ */
 export type Now = {
   at: Date;
   graceMs: number;
-  /**
-   * How many sessions of THIS TASK'S pool are already at work, and how many may. At work is
-   * `working`: a `blocked` session holds no slot.
-   *
-   * Resolved by the caller rather than looked up here, because the ceiling is per pool — one
-   * subscription is one pool, whichever harnesses run on it, and a Codex session must not use up a
-   * Claude slot.
-   * `decide` only ever compares two numbers, which is all a pure function should need.
-   */
-  used: number;
-  max: number;
 };
 
 /**
@@ -593,13 +582,12 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
 
   // ---- the deadline, over the time the task has actually been RUNNING — its current turn, for a task held open.
   //
-  // Measured from the first attempt's intent rather than from filing: a task queued behind the
-  // ceiling has not started burning its time, and a deadline that expires in the queue would be
-  // a ceiling that quietly fails work instead of delaying it.
+  // Measured from the first attempt's intent rather than from filing: a task queued for admission
+  // has not started burning its time, and a deadline that expires in the queue would be a
+  // ceiling that quietly fails work instead of delaying it.
   //
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
-  // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
-  // counts sessions at work, and one on a permission prompt makes no API calls.
+  // forever, as far as every other rule here is concerned.
   //
   // It stops what runs and settles what it cut; an end its harness recorded is judged by that end, below, and no attempt
   // follows an ended one. A pass steps a task until nothing moves, so an end recorded past the deadline is read past it
@@ -629,13 +617,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
     if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
     // A queued turn waits for the layer above's word, and is started by the pass after the one that wrote it (stage 4c).
-    // Checked after every terminal answer, as the ceiling is, so a queued task can still settle.
+    // Checked after every terminal answer, so a queued task can still settle.
     if (awaitsAdmission(state)) return { do: 'nothing', why: 'queued — waits to be admitted' };
-    // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
-    // be allowed to settle when the board is full — otherwise a full board could never drain.
-    if (now.used >= now.max) {
-      return { do: 'nothing', why: `${state.harness ?? 'default'}'s pool is at its ceiling (${now.used}/${now.max})` };
-    }
     // The first turn continues what the task was filed against; a later one, the session that signed the turn before it.
     const resumeFrom = turn.continues;
     // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two

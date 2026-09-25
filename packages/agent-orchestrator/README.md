@@ -2092,28 +2092,33 @@ up — every 4000ms, ^C to stop
    runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)
 ```
 
-- **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions at work, not runs.** It is the tick's own ceiling, per pool (thin runtime stage 4c;
-  the engine's `maxConcurrent` until then): `claude` and `claude-detached` share one, since they share one subscription; `codex` has its
+- **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions at work, not runs.** It is the tick's own ceiling, per pool, and the only one (thin runtime stage 4c;
+  the engine's `maxConcurrent` until part 1, retired from the engine in part 2, which now refuses it): `claude` and `claude-detached` share one, since they share one subscription; `codex` has its
   own; and a step's check runs on the `check` harness, a pool of its own, so a suite never waits behind a session (`POOLS` in
   `src/admission.ts`). Both steps of `dev` are on `claude`, so one run's review competes with another run's implement for the same slots.
   A task holds a slot while its session works, while it is starting, and once it is admitted until it starts; a session its harness lists
   `blocked` holds none, since it makes no API calls, and one held open for an answer none (`holdsSlot`).
 - **The tick admits; the engine starts.** Every task the run files is filed `queued` (`src/runtime-client.ts`), and the engine starts
-  none of it until it is admitted. After the engine's pass, the tick takes the views that pass built off its one look at each harness
+  none of it until it is admitted. The engine keeps no ceiling, pools or order of its own: it starts what it is given, and its `running`
+  counts sessions at work per harness, not per pool. After the engine's pass, the tick takes the views that pass built off its one look at each harness
   (`TickReport.views`), works out what each pool has room for (`toAdmit`), and admits those (`admit`); the engine starts them on its
   **next** pass. So a new filing, and a slot freed by a session that ended, starts one pass — about 4 s — later than when the engine
   admitted and started in one pass. Admission asks no harness anything of its own: one pass makes one `claude agents` call for it
   (`test/pool.test.ts` counts them). A task filed past the ceiling waits, `pending`, and the timeline counts the wait as queued, as before.
 - **A run in flight keeps its momentum.** A waiting task goes before another in its pool by momentum, then by the earlier filing, then by
   the lower id. Every filing after a run's first steps — a step after another, a try, a round, a check — has momentum (`MOMENTUM`,
-  `priorityOf`), and a run's first steps none, so a run's next step waiting for a slot goes before a newer run's first step. It is read
+  `stepMomentum`), and a run's first steps none, so a run's next step waiting for a slot goes before a newer run's first step. It is read
   off the run records on each pass (`momentumOf`), not carried on the filing; a task no run names — a store edited by hand, a run removed
   while its task waited — has none. Nothing running is stopped for it, and `WF_MAX_RUNS` and the queue are unchanged.
 - **A restarted daemon starts nothing it has not admitted.** A store written before stage 4c has filings with no `queued` key, which the
   engine reads as queued, so `wf up` restarted onto it counts what is at work first and admits the rest in the order above, the way the
-  engine used to: at the default of 2, two sessions at work fill `claude`'s pool and no claude task is admitted until one ends, while
+  engine did before it: at the default of 2, two sessions at work fill `claude`'s pool and no claude task is admitted until one ends, while
   `codex` and `check` fill their own. Its first pass admits and its second starts (`test/restart.test.ts`). An engine from before stage 4c,
-  run on a store this one wrote, reads each task as it did.
+  run on a store this one wrote, reads each task as it did. A filing from before carries a `priority` the engine now folds unread:
+  momentum is read off the run records, so nothing is lost. A `wf up` started before part 2 keeps its engine, and its
+  `maxConcurrent: Infinity`, until it is restarted; restarted, it builds its engine with no ceiling, and a tree only half merged —
+  a client that still passes `maxConcurrent` to an engine that refuses it — fails where the engine is built, exit 2, rather than
+  running with a ceiling nobody keeps.
 - **`WF_MAX_RUNS`, unset or 0 for no cap, counts runs in flight.** A run is in flight while a task of it — a step's or a check's — is filed
   and not settled, or while it has started and the tick files something of it on the pass: a run between two steps is still in flight. One
   that waits on a person, or has finished, is not; one called off is, until the engine has stopped what it had in flight. A run with nothing
@@ -2538,7 +2543,7 @@ holding a concurrency slot forever.
 | `src/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
 | `src/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
 | `src/retry.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`tryOf`, `retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`, `retryRefusal`) stays in `run.ts` |
-| `src/admission.ts` | which queued tasks a pass lets start — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`) |
+| `src/admission.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`) |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
@@ -2552,7 +2557,7 @@ holding a concurrency slot forever.
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
-| `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), which files every task `queued`, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
+| `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
 | `src/views.ts` | what the engine's views of a run's tasks say: a step's phase (`phaseOfView`), whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/start.ts` | a run started (`start`), a plan's cards started (`readPlan`, `startPlan`), an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
 | `src/tick.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first (`tick`, `advance`), the first steps given their parents' closeouts (`parentCloseouts`), and what a pass filed and never wrote down, adopted |

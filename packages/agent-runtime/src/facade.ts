@@ -32,7 +32,7 @@ import { ioCounts, type IoCounts } from './io-tally.ts';
 import { tickMemoLayer } from './tick-memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, viewOfState, type RefusedMove, type TaskView,
+  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, viewOfState, viewsOf, type RefusedMove, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -202,7 +202,13 @@ export type Engine = {
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view(taskId: string): Promise<TaskView>;
-  list(): Promise<TaskView[]>;
+  /**
+   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
+   * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
+   * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
+   * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
+   */
+  list(taskIds?: readonly string[]): Promise<TaskView[]>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
   stop(taskId: string): Promise<void>;
   logs(taskId: string): Promise<string>;
@@ -484,6 +490,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
     return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
   });
 
+  const everyTask = () => go(Effect.gen(function* () {
+    const observed = yield* (yield* Runner).observe;
+    const ids = yield* (yield* Journal).list;
+    return yield* Effect.forEach(ids, (id) => view(id, observed));
+  }));
+
   const engine: Engine = {
     // The harness is RESOLVED here, never left implicit: a task filed without one would otherwise read
     // `default` on its record and its view, and a layer above that pools by harness would count it apart
@@ -512,11 +524,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
     },
     io: () => ({ ...ioCounts(), observed: observedNow() }),
     view: (taskId) => go(viewOf(taskId)),
-    list: () => go(Effect.gen(function* () {
-      const observed = yield* (yield* Runner).observe;
-      const ids = yield* (yield* Journal).list;
-      return yield* Effect.forEach(ids, (id) => view(id, observed));
-    })),
+    list: (...args: unknown[]) => {
+      const [taskIds] = args;
+      if (args.length > 1 || (taskIds !== undefined && (!Array.isArray(taskIds) || !taskIds.every((id) => typeof id === 'string')))) {
+        throw Object.assign(new Error(`list: takes the task ids to view, a list of strings, or nothing for every task; it was handed ${args.map((a) => JSON.stringify(a)).join(', ')}.`), { exitCode: 2 });
+      }
+      return taskIds === undefined ? everyTask() : go(viewsOf(taskIds as string[]));
+    },
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) => go(Effect.gen(function* () {
       const v = yield* viewOf(taskId);

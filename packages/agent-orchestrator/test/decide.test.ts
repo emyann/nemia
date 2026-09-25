@@ -18,6 +18,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { AGENT_FACING, CHECK_AFFECTING, LESSON, advance, consumption, lessonLine, readRun, retry, sensitiveDiff, start, touchedBy } = await import('../src/runner.ts');
+const { metered } = await import('../src/tally.ts');
 const { main } = await import('../src/cli.ts');
 
 const git = (repo: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' });
@@ -50,7 +51,7 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
 /**
  * A board a test settles by hand. A settled attempt carries the usage it is given, as the engine records it. The n-th task filed is filed
  * 10n minutes after midnight on 2026-09-13, its attempt started 5 s and spawned 12 s after that, and ended 5 minutes after filing once it
- * settled; the feed has each filing.
+ * settled; each view and the feed carry its filing. `fed` counts the reads of the feed.
  */
 const board = () => {
   type Filed = { id: string; closeoutSchema?: object; config?: { remoteControl?: boolean } };
@@ -65,6 +66,7 @@ const board = () => {
    * the `remoteControl` it was filed with — as the engine's does.
    */
   const carries = { on: true };
+  const fed = { reads: 0 };
   const e = {
     view: async (id: string) => {
       viewed.set(id, (viewed.get(id) ?? 0) + 1);
@@ -74,7 +76,7 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         ...(t && carries.on && t.phase === 'pending' ? { admission: 'queued' } : {}),
         state: {
-          brief: t ? 'filed' : '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
+          brief: t ? 'filed' : '', ...(t ? { filedAt: iso(t.filedAt) } : {}), closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
           ...(t && carries.on ? { queued: true, ...(t.phase === 'pending' ? {} : { admitted: 0 }), config: t.spec.config } : {}),
           attempts: !t || t.phase === 'pending' ? [] : [{
             n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
@@ -85,13 +87,13 @@ const board = () => {
       };
     },
     file: async (spec: Filed) => { tasks.set(spec.id, { spec, phase: 'pending', filedAt: T0 + tasks.size * 600_000 }); return spec.id; },
-    feed: async () => ({ entries: [...tasks].map(([taskId, t]) => ({ taskId, event: { kind: 'filed', at: iso(t.filedAt) } })), cursor: tasks.size }),
+    feed: async () => (fed.reads++, { entries: [...tasks].map(([taskId, t]) => ({ taskId, event: { kind: 'filed', at: iso(t.filedAt) } })), cursor: tasks.size }),
     stop: async () => {},
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, usage, reason });
   const filed = (id: string): Filed | undefined => tasks.get(id)?.spec;
-  return { e, settle, logs, viewed, carries, filed };
+  return { e, settle, logs, viewed, carries, filed, fed };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -120,7 +122,7 @@ const awaiting = async (implementKeys = '') => {
     write(repo, 'logo.png', new Uint8Array([0, 1, 2, 0, 255]));
   });
 
-  const { e, settle, logs, viewed, carries, filed } = board();
+  const { e, settle, logs, viewed, carries, filed, fed } = board();
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED, USAGE);
   await advance(e, readRun(run.id));
@@ -133,7 +135,7 @@ const awaiting = async (implementKeys = '') => {
   const record = readRun(run.id);
   for (const s of Object.values(record.steps)) s.branch = branch;
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
-  return { run: record, repo, branch, e, viewed, carries, filed };
+  return { run: record, repo, branch, e, settle, viewed, carries, filed, fed };
 };
 
 /** What `wf decide` prints, line by line. */
@@ -166,8 +168,9 @@ const indexOf = (lines: string[], want: string | RegExp): number => {
 };
 
 test('the awaiting screen: what the branch touched, the lesson, and the check files in full — between the verdicts and the closeouts', async (t) => {
-  const { run, repo, branch, e, viewed } = await awaiting();
+  const { run, repo, branch, e, viewed, fed } = await awaiting();
   viewed.clear();
+  fed.reads = 0;
   const lines = await screen(t, e, run.id);
   // Each task viewed once for the whole screen, usage included: every view is a harness observe (plan §4b).
   assert.deepEqual(Object.fromEntries(viewed), { [`${run.id}-implement`]: 1, [`${run.id}-implement-check`]: 1, [`${run.id}-review`]: 1 });
@@ -196,7 +199,9 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(!lines.some((l) => /^\s+cost .*\d/.test(l)), 'cost never prints a number no runner measured');
 
   // Where the time went, after what each step used: its session and its check, each filed, spawned and ended, queued and ran — off the
-  // engine's attempts, and the filing times on its feed.
+  // engine's attempts and each task's filing time on its view. Not off the feed, which holds every task the engine ever filed, read whole
+  // for one run's screen until 2026-09-25.
+  assert.equal(fed.reads, 0, 'the feed is not read for one run');
   assert.deepEqual(lines.slice(check + 3, check + 5), [
     '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
     '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
@@ -595,4 +600,36 @@ test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges,
   });
   assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length, before, 'nothing written');
   assert.ok(start({ brief: 'add sub', repo, workflowDir: dir }), 'with worktrees, it starts');
+});
+
+test('`wf ls` views each task once, and runs added in a repository it already reads add no git process', async (t) => {
+  // Before, each run cost two `merge-base --is-ancestor` per result branch and a run another waited on was viewed again: 406 git
+  // processes and 418 journals for 200 finished runs (2026-09-25). The store holds the other tests' runs too, some in repositories
+  // of their own, so what is counted is what three more runs in one repository add.
+  const { e, viewed, settle, run } = await awaiting();
+  const repo = run.repo!;
+  const ls = async () => {
+    viewed.clear();
+    const log = t.mock.method(console, 'log', () => {});
+    try { return (await metered(() => main(['ls'], e))).tallies!.kinds.git.spawned; } finally { log.mock.restore(); }
+  };
+  // A run of one step, finished in a worktree on a branch of its own, and the next waits on it: `wf ls` reads its task for both.
+  const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(oneStep, 'work.md'), 'work it\n');
+  const first = start({ brief: 'first', repo, workflowDir: oneStep, isolate: true }).id;
+  await advance(e, readRun(first));
+  settle(`${first}-work`, 'succeeded', SIGNED);
+  await advance(e, readRun(first));
+  const before = await ls();
+  for (let k = 1; k < 4; k++) {
+    const more = start({ brief: `more ${k}`, repo, workflowDir: folder(), isolate: false, ...(k === 1 ? { after: [first] } : {}) });
+    branchOff(repo, `wf/${more.id}`, () => write(repo, `more-${k}.txt`, 'x\n'));
+    const record = readRun(more.id);
+    record.steps.implement = { ...record.steps.implement!, branch: `wf/${more.id}` };
+    fs.writeFileSync(path.join(ROOT, 'runs', `${more.id}.json`), JSON.stringify(record, null, 2));
+  }
+  const after = await ls();
+  assert.ok(viewed.has(`${first}-work`), 'the run waited on was read');
+  assert.ok([...viewed.values()].every((n) => n === 1), `every task viewed once: ${JSON.stringify(Object.fromEntries(viewed))}`);
+  assert.equal(after, before, 'three more runs, each with a result branch, in a repository already read');
 });

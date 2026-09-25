@@ -56,13 +56,13 @@ export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter.
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed-store.ts';
 export { lockfileParts, provisionDeps } from './worktree.ts';
 export { artifactFiles, missingArtifacts } from './artifacts.ts';
-export { artifacts, branchStandings, diffStat, isShipped, parentRecord, readArtifact, resultBranches, sensitiveDiff, touchedBy } from './branches.ts';
+export { artifacts, branchReader, branchStandings, diffStat, headsOf, isShipped, parentRecord, readArtifact, resultBranches, sensitiveDiff, touchedBy, type BranchReader } from './branches.ts';
 export { AgentWriteError, agentPlaces, findAgent, listAgents, removeAgent, writeAgent, writeWorkflow } from './authoring.ts';
 export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritten } from './authoring.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
 export type { InboxDropped, InboxQueued } from './inbox-store.ts';
 export { HARNESSES, engine } from './runtime-client.ts';
-export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, endWords, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, waitingOf, wordOfView } from './views.ts';
+export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, endWords, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, viewedOnce, waitingOf, wordOfView } from './views.ts';
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
 export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';

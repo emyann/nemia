@@ -159,7 +159,7 @@ export const runs = new Hono()
       if (answer) kept.set(run.id, answer);
       if (!answer || read.verify) toJudge.push(run);
     }
-    const { views, reader } = await viewsFor(toJudge);
+    const { views, reader } = await viewsFor(toJudge, () => runs);
     const git = branchReader();
     git.prime(toJudge);
     const judged = new Map<string, Judged>();

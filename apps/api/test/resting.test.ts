@@ -181,6 +181,26 @@ test('a run removed from the store leaves the memo', async () => {
   assert.ok(!resting.runs.has('r-gone'));
 });
 
+test('runs waiting on the same run read its journals once between them, off the request\'s one list', async () => {
+  aFinishedRun('r-parent');
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-parent/implement');
+  const child = (id: string) => write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+    id, repo, baseRef: base, workspace: repo, branch: 'main', isolate: true, brief: 'After the parent', createdAt: at,
+    workflowDir: path.join(root, 'no-such-workflow'), workflow: PLAIN, after: ['r-parent'], steps: { implement: { taskId: null } },
+  }, null, 2));
+  child('r-child-1');
+  await list();
+  const cost = async () => {
+    const reads = e.io().reads;
+    await unverified(list);
+    return e.io().reads - reads;
+  };
+  const one = await cost();
+  child('r-child-2');
+  await list();
+  assert.equal(await cost(), one, 'a second run waiting on the parent reads no journal more: the parent\'s tasks are among the request\'s views');
+});
+
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {
   aFinishedRun('r-poisoned');
   await list();

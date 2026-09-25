@@ -42,14 +42,18 @@ const tasksOf = (run: Run): string[] =>
 
 /**
  * The views a request judges `runs` by, and the engine it hands the package's `parentOf` for the runs they wait on: the tasks of those runs
- * alone, over one look at the harnesses (`list(taskIds)`), which reads their journals and no other and asks `claude agents` only for a
- * background session in flight among them — once, however many. A run waited on is read off the same views, and a task of it they do not
- * hold is viewed (`seenBy`).
+ * and of the runs they wait on or are held until, found among `store`, over one look at the harnesses (`list(taskIds)`), which reads their
+ * journals and no other and asks `claude agents` only for a background session in flight among them — once, however many. A task of a run
+ * waited on that the views do not hold, filed since, is viewed (`seenBy`).
  *
- * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at rest.
+ * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at
+ * rest. And a run waited on was read a `view` a task, its journal once more: 632 journals on the second request of the live store, where
+ * reading the parents here too reads what the runs moving and their parents have filed, once.
  */
-export async function viewsFor(runs: readonly Run[]): Promise<{ views: Views; reader: typeof e }> {
-  const views: Views = new Map((await e.list(runs.flatMap(tasksOf))).map((view) => [view.id, view]));
+export async function viewsFor(runs: readonly Run[], store: () => readonly Run[] = listRuns): Promise<{ views: Views; reader: typeof e }> {
+  const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
+  const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
+  const views: Views = new Map((await e.list(read.flatMap(tasksOf))).map((view) => [view.id, view]));
   return { views, reader: seenBy(views) };
 }
 

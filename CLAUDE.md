@@ -116,6 +116,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
   e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
   calendar day — rather than hardcoding which form it will take (learned by the second round of the run that gave an agent its skills).
+- **The e2e's store is in `/tmp`, and a boot can empty `/tmp` under a running check.** WSL let the daemon run a check twelve
+  seconds after it booted, while `systemd-tmpfiles --create --remove --boot` (`D /tmp`: everything, whatever its age) was still walking
+  `/tmp` — twelve and a half minutes. It reached `/tmp/hkb-e2e-*` in the dark theme, every run read 404, the board said the seeded run
+  was removed with `wf rm`, and the answer page failed on a box it never drew, blamed on the branch. `journalctl -b | grep tmpfiles-setup`
+  and `find /tmp -maxdepth 1 ! -newermt <boot>` (nothing) said so; three e2es run at once passed. `visitAll` now checks the store before
+  each page and on a failure, and says it is gone in place of the page's assertion (`storeGone`, proven by `visit.test.ts`). When a failure
+  says so, run the e2e again (learned by thin runtime stage 4a part 2, try 5).
 - **A picture of one card on the fitted Factory is a third of its size.** `card.screenshot()` photographs the node as the floor draws it,
   zoomed out to fit every run, so a card at rest came out 110 pixels wide and nothing on it could be read. Photograph a card with
   `photographCard` (`apps/web/test/e2e/canvas.ts`): it zooms the floor in about the card with the wheel, drags the pane from an empty spot to

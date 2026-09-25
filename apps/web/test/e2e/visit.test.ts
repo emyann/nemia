@@ -74,6 +74,26 @@ test("a press on a button something lies over makes the e2e exit non-zero, and i
   ], 'covered-light-failed.png');
 });
 
+test("a page that fails once the e2e's store is gone says the store is gone, not what the page could not find", { timeout: 60_000 }, async () => {
+  // A sweep of /tmp took the e2e's store halfway through the dark theme, and the check blamed the answer page for a run the board said was removed.
+  const ended = await e2eOn('store-removed');
+  assert.equal(ended.code, 1, said(ended));
+  assert.match(ended.stderr, /^  what removes it: a sweep of the temporary directory — /m, said(ended));
+  assert.match(ended.stderr, /^  what the page then failed on: the page draws a run the store has — not visible after 2000 ms$/m, said(ended));
+  endsSaying(ended, /^e2e: FAILED — the store-removed page \(\/store-removed\) in the light theme: the e2e's store \S+\/store is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed\. Run the e2e again$/, [], 'store-removed-light-failed.png');
+  assert.deepEqual(ended.shots, ['store-removed-light-failed.png'], said(ended));
+});
+
+test("a store gone between two visits is said before the next page, which is not visited", { timeout: 60_000 }, async () => {
+  const ended = await e2eOn('store-swept');
+  assert.equal(ended.code, 1, said(ended));
+  assert.match(ended.stdout, /the store-swept page \(\/store-swept\) in the light theme ✓/, said(ended));
+  for (const stream of [ended.stdout, ended.stderr]) {
+    assert.match(lastSaid(stream).join('\n'), /^e2e: FAILED — before the store-swept page \(\/store-swept\) in the dark theme: the e2e's store \S+\/store is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed\. Run the e2e again$/, said(ended));
+  }
+  assert.deepEqual(ended.shots, ['store-swept-light.png'], said(ended));
+});
+
 test('the same page without the break passes in both themes — or the refusals above would be of the page, not the break', { timeout: 60_000 }, async () => {
   const ended = await e2eOn('none');
   assert.equal(ended.code, 0, said(ended));

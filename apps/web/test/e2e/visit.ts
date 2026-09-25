@@ -22,14 +22,25 @@ export type PageSpec = { name: string; route: string; expect: (page: Page) => Pr
 
 const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.route}) in the ${theme} theme`;
 
+/**
+ * What the e2e says once its store is gone. It sits in the temporary directory, which the machine may sweep while the pages are visited:
+ * on 2026-09-24 a slow WSL boot ran checks while `systemd-tmpfiles --remove --boot` was still emptying /tmp, twelve minutes long, and it
+ * reached the store halfway through the dark theme. Every run then read 404, the board said each was removed with `wf rm`, and the page
+ * being visited failed on an answer box it never drew, blamed on the branch under check.
+ */
+export const storeGone = (store: string): string =>
+  `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again`
+  + '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
+
 class PageFailure extends Error {
-  constructor(where: string, cause: unknown, screenshot: string) {
+  constructor(where: string, cause: unknown, screenshot: string, lost?: string) {
     const why = cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
-    super(`${where}: ${why}\n  what it looked like: ${screenshot}`);
+    // With the store gone, that is the failure, and what the page could not find follows from it.
+    super(lost ? `${where}: ${lost}\n  what the page then failed on: ${why}\n  what it looked like: ${screenshot}` : `${where}: ${why}\n  what it looked like: ${screenshot}`);
   }
 }
 
-async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme, out: string): Promise<string> {
+async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme, out: string, store?: string): Promise<string> {
   const page = await context.newPage();
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
@@ -49,7 +60,7 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
     fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
     await page.screenshot({ path: failed, fullPage: true }).catch(() => {});
-    throw new PageFailure(where(spec, theme), err, failed);
+    throw new PageFailure(where(spec, theme), err, failed, store !== undefined && !fs.existsSync(store) ? storeGone(store) : undefined);
   } finally {
     await page.close();
   }
@@ -57,9 +68,10 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
 
 /**
  * Every page, in the light theme and then the dark, each in a 1280 × 800 browser; a screenshot of each
- * into `out`. Rejects on the first page that fails, naming the page, the theme and the assertion.
+ * into `out`. Rejects on the first page that fails, naming the page, the theme and the assertion — or, once the `store` the api serves
+ * is gone, saying so in place of the assertion (`storeGone`), and visiting no page after it.
  */
-export async function visitAll(browser: Browser, base: string, pages: readonly PageSpec[], out: string): Promise<string[]> {
+export async function visitAll(browser: Browser, base: string, pages: readonly PageSpec[], out: string, store?: string): Promise<string[]> {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
     for (const theme of THEMES) {
@@ -73,7 +85,8 @@ export async function visitAll(browser: Browser, base: string, pages: readonly P
     context.on('page', track);
     try {
       for (const spec of pages) {
-        shots.push(await visit(context, base, spec, theme, out));
+        if (store !== undefined && !fs.existsSync(store)) throw new Error(`before ${where(spec, theme)}: ${storeGone(store)}`);
+        shots.push(await visit(context, base, spec, theme, out, store));
         console.log(`e2e: ${where(spec, theme)} ✓`);
       }
     } finally {

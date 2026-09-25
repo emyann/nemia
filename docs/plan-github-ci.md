@@ -44,11 +44,10 @@ log, evaluation and experiment, and every commit's metadata. Audited on 2026-09-
   quoted `api_key`/`secret`/`token`/`password` values. No dedicated scanner (gitleaks, trufflehog) was installed; running one in
   CI on every push is part of step 5.
 - **A personal email on 11 commits.** The first eleven, all 2026-09-12, are authored `renaudin.yann@gmail.com`; the other 1,311
-  use the GitHub no-reply address, and 11 more are `wf <wf@local>` (the run's own hand-off commits). *Decision:* leave them, or
-  rewrite the authors (`git filter-repo --mailmap`) before the first push. Rewriting changes every commit's hash after them, which
-  is all of main, and the store's past runs judge "shipped" by whether their result branch is an ancestor of main, so every
-  finished run would read as not shipped, and every `--after` chain on one would wait for ever. Rewrite only with the store
-  emptied of the runs that matter, or not at all.
+  use the GitHub no-reply address, and 11 more are `wf <wf@local>` (the run's own hand-off commits). **Decided 2026-09-25: left
+  as they are; the history is not rewritten.** Rewriting the authors (`git filter-repo --mailmap`) would change every commit's hash
+  after them, which is all of main, and the store's past runs judge "shipped" by whether their result branch is an ancestor of
+  main: every finished run would read as not shipped, and every `--after` chain on one would wait for ever.
 - **Local paths.** 28 files at HEAD name `/home/yrnd1` or `/mnt/c/Users/renau` (the evaluation reports, `plan-hold-the-bar.md`,
   the Jev experiments' scripts and datasets, one judge test). Harmless, but a username; they can be generalised in the rename.
 - **Recorded agent output.** The Jev experiments under `docs/pivot-2026-09-18/experiments/` keep real closeouts, needs and
@@ -109,7 +108,7 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 ## Decisions for the owner
 
 1. The project's new name.
-2. The 11 commits with the personal email: leave, or rewrite before the first push (and what that does to the store's past runs).
+2. ~~The 11 commits with the personal email~~ — decided: left as they are, no history rewrite.
 3. The Jev experiments' recorded run data: publish, or move out first.
 4. Round checks: local (as now) or in CI on each push.
 

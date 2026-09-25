@@ -4558,6 +4558,56 @@ or with `--settings`.
 (measured on git 2.43: `rev-list` and `blame` leave it empty). No prefix rule can refuse an option written anywhere on the line, and
 `log` could already do this before the list grew. Only the brief keeps a fenced step from it.
 
+## Shipped: a finished run costs a pass nothing unless something of it changed
+
+Shipped 2026-09-25. Measured with the pass's meter (*What a pass costs*, the README), a pass paid for every run in the store:
+191 records took 470 to 600 ms a pass, git 400 to 480 ms of it in 233 processes, almost all of it for runs that had finished.
+The owner chose an in-memory memo in the daemon, keyed by what the run was judged on, with main's commit left out of the key.
+
+- **At rest** (`atRest`, `src/rest.ts`, pure) is a run whose status is final — succeeded, failed, cancelled, or pruned whatever its
+  steps say — with its workflow frozen on it, not held, every task settled, and a full pass that found nothing due, did nothing, said no
+  note, owed no hand-off and no landing, and read nothing of another run (a claim on the checkout, a wait, a slot, the cap).
+- **Its inputs**, each of which takes it out of the memo: its record, compared whole; every file beside it in the store — `.cancelled`,
+  `.hold`, `.pruned`, the asks directory and its `done/` — stamped by name, inode, size and modification time off one `readdir` and a `stat` each
+  (`restStamps`); its tasks' journals, through the runtime's feed, read once a pass, where a line of any task whose id begins with the
+  run's and a dash takes the run out (`evictedBy`); and its result branches' tips, off one `git for-each-ref` a repository a pass
+  (`headsOf`), against the tips its record keeps (`tipsSeen`). Main's commit is not in the key: a finished run's own pass reads nothing
+  of its base branch. Whether it shipped is asked by a run that waits on it (`--after`, `wf hold`), and a run that waits is never at rest.
+- **The memo is a cache, never a source of truth.** It lives in the daemon's memory, one per engine; a restart rebuilds it with one full
+  pass, a feed that went back or cannot be read empties it, and a run `wf rm` forgot leaves it on the next pass, its record no longer listed. A run answered
+  from it is counted (`rested` on the pass's cost; `, 200 runs at rest answered from memory` in the breakdown).
+- **The tests that tick judge every answer twice.** `WF_VERIFY_REST=1` (`verifyRest` on `tick`), set by every test file that ticks a store,
+  runs the full pass as well for each run answered from memory and throws where the two differ. Two refusals keep the watch honest
+  (`test/rest-store.test.ts`): an ask file the stamp would not see, and a journal line the feed would not read — each run with the
+  mutant (no `.asks` in the stamp; no feed read) fails, and so does the scaling test with the memo's skip taken out.
+- **What it saves, measured** (`test/rest-store.test.ts`, a fake engine, two scratch repositories, a few runs in flight): a pass reads
+  4 journals and observes 6 times at 0, 100 and 200 finished runs, and starts 0 git processes with none and 2 with any (one
+  `for-each-ref` a repository); a fresh memo each pass — a daemon restarted before every one — reads 200 journals more and starts at
+  least 6 git processes more. Observes no longer grew with finished runs before this: main's settled task's view asks no harness.
+- **Departures from the plan.** The feed is read after the runtime's pass, not before it: the runtime appends a settled task's
+  `measured` on its pass, and read before it, that line would take the run out only on the pass after the one that judged it. A run at
+  a gate whose step's task is held open (a claude step, since stage 2 part 4b) is not at rest — its task is not settled — and is judged
+  in full as before; a codex step at a gate is. A moved result branch is judged afresh for two passes, since the first writes its new tip.
+
+**What `wf ls` and `/api/runs` still pay** (measured 2026-09-25 with main's settled-view change in place, a files journal, the same few
+runs in flight; `artifacts/implement/measure-ls-api.ts` of this run):
+
+| finished runs | a pass (memo) | `wf ls` | `/api/runs` |
+|---|---|---|---|
+| 0 | 3 ms: 4 journal reads, 0 git | 16 ms: 6 journal reads, 6 `git merge-base` | 14 ms: 4 journal reads, one observe a harness |
+| 100 | 21 ms: 4, 2 git | 526 ms: 218 journal reads (692 kB), 206 `git merge-base` | 50 ms: 110 journal reads (706 kB), 12 `git merge-base` on its first read |
+| 200 | 27 ms: 4, 2 git | 965 ms: 418 journal reads (1.3 MB), 406 `git merge-base` | 33 ms: 210 journal reads (1.0 MB), 0 git |
+
+`wf ls` reads each run's journals twice (the slots, then the listing) and asks `git merge-base --is-ancestor` twice for each git run
+(`isShipped` through the standings and the decision). `/api/runs` reads every task's journal once a request (`everyView`, through
+`e.list()`) and observes each harness once; its git is memoised on the base (`judged.ts`). Neither observes more with more finished
+runs. Making them pay by what is in flight, as the pass now does, is a card of its own.
+
+**What it leaves.** Two cards. The runtime's own pass still folds every task's journal (agent-runtime's open issue 33): the
+orchestrator's phases no longer grow with the store, and the `runtime` phase still does. And `wf ls` and `/api/runs`, above. The memo
+watches what `advance` reads today: a new input a finished run's pass reads goes into the stamp, the feed or the tips, or a daemon
+answers that run from a stale memo until it restarts, and only `WF_VERIFY_REST` in the tests says so, in the states they reach.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

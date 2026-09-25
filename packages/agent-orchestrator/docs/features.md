@@ -4241,6 +4241,15 @@ The owner set the P3 reach plan aside ("too much … just keep it simple") and a
 deliberately, all of it. `output:` maps to no A2A field and stays a key of its own (A2A's nearest, a skill's `outputModes`, names media
 types). When P3's reach keys are built they want a name that is not `capabilities`, or the two vocabularies collide.
 
+**Superseded 2026-09-25 by agents card 2: the card is generated, and the `.skills.json` files are gone.** An agent's card lists one entry
+per skill its `skills:` composes, read off that skill's SKILL.md frontmatter — the folder's name as `id`, `title:` as `name` (else the
+frontmatter's `name`, else the id), `description` (required), `tags` (`[id]` when it gives none) and `examples` — and an agent with no
+skills gets one entry made from its own description (`cardSkills` in `workflow-store.ts`). Nobody writes a card: a `card:` line, and a
+`skills:` line naming a `.json`, are refused at load with a message saying what replaced them, and so is a board page that still sends
+the card's file (`card`, `cardText`, `skillsText`, a 400). An edit of a composed SKILL.md moves the agent's version, so a stale save is
+refused. The board shows the generated entries read-only where the form used to write the file, and says a card that does not read in
+its place; the e2e's `agents` page composes a skill on a seeded agent and reads its entry. The fourteen shipped skills carry a `title:`.
+
 ## Shipped: steps as `claude -p` jobs, and a mode for each role (thin runtime stage 2 part 2)
 
 Every step on `claude` ran as a background session (`claude-bg`, `claude --bg`) until 2026-09-23. It runs as a job now,
@@ -5042,6 +5051,9 @@ holds the findings that the design depends on, measured on Claude Code 2.1.282:
 - The runtime's flags and `--resume` keep working, the appended body included.
 - The cost of each piece.
 - For an agent that does not code: replace mode, and an output style as a middle ground.
+
+Built since, by the design's cards: 1a (the machinery) and 1b (the shipped procedures as skills), 4 (jobs without user settings), and 2
+(the card generated from the skills, with the `card:` key and the `.skills.json` files retired). Card 3, the board's side, is next.
 
 ## Engine-side work
 

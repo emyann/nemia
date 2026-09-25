@@ -4,7 +4,8 @@
  *
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
- * views none of them: every `claude agents` call a pass makes is the runtime's observe, or admission's.
+ * views none of them: every `claude agents` call a pass makes is the runtime's observe, or admission's — and the observe asks it only for
+ * a session expected that is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
  *
  * These are the runtime's own `pool.test.ts` cases, moved with the rule. An admitted task starts on the runtime's next pass, so a freed
  * slot is taken one pass later than when the runtime admitted: each case ticks once to admit and once to start.
@@ -164,29 +165,31 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
   }
 });
 
-test('one pass — the runtime\'s tick, admission and admit — asks `claude agents` once, with claude tasks at work and waiting', async () => {
+test('one pass — the runtime\'s tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting', async () => {
   try {
     for (const id of ['s1', 's2', 's3', 's4']) await file(id, 'claude');
     // The pass that admits s1 and s2: its `admit` is a word to the journals, and asks no harness.
     const admitting = fake.agentsCalls();
     const first = (await tick(e)).cost;
-    assert.equal(fake.agentsCalls() - admitting, 1, 'one observe for the pass that admits');
+    assert.equal(fake.agentsCalls() - admitting, 0, 'no `claude agents` for the pass that admits: nothing has started');
     assert.deepEqual([(await e.view('s1')).admission, (await e.view('s3')).admission], ['admitted', 'queued']);
-    assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the same one');
+    assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
+    assert.equal(first?.harnesses.claude?.spawned, 0);
     await tick(e);
     await until(['s1', 's2'], 'running (working)');
     assert.equal((await e.view('s3')).admission, 'queued');
 
     // Admission here reads the views the runtime's pass built; a read of `e.list()` or `e.view` for it would ask the harness again.
+    // And the runtime's observe is told the jobs it expects, which are listed off their run files: Claude Code's registry is not asked.
     const before = fake.agentsCalls();
     const { cost } = await tick(e);
-    assert.equal(fake.agentsCalls() - before, 1, 'one observe for the whole pass');
+    assert.equal(fake.agentsCalls() - before, 0, 'no `claude agents` for the whole pass: every claude task in flight is a job');
     assert.ok(cost, 'the pass says what it cost');
     assert.equal(cost.harnesses.claude?.calls, 1, 'one observe of claude, as the meter counts the pass');
     // Each harness is observed once a pass, and a process one starts is counted against every harness observing in that moment
-    // (`ObserveCount`), so the pass's own count says how many were started in all: the one `claude agents`.
+    // (`ObserveCount`), so the pass's own count says how many were started in all: none.
     for (const [name, o] of Object.entries(cost.harnesses)) assert.equal(o.calls, 1, `${name} observed once`);
-    assert.equal(cost.spawned, 1, 'one process started in the whole pass');
+    assert.equal(cost.spawned, 0, 'no process started in the whole pass');
     assert.equal(await attempts('s3'), 0, 'and s3 still waits');
   } finally {
     await drain();

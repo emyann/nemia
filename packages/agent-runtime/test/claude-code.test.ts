@@ -135,19 +135,39 @@ test('observeFor asks `claude agents` only when a session expected is not a job:
     await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
     fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([{ name: 'ae/b/1', sessionId: BG_ID, state: 'working', status: 'busy', kind: 'background' }]));
 
-    assert.equal((await Effect.runPromise(ops.observeFor!([]))).size, 1, 'nothing expected: the jobs, off their run files');
+    assert.equal((await Effect.runPromise(ops.observeFor!([]))).seen.size, 1, 'nothing expected: the jobs, off their run files');
     const jobs = await Effect.runPromise(ops.observeFor!([{ name: 'ae/j/1', harness: 'claude' }]));
-    assert.equal(jobs.get('ae/j/1')?.sessionId, 'ae/j/1');
+    assert.equal(jobs.seen.get('ae/j/1')?.sessionId, 'ae/j/1');
+    assert.deepEqual(jobs.unread, new Set());
     assert.equal(calls(), 0, 'a pass with only jobs in flight spawns no `claude agents`');
 
     // A background session is known by nothing on the task: its name is simply not a job's.
     const both = await Effect.runPromise(ops.observeFor!([{ name: 'ae/j/1', harness: 'claude' }, { name: 'ae/b/1', harness: 'claude' }]));
-    assert.equal(both.get('ae/b/1')?.sessionId, BG_ID);
-    assert.equal(both.get('ae/j/1')?.sessionId, 'ae/j/1');
+    assert.equal(both.seen.get('ae/b/1')?.sessionId, BG_ID);
+    assert.equal(both.seen.get('ae/j/1')?.sessionId, 'ae/j/1');
     assert.equal(calls(), 1, 'one expected session that is no job: one `claude agents`');
 
     await Effect.runPromise(ops.observe);
     assert.equal(calls(), 2, 'observe, told nothing, still asks the registry');
+  } finally { f.restore(); }
+});
+
+test('observeFor says which names it could not read: a background session\'s, and a job\'s not on disk, when `claude agents` fails; never a job it listed', async () => {
+  const f = fake();
+  try {
+    const ops = opsIn(tmp('root'));
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), 'not json');
+    const o = await Effect.runPromise(ops.observeFor!([
+      { name: 'ae/j/1', harness: 'claude' }, { name: 'ae/b/1', harness: 'claude' }, { name: 'ae/j/2', harness: 'claude' },
+    ]));
+    assert.deepEqual([...o.seen.keys()], ['ae/j/1'], 'the registry failing does not hide a job');
+    assert.deepEqual(o.unread, new Set(['ae/b/1', 'ae/j/2']), 'a name the failed read could have listed is unread, not gone');
+
+    // Read, and not listed: gone. The registry answered and lists neither.
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([]));
+    const read = await Effect.runPromise(ops.observeFor!([{ name: 'ae/b/1', harness: 'claude' }, { name: 'ae/j/2', harness: 'claude' }]));
+    assert.deepEqual(read.unread, new Set());
   } finally { f.restore(); }
 });
 

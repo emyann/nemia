@@ -105,6 +105,15 @@ export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor }
 export type ExpectedSession = { name: string; harness?: string };
 
 /**
+ * What a look told what to expect saw (`observeFor`): the sessions it listed, by name, and the names expected of it that it could
+ * not look for this time — a harness, or one mode of it, whose read failed (`claude agents` timing out, the registry busy). A name
+ * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
+ * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
+ * an absence (2026-09-25).
+ */
+export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string> };
+
+/**
  * The seam itself, as a plain value.
  *
  * Four verbs. A harness that cannot do one of them is not a harness this engine can drive, and a
@@ -126,8 +135,13 @@ export type RunnerOps = {
    * observed in full. Told names, never asked for them: the pass reads them off the journal on every pass, so a session
    * started before a restart is expected on the first pass after it. `harness` is the harness the task was filed on, for
    * a runner that routes (`composite`), and read by no other.
+   *
+   * Answers what it listed and what it could not read (`Observation`): a runner that reads in parts — several harnesses,
+   * or Claude Code's jobs and its registry — says which expected names a failed part left unread, and fails as a whole only
+   * when it read nothing. `observe` keeps its Map: a full listing is read by views and verbs, where an unread harness is
+   * nothing observed, and by no rule that ends or forgets on an absence.
    */
-  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Map<string, Sighting>, RunnerError>;
+  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Observation, RunnerError>;
   /**
    * The one session running under `name`, found without observing every other: which session it is, and nothing of
    * its state. Optional — for a harness that can answer by name for less than `observe` costs (Claude Code: the

@@ -77,6 +77,8 @@ export type LifecycleEvent =
   | { type: 'UNSPAWNED'; attempt: number; name: string }
   | { type: 'UNSEEN_IN_GRACE'; attempt: number }
   | { type: 'LOST'; attempt: number }
+  /** Spawned, and its harness could not be read this pass (`Now.unread`): neither seen nor gone. `overdue`: past its deadline. */
+  | { type: 'UNREAD'; attempt: number; overdue: boolean }
   | { type: 'DEADLINE_PASSED'; attempt: number; sighting?: Sighting; live: boolean }
   /** The engine's own: the harness refused the spawn, and nothing started. Never observed, since only the spawn call knows. */
   | { type: 'SPAWN_REFUSED'; attempt: number; error: string }
@@ -104,7 +106,7 @@ export type Move = (from: LifecycleState, event: LifecycleEvent) => Moved;
 
 type Ev<T extends EventType> = Extract<LifecycleEvent, { type: T }>;
 type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
-type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST'>;
+type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 
 const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
@@ -112,6 +114,7 @@ const said = (event: LifecycleEvent): Action => {
     case 'SESSION_LIVE': return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
     case 'SESSION_BLOCKED': return { do: 'nothing', why: 'blocked — needs a person' };
     case 'UNSEEN_IN_GRACE': return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
+    case 'UNREAD': return { do: 'nothing', why: 'its harness could not be read this pass' };
     case 'QUEUED': return { do: 'nothing', why: 'queued — waits to be admitted' };
     case 'AWAITING_INPUT': return { do: 'nothing', why: 'input-required' };
     default: return { do: 'nothing', why: event.type };
@@ -219,6 +222,8 @@ const CONFIG = {
         ...inFlight,
         // Not registered yet, a race measured in seconds, or gone: the grace window tells the two apart.
         UNSEEN_IN_GRACE: { actions: nothing },
+        // Its harness could not be read: nothing is known, so nothing is done. The deadline is read before this, and ends it.
+        UNREAD: { actions: nothing },
         LOST: { target: 'ending', actions: act('record-end', (e: Ev<'LOST'>) => ({ do: 'record-end', attempt: e.attempt, sessionId: '(never seen)', observed: 'failed', reason: 'lost' })) },
       },
     },
@@ -240,6 +245,12 @@ const CONFIG = {
         UNSPAWNED: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
         UNSEEN_IN_GRACE: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
         LOST: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
+        // Its harness could not be read: the stop waits for a read that says what runs, and once the deadline has passed
+        // it is cut as a lost one is, so a person's stop is bounded by a harness that is never read again.
+        UNREAD: [
+          { guard: 'overdue', actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
+          { actions: nothing },
+        ],
         NOTHING_OPEN: { target: 'canceled', actions: settle('stopped', () => 'operator') },
       },
     },
@@ -268,6 +279,7 @@ const CONFIG = {
 const GUARDS = {
   holds: ({ event }: { event: LifecycleEvent }) => 'holds' in event && event.holds,
   live: ({ event }: { event: LifecycleEvent }) => event.type === 'DEADLINE_PASSED' && event.live,
+  overdue: ({ event }: { event: LifecycleEvent }) => event.type === 'UNREAD' && event.overdue,
   lastDone: ({ event }: { event: LifecycleEvent }) => event.type === 'CLOSED' && event.last?.ended === 'done',
   endedDone: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'done',
   endedStopped: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'stopped',

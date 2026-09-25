@@ -14,6 +14,7 @@ import { withoutEdge } from '../src/lifecycle.ts';
 import { decide, fold, nameFor, type Event, type SessionState, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 import { tickMemoLayer } from '../src/tick-memo.ts';
+import { composite } from '../src/runner-composite.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -937,7 +938,7 @@ test('a pass tells its runner the sessions it expects — every attempt of every
   const runner = Runner.layer({
     ...ops,
     observe: Effect.suspend(() => { observes++; return ops.observe; }),
-    observeFor: (expected) => Effect.suspend(() => { told.push(expected.map((e) => `${e.name}@${e.harness ?? '-'}`)); return ops.observe; }),
+    observeFor: (expected) => Effect.suspend(() => { told.push(expected.map((e) => `${e.name}@${e.harness ?? '-'}`)); return ops.observe.pipe(Effect.map((seen) => ({ seen, unread: new Set<string>() }))); }),
   });
   const layer = Layer.mergeAll(Journal.test(), runner, tickMemoLayer({ verify: true }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
@@ -970,7 +971,7 @@ test('a release the harness refuses is asked again on every pass while the harne
     ...ops,
     observeFor: (expected) => Effect.sync(() => {
       told.push(expected.map((e) => e.name));
-      return new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
+      return { seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))), unread: new Set<string>() };
     }),
     release: (s) => Effect.suspend(() => {
       asked.push(pass);
@@ -1008,4 +1009,69 @@ test("a pass's views are what `view` reads after it: an attempt's measure, writt
   assert.equal(reported?.phase, 'input-required', 'held open: unsettled, so on the report');
   assert.equal(reported?.state.attempts[0]?.usage?.costUsd, 0.5, 'with what the release measured on this pass');
   assert.deepEqual(reported, await run(view(id, new Map(sessions))));
+});
+
+/**
+ * A harness behind the composite, as `createEngine` puts every harness, whose reads fail on the passes a test chooses: the
+ * failure the composite answers for, as a `claude agents` timing out is. Lists only what it is told to look for.
+ */
+const flakyHarness = (sessions: Map<string, Sighting>, readFails: () => boolean) => {
+  const ops = testOps({ sessions });
+  const read = (expected?: readonly { name: string }[]) => Effect.suspend(() => readFails()
+    ? Effect.fail(new RunnerError({ verb: 'observe', message: 'claude agents: timed out' }))
+    : Effect.succeed(new Map([...sessions].filter(([name]) => !expected || expected.some((e) => e.name === name)))));
+  // A read that fails fails whole, as a registry that timed out does: the composite says the names it was to find unread.
+  return { ...ops, observe: read(), observeFor: (expected: readonly { name: string }[]) => read(expected).pipe(Effect.map((seen) => ({ seen, unread: new Set<string>() }))) };
+};
+
+test('a release refused, then one pass that could not read the harness: the release is asked again on the next good pass, since a failed read is not the session gone', async () => {
+  const sessions = new Map<string, Sighting>();
+  const asked: number[] = [];
+  let refusals = 3;
+  let pass = 0;
+  const runner = Runner.layer(composite({
+    claude: {
+      ...flakyHarness(sessions, () => pass === 4),
+      release: (s) => Effect.suspend(() => {
+        asked.push(pass);
+        if (refusals-- > 0) return Effect.fail(new RunnerError({ verb: 'release', message: 'claude rm: registry busy' }));
+        for (const [name, listed] of sessions) if (listed.sessionId === s.sessionId) sessions.delete(name);
+        return Effect.succeed(undefined);
+      }),
+    },
+  }, 'claude'));
+  const layer = Layer.mergeAll(Journal.test(), runner, tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ ...spec, harness: 'claude' }));
+  await run(tick());
+  const name = nameFor(id, 1);
+  sessions.set(name, { ...sessions.get(name)!, state: 'completed' });
+  for (pass = 1; pass <= 6; pass++) await run(tick());
+  assert.equal((await run(view(id, new Map()))).state.settled, 'succeeded');
+  // Settled on pass 1 and kept from 3: refused on 1 to 3, not read on 4, let go on 5.
+  assert.deepEqual(asked, [1, 2, 3, 5], 'the pass that could not read asked nothing, and the next good one asked again');
+  assert.equal(sessions.has(name), false, 'and the session was let go');
+});
+
+test('a pass that could not read the harness does not end an attempt `lost`, its grace long past: the next good read follows it', async () => {
+  const sessions = new Map<string, Sighting>();
+  let failing = true;
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude: flakyHarness(sessions, () => failing) }, 'claude')), tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ ...spec, harness: 'claude' }));
+  // Spawned twice the grace ago, by an engine before this one, and running under its name since.
+  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  await run(Effect.flatMap(Journal, (j) => Effect.all([
+    j.append(id, { kind: 'starting', at: long, attempt: 1 }),
+    j.append(id, { kind: 'spawned', at: long, attempt: 1 }),
+  ], { discard: true })));
+  sessions.set(nameFor(id, 1), { sessionId: 'kept', state: 'working', nativeId: 'kept' });
+  await run(tick());
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  assert.equal(events.some((e) => e.kind === 'ended' || e.kind === 'settled'), false, 'nothing ended on a read that failed');
+  failing = false;
+  await run(tick());
+  const v = await run(view(id, new Map(sessions)));
+  assert.equal(v.state.attempts[0]!.ended, null);
+  assert.equal(v.phase, 'running (working)', 'followed as it runs');
 });

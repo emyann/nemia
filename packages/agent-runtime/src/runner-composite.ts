@@ -10,7 +10,7 @@
  */
 import { Effect } from 'effect';
 import type { Sighting } from './domain.ts';
-import { RunnerError, type RunnerOps } from './runner.ts';
+import { RunnerError, type Observation, type RunnerOps } from './runner.ts';
 
 export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
   const pick = (name?: string) => harnesses[name ?? fallback] ?? harnesses[fallback]!;
@@ -27,29 +27,39 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
   /** The name of the harness `pick` gives for a task's harness: where its spawn went, and so where its session is listed. */
   const routeOf = (asked?: string) => (harnesses[asked ?? fallback] ? (asked ?? fallback) : fallback);
 
-  /** Every harness observed at once, each by `look`, and merged: what `observe` and `observeFor` both are. */
-  const observeAll = (look: (name: string, ops: RunnerOps) => Effect.Effect<Map<string, Sighting>, RunnerError>) => Effect.forEach(
+  /**
+   * Every harness observed at once, each by `look`, and merged: what `observe` and `observeFor` both are. A harness whose look
+   * failed is `unread` — nothing listed, and every name `look` was to find there not looked for — so one harness being unreachable
+   * blinds the engine neither to the others nor to the fact that it could not look (2026-09-25; before, a failed look was an
+   * empty listing, and the pass read each session on it gone).
+   */
+  const observeAll = (look: (name: string, ops: RunnerOps) => { read: Effect.Effect<Observation, RunnerError>; expected: readonly string[] }) => Effect.forEach(
     Object.entries(harnesses),
-    ([name, ops]) =>
-      // One harness being unreachable must not blind the engine to the others: a failed
-      // observe contributes nothing rather than failing the pass.
-      look(name, ops).pipe(
-        Effect.map((m) => [name, m] as const),
-        Effect.catchCause(() => Effect.succeed([name, new Map<string, Sighting>()] as const)),
-      ),
+    ([name, ops]) => {
+      const { read, expected } = look(name, ops);
+      return read.pipe(
+        Effect.map((o) => [name, o] as const),
+        Effect.catchCause(() => Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected) }] as const)),
+      );
+    },
     { concurrency: 'unbounded' },
   ).pipe(
-    Effect.map((results) => {
-      const merged = new Map<string, Sighting>();
-      for (const [harness, m] of results) {
-        for (const [sessionName, sighting] of m) {
-          merged.set(sessionName, sighting);
+    Effect.map((results): Observation => {
+      const seen = new Map<string, Sighting>();
+      const unread = new Set<string>();
+      for (const [harness, o] of results) {
+        for (const [sessionName, sighting] of o.seen) {
+          seen.set(sessionName, sighting);
           owner.set(sighting.sessionId, harness);
         }
+        for (const name of o.unread) unread.add(name);
       }
-      return merged;
+      return { seen, unread };
     }),
   );
+
+  /** A harness's full listing as an observation that expected nothing, so it leaves nothing unread. */
+  const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
 
   return {
     spawn: (r) => pick(r.harness).spawn(r),
@@ -57,14 +67,17 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     // To the harness the task names, as a spawn is: its vocabulary is its own.
     refuses: (task) => pick(task.harness).refuses?.(task),
 
-    observe: observeAll((_, ops) => ops.observe),
+    // A harness that cannot be read contributes nothing here: a full listing is read by views and verbs, which read an
+    // unread harness as nothing observed, and never by the pass (`observeFor`).
+    observe: observeAll((_, ops) => ({ read: listing(ops), expected: [] })).pipe(Effect.map((o) => o.seen)),
 
     // Each harness told only the names routed to it, as a spawn is routed: a flat list would have Claude Code take a Codex
     // task's name for a background session it must look for. Every harness is still observed — one with nothing expected
     // is told so, and one without the verb lists everything — so a session no journal names is not hidden from a harness.
+    // A harness that could not be read leaves every name routed to it unread, whichever verb it was read by.
     observeFor: (expected) => observeAll((name, ops) => {
       const mine = expected.filter((e) => routeOf(e.harness) === name);
-      return ops.observeFor ? ops.observeFor(mine) : ops.observe;
+      return { read: ops.observeFor ? ops.observeFor(mine) : listing(ops), expected: mine.map((e) => e.name) };
     }),
 
     stop: (sessionId) => pick(owner.get(sessionId)).stop(sessionId),

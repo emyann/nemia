@@ -159,6 +159,7 @@ stateDiagram-v2
   working --> working: DEADLINE_PASSED [live] / stop
   working --> ending: DEADLINE_PASSED / record-end
   working --> working: UNSEEN_IN_GRACE / nothing
+  working --> working: UNREAD / nothing
   working --> ending: LOST / record-end
   input_required --> input_required: AWAITING_INPUT / nothing
   stopping --> stopping: SESSION_LIVE / stop
@@ -169,6 +170,8 @@ stateDiagram-v2
   stopping --> stopping: UNSPAWNED / record-end
   stopping --> stopping: UNSEEN_IN_GRACE / record-end
   stopping --> stopping: LOST / record-end
+  stopping --> stopping: UNREAD [overdue] / record-end
+  stopping --> stopping: UNREAD / nothing
   stopping --> canceled: NOTHING_OPEN / settle
   ending --> completed: CLOSED [lastDone] / settle
   ending --> failed: CLOSED / settle
@@ -183,7 +186,11 @@ stateDiagram-v2
 <!-- lifecycle:end -->
 
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
-still running is stopped rather than ended; `lastDone`, `endedDone` and `endedStopped`, the end a task settles on. XState
+still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
+the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
+end a task settles on. `UNREAD` is a pass that could not read the attempt's harness (`Observation.unread`): nothing is
+known of the session, so nothing is done in `working` — where the deadline, read first, still ends it — and it never
+counts toward `LOST`. XState
 is a dependency of this package alone, imported by `src/lifecycle.ts` alone (`test/xstate-boundary.test.ts`), and no
 entry exports the machine, as none exports `decide`.
 
@@ -1285,8 +1292,8 @@ could not say whether a result was an error. What the records do not give, and s
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
 `claude agents`, and a registry that cannot be read does not stop it. An attempt in flight is found by
 name when its task's harness can `find` it — for Claude Code, from the session's registration, with no `claude
-agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed,
-as a pass counts it. So does a session not started yet: no events, and the cursor asked with (or one from
+agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed
+here: a view is read again. A pass, which acts on what it reads, does not count it so (`observeFor`, below). So does a session not started yet: no events, and the cursor asked with (or one from
 the start). Neither is a refusal: ask again.
 
 **Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a harness
@@ -1466,6 +1473,16 @@ before jobs were the default, or a job whose run file is gone. So a pass with on
 background sessions spawns one (measured at 0.2-0.4 s a call, 2026-09-25). Nothing is remembered of what a pass did: `expected` is read
 off the journal and the last observation, so a session started before a restart is expected on the first pass after it. The composite tells each harness the names
 routed to it, as a spawn is routed, and observes a harness without the verb in full.
+
+`observeFor` answers an `Observation`: the sessions it listed (`seen`), and the names expected that it could not read (`unread`). A
+harness whose read fails — `claude agents` timing out, a directory that cannot be listed — leaves every name routed to it unread, and
+the composite still merges what the others listed; Claude Code, which reads its jobs and its registry apart, leaves unread only the names
+the failed read could have listed. A name unread is neither there nor gone, and the pass reads it so (since 2026-09-25; before, a failed
+read was an empty listing): its attempt is not counted toward `lost` (`UNREAD` in the lifecycle — a person's stop is cut once the deadline
+has passed), and a settled task whose finished session was listed stays looked for, so a release the harness refused is asked again on the
+next pass that reads it. A harness's `unread` crosses the A2A seam beside its Tasks (`observeSessions`), and each observe that left
+something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
+reads an unread harness as nothing.
 
 What a blocked session waits for is the harness's own word, carried and never judged: Claude Code prints
 `waitingFor: 'permission prompt'` beside `state: 'blocked'`, `observe` puts it on the sighting, and `view` puts it

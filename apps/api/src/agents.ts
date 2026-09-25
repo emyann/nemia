@@ -15,6 +15,7 @@ import { AgentWriteError, agentUsers, agentVersion, cardSkills, HOME, loadAgents
 import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, formerSandbox, frontmatterKey, isCardFile, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey, type SkillsFound } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
+import { givenSkills, type GivenSkill } from './skills.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from './workflows.ts';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
@@ -45,6 +46,11 @@ export type AgentListing = {
   cardError: string | null;
   /** The skills its steps are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
   skills: string | null;
+  /**
+   * Each skill its `skills:` gives, in its order: where a start finds it — your library, the repository, or none — its card entry or why it has
+   * none, and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
+   */
+  given: GivenSkill[];
   /** What becomes of Claude Code's system prompt, as written: `default`, `no-coding` or `own`; null for none, which is `default`. */
   systemPrompt: string | null;
   source: string;
@@ -129,7 +135,7 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string, rep
   try { card = cardSkills(agent, found); } catch (err) { cardError = messageOf(err); }
   return {
     name, from, dir, file, description: agent.description ?? null, keys: agent.keys, body: agent.body, schema: sidecarOf(agent.keys.output),
-    card, cardError, skills: agent.skills?.join(', ') ?? null, systemPrompt: agent.systemPrompt ?? null,
+    card, cardError, skills: agent.skills?.join(', ') ?? null, given: givenSkills(agent.skills ?? [], found, repo, home), systemPrompt: agent.systemPrompt ?? null,
     source, version, usedBy, error: null,
   };
 }
@@ -144,7 +150,7 @@ function skillsLineOf(source: string): string | null {
 }
 
 const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing =>
-  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, cardError: null, skills: null, systemPrompt: null, source: '', version, usedBy, error: null });
+  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, cardError: null, skills: null, given: [], systemPrompt: null, source: '', version, usedBy, error: null });
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why

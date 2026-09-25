@@ -5053,7 +5053,10 @@ holds the findings that the design depends on, measured on Claude Code 2.1.282:
 - For an agent that does not code: replace mode, and an output style as a middle ground.
 
 Built since, by the design's cards: 1a (the machinery) and 1b (the shipped procedures as skills), 4 (jobs without user settings), and 2
-(the card generated from the skills, with the `card:` key and the `.skills.json` files retired). Card 3, the board's side, is next.
+(the card generated from the skills, with the `card:` key and the `.skills.json` files retired), and 3a (an agent of yours composes its
+skills on the board from your library, this repository's and HKB's shipped ones, a shipped one copied into your library first, each
+with what it costs a turn; `systemPrompt` as radios by what the agent does). 3b, writing a skill on the board, and 3c, trying an agent on
+a short brief, follow, in that order.
 
 ## Engine-side work
 

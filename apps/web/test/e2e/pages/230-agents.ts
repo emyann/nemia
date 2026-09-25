@@ -12,7 +12,7 @@ export default {
   // Each says what its agent can do, its card generated from its skills in A2A's words: an entry for each skill it gives, read off its
   // SKILL.md, or one from its description when it gives none. The repository's `implementer` read, and the node that names it followed to
   // its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and its card shown read-only,
-  // one entry, for it gives no skills; an agent made with a skill given by name, its card that skill's entry, edited and removed, each on
+  // one entry, for it gives no skills; an agent made with a skill picked from your library, its card that skill's entry, edited and removed, each on
   // disk as the package writes it, and no card file anywhere. And, in a page of its own, a removal refused
   // because a node still names the agent. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
   name: 'agents',
@@ -92,7 +92,7 @@ export default {
     await expectTexts(scribeForm.locator('[data-card] [data-agent-skill]'), [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`], `${seeded.name}'s form shows its card, one entry made from its description`);
     await expectVisible(scribeForm.locator('[data-card]', { hasText: 'Generated from its skills' }), 'and says it is generated from its skills');
     for (const gone of ['Card file', 'Its card']) await expectCount(scribeForm.getByRole('textbox', { name: gone }), 0, `and has no ${gone} field`);
-    if ((await scribeForm.getByRole('textbox', { name: 'Skills', exact: true }).inputValue()) !== '') throw new Refused(`${seeded.name} gives its sessions no skills, and its Skills field is empty`);
+    await expectVisible(scribeForm.locator('[data-given-none]'), `${seeded.name} gives its sessions no skills, and its list says so`);
     const instructions = await scribeForm.getByRole('textbox', { name: 'Instructions' }).inputValue();
     if (instructions.trim() !== seeded.body) throw new Refused(`and its instructions are its body — they read ${JSON.stringify(instructions)}`);
     await expectVisible(scribeForm.getByRole('button', { name: 'Save' }), 'yours offers Save');
@@ -110,7 +110,14 @@ export default {
       await form.getByRole('textbox', { name: 'Description' }).fill(made.description);
       await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill(made.tools);
-      await form.getByRole('textbox', { name: 'Skills', exact: true }).fill(made.skills);
+      // Its skill picked from the list, in your library, where it is seeded: nothing to type.
+      await form.getByRole('button', { name: 'Add a skill' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Add a skill' });
+      await sheet.locator('section[aria-label="Your library"]').getByRole('button', { name: `Add ${made.skills}`, exact: true }).click();
+      await expectVisible(sheet.locator(`[data-offered-skill="${made.skills}"]`, { hasText: 'given' }), `${made.skills} is given once added`);
+      await sheet.getByRole('button', { name: 'Close', exact: true }).click();
+      await expectCount(sheet, 0, 'the sheet closes');
+      await expectVisible(form.locator(`[data-given-skill="${made.skills}"] [data-skill-from="yours"]`), `${made.skills} is given, from your library`);
       await expectVisible(form.locator('[data-card-generated]', { hasText: 'Shown once it is saved.' }), 'a new agent has no card to show until it is saved, and no field to write one');
       await expectCount(form.getByRole('textbox', { name: 'Its card' }), 0, 'no card is pasted');
       await form.getByRole('textbox', { name: 'Instructions' }).fill(made.body);

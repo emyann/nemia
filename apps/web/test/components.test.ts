@@ -2259,13 +2259,13 @@ test("an agent's form shows its card read-only, generated from its skills: an en
   const { AgentForm } = await import('../src/components/AgentForm.tsx');
   const agent = {
     name: 'scribe', from: 'yours' as const, dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read, Skill' }, body: 'Write.\n',
-    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, cardError: null,
+    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, cardError: null,
     card: [
       { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'] },
       { id: 'file-it', name: 'File it away', description: 'Files a note where it belongs.', tags: ['file-it'] },
     ],
   };
-  const form = (listing: typeof agent | null) => renderToStaticMarkup(createElement(AgentForm, { listing, keyForm: undefined, saving: false, refusal: null, onSave: () => {} }));
+  const form = (listing: typeof agent | null) => withClient(createElement(AgentForm, { listing, keyForm: undefined, saving: false, refusal: null, onSave: () => {} }));
   const html = form(agent);
   assert.deepEqual([...html.matchAll(/data-agent-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'file-it'], 'an entry for each skill, in its order');
   assert.ok(textsOf(html).includes('Write a note') && textsOf(html).includes('Files a note where it belongs.'));
@@ -2276,4 +2276,69 @@ test("an agent's form shows its card read-only, generated from its skills: an en
   assert.ok(textsOf(refused).some((t) => t.startsWith('agents/scribe.md gives the skill `file-it`, and no skills folder has it')));
   assert.doesNotMatch(refused, /data-agent-skill/);
   assert.match(form(null), /data-card-generated[^>]*>[^<]*Shown once it is saved\./, 'a new agent has no card until it is saved');
+});
+
+const PLACES = [
+  { from: 'yours', dir: '/store/workflows/skills', skills: [
+    { name: 'write-a-note', from: 'yours', dir: '/store/workflows/skills/write-a-note', entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }, error: null, preload: false, cost: { preload: false, listed: 12, body: 340, perTurn: 12 }, usedBy: ['scribe'], found: null },
+  ] },
+  { from: 'repo', dir: '/repo/.claude/skills', skills: [
+    { name: 'scratch', from: 'repo', dir: '/repo/.claude/skills/scratch', entry: null, error: '/repo/.claude/skills/scratch/SKILL.md has no frontmatter', preload: false, cost: { preload: false, listed: 3, body: 9, perTurn: 3 }, usedBy: [], found: null },
+    { name: 'ask-first', from: 'repo', dir: '/repo/.claude/skills/ask-first', entry: { id: 'ask-first', name: 'Ask first', description: 'Asks before it acts.', tags: ['ask-first'] }, error: null, preload: true, cost: { preload: true, listed: 8, body: 1200, perTurn: 1208 }, usedBy: [], found: null },
+  ] },
+  { from: 'shipped', dir: '/hkb/workflows/skills', skills: [] },
+];
+
+/** An agent's form of yours with the skill list read already, as the picker reads it. */
+function agentFormWith(listing: Record<string, unknown>, readOnly = false): Promise<string> {
+  return import('../src/components/AgentForm.tsx').then(({ AgentForm }) => {
+    const client = new QueryClient();
+    client.setQueryData(['skills'], PLACES);
+    return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(AgentForm, { listing: listing as never, keyForm: undefined, readOnly, saving: false, refusal: null, onSave: () => {} })));
+  });
+}
+
+const composing = {
+  name: 'scribe', from: 'yours', dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read' }, body: 'Write.\n',
+  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, cardError: null, card: null,
+  given: [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.', preload: false, cost: null }],
+};
+
+test("an agent of yours lists the skills it gives, each with where it is found and what it costs a turn, and a Remove each; one found nowhere says so", async () => {
+  const html = await agentFormWith(composing);
+  assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'ask-first', 'gone'], 'in the order its line gives them');
+  assert.deepEqual([...html.matchAll(/data-skill-from="([^"]+)"/g)].map((m) => m[1]), ['yours', 'repo', 'none']);
+  const texts = textsOf(html);
+  assert.ok(texts.includes('named — about 12 tokens a turn, and about 340 more in a turn that loads it'), texts.join(' | '));
+  assert.ok(texts.includes('loaded every turn — about 1,208 tokens (cached)'), 'a preloaded skill costs its body every turn');
+  assert.ok(texts.some((t) => t.startsWith('No skills folder has `gone`')), 'the one found nowhere says why, in the api\'s words');
+  assert.equal([...html.matchAll(/aria-label="Remove [^"]+"/g)].length, 3);
+  assert.match(html, />Add a skill</);
+  assert.doesNotMatch(html, /aria-label="Skills"|placeholder="review-a-change/, 'no field to type the names in');
+});
+
+test("an agent whose tools leave out Skill is told so before a save is refused, with the one press that puts it right; one with no tools set is not", async () => {
+  assert.match(await agentFormWith(composing), /data-skill-tool-note[\s\S]*Add Skill to its tools/);
+  assert.doesNotMatch(await agentFormWith({ ...composing, keys: { tools: 'Read, Skill' } }), /data-skill-tool-note/);
+  assert.doesNotMatch(await agentFormWith({ ...composing, keys: {} }), /data-skill-tool-note/, 'unset, the harness decides, and Skill is among what it allows');
+  assert.match(await agentFormWith({ ...composing, keys: { disallowedTools: 'Skill' } }), /Take Skill off its denied tools/);
+  assert.doesNotMatch(await agentFormWith({ ...composing, skills: null, given: [] }), /data-skill-tool-note/, 'nor one that gives no skills');
+});
+
+test("the system prompt is a choice of what the agent does, the default drawn chosen when unset, and Only my instructions kept behind For experts", async () => {
+  const unset = await agentFormWith({ ...composing, skills: null, given: [] });
+  assert.match(unset, /data-system-prompt="default"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="default"/, 'unset reads as the default');
+  assert.match(unset, /Works on code or files/);
+  assert.match(unset, /Doesn&#x27;t write code/);
+  assert.match(unset, /For experts/);
+  assert.doesNotMatch(unset, /Only my instructions/, 'the expert choice is not drawn while its fold is shut');
+  const own = await agentFormWith({ ...composing, systemPrompt: 'own' });
+  assert.match(own, /data-system-prompt="own"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="own"/, 'an agent that says own opens the fold, chosen');
+  assert.match(await agentFormWith({ ...composing, systemPrompt: 'terse' }), /systemPrompt: terse<\/code>, which is none of these/);
+});
+
+test("the repository's agent lists the skills it gives read-only: no Remove, no Add, and no list read for it", async () => {
+  const html = await agentFormWith({ ...composing, from: 'repo', given: [{ name: 'write-a-note', from: 'repo', entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes.', tags: [] }, error: null, preload: false, cost: { preload: false, listed: 5, body: 7, perTurn: 5 } }], skills: 'write-a-note' }, true);
+  assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note']);
+  assert.doesNotMatch(html, /aria-label="Remove |Add a skill|data-skill-tool-note/);
 });

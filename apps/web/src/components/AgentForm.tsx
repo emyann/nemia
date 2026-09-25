@@ -1,13 +1,31 @@
 import { useState, type ReactNode } from 'react';
-import { TextField, Text } from 'react-aria-components';
+import { Radio, RadioGroup, TextField, Text } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
-import { Skills } from './AgentParts';
-import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, SYSTEM_PROMPTS, type AgentForm as Form } from '../lib/agents';
+import { GivenSkills, Skills } from './AgentParts';
+import { SkillPicker } from './SkillPicker';
+import {
+  choicesOf,
+  deniedWithoutSkill,
+  draftOf,
+  edited,
+  formOf,
+  hasKey,
+  KEY_LABELS,
+  meaningOf,
+  pickSystemPrompt,
+  schemaFileFor,
+  skillToolGap,
+  SYSTEM_PROMPT_CHOICES,
+  systemPromptShown,
+  toolsWithSkill,
+  type AgentForm as Form,
+} from '../lib/agents';
 
 /** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
 const UNSET = '(unset)';
@@ -27,13 +45,15 @@ const HINTS: Partial<Record<AgentRoleKey, string>> = {
  *
  * `onSave` is handed the draft and resolves once written, or rejects with the refusal; the form keeps what was typed either way.
  */
-export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal, onSave, footer }: {
+export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal, onSave, onSkillCopied, footer }: {
   listing: AgentListing | null;
   keyForm: KeyForm | undefined;
   readOnly?: boolean;
   saving: boolean;
   refusal: ReactNode;
   onSave: (draft: ReturnType<typeof draftOf>) => void;
+  /** Called once a skill is copied into your library, before the board reads anything again: an agent that names it moves its version. */
+  onSkillCopied?: () => Promise<void>;
   footer?: ReactNode;
 }) {
   const [form, setForm] = useState<Form>(() => formOf(listing));
@@ -146,28 +166,18 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3">
+      <fieldset className="space-y-4">
         <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What its sessions are told</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field
-            className="sm:col-span-2"
-            label="Skills"
-            hint="skills: — the skills its Claude Code sessions are given, by name, comma-separated: each a folder with a SKILL.md under skills/ beside agents/, or the repository's .claude/skills/. Its tools must include Skill."
-            value={form.skills}
-            onChange={(skills) => setForm((f) => ({ ...f, skills }))}
-            readOnly={readOnly}
-            mono
-            placeholder={listing ? undefined : 'review-a-change, write-a-note'}
-          />
-          <Choice
-            label="System prompt"
-            hint="Claude Code's own prompt with the instructions after it (default), the same less its coding instructions (no-coding), or the instructions alone (own)."
-            value={form.systemPrompt}
-            choices={SYSTEM_PROMPTS}
-            onChange={(systemPrompt) => setForm((f) => ({ ...f, systemPrompt }))}
-            readOnly={readOnly}
-          />
-        </div>
+        {readOnly ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium">Skills</p>
+            <GivenSkills rows={listing?.given ?? []} none="It gives no skills." />
+          </div>
+        ) : (
+          <SkillPicker skills={form.skills} given={listing?.given ?? []} onSkills={(skills) => setForm((f) => ({ ...f, skills }))} onCopied={onSkillCopied} />
+        )}
+        {!readOnly && <SkillToolNote form={form} setKey={setKey} />}
+        <SystemPrompt value={form.systemPrompt} onChange={(picked) => setForm((f) => ({ ...f, systemPrompt: pickSystemPrompt(picked, listing?.systemPrompt ?? '') }))} readOnly={readOnly} />
       </fieldset>
 
       <Field
@@ -291,5 +301,79 @@ function Choice({ label, hint, value, choices, onChange, readOnly }: {
         </Text>
       )}
     </Select>
+  );
+}
+
+/**
+ * What the package refuses on save said before it: skills given, and tools that leave out `Skill` — the tool a session loads a skill with — or
+ * deny it. One press puts it right.
+ */
+function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKey, value: string) => void }) {
+  const gap = skillToolGap(form);
+  if (!gap) return null;
+  return (
+    <div data-skill-tool-note className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+      <p className="min-w-0 flex-1">
+        {gap === 'tools' ? (
+          <>Its tools leave out <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not use these skills, and a save is refused.</>
+        ) : (
+          <>Its denied tools take <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not use these skills, and a save is refused.</>
+        )}
+      </p>
+      {gap === 'tools' ? (
+        <Button variant="outline" size="xs" onPress={() => setKey('tools', toolsWithSkill(form.keys.tools))}>Add Skill to its tools</Button>
+      ) : (
+        <Button variant="outline" size="xs" onPress={() => setKey('disallowedTools', deniedWithoutSkill(form.keys.disallowedTools))}>Take Skill off its denied tools</Button>
+      )}
+    </div>
+  );
+}
+
+const RADIO = 'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
+const DOT = 'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
+
+/**
+ * `systemPrompt:`, as a choice of what the agent does: Claude Code's instructions whole, less their coding section, or none — which drops
+ * its safety rules, and is kept behind For experts, open where the agent already says it. Unset, the default is drawn chosen and nothing is
+ * written until a person picks another (`pickSystemPrompt`). A word the file has that is none of these is shown as written: the package
+ * says what is wrong with it.
+ */
+function SystemPrompt({ value, onChange, readOnly }: { value: string; onChange: (value: string) => void; readOnly: boolean }) {
+  const shown = systemPromptShown(value);
+  const known = SYSTEM_PROMPT_CHOICES.some((choice) => choice.value === shown);
+  const radio = (choice: (typeof SYSTEM_PROMPT_CHOICES)[number]) => (
+    <Radio key={choice.value} value={choice.value} className={RADIO} data-system-prompt={choice.value}>
+      <span aria-hidden className={DOT} />
+      <span className="space-y-0.5">
+        <span className="block text-xs font-medium">{choice.label}</span>
+        <span className="block text-[11px] leading-snug text-muted-foreground">{choice.says}</span>
+      </span>
+    </Radio>
+  );
+  return (
+    <RadioGroup value={known ? shown : null} onChange={onChange} isDisabled={readOnly} className="space-y-2">
+      <Label className="text-xs">System prompt</Label>
+      <div className="grid gap-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
+      {!known && (
+        <p className="text-[11px] text-red-700 dark:text-red-400">
+          Its file says <code className="font-mono">systemPrompt: {value}</code>, which is none of these.
+        </p>
+      )}
+      <Collapsible defaultExpanded={shown === 'own'}>
+        {({ isExpanded }) => (
+          <>
+            <CollapsibleTrigger className="rounded-sm text-[11px] text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
+              {isExpanded ? '▾' : '▸'} For experts
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              {isExpanded && <div className="grid gap-2 pt-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>}
+            </CollapsibleContent>
+          </>
+        )}
+      </Collapsible>
+      <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
+        <code className="font-mono">systemPrompt:</code> — what Claude Code tells its sessions before the instructions below.
+      </Text>
+    </RadioGroup>
   );
 }

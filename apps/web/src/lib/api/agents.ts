@@ -2,6 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { SchemaFile } from './builder.ts';
+import type { GivenSkill } from './skills.ts';
 
 /**
  * Mirrors `AgentSkill` in the package: one thing an agent says it can do, in the A2A protocol's words — `id`, `name`, `description` and
@@ -48,6 +49,8 @@ export type AgentListing = {
   skills: string | null;
   /** `default`, `no-coding` or `own`, as written; null for none, which is `default`. */
   systemPrompt: string | null;
+  /** The skills it gives, one row each in its order: where a start finds it and what it costs a turn, or why none is found. */
+  given: GivenSkill[];
   source: string;
   version: string;
   usedBy: AgentUser[];
@@ -61,10 +64,14 @@ export const agentsQuery = queryOptions({
 });
 
 /** One agent, for its page. */
+/** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */
+export const readAgent = (from: string, name: string): Promise<AgentListing> =>
+  get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`);
+
 export const agentQuery = (from: string, name: string) =>
   queryOptions({
     queryKey: ['agents', from, name],
-    queryFn: () => get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
+    queryFn: () => readAgent(from, name),
   });
 
 /**

@@ -204,6 +204,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **Playwright's click on a React Aria switch waits for ever.** Its role and name are on an input hidden to the eye inside the switch's own
   `<label>`, which intercepts the click. Press the label, `page.locator('label', { has: toggle })`, then check it is `checked`
   (`showFinished` in `canvas.ts`). A checkbox or radio from React Aria is built the same way (learned by the same run).
+- **Close an e2e's sheet with its Close button, not Escape.** In the agents page's sheet, pressing *Add* replaces that button with
+  the word `given`, and an Escape pressed next closed the sheet in the light theme and not in the dark one ("the sheet closes —
+  expected 0, found 1"). The likely reason is that focus left the dialog with the button, and React Aria's Escape is heard only inside
+  it; that was not proven. `sheet.getByRole('button', { name: 'Close', exact: true })` closes it every time (learned by agents card 3a).
 - **`browser_take_screenshot` resolves a relative `filename` against the workspace, not `--output-dir`.** With `@playwright/mcp` 0.0.80 a
   relative name failed as a path under the worktree, and would have written there had the folder existed. Give it an absolute path under
   `/tmp/playwright-mcp`, in a folder made first (learned by the same run; the `look` skill still says relative).
@@ -417,6 +421,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   of yours whose skill is in the repository's `.claude/skills/` was refused as changed on every save and removal, and the test that sent
   an old version passed either way. Both take `repo` and read the same places (`skillsAt` in `authoring.ts`); a test of a version check
   also saves at the version just listed (learned in review of agents card 2, round 1).
+- **A write beside an agent moves its version, and a form keyed on the version is thrown away with its draft.** `agentVersion` digests every
+  skill the agent's file names, a missing one included, so copying a skill into the library moves the version of an agent that already names
+  it; the page keyed `AgentForm` on `agent.version`, so the refetch after the copy remounted the form from the file, closed the sheet and lost
+  every unsaved edit. The page reads the agent again before it invalidates, and keeps the form's key for that one version while the file and
+  schema are unchanged (`keptAfterCopy`, `formKeyOf` in `apps/web/src/lib/agents.ts`); the save sends the new version. An e2e of a write
+  beside an agent makes the agent name what the write changes first (`320-skills.ts`; learned in review of agents card 3a, round 1).
 - **Who names an agent is read in every place that falls back to it, and a guard added at load is added to each verb that sets the same thing.**
   A repository's workflows are given the store's agent when the repository has none of that name (`lookupRoots`), so `removeAgent`, reading
   only the workflows beside the agent, let the board delete one a repository's step named: it reads the board's repository too now

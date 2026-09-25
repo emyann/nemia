@@ -118,5 +118,26 @@ out until Codex has a place for them, and the load says so for a codex agent tha
    leftover `card:` line, or a `skills:` line naming a `.json`, refused at load; the board shows the entries read-only; the fourteen
    shipped skills carry a `title:`.
 3. **The board**: compose skills on an agent from a list, write a new skill, try an agent on a short brief.
+   Cut in three by the plan approved 2026-09-25, whose answers to the gate's questions the owner took as recommended:
+   - *Where a new skill is saved*: your library (the store's `workflows/skills`), since a person with no repository has only that; a
+     repository's `.claude/skills` is read, never written from the board.
+   - *A skill HKB ships*: an agent of yours finds none where HKB keeps them, so the board copies it into your library first. The copy
+     is a write of its own, kept whether or not the agent is saved, and the sheet says so. A shipped name your library or the repository
+     already has is not offered again.
+   - *What a skill costs a turn*: said on each row, about chars/4 tokens: a named skill costs its name and description every turn and
+     its body in a turn that loads it; a preloaded one costs its body every turn, cached.
+   - *`systemPrompt` for a non-developer*: radios by what the agent does, *Works on code or files* (`default`) and *Doesn't write code*
+     (`no-coding`), with *Only my instructions* (`own`) behind *For experts*, saying it drops Claude Code's safety rules. An agent whose
+     file says nothing is drawn as the default and still writes nothing until a person picks another.
+   - *How "try it" runs*: a one-step run in a folder workspace with a budget of $1, `dontAsk` and `Edit(**)`, its cost and output on
+     the page (3c).
+
+   **3a, compose.** Built 2026-09-25: the Skills field of an agent of yours is a list of what it gives, each with where it is found and
+     what it costs a turn, and *Add a skill*, a sheet grouped as your library, this repository and what HKB ships; a skill that does not
+     read is listed with its reason and nothing to press. Tools that leave out `Skill` are said with a one-press fix. The api lists the
+     groups (`GET /api/skills`) and copies a shipped skill (`POST /api/skills/yours {copy}`, `copySkill` in `authoring.ts`). A
+     repository agent's page shows the same rows, read-only. The e2e's `skills` page.
+   **3b, write a skill** in your library (a page of its own, `preload:` as a switch with its cost), after 3a. **3c, try an agent** on a
+     short brief, after 3b.
 4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
    runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

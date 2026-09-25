@@ -20,9 +20,13 @@ who it is — `description:`, `card:`, `skills:` and `systemPrompt:`, then the k
 
 At `wf start` each step is resolved and frozen on the run: the agent's keys are the defaults, a key the step
 writes wins. On Claude Code the agent's instructions are appended to the session's system prompt, which is kept, and the
-step's brief is its own note; on codex the brief is the instructions with the step's note after them. So a change
-here reaches every step that names the agent, on the next run — a run already started keeps what it froze. An
-`output:` schema sits here, beside the agent that declares it.
+step's brief is its own note. So a change here reaches every step that names the agent, on the next run — a run already
+started keeps what it froze. An `output:` schema sits here, beside the agent that declares it.
+
+Every agent here gives skills (below), so each runs on Claude Code alone: a step that names one and says `harness: codex`,
+or continues another step's session with `resume:`, is refused at load (`composedRefusal`), since codex loads no plugin and
+a continued session keeps the system prompt it was started with. Such a step names an agent of its own, without `skills:` —
+codex is then handed that agent's instructions in the brief, with the step's note after them.
 
 `card:` names a second file beside the agent — `<name>.skills.json`, a list of what it can do, written as A2A's
 `AgentSkill` is: an `id`, a `name`, a `description`, `tags`, and the `examples` of when to reach for it. It is

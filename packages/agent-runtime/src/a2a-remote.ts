@@ -21,7 +21,13 @@
  * **Auth** is what the card declares: its requirements, the first one whose every scheme can be met, each secret asked of
  * the caller's `credentials` on every request and sent as a header. Nothing a secret is written to — the task's filing, the
  * journal, the registry, the feed — ever holds one. A card whose every requirement asks what this runtime cannot send, or
- * a secret `credentials` does not give, refuses the spawn before anything is sent.
+ * a secret `credentials` does not give, refuses the spawn before anything is sent. A request goes only where the harness
+ * says: to an agent given by its URL, only on an interface of that URL's origin, whatever the card it serves names; and
+ * a redirect is never followed, since a header that carries a key is not dropped on the way to another origin.
+ *
+ * **Every request is bounded** (`REQUEST_MS`), since a pass waits on every harness's observe and an agent that holds a
+ * request would hold the runtime: a GetTask not answered in time reads the session as last seen, a send not answered is
+ * in doubt as a send that failed on the way, and a card not read is a spawn refused.
  *
  * What the client learns of the card and the binding it chose is kept in memory, a view dropped at the first failure and
  * read again: the registry is the record.
@@ -42,13 +48,30 @@ import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from '.
 
 /**
  * A remote A2A agent, as a harness is configured: the agent's base URL, whose card is read from
- * `/.well-known/agent-card.json` under it (or the URL itself, when it names a `.json` file), or the card itself, as the
- * JSON the agent would serve. Its secrets are not here: the engine's `credentials` gives each when a request needs it.
+ * `.well-known/agent-card.json` beneath its path (`https://a.example/reviewer` reads
+ * `https://a.example/reviewer/.well-known/agent-card.json`), or at the URL itself when it names a `.json` file; or the
+ * card itself, as the JSON the agent would serve. Its secrets are not here: the engine's `credentials` gives each when a
+ * request needs it.
  */
 export type RemoteAgent = { url: string } | { card: Record<string, unknown> };
 
-/** The secret for one of a card's security schemes, by its name on the card, for the agent at `agentUrl`; `undefined` when there is none. */
+/**
+ * The secret for one of a card's security schemes, by its name on the card, for the agent at `agentUrl` — the URL the
+ * harness was given, on whose origin every request goes, or for an agent given by its card the interface's URL;
+ * `undefined` when there is none.
+ */
 export type Credentials = (scheme: string, agentUrl: string) => string | undefined;
+
+/** How long a request to a remote agent is waited on, the card's included, before it is read as not answered. */
+export const REQUEST_MS = 10_000;
+
+/** Where the card of an agent given by `address` is read: the address itself when it names a `.json` file, else beneath its path. */
+export const cardUrlOf = (address: string): URL => {
+  const url = new URL(address);
+  if (url.pathname.endsWith('.json')) return url;
+  if (!url.pathname.endsWith('/')) url.pathname = `${url.pathname}/`;
+  return new URL('.well-known/agent-card.json', url);
+};
 
 /** The bindings this runtime speaks, as a card names them. gRPC is part 3's. */
 const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
@@ -110,9 +133,11 @@ export const cardOfJson = (json: Record<string, unknown>): AgentCard => {
   return sdkForm ? { ...parsed, securitySchemes: schemes as Record<string, SecurityScheme> } : parsed;
 };
 
-/** The first interface of the card's that this runtime speaks, or `undefined`. */
-const interfaceOf = (card: AgentCard): AgentInterface | undefined =>
-  card.supportedInterfaces.find((i) => SPOKEN.includes(i.protocolBinding.toUpperCase()) && !i.protocolVersion.startsWith('0.'));
+/** The card's interfaces that this runtime speaks, in the card's order. */
+const spokenOf = (card: AgentCard): AgentInterface[] =>
+  card.supportedInterfaces.filter((i) => SPOKEN.includes(i.protocolBinding.toUpperCase()) && !i.protocolVersion.startsWith('0.'));
+
+const originOf = (url: string): string | undefined => (URL.canParse(url) ? new URL(url).origin : undefined);
 
 /** The headers a card's requirements ask for, as the caller's secrets meet them — or why none can be met. */
 type Auth = { headers: Record<string, string> } | { refusal: string };
@@ -165,8 +190,14 @@ const authOf = (card: AgentCard, agentUrl: string, credentials: Credentials | un
   return { refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${why.join('; or ')}. Nothing was sent.` };
 };
 
-/** The agent refused a request's authentication (HTTP 401 or 403): nothing it was asked was done. */
-class AuthRefused extends Error {}
+/** The agent answered a request without taking it: nothing it was asked was done. */
+class Untaken extends Error {}
+
+/** The agent refused a request's authentication (HTTP 401 or 403). */
+class AuthRefused extends Untaken {}
+
+/** The agent answered with a redirect, which is not followed. */
+class Redirected extends Untaken {}
 
 /** A spawn that nothing started, in words: the attempt ends `unstartable`. */
 class Refusal extends Error {}
@@ -177,8 +208,8 @@ const REFUSALS = [
   VersionNotSupportedError, TaskNotFoundError,
 ];
 
-const authRefused = (e: unknown): boolean => e instanceof AuthRefused || (e instanceof Error && e.cause instanceof AuthRefused);
-const sendRefused = (e: unknown): boolean => authRefused(e) || REFUSALS.some((E) => e instanceof E);
+const untaken = (e: unknown): boolean => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
+const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => e instanceof E);
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -204,9 +235,9 @@ const TERMINAL = new Set(['done', 'failed', 'stopped']);
 
 /**
  * A remote A2A agent's `RunnerOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
- * schemes; absent, only an agent that asks for no authentication is reached.
+ * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request.
  */
-export const remoteOps = (harness: string, agent: RemoteAgent, root: string, credentials?: Credentials): RunnerOps => {
+export const remoteOps = (harness: string, agent: RemoteAgent, root: string, credentials?: Credentials, requestMs = REQUEST_MS): RunnerOps => {
   const dir = path.join(root, 'remote');
   const done = path.join(dir, 'done');
   const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
@@ -258,11 +289,23 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
   const address = 'url' in agent ? agent.url : undefined;
   let seam: Promise<{ card: AgentCard; agentUrl: string; client: Client }> | undefined;
 
+  /** A fetch that gives up after `requestMs`, in words that say so. */
+  const bounded = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+    const late = AbortSignal.timeout(requestMs);
+    try {
+      return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, late]) : late });
+    } catch (e) {
+      if (late.aborted) throw new Error(`${input instanceof Request ? input.url : String(input)} did not answer within ${requestMs / 1000} s`);
+      throw e;
+    }
+  };
+
   const readCard = async (): Promise<AgentCard> => {
     if (!address) return cardOfJson((agent as { card: Record<string, unknown> }).card);
-    const at = new URL(address).pathname.endsWith('.json') ? new URL(address) : new URL('/.well-known/agent-card.json', address);
+    const at = cardUrlOf(address);
     let response: Response;
-    try { response = await fetch(at, { headers: { accept: 'application/json' } }); } catch (e) {
+    // The card carries no secret, so a redirect to it is followed: what it names is held to the address's origin below.
+    try { response = await bounded(at, { headers: { accept: 'application/json' } }); } catch (e) {
       throw new Refusal(`the agent's card could not be read at ${at} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`);
     }
     if (!response.ok) throw new Refusal(`the agent's card could not be read at ${at}: it answered ${response.status} ${response.statusText}, and nothing was sent.`);
@@ -273,7 +316,11 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
 
   const connect = async () => {
     const card = await readCard();
-    const chosen = interfaceOf(card);
+    const spoken = spokenOf(card);
+    const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
+    if (!chosen && spoken.length) {
+      throw new Refusal(`the agent's card names ${spoken.map((i) => i.url).join(', ')}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`);
+    }
     if (!chosen) {
       const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);
       throw new Refusal(`the agent's card offers ${offered.length ? offered.join(', ') : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`);
@@ -281,7 +328,10 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
     const agentUrl = address ?? chosen.url;
     // Asked on every request, so a secret that changes is sent as it is now; a refusal here was said before the send.
     const fetchImpl = createAuthenticatingFetchWithRetry(async (input, init) => {
-      const response = await fetch(input, init);
+      const response = await bounded(input, { ...init, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        throw new Redirected(`the agent answered ${response.status} to ${response.headers.get('location') ?? 'nowhere it named'}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`);
+      }
       if (response.status === 401 || response.status === 403) {
         throw new AuthRefused(`the agent refused the request's authentication (${response.status} ${response.statusText}): check what \`credentials\` gives for the schemes its card declares.`);
       }
@@ -339,7 +389,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
         // Refused, the agent did nothing with the message, and the intent goes: nothing was started under the name.
         if (sendRefused(e)) {
           fs.rmSync(fileOf(r.name), { force: true });
-          throw new Refusal(`${messageOf(e)}${authRefused(e) ? '' : ' Nothing was started.'}`);
+          throw new Refusal(`${messageOf(e)}${untaken(e) ? '' : ' Nothing was started.'}`);
         }
         throw e;
       }

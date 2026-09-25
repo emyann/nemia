@@ -15,7 +15,7 @@ import { Effect } from 'effect';
 import { ClientFactory, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
 import { AgentCard, Role } from '@a2a-js/sdk';
 import { createEngine, type Engine, type EngineOptions, type TaskSpec, type TaskView } from '../src/facade.ts';
-import { remoteOps } from '../src/a2a-remote.ts';
+import { REQUEST_MS, remoteOps } from '../src/a2a-remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a-map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
@@ -332,6 +332,21 @@ test('a harness given by its card, not its URL, is reached on the card\'s interf
   assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
 });
 
+test('an agent that lives under a path has its card read beneath that path, and a URL that names a `.json` file is the card', async () => {
+  const done = () => [{ data: { ok: true }, state: 'completed' as const }];
+  const under = await serve({ prefix: '/agents/reviewer', script: done });
+  for (const url of [under.url, `${under.url}/`]) {
+    const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
+    assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded', url);
+  }
+  assert.deepEqual(under.cards, ['/agents/reviewer/.well-known/agent-card.json', '/agents/reviewer/.well-known/agent-card.json']);
+  assert.ok(under.paths.length && under.paths.every((p) => p.startsWith('/agents/reviewer/a2a/')), under.paths.join(' '));
+  const named = await serve({ prefix: '/agents/reviewer', cardAt: '/card.json', script: done });
+  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } });
+  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+  assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
+});
+
 // ─── restarts ───────────────────────────────────────────────────────────────
 
 test('restart after `spawned`: a new engine over the same root reads the Task by GetTask and settles it, sending nothing', async () => {
@@ -427,6 +442,84 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   for (const [file, text] of files) assert.ok(!text.includes(token), `${file} holds the secret`);
   assert.ok(!JSON.stringify(v).includes(token));
   assert.ok(!JSON.stringify(await e.feed()).includes(token));
+});
+
+test('a card served at one origin that names its interfaces on another: unstartable, and neither origin is sent the secret', async () => {
+  const key = 'key-5e1d-SECRET';
+  const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
+  const s = await serve({ security: apiKey(key), interfacesAt: elsewhere.url, script: HELD });
+  const { e, root } = engineOn(s, { credentials: () => key });
+  const a = (await settled(e, await e.file(task()))).state.attempts[0]!;
+  assert.equal(a.reason, 'unstartable');
+  assert.match(a.error ?? '', new RegExp(`card names ${elsewhere.url}/a2a/jsonrpc, ${elsewhere.url}/a2a/rest, and none is on ${s.url}, the origin the harness was given`));
+  assert.match(a.error ?? '', /Nothing was sent/);
+  assert.equal(elsewhere.paths.length, 0, 'the other origin was sent nothing');
+  assert.equal(s.paths.length, 0);
+  assert.ok(!fs.existsSync(path.join(root, 'remote')) || fs.readdirSync(path.join(root, 'remote')).length === 0, 'no intent was written');
+});
+
+test('a redirect from the agent is not followed: the send is refused, and the address it names is sent nothing', async () => {
+  const key = 'key-8b2c-SECRET';
+  const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
+  const s = await serve({ security: apiKey(key), redirectTo: elsewhere.url, script: HELD });
+  const { e, root } = engineOn(s, { credentials: () => key });
+  const a = (await settled(e, await e.file(task()))).state.attempts[0]!;
+  assert.equal(a.reason, 'unstartable');
+  assert.match(a.error ?? '', new RegExp(`answered 307 to ${elsewhere.url}/a2a/jsonrpc, and a redirect is not followed`));
+  assert.equal(elsewhere.paths.length, 0, 'the address it named was sent nothing');
+  assert.equal(s.paths.length, 1, 'one send, answered with the redirect');
+  assert.equal(s.counts.sendMessage ?? 0, 0);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'remote')), [], 'the intent went with the refusal');
+});
+
+// ─── an agent that does not answer ──────────────────────────────────────────
+
+/** How long `f` took, in ms, and what it gave. */
+const timed = async <A>(f: () => Promise<A>): Promise<[number, A]> => {
+  const from = performance.now();
+  const a = await f();
+  return [performance.now() - from, a];
+};
+
+test('a request the agent holds is given up after its bound: a card not read refuses, a send is in doubt, a GetTask reads as last seen', async () => {
+  const s = await serve({ script: HELD });
+  const root = scratch('ae-remote-');
+  const ops = remoteOps('remote', { url: s.url }, root, undefined, 300);
+  const spawnOf = (name: string) => Effect.runPromise(Effect.flip(ops.spawn({ name, brief: 'b', cwd: '/w' })));
+
+  s.hanging.card = true;
+  const [cardMs, card] = await timed(() => spawnOf('ae/card/1'));
+  assert.ok(cardMs < 3_000, `${cardMs} ms`);
+  assert.equal(card.refused, true);
+  assert.match(card.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.3 s\): the agent is not reachable/);
+  s.hanging.card = false;
+
+  s.hanging.a2a = true;
+  const [sendMs, send] = await timed(() => spawnOf('ae/send/1'));
+  assert.ok(sendMs < 3_000, `${sendMs} ms`);
+  assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
+  assert.match(send.message, /did not answer within 0\.3 s/);
+  assert.equal(JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).taskId, undefined, 'the intent stays, with no Task');
+  s.hanging.a2a = false;
+
+  await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
+  const taskId = s.tasks()[0]!;
+  s.hanging.a2a = true;
+  const [observeMs, seen] = await timed(() => Effect.runPromise(ops.observe));
+  assert.ok(observeMs < 3_000, `${observeMs} ms`);
+  assert.equal(seen.get('ae/seen/1')?.sessionId, taskId);
+  assert.equal(seen.get('ae/seen/1')?.state, 'working', 'as last seen');
+});
+
+test(`at shipped defaults an agent that holds every request holds a pass ${REQUEST_MS / 1000} s at most, and the task reads as last seen`, async () => {
+  const s = await serve({ script: HELD });
+  const { e } = engineOn(s);
+  const id = await e.file(task());
+  await running(e, id);
+  s.hanging.a2a = true;
+  const [ms] = await timed(() => e.tick());
+  assert.ok(ms >= REQUEST_MS - 100 && ms < REQUEST_MS + 5_000, `${ms} ms`);
+  assert.equal((await e.view(id)).phase, 'running (working)');
 });
 
 // ─── every verb reaches the agent ───────────────────────────────────────────

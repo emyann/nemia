@@ -12,6 +12,10 @@
  *
  * `counts` counts every call the request handler answers, by method (`sendMessage`, `getTask`, `cancelTask`, …), on
  * whichever binding it came: what the tests assert of the runtime's traffic.
+ *
+ * What an agent elsewhere may do is an option too: live under a path (`prefix`), serve its card at a path of its own
+ * (`cardAt`), name interfaces on another origin (`interfacesAt`), answer every A2A request with a redirect (`redirectTo`),
+ * or hold a request with no answer (`hanging`, switched on and off as the test goes).
  */
 import express from 'express';
 import http from 'node:http';
@@ -50,11 +54,23 @@ export type ServerOptions = {
   script?: (t: Turn) => Step[];
   security?: Security;
   cardForm?: 'wire' | 'sdk';
+  /** A path the whole agent lives under, `/agents/reviewer`: its card and its routes beneath it, its URL with it. */
+  prefix?: string;
+  /** Where the card is served, under the prefix. Default `/.well-known/agent-card.json`. */
+  cardAt?: string;
+  /** The base the card's interfaces are named on, in place of the server's own: another origin, say. */
+  interfacesAt?: string;
+  /** Every request to the A2A routes is answered 307 to this base, its path kept, and reaches no handler. */
+  redirectTo?: string;
 };
 
 export type RemoteServer = {
   /** The agent's base URL, the card at `/.well-known/agent-card.json` under it. */
   url: string;
+  /** The path of every request for the card, in order. */
+  cards: string[];
+  /** Requests held with no answer while on: the card's, and the A2A routes'. A held request ends when the server closes. */
+  hanging: { card: boolean; a2a: boolean };
   counts: Record<string, number>;
   /** Every message the agent was sent, in order. */
   sent: Message[];
@@ -113,6 +129,9 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const headers: http.IncomingHttpHeaders[] = [];
   const paths: string[] = [];
   const made: string[] = [];
+  const cards: string[] = [];
+  const hanging = { card: false, a2a: false };
+  const prefix = o.prefix ?? '';
   const turns = new Map<string, number>();
   // Per task: steps a `move` handed over before the executor waited for them, and the executor's wait.
   const queued = new Map<string, Step[][]>();
@@ -191,7 +210,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const card = (): AgentCard => ({
     name: 'test agent', description: 'A remote A2A agent a test started.', version: '1.0.0',
     supportedInterfaces: bindings.map((b) => ({
-      url: `${base}${b === 'JSONRPC' ? '/a2a/jsonrpc' : b === 'HTTP+JSON' ? '/a2a/rest' : '/a2a/grpc'}`,
+      url: `${o.interfacesAt ?? `${base}${prefix}`}${b === 'JSONRPC' ? '/a2a/jsonrpc' : b === 'HTTP+JSON' ? '/a2a/rest' : '/a2a/grpc'}`,
       protocolBinding: b, tenant: '', protocolVersion: '1.0',
     })),
     provider: undefined, documentationUrl: undefined, iconUrl: undefined,
@@ -214,27 +233,34 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   });
 
   const app = express();
-  app.get('/.well-known/agent-card.json', (_req, res) => {
+  app.get(`${prefix}${o.cardAt ?? '/.well-known/agent-card.json'}`, (req, res) => {
+    cards.push(req.originalUrl);
+    if (hanging.card) return;
     res.json(o.cardForm === 'sdk' ? JSON.parse(JSON.stringify(card())) : AgentCard.toJSON(card()));
   });
-  app.use('/a2a', (req, res, go) => {
+  app.use(`${prefix}/a2a`, (req, res, go) => {
     headers.push({ ...req.headers });
     paths.push(req.originalUrl);
+    if (hanging.a2a) return;
+    if (o.redirectTo) {
+      res.redirect(307, `${o.redirectTo}${req.originalUrl.slice(prefix.length)}`);
+      return;
+    }
     if (o.security && !o.security.accepts(req.headers)) {
       res.status(401).json({ error: 'unauthenticated' });
       return;
     }
     go();
   });
-  if (bindings.includes('JSONRPC')) app.use('/a2a/jsonrpc', jsonRpcHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
-  if (bindings.includes('HTTP+JSON')) app.use('/a2a/rest', restHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
+  if (bindings.includes('JSONRPC')) app.use(`${prefix}/a2a/jsonrpc`, jsonRpcHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
+  if (bindings.includes('HTTP+JSON')) app.use(`${prefix}/a2a/rest`, restHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
   return {
-    url: base, counts, sent, headers, paths,
+    url: `${base}${prefix}`, counts, sent, headers, paths, cards, hanging,
     tasks: () => [...made],
     move: (taskId, ...steps) => {
       const wake = waiting.get(taskId);

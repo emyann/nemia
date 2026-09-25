@@ -395,8 +395,8 @@ const engine = createEngine({
 await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema });
 ```
 
-The configuration is `{ url }` — the agent's base URL, whose card is read at `/.well-known/agent-card.json` beneath it, or
-the URL itself when it names a `.json` file — or `{ card }`, the card as the JSON the agent would serve. Nothing else:
+The configuration is `{ url }` — the agent's base URL, whose card is read at `.well-known/agent-card.json` beneath its path
+(`https://agents.example/reviewer/.well-known/agent-card.json` above), or the URL itself when it names a `.json` file — or `{ card }`, the card as the JSON the agent would serve. Nothing else:
 `createEngine` refuses, with exit 2, another key, both or neither, an address that is not `http:` or `https:`, one that
 carries a user name or password, and a card that lists no interface to reach the agent by. A task on a remote agent
 carries no `config`: the agent runs as its operator configured it, and `file` refuses every harness argument, naming it.
@@ -429,18 +429,26 @@ is written into its entry and read from there, with no call, and a session let g
 asks nothing about a settled task. A GetTask that fails reads the session as it was last seen: an agent unreachable for a
 moment is not a session gone, and a deadline bounds one gone for good. The entry names the harness, never the address.
 
+**A request is bounded.** A pass waits on every harness's observe, so an agent that holds a request would hold the whole
+runtime: each request, the card's included, is given up after `REQUEST_MS` (10 s). A GetTask given up reads the session as
+last seen; a send given up is in doubt, as one that failed on the way is, and ends `lost` past the grace window; a card not
+read refuses the spawn.
+
 **Which binding.** The card's interfaces are read in its order, and the first one this runtime speaks is used for every
 call: JSON-RPC (`JSONRPC`) or REST (`HTTP+JSON`), at A2A 1.0. A card that offers only gRPC, or only a version before 1.0,
 ends the attempt `unstartable`, in words that name what is spoken; so does a card that cannot be read, since nothing was
 sent. A card served as A2A's JSON and one served as the SDK's own objects stringified are both read, security schemes
-included (`cardOfJson`).
+included (`cardOfJson`). For an agent given by its URL, only an interface on that URL's origin is used: a card that names
+its interfaces elsewhere ends the attempt `unstartable` with nothing sent, since the secret goes where the requests go.
+Give such an agent by its card, whose interfaces are the caller's own word.
 
 **Auth, and where a secret lives.** As the card declares it: of its security requirements, the first whose every scheme
 the caller's secrets meet, each asked of `credentials` by the scheme's name on the card and the agent's address, on every
 request, and sent as a header — HTTP `Bearer`, HTTP `Basic` (the secret as `user:password`), an OAuth 2 or OpenID Connect
 token as a bearer (the runtime runs no flow), and an API key in a header. An API key in a query or a cookie, mutual TLS,
 another HTTP scheme, or a secret `credentials` does not give refuses the spawn before any request, the attempt ending
-`unstartable` in words that name the scheme and the fix; a 401 or 403 from the agent does the same. A secret is held by
+`unstartable` in words that name the scheme and the fix; a 401 or 403 from the agent does the same, and so does a
+redirect, which is never followed: a key in a header of its own would go with it to any origin. A secret is held by
 the caller's function alone: it is on no filing, journal, registry entry or feed line, which a test reads byte for byte.
 
 **What a pass costs.** One GetTask per open remote session, in parallel, and none for a settled one: the pass's meter

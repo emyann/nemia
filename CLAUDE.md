@@ -635,9 +635,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `e.admit(ids)`, which only journals the word. A new admission input is taken off those views or off the run records, never off
   `e.list()` or `e.view`: each is a `claude agents` call more on every pass, and `test/pool.test.ts` counts exactly one for a pass with
   claude tasks at work and waiting, on the fake's counter and on the pass's own cost (`harnesses`, `spawned`). `admit` is metered in `act`
-  (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` still views each task in flight on its own; moving it onto the same report is a card of
-  its own. And an admitted task starts on the runtime's *next* pass, so a test that files and wants a start ticks twice (learned by
-  thin runtime stage 4c, part 1).
+  (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` reads the
+  same report: `pass()` hands it `reportedEngine` (`views.ts`), whose `view` of a reported task is the report's, so a new engine verb that
+  changes a task goes into `ENGINE_WRITES` there too (an unknown one drops every reported view). And an admitted task starts on the runtime's
+  *next* pass, so a test that files and wants a start ticks twice (learned by thin runtime stage 4c, part 1).
 - **The runtime's pass skips a settled task until the feed names it, so every write to a task's journal goes through `Journal.append`.**
   An engine keeps a cursor into its feed and the settled tasks it has folded (`tick-memo.ts`), and a pass reads no journal the feed has
   not named since. A store, a `PromiseJournal` or a hand edit that appends to `tasks/*.jsonl` without the feed's line is read by no running
@@ -652,6 +653,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   step and returned `[]` — refused now, as `step`'s third argument is (`StepRefused`, found in review of the same run). An `Effect.fn` generator that must see
   its arguments cannot declare `...args: never[]` (TS2769 at the call site); it declares none and reads `[...arguments]` (`tick` in
   `agent-runtime/src/engine.ts`, learned by the run that retired the runtime's ceiling).
+- **A pass asks `claude agents` only for a session it expects that is no job.** The runtime's pass folds first and hands the runner
+  every attempt of every task it folds (`observeFor`, `observeSessions` across the A2A seam); Claude Code's lists its jobs off their run
+  files and reads its registry only when a name is not among them, and `advance` reads the pass's views rather than viewing again. The skip
+  is read off the world, never off `config.background`: a task filed on `claude` before jobs were its default runs `--bg` without the flag.
+  `agent-orchestrator/test/agents-calls.test.ts` counts the calls on a fake `claude` — none with jobs alone, one with a background session,
+  one on a fresh engine's first pass — and a test that asserted a count of `claude agents` calls (`pool.test.ts`'s once a pass) was
+  asserting the waste (learned by the run that took the pass's two `claude agents` calls down to what it needs).
 - **XState's `transition` answers an event with no edge by staying where it was, as a self-edge does.** It returns the same snapshot
   and no action, and throws nothing (5.33.2), so a missing edge read off its answer looks like a task at rest. `moveOn` in
   `agent-runtime/src/lifecycle.ts` asks `snapshot.can(event)` first and refuses on false, and a refusal stalls a task out loud

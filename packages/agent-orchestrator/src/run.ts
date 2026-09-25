@@ -726,8 +726,11 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
 
 /**
  * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
- * when it does nothing. Pure: the tick reads the checkout (`mergeState`), acts, and writes what it did on the step's record (`landed`), once
- * for each try. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
+ * when it does nothing. Pure: the tick acts, and writes what it did on the step's record (`landed`), once for each try. The checkout is read
+ * through `merge` (`mergeState`: a handful of git calls in a person's own checkout), and only once a landing can be due: never while the
+ * step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — MERGE_HEAD is there,
+ * read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing staged,
+ * which lands nothing and is never `landed`, costs a pass one `stat` of the checkout and no git. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
  * does the same, so a merge staged by an ending is never left staged once nothing of it runs.
  *
  * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on a merge that is not this run's
@@ -745,7 +748,7 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  */
 export function landingDue(
   step: Workflow, run: Run, own: StepStatus, phaseOf: (taskId: string) => TaskPhase, message: string | undefined,
-  verdict: Verdict | undefined, merge: MergeState,
+  verdict: Verdict | undefined, staged: boolean, merge: () => MergeState,
 ): Landing | undefined {
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
@@ -753,23 +756,25 @@ export function landingDue(
   if (busy(phaseOf(record.taskId))) return undefined;
   const check = record.check ? phaseOf(record.check.taskId) : undefined;
   if (check && busy(check)) return undefined;
-  if (merge.merging === 'other') return undefined;
-  const ours = merge.merging === 'ours';
-  const onHead = !ours && merge.merging === 'none' && merge.missing.length === 0;
+  if (own !== 'checking' && !staged) return undefined;
+  const { merging, conflicted, missing, head } = merge();
+  if (merging === 'other') return undefined;
+  const ours = merging === 'ours';
+  const onHead = !ours && merging === 'none' && missing.length === 0;
   const end = (why: string): Landing | undefined => (ours ? { act: 'abort', why } : { act: 'record', landed: { aborted: why } });
   // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget: the step's own word stands, and what it
   // left staged is taken back.
   if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : undefined;
   if (run.cancelledAt) return end('the run was called off before its merge was committed');
-  if (ours && merge.conflicted) return end('the merge it staged has conflicts');
-  if (ours && merge.missing.length) return end(`the merge it staged leaves out ${andList(merge.missing)}`);
+  if (ours && conflicted) return end('the merge it staged has conflicts');
+  if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`);
   if (!check) {
     if (ours || onHead) return run.hold ? end('the run was held before its check was filed') : undefined;   // the check is filed on this pass
     return { act: 'record', landed: { aborted: `${step.name} signed off with no merge of the run's result staged, so nothing was checked or committed` } };
   }
   if (check === 'succeeded') {
     if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
-    if (onHead && merge.head) return { act: 'record', landed: { commit: merge.head } };
+    if (onHead && head) return { act: 'record', landed: { commit: head } };
     return { act: 'record', landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' } };
   }
   const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';

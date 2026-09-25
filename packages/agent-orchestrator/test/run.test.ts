@@ -4469,8 +4469,11 @@ const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['
 const due = (r: Run, own: StepStatus, ship: TaskPhase, check: TaskPhase | undefined, merge: MergeState, message: string | undefined = 'Add a flag', verdict?: Verdict) => {
   const { check: _filed, ...unfiled } = r.steps.ship!;
   const at = check ? r : { ...r, steps: { ...r.steps, ship: unfiled } };
-  return landingDue(LANDER, at, own, phases({ 't-impl': 'succeeded', 't-ship': ship, ...(check ? { 't-ship-check': check } : {}) }), message, verdict, merge);
+  return landingDue(LANDER, at, own, phases({ 't-impl': 'succeeded', 't-ship': ship, ...(check ? { 't-ship-check': check } : {}) }), message, verdict,
+    merge.merging !== 'none', () => merge);
 };
+/** A read of the checkout that fails the test: where `landingDue` must not ask git at all. */
+const UNREAD = (): MergeState => { throw new Error('the checkout was read'); };
 
 test('an ending lands on its check only where it is approved first and has a check: a gated main step, never a plain step or one with no check', () => {
   assert.equal(landsOnCheck(LANDER, run({})), true);
@@ -4492,7 +4495,7 @@ test('REFUSED: landingDue commits nothing while the session or its check is in f
   assert.equal(due(atLanding(), 'checking', 'succeeded', 'succeeded', { ...STAGED, merging: 'other' }), undefined, 'another merge is never touched');
   assert.equal(due(atLanding({}, { landed: { commit: 'merged0' } }), 'checking', 'succeeded', 'succeeded', STAGED), undefined, 'once for the try');
   assert.equal(due(atLanding({}, { landed: { aborted: 'x' } }), 'checking', 'succeeded', 'succeeded', STAGED), undefined);
-  assert.equal(landingDue({ ...LANDER, check: undefined }, atLanding(), 'unverified', phases({ 't-ship': 'succeeded' }), 'm', undefined, STAGED), undefined,
+  assert.equal(landingDue({ ...LANDER, check: undefined }, atLanding(), 'unverified', phases({ 't-ship': 'succeeded' }), 'm', undefined, true, () => STAGED), undefined,
     'a ship with no check lands nothing of the run');
 });
 
@@ -4502,7 +4505,7 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 'unfinished'), abort('its check did not finish'));
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'stopped', STAGED, 'm', 1), abort('its check did not finish'), 'a stopped check is no verdict, whatever it exited');
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'succeeded', STAGED, ' \n'), abort('ship signed off no commit message'));
-  assert.deepEqual(landingDue(LANDER, atLanding(), 'checking', phases({ 't-ship': 'succeeded', 't-ship-check': 'succeeded' }), undefined, 0, STAGED),
+  assert.deepEqual(landingDue(LANDER, atLanding(), 'checking', phases({ 't-ship': 'succeeded', 't-ship-check': 'succeeded' }), undefined, 0, true, () => STAGED),
     abort('ship signed off no commit message'), 'none given at all');
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'succeeded', { ...STAGED, conflicted: true }), abort('the merge it staged has conflicts'));
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'succeeded', { ...STAGED, missing: ['wf/r-1/implement'] }), abort('the merge it staged leaves out wf/r-1/implement'));
@@ -4514,6 +4517,24 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
     assert.equal(due(atLanding(), own, 'succeeded', undefined, NOT_STAGED), undefined, `${own}, with nothing staged: its own word stands`);
   }
   assert.deepEqual(due(atLanding({ hold: { at: '2026-01-01T01:00:00Z', until: ['r-0'] } }), 'checking', 'succeeded', undefined, STAGED), abort('the run was held before its check was filed'));
+});
+
+test('REFUSED: landingDue reads no git where no landing can be due — its session or its check in flight, or an ending that did not sign off done with nothing staged', () => {
+  const read = (r: Run, own: StepStatus, ship: TaskPhase, check: TaskPhase | undefined, staged: boolean) => {
+    const { check: _filed, ...unfiled } = r.steps.ship!;
+    const at = check ? r : { ...r, steps: { ...r.steps, ship: unfiled } };
+    return landingDue(LANDER, at, own, phases({ 't-impl': 'succeeded', 't-ship': ship, ...(check ? { 't-ship-check': check } : {}) }), 'm', undefined, staged, UNREAD);
+  };
+  for (const busy of ['pending', 'running'] as const) {
+    assert.equal(read(atLanding(), 'running', busy, undefined, true), undefined, `ship ${busy}`);
+    assert.equal(read(atLanding(), 'checking', 'succeeded', busy, true), undefined, `its check ${busy}: twenty minutes of passes`);
+  }
+  // Never landed, so without this every pass would read git in the person's checkout for as long as the run is kept.
+  for (const own of ['blocked', 'unsigned', 'failed', 'stopped', 'denied', 'budget exhausted'] as const)
+    assert.equal(read(atLanding(), own, own === 'failed' || own === 'stopped' ? own : 'succeeded', undefined, false), undefined, own);
+  assert.equal(read(atLanding({}, { landed: { commit: 'merged0' } }), 'verified', 'succeeded', 'succeeded', true), undefined, 'once landed');
+  assert.throws(() => read(atLanding(), 'blocked', 'succeeded', undefined, true), /the checkout was read/, 'a merge staged is read, to be taken back');
+  assert.throws(() => read(atLanding(), 'checking', 'succeeded', 'succeeded', false), /the checkout was read/, 'a settled check is read, to land');
 });
 
 test('landingDue records what a pass after a restart finds: a merge committed, one aborted, nothing staged — and files the check on a merge staged', () => {

@@ -557,9 +557,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   owner's word at the plan gate of the run that moved the ship's check into the run, whose shipper had waited so on a check of twenty minutes).
 - **The ending's check is the run's, and a merge left staged on the base branch is the tick's to finish.** A gated `workspace: main`
   step with a `check:` stages its merge and signs off the message; the tick files the check and, on the pass that reads it settled,
-  commits (exit 0) or aborts (anything else). Level-triggered: `landingDue` reads `MERGE_HEAD` off git on every pass, so a restart
+  commits (exit 0) or aborts (anything else). Level-triggered: `landingDue` reads `MERGE_HEAD` off disk on every pass, so a restart
   mid-check, mid-commit or after a person aborted by hand reads the same, and a merge whose heads are not the run's result branches is
-  never touched. Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
+  never touched. That checkout is a person's, so a pass spawns git there only once a landing can be due — nothing in flight, and a
+  merge staged or a check settled (`mergeInProgress` is one stat) — and reads conflicts with `ls-files --unmerged`: `git diff` refreshes
+  the index and takes `index.lock`, and a pass every few seconds would race the shipper's own git (learned in review, round 1). Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
   nothing, and its offer is `wf retry <run> ship`, never `--recheck`: the merge it checked is gone (learned by the run that moved
   the ship's check into the run).
 

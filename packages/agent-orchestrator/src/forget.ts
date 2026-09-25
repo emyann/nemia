@@ -11,14 +11,14 @@ import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
 import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, handOffDue, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruning, type Run } from './run.ts';
 import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
-import { gitSays, handOff, mergeState } from './worktree.ts';
+import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, resultTips, unrecordedSteps } from './tick.ts';
 
 /** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
 const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
-  (isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) ? mergeState(run.repo, resultTips(run)).merging : 'none');
+  (isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none');
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is

@@ -21,7 +21,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { accept, advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
-const { abortMerge, commitMerge, mergeState } = await import('../src/worktree.ts');
+const { abortMerge, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 // The shipped agents, beside every folder this file makes under ROOT: the shipped ship.md names `agent: shipper`, and its recipe is there.
@@ -317,8 +317,10 @@ test("mergeState reads the checkout as a landing needs it: whose merge is staged
   const base = git(repo, 'rev-parse', 'HEAD');
   const tips = { 'wf/r/a': a, 'wf/r/b': b };
   assert.deepEqual(mergeState(repo, tips), { merging: 'none', conflicted: false, missing: ['wf/r/a', 'wf/r/b'], head: base });
+  assert.equal(mergeInProgress(repo), false);
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a');
+  assert.equal(mergeInProgress(repo), true, 'read off the file alone, which is all a pass asks of a checkout with no landing due');
   assert.deepEqual(mergeState(repo, tips), { merging: 'ours', conflicted: false, missing: ['wf/r/b'], head: base }, 'one branch of two staged');
   assert.equal(mergeState(repo, { 'wf/r/b': b }).merging, 'other', "a merge of a commit that is not one of the run's tips is another's");
   assert.equal(abortMerge(repo), undefined);
@@ -342,6 +344,20 @@ test("mergeState reads the checkout as a landing needs it: whose merge is staged
   assert.ok('error' in commitMerge(repo, 'never\n'), 'git refuses to commit a conflict');
   assert.equal(abortMerge(repo), undefined);
   assert.equal(git(repo, 'status', '--porcelain'), '');
+  assert.equal(mergeInProgress(repo), false);
+
+  // A linked worktree's `.git` is a file naming its own git directory, and its merge is read there.
+  const linked = path.join(path.dirname(repo), `${path.basename(repo)}-linked`);
+  const d = branch('wf/r/d', 'd.ts', 'd\n');
+  git(repo, 'worktree', 'add', '-q', '-b', 'side', linked, 'main');
+  assert.ok(fs.statSync(path.join(linked, '.git')).isFile());
+  git(linked, 'merge', '--no-ff', '--no-commit', 'wf/r/d');
+  assert.equal(mergeInProgress(linked), true);
+  assert.equal(mergeInProgress(repo), false, "the main checkout's own merge is its own");
+  assert.equal(mergeState(linked, { 'wf/r/d': d }).merging, 'ours');
+  assert.equal(abortMerge(linked), undefined);
+  assert.equal(mergeInProgress(linked), false);
+  assert.equal(mergeInProgress(path.join(repo, 'no-such')), false, 'no checkout, no merge');
 });
 
 const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch: 1 commit; the check on the merged tree.\n';

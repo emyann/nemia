@@ -21,7 +21,7 @@ import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from '
 import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
-import { abortMerge, commitMerge, gitSays, handOff, mergeState, workspaceFor } from './worktree.ts';
+import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
 import { refsOf, resultBranches } from './branches.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
@@ -250,7 +250,9 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = await taskPhases(e, run);
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
-    if (landingOpen(ending, run, own, phaseOf, mergeState(run.repo, resultTips(run)).merging)) return { id: run.id, repo, step: ending.name, holds: true };
+    // Whose merge it is is asked of git only where one is in progress, which the file system says with no git.
+    const merging = mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none';
+    if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
   if (run.cancelledAt) return undefined;
   const { asks, rounds } = readAsks(run.id);
@@ -797,7 +799,8 @@ function landEnding(
   if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !fs.existsSync(runFile(run.id))) return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
-  const due = landingDue(ending, run, own, phaseOf, typeof said === 'string' ? said : undefined, verdictOf(ending.name), mergeState(run.repo, resultTips(run)));
+  const due = landingDue(ending, run, own, phaseOf, typeof said === 'string' ? said : undefined, verdictOf(ending.name),
+    mergeInProgress(run.repo), () => mergeState(run.repo, resultTips(run)));
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
   const write = (landed: Landed, note: string) => {

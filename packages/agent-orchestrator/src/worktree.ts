@@ -358,13 +358,35 @@ export const gitSays = (repo: string, ...args: string[]): string | undefined => 
 };
 
 /**
+ * The file a merge in progress in `repo`'s checkout is named in, found with no git: `.git/MERGE_HEAD` where `.git` is a directory, and
+ * under the directory a `.git` file names (`gitdir: …`) where the checkout is a worktree. Undefined where neither reads.
+ */
+function mergeHeadFile(repo: string): string | undefined {
+  const dotGit = path.join(repo, '.git');
+  try {
+    if (fs.statSync(dotGit).isDirectory()) return path.join(dotGit, 'MERGE_HEAD');
+    const named = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'))?.[1]?.trim();
+    return named ? path.join(path.resolve(repo, named), 'MERGE_HEAD') : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * Whether a merge is in progress in `repo`'s checkout — MERGE_HEAD is there — read off the file system: no git is spawned and no lock is
+ * taken in a checkout a person works in, so a pass may ask it every time (`landingDue`'s `staged`, `mainClaim`).
+ */
+export const mergeInProgress = (repo: string): boolean => {
+  const file = mergeHeadFile(repo);
+  return file !== undefined && fs.existsSync(file);
+};
+
+/**
  * The repository's own checkout as a pass reads it for an ending that lands on its check (`MergeState`, `landingDue`): whether a merge is in
  * progress, and whose — this run's when every commit its MERGE_HEAD names is the tip of one of `tips`, the run's result branches — whether a
  * path is unmerged, which result branches a commit now would leave out, and HEAD. Read quietly: a checkout git cannot read is merging nothing.
+ * A handful of git calls, so a pass asks only once a landing can be due (`landingDue`'s `merge`).
  */
 export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
-  const gitDir = gitSays(repo, 'rev-parse', '--absolute-git-dir')?.trim();
-  const file = gitDir ? path.join(gitDir, 'MERGE_HEAD') : undefined;
+  const file = mergeHeadFile(repo);
   const heads = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean) : [];
   const shas = new Set(Object.values(tips));
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
@@ -372,7 +394,8 @@ export function mergeState(repo: string, tips: Readonly<Record<string, string>>)
     .filter(([, sha]) => !heads.includes(sha) && gitSays(repo, 'merge-base', '--is-ancestor', sha, 'HEAD') === undefined)
     .map(([branch]) => branch);
   const head = gitSays(repo, 'rev-parse', '--verify', '--quiet', 'HEAD')?.trim();
-  return { merging, conflicted: Boolean(gitSays(repo, 'diff', '--name-only', '--diff-filter=U')?.trim()), missing, ...(head ? { head } : {}) };
+  // `ls-files -u` reads the index as it is; `git diff` would refresh it, taking `index.lock` for a moment in a checkout a person commits in.
+  return { merging, conflicted: Boolean(gitSays(repo, 'ls-files', '--unmerged')?.trim()), missing, ...(head ? { head } : {}) };
 }
 
 /**

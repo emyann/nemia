@@ -108,7 +108,7 @@ export const modeWord = (how: { mode: RetryMode; model?: string }): string => (h
  * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
-  const { check, tries = [], handedOff: _, ...rest } = record;
+  const { check, tries = [], handedOff: _, landed: __, ...rest } = record;
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),

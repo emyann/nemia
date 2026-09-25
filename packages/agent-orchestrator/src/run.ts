@@ -12,7 +12,7 @@
  * the run, and is the only state this file writes down rather than derives.
  */
 import path from 'node:path';
-import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
+import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
@@ -686,12 +686,111 @@ export function endingStopped(
  * past, and is spent (`spentApprovals`). Pure.
  */
 export function sentBack(record: StepRecord): StepRecord {
-  const { check, tries = [], taskId, handedOff: _, ...rest } = record;
+  const { check, tries = [], taskId, handedOff: _, landed: __, ...rest } = record;
   return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), then: 'back' }] };
 }
 
 /** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+
+// ─── an ending that lands on its check ──────────────────────────────────────
+
+/**
+ * Whether an ending's merge is landed by the run on its check: it works in the repository's own checkout, a person approves it before it
+ * is filed (`approvedFirst`), and it has a `check:` — which the parser takes beside `workspace: main` only with `gate: true`. Pure.
+ *
+ * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the
+ * merge onto the base branch on its word, with the message the step signed off, or aborts it (`landingDue`). A frozen run whose ending has
+ * no check keeps its old recipe: the step runs the check itself, in its prose, and commits or aborts on what it found.
+ */
+export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, run: Pick<Run, 'gates'>): boolean =>
+  approvedFirst(step, run) && step.check !== undefined;
+
+/** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.ts). */
+export type MergeState = {
+  /**
+   * `ours`: a merge is in progress — MERGE_HEAD — and every commit it merges is the tip of one of this run's result branches; `other`: one is,
+   * and it merges something else, a person's or another run's; `none`: no merge is in progress.
+   */
+  merging: 'ours' | 'other' | 'none';
+  /** Whether git holds a path unmerged. */
+  conflicted: boolean;
+  /** The result branches neither in the merge nor already on the checkout's HEAD: what a commit now would leave out. */
+  missing: readonly string[];
+  /** The checkout's HEAD, what a result already on it landed as. */
+  head?: string;
+};
+
+/** What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, or only write down how it stands. */
+export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: string } | { act: 'record'; landed: Landed };
+
+/**
+ * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
+ * when it does nothing. Pure: the tick reads the checkout (`mergeState`), acts, and writes what it did on the step's record (`landed`), once
+ * for each try. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
+ * does the same, so a merge staged by an ending is never left staged once nothing of it runs.
+ *
+ * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on a merge that is not this run's
+ * (`other`), which is never touched — the run did not start it. Once neither runs:
+ * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
+ *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
+ *   person's approval, and its check is the run's own, from the folder frozen on the record.
+ * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no merge
+ *   waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
+ *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
+ *   step gave no message to commit it with.
+ * - **record**, with no merge of the run's to act on: the step signed off done having staged none (nothing is checked or committed); the
+ *   check passed and the result is on the checkout's HEAD already (it landed there as that commit); or the check ended and the merge it
+ *   judged is no longer staged.
+ */
+export function landingDue(
+  step: Workflow, run: Run, own: StepStatus, phaseOf: (taskId: string) => TaskPhase, message: string | undefined,
+  verdict: Verdict | undefined, merge: MergeState,
+): Landing | undefined {
+  const record = run.steps[step.name];
+  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
+  const busy = (phase: TaskPhase) => phase === 'pending' || phase === 'running';
+  if (busy(phaseOf(record.taskId))) return undefined;
+  const check = record.check ? phaseOf(record.check.taskId) : undefined;
+  if (check && busy(check)) return undefined;
+  if (merge.merging === 'other') return undefined;
+  const ours = merge.merging === 'ours';
+  const onHead = !ours && merge.merging === 'none' && merge.missing.length === 0;
+  const end = (why: string): Landing | undefined => (ours ? { act: 'abort', why } : { act: 'record', landed: { aborted: why } });
+  // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget: the step's own word stands, and what it
+  // left staged is taken back.
+  if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : undefined;
+  if (run.cancelledAt) return end('the run was called off before its merge was committed');
+  if (ours && merge.conflicted) return end('the merge it staged has conflicts');
+  if (ours && merge.missing.length) return end(`the merge it staged leaves out ${andList(merge.missing)}`);
+  if (!check) {
+    if (ours || onHead) return run.hold ? end('the run was held before its check was filed') : undefined;   // the check is filed on this pass
+    return { act: 'record', landed: { aborted: `${step.name} signed off with no merge of the run's result staged, so nothing was checked or committed` } };
+  }
+  if (check === 'succeeded') {
+    if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
+    if (onHead && merge.head) return { act: 'record', landed: { commit: merge.head } };
+    return { act: 'record', landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' } };
+  }
+  const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';
+  return end(onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why);
+}
+
+/**
+ * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its session
+ * or its check in flight, its check due, or its merge staged. What keeps another run's ending out of the checkout (`mainClaim`) and `wf rm`
+ * from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
+ */
+export const landingOpen = (step: Workflow, run: Run, own: StepStatus, phaseOf: (taskId: string) => TaskPhase, merging: MergeState['merging']): boolean => {
+  const record = run.steps[step.name];
+  if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
+  const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
+  return busy(phaseOf(record.taskId)) || busy(record.check && phaseOf(record.check.taskId)) || own === 'checking' || merging === 'ours';
+};
+
+/** What the run did with an ending's merge, as `wf ls` and `wf decide` say it: `committed onto main as 1a2b3c4`, or why it made no commit. */
+export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
+  ('commit' in landed ? `the run committed its merge onto ${run.branch} as ${landed.commit.slice(0, 7)}` : `nothing landed on ${run.branch}: ${landed.aborted}`);
 
 // ─── one checkout, one ending step ──────────────────────────────────────────
 
@@ -1461,6 +1560,15 @@ export function ownStatus(
   if (!step.check) return signed('unverified');
 
   const check = st.check ? phaseOf(st.check.taskId) : undefined;
+  // An ending that lands on its check stands where the run's landing of its merge left it (`landingDue`), never on the check alone: `verified`
+  // once the run has committed the merge, and `checking` until it has committed it or aborted it — so nothing reads the step settled, and
+  // offers a try of it, while its merge is still staged in the checkout.
+  if (landsOnCheck(step, run)) {
+    const landed = st.landed;
+    if (!landed) return 'checking';
+    if ('commit' in landed) return signed('verified');
+    return check === 'failed' || check === 'stopped' || check === 'unknown' ? 'failed (check)' : 'failed';
+  }
   return check === 'succeeded' ? signed('verified')
     : check === 'failed' || check === 'stopped' ? 'failed (check)'
     : 'checking';
@@ -1693,7 +1801,12 @@ export type StepRecord = {
   taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[];
   /** The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is theirs. */
   handedOff?: string;
+  /** What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once for each try. */
+  landed?: Landed;
 };
+
+/** What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to commit — and why. */
+export type Landed = { commit: string } | { aborted: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.
@@ -1782,7 +1895,8 @@ export function retryable(
     || (satisfiesAfter(status) && noneFiled
       && followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
   const modes: RetryMode[] =
-    tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
+    // Not an ending that lands on its check: the run aborted the merge its check judged, so a recheck would judge the checkout without it.
+    tried === 'failed (check)' ? (landsOnCheck(step, run) ? ['nudge', 'fresh'] : ['nudge', 'fresh', 'recheck'])
     : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || tried === 'denied' || blockedByHarness || sendsBack ? ['nudge', 'fresh']
     : [];
   const raise = settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
@@ -1984,6 +2098,10 @@ export function retryRefusal(
     };
     return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
   }
+  if (!modes.includes(how.mode) && landsOnCheck(step, run) && status === 'failed (check)') {
+    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name]!.check!.taskId) : 'unknown', verdictOf(name)) ? 'refused it' : 'did not finish';
+    return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
+  }
   if (!modes.includes(how.mode)) {
     const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off'
       : status === 'denied' ? 'was denied a call by its harness, and its check was never run' : `is ${status}`;
@@ -2013,7 +2131,7 @@ export function retryRefusal(
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
     // A check that did not finish is no verdict: run again as the work stands, it costs nothing, and may pass.
-    if (status === 'failed (check)') {
+    if (status === 'failed (check)' && modes.includes('recheck')) {
       return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
     }
     return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
@@ -2100,6 +2218,19 @@ export function retryLines(
     // An ending that stopped on the base branch is tried again for what was not the work; the send-back above is for what was.
     const shipAgain = endingStopped(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) ? ' Ship again, when what stopped it was not the work — a dirty checkout, a flaky test.' : '';
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
+    const record = run.steps[step.name];
+    // An ending that lands on its check, which the run aborted: said with why, and a check that did not finish is tried by merging again,
+    // since there is nothing staged for `--recheck` to judge (`retryRefusal`).
+    if (landsOnCheck(step, run) && record?.landed && 'aborted' in record.landed) {
+      const budget = raise ? ` --budget <amount>` : '';
+      const session = raise ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})` : '';
+      if (d.unfinishedCheck.includes(step.name)) {
+        lines.push(`${step.name}: its check did not finish, so the run aborted the merge and nothing landed on ${run.branch}. Merge and check again:  ${command}${budget}${session}`);
+      } else {
+        lines.push(`${step.name}: ${status} — ${landedWords(run, record.landed)}.${shipAgain} Continue its session, told what happened:  ${command}${budget}  (--fresh, or --model <m>, for a new session${session})`);
+      }
+      continue;
+    }
     // A check that did not finish first, past a budget or not: run again as the work stands, it costs nothing. A session needs the raise.
     if (d.unfinishedCheck.includes(step.name)) {
       const session = raise ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})` : '';
@@ -2381,7 +2512,7 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
   const looping = steps.find((s) => s.name === r.step);
   const next = { ...run.steps };
   for (const name of looping ? loopSpan(steps, looping) : []) {
-    const { check, tries = [], handedOff: _, ...rest } = run.steps[name] ?? { taskId: null };
+    const { check, tries = [], handedOff: _, landed: __, ...rest } = run.steps[name] ?? { taskId: null };
     // A cap a person raised with the round is kept on each step it was raised for, in force from its next try (`budgetOf`).
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round', ...raised }] : [];
@@ -2833,6 +2964,11 @@ export function forgetRefusal(
   standings: readonly BranchStanding[] = [],
   /** The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`. */
   verb: 'rm' | 'prune' = 'rm',
+  /**
+   * Whose merge is in progress in the repository's checkout (`mergeState` in worktree.ts), for an ending that lands on its check: one staged
+   * and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the engine say holds it.
+   */
+  merging: MergeState['merging'] = 'none',
 ): string | null {
   const held: string[] = [];
   const fixes: string[] = [];
@@ -2848,6 +2984,16 @@ export function forgetRefusal(
     }
   }
   if (live.length) held.push(andList(live));
+  // An ending that lands on its check, with nothing of it running and its merge not landed: a pass checks it, commits it or aborts it —
+  // cancelled or not — and once the record is gone no pass would, and the merge would stay staged in the repository's checkout.
+  const ending = steps?.find((s) => landsOnCheck(s, run));
+  const unlanded = ending && !live.length && steps
+    && landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, merging);
+  if (ending && unlanded) {
+    held.push(merging === 'ours'
+      ? `${ending.name}'s merge is staged in the repository's checkout (${run.repo}), and the run has not yet committed or aborted it`
+      : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`);
+  }
 
   const due: string[] = [];
   const unheard: AskName[] = [];
@@ -2906,6 +3052,7 @@ export function forgetRefusal(
     fixes.push(`${verb === 'rm' ? 'Forgetting' : 'Pruning'} is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then ${again}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`);
   }
   if (unheard.length) fixes.push(`Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: rm ${unheard.map(askAt).join(' ')}`);
+  if (unlanded) fixes.push(`The next tick lands it, cancelled or not: ${again} once wf ls ${id} says what became of ${ending.name}'s merge`);
 
   const stranded = others.filter((o) => o.id !== id && o.after?.includes(id) && gated(o)).map((o) => o.id).sort();
   if (stranded.length) {
@@ -4102,7 +4249,7 @@ export function composeBrief(
   // A folder run's steps are told of folders, and never of git: there is no repository, branch or commit to name (`placeOf`).
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
-    ...(step.check ? [checkContract(step.check)] : []),
+    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check) : checkContract(step.check)] : []),
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
     closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false, inFolder),
   ].join('\n');
@@ -4202,7 +4349,8 @@ export function composeBrief(
       parts.push(`This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`, '');
     }
     // The check is the folder's, not the ending's words: one shipper serves every folder, and each is told the check its work was judged by.
-    for (const check of workChecks(steps)) parts.push(`This workflow's check, which its work was judged by: \`${check}\``, '');
+    // An ending with a check of its own is told that one, which the run executes on its merge (`landingContract`), and not the work's too.
+    for (const check of step.check ? [] : workChecks(steps)) parts.push(`This workflow's check, which its work was judged by: \`${check}\``, '');
     parts.push(
       'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
       'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',

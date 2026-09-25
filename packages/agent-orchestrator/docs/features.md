@@ -4355,6 +4355,45 @@ file that changes nothing keeps the file, former line and all. Restart `wf up` o
 `review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted. The copies under
 `permissionMode` go when `withFormerNames` does.
 
+## Shipped: the run checks the ending's merge and lands it
+
+Until 2026-09-25 the shipper ran the ship's check itself, mid-merge, in its own session: a `claude -p` job whose turn cannot end to
+wait for a suite that runs twenty minutes (the harness demands the closing statement at once, `[structured-output-enforce]`), and
+whose check nobody but the shipper read. The run executes it now, as it executes a step's check, and commits or aborts on its exit.
+
+- **A gated `workspace: main` step may carry `check:`**, and the four `dev*` folders' `ship.md` carry implement's line (cb4141e).
+  An ungated one is still refused, and so is `retries:` beside it: a try of an ending is a person's word. `wf retry <run> ship` is that
+  word, and needs no new approval.
+- **The ending stages; the run lands.** The shipper merges `--no-ff --no-commit` and signs off `done` with the commit message as its
+  closeout's `message` (`workflows/agents/shipper.schema.json`); its brief says so under *The run checks and lands your merge*
+  (`landingContract` in `check.ts`). The tick files the check on the `check` harness in the checkout, with `CHECK_DEADLINE_SECONDS`,
+  niced, its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue`
+  (pure, `run.ts`) says what the settled check calls for, and `landEnding` (`tick.ts`) applies it: `git commit -F -` with the message
+  on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check (…)` /
+  `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and the feed says which.
+- **Aborted, with what `wf decide` says:** a refusal (`exit N`); a check that did not finish — no verdict, so nothing lands, and the offer
+  is `wf retry <run> ship`, never `--recheck`, since the merge it checked is gone (the owner's word at the plan gate); a blank message;
+  a staged merge that conflicts or leaves out a result branch; the run cancelled, or held before its check was filed; the session ending
+  any way but `done` with its merge staged; git refusing the commit (a hook), after which the merge is aborted too. A sign-off with
+  nothing staged checks and commits nothing, and says so. A result already on the base branch when the check refused is said beside it.
+- **Nothing is left mid-merge on the base branch.** While the landing is owed the checkout stays the run's (`landingOpen`, so no other
+  run's ending is filed there) and `wf rm` refuses the run. The tick reads `MERGE_HEAD` off git on every pass, whatever the daemon did
+  before a restart: a merge whose heads are not this run's result branches is never touched; this run's is committed only on an exit 0 on
+  record and aborted on anything else; a commit already on HEAD is recorded as landed, and a merge a person aborted by hand is recorded
+  with the check's words. An abort git refuses is tried again on the next pass.
+- **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/test/decision.test.ts` asserts the bare
+  command for an ending whose check did not finish.
+- **Tests that refuse**, each proven against a mutant: a commit on any settled check, another merge touched, no abort on cancel, a
+  blank message committed, the checkout released before the landing (`ship.test.ts`, `run.test.ts`, with real git for
+  `mergeState`, `commitMerge` and `abortMerge`).
+- **Departures from the plan.** No guard that the approval still stands at the landing: a try 2 is filed by `wf retry` with no new
+  approval, so such a guard would abort it, and filing is already gated on the approval. The git fixture's `succeeded` pin moves from
+  `succeeded` to checking/running, since a signed ending with a check is now judged by it (`git-before-after.test.ts`'s doc).
+
+**What it leaves.** A folder whose ending has no `check:` lands nothing: the shipper's brief keeps the old recipe for it (run the check
+and commit itself), with the job's limit on long work said beside it. The board draws `checking` and the verdict from the step's
+status, and shows `landed` only through the feed's line.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

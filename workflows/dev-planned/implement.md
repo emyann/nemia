@@ -7,7 +7,7 @@ agent: implementer
 # The build and the e2e run when, and only when, the work touched what they read: apps/web/, apps/api/ (which serves the e2e),
 # or the root's package.json, package-lock.json and turbo.json (the scripts, the dependencies and the build's tasks). The packages'
 # sources reach no browser, and their own tests judge them. What was touched is git's fact: in a check, the branch against the run's
-# base (WF_BASE_REF); in the shipper's hands, mid-merge with no WF_BASE_REF, what the merge brings (HEAD...MERGE_HEAD). Neither there,
+# base (WF_BASE_REF); in ship's check, mid-merge with no WF_BASE_REF, what the merge brings (HEAD...MERGE_HEAD). Neither there,
 # or git unable to say, and the check fails with words rather than skipping. --no-renames, or a file moved out of apps/web/ is
 # listed by its new path only; core.quotePath=false, or a path with a non-ASCII character is quoted and misses ^apps/.
 # Written here, not in a script the step could edit.

@@ -14,7 +14,7 @@ import { promisify } from 'node:util';
 import { lastLines } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 import { folderPlace } from './places.ts';
-import { isGitRun, workspacePlan, type Run } from './run.ts';
+import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 import { HOME, lstatOf, runsDir } from './store.ts';
 
@@ -356,3 +356,40 @@ function failedWords(err: unknown, lines = 4): string {
 export const gitSays = (repo: string, ...args: string[]): string | undefined => {
   try { return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
 };
+
+/**
+ * The repository's own checkout as a pass reads it for an ending that lands on its check (`MergeState`, `landingDue`): whether a merge is in
+ * progress, and whose — this run's when every commit its MERGE_HEAD names is the tip of one of `tips`, the run's result branches — whether a
+ * path is unmerged, which result branches a commit now would leave out, and HEAD. Read quietly: a checkout git cannot read is merging nothing.
+ */
+export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
+  const gitDir = gitSays(repo, 'rev-parse', '--absolute-git-dir')?.trim();
+  const file = gitDir ? path.join(gitDir, 'MERGE_HEAD') : undefined;
+  const heads = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  const shas = new Set(Object.values(tips));
+  const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
+  const missing = Object.entries(tips)
+    .filter(([, sha]) => !heads.includes(sha) && gitSays(repo, 'merge-base', '--is-ancestor', sha, 'HEAD') === undefined)
+    .map(([branch]) => branch);
+  const head = gitSays(repo, 'rev-parse', '--verify', '--quiet', 'HEAD')?.trim();
+  return { merging, conflicted: Boolean(gitSays(repo, 'diff', '--name-only', '--diff-filter=U')?.trim()), missing, ...(head ? { head } : {}) };
+}
+
+/**
+ * Commit the merge staged in `repo` with `message`, on stdin, as the repository's own identity commits — the person's, as the step did
+ * before the run landed its merges — its hooks and signing honoured. The commit made, or git's words on why it made none.
+ */
+export function commitMerge(repo: string, message: string): { commit: string } | { error: string } {
+  try {
+    execFileSync('git', ['commit', '-F', '-'], { cwd: repo, encoding: 'utf8', input: message, stdio: ['pipe', 'pipe', 'pipe'] });
+    return { commit: git(repo, 'rev-parse', 'HEAD') };
+  } catch (err) { return { error: failedWords(err) }; }
+}
+
+/** Abort the merge in progress in `repo` (`git merge --abort`): undefined once it is, or git's words on why it is not. */
+export function abortMerge(repo: string): { error: string } | undefined {
+  try {
+    git(repo, 'merge', '--abort');
+    return undefined;
+  } catch (err) { return { error: failedWords(err) }; }
+}

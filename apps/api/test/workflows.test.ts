@@ -378,8 +378,9 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
         name: 'review',
         spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
-      // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own.
-      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      // The run's ending, gated: it stages the merge in the repository's own checkout and signs off its message, and the run executes
+      // implement's check on the merge and commits it on exit 0 — so ship's check is implement's, and its output the message.
+      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, check, output: 'shipper.schema.json', disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);

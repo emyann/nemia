@@ -553,8 +553,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   statement at once (`[structured-output-enforce]`), so a session that starts a suite in the background and ends its turn to
   wait has signed off, and the suite's verdict reaches nobody. Run long work in the foreground, in pieces under the 10-minute
   limit of a Bash call, or start it in the background and wait on it with blocking calls — `timeout 580 bash -c "while kill -0
-  <pid>; do sleep 5; done"` — never by ending the turn. The implementers' and reviewers' briefs say so (the owner's word
-  at the plan gate of the run that moved the ship's check into the run, whose shipper had waited so on a check of twenty minutes).
+  <pid>; do sleep 5; done"` — never by ending the turn. The implementers', reviewers' and shipper's briefs say so (the
+  owner's word at the plan gate of the run that moved the ship's check into the run, whose shipper had waited so on a check of twenty minutes).
+- **The ending's check is the run's, and a merge left staged on the base branch is the tick's to finish.** A gated `workspace: main`
+  step with a `check:` stages its merge and signs off the message; the tick files the check and, on the pass that reads it settled,
+  commits (exit 0) or aborts (anything else). Level-triggered: `landingDue` reads `MERGE_HEAD` off git on every pass, so a restart
+  mid-check, mid-commit or after a person aborted by hand reads the same, and a merge whose heads are not the run's result branches is
+  never touched. Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
+  nothing, and its offer is `wf retry <run> ship`, never `--recheck`: the merge it checked is gone (learned by the run that moved
+  the ship's check into the run).
 
 ## Rules the code keeps
 
@@ -606,7 +613,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **Never push, never merge, never `git branch -D`.** `.claude/settings.json` refuses the first
   and the last; a person merges after a trial merge runs the suite. The one exception is a run's
   ending step — `workflows/*/ship.md`, which runs in this checkout and is filed only once a person
-  approves it at its gate — and it merges the run's own result branch, aborting on any failure.
+  approves it at its gate — and it stages the merge of the run's own result branch and signs off its message;
+  the run then executes the ship's `check:` on the merged tree and commits on exit 0, or aborts the merge on
+  anything else, a check that did not finish included (`landingDue`).
   If you are a workflow step, commit as you go all the same: the run commits only what you leave
   uncommitted, in one commit under your step's name, and a person decides what ships. (F's two steps read the old wording as
   "do not commit" and handed off 1,300 lines in one commit each.)

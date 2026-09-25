@@ -61,8 +61,8 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
 }
 
 /**
- * What an agent says it can do: each skill its `skills:` file holds, in the file's order — the name a caller would read, what it is for, and
- * the tags it carries. `none` is what stands there when the agent names no skills file, or when the file does not read and the refusal is
+ * What an agent says it can do: each A2A skill its `card:` file holds, in the file's order — the name a caller would read, what it is for, and
+ * the tags it carries. `none` is what stands there when the agent names no card, or when the file does not read and the refusal is
  * shown elsewhere; nothing is drawn at all where `none` is left out.
  */
 export function Skills({ skills, none, className }: { skills: readonly AgentSkill[] | null | undefined; none?: React.ReactNode; className?: string }) {

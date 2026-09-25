@@ -95,7 +95,7 @@ function AgentPage() {
         </div>
         {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
         {/* What it says it can do, as its card says it: the same list the Agents page and a step's page show. */}
-        <Skills skills={agent.skills?.list} />
+        <Skills skills={agent.card?.list} />
         <UsedBy listing={agent} />
         {!mine && (
           <p data-read-only className="text-xs text-neutral-500">
@@ -130,8 +130,8 @@ function AgentPage() {
 /** Remove, asked twice: the first press asks, the second removes. */
 function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: boolean; onRemove: () => void }) {
   const [asking, setAsking] = useState(false);
-  // Each file the agent names beside it, which go with it unless another agent names one: the skills, the result schema.
-  const beside = [agent.skills?.file, agent.keys.output].filter((file): file is string => Boolean(file));
+  // Each file the agent names beside it, which go with it unless another agent names one: the card, the result schema.
+  const beside = [agent.card?.file, agent.keys.output].filter((file): file is string => Boolean(file));
   if (!asking)
     return (
       <Button variant="outline" className="ml-auto" onPress={() => setAsking(true)} isDisabled={pending}>

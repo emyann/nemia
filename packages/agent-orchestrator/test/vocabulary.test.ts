@@ -144,3 +144,39 @@ test("REFUSED at load in the engine's words: a `budget:` beside `background: tru
   assert.equal(await refusal({}), undefined);
   assert.equal(parseWorkflow('watch', '---\nbudget: 5\n---\nwatch it\n').budget, 5);
 });
+
+test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
+  const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
+  const { renderedFlags } = await import('../src/rendering.ts');
+  // What the tick files for an agent with instructions and `systemPrompt: no-coding`: every flag `renderedFlags` gives but `systemPromptFile`.
+  const scribe = parseAgent('scribe', '---\nsystemPrompt: no-coding\n---\nYou write.\n');
+  const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
+  const claude = renderedFlags(step, '/runs/r/agents/write');
+  assert.deepEqual(Object.keys(claude ?? {}).sort(), ['appendSystemPromptFile', 'pluginDir', 'settings']);
+  const dir = scratch('wf-vocabulary-');
+  fs.writeFileSync(path.join(dir, 'claude'), [
+    '#!/bin/sh',
+    'case "$1" in',
+    '  agents) echo "[]" ;;',
+    `  *) printf '%s\\n' "$@" > '${path.join(dir, 'args')}'; exit 1 ;;`,
+    'esac',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const e = createEngine({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } });
+    const id = await e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } });
+    const until = Date.now() + 20_000;
+    while (!(await e.view(id)).state.settled) {
+      assert.ok(Date.now() < until, 'settled');
+      await e.tick();
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  } finally { process.env.PATH = prev; }
+  const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
+  assert.equal(args[args.indexOf('--permission-mode') + 1], DEFAULT_PERMISSION_MODE, "the parser's copy of the runtime's default");
+  assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
+  assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/hkb-scribe');
+  assert.equal(args[args.indexOf('--settings') + 1], '{"outputStyle":"hkb-scribe:no-coding"}');
+});

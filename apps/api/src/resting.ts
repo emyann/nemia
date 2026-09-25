@@ -34,7 +34,9 @@ export type RestingRead<T> = {
   /**
    * Keep `answer` for `run`, judged on its record as read and on the tips of `branches`, the result branches git was asked about for it —
    * and its base branch with them, since whether a branch is on it moves when the base does — as `heads` gives them: the listing the answer
-   * was read from. Nothing is kept for a run the store has no stamp for, or for a memo that could not read the feed.
+   * was read from. Nothing is kept for a run the store has no stamp for, for a memo that could not read the feed, or once another request has
+   * read the feed on past where this one read to: a line it read concerned no run then kept, and this answer may be judged on a journal from
+   * before it.
    */
   keep(run: Run, answer: T, branches: readonly string[], heads: (repo: string) => ReadonlyMap<string, string>): void;
   /** Take `run` out: judged afresh, it was not at rest. */
@@ -69,6 +71,8 @@ export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.
     memo.cursor = undefined;
     fed = false;
   }
+  // Where this request read the feed to: a line past it is read by the next request, unless another request reads it first (`keep`).
+  const readTo = memo.cursor;
   const stamps = restStamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
@@ -87,7 +91,7 @@ export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.
     },
     keep(run, answer, branches, heads) {
       const stamp = stamps.get(run.id);
-      if (!fed || stamp === undefined) return;
+      if (!fed || memo.cursor !== readTo || stamp === undefined) return;
       memo.runs.set(run.id, { stamp, record: JSON.stringify(run), tips: tipsOf(run, branches, heads), answer });
     },
     drop(run) { memo.runs.delete(run.id); },

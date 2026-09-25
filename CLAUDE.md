@@ -717,7 +717,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   base stand. A new input `summarize` (`apps/api/src/runs.ts`) reads for a finished run goes into one of those, or a poll answers that run
   stale until the api restarts; every api test judges each kept answer afresh and fails the request on a difference, which is how it is
   seen. A test that counts what a poll reads turns the check off for that request (`unverified` in `test/resting.test.ts`), since the check
-  reads everything again (same run).
+  reads everything again (same run). Requests overlap, and the memo's feed cursor is shared: a request keeps nothing once another has read
+  the feed on past where it read to, or a line of a run it judged before the line is consumed by a request that had nothing to evict, and the
+  answer stays stale. One request at a time never shows it; the test interleaves two reads by hand (found in review, round 1).
 - **`list(taskIds)` looks at no harness when nothing among the tasks is in flight.** The api's list and a run's detail read their tasks
   through it, so the tests that asserted one `claude agents` call or one observation per request now assert none where the tasks are
   settled or Codex's: the one observation was the cost of reading every journal, not something the page needed. A run's tasks are every

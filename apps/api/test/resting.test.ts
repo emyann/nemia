@@ -21,7 +21,8 @@ process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
 const { resting } = await import('../src/runs.ts');
-const { e } = await import('../src/store.ts');
+const { e, findRun } = await import('../src/store.ts');
+const { restingRead } = await import('../src/resting.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
@@ -199,6 +200,27 @@ test('runs waiting on the same run read its journals once between them, off the 
   child('r-child-2');
   await list();
   assert.equal(await cost(), one, 'a second run waiting on the parent reads no journal more: the parent\'s tasks are among the request\'s views');
+});
+
+test('two requests at once: one that read the feed before the other read on past a line of its run keeps nothing', async () => {
+  aFinishedRun('r-raced');
+  const answer = await listed('r-raced');
+  assert.ok(answer && resting.runs.has('r-raced'));
+  resting.runs.delete('r-raced'); // not yet kept, as on the request that first judges it
+  const { startedAt: _, ...judged } = answer as Listed & { startedAt?: unknown };
+
+  const first = await restingRead(resting, false); // the first request reads the feed, then the run's journal, judged succeeded
+  blocked('r-raced-implement');
+  fed('r-raced-implement', 'settled'); // a line of its task, before the first request keeps what it judged
+  await restingRead(resting, false); // the second reads the feed on past the line: the run is not kept, so nothing is taken out
+  first.keep(findRun('r-raced')!, judged as never, [], () => new Map());
+  assert.ok(!resting.runs.has('r-raced'), 'kept nothing: the line is past where the first request read, and no request will read it again');
+  assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
+
+  const alone = await restingRead(resting, false);
+  alone.keep(findRun('r-raced')!, judged as never, [], () => new Map());
+  assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
+  resting.runs.delete('r-raced');
 });
 
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {

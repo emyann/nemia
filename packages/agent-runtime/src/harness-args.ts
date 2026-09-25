@@ -56,18 +56,10 @@ export type HarnessArgs = {
    */
   contextTokens?: number;
   /**
-   * Bridge the session to claude.ai: Claude Code's `--bg` session is given `--remote-control`, and is listed in the web's
-   * agents view, where anyone signed in to the account can drive it — type into it, answer its prompts, stop it — from a
-   * browser or a phone. Never a default, for that reason. Refused unless true or false, and `true` on a harness that has no
-   * such flag: `codex`, `claude-detached` — whose `claude -p` runs a prompt and exits — and any `HarnessSpec`. A harness
-   * brought as a `PromiseRunner` is handed it on the spawn and asked nothing.
-   */
-  remoteControl?: boolean;
-  /**
    * How Claude Code runs the session on the `claude` harness. Absent or false: as a job — `claude -p`, which runs its
    * brief to the end and exits, prints every event as it goes, says what it was denied (`Sighting.denials`), and takes
    * words said to it on its stdin until its result. True: as a background session — `claude --bg`, listed in
-   * `claude agents`, which a person can attach to, say words to while it runs, and bridge to claude.ai (`remoteControl`,
+   * `claude agents`, which a person can attach to, say words to while it runs, and bridge to claude.ai (`claude.remoteControl`,
    * which asks for it). Refused unless true or false, and `true` on any
    * other harness, none of which has two ways to run.
    */
@@ -89,6 +81,11 @@ export type HarnessArgs = {
    * which would start its session without them. A flag the CLI does not have fails the attempt as the CLI fails it, its
    * words in the attempt's logs. Refused unless an object whose keys are flags in camelCase and whose values are `true`,
    * a string, a number, or a list of strings.
+   *
+   * A flag of Claude Code's alone is given here, never as a harness argument of its own: `remoteControl: true` bridges a
+   * background session to claude.ai (`--remote-control`), and is refused on a job and on any harness but Claude Code. What stays
+   * named above is what another harness translates (`worktree`, the fence, `effort`), what a `HarnessSpec` may declare
+   * (`contextTokens`), what chooses the runtime's own process (`background`), or what a caller judges (`budgetUsd`).
    */
   claude?: ClaudeFlags;
 };
@@ -96,9 +93,16 @@ export type HarnessArgs = {
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
   model: true, permissionMode: true, effort: true, tools: true, allowedTools: true, disallowedTools: true,
-  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true, budgetUsd: true, claude: true,
+  mcp: true, contextTokens: true, background: true, worktree: true, budgetUsd: true, claude: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
+
+/**
+ * A harness argument that was one of its own and is now Claude Code's flag in `config.claude`, by the flag's key there: filed at
+ * its old place — under `config` or beside it — it is refused naming the new one (`argsRefusalOf`), and read from a journal written
+ * before the move as the new one (`upgrade` in `journal.ts`). `remoteControl` moved on 2026-09-25.
+ */
+export const FORMER_ARGS: Readonly<Record<string, string>> = { remoteControl: 'remoteControl' };
 
 /**
  * The harness arguments a later turn of a task held open may give for itself (`answer`), on top of the task's own. A turn
@@ -154,9 +158,17 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  * words — the modes and efforts it takes — are its runner's (`harnessRefusalOf` in `facade.ts`, open issue 6).
  *
  * A harness argument filed beside `config` rather than in it is refused first: an untyped caller would otherwise have it
- * journalled nowhere and its session started without it.
+ * journalled nowhere and its session started without it. And before that, one that moved into Claude Code's flags
+ * (`FORMER_ARGS`), wherever it was filed, with a sentence naming where it went.
  */
 export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefined => {
+  const filed = (spec as { config?: unknown }).config;
+  // An own key, whatever its value: a caller still writing `remoteControl: step.remote` is told where it went, false and undefined too.
+  const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
+  const former = Object.keys(FORMER_ARGS).find((key) => at(spec, key) || at(filed, key));
+  if (former) {
+    return `\`${former}\` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as \`config: { claude: { ${FORMER_ARGS[former]}: true } }\`, or leave it out.`;
+  }
   const loose = HARNESS_ARGS.find((key) => Object.hasOwn(spec, key) && (spec as Record<string, unknown>)[key] !== undefined);
   if (loose) return `\`${loose}\` is the harness's configuration: file it under \`config\`, as \`config: { ${loose}: … }\`.`;
   const config = spec.config;
@@ -180,9 +192,6 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   }
   const mcp = config.mcp === undefined ? undefined : mcpRefuses(config.mcp);
   if (mcp) return mcp;
-  if (config.remoteControl !== undefined && typeof config.remoteControl !== 'boolean') {
-    return `\`remoteControl: ${JSON.stringify(config.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
-  }
   if (config.background !== undefined && typeof config.background !== 'boolean') {
     return `\`background: ${JSON.stringify(config.background)}\` is not true or false. Give true to run the session as \`claude --bg\`, or leave it out to run it as a job.`;
   }

@@ -37,7 +37,7 @@ const promiseDoor = () => {
 const ok: Filing = { brief: 'b', cwd: '/r' };
 
 /** Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are cast, as a JSON caller would send them. */
-const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume' | 'priority', unknown>>, RegExp]> = [
+const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume' | 'priority' | 'remoteControl', unknown>>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
   [{ cwd: 'repo' }, new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`)],
@@ -68,7 +68,10 @@ const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAtt
   [{ priority: -1 }, /^`priority` is retired:/],
   [{ priority: Number.NaN }, /^`priority` is retired:/],
   [{ priority: 'high' }, /^`priority` is retired:/],
-  [{ config: { remoteControl: 'true' } }, /^`remoteControl: "true"` is not true or false\./],
+  // A harness argument until 2026-09-25, Claude Code's flag since: refused at its old place, whatever it says, naming the new one.
+  [{ config: { remoteControl: true } }, /^`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`, or leave it out\.$/],
+  [{ config: { remoteControl: 'true' } }, /^`remoteControl` is Claude Code's own flag/],
+  [{ remoteControl: true }, /^`remoteControl` is Claude Code's own flag/],
   [{ config: { background: 'yes' } }, /^`background: "yes"` is not true or false\. Give true to run the session as `claude --bg`, or leave it out to run it as a job\.$/],
   [{ config: { background: 1 } }, /^`background: 1` is not true or false\./],
   [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
@@ -113,8 +116,8 @@ test('the Effect door journals a filing that refuses nothing, with every checked
     ...ok, deadlineSeconds: 60, resumeFrom: 's-1', queued: true, holdOpen: true,
     config: {
       model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
-      allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, background: false, contextTokens: 200000,
-      budgetUsd: 0.25,
+      allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, background: true, contextTokens: 200000,
+      claude: { remoteControl: true },
     },
   };
   const id = await effect.run(file(full));

@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { refusedText, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
+import { refusedText, type ClaudeFlags, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
@@ -553,9 +553,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
           tools: step.tools,
           disallowedTools: filedDenies(step, run),
           allowedTools: step.allowedTools,
-          // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
+          // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
           background: step.background,
-          remoteControl: step.remote,
           // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
           budgetUsd,
           // The agent `wf start` rendered for it: a try is told what the step is.
@@ -625,7 +624,6 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
           disallowedTools: filedDenies(target, run),
           allowedTools: target.allowedTools,
           background: target.background,
-          remoteControl: target.remote,
           budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
           claude: told.claude,
         },
@@ -733,14 +731,13 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         allowedTools: step.allowedTools,
         // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
         background: step.background,
-        // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
-        remoteControl: step.remote,
         // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
         // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
         // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
         // over is this package's (`ownStatus`, `held`).
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
-        // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`).
+        // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`);
+        // and the bridge to claude.ai when the step says `remote: true` (`toldOf`).
         claude: told.claude,
       },
       deadlineSeconds: step.deadlineSeconds,
@@ -906,12 +903,15 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
  * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
- * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start.
+ * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start. And
+ * bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true` — never a default: Claude Code's own
+ * flag, among its others (`claude.remoteControl`), first, where the runtime put it while it was a harness argument (until 2026-09-25).
  */
-function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ReturnType<typeof renderedFlags> } {
+function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
   const told = rendersAgent(step) && !isDirectory(dir) ? unrendered(step) : step;
-  return { step: told, claude: renderedFlags(told, dir) };
+  const rendered = renderedFlags(told, dir);
+  return { step: told, claude: told.remote ? { remoteControl: true, ...rendered } : rendered };
 }
 
 /**

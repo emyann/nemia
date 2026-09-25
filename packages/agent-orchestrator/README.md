@@ -930,6 +930,13 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   outlives a tick that dies, is stopped by `wf cancel`, ends at a twenty-minute deadline, runs once and is
   never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
   `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
+- **It starts at low priority:** under `nice -n 10`, and in the idle IO class (`ionice -c3`) where the machine has
+  `ionice` and lets it be taken; a machine without it runs the check as before. On 2026-09-24 several runs' checks at
+  once — turbo across five packages, the web build, the e2e's software-GL Chromium — froze a Windows desktop running
+  them in WSL for moments, video and typing, with vmmemWSL at up to 401% of a core. A check is a batch job nobody
+  watches while it runs; the agent sessions, filed on other harnesses, stay at normal priority, and so does a suite a
+  session runs itself. `nice` ranks processes inside one kernel: in WSL a check now yields to the sessions and to a
+  person's own Linux work, but with nothing else busy there it still uses every CPU the VM has. `CHECK_NICENESS`.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
   number shown to a person; a command that prints one of its own changes that number and nothing else.
 - The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, and `WF_ARTIFACTS` — the

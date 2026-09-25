@@ -405,3 +405,17 @@ test("an agent of yours a step of the repository's workflows is given — the re
     fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
   }
 });
+
+test('an agent is listed with each skill it gives, found where a start finds it, with what it costs a turn', async () => {
+  const all = await listed();
+  const theirs = all.find((a) => a.from === 'repo' && a.name === 'reviewer')!;
+  const yours = all.find((a) => a.from === 'yours' && a.name === 'reviewer')!;
+  assert.deepEqual(theirs.given.map((g) => [g.name, g.from]), [['review-a-change', 'repo'], ['send-work-round-again', 'repo']], "the repository's agent, from the skills beside it");
+  assert.deepEqual(yours.given.map((g) => [g.name, g.from]), [['review-a-change', 'yours'], ['send-work-round-again', 'yours']], 'yours, from your library');
+  for (const g of [...theirs.given, ...yours.given]) {
+    assert.equal(g.error, null, g.name);
+    assert.equal(g.entry?.id, g.name);
+    assert.ok(g.cost && g.cost.perTurn === g.cost.listed + (g.preload ? g.cost.body : 0) && g.cost.listed > 0, `${g.name} costs its listing, and its body when preloaded`);
+  }
+  assert.deepEqual(all.find((a) => a.from === 'yours' && a.name === 'broken')?.given ?? [], [], 'none for an agent that does not read');
+});

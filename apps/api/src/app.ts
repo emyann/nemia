@@ -5,6 +5,7 @@ import { readDaemon } from './daemon.ts';
 import { inbox } from './inbox.ts';
 import { readQuota } from './quota.ts';
 import { agents } from './agents.ts';
+import { skills } from './skills.ts';
 import { builder } from './builder.ts';
 import { workflows } from './workflows.ts';
 import { asks } from './asks.ts';
@@ -27,6 +28,9 @@ export const app = new Hono()
   // The agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put back or removed —
   // three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent` (agents.ts).
   .route('/', agents)
+  // The skills an agent of yours can be given, by place, and one HKB ships copied into your library — a write, guarded as a start is,
+  // through the package's `copySkill` (skills.ts).
+  .route('/', skills)
   // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
   .route('/', inbox)
   // The runs listed, one run in full, and what `wf decide` shows of it (runs.ts).

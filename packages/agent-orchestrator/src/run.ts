@@ -17,7 +17,7 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, modeOf, outputFields, remoteRetryRefusal, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, isRemoteHarness, LOOP_REPLIES, loopSpan, modeOf, outputFields, remoteRetryRefusal, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
 import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
@@ -2292,6 +2292,9 @@ export function retryLines(
       lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
     } else if (status === 'denied') {
       lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
+    } else if (isRemoteHarness(step.harness)) {
+      // A remote agent's try is a new Task, never its session continued, and takes no `--model` (`remoteRetryRefusal`).
+      lines.push(`${step.name}: ${status}. Send it again, as a new Task told what happened:  ${command}${spent ? `  (${spent.slice(2)})` : ''}`);
     } else {
       lines.push(`${step.name}: ${status}.${shipAgain} Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }

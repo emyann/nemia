@@ -125,6 +125,9 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   assert.equal(view.phase, 'failed');
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
+  // Offered a new Task, and not a session continued nor a model, which `wf retry` refuses on a remote step.
+  assert.ok(decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  wf retry ${id} ask`), decided.join('\n'));
+  assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
 });
 
 test('a Task the agent leaves waiting on a question reads as waiting on you: wf logs prints the question, and wf say answers it', async () => {

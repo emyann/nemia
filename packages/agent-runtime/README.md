@@ -1556,6 +1556,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement |
 | `src/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/engine.ts` | applies one decision, then the pass over every task |
+| `src/tick-memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
 | `src/facade.ts` | `createEngine`: the engine in Promises, and what `file()` refuses |
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |

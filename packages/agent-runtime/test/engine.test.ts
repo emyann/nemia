@@ -7,21 +7,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { Journal } from '../src/journal.ts';
+import { Journal, type FeedEntry, type JournalOps } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { admit, answer, file, GRACE_MS, Lifecycle, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
 import { withoutEdge } from '../src/lifecycle.ts';
 import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
+import { tickMemoLayer } from '../src/tick-memo.ts';
 
-/** One board: a journal and a fake harness whose session states a test moves by hand. */
-const board = (journal = Journal.test()) => {
+/**
+ * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
+ * tasks it skips, in check mode: every skipped task is folded and decided all the same, and a difference fails the pass
+ * (`TickMemoDiverged`), so every tick in this file proves the skip changes nothing. `memo: false` is the Effect door with
+ * no memo, which folds every task.
+ */
+const board = (journal = Journal.test(), memo: { verify: boolean } | false = { verify: true }) => {
   const sessions = new Map<string, Sighting>();
   /** Every spawn the engine asked for, so a test can assert what the harness was TOLD. */
   const spawned: SpawnRequest[] = [];
   // The layers are values, so "restarting the engine" is just running a new program against the
-  // same two — which is exactly what a new process would see.
-  const layer = Layer.mergeAll(journal, Runner.test({ sessions, spawned }));
+  // same two — which is exactly what a new process would see. The memo survives such a restart, which a new process's
+  // would not; in check mode that costs no test its proof, since every task it skips is folded again.
+  const runner = Runner.test({ sessions, spawned });
+  const layer = memo ? Layer.mergeAll(journal, runner, tickMemoLayer(memo)) : Layer.mergeAll(journal, runner);
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   return { sessions, spawned, run };
 };
@@ -811,4 +819,109 @@ test('a store of settled tasks, ticked again and again, reports no refusal — a
   assert.deepEqual(await Promise.all(['done', 'broke', 'stopped'].map((id) => b.run(phaseOf(id, b)))), ['succeeded', 'failed', 'stopped']);
   // A final state has no edge, so a settled task observed would be refused on every pass: `settledQuiet` keeps it unobserved.
   for (let pass = 0; pass < 3; pass++) assert.deepEqual((await b.run(tick())).refused, [], `pass ${pass}`);
+});
+
+/**
+ * A journal in memory, as `Journal.test` keeps one, that counts each task's reads — and the store's mutant: `pastTheFeed`
+ * writes an entry to a task's record and not to the feed, which no writer of the runtime's does (`JournalOps.append`).
+ */
+const countedJournal = () => {
+  const store = new Map<string, Event[]>();
+  const feed: FeedEntry[] = [];
+  const reads = new Map<string, number>();
+  const ops: JournalOps = {
+    append: (taskId, event) => Effect.sync(() => {
+      store.set(taskId, [...(store.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    }),
+    read: (taskId) => Effect.sync(() => {
+      reads.set(taskId, (reads.get(taskId) ?? 0) + 1);
+      return [...(store.get(taskId) ?? [])];
+    }),
+    list: Effect.sync(() => [...store.keys()].sort()),
+    feed: (after) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
+  };
+  return {
+    layer: Journal.layer(ops),
+    readsOf: (id: string) => reads.get(id) ?? 0,
+    pastTheFeed: (id: string, event: Event) => { store.set(id, [...(store.get(id) ?? []), event]); },
+  };
+};
+
+/** `done` settled `succeeded` and `live` at work, on a board of that journal, and a pass after the settling's. */
+const settledBeside = async (j: ReturnType<typeof countedJournal>, memo: { verify: boolean } | false) => {
+  const b = board(j.layer, memo);
+  for (const id of ['done', 'live']) await b.run(file({ ...spec, id }));
+  await b.run(tick());
+  b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'done' });
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf('done', b)), 'succeeded');
+  // The pass after the settling folds it again, since the feed names the settling: after it, nothing has.
+  await b.run(tick());
+  return b;
+};
+
+test('a pass skips a settled task nothing has written to since it was folded, and folds every task not settled', async () => {
+  const j = countedJournal();
+  const b = await settledBeside(j, { verify: false });
+  const done = j.readsOf('done');
+  const live = j.readsOf('live');
+  for (let pass = 0; pass < 3; pass++) await b.run(tick());
+  assert.equal(j.readsOf('done'), done, 'the settled task was not read again');
+  assert.equal(j.readsOf('live'), live + 3 * 2, 'the task at work is folded on every pass, and read again by its step');
+});
+
+test('an entry appended to a settled task, through the feed, has the next pass fold it again — and the pass after skip it', async () => {
+  const j = countedJournal();
+  const b = await settledBeside(j, { verify: true });
+  const before = j.readsOf('done');
+  await b.run(requestStop('done'));
+  await b.run(tick());
+  assert.equal(j.readsOf('done'), before + 2, 'folded again, and stepped: its decision is nothing');
+  await b.run(tick());
+  assert.equal(j.readsOf('done'), before + 2 + 1, 'in check mode, a skip is folded once more, to prove it');
+});
+
+test('REFUSED in check mode: a pass that would skip a settled task whose journal changed past the feed fails, naming it', async () => {
+  const j = countedJournal();
+  const b = await settledBeside(j, { verify: true });
+  j.pastTheFeed('done', { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } });
+  await assert.rejects(b.run(tick()), (e: Error & { _tag?: string; taskId?: string }) =>
+    e._tag === 'TickMemoDiverged' && e.taskId === 'done' && /the feed did not say so/.test(e.message));
+});
+
+test('the same change past the feed, without check mode, is skipped: the proof above is what would catch it', async () => {
+  const j = countedJournal();
+  const b = await settledBeside(j, { verify: false });
+  const before = j.readsOf('done');
+  j.pastTheFeed('done', { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } });
+  await b.run(tick());
+  assert.equal(j.readsOf('done'), before, 'not read: the memo trusts the feed');
+});
+
+test('a pass with no memo — the Effect door, on layers of its own — folds every task on every pass', async () => {
+  const j = countedJournal();
+  const b = await settledBeside(j, false);
+  const before = j.readsOf('done');
+  await b.run(tick());
+  assert.equal(j.readsOf('done'), before + 2, 'folded, and read again by its step');
+});
+
+test('a settled task still listed is let go on every pass off what the memo kept, and what it consumed is written once', async () => {
+  const j = countedJournal();
+  const sessions = new Map<string, Sighting>();
+  const released: string[] = [];
+  // A harness that keeps a session listed after it is let go, and says what it consumed only once it has let it go.
+  const runner = Runner.layer({ ...testOps({ sessions }), release: (s) => Effect.sync(() => { released.push(s.sessionId); return { costUsd: 0.5 }; }) });
+  const layer = Layer.mergeAll(j.layer, runner, tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  await run(file({ ...spec, id: 'done' }));
+  await run(tick());
+  sessions.set(nameFor('done', 1), { ...sessions.get(nameFor('done', 1))!, state: 'done' });
+  // The settling's pass writes `measured` after it folded the task: through the feed, so the next pass folds it again, and
+  // a memo that kept the fold from before would be proved stale there (`TickMemoDiverged`).
+  for (let pass = 0; pass < 4; pass++) await run(tick());
+  const events = await run(Effect.flatMap(Journal, (jr) => jr.read('done')));
+  assert.equal(events.filter((e) => e.kind === 'measured').length, 1, 'measured once');
+  assert.equal(released.length, 4, 'let go on each of the four passes that listed it');
 });

@@ -195,6 +195,39 @@ test('a settled task is decided nothing before anything is observed of it, on an
   assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned!)), false);
 });
 
+/** Every entry a writer can append to a settled task: the verbs' (`requestStop`, `say`, `file` again under its id), a pass's (`measured`, an end), a hand's. */
+const LATER: Record<string, Event[]> = {
+  nothing: [],
+  'asked to stop': [{ kind: 'stop-requested', at: at(4 * S) }],
+  said: [{ kind: 'said', at: at(4 * S), attempt: 1, text: 'hi' }],
+  answered: [{ kind: 'input', at: at(4 * S), text: 'go on' }],
+  closed: [{ kind: 'closed', at: at(4 * S) }],
+  admitted: [{ kind: 'admitted', at: at(4 * S) }],
+  measured: [{ kind: 'measured', at: at(4 * S), attempt: 1, usage: { costUsd: 1 } }],
+  'an end written late': [ended(1, 'done', 'harness', 'native-late')],
+  'filed again under its id': [filed({ holdOpen: true })],
+  'a second attempt': [starting(2, 4 * S), spawned(2, 5 * S)],
+  'settled again': [{ kind: 'settled', at: at(4 * S), outcome: 'succeeded' }],
+};
+
+test('what the tick\'s memo rests on: a settled task decides nothing in every journal shape, under every sighting and clock, whatever is appended after', () => {
+  // The pass skips a settled task until the feed names it (`tick-memo.ts`), and folds it again when the feed does. That is
+  // sound only if a settled task stays settled whatever is appended to it, and decides nothing whatever the pass sees —
+  // an attempt left open, a session live or blocked, a clock past its deadline and every grace window.
+  let cases = 0;
+  for (const c of corpus()) for (const outcome of ['succeeded', 'failed', 'stopped'] as const) for (const [l, later] of Object.entries(LATER)) {
+    const state = fold(TASK, [...c.events, { kind: 'settled', at: at(3 * S), outcome }, ...later]);
+    assert.equal(settledQuiet(state), true, `${c.name} · settled ${outcome} · ${l}: still settled`);
+    assert.deepEqual(decide(state, c.observed, c.now), { do: 'nothing', why: `settled: ${state.settled}` }, `${c.name} · settled ${outcome} · ${l}`);
+    cases++;
+  }
+  assert.ok(cases > 10_000, `every shape, every outcome, every later entry (${cases} cases)`);
+  // Among them, settled over an attempt still open, with its session live and the deadline long past.
+  const open = fold(TASK, [filed({ deadlineSeconds: 1 }), starting(1), spawned(1), { kind: 'settled', at: at(3 * S), outcome: 'stopped' }]);
+  assert.equal(open.attempts.at(-1)!.ended, null, 'the attempt is open');
+  assert.equal(decide(open, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' }]]), { at: new Date(T0.getTime() + 1e9), graceMs: 0 }).do, 'nothing');
+});
+
 test('the machine: its states are the ones named, each edge names one action, and every state but a final one leaves or holds by an edge', () => {
   assert.deepEqual(Object.keys(MACHINE.root.states), [...STATES]);
   assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);

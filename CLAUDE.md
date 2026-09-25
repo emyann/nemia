@@ -649,6 +649,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` still views each task in flight on its own; moving it onto the same report is a card of
   its own. And an admitted task starts on the runtime's *next* pass, so a test that files and wants a start ticks twice (learned by
   thin runtime stage 4c, part 1).
+- **The runtime's pass skips a settled task until the feed names it, so every write to a task's journal goes through `Journal.append`.**
+  An engine keeps a cursor into its feed and the settled tasks it has folded (`tick-memo.ts`), and a pass reads no journal the feed has
+  not named since. A store, a `PromiseJournal` or a hand edit that appends to `tasks/*.jsonl` without the feed's line is read by no running
+  engine until it restarts. A test that builds its own layers without `tickMemoLayer` folds every task, as the Effect door does; the engine's
+  own tick tests run `tickMemoLayer({ verify: true })` (`board()` in `engine.test.ts`), which folds each skipped task again and fails the pass
+  on a difference, so a new append that bypasses the feed fails there (learned by the run that made the pass skip settled tasks).
 - **A parameter taken away is refused, or a caller that still passes it is obeyed by nobody.** A JavaScript function ignores an
   argument it does not declare, so `tick(3)` after the ceiling left would have started every task and said nothing; an object key the
   type no longer has is the same, `createEngine({ maxConcurrent })` or a harness's `pool`. Stage 4c part 2 refuses each by

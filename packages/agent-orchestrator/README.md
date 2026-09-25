@@ -2232,8 +2232,8 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
   answers), `journals` (the runtime's journals, read through the engine), `observe` (asking each harness what runs), `runtime` (the
   runtime's own pass, less its observe), `git` (every git command, whether it judged or acted — so it is a phase of its own rather than
-  part of `act`), `assess` (the judgement, and any time counted as no other phase) and `act` (filing, stopping, collecting artifacts,
-  and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's
+  part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
+  (filing, admitting, stopping, collecting artifacts, and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's
   time, which is measured apart from them; `test/meter-store.test.ts` holds the one against the other.
 - **Each phase says its time, its calls, the bytes read and the processes started.** The bytes are those read through the store's
   readers and the runtime's (a thin wrapper each, not a syscall tracer), so what git reads is not in them. The runtime reports what it

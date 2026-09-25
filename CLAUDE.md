@@ -633,7 +633,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   runtime's pass built off its one observation (`viewOfState`), hands them to `toAdmit` (`src/admission.ts`, pure), and calls
   `e.admit(ids)`, which only journals the word. A new admission input is taken off those views or off the run records, never off
   `e.list()` or `e.view`: each is a `claude agents` call more on every pass, and `test/pool.test.ts` counts exactly one for a pass with
-  claude tasks at work and waiting. `advance` still views each task in flight on its own; moving it onto the same report is a card of
+  claude tasks at work and waiting, on the fake's counter and on the pass's own cost (`harnesses`, `spawned`). `admit` is metered in `act`
+  (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` still views each task in flight on its own; moving it onto the same report is a card of
   its own. And an admitted task starts on the runtime's *next* pass, so a test that files and wants a start ticks twice (learned by
   thin runtime stage 4c, part 1).
 

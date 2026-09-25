@@ -127,12 +127,13 @@ test("implement is dev's, after the plan and reading it: the plan reaches it und
   assert.doesNotMatch(brief, /PLANNER-ACCOUNT/);
 });
 
-test('dev-planned-build is dev-planned with dev-build\'s check on implement: the plan first, the same fence, the build and the e2e before implement is verified', () => {
+test('dev-planned-build is dev-planned with dev-build\'s check on implement: the plan first, the same fence, the build before implement is verified and the e2e on the merged tree', () => {
   const built = path.join(REPO, 'workflows', 'dev-planned-build');
   const steps = loadWorkflows(built);
   assert.deepEqual(steps.map((s) => s.name), loadWorkflows(PLANNED).map((s) => s.name), 'the same steps in the same order');
   const byName = Object.fromEntries(steps.map((s) => [s.name, s]));
-  assert.equal(byName.implement?.check, 'npm test && npm run typecheck && npm run build && npm run e2e');
+  assert.equal(byName.implement?.check, loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')?.check);
+  assert.match(byName.implement!.check!, /^npm test && npm run typecheck && npm run build && if \[ -n "\$\{WF_BASE_REF:-\}" \]; then .*; else npm run e2e; fi$/);
   const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));
   for (const name of ['plan', 'review']) assert.deepEqual({ ...byName[name], body: '' }, { ...plannedByName[name], body: '' }, `${name} is dev-planned's, key for key`);
   // And its ending is dev-build's, file for file: the same step, with the build and the e2e in the check it runs itself.

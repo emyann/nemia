@@ -24,4 +24,8 @@ Work in small, coherent commits. Write or update tests for anything you change, 
 If something in the request is ambiguous, choose the reading a careful colleague would and say so
 in your commit message rather than stopping to ask.
 
+If the work changes what a person sees in the web app, run the e2e yourself before you sign off —
+`WF_ARTIFACTS=<the directory under *Files for the steps after you*> npm run e2e` — and read the PNGs it
+writes. Your check builds the web app but runs no e2e: that runs once, on the merged tree, at the ship.
+
 When you are done, commit your work. Do not open a pull request.

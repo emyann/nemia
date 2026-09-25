@@ -407,7 +407,7 @@ filing of the step (the first, each try and each round), and a deny beats every 
 `.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallowedTools:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
 for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
-`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace — those two
+`npm run build` and `npm run e2e`, which implement's check and its own run need and which write into the workspace — those two
 commands, and not the build and the e2e by another name (below). Every
 `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
 
@@ -597,7 +597,7 @@ Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s tw
 ```md
 ---
 harness: claude
-check: npm test && npm run typecheck && npm run build && npm run e2e
+check: npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi
 output: implement.schema.json   # screenshots, pages
 ---
 Implement what was asked, in this repository. It changes what a person sees in the web app. …
@@ -958,8 +958,9 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 
 This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
 check a person used to run by hand at every trial merge — and every round of it is checked again.
-`workflows/ui/`, for a change to the web app, adds `npm run build && npm run e2e`. Point the folder at
-another repository and change that line.
+`workflows/ui/`, for a change to the web app, adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF`
+is set: a round's check runs no e2e, and a person merging runs the line whole on the merged tree. Point the folder
+at another repository and change that line.
 
 ### What a step's line says
 
@@ -1322,11 +1323,14 @@ the absolute paths of its PNGs, and `review` reads them with `input: implement`.
 implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
-`implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`.
-`npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a seeded
-store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
+`implement` carries `check: npm test && npm run typecheck && npm run build`, and then `npm run e2e` only
+where no `WF_BASE_REF` is set, which a check the run executes never is: a round's check builds and runs no
+e2e, and whoever merges runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
+every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
+seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
 have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
-own directory and read the PNGs, and to use the look skill on every page it changed. It declares
+own directory, after its last commit, and read the PNGs — those are the screenshots review reads — and to use
+the look skill on every page it changed. It declares
 `screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
 else of implement, and uses the look skill on the screenshots and the pages side by side — read by its
 file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and with it the Skill tool. Its schema is

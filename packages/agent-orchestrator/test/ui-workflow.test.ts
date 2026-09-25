@@ -1,6 +1,7 @@
 /**
  * `workflows/ui/`, the workflow for a change a person will see, held to its shape — so an edit that drops
- * the browser check, the screenshots, the look or the loop fails the suite rather than a run.
+ * the build check, the screenshots, the look or the loop fails the suite rather than a run. The e2e is the
+ * implementer's own run, for the screenshots, and the check's on the merged tree only (since 2026-09-25).
  *
  *   implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
  *
@@ -20,7 +21,8 @@ import { scratch } from './scratch.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
-const E2E = 'npm test && npm run typecheck && npm run build && npm run e2e';
+/** The build folders' and ui's implement check: the build every round, and the e2e only where the run set no `WF_BASE_REF` — the merged tree. */
+const BUILD = 'npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
 /** `dev`'s implement check, as its folder writes it: the suite and the types, then the build and the e2e on what git says was touched. */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
 const ui = loadWorkflows(path.join(WORKFLOWS, 'ui'));
@@ -93,8 +95,8 @@ test('REFUSED: a step told to use the look skill that could not reach it — no 
   assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(told, 'the skill') }), []);
 });
 
-test('implement is checked in a browser; review, which writes nothing, declares no check', () => {
-  assert.equal(steps.implement?.check, E2E);
+test('implement is checked by the build, and in a browser only on the merged tree; review, which writes nothing, declares no check', () => {
+  assert.equal(steps.implement?.check, BUILD);
   assert.equal(steps.review?.check, undefined);
 });
 
@@ -125,11 +127,12 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
 
 test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
   const CHECKS: Record<string, string> = {
-    // The suite and the types, then the build and the e2e when git says the work touched the web app (web-check.test.ts runs it).
+    // The suite and the types, then the build when git says the work touched the web app, and the e2e on the merged tree alone
+    // (web-check.test.ts runs both).
     dev: DEV_CHECK,
     'dev-planned': DEV_CHECK,
-    'dev-build': E2E,
-    'dev-planned-build': E2E,
+    'dev-build': BUILD,
+    'dev-planned-build': BUILD,
   };
   for (const [folder, check] of Object.entries(CHECKS)) {
     const dir = path.join(REPO, 'workflows', folder);
@@ -188,7 +191,7 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
   const WHY = ["`npm run build` regenerates the web app's route tree", '`npm run e2e` visits every page in both themes', 'the merged tree is the first tree either has seen'];
   for (const folder of Object.keys(CHECKS)) {
     const body = said(loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'ship')!.body);
-    for (const why of WHY) assert.equal(body.includes(why), CHECKS[folder] === E2E, `${folder}: ${why}\n\n${body}`);
+    for (const why of WHY) assert.equal(body.includes(why), CHECKS[folder] === BUILD, `${folder}: ${why}\n\n${body}`);
   }
 });
 

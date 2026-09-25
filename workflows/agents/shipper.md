@@ -29,6 +29,8 @@ and the run commits nothing here on your behalf, so leave the checkout as you fo
 3. Run this workflow's check, whole, from the repository root: the command named under *Where to look*.
    Run it as written, mid-merge, and set nothing for it: where it asks git what the work touched, it reads what
    the merge brings when no `WF_BASE_REF` is set, and fails, rather than skipping anything, when it cannot tell.
+   With no `WF_BASE_REF` it also runs the e2e, where the folder has one, which no round's check ran: this is the
+   one time the work meets it before it reaches the base branch.
 4. Exit 0, and only then, commit the merge with a message you write — never git's default, so never `--no-edit`.
    The subject is one plain line saying what shipped, for a person scanning `git log --oneline`: the run's own
    title — the first line under *What was asked for* — trimmed to about 72 characters. Not a description of git:

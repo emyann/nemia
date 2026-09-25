@@ -33,6 +33,7 @@ import { worktreeName } from './runner-claude-vocabulary.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
+import { countSpawn, readTextAsync } from './io-tally.ts';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
   verb: Schema.String,
@@ -268,12 +269,12 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const closeoutFrom = options.closeoutFrom ?? (async (sessionId: string) => {
     const file = transcriptFile(sessionId);
     if (!file) return undefined;
-    try { return lastStructuredOutput(await fs.promises.readFile(file, 'utf8')); } catch { return undefined; }
+    try { return lastStructuredOutput(await readTextAsync(file)); } catch { return undefined; }
   });
   const usageFrom = options.usageFrom ?? (async (sessionId: string, since: number) => {
     const file = transcriptFile(sessionId);
     if (!file) return undefined;
-    try { return transcriptUsage(await fs.promises.readFile(file, 'utf8'), since); } catch { return undefined; }
+    try { return transcriptUsage(await readTextAsync(file), since); } catch { return undefined; }
   });
 
   /**
@@ -644,6 +645,7 @@ const short = (sessionId: string) => sessionId.split('-')[0]!;
 
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
+    countSpawn();
     const child = execFile(cmd, args, { cwd: o.cwd, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
       resume(err
         ? Effect.fail(new RunnerError({

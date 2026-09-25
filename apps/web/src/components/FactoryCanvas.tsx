@@ -51,6 +51,8 @@ import {
 } from '@/lib/factory';
 import { flowSteps, tilesOf } from '@/lib/flow';
 import { capLine, queueOf } from '@/lib/inbox';
+import { passLine, passTitle } from '@/lib/pass';
+import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
 import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
@@ -532,10 +534,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 /**
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count is the
  * cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is not; the
- * difference is said on hover. Nothing until the cap is read; why, when it cannot be.
+ * difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, with its breakdown on hover (`passTitle`), once a pass has
+ * written it. Nothing until the cap is read; why, when it cannot be.
  */
 function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
   const { data, error } = useQuery(ceilingsQuery);
+  // The pass's time of day is said as today's or another day's: read against a clock that moves.
+  const now = new Date(useNow(60_000));
   if (error || queueError) {
     return (
       <p data-cap-error className="max-w-md truncate text-xs text-red-600 dark:text-red-400" title={(error ?? queueError)!.message}>
@@ -553,6 +558,12 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   return (
     <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-sm text-muted-foreground">
       {capLine(data, queued)}
+      {data.pass && (
+        <span data-pass={Math.round(data.pass.ms)} title={passTitle(data.pass, now)}>
+          {' · '}
+          {passLine(data.pass)}
+        </span>
+      )}
     </p>
   );
 }

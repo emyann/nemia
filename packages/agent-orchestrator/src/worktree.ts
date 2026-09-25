@@ -9,7 +9,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lastLines } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
@@ -17,6 +17,7 @@ import { folderPlace } from './places.ts';
 import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 import { HOME, lstatOf, runsDir } from './store.ts';
+import { countSpawn, execCounted, readText } from './tally.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
@@ -63,7 +64,7 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
 /** Whether git ignores a path in a checkout. `git check-ignore` says no for a tracked path, and for one git has not been told to ignore. */
 function ignored(repo: string, rel: string): boolean {
   try {
-    execFileSync('git', ['check-ignore', '-q', '--', rel], { cwd: repo, stdio: 'ignore' });
+    execCounted('git', ['check-ignore', '-q', '--', rel], { cwd: repo, stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -135,6 +136,7 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
 
   if (lockfileParts(mainRoot, worktree)) {
     try {
+      countSpawn();
       await execFileAsync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
       return { tree: 'own', installed: true };
     } catch (err) {
@@ -231,7 +233,7 @@ function includeFiles(repo: string, worktree: string): string[] {
  * own: a queued card whose `repo:` is no git repository made the tick run `rev-parse` there on every pass, and each one printed git's `fatal:
  * not a git repository` on the daemon's terminal, beside the one line `wf up` says about the card.
  */
-export const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+export const git = (repo: string, ...args: string[]) => execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /**
  * Cut the run's starting workspace.
@@ -332,9 +334,9 @@ export async function workspaceFor(
 export function handOff(workspace: string, step: string, when = ''): { commit: string } | { error: string } | undefined {
   const quiet = { cwd: workspace, encoding: 'utf8' as const, stdio: ['ignore', 'pipe', 'pipe'] as Array<'ignore' | 'pipe'> };
   try {
-    if (!execFileSync('git', ['status', '--porcelain'], quiet).trim()) return undefined;
-    execFileSync('git', ['add', '-A'], quiet);
-    execFileSync('git', [
+    if (!execCounted('git', ['status', '--porcelain'], quiet).trim()) return undefined;
+    execCounted('git', ['add', '-A'], quiet);
+    execCounted('git', [
       '-c', 'user.email=wf@local', '-c', 'user.name=wf',
       'commit', '-m', `${step}: hand off what was left uncommitted${when}`,
     ], quiet);
@@ -354,7 +356,7 @@ function failedWords(err: unknown, lines = 4): string {
  * feeds, and untrimmed, since a name may end in a space. A lockfile's diff is large, so is the buffer.
  */
 export const gitSays = (repo: string, ...args: string[]): string | undefined => {
-  try { return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
+  try { return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
 };
 
 /**
@@ -365,7 +367,7 @@ function mergeHeadFile(repo: string): string | undefined {
   const dotGit = path.join(repo, '.git');
   try {
     if (fs.statSync(dotGit).isDirectory()) return path.join(dotGit, 'MERGE_HEAD');
-    const named = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'))?.[1]?.trim();
+    const named = /^gitdir:\s*(.+)$/m.exec(readText(dotGit))?.[1]?.trim();
     return named ? path.join(path.resolve(repo, named), 'MERGE_HEAD') : undefined;
   } catch { return undefined; }
 }
@@ -387,7 +389,7 @@ export const mergeInProgress = (repo: string): boolean => {
  */
 export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
   const file = mergeHeadFile(repo);
-  const heads = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  const heads = file && fs.existsSync(file) ? readText(file).split('\n').map((l) => l.trim()).filter(Boolean) : [];
   const shas = new Set(Object.values(tips));
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
   const missing = Object.entries(tips)
@@ -404,7 +406,7 @@ export function mergeState(repo: string, tips: Readonly<Record<string, string>>)
  */
 export function commitMerge(repo: string, message: string): { commit: string } | { error: string } {
   try {
-    execFileSync('git', ['commit', '-F', '-'], { cwd: repo, encoding: 'utf8', input: message, stdio: ['pipe', 'pipe', 'pipe'] });
+    execCounted('git', ['commit', '-F', '-'], { cwd: repo, encoding: 'utf8', input: message, stdio: ['pipe', 'pipe', 'pipe'] });
     return { commit: git(repo, 'rev-parse', 'HEAD') };
   } catch (err) { return { error: failedWords(err) }; }
 }

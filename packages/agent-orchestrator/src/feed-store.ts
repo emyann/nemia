@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { HOME } from './store.ts';
+import { countRead, within } from './tally.ts';
 import { feedChanges, foldFeed, freshMemo, type FeedLine, type FeedMemo } from './feed.ts';
 import type { FeedWords } from './run.ts';
 
@@ -23,7 +24,7 @@ const feedMemo: FeedMemo = freshMemo();
  * test, which starts one afresh to be a restarted daemon.
  */
 export const recordFeed = (now: ReadonlyMap<string, FeedWords>, { at = new Date().toISOString(), memo = feedMemo }: { at?: string; memo?: FeedMemo } = {}): FeedLine[] =>
-  recordFeedFile(feedFile(), now, at, memo);
+  within('act', () => recordFeedFile(feedFile(), now, at, memo));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -46,7 +47,7 @@ function byteAt(file: string, at: number): number {
   const fd = fs.openSync(file, 'r');
   try {
     const one = Buffer.alloc(1);
-    fs.readSync(fd, one, 0, 1, at);
+    countRead(fs.readSync(fd, one, 0, 1, at));
     return one[0]!;
   } finally {
     fs.closeSync(fd);
@@ -92,7 +93,7 @@ function linesFrom(file: string, after: number, size: number): { lines: FeedLine
   const buf = Buffer.alloc(size - after);
   const fd = fs.openSync(file, 'r');
   try {
-    fs.readSync(fd, buf, 0, buf.length, after);
+    countRead(fs.readSync(fd, buf, 0, buf.length, after));
   } finally {
     fs.closeSync(fd);
   }

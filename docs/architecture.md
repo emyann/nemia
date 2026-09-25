@@ -41,11 +41,11 @@ Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestra
 `packages/agent-orchestrator/test/boundary.test.ts`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: check, closeout, daemon, deps, feed, inbox, plan, radius, retry, run, timeline, workflow.
+  kinds: check, closeout, daemon, deps, feed, inbox, meter, plan, radius, retry, run, timeline, workflow.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client: places,
-  workflow-store, store, worktree, branches, artifacts, authoring, daemon-store, feed-store, inbox-store. They load as a
-  tree. At the bottom are places.ts and workflow-store.ts, which import no store file. store.ts imports only those two,
-  and worktree.ts imports only store.ts and places.ts. No other store file is imported by another. Outside the store,
+  workflow-store, store, worktree, branches, artifacts, authoring, daemon-store, feed-store, inbox-store, tally. They load as a
+  tree. At the bottom are places.ts, workflow-store.ts and tally.ts (the pass's meter), which import no store file. store.ts
+  imports only those three, and worktree.ts imports only store.ts, places.ts and tally.ts. No other store file is imported by another. Outside the store,
   only the client and the controllers beneath the CLI import a store file, and one of them imports each.
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; views.ts,
   start.ts, tick.ts, verbs.ts, forget.ts and decide.ts beneath it, split by concern; and cli.ts and bin/wf.ts above it.

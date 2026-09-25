@@ -34,7 +34,7 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 /** Every card, try, record, journal and the tick's ceilings gone, so each test starts from an empty store. */
 const clear = (): void => {
   for (const dir of ['inbox', 'queue', 'runs', 'engine']) fs.rmSync(path.join(root, dir), { recursive: true, force: true });
-  fs.rmSync(path.join(root, 'tick.json'), { force: true });
+  for (const file of ['tick.json', 'tick-stats.json']) fs.rmSync(path.join(root, file), { force: true });
 };
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
@@ -321,7 +321,7 @@ test('GET /api/ceilings with no pass written and no cap is `no cap`, and reads n
   clear();
   seedRuns();
   const before = observations();
-  assert.deepEqual(await ceilings(), { last: null, cap: 0, inFlight: null, held: [] });
+  assert.deepEqual(await ceilings(), { last: null, cap: 0, inFlight: null, held: [], pass: null });
   assert.equal(observations(), before, 'no observation of the harness with no cap');
 });
 
@@ -341,6 +341,7 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
       { run: 'b-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
       { run: 'c-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
     ],
+    pass: null,
   });
   assert.deepEqual(one.held, await packageHeld(), "held as the package's runSlots holds them");
 
@@ -352,7 +353,7 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
 
   // A cap of 3: nothing held.
   tickWrote({ sessions: 4, runs: 3 });
-  assert.deepEqual(await ceilings(), { last: { sessions: 4, runs: 3 }, cap: 3, inFlight: ['a-flying'], held: [] });
+  assert.deepEqual(await ceilings(), { last: { sessions: 4, runs: 3 }, cap: 3, inFlight: ['a-flying'], held: [], pass: null });
   assert.deepEqual(await packageHeld(), []);
 
   // Two in flight, oldest first by `createdAt`, then id.
@@ -370,7 +371,7 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
 
   process.env.WF_MAX_RUNS = '1';
   tickWrote({ sessions: 2, runs: 0 });
-  assert.deepEqual(await ceilings(), { last: { sessions: 2, runs: 0 }, cap: 0, inFlight: null, held: [] });
+  assert.deepEqual(await ceilings(), { last: { sessions: 2, runs: 0 }, cap: 0, inFlight: null, held: [], pass: null });
   tickWrote({ sessions: 2, runs: 3 });
   assert.equal((await ceilings()).cap, 3, 'the last pass cap, not the shell of the api');
 
@@ -386,4 +387,27 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
   // Once a pass has written its ceilings, the api's environment is not read at all.
   tickWrote({ sessions: 2, runs: 2 });
   assert.equal((await ceilings()).cap, 2);
+});
+
+/** What a pass cost, as the tick writes it (`recordPassCost`): each phase, the harnesses observed, and the totals. */
+const PASS = {
+  at: '2026-09-25T10:00:00.000Z', ms: 212, records: 12, bytes: 812_000, spawned: 1, overheadMs: 0.4,
+  phases: Object.fromEntries(['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p, k) => [p, { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 }])),
+  harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1 } },
+};
+
+test('GET /api/ceilings serves what the last pass cost beside the ceilings, cap or none, as the tick wrote it; null for a file that does not read as one', async () => {
+  clear();
+  const stats = path.join(root, 'tick-stats.json');
+  fs.writeFileSync(stats, JSON.stringify(PASS));
+  assert.deepEqual((await ceilings()).pass, PASS, 'with no cap');
+  tickWrote({ sessions: 2, runs: 2 });
+  const capped = await ceilings();
+  assert.equal(capped.cap, 2);
+  assert.deepEqual(capped.pass, PASS, 'and with one');
+
+  fs.writeFileSync(stats, JSON.stringify(PASS).slice(0, 80));
+  assert.equal((await ceilings()).pass, null, 'half a file is no pass');
+  fs.writeFileSync(stats, JSON.stringify({ ...PASS, phases: { ...PASS.phases, git: undefined } }));
+  assert.equal((await ceilings()).pass, null, 'nor one missing a phase');
 });

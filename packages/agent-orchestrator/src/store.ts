@@ -14,6 +14,7 @@ import { spentAsks, type RetryAsk } from './retry.ts';
 import { asNamed, asRan, orderSteps, withFormerNames, type Workflow } from './workflow.ts';
 import { loadWorkflows } from './workflow-store.ts';
 import { inputsRoot } from './places.ts';
+import { countRecord, readText, within } from './tally.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -52,7 +53,7 @@ export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 /** The prune marker, read: undefined for a run never pruned, and for a marker that no longer reads as one, whose run is taken as pruned all the same. */
 function readPruned(id: string): Pruned | undefined {
   let text: string;
-  try { text = fs.readFileSync(pruneFile(id), 'utf8'); } catch { return undefined; }
+  try { text = readText(pruneFile(id)); } catch { return undefined; }
   try {
     const { at, worktrees } = JSON.parse(text) as Partial<Pruned>;
     return { at: typeof at === 'string' ? at : '', worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [] };
@@ -74,7 +75,7 @@ export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
  */
 function readHold(id: string): Hold | undefined {
   let text: string;
-  try { text = fs.readFileSync(holdFile(id), 'utf8'); } catch { return undefined; }
+  try { text = readText(holdFile(id)); } catch { return undefined; }
   try {
     const { at, until } = JSON.parse(text) as Partial<Hold>;
     return { at: typeof at === 'string' ? at : '', until: Array.isArray(until) ? until.filter((u): u is string => typeof u === 'string') : [] };
@@ -120,15 +121,19 @@ export const removeHold = (id: string, at: string): boolean => {
  * approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is ever written into
  * the record (`rewriteRun`).
  */
-export const readRun = (id: string): Run => {
+/** A run record read, counted as one (`countRecord`) under `records` while a pass is metered. */
+export const readRun = (id: string): Run => within('records', () => readRecord(id));
+
+const readRecord = (id: string): Run => {
   // A mistyped run id is the commonest way to reach this, and `ENOENT: no such file or directory,
   // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
-  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...read } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
+  countRecord();
+  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...read } = JSON.parse(readText(runFile(id))) as Run;
   // A run frozen before a step key was renamed is read under the names the keys have now (`asNamed`), and written back under both (`recordText`).
   const run = read.workflow ? { ...read, workflow: read.workflow.map(asNamed) } : read;
-  const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
+  const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);
   const { approvals } = readApprovals(id);
@@ -163,7 +168,7 @@ export const markCancelled = (id: string): string => {
     fs.writeFileSync(cancelFile(id), at, { flag: 'wx' });
     return at;
   } catch {
-    return fs.readFileSync(cancelFile(id), 'utf8').trim() || at;
+    return readText(cancelFile(id)).trim() || at;
   }
 };
 
@@ -194,6 +199,10 @@ export const acceptFile = (id: string, step: string, n: number): string => path.
 
 /** The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named as one that cannot be read as one. */
 export function readApprovals(id: string): { approvals: Approval[]; notes: string[] } {
+  return within('asks', () => readApprovalsNow(id));
+}
+
+function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] } {
   const approvals: Approval[] = [];
   const notes: string[] = [];
   let names: string[];
@@ -214,7 +223,7 @@ export function readApprovals(id: string): { approvals: Approval[]; notes: strin
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
 export function approvalIn(file: string, step: string, n: number): Approval | string {
   let held: unknown;
-  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an approval wf approve wrote';
   const { at, message } = held as Record<string, unknown>;
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
@@ -225,6 +234,10 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
 
 /** The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named as one that cannot be read as one. */
 export function readAcceptances(id: string): { acceptances: Acceptance[]; notes: string[] } {
+  return within('asks', () => readAcceptancesNow(id));
+}
+
+function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: string[] } {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
   let names: string[];
@@ -249,7 +262,7 @@ export function readAcceptances(id: string): { acceptances: Acceptance[]; notes:
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
   let held: unknown;
-  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an acceptance wf accept wrote';
   const { at, message } = held as Record<string, unknown>;
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
@@ -260,6 +273,10 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
 
 /** The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one. */
 export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
+  return within('asks', () => readAsksNow(id));
+}
+
+function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
   const asks: RetryAsk[] = [];
   const rounds: RoundAsk[] = [];
   const notes: string[] = [];
@@ -291,7 +308,7 @@ export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; no
 /** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
 export function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
   let held: unknown;
-  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an ask wf round wrote';
   const { at, budget } = held as Record<string, unknown>;
   if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
@@ -308,7 +325,7 @@ const isDollars = (v: unknown): v is number => typeof v === 'number' && Number.i
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   let held: unknown;
-  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
   const { mode, model, message, budget, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
   if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
   if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
@@ -329,6 +346,10 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
  * is left out; the tick's own read (`readAsks`) says why.
  */
 export function readAnswers(id: string): RetryAsk[] {
+  return within('asks', () => readAnswersNow(id));
+}
+
+function readAnswersNow(id: string): RetryAsk[] {
   const answers: RetryAsk[] = [];
   for (const dir of [asksDir(id), path.join(asksDir(id), 'done')]) {
     let names: string[];
@@ -369,6 +390,10 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit.
  */
 export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
+  within('act', () => consumeNow(run, asks, rounds));
+}
+
+function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
   const spent = [
     ...spentAsks(run, asks).map((a) => askFile(run.id, a.step, a.try)),
     ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
@@ -384,7 +409,7 @@ export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonl
 }
 
 /** Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass. */
-export const listRuns = (): Run[] =>
+export const listRuns = (): Run[] => within('records', () =>
   fs.existsSync(runsDir())
     ? fs.readdirSync(runsDir()).filter((f) => f.endsWith('.json')).flatMap((f) => {
       const id = path.basename(f, '.json');
@@ -395,7 +420,7 @@ export const listRuns = (): Run[] =>
         return [];
       }
     }).sort((a, b) => a.id.localeCompare(b.id))
-    : [];
+    : []);
 
 /**
  * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
@@ -421,7 +446,9 @@ export const writeRun = (run: Run) => {
  * Without the approvals, acceptances, pruning and hold `readRun` composed onto it: they are a person's files, and a copy in the record would
  * outlive the file it was read from.
  */
-export const rewriteRun = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, ...run }: Run): boolean => {
+export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
+
+const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');

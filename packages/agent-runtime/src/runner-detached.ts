@@ -180,11 +180,13 @@ const leased = (run: { state: WorkerState; heartbeatAt: string }, now: number): 
   run.state === 'working' && now - new Date(run.heartbeatAt).getTime() > STALE_MS ? 'failed' : run.state;
 
 /** A run file's state as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
-export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now: number): SessionState =>
-  WORKER_STATES[leased(run as { state: WorkerState; heartbeatAt: string }, now)] ?? 'failed';
+export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now: number): SessionState => {
+  const word = leased(run as { state: WorkerState; heartbeatAt: string }, now);
+  return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word] : 'failed';
+};
 
 type RunFile = {
-  /** The worker's own words (`bin/ae-worker.ts`), kept on disk as they are: `observedState` translates them. */
+  /** The worker's own words (`bin/ae-worker.ts`), kept on disk as they are: `detachedStateOf` translates them. */
   name?: string; state: WorkerState; pid: number; heartbeatAt: string; startedAt?: string;
   nativeId?: string; logFile: string; exitCode?: number;
   /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */

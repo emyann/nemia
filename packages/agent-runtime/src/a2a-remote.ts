@@ -244,12 +244,13 @@ const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'can
  * An entry as this code reads it: one written before sightings spoke A2A's names (2026-09-25) says how it was last seen in
  * the runtime's former words — `done`, `blocked`, `stopped` — and is read in A2A's, as the Task it was seen in said them
  * (`blocked` waiting for `authentication` was `AUTH_REQUIRED`, `WAITS`). The file keeps its words until it is next written.
+ * A word neither vocabulary has is `failed`, as the other drivers read one: no session the runtime can wait on.
  */
 const upgraded = (e: Entry): Entry => {
   const seen = e.seen as (Omit<Sighting, 'state'> & { state: string }) | undefined;
   if (!seen || isSessionState(seen.state)) return e;
-  const state = seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : formerStateOf(seen.state);
-  return state ? { ...e, seen: { ...seen, state } } : e;
+  const state = seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : formerStateOf(seen.state) ?? 'failed';
+  return { ...e, seen: { ...seen, state } };
 };
 
 /**

@@ -717,7 +717,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 }
 
 // ─── the vocabulary, all plain data ─────────────────────────────────────────
-export type { PromiseRunner } from './runner-promise.ts';
+export type { PromiseRunner, PromiseSighting } from './runner-promise.ts';
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 // The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.

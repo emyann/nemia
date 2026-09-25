@@ -36,9 +36,11 @@ const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' }, summ
 /**
  * What the fake `codex` is told, per session, in `fake.json` in its working directory: wait for `gate` (a file in the same
  * directory) before it prints its thread; write prose rather than JSON to `-o`; start a `sleep` of its own and write its pid;
- * stay up `sleepMs` after its last line, or until the file `exitOn` exists. It writes each argv it is run with to `argv.jsonl` and its own pid to `pid`.
+ * stay up `sleepMs` after its last line, or until the file `exitOn` exists; or write `-o` first and print its thread only once the
+ * file `threadOn` exists, which is what the worker reads when it has not yet read the thread line off the pipe. It writes each argv
+ * it is run with to `argv.jsonl`, its own pid to `pid`, and `wrote-out` once `-o` is written.
  */
-type Fake = { gate?: string; prose?: boolean; grandchild?: boolean; sleepMs?: number; exitOn?: string };
+type Fake = { gate?: string; prose?: boolean; grandchild?: boolean; sleepMs?: number; exitOn?: string; threadOn?: string };
 
 const FAKE = `
 const fs = require('node:fs');
@@ -54,10 +56,19 @@ const r = args.indexOf('resume');
 const thread = r === -1 ? '${THREAD}' : args[r + 1];
 const out = args.indexOf('-o');
 if (o.grandchild) fs.writeFileSync('grandchild', String(spawn('sleep', ['60'], { stdio: 'ignore' }).pid));
+const statement = () => {
+  if (out !== -1) fs.writeFileSync(args[out + 1], o.prose ? 'turn ' + calls + ', in prose' : JSON.stringify({ outcome: 'done', summary: 'turn ' + calls }));
+  fs.writeFileSync('wrote-out', '');
+};
 const go = () => {
+  if (o.threadOn && !fs.existsSync(o.threadOn)) { statement(); const late = () => (fs.existsSync(o.threadOn) ? rest() : setTimeout(late, 20)); return late(); }
   said({ type: 'thread.started', thread_id: thread });
   said({ type: 'turn.started' });
-  if (out !== -1) fs.writeFileSync(args[out + 1], o.prose ? 'turn ' + calls + ', in prose' : JSON.stringify({ outcome: 'done', summary: 'turn ' + calls }));
+  statement();
+  finish();
+};
+const rest = () => { said({ type: 'thread.started', thread_id: thread }); said({ type: 'turn.started' }); finish(); };
+const finish = () => {
   said({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 2 } });
   const exit = () => (o.exitOn && !fs.existsSync(o.exitOn) ? setTimeout(exit, 20) : process.exit(0));
   setTimeout(exit, o.sleepMs ?? 0);
@@ -249,6 +260,32 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   await engine.close(id);
   await until(() => phase('succeeded'), 'closed and settled');
   assert.equal((await get(client, nameFor(id, 2))).status!.state, TaskState.TASK_STATE_COMPLETED, 'closed, nothing waits');
+});
+
+test('a held Codex attempt whose statement is on disk before its thread is read is not ended on the statement: it ends once its session is known, and the answer resumes that thread', async () => {
+  // Under load the worker reads the thread line off Codex's stdout after Codex has written `-o`: the run file then carries a
+  // statement and no thread. Ended on the statement, the attempt was recorded with no session, and `answer` refused a task
+  // that waited on it — once in a loaded suite, on 2026-09-25. The fake writes `-o` first and holds its thread line on a file.
+  const root = tmp('store');
+  const cwd = workdir({ threadOn: 'thread-go', exitOn: 'exit1' });
+  const engine = createEngine({ root, harnesses: { codex } });
+  const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
+  const phase = async (want: string) => { await engine.tick(); return (await engine.view(id)).phase === want; };
+
+  await until(async () => { await engine.tick(); return fs.existsSync(path.join(cwd, 'wrote-out')); }, 'the statement written');
+  for (let i = 0; i < 5; i++) await engine.tick();
+  assert.notEqual((await engine.view(id)).phase, 'input-required', 'a statement with no session known does not end the attempt');
+
+  fs.writeFileSync(path.join(cwd, 'thread-go'), '');
+  await until(() => phase('input-required'), 'the attempt ended once its thread was read');
+  fs.writeFileSync(path.join(cwd, 'exit1'), '');
+  fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({} satisfies Fake));
+  await engine.answer(id, 'the words');
+  await until(async () => { await engine.tick(); return argvOf(cwd).length === 2; }, 'the fake codex run again');
+  assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
+  await until(() => phase('input-required'), 'turn 1 signed and waiting');
+  await engine.close(id);
+  await until(() => phase('succeeded'), 'closed and settled');
 });
 
 test("what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it", async () => {

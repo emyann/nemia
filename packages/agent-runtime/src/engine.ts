@@ -260,6 +260,11 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   // Still computing: a statement it may yet revise. Measured once, with the file — a step declared
   // itself done, kept going, found it could not commit, and rewrote the verdict to blocked.
   if (seen.busy) return observed;
+  // Its session not yet known: the end recorded now would carry none, and nothing records one on an ended attempt, so an answer,
+  // or a later turn that continues the session, would have no conversation to go on. Codex writes `-o` and prints its thread on
+  // a pipe the worker reads when it is next scheduled — under load, after. The session is known a pass later, or the harness's
+  // own end brings what it printed.
+  if (!seen.nativeId) return observed;
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 

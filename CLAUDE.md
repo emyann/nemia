@@ -278,6 +278,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   concerned (freeze the worker with `SIGSTOP` after its first rename, delay its `fs.write`, pause the watch's child after its
   banner), and the test for the worker keeps its hook. Wait on a frozen process with `ps -o stat=` before continuing it: a
   `SIGCONT` sent before its own `SIGSTOP` leaves it stopped for good (learned by the run that found them).
+- **A statement on disk is not an end the engine may record before it knows the session.** Codex writes `-o` and prints its
+  thread on a pipe the detached worker reads when it is next scheduled, so under load the run file carried a statement and no
+  `nativeId`; `closedOut` ended the held attempt on the statement, an ended attempt never takes a session later, and `answer`
+  refused the task as having no conversation (`codex-agent.test.ts`, once in a loaded `turbo --force` on 2026-09-25). `closedOut`
+  now waits for the session, and the fake's `threadOn` writes `-o` before its thread line, which makes the race happen every
+  time (learned by thin runtime stage 4a part 2, round 5).
 - **A rule about order or names is not proven by a fixture that already has it.** The equal-times admission test read
   a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping

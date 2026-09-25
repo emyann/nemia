@@ -29,7 +29,7 @@ const memoryJournal = (): PromiseJournal => {
 const fakeHarness = (sessions: Map<string, Sighting>): PromiseRunner => ({
   async spawn(r) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
   async observe() { return new Map(sessions); },
-  async stop(id) { for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'stopped' }); },
+  async stop(id) { for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' }); },
   async logs() { return 'fake logs'; },
 });
 
@@ -49,7 +49,7 @@ test('a consumer can run the whole lifecycle in plain async/await', async () => 
   assert.equal(sessions.size, 1);
 
   // The harness finishes the work; the engine finds out by asking.
-  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done' });
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
   await engine.tick();
   assert.equal((await engine.view(id)).phase, 'succeeded');
 });
@@ -60,7 +60,7 @@ test('the feed is enough to build a workflow on, with no Effect anywhere', async
 
   const first = await engine.file({ brief: 'implement', cwd: '/repo' });
   await engine.tick();
-  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done' });
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
   await engine.tick();
 
   // "When something succeeds, file the review." The whole upper-layer pattern, in six lines.
@@ -89,7 +89,7 @@ test('the start, the stop and the list all work through the facade — and every
 
   await engine.stop('task-0');
   await engine.tick();
-  assert.equal(sessions.get(nameFor('task-0', 1))!.state, 'stopped');
+  assert.equal(sessions.get(nameFor('task-0', 1))!.state, 'canceled');
 });
 
 test('the file-backed default needs no configuration at all', async () => {
@@ -223,7 +223,7 @@ test('watch delivers every event, in order, once', async () => {
 
   const id = await engine.file({ brief: 'b', cwd: '/r' });
   await engine.tick();
-  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done' });
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
   await engine.tick();
   await new Promise((r) => setTimeout(r, 200));
   w.stop();
@@ -685,7 +685,7 @@ test('a usage whose key has no value is not something new to write down — meas
   await engine.tick();
   const measured = async () => (await engine.feed(0)).entries.filter((e) => e.taskId === id && e.event.kind === 'measured').map((e) => e.event);
 
-  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done', usage: { turns: 3, costUsd: undefined } });
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { turns: 3, costUsd: undefined } });
   for (let i = 0; i < 4; i++) await engine.tick();
   assert.equal((await engine.view(id)).state.settled, 'succeeded');
   assert.deepEqual(await measured(), [], 'the end already says turns, and nothing says a cost: nothing to write, on any pass');

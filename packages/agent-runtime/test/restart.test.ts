@@ -26,7 +26,7 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, unknown]> = [];
   let n = 0;
-  const fake: PromiseRunner = {
+  const fake = {
     async spawn(r: SpawnRequest) {
       asked.push(['spawn', r.name]);
       const id = `s-${++n}`;
@@ -37,10 +37,10 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
     async observe() { asked.push(['observe', undefined]); return new Map(sessions); },
     async stop(sessionId) {
       asked.push(['stop', sessionId]);
-      for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs() { return ''; },
-  };
+  } satisfies PromiseRunner;
   /** A runtime's process, started on what outlives it. */
   const runtime = () => createEngine({ journal, harnesses: { fake } });
   /** The fake's agent as a new process builds it: a client over a handler with nothing in its memory. */
@@ -48,7 +48,7 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
     spawn: (r) => Effect.promise(() => fake.spawn(r)),
     observe: Effect.promise(() => fake.observe()),
     stop: (id) => Effect.promise(() => fake.stop(id)),
-    logs: (id) => Effect.promise(() => fake.logs(id)),
+    logs: () => Effect.promise(() => fake.logs()),
   };
   const client = () => clientOf('fake', ops, (taskId) => journal.read(taskId));
   return { runtime, client, sessions, asked, journal };
@@ -80,7 +80,7 @@ test('a restarted runtime answers for a session it never started, then stops it 
   await b.tick();
   // The pass observes; then the agent asked to cancel observes to find the session, and stops it: the seam's path.
   assert.deepEqual(w.asked, [['observe', undefined], ['observe', undefined], ['stop', 's-1']]);
-  assert.equal(w.sessions.get('ae/t-r/1')!.state, 'stopped');
+  assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
   await b.tick();
   assert.equal((await b.view(id)).phase, 'stopped');
 
@@ -108,7 +108,7 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
   assert.deepEqual(w.asked.filter(([verb]) => verb === 'spawn'), [['spawn', 'ae/t-r/1']], 'adopted, not spawned again');
   assert.equal((await b.view(id)).phase, 'running (working)');
 
-  w.sessions.set('ae/t-r/1', { ...w.sessions.get('ae/t-r/1')!, state: 'done', busy: false });
+  w.sessions.set('ae/t-r/1', { ...w.sessions.get('ae/t-r/1')!, state: 'completed', busy: false });
   await b.tick();
   assert.equal((await b.view(id)).phase, 'succeeded');
 });

@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { Observed, Sighting, Usage } from './domain.ts';
+import type { SessionState, Sighting, Usage } from './domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './runner-claude-transcript.ts';
 import { claudeFlagsOf, worktreeName } from './runner-claude-vocabulary.ts';
@@ -210,7 +210,39 @@ export const QUIESCENT_AFTER_MS = 90_000;
  */
 const MTIME_SLOP_MS = 1_000;
 
-const FINAL: ReadonlySet<Observed> = new Set(['done', 'failed', 'stopped']);
+const FINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled']);
+
+/**
+ * A `waitingFor` that names signing in, in Claude Code's words: `auth`, `authenticate` and its forms, `log in`, `login`,
+ * `sign in`, `sign-in` — whole words only, so `author`, `authority` and `oauth-proxy` are not it. `authorize` and
+ * `authorization` are left out on purpose: a tool call authorised is a permission, which a person gives with words
+ * (`input-required`), not an identity. Written from words, not from a measured wait: Claude Code has not been seen
+ * waiting to authenticate, and one worded otherwise reads `input-required` — a wait on a person all the same.
+ */
+export const AUTH_WAIT = /\b(?:auth|authenticat(?:e|es|ed|ing|ion)|log[ -]?in|sign[ -]?in)\b/i;
+
+/**
+ * A `claude agents --json` row's `state`, in A2A's names — translated here, once, as the registry is parsed:
+ *
+ *   working  → working         at work; `status` says whether it computes (`busy`)
+ *   blocked  → auth-required   when what it waits for names signing in (`AUTH_WAIT`), since that is A2A's word for it
+ *            → input-required  otherwise: a permission prompt, a question — a person's words
+ *   done     → completed       ended on its own
+ *   failed   → failed
+ *   stopped  → canceled        stopped under it (`claude stop`, or a person at its side)
+ *
+ * Any other word is `failed`: a state this runner has no reading of is no session it can wait on, and a pass then ends the
+ * attempt as the harness's failure, which is what it did before — but writes the journal's word, never the harness's raw one.
+ */
+export const claudeStateOf = (word: string, waitingFor?: string): SessionState => {
+  switch (word) {
+    case 'working': return 'working';
+    case 'blocked': return waitingFor !== undefined && AUTH_WAIT.test(waitingFor) ? 'auth-required' : 'input-required';
+    case 'done': return 'completed';
+    case 'stopped': return 'canceled';
+    default: return 'failed';
+  }
+};
 
 /**
  * A session's closing statement as this runner reads it: what it said, when it said it, and whether its conversation
@@ -343,7 +375,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * is still running on Claude Code, and `release` must stop that one. Rebuilt by every `observe`, which a
    * pass always makes before it releases anything.
    */
-  const listed = new Map<string, Observed>();
+  const listed = new Map<string, SessionState>();
   /**
    * The process `claude agents` last listed for each of our sessions, by session id: how `say` finds the
    * session's registration, and so its inbox. Rebuilt by every `observe`, which `say` is always handed a
@@ -436,7 +468,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
           // row with no `state` is an interactive session — never one of ours — and reading its
           // `status` as a state is how `idle` once became a recorded failure.
-          const state = row.state as Observed | undefined;
+          // In A2A's names from here on (`claudeStateOf`); read after `waitingFor`, which tells two waits apart.
+          const said = typeof row.state === 'string' && row.state ? row.state : undefined;
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
           // What the harness says the session waits for, as it says it: carried onto the sighting and judged by nothing
@@ -444,7 +477,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // or says it in some shape we have no reading of, leaves it unset rather than putting `undefined` in front of
           // a person.
           const waitingFor = typeof row.waitingFor === 'string' && row.waitingFor.trim() ? row.waitingFor.trim() : undefined;
-          if (row.name?.startsWith('ae/') && row.sessionId && state) {
+          if (row.name?.startsWith('ae/') && row.sessionId && said) {
+            const state = claudeStateOf(said, waitingFor);
             listed.set(row.sessionId, state);
             if (Number.isInteger(row.pid) && (row.pid as number) > 0) pids.set(row.sessionId, row.pid as number);
             if (typeof row.startedAt === 'number') starts.set(row.sessionId, row.startedAt);
@@ -574,7 +608,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // this runner has not listed — no `observe` made here — has only its sighting to go by. A process listed
       // for it runs whatever its state says: a session `done` keeps its process until it is stopped (2.1.272).
       const running = listed.get(session.sessionId) ?? session.state;
-      const alive = running === 'working' || running === 'blocked' || pids.has(session.sessionId);
+      const alive = running === 'working' || running === 'input-required' || running === 'auth-required' || pids.has(session.sessionId);
       if (alive) {
         // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
         yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
@@ -649,7 +683,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
       }),
       observe: Effect.sync(() => new Map(sessions)),
       stop: (id) => Effect.sync(() => {
-        for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped' });
+        for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled' });
       }),
     logs: () => Effect.succeed('(fake runner: no logs)'),
   };

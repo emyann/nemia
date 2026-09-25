@@ -13,12 +13,12 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { splitFrontmatter, type Agent, type Workflow } from '../src/workflow.ts';
 import { loadAgents, loadWorkflows, preloads, skillsFor } from '../src/workflow-store.ts';
-import { pluginOf } from '../src/rendering.ts';
+import { briefBody, pluginOf, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-shipped-skills-');
 process.env.WF_ROOT = ROOT;
-const { agentFilesDir, writeAgentFiles } = await import('../src/store.ts');
+const { agentFilesDir, skillsAgain, writeAgentFiles } = await import('../src/store.ts');
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 /** The two places skills are shipped: the repository's workflows, and the package's own copy of ui's three agents' (ui-workflow.test.ts). */
@@ -163,4 +163,19 @@ test("a shipped agent renders as `wf start` renders it: skills to load named in 
       assert.equal(prompt.includes(whole), PRELOADED.includes(skill), `${folder}/${name}: ${skill} ${PRELOADED.includes(skill) ? 'is' : 'is not'} told whole\n\n${prompt}`);
     }
   }
+});
+
+test("a shipped step whose rendered folder is gone is told every skill whole in its brief — the shipper's merge without committing included", () => {
+  const dir = path.join(REPO, 'workflows', 'dev');
+  for (const step of loadWorkflows(dir).filter((s) => s.agent?.skills?.length)) {
+    const brief = briefBody(unrendered(step, skillsAgain(step, skillsFor(dir))));
+    assert.ok(brief.startsWith(step.agent!.instructions!.trimEnd()), `${step.name}: the instructions first`);
+    for (const skill of step.agent!.skills!) {
+      const file = path.join(REPO, 'workflows', 'skills', skill, 'SKILL.md');
+      assert.ok(brief.includes(`## Skill \`${skill}\`\n\n${splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body}`), `${step.name}: ${skill} told whole\n\n${brief}`);
+    }
+  }
+  const ship = loadWorkflows(dir).find((s) => s.name === 'ship')!;
+  assert.match(briefBody(unrendered(ship, skillsAgain(ship, skillsFor(dir)))), /--no-commit/);
+  assert.doesNotMatch(briefBody(unrendered(ship)), /--no-commit/, 'the fallback before: the promise of skills, and none of them');
 });

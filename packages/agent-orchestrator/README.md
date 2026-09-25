@@ -393,7 +393,9 @@ on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
 
 A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
-file that is not there.
+file that is not there. With no plugin there is nothing to load, so the brief tells each of the agent's skills whole after the
+instructions, read again from where a start of the run's folder finds them — an edit made since `wf start` reaches it, and a folder run,
+which keeps no repository, finds none in the one it was started in — or says which it could not tell and why (`unrendered`, `skillsAgain`).
 
 The shipped agents give skills (since 2026-09-25): each entry of an agent's card is a skill in the repository's `workflows/skills/`,
 the procedure the entry describes, and the agent's body keeps its role and its limits and says when to load each

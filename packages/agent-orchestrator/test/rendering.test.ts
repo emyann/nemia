@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
 import { agentsFor, agentVersion, formerKeyLines, loadWorkflows, lookupRoots, skillsFor } from '../src/workflow-store.ts';
@@ -330,7 +331,7 @@ test('a codex step is filed as before: its instructions in its brief, and no Cla
   assert.match(code.brief, /^You write code\.\n\nCode it\./);
 });
 
-test('a rendered step whose folder is gone is filed as before 2026-09-25: the instructions in its brief, and no flag naming a file that is not there', async () => {
+test('a rendered step whose folder is gone is filed as before 2026-09-25 — the instructions in its brief, no flag naming a file that is not there — and told its skills whole', async () => {
   const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
   const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir });
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
@@ -339,6 +340,28 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25: the in
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined);
   assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
+  // With no plugin there is nothing to load, so each skill is told whole, read again where a start of the run's folder finds it: the store's.
+  // A folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for.
+  assert.match(write.brief, /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./);
+  assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills\. Sign off blocked if you need it\.\n\n## What was asked for/);
+});
+
+test("a git run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q', '-b', 'main');
+  fs.mkdirSync(path.join(repo, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), SKILL('mind-the-tone', 'preload: true\n').replace('How to', 'In this repository, how to'));
+  git('add', '-A');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'skills');
+  const dir = storeTeam('lost-git', { write: '---\nagent: scribe\n---\nWrite about tides.\n' });
+  const run = start({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false });
+  fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+  const { e, filed } = board();
+  await advance(e, readRun(run.id));
+  const write = filed.get(`${run.id}-write`)!;
+  assert.equal(write.config?.claude, undefined);
+  assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
 });
 
 test('REFUSED at shipped defaults: wf start of a team whose agent gives a skill no place has, and nothing written', () => {

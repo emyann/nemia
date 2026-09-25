@@ -41,15 +41,29 @@ export const rendersAgent = (step: Workflow): boolean => {
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
 export const briefBody = (step: Workflow): string => (rendersAgent(step) ? step.agent!.body : step.body);
 
+/** A skill as a step whose rendered folder is gone is told it: its SKILL.md's body, read again where the load finds it, or why it cannot be. */
+export type SkillAgain = { name: string; text: string } | { name: string; missing: string };
+
 /**
  * A step as it is told when its rendered folder is not there — removed by hand, or never written — with its agent's instructions in its
  * brief and no flags, as a step from before 2026-09-25 is: filing it with a flag naming a file that is not there would end the session at
- * its start, and a brief without the instructions would tell it nothing of them.
+ * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
+ * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare name,
+ * as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `wf start` reaches it).
  */
-export const unrendered = (step: Workflow): Workflow => {
+export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
   const { instructions: _i, skills: _s, systemPrompt: _p, ...agent } = step.agent;
-  return { ...step, agent };
+  if (!skills.length) return { ...step, agent };
+  return {
+    ...step,
+    body: [
+      step.body.trimEnd(),
+      'No skill is loaded with the Skill tool for this step — the folder the run rendered its agent into is gone — so each is told whole here.',
+      ...skills.map((s) => `## Skill \`${s.name}\`\n\n${'text' in s ? s.text.trim() : `Not told: ${s.missing} Sign off blocked if you need it.`}`),
+    ].join('\n\n'),
+    agent,
+  };
 };
 
 /** A skill as the prompt tells it: by name, or whole — its SKILL.md's body — when it asks to be (`preload: true`). */

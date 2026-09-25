@@ -659,7 +659,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   is read off the world, never off `config.background`: a task filed on `claude` before jobs were its default runs `--bg` without the flag.
   `agent-orchestrator/test/agents-calls.test.ts` counts the calls on a fake `claude` — none with jobs alone, one with a background session,
   one on a fresh engine's first pass — and a test that asserted a count of `claude agents` calls (`pool.test.ts`'s once a pass) was
-  asserting the waste (learned by the run that took the pass's two `claude agents` calls down to what it needs).
+  asserting the waste (learned by the run that took the pass's two `claude agents` calls down to what it needs). What a pass is told to
+  look for is also what it can release: a settled task the memo keeps was on no list, so a `claude rm` refused twice was never asked
+  again, and the fixture's `testOps`, which has no `observeFor`, lists everything and hid it. A kept task whose harness still listed a
+  finished session stays expected (`TickMemoState.listed`) until a pass sees it gone; a runner in a test of what a pass looks for lists
+  only what it is told (found in review, round 1).
 - **XState's `transition` answers an event with no edge by staying where it was, as a self-edge does.** It returns the same snapshot
   and no action, and throws nothing (5.33.2), so a missing edge read off its answer looks like a task at rest. `moveOn` in
   `agent-runtime/src/lifecycle.ts` asks `snapshot.can(event)` first and refuses on false, and a refusal stalls a task out loud

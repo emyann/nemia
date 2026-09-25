@@ -491,17 +491,20 @@ export const settleTask = Effect.fn('settleTask')(function* (
  * sighting's. Written once: a session left listed is seen on every pass, and the second read says nothing new.
  *
  * It reads a task's settling, its config and each attempt's end, session and usage, and no more (`Releasable`): a settled
- * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`.
+ * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`, and whether the
+ * harness listed a finished session of the task — the memo keeps looking for one it did (`TickMemoState.listed`).
  */
 const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasable, observed: ReadonlyMap<string, Sighting>) {
   const runner = yield* Runner;
   const journal = yield* Journal;
   let wrote = false;
-  if (!runner.release) return wrote;
+  let listed = false;
+  if (!runner.release) return { wrote, listed };
   for (const attempt of state.attempts) {
     const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
     const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
     if (!session) continue;
+    listed = true;
     // The task's harness arguments, unopened: the runner reads there whether it cut a worktree it must keep.
     const released = yield* runner.release(session, state.config ?? {}).pipe(
       Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
@@ -514,7 +517,7 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasabl
       wrote = true;
     }
   }
-  return wrote;
+  return { wrote, listed };
 });
 
 /** A tick that was handed an argument, and why. Nothing was read or written. */
@@ -542,13 +545,16 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
 };
 
 /**
- * The sessions a pass expects its harnesses to list: every attempt of every task it folds, on the harness the task was filed on.
- * A pass folds every task not settled, so every session that can still move is on it; a settled task the memo keeps is not, and
- * one it folds is — on an engine's first pass, every one — so a session whose release a crash cut short is let go after a
- * restart, as `releaseFinished` promises. Off the journal on every pass, never remembered: a session started before a restart
- * is expected on the first pass after it.
+ * The sessions a pass expects its harnesses to list: every attempt of every task it folds, on the harness the task was filed on,
+ * and of every settled task the memo keeps whose harness listed a finished session of it on the last pass that looked.
+ * A pass folds every task not settled, so every session that can still move is on it; a settled task it folds is — on an
+ * engine's first pass, every one — so a session whose release a crash cut short is let go after a restart. A kept task stays on
+ * it while its harness lists it, so a release the harness refused is asked again on every pass, as `releaseFinished` promises,
+ * and drops off on the first pass that sees it gone: an absence read as every absence is, off the pass's one observation.
+ * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
+ * first pass after it.
  */
-const expectedOf = (states: Iterable<State>): ExpectedSession[] => {
+const expectedOf = (states: Iterable<Pick<State, 'taskId' | 'harness'> & { attempts: ReadonlyArray<{ n: number }> }>): ExpectedSession[] => {
   const expected: ExpectedSession[] = [];
   for (const state of states) for (const a of state.attempts) expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness });
   return expected;
@@ -557,7 +563,10 @@ const expectedOf = (states: Iterable<State>): ExpectedSession[] => {
 /** Read the feed on from the memo's cursor, and forget every task it names: each is folded again on this pass. */
 const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
   const { entries, cursor } = yield* (yield* Journal).feed(memo.cursor ?? 0);
-  for (const e of entries) memo.settled.delete(e.taskId);
+  for (const e of entries) {
+    memo.settled.delete(e.taskId);
+    memo.listed.delete(e.taskId);
+  }
   memo.cursor = cursor;
 });
 
@@ -609,7 +618,8 @@ export const tick = Effect.fn('tick')(function* () {
   // Every task the memo does not keep, folded before the harnesses are looked at, so the look can be told what to look for.
   const folded = new Map<string, State>();
   for (const id of ids) if (!memo?.settled.has(id)) folded.set(id, fold(id, yield* journal.read(id)));
-  const observed = yield* (runner.observeFor ? runner.observeFor(expectedOf(folded.values())) : runner.observe);
+  const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
+  const observed = yield* (runner.observeFor ? runner.observeFor(expectedOf(lookedFor)) : runner.observe);
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -619,7 +629,9 @@ export const tick = Effect.fn('tick')(function* () {
     const kept = memo?.settled.get(id);
     if (kept) {
       if (memo!.verify) yield* verifyKept(kept, observed);
-      yield* releaseFinished(kept, observed);
+      const { listed } = yield* releaseFinished(kept, observed);
+      if (listed) memo!.listed.add(id);
+      else memo!.listed.delete(id);
       continue;
     }
     const before = folded.get(id)!;
@@ -630,8 +642,13 @@ export const tick = Effect.fn('tick')(function* () {
     // only when the pass wrote to it.
     const stepped = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
     // And again when the release wrote down what an attempt consumed, so the view the pass reports is what `view` reads after it.
-    const after = (yield* releaseFinished(stepped, observed)) ? fold(id, yield* journal.read(id)) : stepped;
-    if (memo && settledQuiet(after)) memo.settled.set(id, releasableOf(after));
+    const released = yield* releaseFinished(stepped, observed);
+    const after = released.wrote ? fold(id, yield* journal.read(id)) : stepped;
+    if (memo && settledQuiet(after)) {
+      memo.settled.set(id, releasableOf(after));
+      if (released.listed) memo.listed.add(id);
+      else memo.listed.delete(id);
+    }
     // The board as this pass left it, off its one observation and the fold it already made: what the layer above
     // admits by (stage 4c), with no second look at any harness.
     if (after.settled) continue;
@@ -642,6 +659,7 @@ export const tick = Effect.fn('tick')(function* () {
   if (memo) {
     const listed = new Set(ids);
     for (const id of memo.settled.keys()) if (!listed.has(id)) memo.settled.delete(id);
+    for (const id of memo.listed) if (!memo.settled.has(id)) memo.listed.delete(id);
   }
 
   return {

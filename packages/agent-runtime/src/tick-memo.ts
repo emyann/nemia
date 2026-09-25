@@ -17,8 +17,11 @@ import { isDeepStrictEqual } from 'node:util';
 import { settledQuiet, type Attempt, type State } from './domain.ts';
 import type { Cursor } from './journal.ts';
 
-/** What of a settled task a pass still reads: what `releaseFinished` reads, and nothing else — a brief is not kept. */
-export type Releasable = Pick<State, 'taskId' | 'settled' | 'config'> & {
+/**
+ * What of a settled task a pass still reads: what `releaseFinished` reads, and the harness its sessions are looked for on
+ * (`expectedOf`), and nothing else — a brief is not kept.
+ */
+export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness'> & {
   attempts: Array<Pick<Attempt, 'n' | 'ended' | 'nativeId' | 'usage'>>;
 };
 
@@ -26,22 +29,25 @@ export const releasableOf = (state: State): Releasable => ({
   taskId: state.taskId,
   settled: state.settled,
   config: state.config,
+  harness: state.harness,
   attempts: state.attempts.map(({ n, ended, nativeId, usage }) => ({ n, ended, nativeId, usage })),
 });
 
 /**
  * One engine's memo. `cursor` is where the last pass read the feed to, unset until the first pass; `settled` is each
- * settled task folded since, by id. `verify` is the proof's switch: each skipped task is folded again all the same, and a
- * difference fails the pass (`TickMemoDiverged`) — on in the engine's tick tests, off in an engine.
+ * settled task folded since, by id. `listed` is those of them whose harness still listed a finished session on the last
+ * pass that looked: a pass tells its runner to look for them again (`expectedOf`), so a release the harness refused is asked
+ * again, and one that went through is seen gone and dropped. `verify` is the proof's switch: each skipped task is folded again
+ * all the same, and a difference fails the pass (`TickMemoDiverged`) — on in the engine's tick tests, off in an engine.
  */
-export type TickMemoState = { cursor: Cursor | undefined; settled: Map<string, Releasable>; readonly verify: boolean };
+export type TickMemoState = { cursor: Cursor | undefined; settled: Map<string, Releasable>; listed: Set<string>; readonly verify: boolean };
 
 /** The memo a pass skips by, when it has one. None by default: a pass without one folds every task. */
 export const TickMemo = Context.Reference<TickMemoState | undefined>('engine/TickMemo', { defaultValue: () => undefined });
 
 /** One memo, made once here: an engine builds this layer once, so every pass it runs shares the one memo. */
 export const tickMemoLayer = (options: { verify?: boolean } = {}) =>
-  Layer.succeed(TickMemo)({ cursor: undefined, settled: new Map(), verify: options.verify === true });
+  Layer.succeed(TickMemo)({ cursor: undefined, settled: new Map(), listed: new Set(), verify: options.verify === true });
 
 /** Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip. */
 export const divergence = (kept: Releasable, fresh: State, decided: { do: string }): string | undefined =>

@@ -1342,12 +1342,14 @@ registration, `~/.claude/sessions/<pid>.json`, which a running session writes fo
 | `say(id)` | its state, and its process | `observe`, then the registration by the pid listed |
 
 A harness may also answer `observeFor(expected)`: `observe`, told the sessions the journal expects it to list — every attempt of every
-task the pass folds, by name, with the harness its task was filed on — and answering at least those. A pass that folds no task a harness
+task the pass folds, by name, with the harness its task was filed on, and of every settled task its memo keeps whose harness listed a
+finished session of it on the last pass that looked — and answering at least those. A release the harness refuses is so asked again on
+every pass while the session is listed, and a session seen gone is looked for no more. A pass that folds no task a harness
 has is no reason for that harness to read its registry, and Claude Code's runs its steps as jobs, each known by a run file of ours: its
 `observeFor` lists the jobs, and asks `claude agents` only when a name expected is no job's — a background session, one filed as `--bg`
 before jobs were the default, or a job whose run file is gone. So a pass with only jobs in flight spawns no `claude agents`, and one with
-background sessions spawns one (measured at 0.2-0.4 s a call, 2026-09-25). Nothing is remembered: `expected` is read off the journal on
-every pass, so a session started before a restart is expected on the first pass after it. The composite tells each harness the names
+background sessions spawns one (measured at 0.2-0.4 s a call, 2026-09-25). Nothing is remembered of what a pass did: `expected` is read
+off the journal and the last observation, so a session started before a restart is expected on the first pass after it. The composite tells each harness the names
 routed to it, as a spawn is routed, and observes a harness without the verb in full.
 
 What a blocked session waits for is the harness's own word, carried and never judged: Claude Code prints

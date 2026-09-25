@@ -31,9 +31,10 @@ implement's own session is continued with the findings, then a new review. After
 person decides.
 
 `ship` is `dev-build`'s, file for file: gated (`gate: true`), so nothing of it is filed until a person approves it
-with `wf approve <run> ship`, it runs in the repository's own checkout (`workspace: main`), where the shipper trial
-merges the run's branch, runs implement's check whole with no `WF_BASE_REF` — the build and the e2e, on the merged
-tree — and commits the merge, or aborts it and says why.
+with `wf approve <run> ship`, it runs in the repository's own checkout (`workspace: main`), where the shipper stages
+the merge of the run's branch and signs off its message, and the run executes ship's `check:`, implement's line,
+with no `WF_BASE_REF` — the build and the e2e, on the merged tree — and commits the merge on exit 0, or aborts it
+on anything else, a check that did not finish included.
 
 Looking is a skill rather than a step, so any step may do it: a step of its own could only look at
 pictures another step took, and could not send the change round again.

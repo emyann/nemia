@@ -193,6 +193,25 @@ export const checkContract = (command: string): string => [
   'until it does. Do not weaken it to pass it: the command comes from the run, not from this checkout.',
 ].join('\n');
 
+/**
+ * The check, told to an ending that lands on it (`landsOnCheck` in run.ts) in place of `checkContract`: the step stages the merge, and the
+ * run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the run executes
+ * the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and aborts it
+ * otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it
+ * cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself.
+ */
+export const landingContract = (command: string): string => [
+  '', '## The run checks and lands your merge', '',
+  `Once you sign off, the run executes ${codeSpan(command)} in this checkout, on the merge you left staged, as it executes any step's check.`,
+  "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
+  'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
+  '',
+  'So stage the merge and sign off: merge every result branch in one `git merge --no-ff --no-commit`, leave it staged, and do not run',
+  'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
+  '`git commit` and `git merge --continue` are denied you for that reason; a merge without `--no-commit` would commit it all the same.',
+  "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
+].join('\n');
+
 /** What a check that did not pass said: the command, its verdict, and the last lines of each stream. */
 export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; stderr: string };
 

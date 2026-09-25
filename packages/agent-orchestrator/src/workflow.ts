@@ -506,7 +506,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     name,
     after,
     resume: meta.resume,
-    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume),
+    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
     slot: slotOf(name, meta.slot),
     body,
     harness,
@@ -1089,10 +1089,13 @@ export const WORKSPACES: readonly string[] = ['main', 'folder'];
 /**
  * `workspace:` as written: `main`, `folder`, or refused. A step without the line works where the shape of the workflow puts it
  * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
- * a directory the run would have to invent. `main` is refused too on a step with a `check:`, whose command the run executes in the step's
- * workspace. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
+ * a directory the run would have to invent. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
+ * stages, and commits that merge onto the base branch on its word; and not on codex, which cannot be denied the commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
  */
-function workspaceOf(step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined): 'main' | 'folder' | undefined {
+function workspaceOf(
+  step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined, gate: string | undefined, retries: string | undefined,
+  harness: string | undefined,
+): 'main' | 'folder' | undefined {
   if (workspace === undefined) return undefined;
   if (workspace === 'folder') return 'folder';
   if (workspace === 'worktree') {
@@ -1101,8 +1104,18 @@ function workspaceOf(step: string, workspace: string | undefined, check: string 
   if (workspace !== 'main') {
     refuse(`${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`);
   }
-  if (check !== undefined) {
-    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found. Delete one of the two lines.`);
+  // A check beside it is run by the run on the merge the step leaves staged, and it lands or aborts that merge (`landingDue`): only on a step a
+  // person approves first, since the run commits onto the base branch on the check's word, and nothing else may start that.
+  if (check !== undefined && gate?.trim() !== 'true') {
+    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no \`gate: true\`. Add \`gate: true\`, or delete the \`check:\` line.`);
+  }
+  // The run keeps such a step from committing the merge itself with a deny list (`filedDenies`), and codex takes none.
+  if (check !== undefined && harness === 'codex') {
+    refuse(`${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying \`git commit\` — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`);
+  }
+  // A try of an ending does the act on the base branch again, and only a person asks for one: `wf retry`, never `retries:`.
+  if (retries !== undefined) {
+    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: wf retry <run> ${step}. Delete the \`retries:\` line.`);
   }
   if (resume !== undefined) {
     refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`);

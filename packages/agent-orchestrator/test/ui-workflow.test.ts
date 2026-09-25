@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Ajv } from 'ajv';
 import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
+import { landingContract } from '../src/check.ts';
 import { closeoutSchemaOf, outputLines, type Closeout } from '../src/closeout.ts';
 import { loopSpan, terminalSteps } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
@@ -51,9 +52,9 @@ function unreachableSkills(step: { body: string; tools?: string[] }): string[] {
   return [...problems];
 }
 
-test('the ui workflow loads as two steps, the loop between them and the ship after it — every declared schema strict, or it would not', () => {
+test("the ui workflow loads as two steps, the loop between them and the ship after it — every declared schema strict, the shipper's message's too, or it would not", () => {
   assert.deepEqual(ui.map((s) => s.name), ['implement', 'review', 'ship']);
-  assert.deepEqual(ui.filter((s) => s.output).map((s) => [s.name, s.output!.schema.additionalProperties]), [['implement', false], ['review', false]]);
+  assert.deepEqual(ui.filter((s) => s.output).map((s) => [s.name, s.output!.schema.additionalProperties]), [['implement', false], ['review', false], ['ship', false]]);
   assert.deepEqual([steps.review?.loop, steps.review?.rounds], ['implement', 3]);
   assert.deepEqual(loopSpan(ui, steps.review!), ['implement', 'review']);
   assert.deepEqual(terminalSteps(ui).map((s) => s.name), ['ship']);
@@ -127,7 +128,7 @@ const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
 /** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
-test("every dev* folder, and ui, ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
+test("every dev* folder, and ui, ends in `ship`: gated, in the repository's checkout, with implement's denies and that folder's check, which the run executes on the merge — and its prose stages the merge and signs off the message, and neither runs the check nor commits", () => {
   const CHECKS: Record<string, string> = {
     // The suite and the types, then the build when git says the work touched the web app, and the e2e on the merged tree alone
     // (web-check.test.ts runs both).
@@ -144,47 +145,54 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
     const ship = byName.ship!;
     assert.ok(ship, `${folder} has an ending step`);
-    const { after, workspace, gate, harness, model, disallowedTools, check: own, tools, output, loop } = ship;
-    assert.deepEqual({ after, workspace, gate, harness, model, disallowedTools, check: own, tools, output, loop }, {
+    const { after, workspace, gate, harness, model, disallowedTools, check: own, tools, loop } = ship;
+    assert.deepEqual({ after, workspace, gate, harness, model, disallowedTools, check: own, tools, loop }, {
       after: ['review'], workspace: 'main', gate: true, harness: 'claude', model: 'opus',
-      disallowedTools: IMPLEMENT_DENIED, check: undefined, tools: undefined, output: undefined, loop: undefined,
+      disallowedTools: IMPLEMENT_DENIED, check, tools: undefined, loop: undefined,
     }, folder);
-    assert.deepEqual(terminalSteps(loadWorkflows(dir)).map((s) => s.name), ['ship'], `${folder} ends there`);
+    // Its check is implement's, the same line: what the work was judged by is what the merged tree is judged by.
+    assert.equal(own, byName.implement!.check, `${folder}: ship's check is implement's`);
+    // And the message the run commits the merge with is the step's closeout, one required string.
+    assert.equal(ship.output?.file, 'shipper.schema.json', folder);
+    const schema = closeoutSchemaOf(ship, loadWorkflows(dir)) as { required: string[]; properties: Record<string, { type: string }> };
+    assert.ok(schema.required.includes('message'), `${folder}: a sign-off gives its message`);
+    assert.equal(schema.properties.message!.type, 'string');
+    assert.equal(terminalSteps(loadWorkflows(dir)).map((s) => s.name).join(), 'ship', `${folder} ends there`);
 
-    // The prose is the recipe, one for every folder (the shipper's), and the folder's own check reaches it in the brief: a step whose
-    // `check:` the run would execute in a person's checkout is refused, so what this step is judged by is what it runs itself.
+    // The prose is the recipe, one for every folder (the shipper's): stage the merge, write the message, leave the rest to the run.
     const body = said(ship.body);
     for (const sentence of [
-      "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.",
-      'git merge --no-ff --no-commit <branch>',
-      "Run this workflow's check, whole, from the repository root: the command named under *Where to look*.",
+      "Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
+      'git merge --no-ff --no-commit <branch>…',
       // The merge is committed with a message the shipper writes, not git's `Merge branch '…'`: what shipped, and the evidence for it.
-      'commit the merge with a message you write — never git\'s default, so never `--no-edit`.',
+      "Write the commit message — never git's default.",
       "the run's own title — the first line under *What was asked for* — trimmed to about 72 characters.",
       '"Merge branch …" is what this message replaces.',
-      'a body of two to six lines: what was built, in plain words, then one line naming the run, its branch, how many commits it brought, and the check that passed on the merged tree.',
+      'a body of two to six lines: what was built, in plain words, then one line naming the run, its branch, how many commits it brought, and the check the run executes on the merged tree.',
       "`git log --format='%s' <base>..<branch>`, `git diff --stat <base>...<branch>`",
       "never from anyone's account of the work.",
       'No trailers of any kind: no `Co-Authored-By`, no `Signed-off-by`, no session URL.',
-      'Write the message to a file in the directory named under *Files for the person who decides*, outside this checkout, and commit with `git commit -F <that file>`',
-      '`git merge --abort`, then sign off `blocked` saying what happened',
-      'Nothing is committed, so no message reaches git.',
+      "Leave the merge staged, and sign off `done`, the message whole as your closeout's `message`.",
+      'Do not run the check, do not commit, and do not abort a merge that is clean: the run does each, on the check\'s exit',
+      '`git merge --abort` if a merge is staged, then sign off `blocked` saying what happened.',
+      // A job cannot end its turn to wait for a suite: the lesson the owner gave with the plan's approval.
+      '`[structured-output-enforce]`',
+      'timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"',
       'Do not push, and do not delete the branch',
     ]) assert.ok(body.includes(sentence), `${folder}: ${sentence}\n\n${body}`);
-    assert.ok(!body.includes('`git commit --no-edit`'), `${folder}: the recipe no longer commits git's default message\n\n${body}`);
+    assert.ok(!body.includes('`git commit --no-edit`'), `${folder}: the recipe never commits git's default message\n\n${body}`);
     const run: Run = {
       id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Ship it',
       workflowDir: dir, createdAt: '2026-09-19T00:00:00Z',
       steps: Object.fromEntries(Object.keys(byName).map((name) => [name, name === 'ship' ? { taskId: null } : { taskId: `t-${name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
     };
     const brief = composeBrief(ship, run, loadWorkflows(dir), undefined, '/wf/runs/r-1/artifacts/ship');
-    // The title the recipe's subject is taken from, and the directory it writes its message into, are the brief's, under those headings.
+    // The title the recipe's subject is taken from is the brief's, under its heading.
     assert.ok(brief.includes('\n## What was asked for\n\nShip it'), `${folder}\n\n${brief}`);
-    // The directory the recipe writes its message into is the one the brief names under that heading, by absolute path.
-    assert.ok(brief.includes('\n## Files for the person who decides\n\nA report, a log or a screenshot reaches them one way: put it in `/wf/runs/r-1/artifacts/ship`'), `${folder}\n\n${brief}`);
-    const where = brief.slice(brief.indexOf('\n## Where to look\n'));
-    assert.ok(where.includes(`This workflow's check, which its work was judged by: \`${check}\``), `${folder}\n\n${brief}`);
-    assert.equal(brief.split("This workflow's check, which its work was judged by:").length, 2, `${folder}: its check, and no other`);
+    // The brief says the run executes the folder's check on the merge and commits it — once — and never hands the step a check to run.
+    assert.equal(brief.split(landingContract(check)).length, 2, `${folder}\n\n${brief}`);
+    assert.ok(!brief.includes("This workflow's check, which its work was judged by:"), `${folder}\n\n${brief}`);
+    assert.ok(!brief.includes('## Finishing'), `${folder}: no contract to run a check before signing off\n\n${brief}`);
   }
 
   // One ending, written once: every dev* folder's ship.md is the same wiring and the shipper. A build folder's adds a note after it, the
@@ -194,7 +202,9 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
   assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'), 'dev-planned-build');
   assert.equal(shipIn('ui'), shipIn('dev-build'), 'ui');
   assert.equal(fs.readFileSync(path.join(WORKFLOWS, 'ui', 'ship.md'), 'utf8'), shipIn('ui'), "the package's ui");
-  assert.ok(shipIn('dev-build').startsWith(shipIn('dev')), 'dev-build is the same wiring, then its note');
+  // The same wiring, its check its own folder's (and a comment on what that line does mid-merge), then its note.
+  const wiring = (folder: string) => shipIn(folder).replace(/^check: .+$/m, 'check:').replace(/^# (Mid-merge, |and runs the e2e |With no WF_BASE_REF there, ).+\n/gm, '');
+  assert.ok(wiring('dev-build').startsWith(wiring('dev')), 'dev-build is the same wiring, then its note');
   const WHY = ["`npm run build` regenerates the web app's route tree", '`npm run e2e` visits every page in both themes', 'the merged tree is the first tree either has seen'];
   for (const folder of Object.keys(CHECKS)) {
     const body = said(loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'ship')!.body);
@@ -310,12 +320,12 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
   assert.deepEqual(differences(repository, shipped), []);
   assert.ok(fs.existsSync(path.join(repository, 'README.md')), 'the repository copy says what it is');
 
-  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their skills and their schema,
+  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their skills and their schemas,
   // each the repository's byte for byte.
   const agents = path.join(WORKFLOWS, 'agents');
   const theirs = path.join(REPO, 'workflows', 'agents');
   assert.deepEqual(fs.readdirSync(agents).sort(), [
-    'implement.schema.json', 'shipper.md', 'shipper.skills.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json',
+    'implement.schema.json', 'shipper.md', 'shipper.schema.json', 'shipper.skills.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json',
   ]);
   for (const file of fs.readdirSync(agents)) assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
 });

@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "The commit message the run commits your staged merge with once its check passes on it: the subject line, a blank line, then the body. Never git's default, and no trailers. Empty when you sign off blocked: a done sign-off with an empty message has the run abort the merge."
+    }
+  },
+  "required": ["message"],
+  "additionalProperties": false
+}

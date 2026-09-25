@@ -14,16 +14,16 @@ import { modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
-import { feedPhase, feedWords, type FeedWords } from './run.ts';
+import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
 import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
-import { gitSays, handOff, workspaceFor } from './worktree.ts';
+import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
-import { refsOf } from './branches.ts';
+import { refsOf, resultBranches } from './branches.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
 
@@ -245,6 +245,15 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
   if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
+  // And an ending that lands on its check has it from its filing until the run has landed its merge: while its check runs on that merge,
+  // and while the merge is staged there and not yet committed or aborted — a run called off included, whose merge a pass still aborts.
+  if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
+    const { views, phaseOf } = await taskPhases(e, run);
+    const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
+    // Whose merge it is is asked of git only where one is in progress, which the file system says with no git.
+    const merging = mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none';
+    if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
+  }
   if (run.cancelledAt) return undefined;
   const { asks, rounds } = readAsks(run.id);
   const at = endingAsked(run, ending, asks);
@@ -340,6 +349,12 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     return collectArtifacts(run, name, signedOff(name));
   });
 
+  // The merge an ending that lands on its check staged in the repository's checkout is committed on its check's word, or aborted — before
+  // anything reads where the ending stands, so the pass that lands it reads it landed, and a try of it is never filed over a merge still
+  // staged. Level-triggered: after a restart, of the daemon or the machine, a pass reads the checkout and the engine as they are, and a
+  // merge whose session and check have both stopped running is committed or aborted then (`landingDue`).
+  const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
+
   // Two runs' ending steps never work in one checkout at once (`checkoutHold`): while another run's `workspace: main` task is unsettled
   // there, this run's is not filed, whatever its approval says. Read from the world on this pass, including what the pass has already
   // filed, so the order a pass takes the runs in decides nothing, and a restart changes nothing.
@@ -405,7 +420,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
-  const notes: string[] = [...askNotes, ...collected, ...liftNotes, ...closeNotes];
+  const notes: string[] = [...askNotes, ...collected, ...landing.notes, ...liftNotes, ...closeNotes];
   // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
   // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
   // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
@@ -520,7 +535,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           permissionMode: modeOf(step),
           // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
           tools: step.tools,
-          disallowedTools: step.disallowedTools,
+          disallowedTools: filedDenies(step, run),
           allowedTools: step.allowedTools,
           // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
           background: step.background,
@@ -590,7 +605,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           contextTokens: sessionContext(target, steps),
           permissionMode: modeOf(target),
           tools: target.tools,
-          disallowedTools: target.disallowedTools,
+          disallowedTools: filedDenies(target, run),
           allowedTools: target.allowedTools,
           background: target.background,
           remoteControl: target.remote,
@@ -629,7 +644,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         harness: 'check',
         // The command from the workflow this run froze — never from the workspace it is about to judge.
         brief: checkBrief(step.check!, {
-          WF_RUN: run.id, WF_STEP: name, ...(isGitRun(run) ? { WF_BASE_REF: run.baseRef } : {}), WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+          // No base to diff against in the repository's checkout: an ending's check judges the merge staged there, against HEAD, which a
+          // check reads from MERGE_HEAD itself, and the run's base is by then an older commit of the branch it merges onto.
+          WF_RUN: run.id, WF_STEP: name, ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}), WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
           WF_ARTIFACTS: files,
         }),
         cwd: workspace,
@@ -694,8 +711,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: modeOf(step),
         // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
         tools: step.tools,
-        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
-        disallowedTools: step.disallowedTools,
+        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings. An ending that lands on its check may
+        // not commit its merge either: the run does, on the check's word (`filedDenies`).
+        disallowedTools: filedDenies(step, run),
         allowedTools: step.allowedTools,
         // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
         background: step.background,
@@ -736,7 +754,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
-  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff) rewriteRun(run);
+  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff || landing.landed) rewriteRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
@@ -748,6 +766,56 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     ...(held ? { held } : {}),
     feed,
   };
+}
+
+/**
+ * The commit each of a run's result branches is at, as git has it — or, for one git no longer has, the tip the run last saw (`tipsSeen`):
+ * what a merge in the repository's checkout is read as this run's by (`mergeState`).
+ */
+export function resultTips(run: GitRun): Record<string, string> {
+  const branches = resultBranches(run);
+  return { ...Object.fromEntries(Object.entries(run.tips ?? {}).filter(([b]) => branches.includes(b))), ...refsOf(run.repo, branches) };
+}
+
+/**
+ * Land the merge the run's ending staged in the repository's checkout, where one lands on its check (`landingDue`): commit it with the
+ * message its closeout gave, or abort it, and write on the step's record (in memory — `advance` writes the run) what was done, once for the
+ * try. A commit git refuses — a hook, a signature — aborts the merge, and says git's words. An abort git refuses is said, and nothing is
+ * written, so the next pass tries again. Nothing is done for a run `wf rm` forgot while this pass was at work.
+ *
+ * What the pass does when it finds MERGE_HEAD in the checkout with nothing of the ending running: a merge that is not this run's — every
+ * commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is this run's is
+ * committed only if its check passed on it, and aborted otherwise.
+ */
+function landEnding(
+  run: Run, steps: readonly Workflow[], phaseOf: (taskId: string) => TaskPhase, signedOff: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => CloseoutAsked, spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
+): { notes: string[]; landed: boolean } {
+  const ending = steps.find((s) => landsOnCheck(s, run));
+  const record = ending && run.steps[ending.name];
+  if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !fs.existsSync(runFile(run.id))) return { notes: [], landed: false };
+  const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
+  const said = signedOff(ending.name)?.output?.message;
+  const due = landingDue(ending, run, own, phaseOf, typeof said === 'string' ? said : undefined, verdictOf(ending.name),
+    mergeInProgress(run.repo), () => mergeState(run.repo, resultTips(run)));
+  if (!due) return { notes: [], landed: false };
+  const name = ending.name;
+  const write = (landed: Landed, note: string) => {
+    run.steps[name] = { ...record, landed };
+    return { notes: [`${name}: ${note}`], landed: true };
+  };
+  if (due.act === 'record') return write(due.landed, landedWords(run, due.landed));
+  if (due.act === 'commit') {
+    const made = commitMerge(run.repo, due.message);
+    if ('commit' in made) return write(made, `its check passed on the merge, and ${landedWords(run, made)}`);
+    const why = `git refused the commit of its merge: ${made.error}`;
+    const refused = abortMerge(run.repo);
+    if (refused) return { notes: [`${name}: ${why}; and the run could not abort the merge either (${refused.error}): the next tick tries again`], landed: false };
+    return write({ aborted: why }, `${why}, so the run aborted the merge; nothing landed on ${run.branch}`);
+  }
+  const refused = abortMerge(run.repo);
+  if (refused) return { notes: [`${name}: ${due.why}, and the run could not abort its merge (${refused.error}): the next tick tries again`], landed: false };
+  return write({ aborted: due.why }, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
 }
 
 /**

@@ -9,12 +9,16 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
-import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, handOffDue, heldWorktree, idRefusal, isGitRun, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type Pruning } from './run.ts';
+import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, handOffDue, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruning, type Run } from './run.ts';
 import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
-import { gitSays, handOff } from './worktree.ts';
+import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from './tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, resultTips, unrecordedSteps } from './tick.ts';
+
+/** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
+const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
+  (isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none');
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
@@ -72,7 +76,7 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   // Where the result stands against the base branch, for an ending that has not run: one whose result git already has holds nothing.
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
-  const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings);
+  const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'rm', merging(run, steps));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
   // A step's task held open that waits for a word nobody will give now: closed, since once the record is gone no pass reads the run to close
   // it. A refusal changes nothing here — the engine refuses a task answered, settled or stopped since it was read, none of which waits.
@@ -195,7 +199,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     // No other run is asked: one waiting on this run reads its record, which stays.
-    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune');
+    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps));
     owed = handOffDue(steps, run, phaseOf);
   }
   // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.

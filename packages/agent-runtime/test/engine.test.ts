@@ -925,3 +925,48 @@ test('a settled task still listed is let go on every pass off what the memo kept
   assert.equal(events.filter((e) => e.kind === 'measured').length, 1, 'measured once');
   assert.equal(released.length, 4, 'let go on each of the four passes that listed it');
 });
+
+test('a pass tells its runner the sessions it expects — every attempt of every task it folds, on its harness — and asks observe nothing when it can be told', async () => {
+  const sessions = new Map<string, Sighting>();
+  const told: string[][] = [];
+  let observes = 0;
+  const ops = testOps({ sessions });
+  const runner = Runner.layer({
+    ...ops,
+    observe: Effect.suspend(() => { observes++; return ops.observe; }),
+    observeFor: (expected) => Effect.suspend(() => { told.push(expected.map((e) => `${e.name}@${e.harness ?? '-'}`)); return ops.observe; }),
+  });
+  const layer = Layer.mergeAll(Journal.test(), runner, tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  await run(file({ ...spec, id: 'a', harness: 'claude' }));
+  await run(file({ ...spec, id: 'b', harness: 'codex' }));
+  await run(tick());
+  await run(tick());
+  sessions.set(nameFor('a', 1), { ...sessions.get(nameFor('a', 1))!, state: 'done' });
+  for (let pass = 0; pass < 3; pass++) await run(tick());
+  assert.deepEqual(told, [
+    [],
+    ['ae/a/1@claude', 'ae/b/1@codex'],
+    ['ae/a/1@claude', 'ae/b/1@codex'],
+    // Folded again on the pass after, as the feed names what its settling wrote.
+    ['ae/a/1@claude', 'ae/b/1@codex'],
+    ['ae/b/1@codex'],
+  ], 'nothing before a spawn; both while they run; `a` while it is folded, and not once the memo keeps it');
+  assert.equal(observes, 0, 'observe, told nothing, is never asked when the runner can be told');
+});
+
+test("a pass's views are what `view` reads after it: an attempt's measure, written by this pass's release, is on the view it reports", async () => {
+  const sessions = new Map<string, Sighting>();
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer({ ...testOps({ sessions }), release: () => Effect.succeed({ costUsd: 0.5 }) }), tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ ...spec, holdOpen: true, closeoutSchema: SCHEMA }));
+  await run(tick());
+  const name = nameFor(id, 1);
+  const startedAt = Date.parse((await run(view(id, new Map()))).state.attempts[0]!.startedAt);
+  sessions.set(name, { ...sessions.get(name)!, state: 'done', closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
+  const report = await run(tick());
+  const reported = report.views.find((v) => v.id === id);
+  assert.equal(reported?.phase, 'input-required', 'held open: unsettled, so on the report');
+  assert.equal(reported?.state.attempts[0]?.usage?.costUsd, 0.5, 'with what the release measured on this pass');
+  assert.deepEqual(reported, await run(view(id, new Map(sessions))));
+});

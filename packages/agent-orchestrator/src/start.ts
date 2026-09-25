@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HARNESSES, remoteAgents } from './runtime-client.ts';
+import { HARNESSES, readRemote } from './runtime-client.ts';
 import { remoteAgentsFile } from './a2a-agents.ts';
 import { refusalLines } from './deps.ts';
 import { fansOut, isFolderTeam, remoteNameOf, WorkflowError, type Workflow } from './workflow.ts';
@@ -105,18 +105,23 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
 }
 
 /**
- * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not declare, refused with the entry to add,
+ * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not give the engine, refused with the fix,
  * or undefined. Read here, before the run is written, since the engine would otherwise refuse the filing on the first pass, with the run on
- * the record. A file the runtime refuses is refused here in its words too (`remoteAgents`), and only when a step names a remote agent.
+ * the record. A name the file does not declare is refused with the entry to add; a file refused as it stands, or the entry a step names
+ * refused by the runtime, in the file's words (`readRemote`) — and only when a step names a remote agent, and only the entry it names:
+ * `engine()` leaves out what is refused, and every other command and run works on.
  */
 function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
   const remote = steps.map((s) => ({ s, name: remoteNameOf(s.harness) })).filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
   if (remote.length === 0) return undefined;
-  const declared = remoteAgents();
-  const missing = remote.find(({ name }) => !declared.has(name));
+  const read = readRemote();
+  if (read.unread) return `${remote[0]!.s.name}: \`harness: ${remote[0]!.s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
+  const refused = remote.find(({ name }) => read.refused.has(name));
+  if (refused) return `${refused.s.name}: \`harness: ${refused.s.harness}\` names a remote A2A agent whose entry is refused. ${read.refused.get(refused.name)}`;
+  const missing = remote.find(({ name }) => !read.agents.has(name));
   if (!missing) return undefined;
   const file = remoteAgentsFile(HOME);
-  const has = declared.size === 0 ? 'declares none' : `declares ${[...declared.keys()].map((n) => `\`${n}\``).join(', ')}`;
+  const has = read.agents.size === 0 ? 'declares none' : `declares ${[...read.agents.keys()].map((n) => `\`${n}\``).join(', ')}`;
   return `${missing.s.name}: \`harness: ${missing.s.harness}\` names a remote A2A agent \`${missing.name}\`, and ${file} ${has}. Add it there — \`{ "${missing.name}": { "url": "https://…" } }\`, the agent's base URL, where its card is served — or name a declared one.`;
 }
 

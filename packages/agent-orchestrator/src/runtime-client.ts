@@ -50,26 +50,58 @@ export const HARNESSES = {
  * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
  * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted. The runtime keeps no
  * ceiling of its own since thin runtime stage 4c part 2, and refuses a `maxConcurrent` handed to it.
+ *
+ * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
+ * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
+ * `wf ls`, `wf up`, `wf rm`, the api — works on as before. It is `wf start` that refuses a step naming what was left out, in the file's words.
  */
 export const engine = (): Engine => {
-  const remote = Object.fromEntries([...remoteAgents()].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
+  const read = readRemote();
+  const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
+  for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
   const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential });
   return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
 };
 
+/** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
+const LEFT_OUT = 'It is left out: a step that names it is refused by `wf start`, and filed on nothing until the file is fixed and this process restarts.';
+
 /**
- * The remote A2A agents the store's `a2a-agents.json` declares, by name (`a2a-agents.ts`), each address judged by the runtime's own rule
- * (`remoteConfigRefusal`) and refused in the file's words, naming the file: what `engine()` gives the engine as `a2a:<name>` harnesses, what
- * `wf start` checks a step's name against, and what the api offers a step. Read afresh on each call.
+ * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in
+ * the file's words and naming the file; and, when the file as a whole is refused (`readRemoteAgents`) or cannot be read, why, with no agent.
+ * Read afresh on each call; it throws nothing, so a bad file stops only a step that names one of its agents (`undeclaredRefusal` in start.ts).
+ */
+export type RemoteRead = { agents: ReadonlyMap<string, RemoteAgent>; refused: ReadonlyMap<string, string>; unread?: string };
+
+export function readRemote(): RemoteRead {
+  const file = remoteAgentsFile(HOME);
+  let entries: ReturnType<typeof readRemoteAgents>;
+  try {
+    entries = readRemoteAgents(file);
+  } catch (err) {
+    return { agents: new Map(), refused: new Map(), unread: (err as Error).message };
+  }
+  const agents = new Map<string, RemoteAgent>();
+  const refused = new Map<string, string>();
+  for (const [name, agent] of entries) {
+    const why = remoteConfigRefusal(`${REMOTE_PREFIX}${name}`, agent);
+    if (why) refused.set(name, `${file}: \`${name}\`: ${why}`);
+    else agents.set(name, agent as RemoteAgent);
+  }
+  return { agents, refused };
+}
+
+/** Every refusal a read of the file came to: the file's own, or each entry's. */
+export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.unread] : [...read.refused.values()]);
+
+/**
+ * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step and
+ * reads a run's address off. An entry the runtime refuses is not among them; a file refused as it stands is refused, exit code 2, in its words.
  */
 export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
-  const file = remoteAgentsFile(HOME);
-  const agents = readRemoteAgents(file);
-  for (const [name, agent] of agents) {
-    const refused = remoteConfigRefusal(`${REMOTE_PREFIX}${name}`, agent);
-    if (refused) throw Object.assign(new Error(`${file}: \`${name}\`: ${refused}`), { exitCode: 2 });
-  }
-  return agents as ReadonlyMap<string, RemoteAgent>;
+  const read = readRemote();
+  if (read.unread) throw Object.assign(new Error(read.unread), { exitCode: 2 });
+  return read.agents;
 }
 
 /**

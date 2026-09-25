@@ -1761,9 +1761,10 @@ Read the note and say whether it is right.
 - **`~/.agent-workflows/a2a-agents.json`** (`$WF_ROOT/a2a-agents.json`, `src/a2a-agents.ts`) maps each name to `{ "url": … }`, the
   agent's base URL, whose card is read at `.well-known/agent-card.json` beneath it, or to `{ "card": { … } }`, the card itself. A name
   is lowercase words joined by dashes. The runtime judges each entry by its own rule (an `http:` or `https:` address with no user name or
-  password, a card with an interface), and a file it refuses is refused by `wf start` in those words, naming the file. It is read when a
-  process makes its engine, so an edit reaches a running `wf up` or api when it restarts. `wf start` refuses a step whose name the file
-  does not declare, before a run is written.
+  password, a card with an interface). It is read when a process makes its engine, so an edit reaches a running `wf up` or api when it
+  restarts; a file refused as it stands, or an entry refused, is left out of the engine and said on stderr, and every other command and
+  run goes on. `wf start` refuses a step whose name the file does not declare, or whose entry — or the whole file — is refused, in the
+  file's words, before a run is written.
 - **No secret is in it.** A scheme the agent's card asks a secret for is read from the environment on every request,
   `WF_A2A_<NAME>_<SCHEME>` — `reviewer`'s `token` is `WF_A2A_REVIEWER_TOKEN`, upper case, anything but a letter or a digit `_`. One not
   set sends nothing, and the step fails with the variable's name in its words. Two names whose variables can meet (`acme` and

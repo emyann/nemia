@@ -807,6 +807,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **An address from `a2a-agents.json` is shown as origin and path, never whole.** A query string can carry a key, and the api's run
   detail and anything else a person reads print `${origin}${pathname}` (`remoteOf` in `apps/api/src/detail.ts`); its test puts a secret
   in the query and asserts it is on no answer (same run).
+- **What `engine()` reads, it reads without throwing.** Every CLI verb takes `engine()` as its default argument and the api makes one at
+  load, so a throw there stops `wf ls`, `wf up`, `wf rm` and the api for runs that never touch what was refused. A bad `a2a-agents.json`
+  is left out of the engine and said on stderr (`readRemote`), and `wf start` refuses only a step that names what was left out;
+  `test/remote-refused.test.ts` runs `wf ls` and `wf tick` through `main`'s own engine on a bad file (found in review, round 1).
 
 ## Rules the code keeps
 

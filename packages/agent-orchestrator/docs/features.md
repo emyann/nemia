@@ -4740,8 +4740,9 @@ Shipped 2026-09-25. Part 1 made a remote A2A agent a harness of the runtime; thi
 *A remote A2A agent as a step* says how it reads.
 
 - **Declared in the store.** `a2a-agents.json` maps a name to `{ url }` or `{ card }` (`src/a2a-agents.ts`); the runtime client hands
-  each to the engine as the harness `a2a:<name>`, judged by the runtime's own rule (`remoteConfigRefusal`, exported for it). `wf start`
-  refuses a name the file does not declare.
+  each to the engine as the harness `a2a:<name>`, judged by the runtime's own rule (`remoteConfigRefusal`, exported for it). What is
+  refused, the file or an entry, is left out and said on stderr (`readRemote`), so a bad file stops no command; `wf start` refuses a
+  step naming a name the file does not declare, or one refused, in the file's words.
 - **Secrets from the environment**, `WF_A2A_<NAME>_<SCHEME>`, read on every request and never written: a spawn refused for one not
   set says the variable (`missingCredential`). Two names whose variables can meet are refused together.
 - **Filed bare.** A remote step's task carries no `config`, no schema, no `claude` block and no `holdOpen` — left out, not emptied,

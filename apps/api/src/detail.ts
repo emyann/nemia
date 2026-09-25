@@ -563,8 +563,8 @@ function askedModelOf(record: StepRecord | undefined): string | null {
 /**
  * The remote A2A agent a task was filed on (`StepFiled.remote`), or null for a local harness. Its address is read from the store's
  * `a2a-agents.json` on each request (`remoteAgents`), as the base URL given or, for an agent given by its card, the card's first interface:
- * origin and path alone, so a query string that carries a key is never shown. A file that no longer declares the name, or that is refused
- * as it stands, gives no address — the run's page is still drawn, and `wf up` says what is wrong with the file.
+ * origin and path alone, so a query string that carries a key is never shown. A file that no longer declares the name, whose entry for it is
+ * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `wf up` says what is wrong with the file.
  */
 function remoteOf(harness: string | undefined): StepFiled['remote'] {
   const name = remoteNameOf(harness);

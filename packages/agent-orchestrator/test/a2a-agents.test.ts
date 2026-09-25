@@ -16,7 +16,7 @@ const ROOT = scratch('wf-a2a-agents-');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { advance, readRun, remoteAgents, start } = await import('../src/runner.ts');
-const { credentials, missingCredential } = await import('../src/runtime-client.ts');
+const { credentials, missingCredential, readRemote } = await import('../src/runtime-client.ts');
 const { remoteBrief } = await import('../src/run.ts');
 
 const FILE = path.join(ROOT, 'a2a-agents.json');
@@ -76,16 +76,23 @@ test("two names whose secrets' variables can meet are refused: a card the other 
   assert.equal(readRemoteAgents(file).size, 2);
 });
 
-test("an entry the runtime would refuse is refused by remoteAgents(), naming the file and the entry, in the runtime's words", () => {
-  declare({ reviewer: { url: 'ftp://a.example' } });
+test("an entry the runtime would refuse is left out of remoteAgents() and said by readRemote(), naming the file and the entry, in the runtime's words", () => {
+  declare({ reviewer: { url: 'ftp://a.example' }, critic: { url: 'https://a.example/critic' } });
   try {
-    const refused = refusal(() => remoteAgents());
+    assert.deepEqual([...remoteAgents().keys()], ['critic'], 'the entry refused is left out, and the others are not');
+    const refused = readRemote().refused.get('reviewer')!;
     assert.ok(refused.startsWith(`${FILE}: \`reviewer\`: `), refused);
     assert.match(refused, /the `a2a:reviewer` harness/);
     declare({ reviewer: { card: { name: 'no interfaces' } } });
-    assert.match(refusal(() => remoteAgents()), /`reviewer`: .*lists no interface to reach the agent by/);
+    assert.match(readRemote().refused.get('reviewer')!, /`reviewer`: .*lists no interface to reach the agent by/);
     declare({ reviewer: { url: 'https://a.example/reviewer' } });
     assert.deepEqual([...remoteAgents().keys()], ['reviewer']);
+    assert.equal(readRemote().refused.size, 0);
+    // A file refused as it stands is refused by remoteAgents(), and said by readRemote() with no agent.
+    declare('{ reviewer: ');
+    assert.match(refusal(() => remoteAgents()), /a2a-agents\.json: is not JSON/);
+    assert.match(readRemote().unread!, /a2a-agents\.json: is not JSON/);
+    assert.equal(readRemote().agents.size, 0);
   } finally {
     fs.rmSync(FILE, { force: true });
   }
@@ -225,6 +232,12 @@ test('wf start refuses a step whose remote agent a2a-agents.json does not declar
   declare({ critic: { url: 'https://a.example/critic' } });
   try {
     assert.match(refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })), /and .*a2a-agents\.json declares `critic`\. Add it there/);
+    // An entry the runtime refuses is refused for the step that names it, in the file's words; a file refused as it stands, for any.
+    declare({ reviewer: { url: 'ftp://a.example' }, critic: { url: 'https://a.example/critic' } });
+    const entry = refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir }));
+    assert.ok(entry.startsWith(`ask: \`harness: a2a:reviewer\` names a remote A2A agent whose entry is refused. ${FILE}: \`reviewer\`: `), entry);
+    declare('[]');
+    assert.match(refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })), /^ask: `harness: a2a:reviewer` names a remote A2A agent, and the file that declares them is refused\. .*a2a-agents\.json: is a list/);
     const after = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
     assert.equal(after, before, 'no run was written');
   } finally {

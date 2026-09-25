@@ -570,6 +570,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
   A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
   (learned by the run that moved the judgement up).
+- **A judgement moved out of the runtime leaves a fact the board still reads as the old word, through `endWords`.** Stage 4b took the
+  runtime's `budget` end away (a cut is `limit: 'budget'` beside a `harness` end now), and the plan said the api and the board read no
+  budget field: they read the attempt's `reason`, through `endWords`, and would have drawn a capped try as `failed · harness`. A fact
+  that replaces a runtime word is mapped back in `endWords`, and the api's `app.test.ts` reads a journal of each shape. And widening a
+  condition in `ownStatus` to a new phase made an untyped test that left out the required `spendOf` throw: a test's call that omits an
+  argument passes only while the code never reaches it (learned by thin runtime stage 4b).
 - **A test that slices a source file between two names reads to its end once the second name is gone.** "`decide` never reads
   a harness argument" in `agent-runtime/test/engine.test.ts` took `decide`'s text as `slice(indexOf('export function decide('),
   indexOf('function resumeTarget('))`; with `resumeTarget` deleted, `indexOf` gave -1 and the slice ran on through `endOf` and the

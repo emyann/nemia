@@ -530,7 +530,7 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
 | `codex` | refused at load | — |
@@ -1043,7 +1043,7 @@ retries: 1
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
   engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
   engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
-  whole `budgetUsd`; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  whole cap; and it restarted a session the harness failed too. The runtime makes one attempt per start since
   2026-09-23, and `maxAttempts:` is refused.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or

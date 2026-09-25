@@ -3,6 +3,8 @@
 > The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
 >
 > The cards in `jev/cards/` are the briefs Jev was measured on, as they were sent, and carry no such note: one would change what was measured (`packages/agent-orchestrator/test/names.test.ts` exempts them by name).
+>
+> Names of other projects were replaced by descriptions on 2026-09-25, in the quotes `jev/workflow-result.json` recorded too.
 
 The scripts, labels and results that `docs/pivot-2026-09-18.md` cites. They were written in a scratch
 directory during one session and copied here so the evidence outlives it. Nothing here is imported by

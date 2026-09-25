@@ -63,8 +63,8 @@ applier. In Docker's terms the core should carry *image and args* and never read
    validates and understands. The runtime stores it and hands it over. Each driver keeps its vocabulary and refusals (most of
    it already lives in `runner-claude-vocabulary.ts` and the Codex files).
 4. **Drivers — plug-ins behind one interface.** Today's Claude Code and Codex drivers keep working behind it; new drivers
-   are added behind it. Later, each in a package of its own, as Substrate keeps each sandbox class in its own binary behind one
-   gRPC service.
+   are added behind it. Later, each in a package of its own, as a sandbox runtime keeps each sandbox class in its own binary
+   behind one gRPC service.
 
 ## 3. One interface, shaped like A2A
 
@@ -131,7 +131,7 @@ A remote A2A agent — an ADK agent, a cloud-hosted one — needs nothing but it
 **adapter**: an `AgentExecutor` wrapping it, run in-process with no HTTP. Claude Code and Codex become A2A agents that way; the
 same adapters, mounted over HTTP later, make them A2A agents others can call (P6).
 
-**The pattern to follow for an adapter:** <https://github.com/jcwatson11/claude-a2a> (the owner's pointer). An
+**The pattern to follow for an adapter:** an A2A adapter for Claude Code the owner pointed to. An
 `agent-executor.ts` bridges A2A to a `claude-runner.ts` pool; each session is one long-lived `claude` process speaking
 `--input-format stream-json --output-format stream-json` (messages in on stdin, events out on stdout); A2A's `contextId` is a
 Claude session; `--resume` recovers one after a restart. Three cautions: it targets A2A v0.3.0 (we target v1.0.0); it states no
@@ -176,7 +176,7 @@ kubelet."* It exists for three reasons, and all three survive a thin runtime:
 ### The lifecycle as a statechart, with XState
 
 The owner's decision (2026-09-23): the loop keeps its job, and the machine it drives becomes explicit, as a statechart in
-XState. Today the allowed moves live only in `decide`'s `if`s; Substrate has the same weakness (its states are drawn in a doc,
+XState. Today the allowed moves live only in `decide`'s `if`s; a sandbox runtime we read has the same weakness (its states are drawn in a doc,
 its edges checked in separate steps). With the policy moved out (§2), the lifecycle is small, and its states are A2A's, so an
 A2A driver maps onto it with no second vocabulary:
 
@@ -197,7 +197,7 @@ A2A driver maps onto it with no second vocabulary:
 1. **Observe** — from the journal and what the driver reports, work out the event: spawned, done, failed, needs a person, stop
    asked, deadline passed, found by name after a crash. Recomputed from the whole state on every pass, never remembered.
 2. **Transition** — hand that event to the XState machine: it gives the next state and the one action, or refuses an event
-   with no edge from the current state (as Substrate refuses "MarkSuspending prerequisite not met").
+   with no edge from the current state (as that sandbox runtime refuses a suspension whose prerequisite is not met).
 
 What XState brings: the diagram is the code (its visualiser draws the machine the runtime runs, so the doc cannot drift), the
 editor for changing it, guards and actions named on the edges, and a machine the board could draw per session. What to design
@@ -249,7 +249,7 @@ orchestrator's calls to the runtime change.
    `SubscribeToTask` waits for a consumer of a live stream (stage 2, or the board following a session as it speaks).
 2. **The Claude Code adapter runs a step as a job:** `-p` by default, a gate as `TASK_STATE_INPUT_REQUIRED`, denials loud, `auto`
    by default, `--bg` kept for the observer. Also: the stream, `TASK_STATE_INPUT_REQUIRED` for a blocked session, the closeout as an
-   `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the claude-a2a pattern) — the owner's
+   `Artifact`, `contextId` as the session; `--bg` or a long-lived `stream-json` process (the pattern of an A2A adapter that keeps one Claude Code process per session) — the owner's
    call at the gate.
    Planned 2026-09-23 and split by the owner at its gate into five parts, each a card of its own: **(1) the runtime's
    Claude Code adapter** — `claude` runs a task as a job, `claude -p --output-format stream-json --verbose

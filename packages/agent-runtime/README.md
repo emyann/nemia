@@ -866,10 +866,9 @@ worktree that already said it was finished, two steps settled `succeeded` in six
 done nothing, and the board called the run healthy. A statement made to the harness lives in the
 session, not in the repository.
 
-It layers UNDER the harness's own answer rather than replacing it. [Hermes
-Kanban](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) solves the same
-problem with a terminal tool call, `kanban_complete(...)`, which it can require because every worker
-is its own. Here a structured final answer is the fast path and observation is the floor: a workload
+It layers UNDER the harness's own answer rather than replacing it. An agent kanban solves the same
+problem with a terminal "complete" tool call, which it can require because every worker is its own.
+Here a structured final answer is the fast path and observation is the floor: a workload
 that never gives one ends by quiet — `stated: false`, where one was asked for (above).
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the

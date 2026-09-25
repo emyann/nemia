@@ -13,7 +13,7 @@ import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from 
 
 const T0 = new Date('2026-09-25T09:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
-const now = (ms = 0) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, used: 0, max: Infinity });
+const now = (ms = 0) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000 });
 const TASK = 't-q';
 
 const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event =>
@@ -55,10 +55,9 @@ test('the wait comes after every terminal answer: a queued task is stopped, and 
   assert.equal(admissionOf(s), undefined, 'asked to stop: nothing to admit');
 });
 
-test('the wait comes before the ceiling: a queued task at a full board says it is queued, and an admitted one waits for a slot', () => {
-  const full = { ...now(5), used: 3, max: 3 };
-  assert.deepEqual(decide(fold(TASK, [filed({ queued: true })]), new Map(), full), { do: 'nothing', why: 'queued — waits to be admitted' });
-  assert.match((decide(fold(TASK, [filed({ queued: true }), admitted()]), new Map(), full) as { why: string }).why, /ceiling \(3\/3\)/);
+test('a queued task says it is queued, and an admitted one starts: the runtime keeps no ceiling to hold it back', () => {
+  assert.deepEqual(decide(fold(TASK, [filed({ queued: true })]), new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
+  assert.deepEqual(decide(fold(TASK, [filed({ queued: true }), admitted()]), new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
 });
 
 test('a task held open waits for a word before each turn: the one given for its first turn does not start its second', () => {

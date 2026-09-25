@@ -431,7 +431,7 @@ test('a registry that cannot be read rejects, not refuses: ask again', async () 
 });
 
 test('a session with no registration, one registered to another session, one with no inbox, and one whose inbox is gone: rejected, nothing journalled', async () => {
-  // A board each: four running sessions on one would wait on the shipped ceiling of three.
+  // A board each, so each case's registration and inbox are the only ones its engine reads.
   const board = () => createEngine({ root: tmp('board') });
 
   const e1 = board();

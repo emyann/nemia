@@ -52,12 +52,6 @@ export type HarnessSpec = {
    */
   refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
   /**
-   * The pool this harness's sessions are counted in under the concurrency ceiling: what one rate limit covers, a
-   * subscription. Harnesses that name the same pool share one ceiling. Absent: the name the harness is configured
-   * under, a pool of its own.
-   */
-  pool?: string;
-  /**
    * What the harness says in its own output, for one that prints its final answer rather than
    * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
    * stderr whenever it has changed, and returns what it found there — nothing it did not. A pure

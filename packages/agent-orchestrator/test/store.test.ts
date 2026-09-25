@@ -1734,7 +1734,7 @@ test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits
    */
   const admitted = async (momentum: (id: string) => number) => {
     const sessions = new Map<string, Sighting>();
-    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude', maxConcurrent: Infinity });
+    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude' });
     const as = (spec: typeof next) => ({ ...spec, harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
     await e.file(as(newer));
     await new Promise((r) => setTimeout(r, 5));

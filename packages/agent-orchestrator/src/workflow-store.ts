@@ -263,6 +263,16 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
   return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
 }
 
+/**
+ * The version of the skill whose folder is `dir`: a digest of every file in it, as `agentVersion` counts the folder of each skill an agent
+ * gives — so a write that moves this moves the version of every agent that gives the skill. Null for a folder with no SKILL.md. A write of the
+ * skill carries it, and is refused when the skill no longer holds it (`writeSkill`).
+ */
+export function skillVersion(dir: string): string | null {
+  if (!fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })) return null;
+  return createHash('sha256').update(JSON.stringify(folderForVersion(dir))).digest('hex').slice(0, 16);
+}
+
 /** A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through. */
 function readForVersion(file: string): string | { unreadable: string } | { link: string } {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
 import { agentsFor, agentVersion, formerKeyLines, loadWorkflows, lookupRoots, skillsFor } from '../src/workflow-store.ts';
 import { briefBody, noCodingStyle, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
@@ -154,6 +154,39 @@ test("a name is looked for in the workflow's own root, then the repository's .cl
   // The workflow's own root first: a store workflow's is the store, so its own come first there.
   const own = team('---\nskills: write-a-note\n---\nYou build.\n', { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') });
   assert.equal(skillsFor(own, places).at.get('write-a-note'), path.join(path.dirname(own), 'skills', 'write-a-note'));
+});
+
+// As Claude Code's `/agents` wizard writes a project subagent (2.1.282): its name, a description with an example, its tools, its model, its colour.
+const WIZARD = '---\nname: code-reviewer\ndescription: Use this agent when a change needs a second look. Example: after a feature is written.\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\ncolor: blue\n---\nYou are a careful code reviewer.\n';
+
+test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as it is: `color` read and ignored, every other line the run's", () => {
+  const repo = tree({ '.claude/agents/code-reviewer.md': WIZARD });
+  const home = tree({ 'workflows/team/review.md': '---\nagent: code-reviewer\n---\nReview the change.\n' });
+  const [step] = loadWorkflows(path.join(home, 'workflows', 'team'), { repo, home });
+  assert.deepEqual([step!.model, step!.tools, step!.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
+  const agent = agentsFor(path.join(home, 'workflows', 'team'), { repo, home }).get('code-reviewer') as Agent;
+  assert.equal(agent.description, 'Use this agent when a change needs a second look. Example: after a feature is written.');
+  assert.equal(agent.body.trim(), 'You are a careful code reviewer.');
+  assert.ok(!('color' in agent.keys), 'not a role key: no step inherits it');
+  assert.doesNotMatch(renderAgent({ name: agent.name, description: agent.description, keys: agent.keys, body: agent.body }), /color/, 'not written back');
+});
+
+test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would drop — each named, with what does it in a run — and `model: inherit`, which a step has no parent to inherit from", () => {
+  const cases: Array<[string, RegExp]> = [
+    ['maxTurns: 20', /`budget:` and `deadlineSeconds:`/],
+    ['mcpServers: github', /`\.mcp\.json`/],
+    ['hooks: lint', /`\.claude\/settings\.json`/],
+    ['memory: project', /no memory of an agent's own/],
+    ['isolation: worktree', /`workspace:`/],
+  ];
+  for (const [line, why] of cases) {
+    const said = refusal(() => parseAgent('code-reviewer', `---\ndescription: Reviews.\n${line}\n---\nYou review.\n`));
+    assert.ok(said.startsWith(`agents/code-reviewer.md: \`${line.split(':')[0]}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — `), said);
+    assert.match(said, why);
+  }
+  assert.match(refusal(() => parseAgent('code-reviewer', WIZARD.replace('model: sonnet', 'model: inherit'))), /^agents\/code-reviewer\.md: `model: inherit` is Claude Code's word for a subagent that runs on the model of the conversation that called it/);
+  // A key that is no one's is still refused as before.
+  assert.match(refusal(() => parseAgent('code-reviewer', '---\ncolour: blue\n---\n')), /`colour` is not a key an agent has/);
 });
 
 test("REFUSED at shipped defaults: a name in both of one repository's places, workflows/ and .claude/ — an agent and a skill — naming both", () => {

@@ -370,6 +370,12 @@ is refused, naming both. A folder team, which has no repository, reads the `.cla
 `agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
 refuses a stale read.
 
+A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
+are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
+back — and is not written back by the board's save. Claude Code's keys that change what a session may do or has, which a run does not
+carry to its sessions, are refused by name, each with what does that in a run (`maxTurns`, `mcpServers`, `hooks`, `memory`,
+`isolation`), and so is `model: inherit`, since a step's session has no conversation to take a model from.
+
 Refused at load, each in the name of the agent or of the step that names it (`composedRefusal`, `autoRefusal`): a skill no place has,
 naming each place looked in; skills with no `Skill` in the step's `tools:` or with `Skill` in its `disallowedTools:`, since a skill a
 session cannot load is a name in its prompt (F11); skills or a system prompt on codex, which is handed the instructions in its brief

@@ -536,6 +536,10 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
   const harness = harnessOf(name, meta.harness);
   const background = backgroundOf(name, meta.background, harness);
   const output = outputOf(name, meta.output, read);
+  // What Claude Code's `/agents` wizard writes for "the parent's model" (`.claude/agents/`, 2.1.282), and a run's session has no parent.
+  if (meta.model?.trim() === 'inherit') {
+    refuse(`${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`);
+  }
   autoRefusal(name, harness, meta.model, meta.permissionMode);
 
   return {
@@ -1684,10 +1688,32 @@ export type Agent = {
 /** The agents a folder of workflows has, by name: each read, or why it cannot be — thrown only at a step that names it. */
 export type Agents = ReadonlyMap<string, Agent | WorkflowError>;
 
+/**
+ * Claude Code's own subagent keys that are not the run's, as its `/agents` wizard and its documentation write them into `.claude/agents/`
+ * (2.1.282). `color` is read and ignored: it picks the colour Claude Code shows the subagent's name in and holds nothing back, and the
+ * wizard writes it on every file. It is not kept, so the board's save of an agent does not write it back.
+ */
+export const CLAUDE_CODE_IGNORED: readonly string[] = ['color'];
+
+/**
+ * Claude Code's own subagent keys the run refuses, each with what does the work in a run: each changes what a session may do or has, and
+ * the run carries none of them to its sessions, so a line read and dropped would be a constraint nobody enforces (as `fileRuleRefusal`).
+ */
+const CLAUDE_CODE_REFUSED: Record<string, string> = {
+  maxTurns: 'a run bounds a session by the step\'s `budget:` and `deadlineSeconds:`, never by a count of turns',
+  mcpServers: 'a run gives a session no MCP servers of an agent\'s own; the repository\'s `.mcp.json` is what its sessions load',
+  hooks: 'a run starts no hooks of an agent\'s own; hooks go in the repository\'s `.claude/settings.json`, which its sessions read in a checkout Claude Code trusts',
+  memory: 'a run keeps no memory of an agent\'s own between sessions: what a step knows is its brief, its workspace and the session it continues',
+  isolation: 'where a step works is the step\'s `workspace:` — a worktree of its own unless it says `main` or `folder`',
+};
+
 /** Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. */
 function agentKeyRefusal(file: string, key: string): string | undefined {
   // Claude Code's own agent files say their name, and one in `.claude/agents/` is read as it is written (`parseAgent` holds it to the file's).
-  if (isAgentKey(key) || key === 'name') return undefined;
+  if (isAgentKey(key) || key === 'name' || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
+  if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
+    return `${file}: \`${key}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — ${CLAUDE_CODE_REFUSED[key]}. Delete the line to use this agent in a run: a key the run does not read is a constraint nobody enforces.`;
+  }
   if (key === 'agent') {
     return `${file}: \`agent\` is a step's key, which attaches an agent to the step, and an agent does not name another. Write here what this agent is told and runs with, or give the step the other agent.`;
   }
@@ -1707,9 +1733,10 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
-  const { meta: { description, card: carded, skills: listed, systemPrompt: prompt, name: said, ...written }, spelled } = block === null
-    ? { meta: {} as Partial<Record<AgentKey | 'name', string>>, spelled: {} }
-    : readKeys<AgentKey | 'name'>(file, block, (key) => agentKeyRefusal(file, key));
+  // `color` is Claude Code's alone (`CLAUDE_CODE_IGNORED`): read, and dropped here.
+  const { meta: { description, card: carded, skills: listed, systemPrompt: prompt, name: said, color: _, ...written }, spelled } = block === null
+    ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color', string>>, spelled: {} }
+    : readKeys<AgentKey | 'name' | 'color'>(file, block, (key) => agentKeyRefusal(file, key));
   if (said !== undefined && said !== name) {
     refuse(`${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`);
   }

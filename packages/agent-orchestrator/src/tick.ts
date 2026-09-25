@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Engine, TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
-import { sessionContext, type Workflow } from './workflow.ts';
+import { modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
@@ -517,7 +517,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           effort: step.effort,
           // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
           contextTokens: sessionContext(step, steps),
-          permissionMode: step.permissionMode,
+          permissionMode: modeOf(step),
           // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
           tools: step.tools,
           disallowedTools: step.disallowedTools,
@@ -588,7 +588,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           model: sessionModel(target, record),
           effort: target.effort,
           contextTokens: sessionContext(target, steps),
-          permissionMode: target.permissionMode,
+          permissionMode: modeOf(target),
           tools: target.tools,
           disallowedTools: target.disallowedTools,
           allowedTools: target.allowedTools,
@@ -695,7 +695,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         contextTokens: sessionContext(step, steps),
         // Left to the engine's default (`auto`) unless the step says otherwise. A job asks nobody in any mode: a call it may not make
         // is denied, recorded, and the session carries on (agent-runtime's open issue 28, M1).
-        permissionMode: step.permissionMode,
+        permissionMode: modeOf(step),
         // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
         tools: step.tools,
         // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.

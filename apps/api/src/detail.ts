@@ -79,7 +79,10 @@ export type StepSpec = {
    */
   workspace: string | null;
   resume: string | null;
+  /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
+  /** Codex's sandbox (`sandbox:`; on a run frozen before 2026-09-23, its `permissionMode`, read so): null on Claude Code. */
+  sandbox: string | null;
   /** The only tools the session may have: null for the harness's own set, empty for none. */
   tools: string[] | null;
   deadlineSeconds: number | null;
@@ -106,6 +109,7 @@ export type StepFiled = {
   effort: string | null;
   /** The context window the try was filed with, in tokens (`contextTokens`): null for the model's whole window. */
   contextTokens: number | null;
+  /** The fence the try was filed with, as the engine's task names it: Claude Code's permission mode, or Codex's sandbox (a step's `sandbox:`). */
   permissionMode: string | null;
   /**
    * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
@@ -413,6 +417,7 @@ const specOf = (step: Workflow): StepSpec => ({
   workspace: step.workspace ?? null,
   resume: step.resume ?? null,
   permissionMode: step.permissionMode ?? null,
+  sandbox: step.sandbox ?? null,
   tools: step.tools ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,

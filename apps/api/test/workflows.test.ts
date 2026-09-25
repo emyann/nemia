@@ -63,7 +63,7 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -145,7 +145,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     // This step names no agent, so there is nothing it says it can do; a step whose agent has skills is further down, in this test.
     agentSkills: null,
   });
-  assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
+  assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', sandbox: null, tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
   assert.deepEqual(review.keys.map((k) => k.key), [...STEP_KEYS], "in the package's order, set or not");
 
   // Yours, and a step that sets counts: each in digits.

@@ -634,7 +634,7 @@ async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; re
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
@@ -719,6 +719,10 @@ test('a step with more than three tools counts them on its node, named in the ti
   assert.deepEqual(toolsOf([]), [['tools', 'none']]);
   // The effort a step sets, and the harness's own where it sets none.
   assert.deepEqual(specLines({ ...unset, effort: 'high' }).find(([label]) => label === 'effort'), ['effort', 'high']);
+  // A codex step's fence under Codex's name, `sandbox`, never Claude Code's `mode`.
+  const fenced = specLines({ ...unset, harness: 'codex', sandbox: 'read-only' });
+  assert.deepEqual(fenced.find(([label]) => label === 'sandbox'), ['sandbox', 'read-only']);
+  assert.equal(fenced.find(([label]) => label === 'mode'), undefined);
   assert.deepEqual(specLines(unset).find(([label]) => label === 'effort'), ['effort', "harness's own"]);
   // The context window, under the effort, as the package writes it — and no line where the step sets none, the model's whole window.
   const lines = specLines({ ...unset, effort: 'high', context: 200_000 });
@@ -1098,10 +1102,24 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   // which reads as Claude Code's prompting default — Codex's `workspace-write`, and a Codex sandbox its tools narrowed, whatever was named.
   assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'auto', by: 'default' } })['permission mode'], 'auto · default');
   assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'], 'workspace-write · default');
-  const reviewer: StepSpec = { ...unset, harness: 'codex', permissionMode: 'workspace-write', tools: ['Read', 'Grep'] };
+  // A codex step's fence is its `sandbox:`, which the engine's task files as its permission mode: its row is called `sandbox`, and none `permission mode`.
+  const reviewer: StepSpec = { ...unset, harness: 'codex', sandbox: 'workspace-write', tools: ['Read', 'Grep'] };
   const narrowed: StepFiled = { ...bare, permissionMode: 'workspace-write', tools: ['Read', 'Grep'], runsIn: { mode: 'read-only', by: 'tools' } };
-  assert.equal(rowsOf(reviewer, narrowed)['permission mode'], 'read-only · by tools');
-  assert.equal(rowsOf({ ...reviewer, permissionMode: null }, { ...narrowed, permissionMode: null })['permission mode'], 'read-only · by tools');
+  assert.equal(rowsOf(reviewer, narrowed).sandbox, 'read-only · by tools');
+  assert.equal(rowsOf(reviewer, narrowed)['permission mode'], undefined);
+  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, permissionMode: null }).sandbox, 'read-only · by tools');
+  const readOnly: StepSpec = { ...unset, harness: 'codex', sandbox: 'read-only' };
+  assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only', "the workflow's word, as filed");
+  assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox, 'workspace-write · this try');
+  assert.equal(rowsOf(readOnly, null).sandbox, 'read-only', 'and a step not filed yet says what its workflow says');
+  // A codex run frozen before 2026-09-23 with `permissionMode: bypassPermissions` reads as `sandbox: danger-full-access`, and its tries were
+  // filed with the former word: the same fence, which Codex ran as `-s danger-full-access`, so no try of its own — as run, or where the api
+  // could not ask the harness.
+  const widest: StepSpec = { ...unset, harness: 'codex', sandbox: 'danger-full-access' };
+  const former: StepFiled = { ...bare, permissionMode: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
+  assert.equal(rowsOf(widest, former).sandbox, 'danger-full-access');
+  assert.equal(rowsOf(widest, { ...former, runsIn: null }).sandbox, 'danger-full-access');
+  assert.equal(rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only · this try', 'another sandbox is still a try of its own');
 
   // A model a person's `wf retry --model` asked for is this try's, and not a default, where the workflow names none.
   assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');

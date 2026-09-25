@@ -22,7 +22,7 @@ const { app } = await import('../src/app.ts');
 const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/builder.ts');
 const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { loadWorkflows, writeWorkflow } = await import('agent-orchestrator');
-const { AGENT_KEYS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
+const { AGENT_KEYS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type KeyForm = import('../src/builder.ts').KeyForm;
 type WorkflowSaved = import('../src/builder.ts').WorkflowSaved;
 type BuildRefused = import('../src/builder.ts').BuildRefused;
@@ -91,7 +91,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -105,6 +105,9 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
   assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
   assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
+  // Codex's fence is its sandbox, a key of its own; each harness has one of the two, and the form offers a step the one its harness takes.
+  assert.deepEqual([kindOf.sandbox, form.keys.find((k) => k.key === 'sandbox')?.byHarness], ['harness-word', SANDBOXES]);
+  for (const harness of HARNESSES) assert.equal(Object.hasOwn(PERMISSION_MODES, harness) !== Object.hasOwn(SANDBOXES, harness), true, harness);
   // `denials:` says one word or nothing, as `slot:` does: a choice of `fail`, which the parser reads and nothing else.
   assert.deepEqual([kindOf.denials, form.keys.find((k) => k.key === 'denials')?.choices], ['choice', ['fail']]);
   // The agent is picked from yours' agents/, and the keys a step takes from it are the package's agent keys but the description.
@@ -147,11 +150,13 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(flags, { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] });
   for (const [key, words] of Object.entries(flags)) for (const word of words!) assert.equal(refusedAs(key, word), null, `${key}: ${word}`);
   assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/);
-  // The default harness is the parser's: a step that names none takes each of its modes, and not a mode only codex takes.
+  // The default harness is the parser's: a step that names none takes each of its modes, not a sandbox of codex's as a mode, and no sandbox.
   assert.equal(form.defaultHarness, DEFAULT_HARNESS);
   for (const mode of PERMISSION_MODES[DEFAULT_HARNESS]!) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
-  const codexOnly = PERMISSION_MODES.codex!.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS]!.includes(m))!;
+  assert.equal(Object.hasOwn(SANDBOXES, DEFAULT_HARNESS), false);
+  const codexOnly = SANDBOXES.codex!.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS]!.includes(m))!;
   assert.throws(() => parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`), (e: Error) => e.message.startsWith('a: '));
+  assert.throws(() => parseWorkflow('a', `---\nsandbox: ${codexOnly}\n---\nDo a.\n`), (e: Error) => e.message.startsWith('a: `sandbox: '));
 });
 
 test("PUT /api/workflows/yours/:name with a folder's steps as the listing has them writes nothing: every file is kept, comments, budget and all", async () => {
@@ -267,6 +272,37 @@ test("a folder that writes a list under its former name — `disallow:`, `allow:
   const saved = await put('former', { steps: [{ ...step, spec: { ...step.spec, allowedTools: ['Edit(notes/**)'] } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(fs.readFileSync(path.join(dir, 'write.md'), 'utf8'), '---\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n');
+});
+
+test("a codex step that names its sandbox as `permissionMode:`, as before 2026-09-23, is listed with its `sandbox`, and a save writes `sandbox:`; REFUSED: a page from before, which sends `permissionMode`, and `sandbox` on a Claude Code step — nothing written", async () => {
+  const dir = path.join(STORE, 'fenced');
+  write(path.join(dir, 'review.md'), '---\nharness: codex\npermissionMode: read-only\n---\nReview it.\n');
+  const [step] = await listedSteps('fenced') as [ListedStep];
+  assert.deepEqual([step.spec.sandbox, step.spec.permissionMode], ['read-only', null], 'listed under Codex\'s name, never as a Claude Code mode');
+
+  const before = snapshot(dir);
+  const { sandbox, ...rest } = step.spec;
+  const stale = await put('fenced', { steps: [{ ...step, spec: { ...rest, permissionMode: sandbox } }] });
+  const refusal = await stale.json() as BuildRefused;
+  assert.equal(stale.status, 422, JSON.stringify(refusal));
+  assert.equal(refusal.error, 'review: `permissionMode: read-only` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send `sandbox: read-only` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.');
+  assert.deepEqual(refusal.steps, ['review']);
+  assert.deepEqual(snapshot(dir), before, 'nothing written');
+
+  // A Claude Code step has no sandbox: refused naming its own fence.
+  const claude = await put('fenced', { steps: [{ ...step, spec: { ...step.spec, harness: 'claude' } }] });
+  const refused = await claude.json() as BuildRefused;
+  assert.equal(claude.status, 422, JSON.stringify(refused));
+  assert.ok(refused.error.startsWith("review: `sandbox: read-only` is not a key claude takes. `sandbox:` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, `permissionMode:`"), refused.error);
+  assert.deepEqual(snapshot(dir), before, 'nothing written');
+
+  // Saved unchanged, the file is kept, as it reads as the step; saved with a change from today's page, it says `sandbox:`.
+  const kept = await put('fenced', { steps: [step] });
+  assert.equal(kept.status, 200, await kept.clone().text());
+  assert.deepEqual(snapshot(dir), before, 'kept');
+  const saved = await put('fenced', { steps: [{ ...step, spec: { ...step.spec, sandbox: 'workspace-write' } }] });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  assert.equal(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), '---\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n');
 });
 
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {

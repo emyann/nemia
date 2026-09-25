@@ -4,7 +4,7 @@ An agent is a node's attachment, and we pass it a brief. A step is a node of its
 what it is handed (`input:`) and what it hands on (`output:`) — and what is attached to it does the work. A file here
 is one such attachment, written once and named by every node that uses it (`agent: reviewer`): its frontmatter says
 who it is — `description:` and `skills:`, then the keys of a role (`harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `output`) — and its body is its instructions. The step file keeps the wiring: `after`, `input`,
+`permissionMode` on Claude Code or `sandbox` on codex, `tools`, `disallowedTools`, `allowedTools`, `remote`, `output`) — and its body is its instructions. The step file keeps the wiring: `after`, `input`,
 `workspace`, `check`, `budget`, `loop`, `gate`.
 
 | agent | steps that name it |

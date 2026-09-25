@@ -233,7 +233,8 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
           ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
           ['disallowed tools', fence.disallowedTools.join(', ') || 'nothing'],
           ['allowed tools', fence.allowedTools.join(', ') || 'nothing'],
-          ['permission mode', fence.permissionMode ?? OWN],
+          // Each harness has one fence under its own name: Codex's sandbox, Claude Code's permission mode.
+          step.harness === 'codex' ? ['sandbox', fence.sandbox ?? OWN] : ['permission mode', fence.permissionMode ?? OWN],
           ['effort', fence.effort ?? OWN],
           ['mcp', 'none named: a step has no mcp: key'],
         ] as const).map(([label, value]) => (
@@ -246,7 +247,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
 
       {!step.claudeCode ? (
         <p data-not-claimed className="text-sm text-neutral-500">
-          Runs on {step.harness}, which has no tool list: its fence is the sandbox its permission mode names. What a {step.harness} session is given
+          Runs on {step.harness}, which has no tool list: its fence is its sandbox, the step's <span className="font-mono">sandbox:</span>. What a {step.harness} session is given
           was not measured, so no tool, skill or server is claimed for it. {allowed.why}
         </p>
       ) : (

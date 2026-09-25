@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
   addStep, connect, contextText, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
-  setKey, setSchema, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
+  setKey, setSchema, takes, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
@@ -188,7 +188,7 @@ test("an agent attached to a step makes what it has its own; taken away, the ste
 
 /** What the api says each agent gives a step: `coder` as `attached` has it, and `reviewer`, which sets a model and nothing else. */
 const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
-  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
+  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
   agents: { coder: { harness: 'claude', model: 'opus', effort: 'high' }, reviewer: { model: 'sonnet' } },
 };
 
@@ -203,4 +203,16 @@ test("a step moved to another agent shows what that agent gives it, and nothing 
 
   const unset = setKey(setKey(draftOf(attached), 'build', 'effort', 'low', agents), 'build', 'effort', null, agents);
   assert.deepEqual([unset[0]!.spec.effort, unset[0]!.own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
+});
+
+test("a step's form has its harness's fence alone: a permission mode on Claude Code, a sandbox on codex", () => {
+  const harness = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'claude-detached'], byHarness: null } as const;
+  const permissionMode = { byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] } };
+  const sandbox = { byHarness: { codex: ['read-only'] } };
+  const form = { keys: [harness] } as unknown as Pick<KeyForm, 'keys'>;
+  assert.deepEqual([takes(form, sandbox, 'codex'), takes(form, permissionMode, 'codex')], [true, false]);
+  assert.deepEqual([takes(form, sandbox, 'claude'), takes(form, permissionMode, 'claude')], [false, true]);
+  assert.equal(takes(form, { byHarness: null }, 'codex'), true, 'a key that is not a harness word is every harness\'s');
+  assert.equal(takes(form, sandbox, 'nowhere'), true, 'a harness the form does not know is judged on save');
+  assert.equal(UNSET.sandbox, null);
 });

@@ -38,11 +38,15 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
   ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],
-  ['permission mode', modeRow(spec.permissionMode, filed)],
+  // A codex step's fence is its sandbox, which the engine's task files as its permission mode: the same row, under Codex's name.
+  [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
   ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
+
+/** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
+export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string => (spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode');
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
@@ -74,17 +78,26 @@ function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
  */
 function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
   const runs = filed?.runsIn;
-  if (!filed || !runs) return ranWith(workflow, filed, (f) => f.permissionMode);
+  const asFiled = filed && filedFence(filed.permissionMode, workflow);
+  if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.permissionMode, workflow));
   if (runs.by === 'tools') {
     const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
     return <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />;
   }
   if (workflow === null) return <Marked value={runs.mode} mark="default" />;
-  if (filed.permissionMode !== workflow) {
+  if (asFiled !== workflow) {
     return <Marked value={runs.mode} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`} />;
   }
   return runs.mode === workflow ? code(workflow) : <Marked value={runs.mode} mark="as run" title={`The workflow says ${workflow}, which its harness runs as ${runs.mode}.`} />;
 }
+
+/**
+ * The fence a try was filed with, in the words the workflow now uses for it. A codex run frozen before 2026-09-23 named its widest sandbox
+ * `permissionMode: bypassPermissions`, which its record now reads as `sandbox: danger-full-access` (`asNamed`) while the engine's task keeps
+ * the word it was filed with; Codex ran it `-s danger-full-access` either way, so it is the same fence and no try of its own.
+ */
+const filedFence = (filed: string | null, workflow: string | null): string | null =>
+  filed === 'bypassPermissions' && workflow === 'danger-full-access' ? workflow : filed;
 
 function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {
   return (

@@ -10,8 +10,8 @@ import { parseCloseout, type Closeout } from './closeout.ts';
 import { answerOf, type Retry } from './retry.ts';
 import { timeline, type Timeline } from './timeline.ts';
 import { readAnswers, readAsks, readRun, stepsOf } from './store.ts';
-import { shippedOf, standingsOf } from './branches.ts';
-import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, engineWord, harnessBlocked, parentsOf, readFilings, saidCount, saidIn, spendReader, taskPhases, waitingOf, type CheckReport } from './views.ts';
+import { branchReader, shippedOf, standingsOf, type BranchReader } from './branches.ts';
+import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, engineWord, harnessBlocked, parentsOf, saidCount, saidIn, spendReader, taskPhases, viewedOnce, waitingOf, type CheckReport } from './views.ts';
 import { checkoutHold, runSlots } from './tick.ts';
 
 /**
@@ -20,25 +20,28 @@ import { checkoutHold, runSlots } from './tick.ts';
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the
  * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
  */
-export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing> {
+export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReader = branchReader()): Promise<Listing> {
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
   const { asks, rounds } = readAsks(run.id);
   // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
-  const standings = standingsOf(run);
+  const standings = standingsOf(run, git);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
-  const parent = await parentsOf(e, run);
+  const parent = await parentsOf(e, run, git);
   return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, parent), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views), deniedOf(views), holdsOf(run, parent));
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
 
-/** What is left for a person to do — the pure call, with git asked the one question it owns. */
-export async function decide(e: Engine, id: string): Promise<{
+/**
+ * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
+ * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both.
+ */
+export async function decide(engine: Engine, id: string): Promise<{
   run: Run;
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
@@ -100,6 +103,8 @@ export async function decide(e: Engine, id: string): Promise<{
   /** What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged. */
   toDecide?: ToDecide;
 }> {
+  const e = viewedOnce(engine);
+  const git = branchReader();
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
@@ -114,9 +119,9 @@ export async function decide(e: Engine, id: string): Promise<{
   const spendOf = spendReader(views);
   // Which run's ending step has the repository's own checkout, when this run's waits for it: a run still running for that, and nothing else.
   const checkout = await checkoutHold(e, run, steps);
-  const d = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+  const d = decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   // Where the result stands against the base branch, read off git now — and what that leaves a person to decide (`assess`, on the same facts).
-  const standings = standingsOf(run);
+  const standings = standingsOf(run, git);
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.
@@ -150,8 +155,9 @@ export async function decide(e: Engine, id: string): Promise<{
     }
     if (told.length) said[name] = told;
   }
-  // A screen that cannot read the feed this time is still the screen: the queue times say they are not known.
-  const filed = await readFilings(e).then(({ filed }) => filed, () => new Map<string, string>());
+  // When each try's task and check was filed, off the views just read (`State.filedAt`, the `at` of each journal's `filed` entry): the
+  // engine's feed says the same of every task ever filed, and was read whole for one run — 15 MB of the live store's, on 2026-09-25.
+  const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const used = consumption(views, run);
   const costs = Object.fromEntries(Object.entries(run.steps).filter(([, record]) => record.taskId || record.tries?.length)
     .map(([name]) => [name, costLine(steps.find((s) => s.name === name), run, name, used[name], spendOf)]));
@@ -178,7 +184,7 @@ export async function decide(e: Engine, id: string): Promise<{
   // so the api's decision, which calls the same functions, says the same. A held run files nothing while the hold stands, the same way
   // (`heldRefusal`).
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
-  const parent = await parentsOf(e, run);
+  const parent = await parentsOf(e, run, git);
   return {
     run, decision: d, closeouts, checks,
     retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),

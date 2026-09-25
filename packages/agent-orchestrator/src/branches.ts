@@ -30,30 +30,35 @@ import { git, gitSays } from './worktree.ts';
  * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
  * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
  */
-export function isShipped(run: GitRun, branch: string): Shipped {
-  const within = (commit: string, base: string) => execCounted('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
-  // On the base branch already: with commits past the run's base, or none. Exit 1 is git's no — the commit is not within the run's base.
-  const landed = (commit: string): Shipped => {
-    try {
-      within(commit, run.baseRef);
-      return 'unchanged';
-    } catch (err) {
-      return (err as { status?: number }).status === 1 ? true : 'unchanged';
-    }
-  };
+export const isShipped = (run: GitRun, branch: string): Shipped => shippedBy(askGit, run, branch);
+
+/**
+ * Whether `commit` is within `base` — git's `merge-base --is-ancestor` — as `yes`, git's `no` (its exit 1), or `unknown`: a name git cannot read.
+ * What `isShipped` asks, twice at most for a branch; answered by one process each here, and by a listing of the repository's branches in a
+ * `BranchReader`.
+ */
+type Within = (repo: string, commit: string, base: string) => 'yes' | 'no' | 'unknown';
+
+const askGit: Within = (repo, commit, base) => {
   try {
-    within(branch, run.branch);
+    execCounted('git', ['merge-base', '--is-ancestor', commit, base], { cwd: repo, stdio: 'ignore' });
+    return 'yes';
   } catch (err) {
-    // Exit 1 is git's no. Anything else is a name git cannot read, and the tip is asked instead — only then, since a branch that is
-    // still there and not on the base has not landed, whatever an older tip of it says.
-    const tip = run.tips?.[branch];
-    if ((err as { status?: number }).status === 1 || !tip) return false;
-    try {
-      within(tip, run.branch);
-    } catch { return false; }
-    return landed(tip);
+    return (err as { status?: number }).status === 1 ? 'no' : 'unknown';
   }
-  return landed(branch);
+};
+
+function shippedBy(within: Within, run: GitRun, branch: string): Shipped {
+  // On the base branch already: with commits past the run's base, or none. Git's no is the commit is not within the run's base; a name it
+  // cannot read is `unchanged`, decided by a person.
+  const landed = (commit: string): Shipped => (within(run.repo, commit, run.baseRef) === 'no' ? true : 'unchanged');
+  const onBase = within(run.repo, branch, run.branch);
+  if (onBase === 'yes') return landed(branch);
+  // Git's no is final. A name git cannot read is asked by its tip instead — only then, since a branch that is still there and not on the base
+  // has not landed, whatever an older tip of it says.
+  const tip = run.tips?.[branch];
+  if (onBase === 'no' || !tip) return false;
+  return within(run.repo, tip, run.branch) === 'yes' ? landed(tip) : false;
 }
 
 /**
@@ -65,18 +70,185 @@ export function isShipped(run: GitRun, branch: string): Shipped {
  * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
  */
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
-export const standingsOf = (run: Run): BranchStanding[] => (isGitRun(run) ? branchStandings(run, resultBranches(run)) : []);
+export const standingsOf = (run: Run, git: BranchReader = oneByOne): BranchStanding[] => (isGitRun(run) ? branchStandings(run, resultBranches(run), git) : []);
 
 /** Whether a branch of the run is on its base (`isShipped`): never, for a folder run, which has no branch to ask about. */
-export const shippedOf = (run: Run) => (branch: string): Shipped => (isGitRun(run) ? isShipped(run, branch) : false);
+export const shippedOf = (run: Run, git: BranchReader = oneByOne) => (branch: string): Shipped => (isGitRun(run) ? git.shipped(run, branch) : false);
 
-export function branchStandings(run: GitRun, branches: readonly string[]): BranchStanding[] {
+export function branchStandings(run: GitRun, branches: readonly string[], git: BranchReader = oneByOne): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
-    if (isShipped(run, branch) !== false) return { branch, where: 'on' };
-    if (gitSays(run.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) === undefined) return { branch, where: 'gone' };
-    const count = Number(gitSays(run.repo, 'rev-list', '--count', `${run.branch}..${branch}`)?.trim());
-    return { branch, where: 'ahead', commits: Number.isSafeInteger(count) ? count : 0 };
+    if (git.shipped(run, branch) !== false) return { branch, where: 'on' };
+    if (!git.has(run.repo, branch)) return { branch, where: 'gone' };
+    return { branch, where: 'ahead', commits: git.ahead(run, branch) };
   });
+}
+
+/**
+ * What git says of result branches — `isShipped`, whether git has a branch, how far one is ahead of its base — for one command or one
+ * request. `oneByOne` asks git a process for each question, as `isShipped` always has. `branchReader()` answers them from one
+ * `for-each-ref` of a repository's branches with each branch's distance from a base (`%(ahead-behind:<base>)`, git 2.41), made once for
+ * each repository and base and kept for the reader's life, which is the command's: `wf ls` over 200 finished runs asked 406
+ * `merge-base --is-ancestor` (measured 2026-09-25). `prime(runs)` lists every base those runs will ask about in one process per repository.
+ *
+ * The same answers: a question the listing cannot answer — a branch it does not list, a commit that is no branch, a listing git refused
+ * because a base is unreadable, or an older git — is asked one by one, as before. A reader is a cache of git's word for as long as the
+ * command runs, never kept past it: a person merging by hand changes the answer.
+ */
+export type BranchReader = {
+  shipped(run: GitRun, branch: string): Shipped;
+  /** Whether git has the branch (`rev-parse --verify refs/heads/<branch>`). */
+  has(repo: string, branch: string): boolean;
+  /** The commits on the branch that the run's base branch does not have (`rev-list --count <base>..<branch>`); none where git cannot count. */
+  ahead(run: GitRun, branch: string): number;
+  /**
+   * List, in one process for each repository, every base these runs will ask about: their base branches and the commits they were cut at.
+   * Made on the first question about the repository, so a repository nothing is asked about costs no process.
+   */
+  prime(runs: readonly Run[]): void;
+  /**
+   * Each branch of the repository and its commit, off the listing the answers were read from — what a memo of those answers keys them by,
+   * so a branch that moves between the answer and the key is read as moved. Empty where git would not list them.
+   */
+  heads(repo: string): ReadonlyMap<string, string>;
+};
+
+const countOf = (said: string | undefined) => {
+  const count = Number(said?.trim());
+  return Number.isSafeInteger(count) ? count : 0;
+};
+
+/** Each question, a process of its own. */
+export const oneByOne: BranchReader = {
+  shipped: (run, branch) => isShipped(run, branch),
+  has: (repo, branch) => gitSays(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) !== undefined,
+  ahead: (run, branch) => countOf(gitSays(run.repo, 'rev-list', '--count', `${run.branch}..${branch}`)),
+  prime: () => {},
+  heads: (repo) => new Map(Object.entries(headsOf(repo))),
+};
+
+/** A commit's full name, which a base is when it is a run's `baseRef`: never a branch, so a listing for it is made by `prime` alone. */
+const isCommitName = (name: string) => /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(name);
+
+export function branchReader(): BranchReader {
+  /**
+   * For each repository: each branch's commit (`null` where git would not list them), each branch's distance ahead of each base listed
+   * (`null` for a base git would not list), and every question answered, by the commit and the base asked about.
+   */
+  const repos = new Map<string, { heads?: Map<string, string> | null; ahead: Map<string, Map<string, number> | null>; asked: Map<string, ReturnType<Within>> }>();
+  const of = (repo: string) => {
+    let r = repos.get(repo);
+    if (!r) repos.set(repo, r = { ahead: new Map(), asked: new Map() });
+    return r;
+  };
+
+  const listing = (repo: string, bases: readonly string[]) => {
+    const format = ['%(objectname)', ...bases.map((b) => `%(ahead-behind:${b})`), '%(refname)'].join(' ');
+    const listed = gitSays(repo, 'for-each-ref', `--format=${format}`, 'refs/heads/');
+    if (listed === undefined) return undefined;
+    const heads = new Map<string, string>();
+    const each = bases.map(() => new Map<string, number>());
+    for (const line of listed.split('\n')) {
+      const words = line.split(' ');
+      if (words.length < 2 + bases.length * 2) continue;
+      const branch = words.slice(1 + bases.length * 2).join(' ').replace(/^refs\/heads\//, '');
+      heads.set(branch, words[0]!);
+      bases.forEach((_, k) => each[k]!.set(branch, Number(words[1 + k * 2])));
+    }
+    return { heads, each };
+  };
+
+  /**
+   * One `for-each-ref` of every branch, with its distance from each base not yet listed. Git refuses the whole listing for one base it cannot
+   * read — a commit a run was cut at that is gone from the repository — so where it does, the commits it can read are asked for in one more
+   * process (`rev-list --no-walk --ignore-missing`) and listed again without the rest; a base branch the repository does not have is found by
+   * a listing of the branches alone, and the rest listed again; a base still not listed is asked one by one.
+   */
+  const list = (repo: string, bases: readonly string[]) => {
+    const r = of(repo);
+    let fresh = [...new Set(bases)].filter((b) => !r.ahead.has(b));
+    if (!fresh.length && r.heads !== undefined) return;
+    let listed = listing(repo, fresh);
+    if (!listed && fresh.some(isCommitName)) {
+      const commits = fresh.filter(isCommitName);
+      const readable = new Set((gitSays(repo, 'rev-list', '--no-walk', '--ignore-missing', ...commits) ?? '').split('\n'));
+      for (const c of commits) if (!readable.has(c)) r.ahead.set(c, null);
+      const without = fresh.filter((b) => !isCommitName(b) || readable.has(b));
+      // Every commit readable, the listing would be refused again: the base it cannot read is a branch.
+      if (without.length < fresh.length) listed = listing(repo, fresh = without);
+    }
+    if (!listed && fresh.length) {
+      // A base branch the repository does not have: the branches alone, and again with the bases among them.
+      const bare = listing(repo, []);
+      if (bare) {
+        r.heads ??= bare.heads;
+        const known = fresh.filter((b) => isCommitName(b) || bare.heads.has(b));
+        for (const b of fresh) if (!known.includes(b)) r.ahead.set(b, null);
+        fresh = known;
+        listed = fresh.length ? listing(repo, fresh) : bare;
+      }
+    }
+    if (!listed) {
+      for (const b of fresh) r.ahead.set(b, null);
+      r.heads ??= null;
+      return;
+    }
+    r.heads ??= listed.heads;
+    fresh.forEach((b, k) => r.ahead.set(b, listed.each[k]!));
+  };
+
+  /** The bases `prime` was handed for each repository, listed on the first question about it. */
+  const primed = new Map<string, Set<string>>();
+  const asking = (repo: string) => {
+    const bases = primed.get(repo);
+    if (bases) {
+      primed.delete(repo);
+      list(repo, [...bases]);
+    }
+    return of(repo);
+  };
+
+  const within: Within = (repo, commit, base) => {
+    const r = asking(repo);
+    const key = `${commit} ${base}`;
+    const known = r.asked.get(key);
+    if (known) return known;
+    if (!r.ahead.has(base) && !isCommitName(base)) list(repo, [base]);
+    const listed = r.ahead.get(base)?.get(commit);
+    const said: ReturnType<Within> = listed !== undefined ? (listed === 0 ? 'yes' : 'no')
+      // A commit is within itself: a branch still at the commit the run was cut at.
+      : commit === base || r.heads?.get(commit) === base ? 'yes'
+      : askGit(repo, commit, base);
+    r.asked.set(key, said);
+    return said;
+  };
+
+  return {
+    shipped: (run, branch) => shippedBy(within, run, branch),
+    has: (repo, branch) => {
+      const r = asking(repo);
+      if (r.heads === undefined) list(repo, []);
+      return r.heads ? r.heads.has(branch) : oneByOne.has(repo, branch);
+    },
+    ahead: (run, branch) => {
+      if (!asking(run.repo).ahead.has(run.branch)) list(run.repo, [run.branch]);
+      const listed = of(run.repo).ahead.get(run.branch)?.get(branch);
+      return listed ?? oneByOne.ahead(run, branch);
+    },
+    heads: (repo) => {
+      const r = asking(repo);
+      if (r.heads === undefined) list(repo, []);
+      return r.heads ?? new Map();
+    },
+    prime: (runs) => {
+      for (const run of runs) {
+        if (!isGitRun(run)) continue;
+        let set = primed.get(run.repo);
+        if (!set) primed.set(run.repo, set = new Set());
+        set.add(run.branch);
+        set.add(run.baseRef);
+      }
+    },
+  };
 }
 
 /**
@@ -84,13 +256,13 @@ export function branchStandings(run: GitRun, branches: readonly string[]): Branc
  * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
  * edge by (`afterRefusal`), and where `parentOf` starts.
  */
-export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
+export function parentRecord(id: string, git: BranchReader = oneByOne): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
   try { record = readRun(id); } catch { return {}; }
   let branches: string[];
   try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
-  const git = isGitRun(record) ? record : undefined;
-  const gone = git ? branches.filter((b) => gitSays(git.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined && !isShipped(git, b)) : [];
+  const cut = isGitRun(record) ? record : undefined;
+  const gone = cut ? branches.filter((b) => !git.has(cut.repo, b) && !git.shipped(cut, b)) : [];
   return { record, ...(gone.length ? { gone } : {}) };
 }
 

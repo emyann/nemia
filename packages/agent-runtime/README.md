@@ -1414,6 +1414,7 @@ registration, `~/.claude/sessions/<pid>.json`, which a running session writes fo
 |---|---|---|
 | `tick` | every session's state | `observeFor`, once a pass: `claude agents` only when a session expected is no job |
 | `list()` | every task's phase | `observe`, once |
+| `list(ids)` | the phase of those tasks: the api's list of runs, for the runs it has not kept | `observeFor` the last attempt of each in flight among them, once: `claude agents` only for a background session; nothing when none is in flight |
 | `view(id)`, attempt in flight | its session's state — working, idle, blocked — and, for a blocked one, what the harness says it waits for | `observeFor` its own sessions: `claude agents` for a background session |
 | `view(id)`, any other task | its phase, and its session's id once an attempt has ended: both on the record | nothing; `find` for a session whose id the record lacks |
 | `logs(id)` | the session's id | as `view(id)` |

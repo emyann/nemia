@@ -4602,7 +4602,8 @@ runs in flight; `artifacts/implement/measure-ls-api.ts` of this run):
 `wf ls` reads each run's journals twice (the slots, then the listing) and asks `git merge-base --is-ancestor` twice for each git run
 (`isShipped` through the standings and the decision). `/api/runs` reads every task's journal once a request (`everyView`, through
 `e.list()`) and observes each harness once; its git is memoised on the base (`judged.ts`). Neither observes more with more finished
-runs. Making them pay by what is in flight, as the pass now does, is a card of its own.
+runs. Making them pay by what is in flight, as the pass now does, is a card of its own (shipped since, 2026-09-25: *Shipped:
+`wf ls`, `wf decide` and the api pay for what they show*).
 
 **What it leaves.** Two cards. The runtime's own pass still folds every task's journal (agent-runtime's open issue 33): the
 orchestrator's phases no longer grow with the store, and the `runtime` phase still does (shipped since, 2026-09-25: *Shipped: the
@@ -4682,6 +4683,47 @@ once in its step): agent-runtime's open issue 33.
 
   A first pass reads the feed whole to learn where it ends (open issue 33). The probe's times are a warm page cache with no harness
   observed; the live `runtime` phase of `wf up --stats` after the merge is the confirmation.
+
+## Shipped: `wf ls`, `wf decide` and the api pay for what they show
+
+Shipped 2026-09-25. At 200 finished runs `wf ls` took about 900 ms, read 418 journals and ran `git merge-base --is-ancestor` 406
+times, and `/api/runs` read every journal in the store on every poll (1,850 on the live store). The owner approved the tick's rest memo's
+approach for the api: a cache of a pure function keyed by the same facts, rebuilt on restart, proven by `WF_VERIFY_REST` in the tests.
+
+- **A task's journal is read once for its view** (the runtime's `view`), and `wf ls` reads each run's views once (`viewedOnce`), where it
+  read them for the slots and again for the listing.
+- **Git is asked once a repository** (`branchReader` in `src/branches.ts`): one `for-each-ref` with `%(ahead-behind:<base>)` for every
+  base the runs name, listed on the first question about that repository, answers what `isShipped` and `branchStandings` asked one
+  process at a time (`oneByOne`, kept as the reference its test compares with, shape by shape). Git refuses the whole listing for one base
+  it cannot read — a commit it does not have, a branch it does not have — so the reader lists again without it and asks that one run's
+  questions one by one. `heads(repo)` gives the tips off the same listing, what the api's memo keys by.
+- **The runtime lists some tasks** (`list(taskIds)`, `viewsOf` in agent-runtime's engine.ts): each journal named read once, and the
+  harnesses told the last attempt of each task in flight among them (`observeFor`) — one look however many, and none with none in flight.
+  This meets the operator's fallback (one `list()` when several `claude --bg` tasks are in flight) differently: one observation that asks
+  `claude agents` only for a background session, with no journal read that was not named.
+- **The api answers a run at rest from memory** (`apps/api/src/resting.ts`), keyed as the tick's memo is: `restStamps`, the record as
+  read, the feed since (`evictedBy`), and the tips of the branches git was asked about that are not on the base, with the base's. What it
+  keeps is what the list says, not what a pass would file: a final status or a pruned run, nothing moving, waited on or held, every task
+  settled, the workflow frozen, every git question answered. `startedAt` is read per request, so a kept answer holds no clock. The runs it
+  judges are read through one `list(taskIds)`, with the runs they wait on or are held until. A run's detail reads the same way.
+- **Proved.** The api's test harness sets `WF_VERIFY_REST=1`, so every api test judges each kept answer afresh and fails the request on a
+  difference. `apps/api/test/resting.test.ts` moves each watch — the record, an ask, a feed line, a branch merged, the run removed — and a
+  mutant of each fails its test; a journal changed with no feed line is shown unseen, and the check catches it.
+- **Measured** (`artifacts/implement/{before,after}.txt` of the run, a fixture of 200 finished runs, and a copy of the live store with its
+  repositories as scratch mirrors, never ticked):
+
+  | | before | after |
+  |---|---|---|
+  | `wf ls`, fixture | 881 ms, 418 reads, 406 git | 36 ms, 209 reads, 3 git |
+  | `wf ls`, live copy | 1,261 ms, 2,838 reads, 342 git | 307 ms, 1,795 reads, 2 git |
+  | `wf decide`, live copy | 60 ms, 11 reads | 18 ms, 5 reads |
+  | `/api/runs` again, fixture | 34 ms, 209 reads | 13 ms, 3 reads |
+  | `/api/runs` again, live copy | 223 ms, 1,849 reads | 62 ms, 643 reads |
+
+- **Still paid.** The live copy's 643 reads on a poll are mostly the detached harnesses' run files (871 on the live store): Codex, check
+  and claude-detached have no `observeFor`, so a look at them — made whenever a task among those judged is in flight, and on every pass
+  of the tick — reads every run file each ever wrote. An `observeFor` on the detached runner is the runtime's card. `wf ls` shows every
+  run and still reads every run's journals. The api's `/api/ceilings` reads every journal (`everyView`) when a cap is set.
 
 ## 1. A run that grows steps from a plan
 

@@ -6,7 +6,7 @@ import { folderFiles, type StepArtifact } from './artifacts.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
-import { bare, e, everyView, filedTimes, judgedSteps, seenBy, stepNames, type TaskView, type Views, workflowsOf, workFolderOf } from './store.ts';
+import { bare, e, filedTimes, judgedSteps, stepNames, type TaskView, type Views, viewsFor, workflowsOf, workFolderOf } from './store.ts';
 import { attemptsIn, closeoutIn, type StepAttempts, type StepCloseout, type StepTry, triesOf, unreadableIn } from './tries.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
@@ -431,20 +431,19 @@ export async function detail(run: Run): Promise<RunDetail> {
   const folder = workflowsOf(run);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  // Every task in the store over one observation, as the list reads them, rather than a `view` — an observation, ~0.3 s here — for
-  // each task of each try, one after another, on a page polled every five seconds: a loop's later rounds made that seconds a poll.
-  // Folding every journal cost about what one observation does (163 journals, 2026-09-13). The record is read first, as the list reads it.
-  // One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
-  // run's own detail reads.
-  const views = await everyView();
-  const seen = seenBy(views);
+  // The run's tasks, every try's, over one look at the harnesses (`viewsFor`), as the list reads them, rather than a `view` — an
+  // observation, ~0.3 s here — for each task of each try, one after another, on a page polled every five seconds: a loop's later rounds
+  // made that seconds a poll. Until 2026-09-25 it was every task in the store (1,850 journals on the live store), for one run's handful.
+  // The record is read first, as the list reads it. One more observation for each refused check's output (`checksOf`) and each blocked
+  // session's last line (`lastLineOf`), which only a run's own detail reads.
+  const { views, reader: seen } = await viewsFor([run]);
   const judged = judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) => standingsOf(run, steps, status));
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
   // Off the views already read: no observation of its own.
   const used = consumption(views, run);
-  // Off the same views — every task in the store, so every try's — and the feed's filing times: no observation either.
+  // Off the same views — every try's task — and the feed's filing times: no observation either.
   // And the steps the run is judged by, whose loops its rounds are of.
   const filed = await filedTimes();
   const clock = timeline(run, views, filed, steps);

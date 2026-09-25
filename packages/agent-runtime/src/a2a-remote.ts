@@ -1,0 +1,454 @@
+/**
+ * A remote A2A agent as a harness: the runtime's session verbs as A2A calls to an agent another party runs, over HTTP,
+ * by the SDK's client (thin runtime stage 6, part 1). The in-process seam (`a2a-client.ts`) speaks to a handler the
+ * runtime built over its own driver; here nothing of the runtime stands on the other side, so the only words exchanged are
+ * A2A's own — SendMessage, GetTask, CancelTask — and the runtime extension's methods are never asked.
+ *
+ * **The registry** is the driver's, and the record of what it sent: `<root>/remote/<session name>.json`, one file per
+ * session, written whole to a temporary file and renamed. The intent — the name, the harness, the message's id, when — is on
+ * disk before the message is sent, and the Task's id and context are written as the answer comes back, before `spawn`
+ * returns. So a spawn asked again for a name that has a file never sends twice: with a Task recorded, it adopts it; without,
+ * whether a Task started is not known, and the spawn fails in words that are no refusal, which the engine's grace window
+ * reads `lost`. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A session let
+ * go of (`release`) moves to `remote/done/`, where `find` and `logs` still read it and `observe` does not.
+ *
+ * **A pass** is one GetTask per open entry — not ListTasks, which on an agent others use lists theirs too. A Task that has
+ * ended is written into its entry and read from there, with no call, until the engine lets it go. A GetTask that fails
+ * reads the entry as it was last seen, since an agent unreachable for a moment is not a session gone, and a deadline
+ * bounds one gone for good; a Task the agent says it does not have is not listed, and the engine reads that as it reads a
+ * session no harness lists.
+ *
+ * **Auth** is what the card declares: its requirements, the first one whose every scheme can be met, each secret asked of
+ * the caller's `credentials` on every request and sent as a header. Nothing a secret is written to — the task's filing, the
+ * journal, the registry, the feed — ever holds one. A card whose every requirement asks what this runtime cannot send, or
+ * a secret `credentials` does not give, refuses the spawn before anything is sent.
+ *
+ * What the client learns of the card and the binding it chose is kept in memory, a view dropped at the first failure and
+ * read again: the registry is the record.
+ */
+import { Effect } from 'effect';
+import { AgentCard, type AgentInterface, type Message, type SecurityScheme, type Task } from '@a2a-js/sdk';
+import { Client, ClientFactory, createAuthenticatingFetchWithRetry, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
+import {
+  ContentTypeNotSupportedError, ExtensionSupportRequiredError, RequestMalformedError, TaskNotCancelableError,
+  TaskNotFoundError, UnsupportedOperationError, VersionNotSupportedError,
+} from '@a2a-js/sdk/errors';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Sighting } from './domain.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './a2a-map.ts';
+
+/**
+ * A remote A2A agent, as a harness is configured: the agent's base URL, whose card is read from
+ * `/.well-known/agent-card.json` under it (or the URL itself, when it names a `.json` file), or the card itself, as the
+ * JSON the agent would serve. Its secrets are not here: the engine's `credentials` gives each when a request needs it.
+ */
+export type RemoteAgent = { url: string } | { card: Record<string, unknown> };
+
+/** The secret for one of a card's security schemes, by its name on the card, for the agent at `agentUrl`; `undefined` when there is none. */
+export type Credentials = (scheme: string, agentUrl: string) => string | undefined;
+
+/** The bindings this runtime speaks, as a card names them. gRPC is part 3's. */
+const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
+const SPOKEN_WORDS = 'JSON-RPC (`JSONRPC`) and REST (`HTTP+JSON`), at A2A 1.0';
+
+/**
+ * Why a remote agent's configuration cannot be taken, or `undefined`. Asked by `createEngine`, so an address that could
+ * never be reached — or one that carries a secret in it, which the configuration is no place for — is refused before any
+ * task is filed on it.
+ */
+export const remoteConfigRefusal = (harness: string, agent: Record<string, unknown>): string | undefined => {
+  const keys = Object.keys(agent);
+  const extra = keys.filter((k) => k !== 'url' && k !== 'card');
+  if (extra.length) {
+    return `the \`${harness}\` harness is a remote A2A agent, which takes \`url\` or \`card\` and nothing else, and was given ${extra.map((k) => `\`${k}\``).join(', ')}. Take ${extra.length > 1 ? 'them' : 'it'} off: a secret goes in \`credentials\`, and what a task runs with is the agent's to decide.`;
+  }
+  if (keys.length !== 1) {
+    return `the \`${harness}\` harness is a remote A2A agent, which takes one of \`url\` (its base URL, where its card is served) or \`card\` (the card itself), and was given ${keys.length ? 'both' : 'neither'}.`;
+  }
+  if ('url' in agent) {
+    const url = typeof agent.url === 'string' && URL.canParse(agent.url) ? new URL(agent.url) : undefined;
+    if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+      return `the \`${harness}\` harness's \`url\` is ${typeof agent.url === 'string' ? `\`${url ? `${url.protocol}…` : agent.url}\`` : `a ${typeof agent.url}`}, and a remote A2A agent is reached over HTTP: give its \`http://\` or \`https://\` address.`;
+    }
+    if (url.username || url.password) {
+      return `the \`${harness}\` harness's \`url\` carries a user name or password, which would be written wherever the address is: take it out of the URL, and give the secret through \`credentials\`, for the scheme the agent's card declares.`;
+    }
+    return undefined;
+  }
+  const card = agent.card;
+  if (typeof card !== 'object' || card === null || Array.isArray(card)) {
+    return `the \`${harness}\` harness's \`card\` is not an agent card: give the JSON object the agent serves at \`/.well-known/agent-card.json\`, or its \`url\`.`;
+  }
+  const interfaces = (card as { supportedInterfaces?: unknown }).supportedInterfaces;
+  if (!Array.isArray(interfaces) || !interfaces.length || interfaces.some((i) => typeof i?.url !== 'string' || typeof i?.protocolBinding !== 'string')) {
+    return `the \`${harness}\` harness's \`card\` lists no interface to reach the agent by: its \`supportedInterfaces\` must give each a \`url\` and a \`protocolBinding\`.`;
+  }
+  return undefined;
+};
+
+/** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
+export const remoteRefuses = (harness: string) => (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  const keys = Object.keys(task.config ?? {});
+  return keys.length
+    ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
+    : undefined;
+};
+
+/**
+ * A card as JSON, read into the SDK's objects. A card that follows the specification is proto JSON (`AgentCard.toJSON`),
+ * and is parsed. A card served by an agent built on this SDK's own card handler is its objects stringified, whose security
+ * schemes are `{ scheme: { $case, value } }`: parsed as proto JSON, every scheme reads empty — the SDK's own resolver
+ * drops them so — and a card that asks for a token would name a scheme with nothing in it. So those are kept as they are.
+ */
+export const cardOfJson = (json: Record<string, unknown>): AgentCard => {
+  const parsed = AgentCard.fromJSON(json);
+  const schemes = json.securitySchemes as Record<string, unknown> | undefined;
+  const sdkForm = schemes && Object.values(schemes).some((s) => typeof (s as { scheme?: { $case?: unknown } })?.scheme?.$case === 'string');
+  return sdkForm ? { ...parsed, securitySchemes: schemes as Record<string, SecurityScheme> } : parsed;
+};
+
+/** The first interface of the card's that this runtime speaks, or `undefined`. */
+const interfaceOf = (card: AgentCard): AgentInterface | undefined =>
+  card.supportedInterfaces.find((i) => SPOKEN.includes(i.protocolBinding.toUpperCase()) && !i.protocolVersion.startsWith('0.'));
+
+/** The headers a card's requirements ask for, as the caller's secrets meet them — or why none can be met. */
+type Auth = { headers: Record<string, string> } | { refusal: string };
+
+/** One scheme's header, or why it cannot be sent. */
+const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () => string | undefined): [string, string] | string => {
+  const s = scheme?.scheme;
+  if (!s) return `\`${name}\` is not a scheme the card declares`;
+  const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
+    const given = secret();
+    return given === undefined || given === ''
+      ? `\`${name}\` needs a secret, and \`credentials\` gave none: give \`createEngine\` a \`credentials\` that answers for \`${name}\``
+      : [header, value(given)];
+  };
+  switch (s.$case) {
+    case 'httpAuthSecurityScheme': {
+      const kind = s.value.scheme.toLowerCase();
+      if (kind === 'bearer') return needed('authorization', (t) => `Bearer ${t}`);
+      if (kind === 'basic') return needed('authorization', (t) => `Basic ${Buffer.from(t).toString('base64')}`);
+      return `\`${name}\` is HTTP \`${s.value.scheme}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\``;
+    }
+    case 'oauth2SecurityScheme':
+    case 'openIdConnectSecurityScheme':
+      // The runtime runs no OAuth flow: the caller's `credentials` gives the token, and it is sent as a bearer.
+      return needed('authorization', (t) => `Bearer ${t}`);
+    case 'apiKeySecurityScheme':
+      return s.value.location.toLowerCase() === 'header'
+        ? needed(s.value.name.toLowerCase(), (t) => t)
+        : `\`${name}\` is an API key in a ${s.value.location || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`;
+    case 'mtlsSecurityScheme':
+      return `\`${name}\` is mutual TLS, and this runtime holds no client certificate`;
+  }
+};
+
+/** What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met. */
+const authOf = (card: AgentCard, agentUrl: string, credentials: Credentials | undefined): Auth => {
+  if (!card.securityRequirements.length) return { headers: {} };
+  const why: string[] = [];
+  for (const requirement of card.securityRequirements) {
+    const headers: Record<string, string> = {};
+    const unmet: string[] = [];
+    for (const name of Object.keys(requirement.schemes)) {
+      const h = headerOf(name, card.securitySchemes[name], () => credentials?.(name, agentUrl));
+      if (typeof h === 'string') unmet.push(h);
+      else headers[h[0]] = h[1];
+    }
+    if (!unmet.length) return { headers };
+    why.push(unmet.join(', and '));
+  }
+  return { refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${why.join('; or ')}. Nothing was sent.` };
+};
+
+/** The agent refused a request's authentication (HTTP 401 or 403): nothing it was asked was done. */
+class AuthRefused extends Error {}
+
+/** A spawn that nothing started, in words: the attempt ends `unstartable`. */
+class Refusal extends Error {}
+
+/** An A2A error an agent answers before it has done anything with a message: the send was refused, not lost. */
+const REFUSALS = [
+  ContentTypeNotSupportedError, ExtensionSupportRequiredError, RequestMalformedError, UnsupportedOperationError,
+  VersionNotSupportedError, TaskNotFoundError,
+];
+
+const authRefused = (e: unknown): boolean => e instanceof AuthRefused || (e instanceof Error && e.cause instanceof AuthRefused);
+const sendRefused = (e: unknown): boolean => authRefused(e) || REFUSALS.some((E) => e instanceof E);
+
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** One session's entry in the registry. */
+type Entry = {
+  name: string;
+  /** The harness it was sent through: the engine's name for the agent, never its address. */
+  agent: string;
+  messageId: string;
+  contextId?: string;
+  sentAt: string;
+  /** The Task the agent made of the message, once its answer is back. */
+  taskId?: string;
+  /** How it was last seen: read when the agent cannot be asked. */
+  seen?: Sighting;
+  /** The Task has ended, and `seen` is how: read from here from now on. */
+  ended?: true;
+  /** The agent answered with a Message, not a Task: the whole of the session, in its words. */
+  reply?: string;
+};
+
+const TERMINAL = new Set(['done', 'failed', 'stopped']);
+
+/**
+ * A remote A2A agent's `RunnerOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
+ * schemes; absent, only an agent that asks for no authentication is reached.
+ */
+export const remoteOps = (harness: string, agent: RemoteAgent, root: string, credentials?: Credentials): RunnerOps => {
+  const dir = path.join(root, 'remote');
+  const done = path.join(dir, 'done');
+  const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
+
+  const readEntry = (file: string): Entry | undefined => {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')) as Entry; } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw e;
+    }
+  };
+  const write = (e: Entry) => {
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = `${fileOf(e.name)}.${process.pid}.${randomUUID()}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
+    fs.renameSync(tmp, fileOf(e.name));
+  };
+  /** This harness's open entries: those at the top of the registry, sent through it. */
+  const open = (): Entry[] => {
+    let names: string[];
+    try { names = fs.readdirSync(dir); } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw e;
+    }
+    return names.filter((f) => f.endsWith('.json')).flatMap((f) => {
+      const e = readEntry(path.join(dir, f));
+      return e && e.agent === harness ? [e] : [];
+    });
+  };
+  /**
+   * The entry of the session under `sessionId`, open or let go of. A settled task's view names its session by the id
+   * recorded on its attempt, which for a remote agent is the Task's context (what a later turn continues), so a context
+   * is read as the latest Task sent in it.
+   */
+  const bySession = (sessionId: string): Entry | undefined => {
+    const all: Entry[] = [];
+    for (const under of [dir, done]) {
+      let names: string[] = [];
+      try { names = fs.readdirSync(under); } catch { /* none yet */ }
+      for (const f of names.filter((n) => n.endsWith('.json'))) {
+        const e = readEntry(path.join(under, f));
+        if (e?.agent === harness) all.push(e);
+      }
+    }
+    return all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId)
+      ?? all.filter((e) => e.contextId === sessionId && e.taskId).sort((a, b) => a.sentAt.localeCompare(b.sentAt)).at(-1);
+  };
+
+  // ─── the agent, as the client knows it: a view, dropped on failure ────────
+  const address = 'url' in agent ? agent.url : undefined;
+  let seam: Promise<{ card: AgentCard; agentUrl: string; client: Client }> | undefined;
+
+  const readCard = async (): Promise<AgentCard> => {
+    if (!address) return cardOfJson((agent as { card: Record<string, unknown> }).card);
+    const at = new URL(address).pathname.endsWith('.json') ? new URL(address) : new URL('/.well-known/agent-card.json', address);
+    let response: Response;
+    try { response = await fetch(at, { headers: { accept: 'application/json' } }); } catch (e) {
+      throw new Refusal(`the agent's card could not be read at ${at} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`);
+    }
+    if (!response.ok) throw new Refusal(`the agent's card could not be read at ${at}: it answered ${response.status} ${response.statusText}, and nothing was sent.`);
+    const json = await response.json().catch(() => undefined);
+    if (typeof json !== 'object' || json === null) throw new Refusal(`what ${at} serves is not an agent card, and nothing was sent.`);
+    return cardOfJson(json as Record<string, unknown>);
+  };
+
+  const connect = async () => {
+    const card = await readCard();
+    const chosen = interfaceOf(card);
+    if (!chosen) {
+      const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);
+      throw new Refusal(`the agent's card offers ${offered.length ? offered.join(', ') : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`);
+    }
+    const agentUrl = address ?? chosen.url;
+    // Asked on every request, so a secret that changes is sent as it is now; a refusal here was said before the send.
+    const fetchImpl = createAuthenticatingFetchWithRetry(async (input, init) => {
+      const response = await fetch(input, init);
+      if (response.status === 401 || response.status === 403) {
+        throw new AuthRefused(`the agent refused the request's authentication (${response.status} ${response.statusText}): check what \`credentials\` gives for the schemes its card declares.`);
+      }
+      return response;
+    }, {
+      headers: async () => { const a = authOf(card, agentUrl, credentials); return 'headers' in a ? a.headers : {}; },
+      shouldRetryWithHeaders: async () => undefined,
+    });
+    // The card handed over already read, with only the interface chosen: the factory takes it as it is.
+    const only: AgentCard = { ...card, supportedInterfaces: [chosen] };
+    const factory = new ClientFactory({
+      transports: [new JsonRpcTransportFactory({ fetchImpl }), new RestTransportFactory({ fetchImpl })],
+      cardResolver: { resolve: async () => only, normalizeAgentCard: (c: AgentCard) => c },
+    });
+    return { card, agentUrl, client: await factory.createFromAgentCard(only) };
+  };
+
+  const client = async () => {
+    seam ??= connect();
+    try { return await seam; } catch (e) { seam = undefined; throw e; }
+  };
+  /** A call to the agent; a failure drops what the client knew, and the next call reads the card again. */
+  const ask = async <A>(f: (c: Client) => Promise<A>): Promise<A> => {
+    const { client: c } = await client();
+    try { return await f(c); } catch (e) { seam = undefined; throw e; }
+  };
+
+  const failure = (verb: string) => (cause: unknown): RunnerError =>
+    cause instanceof RunnerError ? cause
+      : cause instanceof Refusal ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
+      : new RunnerError({ verb, message: `the \`${harness}\` harness: ${messageOf(cause)}` });
+
+  // ─── the verbs ────────────────────────────────────────────────────────────
+
+  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> => Effect.tryPromise({
+    catch: failure('spawn'),
+    try: async () => {
+      const recorded = readEntry(fileOf(r.name));
+      if (recorded?.taskId) return; // Sent before, and answered: the Task is adopted, and nothing is sent again.
+      if (recorded) {
+        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded: whether the agent made a Task of it is not known, and it is not sent twice.`);
+      }
+      const { card, agentUrl } = await client();
+      const auth = authOf(card, agentUrl, credentials);
+      if ('refusal' in auth) throw new Refusal(auth.refusal);
+      const intent: Entry = { name: r.name, agent: harness, messageId: randomUUID(), ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}), sentAt: new Date().toISOString() };
+      write(intent);
+      let answer: Task | Message;
+      try {
+        answer = await ask((c) => c.sendMessage({
+          tenant: '', message: remoteMessageOf(r, intent.messageId), metadata: undefined,
+          configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+        }));
+      } catch (e) {
+        // Refused, the agent did nothing with the message, and the intent goes: nothing was started under the name.
+        if (sendRefused(e)) {
+          fs.rmSync(fileOf(r.name), { force: true });
+          throw new Refusal(`${messageOf(e)}${authRefused(e) ? '' : ' Nothing was started.'}`);
+        }
+        throw e;
+      }
+      if ('status' in answer) {
+        write({ ...intent, taskId: answer.id, contextId: answer.contextId });
+        return;
+      }
+      // Answered with a Message: the agent made no Task, and what it said is the session, ended.
+      const text = answer.parts.map((p) => (p.content?.$case === 'text' ? p.content.value : p.content?.$case === 'data' ? JSON.stringify(p.content.value) : '')).join('\n');
+      const data = answer.parts.find((p) => p.content?.$case === 'data');
+      write({
+        ...intent, taskId: answer.messageId, contextId: answer.contextId, reply: text, ended: true,
+        seen: {
+          sessionId: answer.messageId, state: 'done', ...(answer.contextId ? { nativeId: answer.contextId } : {}),
+          ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
+        },
+      });
+    },
+  });
+
+  /** One open entry, as seen now: from the registry once ended, else asked of the agent. */
+  const sightingOf = async (e: Entry & { taskId: string }): Promise<Sighting | undefined> => {
+    if (e.ended && e.seen) return e.seen;
+    let task: Task;
+    try {
+      task = await ask((c) => c.getTask({ tenant: '', id: e.taskId, historyLength: 0 }));
+    } catch (err) {
+      if (err instanceof TaskNotFoundError) return undefined;
+      // Not reached this time: as it was last seen, which a deadline bounds.
+      return e.seen ?? { sessionId: e.taskId, state: 'working', ...(e.contextId ? { nativeId: e.contextId } : {}) };
+    }
+    const s = sightingOfTask(task, Date.now());
+    if (TERMINAL.has(s.state)) write({ ...e, seen: s, ended: true });
+    else if (s.state !== e.seen?.state || s.waitingFor !== e.seen?.waitingFor || s.nativeId !== e.seen?.nativeId) write({ ...e, seen: s });
+    return s;
+  };
+
+  const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.tryPromise({
+    catch: failure('observe'),
+    try: async () => {
+      const entries = open().filter((e): e is Entry & { taskId: string } => e.taskId !== undefined);
+      const seen = await Promise.all(entries.map(async (e) => [e.name, await sightingOf(e)] as const));
+      return new Map(seen.filter((pair): pair is readonly [string, Sighting] => pair[1] !== undefined));
+    },
+  });
+
+  /** Cancel the Task; one that has ended, or that the agent no longer has, has nothing to stop. */
+  const cancel = (taskId: string) => ask((c) => c.cancelTask({ tenant: '', id: taskId, metadata: undefined })).then(
+    () => undefined,
+    (e) => { if (e instanceof TaskNotCancelableError || e instanceof TaskNotFoundError) return undefined; throw e; },
+  );
+
+  const stop = (sessionId: string): Effect.Effect<void, RunnerError> => Effect.tryPromise({
+    catch: failure('stop'),
+    try: async () => {
+      const e = bySession(sessionId);
+      if (e?.reply !== undefined) return; // A reply is no Task: nothing runs.
+      await cancel(e?.taskId ?? sessionId);
+    },
+  });
+
+  const logs = (sessionId: string): Effect.Effect<string, RunnerError> => Effect.tryPromise({
+    catch: failure('logs'),
+    try: async () => {
+      const e = bySession(sessionId);
+      if (e?.reply !== undefined) return `agent: ${e.reply}`;
+      const taskId = e?.taskId ?? sessionId;
+      try {
+        return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined })));
+      } catch (err) {
+        if (err instanceof TaskNotFoundError) return `(the agent no longer has the Task \`${taskId}\`)`;
+        throw err;
+      }
+    },
+  });
+
+  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> => Effect.try({
+    catch: failure('find'),
+    try: () => {
+      const e = readEntry(fileOf(name)) ?? readEntry(fileOf(name, done));
+      return e?.agent === harness && e.taskId ? { sessionId: e.taskId } : undefined;
+    },
+  });
+
+  // The engine has written the attempt's end: a Task still running is cancelled — an attempt ends so only on its deadline or
+  // a stop — and the entry leaves the open registry, so no later pass asks the agent about it.
+  const release = (session: Sighting): Effect.Effect<void, RunnerError> => Effect.tryPromise({
+    catch: failure('release'),
+    try: async () => {
+      const e = open().find((o) => o.taskId === session.sessionId);
+      if (!e) return;
+      if (!e.ended && e.reply === undefined) await cancel(session.sessionId);
+      fs.mkdirSync(done, { recursive: true });
+      fs.renameSync(fileOf(e.name), fileOf(e.name, done));
+    },
+  });
+
+  // Words for a Task that waits on its caller, as A2A's follow-up on it (the facade refuses them to a Task at work).
+  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> => Effect.tryPromise({
+    catch: failure('say'),
+    try: async () => {
+      const e = readEntry(fileOf(session.name));
+      await ask((c) => c.sendMessage({
+        tenant: '', message: remoteFollowUpOf(session.sessionId, e?.contextId ?? '', text, randomUUID()), metadata: undefined,
+        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+      }));
+    },
+  });
+
+  return { spawn, observe, find, stop, logs, release, say, refuses: remoteRefuses(harness) };
+};
+

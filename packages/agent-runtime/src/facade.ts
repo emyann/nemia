@@ -27,7 +27,8 @@ import { detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { codex } from './runner-codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
-import { a2aOps } from './a2a-client.ts';
+import { a2aOps, type SeamOps } from './a2a-client.ts';
+import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type RemoteAgent } from './a2a-remote.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
@@ -47,17 +48,19 @@ export type PromiseJournal = {
 };
 
 /**
- * A harness, as one of four things:
+ * A harness, as one of five things:
  *   `'claude'`      Claude Code as the engine runs it by default: each task a job (`claude -p`, detached by us), or a
  *                   background session (`claude --bg`, its registry Claude Code's) when its `config.background` is true
  *   `'claude-bg'`   Claude Code's own background sessions, every task — it keeps the registry
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
+ *   a `RemoteAgent` an A2A agent another party runs, by its URL or its card (`a2a-remote.ts`) — we keep the registry of
+ *                   what we sent it; its secrets come from `credentials`
  *   a `PromiseRunner` anything else at all
  *
  * None is counted under a ceiling: the runtime starts what it is given, and a layer above that pools its harnesses under
  * one rate limit files them `queued` and `admit`s them (stage 4c). A spec or a runner that still names a `pool` is refused.
  */
-export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | PromiseRunner;
+export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | RemoteAgent | PromiseRunner;
 
 export type EngineOptions = {
   /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
@@ -65,6 +68,13 @@ export type EngineOptions = {
   journal?: PromiseJournal;
   harnesses?: Record<string, HarnessConfig>;
   defaultHarness?: string;
+  /**
+   * The secret for a remote agent's security scheme, asked on every request that needs one: `scheme` is the scheme's name on
+   * the agent's card, `agentUrl` the agent's configured URL (for an agent given by its card, the URL of the interface it is
+   * reached on). `undefined` when there is none, and a task on an agent whose card asks for it is refused before anything is
+   * sent. A secret is sent as a header and written nowhere: not on the task, the journal, the registry or the feed.
+   */
+  credentials?: Credentials;
   /*
    * `maxConcurrent`, the sessions that could be at work at once in each pool, is retired (stage 4c part 2, 2026-09-25):
    * given, `createEngine` refuses it. How many run at once is the layer above's, which files `queued` and `admit`s.
@@ -305,16 +315,19 @@ const handleOf = (events: readonly Event[], attempt: number): string | undefined
 };
 
 const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
+/** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
+const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
 /** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
 const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
 
 /** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
-const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Record<string, RunnerOps> =>
+const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string, credentials?: Credentials): Record<string, RunnerOps> =>
   Object.fromEntries(Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
     name,
     h === 'claude' ? claudeCodeOps({ root })
       : h === 'claude-bg' ? claudeOps({ root })
       : isSpec(h) ? detachedOps(h, root)
+      : isRemote(h) ? remoteOps(name, h, root, credentials)
       : promiseOps(h),
   ]));
 
@@ -331,6 +344,11 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
     if (typeof h === 'object' && h !== null && Object.hasOwn(h, 'pool')) {
       return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`admission.ts\`). ${ADMIT_INSTEAD}`;
     }
+    const remote = typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, h as Record<string, unknown>) : undefined;
+    if (remote) return remote;
+  }
+  if (options.credentials !== undefined && typeof options.credentials !== 'function') {
+    return '`credentials` is a function, `(scheme, agentUrl) => secret | undefined`: give one, or leave it out.';
   }
   return undefined;
 };
@@ -376,7 +394,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
-  return (h === 'claude' ? claudeCodeRefuses : h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
+  return (h === 'claude' ? claudeCodeRefuses : h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : isRemote(h) ? remoteRefuses(spec.harness) : undefined)?.(spec);
 };
 
 // ─── the engine ─────────────────────────────────────────────────────────────
@@ -415,7 +433,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
     }),
   });
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
-  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, counted(name, a2aOps(name, ops, events))]));
+  // A remote agent is A2A already, spoken to by the SDK's client over HTTP: counted, and wrapped in no seam of ours.
+  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root, options.credentials))
+    .map(([name, ops]): [string, SeamOps] => [name, counted(name, isRemote(harnesses[name]!) ? ops : a2aOps(name, ops, events))]));
   const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)));
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
   // services are shared across calls exactly as they would be inside one Effect program.
@@ -587,6 +607,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (sighting.state !== 'working' && sighting.state !== 'blocked') {
         throw refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`);
       }
+      // A remote agent's Task takes a message only where A2A lets its caller speak: once it asks for input. At work, a
+      // message would be a second turn the agent never asked for.
+      if (isRemote(h) && sighting.state !== 'blocked') {
+        throw refuse(`\`${taskId}\` runs on the \`${harness}\` remote A2A agent, whose Task takes words only once it asks for input, and it is at work. Say them when \`ae ls\` shows it waiting, or ${resume.charAt(0).toLowerCase()}${resume.slice(1)}`);
+      }
       try { await go(deliver({ name, sessionId: sighting.sessionId }, text)); } catch (e) {
         throw new Error(`say: ${name} was not given the words (${e instanceof Error ? e.message : String(e)}). Nothing was journalled.`);
       }
@@ -684,6 +709,7 @@ export { claudeDetached } from './runner-claude-detached.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
+export type { Credentials, RemoteAgent } from './a2a-remote.ts';
 export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';

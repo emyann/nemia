@@ -382,6 +382,75 @@ flight (`test/driver-calls.test.ts`). A runner an Effect program provides with `
 `a2aRunner(ops)` gives it the seam (open issue 27). Only `src/a2a-*.ts` import the SDK, and neither entry exports a name of
 its (`test/a2a-boundary.test.ts`).
 
+## A remote A2A agent as a harness
+
+A harness can be an A2A agent another party runs, reached over HTTP by its address (stage 6, part 1). It is configured
+where the other harnesses are, by name, and a task picks it by that name, as it picks `codex`:
+
+```ts
+const engine = createEngine({
+  harnesses: { reviewer: { url: 'https://agents.example/reviewer' } },
+  credentials: (scheme, agentUrl) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
+});
+await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema });
+```
+
+The configuration is `{ url }` — the agent's base URL, whose card is read at `/.well-known/agent-card.json` beneath it, or
+the URL itself when it names a `.json` file — or `{ card }`, the card as the JSON the agent would serve. Nothing else:
+`createEngine` refuses, with exit 2, another key, both or neither, an address that is not `http:` or `https:`, one that
+carries a user name or password, and a card that lists no interface to reach the agent by. A task on a remote agent
+carries no `config`: the agent runs as its operator configured it, and `file` refuses every harness argument, naming it.
+Nothing of the task but its brief, the session it continues (`resumeFrom`, as the message's `contextId`) and its closeout
+schema (in the message's metadata, under the runtime's extension) is sent; `cwd` stays here.
+
+**What the verbs are.** A spawn is one SendMessage, asked to return at once; `observe` is one GetTask per open session;
+`stop` is a CancelTask; `logs` is a GetTask with its history. The session is the agent's Task, named by its id, and its
+context is the attempt's `nativeId`, so `answer` on a task held open is a new Task in the same context, as A2A continues
+a conversation. A Task's state reads as a session's: `SUBMITTED` and `WORKING` at work, `INPUT_REQUIRED` and
+`AUTH_REQUIRED` `blocked` — the view's `needs-human`, `waitingFor` `input` or `authentication` — `COMPLETED` done,
+`FAILED` and `REJECTED` failed, `CANCELED` stopped, and a state no version of A2A this runtime knows at work, which a
+deadline bounds. The closing statement is the data part of the last artifact that has one, read only once the Task has
+completed; a completed Task with none ends `stated: false`, which the orchestrator reads as unsigned, and a remote agent
+is free to ignore the schema it was sent. An agent that answers the message with a Message and makes no Task has given
+the whole session in its reply: it ends at once, its data part the statement, and its logs are its words. `say` reaches a
+Task that asks for input, as a follow-up on it, and is refused while the Task is at work, since A2A gives a running Task
+no words. What the in-process seam's extension answers — `findSession`, `sessionLogs`, `releaseSession`,
+`sessionTranscript` — is never asked of another party: `find` and `release` are the registry's, and there is no
+`transcript`.
+
+**The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
+written whole and renamed. The intent — the name, the harness it went through, the message's id and when — is on disk
+before the message is sent, and the Task's id and context are written as the answer comes back, before the spawn returns.
+So a spawn asked again for a name that has an entry never sends a second message: an entry with a Task adopts it, and
+the next pass reads it by GetTask; an entry without one is a send whose answer never came back, so whether a Task exists
+is not known, and the spawn fails in words that are no refusal, which the grace window reads `lost` with nothing sent
+again. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A Task that has ended
+is written into its entry and read from there, with no call, and a session let go of moves to `remote/done/`, so a pass
+asks nothing about a settled task. A GetTask that fails reads the session as it was last seen: an agent unreachable for a
+moment is not a session gone, and a deadline bounds one gone for good. The entry names the harness, never the address.
+
+**Which binding.** The card's interfaces are read in its order, and the first one this runtime speaks is used for every
+call: JSON-RPC (`JSONRPC`) or REST (`HTTP+JSON`), at A2A 1.0. A card that offers only gRPC, or only a version before 1.0,
+ends the attempt `unstartable`, in words that name what is spoken; so does a card that cannot be read, since nothing was
+sent. A card served as A2A's JSON and one served as the SDK's own objects stringified are both read, security schemes
+included (`cardOfJson`).
+
+**Auth, and where a secret lives.** As the card declares it: of its security requirements, the first whose every scheme
+the caller's secrets meet, each asked of `credentials` by the scheme's name on the card and the agent's address, on every
+request, and sent as a header — HTTP `Bearer`, HTTP `Basic` (the secret as `user:password`), an OAuth 2 or OpenID Connect
+token as a bearer (the runtime runs no flow), and an API key in a header. An API key in a query or a cookie, mutual TLS,
+another HTTP scheme, or a secret `credentials` does not give refuses the spawn before any request, the attempt ending
+`unstartable` in words that name the scheme and the fix; a 401 or 403 from the agent does the same. A secret is held by
+the caller's function alone: it is on no filing, journal, registry entry or feed line, which a test reads byte for byte.
+
+**What a pass costs.** One GetTask per open remote session, in parallel, and none for a settled one: the pass's meter
+reads one observe of the harness per pass, `listed` the open sessions (`test/remote-agent.test.ts` prints what it
+measured).
+
+**Not done yet.** A workflow step naming a remote agent (part 2: the orchestrator's harness key, and how a remote step
+signs off); the gRPC binding (part 3); streaming and SubscribeToTask, relayed to the transcript and the feed, and a
+restarted runtime resubscribing (part 4). Later: the runtime's own adapters mounted over HTTP.
+
 ## What a task may say, and what is refused
 
 A brief is markdown: `key: value` frontmatter, one line per key, and the body is the prompt. `#`
@@ -1511,6 +1580,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a-client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
+| `src/a2a-remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
@@ -1540,6 +1610,8 @@ selector, and it is why no attempt can ever run twice.
 | `test/codex-agent.test.ts` | Codex as an A2A agent through the real worker and the SDK's client, a fake `codex` on PATH: its context, its closeout Artifact, a cancel that ends what it started, a held task's turns in one context, and no words while it runs |
 | `test/restart.test.ts` | the seam's task store is a view: a runtime restarted mid-session answers for a session it never started before its first tick, stops it through its agent and settles it; a spawn it died inside is adopted, never started twice |
 | `test/driver-calls.test.ts` | a task taken through every verb the engine has, with the harness's A2A agent marked: no driver call is made outside an A2A call but `transcript` — made to refuse part 2's shape, which named four |
+| `test/remote-map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |
+| `test/remote-agent.test.ts` | a remote agent end to end against the SDK's own server over HTTP (`test/remote-server.ts`), on each binding and in each order: every refusal at shipped defaults with nothing sent, a restart that never sends twice, the secret on no file, and what a pass costs |
 | `test/a2a-boundary.test.ts` | only `src/a2a-*.ts` import the A2A SDK, and neither entry exports an SDK name or value — each made to refuse planted source |
 | `test/journal-words.test.ts` | the journal's words for five runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |

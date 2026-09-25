@@ -385,6 +385,12 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
+  // Claude Code's own flags, on a harness that is not Claude Code: its session would start without them, and a body meant for
+  // the system prompt would be read by nobody. A `PromiseRunner` is the consumer's own, and is handed them.
+  if (spec.config?.claude !== undefined && isSpec(h) && !h.claudeFlags) {
+    const takers = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return isClaude(o) || (isSpec(o) && o.claudeFlags); }).map((name) => `\`${name}\``);
+    return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
+  }
   return (h === 'claude' ? claudeCodeRefuses : h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
 };
 
@@ -703,6 +709,7 @@ export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
+export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';

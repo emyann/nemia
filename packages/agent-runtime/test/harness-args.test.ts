@@ -24,16 +24,17 @@ type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
 const refusedBy = (ops: RunnerOps, t: Asked) =>
   Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(Runner.layer(ops))));
 
-test('HARNESS_ARGS is the twelve arguments a harness takes — the spend cap among them since stage 4b', () => {
+test('HARNESS_ARGS is the thirteen arguments a harness takes — the spend cap among them since stage 4b, Claude Code\'s own flags since card 1a', () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'allowedTools', 'background', 'budgetUsd', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
+    'allowedTools', 'background', 'budgetUsd', 'claude', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'remoteControl', 'tools', 'worktree',
   ]);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the twelve', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the thirteen', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus', permissionMode: 'auto', effort: 'high', tools: ['Read'], allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
     mcp: {}, contextTokens: 200000, remoteControl: false, background: true, worktree: true, budgetUsd: 5,
+    claude: { appendSystemPromptFile: 'prompt.md' },
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);
@@ -70,6 +71,23 @@ test('a spend cap is dollars above 0, under config: anything else is refused, an
     assert.ok(says.endsWith('or leave it out for no cap.'), says);
   }
   for (const good of [0.01, 5, 250]) assert.equal(argsRefusalOf({ ...task, config: { budgetUsd: good } }), undefined, String(good));
+});
+
+test("Claude Code's own flags are an object of flags in camelCase, each saying one thing on the command line: anything else is refused, at shipped defaults", () => {
+  for (const claude of [null, 'x', 7, ['pluginDir'], true]) {
+    const says = argsRefusalOf({ ...task, config: { claude } } as never) ?? '';
+    assert.ok(says.startsWith(`\`claude: ${JSON.stringify(claude)}\` is not a set of Claude Code's flags.`), says);
+  }
+  for (const key of ['append-system-prompt-file', 'AppendSystemPromptFile', 'p', 'plugin_dir', '--settings', '']) {
+    const says = argsRefusalOf({ ...task, config: { claude: { [key]: 'x' } } }) ?? '';
+    assert.ok(says.startsWith(`\`claude.${key}\` is not a flag's name in camelCase.`), `${key}: ${says}`);
+  }
+  for (const value of [false, null, '', {}, [], ['a', ''], [1], Number.NaN]) {
+    const says = argsRefusalOf({ ...task, config: { claude: { pluginDir: value } } } as never) ?? '';
+    assert.ok(says.startsWith(`\`claude.pluginDir: ${JSON.stringify(value)}\` is not a flag's value.`), `${JSON.stringify(value)}: ${says}`);
+  }
+  assert.equal(argsRefusalOf({ ...task, config: { claude: {} } }), undefined, 'none at all is no flag');
+  assert.equal(argsRefusalOf({ ...task, config: { claude: { appendSystemPromptFile: 'p.md', pluginDir: ['a', 'b'], settings: '{}', bare: true, maxTurns: 2 } } }), undefined);
 });
 
 test('a turn gives its own spend cap and nothing else of the configuration: each refused, at shipped defaults', () => {

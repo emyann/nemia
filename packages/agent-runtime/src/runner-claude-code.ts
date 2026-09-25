@@ -55,6 +55,7 @@ export const claudeJob: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
+  claudeFlags: true,
   // `claude -p --resume` prints its parent's cost and API time on in its own (2.1.280, open issue 4).
   resumeCostCarried: true,
 };

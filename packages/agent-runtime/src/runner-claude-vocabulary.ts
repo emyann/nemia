@@ -30,9 +30,59 @@ export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhig
  */
 export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
 
+/**
+ * Flags handed to Claude Code as they are, by a caller that knows them (`config.claude`): `{ appendSystemPromptFile: 'a.md',
+ * pluginDir: ['p'] }` is `--append-system-prompt-file a.md --plugin-dir p`. A key is the flag in camelCase; `true` is the
+ * flag alone, a string or a number the flag and its value, and a list the flag once per entry. The four named are the ones
+ * agent-orchestrator gives, measured on 2.1.282 (`docs/spike-2026-09-25-agents-skills.md`); any other the CLI has is
+ * taken, and one it does not have ends the session at its start, exit 1, with the CLI's words on its stderr, which the
+ * attempt's logs keep (F22). What the runtime gives itself is refused (`CLAUDE_OWNED_FLAGS`).
+ */
+export type ClaudeFlags = {
+  /** A file whose text is appended to Claude Code's own system prompt, which is kept. */
+  appendSystemPromptFile?: string;
+  /** A file whose text replaces Claude Code's system prompt. */
+  systemPromptFile?: string;
+  /** Directories each loaded as a plugin for the session alone: its skills are named `<plugin>:<skill>`. */
+  pluginDir?: string[];
+  /** Settings for the session alone, as a file or as JSON: `{"outputStyle":"<plugin>:<style>"}`. */
+  settings?: string;
+  [flag: string]: string | number | true | string[] | undefined;
+};
+
+/**
+ * The flags the runtime gives Claude Code itself, or that change how it reads the session, in `config.claude`'s camelCase:
+ * a task that gave one there would have it twice, or the session printing what no reader of it expects. Each is given its
+ * own way — `model`, `permissionMode`, `tools`, `budgetUsd` and the rest are harness arguments of their own. The argv of
+ * every Claude Code spawn is held to this list (`test/claude-code.test.ts`), so a flag the runtime starts giving is added.
+ */
+export const CLAUDE_OWNED_FLAGS: readonly string[] = [
+  'print', 'p', 'bg', 'name', 'inputFormat', 'outputFormat', 'verbose', 'resume', 'continue', 'sessionId', 'forkSession',
+  'permissionPrompts', 'permissionMode', 'dangerouslySkipPermissions', 'allowDangerouslySkipPermissions',
+  'model', 'effort', 'tools', 'disallowedTools', 'allowedTools', 'mcpConfig', 'strictMcpConfig', 'noChrome', 'chrome',
+  'autocompact', 'jsonSchema', 'worktree', 'maxBudgetUsd', 'remoteControl',
+];
+
+/** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */
+export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+
+/** A task's `config.claude` as Claude Code's arguments, in the order written: a flag and its value, or the flag alone for `true`. */
+export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
+  Object.entries(flags ?? {}).flatMap(([key, value]) => {
+    const flag = claudeFlagName(key);
+    if (value === undefined) return [];
+    if (value === true) return [flag];
+    if (Array.isArray(value)) return value.flatMap((v) => [flag, v]);
+    return [flag, String(value)];
+  });
+
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const { permissionMode, effort } = task.config ?? {};
+  const owned = Object.keys(task.config?.claude ?? {}).find((key) => CLAUDE_OWNED_FLAGS.includes(key));
+  if (owned) {
+    return `\`claude.${owned}\` is a flag the runtime gives Claude Code itself (\`${claudeFlagName(owned)}\`), and the session would have it twice. Give it as the harness argument of its own where there is one — \`model\`, \`permissionMode\`, \`tools\`, \`budgetUsd\` and the rest — or leave it out.`;
+  }
   if (permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(permissionMode)) {
     return `\`permissionMode: ${permissionMode}\` is not a mode Claude Code has. Its modes are: ${CLAUDE_PERMISSION_MODES.join(', ')}.`;
   }

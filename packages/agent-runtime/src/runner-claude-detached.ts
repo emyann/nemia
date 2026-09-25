@@ -4,7 +4,7 @@
 import type { SpawnRequest } from './runner.ts';
 import type { HarnessIO, HarnessSpec } from './runner-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeFlagsOf, claudeRefuses, worktreeName } from './runner-claude-vocabulary.ts';
 import { claudeResultOutput } from './runner-detached-output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
 
@@ -33,6 +33,8 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
   // lists above are, and a deny still beats it.
   ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+  // The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
+  ...claudeFlagsOf(r.config?.claude),
   '--permission-mode', r.config?.permissionMode ?? 'auto',
   // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
@@ -73,4 +75,5 @@ export const claudeDetached: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
+  claudeFlags: true,
 };

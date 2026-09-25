@@ -54,7 +54,7 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  * settled; each view and the feed carry its filing. `fed` counts the reads of the feed.
  */
 const board = () => {
-  type Filed = { id: string; closeoutSchema?: object; config?: { remoteControl?: boolean } };
+  type Filed = { id: string; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; filedAt: number }>();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
@@ -63,7 +63,7 @@ const board = () => {
   const viewed = new Map<string, number>();
   /**
    * Whether a view carries what no screen reads — the task's admission (`queued`, `admitted`, and the view's `admission` while it waits) and
-   * the `remoteControl` it was filed with — as the engine's does.
+   * the `claude.remoteControl` it was filed with — as the engine's does.
    */
   const carries = { on: true };
   const fed = { reads: 0 };
@@ -217,11 +217,11 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
-test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `remoteControl` the run's filings were made with or not", async (t) => {
+test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
   // Momentum is the orchestrator's (`momentumOf`), read off the run's record: no filing carries a `priority` since thin runtime stage 4c.
-  assert.deepEqual(ids.map((id) => ['priority' in filed(id)!, filed(id)?.config?.remoteControl]), [[false, true], [false, undefined], [false, undefined]], 'filed with them');
+  assert.deepEqual(ids.map((id) => ['priority' in filed(id)!, filed(id)?.config?.claude?.remoteControl]), [[false, true], [false, undefined], [false, undefined]], 'filed with them');
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();
   carries.on = false;

@@ -340,6 +340,25 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
   assert.deepEqual(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } }).args, claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args);
 });
 
+test("a job reads its checkout's settings and never the operator's — `--setting-sources project,local` once, on both `claude -p` specs; a background session is not given it", async () => {
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
+  const f = fake();
+  let job: string[];
+  let bg: string[];
+  try {
+    const ops = opsIn(tmp('root'));
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+    job = await until(async () => f.read('job-args'), 'the job started');
+    await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+    bg = f.read('bg-args')!;
+  } finally { f.restore(); }
+  assert.deepEqual(sources(job), ['project,local'], 'the argv the worker gave the job');
+  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project,local'], 'claude-detached');
+  assert.deepEqual(sources(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).args), ['project,local'], 'beside the caller\'s own `--settings`');
+  assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
+});
+
 test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, in `config.claude` — and every flag a spawn gives is on that list', async () => {
   const { CLAUDE_OWNED_FLAGS } = await import('../src/runner-claude-vocabulary.ts');
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');

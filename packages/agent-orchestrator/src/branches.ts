@@ -100,8 +100,16 @@ export type BranchReader = {
   has(repo: string, branch: string): boolean;
   /** The commits on the branch that the run's base branch does not have (`rev-list --count <base>..<branch>`); none where git cannot count. */
   ahead(run: GitRun, branch: string): number;
-  /** List, in one process for each repository, every base these runs will ask about: their base branches and the commits they were cut at. */
+  /**
+   * List, in one process for each repository, every base these runs will ask about: their base branches and the commits they were cut at.
+   * Made on the first question about the repository, so a repository nothing is asked about costs no process.
+   */
   prime(runs: readonly Run[]): void;
+  /**
+   * Each branch of the repository and its commit, off the listing the answers were read from — what a memo of those answers keys them by,
+   * so a branch that moves between the answer and the key is read as moved. Empty where git would not list them.
+   */
+  heads(repo: string): ReadonlyMap<string, string>;
 };
 
 const countOf = (said: string | undefined) => {
@@ -115,6 +123,7 @@ export const oneByOne: BranchReader = {
   has: (repo, branch) => gitSays(repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) !== undefined,
   ahead: (run, branch) => countOf(gitSays(run.repo, 'rev-list', '--count', `${run.branch}..${branch}`)),
   prime: () => {},
+  heads: (repo) => new Map(Object.entries(headsOf(repo))),
 };
 
 /** A commit's full name, which a base is when it is a run's `baseRef`: never a branch, so a listing for it is made by `prime` alone. */
@@ -151,7 +160,8 @@ export function branchReader(): BranchReader {
   /**
    * One `for-each-ref` of every branch, with its distance from each base not yet listed. Git refuses the whole listing for one base it cannot
    * read — a commit a run was cut at that is gone from the repository — so where it does, the commits it can read are asked for in one more
-   * process (`rev-list --no-walk --ignore-missing`) and listed again without the rest; a base still not listed is asked one by one.
+   * process (`rev-list --no-walk --ignore-missing`) and listed again without the rest; a base branch the repository does not have is found by
+   * a listing of the branches alone, and the rest listed again; a base still not listed is asked one by one.
    */
   const list = (repo: string, bases: readonly string[]) => {
     const r = of(repo);
@@ -162,8 +172,20 @@ export function branchReader(): BranchReader {
       const commits = fresh.filter(isCommitName);
       const readable = new Set((gitSays(repo, 'rev-list', '--no-walk', '--ignore-missing', ...commits) ?? '').split('\n'));
       for (const c of commits) if (!readable.has(c)) r.ahead.set(c, null);
-      fresh = fresh.filter((b) => !isCommitName(b) || readable.has(b));
-      listed = listing(repo, fresh);
+      const without = fresh.filter((b) => !isCommitName(b) || readable.has(b));
+      // Every commit readable, the listing would be refused again: the base it cannot read is a branch.
+      if (without.length < fresh.length) listed = listing(repo, fresh = without);
+    }
+    if (!listed && fresh.length) {
+      // A base branch the repository does not have: the branches alone, and again with the bases among them.
+      const bare = listing(repo, []);
+      if (bare) {
+        r.heads ??= bare.heads;
+        const known = fresh.filter((b) => isCommitName(b) || bare.heads.has(b));
+        for (const b of fresh) if (!known.includes(b)) r.ahead.set(b, null);
+        fresh = known;
+        listed = fresh.length ? listing(repo, fresh) : bare;
+      }
     }
     if (!listed) {
       for (const b of fresh) r.ahead.set(b, null);
@@ -174,8 +196,19 @@ export function branchReader(): BranchReader {
     fresh.forEach((b, k) => r.ahead.set(b, listed.each[k]!));
   };
 
+  /** The bases `prime` was handed for each repository, listed on the first question about it. */
+  const primed = new Map<string, Set<string>>();
+  const asking = (repo: string) => {
+    const bases = primed.get(repo);
+    if (bases) {
+      primed.delete(repo);
+      list(repo, [...bases]);
+    }
+    return of(repo);
+  };
+
   const within: Within = (repo, commit, base) => {
-    const r = of(repo);
+    const r = asking(repo);
     const key = `${commit} ${base}`;
     const known = r.asked.get(key);
     if (known) return known;
@@ -192,25 +225,28 @@ export function branchReader(): BranchReader {
   return {
     shipped: (run, branch) => shippedBy(within, run, branch),
     has: (repo, branch) => {
-      const r = of(repo);
+      const r = asking(repo);
       if (r.heads === undefined) list(repo, []);
       return r.heads ? r.heads.has(branch) : oneByOne.has(repo, branch);
     },
     ahead: (run, branch) => {
-      if (!of(run.repo).ahead.has(run.branch)) list(run.repo, [run.branch]);
+      if (!asking(run.repo).ahead.has(run.branch)) list(run.repo, [run.branch]);
       const listed = of(run.repo).ahead.get(run.branch)?.get(branch);
       return listed ?? oneByOne.ahead(run, branch);
     },
+    heads: (repo) => {
+      const r = asking(repo);
+      if (r.heads === undefined) list(repo, []);
+      return r.heads ?? new Map();
+    },
     prime: (runs) => {
-      const bases = new Map<string, Set<string>>();
       for (const run of runs) {
         if (!isGitRun(run)) continue;
-        let set = bases.get(run.repo);
-        if (!set) bases.set(run.repo, set = new Set());
+        let set = primed.get(run.repo);
+        if (!set) primed.set(run.repo, set = new Set());
         set.add(run.branch);
         set.add(run.baseRef);
       }
-      for (const [repo, set] of bases) list(repo, [...set]);
     },
   };
 }

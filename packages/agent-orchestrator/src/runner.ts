@@ -48,7 +48,7 @@ export type { FeedLine } from './feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export { DAEMON_FILE, DEFAULT_EVERY_MS, MAX_EVERY_MS, STALE_FLOOR_MS, STALE_PASSES, daemonLine, everyOf, parseDaemonFile, staleAfterMs, takenFromLine, takeoverLine } from './daemon.ts';
 export type { DaemonFile, DaemonStanding, Identity } from './daemon.ts';
-export { HOME, acceptFile, approvalFile, artifactsDir, askFile, checkStderr, inboxDir, inputsDir, listRuns, markCancelled, readAcceptances, readAnswers, readApprovals, readAsks, readRun, roundAskFile, runId, stepsOf } from './store.ts';
+export { HOME, acceptFile, approvalFile, artifactsDir, askFile, checkStderr, inboxDir, inputsDir, listRuns, markCancelled, readAcceptances, readAnswers, readApprovals, readAsks, readRun, restStamps, roundAskFile, runId, stepsOf } from './store.ts';
 export { alive, beat, ceilings, daemonFile, daemonStanding, identify, lastCeilings, lastPassCost, passed, procStartOf, releaseStore, stillHeld, storeRefusal, takeStore } from './daemon-store.ts';
 export type { TakenStore } from './daemon-store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter.ts';
@@ -57,6 +57,7 @@ export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watch
 export { lockfileParts, provisionDeps } from './worktree.ts';
 export { artifactFiles, missingArtifacts } from './artifacts.ts';
 export { artifacts, branchReader, branchStandings, diffStat, headsOf, isShipped, parentRecord, readArtifact, resultBranches, sensitiveDiff, touchedBy, type BranchReader } from './branches.ts';
+export { evictedBy } from './rest.ts';
 export { AgentWriteError, agentPlaces, findAgent, listAgents, removeAgent, writeAgent, writeWorkflow } from './authoring.ts';
 export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, WorkflowWritten } from './authoring.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { branchReader, branchStandings, isShipped, oneByOne, type BranchReader } from '../src/branches.ts';
+import { branchReader, branchStandings, headsOf, isShipped, oneByOne, type BranchReader } from '../src/branches.ts';
 import { metered } from '../src/tally.ts';
 import type { GitRun } from '../src/run.ts';
 
@@ -75,7 +75,7 @@ const answers = (git: BranchReader, runs: readonly GitRun[], branches: readonly 
   runs.map((run) => ({ shipped: branches.map((b) => git.shipped(run, b)), standings: branchStandings(run, branches, git) }));
 
 test('the reader says what git says one question at a time, of every shape a branch can be in, in either order, primed or not', () => {
-  const { runs, all } = shapes();
+  const { repo, runs, all } = shapes();
   const expected = answers(oneByOne, runs, all);
   // The fixture has each answer: a yes with work, a yes with none, a no, gone, and ahead.
   const said = new Set(expected.flatMap((a) => a.shipped.map(String)));
@@ -92,6 +92,11 @@ test('the reader says what git says one question at a time, of every shape a bra
   reversed.prime([...runs].reverse());
   const backwards = [...all].reverse();
   assert.deepEqual(answers(reversed, [...runs].reverse(), backwards), answers(oneByOne, [...runs].reverse(), backwards), 'in the opposite order');
+  // And the heads a memo keys the answers by are git's.
+  assert.deepEqual(Object.fromEntries(primed.heads(repo)), headsOf(repo));
+  assert.deepEqual(Object.fromEntries(branchReader().heads(repo)), headsOf(repo));
+  assert.deepEqual(Object.fromEntries(oneByOne.heads(repo)), headsOf(repo));
+  assert.ok(Object.keys(headsOf(repo)).includes('ahead'));
 });
 
 test('a primed reader asks git once for a repository, where one question at a time asks it twice for each branch', async () => {
@@ -138,4 +143,35 @@ test('a base git cannot read costs the reader one more listing, not a process fo
   assert.deepEqual(value, all.map((run, k) => branchStandings(run, [`wf/r-${Math.min(k, 9)}`], oneByOne)));
   // The listing git refused, the commits it can read, the listing again without the one it cannot, and that run's own question.
   assert.equal(tallies!.kinds.git.spawned, 4);
+});
+
+test('a primed reader lists a repository on the first question about it, and one nothing is asked about costs no process', async () => {
+  const [one, other] = [aRepo(), aRepo()];
+  const runs = [aRun(one, {}), aRun(other, {})];
+  const { value, tallies } = await metered(async () => {
+    const reader = branchReader();
+    reader.prime(runs);
+    return reader.has(one, 'main');
+  });
+  assert.equal(value, true);
+  assert.equal(tallies!.kinds.git.spawned, 1, 'the repository asked about, and not the other');
+  const idle = await metered(async () => { branchReader().prime(runs); });
+  assert.equal(idle.tallies!.kinds.git.spawned, 0);
+});
+
+test('a base branch the repository does not have costs two more listings, and the heads are still read', async () => {
+  const repo = aRepo();
+  const baseRef = git(repo, 'rev-parse', 'main');
+  commitOn(repo, 'wf/r-0', 'main', 'run');
+  const runs = [aRun(repo, { baseRef }), aRun(repo, { baseRef, branch: 'no-such-base' })];
+  const { value, tallies } = await metered(async () => {
+    const reader = branchReader();
+    reader.prime(runs);
+    return { standings: runs.map((run) => branchStandings(run, ['wf/r-0'], reader)), heads: Object.fromEntries(reader.heads(repo)) };
+  });
+  assert.deepEqual(value.standings, runs.map((run) => branchStandings(run, ['wf/r-0'], oneByOne)));
+  assert.deepEqual(value.heads, headsOf(repo));
+  // The listing git refused, the branches alone, the listing again without the base it cannot read, and that run's own questions.
+  const own = await metered(async () => branchStandings(runs[1]!, ['wf/r-0'], oneByOne));
+  assert.equal(tallies!.kinds.git.spawned, 3 + own.tallies!.kinds.git.spawned);
 });

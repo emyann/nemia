@@ -553,11 +553,11 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
 
 import fs from 'node:fs';
 
-test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are declared by the task and reach every attempt untouched', async () => {
+test('tools, disallowedTools, effort, mcp, contextTokens and Claude Code\'s own flags are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
   // A second attempt is a held task's next turn: one attempt per start, and a turn is a start.
-  const id = await b.run(file({ ...spec, holdOpen: true, config: { tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, contextTokens: 200000, remoteControl: true, budgetUsd: 0.5 } }));
+  const id = await b.run(file({ ...spec, holdOpen: true, config: { tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, contextTokens: 200000, claude: { remoteControl: true }, budgetUsd: 0.5 } }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', busy: false, closeout: { payload: { outcome: 'done' }, at: Date.now() + 60_000 } });
   await b.run(tick());
@@ -571,7 +571,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
     assert.deepEqual(r.config?.mcp, mcp, 'and given the same servers');
     assert.equal(r.config?.budgetUsd, 0.5, 'and the same cap');
     assert.equal(r.config?.contextTokens, 200000, 'and the same window: a continuation given none would run on the whole of it');
-    assert.equal(r.config?.remoteControl, true, 'and bridged the same');
+    assert.deepEqual(r.config?.claude, { remoteControl: true }, 'and bridged the same');
   }
 
   const plain = board();
@@ -583,7 +583,7 @@ test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are d
   assert.equal(plain.spawned[0]!.config?.mcp, undefined, 'no map, no servers of its own');
   assert.equal(plain.spawned[0]!.config?.budgetUsd, undefined, 'no budget, no cap');
   assert.equal(plain.spawned[0]!.config?.contextTokens, undefined, "no window: the harness's own");
-  assert.equal(plain.spawned[0]!.config?.remoteControl, undefined, 'no Remote Control unless asked');
+  assert.equal(plain.spawned[0]!.config?.claude, undefined, 'no Remote Control unless asked');
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
@@ -595,7 +595,7 @@ test('decide never reads tools, effort, MCP servers, a budget, a context window,
   const body = source.slice(from, to);
   for (const name of ['export function lifecycleOf(', 'export function observe(', 'export function spawnRefused(']) assert.ok(body.includes(name), `the slice holds ${name}`);
   const machine = fs.readFileSync(new URL('../src/lifecycle.ts', import.meta.url), 'utf8');
-  for (const read of [body, machine]) assert.doesNotMatch(read, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
+  for (const read of [body, machine]) assert.doesNotMatch(read, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.claude\b|\.priority|\.filedAt/);
 });
 
 test('a session its harness ended at its budget ends failed, as its harness said, with the limit and what it cost on its attempt — and the task settles failed as any failure does', async () => {

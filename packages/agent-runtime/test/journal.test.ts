@@ -201,3 +201,30 @@ test("an input's cap is laid under a config it already has, never over it: confi
   const [input] = await run(dir, Effect.flatMap(Journal, (j) => j.read('t')));
   assert.deepEqual(input, { kind: 'input', at: CAPPED[4]!.at, text: 'shorter', config: { budgetUsd: 2 } });
 });
+
+// ─── a journal written while a bridge to claude.ai was a harness argument of its own (until 2026-09-25) ───
+
+test('a filing that asked for remoteControl — under config, or beside it from before config — reads it as Claude Code\'s flag in config.claude, and no byte on disk changes', async () => {
+  const dir = legacyStore({
+    under: [{ ...TODAY, config: { background: true, remoteControl: true } }],
+    beside: [{ ...TODAY, config: undefined, background: true, remoteControl: true }],
+    // A flag already in the bag is the newer word, and is kept; the bridge goes first, where the runtime gave it.
+    both: [{ ...TODAY, config: { background: true, remoteControl: true, claude: { appendSystemPromptFile: 'p.md', remoteControl: 'phone' } } }],
+    // `false` asked for nothing, and is no flag: dropped.
+    off: [{ ...TODAY, config: { model: 'haiku', remoteControl: false } }],
+  });
+  const before = bytesOf(dir);
+  const read = async (id: string) => ((await run(dir, Effect.flatMap(Journal, (j) => j.read(id))))[0] as { config?: unknown }).config;
+  assert.deepEqual(await read('under'), { background: true, claude: { remoteControl: true } });
+  assert.deepEqual(await read('beside'), { background: true, claude: { remoteControl: true } });
+  assert.deepEqual(await read('both'), { background: true, claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } });
+  assert.deepEqual(Object.keys((await read('both') as { claude: object }).claude), ['remoteControl', 'appendSystemPromptFile']);
+  assert.deepEqual(await read('off'), { model: 'haiku' });
+  const { entries } = await run(dir, Effect.flatMap(Journal, (j) => j.feed(0)));
+  assert.deepEqual(entries.find((e) => e.taskId === 'under')?.event, (await run(dir, Effect.flatMap(Journal, (j) => j.read('under'))))[0], 'the feed reads the same shape');
+  assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+
+  const { createEngine } = await import('../src/facade.ts');
+  const { state } = await createEngine({ root: dir }).view('under');
+  assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
+});

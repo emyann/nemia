@@ -378,12 +378,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
       // lists above are, and a deny still beats it.
       ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
-      // Remote Control, only when the task asks: the session bridged to claude.ai and listed in its agents view, where it
-      // can be driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this
-      // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt
-      // taken as its name — so it goes here, where the `--permission-mode` that always follows cannot be taken for one.
-      ...(r.config?.remoteControl ? ['--remote-control'] : []),
-      // The caller's own flags (`config.claude`), as a job is given them: after the variadic lists, before the mode.
+      // The caller's own flags (`config.claude`), after the variadic lists and before the mode. Remote Control among them, only
+      // when the task asks (`claude.remoteControl`): the session bridged to claude.ai and listed in its agents view, where it can be
+      // driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag (measured on
+      // 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt taken as its name — and here
+      // the `--permission-mode` that always follows cannot be taken for one.
       ...claudeFlagsOf(r.config?.claude),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first

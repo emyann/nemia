@@ -562,30 +562,30 @@ test('the facade\'s tick refuses any argument, with exit 2 and nothing started �
   assert.equal((await engine.view('waits')).phase, 'pending');
 });
 
-test('file() refuses remoteControl on every harness with no such flag, by name — codex, claude-detached and a check — and a value that is not true or false; claude journals it', async () => {
+test('file() refuses claude.remoteControl on every harness with no such flag, by name — codex, claude-detached and a check — ahead of the bag\'s own refusal; claude journals it; and the old place is refused naming the new one', async () => {
   const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
   const journal = memoryJournal();
   const engine = createEngine({ journal, harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check } });
+  // claude-detached takes Claude Code's flags, and codex and a check none: each is told of the bridge, never of the bag.
   for (const harness of ['codex', 'claude-detached', 'check']) {
-    await refused(engine, { brief: 'b', cwd: '/r', harness, config: { remoteControl: true } },
-      new RegExp(`\`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`remoteControl\` off`));
+    await refused(engine, { brief: 'b', cwd: '/r', harness, config: { claude: { remoteControl: true } } },
+      new RegExp(`^file: \`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`claude\\.remoteControl\` off`));
   }
-  for (const remoteControl of ['true', 1, null]) {
-    await refused(engine, { brief: 'b', cwd: '/r', config: { remoteControl: remoteControl as unknown as boolean } }, /`remoteControl: .*` is not true or false\. Give true to bridge the session to claude\.ai, or leave it out/);
+  // A harness argument until 2026-09-25: at its old place, at any value and on any harness, told where it went.
+  for (const config of [{ remoteControl: true }, { remoteControl: false }, { remoteControl: 'true' }]) {
+    await refused(engine, { brief: 'b', cwd: '/r', config: config as never }, /^file: `remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`/);
   }
+  await refused(engine, { brief: 'b', cwd: '/r', remoteControl: true } as never, /^file: `remoteControl` is Claude Code's own flag/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
+  const id = await engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } });
   const [filed] = await journal.read(id);
-  assert.equal((filed as { config?: { remoteControl?: boolean } }).config?.remoteControl, true, 'on the record, for the runner');
-  assert.equal((await engine.view(id)).state.config?.remoteControl, true);
-  for (const harness of ['codex', 'claude-detached', 'check']) {
-    assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness, config: { remoteControl: false } }), `false asks ${harness} for nothing`);
-  }
+  assert.deepEqual((filed as { config?: object }).config, { claude: { remoteControl: true } }, 'on the record, for the runner');
+  assert.equal((await engine.view(id)).state.config?.claude?.remoteControl, true);
 
   // Named by what the engine has: no harness brought as 'claude-bg', none to file on.
   const bare = createEngine({ journal: memoryJournal(), harnesses: { codex } });
-  await refused(bare, { brief: 'b', cwd: '/r', config: { remoteControl: true } }, /the `codex` harness has no such flag.*Leave `remoteControl` off: none of this engine's harnesses bridges a session/);
+  await refused(bare, { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } }, /the `codex` harness has no such flag.*Leave `claude\.remoteControl` off: none of this engine's harnesses bridges a session/);
 });
 
 test('file() refuses background on every harness with no such mode, and remoteControl on a job — claude journals a background session, bridged or not', async () => {
@@ -597,11 +597,11 @@ test('file() refuses background on every harness with no such mode, and remoteCo
   const bg = createEngine({ journal: memoryJournal(), harnesses: { claude: 'claude-bg' } });
   await refused(bg, { brief: 'b', cwd: '/r', config: { background: true } }, /the `claude` harness has no such mode: every session of it is one already\. Leave `background` off/);
   // A job runs `claude -p`, which opens no bridge: at shipped defaults, a task is one unless it asks for a background session.
-  await refused(engine, { brief: 'b', cwd: '/r', config: { remoteControl: true } },
-    /`remoteControl: true` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `remoteControl` off/);
+  await refused(engine, { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } },
+    /^file: `claude\.remoteControl` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `claude\.remoteControl` off/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  for (const config of [{ background: true }, { background: true, remoteControl: true }, { background: false }]) {
+  for (const config of [{ background: true }, { background: true, claude: { remoteControl: true } }, { background: false }] as HarnessArgs[]) {
     const id = await engine.file({ brief: 'b', cwd: '/r', config });
     const [filed] = await journal.read(id);
     assert.deepEqual((filed as { config?: object }).config, config, 'on the record, for the runner');
@@ -662,15 +662,15 @@ test('a HarnessSpec is given a contextTokens only when it declares the windows i
   await refused(none, { brief: 'b', cwd: '/r', config: { contextTokens: 200000 } }, /Leave `contextTokens` off: none of this engine's harnesses sets a session's window/);
 });
 
-test('a harness brought as a runner is asked nothing of remoteControl, and is handed it on the spawn', async () => {
+test('a harness brought as a runner is asked nothing of claude.remoteControl, and is handed it on the spawn', async () => {
   const sessions = new Map<string, Sighting>();
   const asked: boolean[] = [];
   const runner = fakeHarness(sessions);
   const engine = createEngine({
     journal: memoryJournal(), defaultHarness: 'mine',
-    harnesses: { mine: { ...runner, spawn: async (r) => { asked.push(r.config?.remoteControl === true); await runner.spawn(r); } } },
+    harnesses: { mine: { ...runner, spawn: async (r) => { asked.push(r.config?.claude?.remoteControl === true); await runner.spawn(r); } } },
   });
-  await engine.file({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
+  await engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } });
   await engine.tick();
   assert.deepEqual(asked, [true], 'its to honour');
 });

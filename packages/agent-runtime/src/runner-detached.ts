@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Denial, Observed, Sighting, Usage } from './domain.ts';
+import type { Denial, SessionState, Sighting, Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
 import { writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
@@ -163,8 +163,36 @@ const sizeOf = (p: string) => { try { return fs.statSync(p).size; } catch { retu
  * The file is the session: `stop` finds the worker by it. Removed, alone or with the store it is in, the worker takes it
  * for a stop, ends its harness and exits, and never writes the file again (open issue 32).
  */
+/** What the detached worker writes of its harness's process: its own words, which a run file on disk keeps. */
+type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
+
+/**
+ * A run file's state in A2A's names — the one place this runner translates, since codex, the check and claude-detached all
+ * run under the worker:
+ *
+ *   working, heartbeat fresh  → working    the worker is at work
+ *   working, heartbeat stale  → failed     the worker is gone, and its process with it: the whole lease
+ *   done                      → completed  the harness exited 0
+ *   failed                    → failed     it exited otherwise, or the worker could not start it
+ *   stopped                   → canceled   a stop ended it
+ *
+ * No run is waiting on a person: a harness the worker runs has no registry that says so (`Sighting.waitingFor`).
+ */
+const WORKER_STATES: Record<WorkerState, SessionState> = { working: 'working', done: 'completed', failed: 'failed', stopped: 'canceled' };
+
+/** A `working` run whose heartbeat has stopped is not working: `failed`. In the worker's words. */
+const leased = (run: { state: WorkerState; heartbeatAt: string }, now: number): WorkerState =>
+  run.state === 'working' && now - new Date(run.heartbeatAt).getTime() > STALE_MS ? 'failed' : run.state;
+
+/** A run file's state as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
+export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now: number): SessionState => {
+  const word = leased(run as { state: WorkerState; heartbeatAt: string }, now);
+  return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word] : 'failed';
+};
+
 type RunFile = {
-  name?: string; state: Observed; pid: number; heartbeatAt: string; startedAt?: string;
+  /** The worker's own words (`bin/ae-worker.ts`), kept on disk as they are: `detachedStateOf` translates them. */
+  name?: string; state: WorkerState; pid: number; heartbeatAt: string; startedAt?: string;
   nativeId?: string; logFile: string; exitCode?: number;
   /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
   resumeFrom?: string;
@@ -229,9 +257,6 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return out;
   };
 
-  /** A `working` run whose heartbeat has stopped is not working. This is the whole lease. */
-  const observedState = (run: RunFile, now: number): Observed =>
-    run.state === 'working' && now - new Date(run.heartbeatAt).getTime() > STALE_MS ? 'failed' : run.state;
 
   const find = (sessionId: string) => readAll().find(({ name }) => name === sessionId);
 
@@ -327,7 +352,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
         if (!run.input) throw new Error(`\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
         if (run.inputClosed) throw new Error(`\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
-        const state = observedState(run, Date.now());
+        const state = leased(run, Date.now());
         if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
         const line = input.line(text);
         // A line with a newline in it would reach the harness as two, or as half a message.
@@ -411,7 +436,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         const usage = usageOf(all, run, output?.read.usage);
         const printed = output?.read.closeout && { payload: output.read.closeout.payload, at: output.at };
         m.set(name, {
-          sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name) ?? printed,
+          sessionId: name, state: detachedStateOf(run, now), nativeId: run.nativeId, closeout: statementOf(name) ?? printed,
           // The process's own exit code, once it has one. The worker writes -1 when there is none —
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),

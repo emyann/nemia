@@ -22,7 +22,7 @@ import { scratch } from './scratch.ts';
 
 /** Sign the session `name` off: done, with a closeout given after its attempt started. */
 const signed = (sessions: Map<string, Sighting>, name: string, summary: string) => sessions.set(name, {
-  ...sessions.get(name)!, state: 'done', busy: false,
+  ...sessions.get(name)!, state: 'completed', busy: false,
   closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
 });
 
@@ -138,7 +138,7 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
   const fake: PromiseRunner = {
     async spawn(r) { const id = `s-${++n}`; sessions.set(r.name, { sessionId: id, state: 'working', busy: true, nativeId: id }); },
     async observe() { return new Map(sessions); },
-    async stop(sessionId) { for (const [k, s] of sessions) if (s.sessionId === sessionId) sessions.set(k, { ...s, state: 'stopped', busy: false }); },
+    async stop(sessionId) { for (const [k, s] of sessions) if (s.sessionId === sessionId) sessions.set(k, { ...s, state: 'canceled', busy: false }); },
     async logs() { return ''; },
   };
   const engine = createEngine({ journal, harnesses: harnesses ?? { fake } });

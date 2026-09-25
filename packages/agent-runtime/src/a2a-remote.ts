@@ -45,7 +45,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Sighting } from './domain.ts';
+import { formerStateOf, isSessionState, type SessionState, type Sighting } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './a2a-map.ts';
 
@@ -238,7 +238,20 @@ type Entry = {
   reply?: string;
 };
 
-const TERMINAL = new Set(['done', 'failed', 'stopped']);
+const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
+
+/**
+ * An entry as this code reads it: one written before sightings spoke A2A's names (2026-09-25) says how it was last seen in
+ * the runtime's former words — `done`, `blocked`, `stopped` — and is read in A2A's, as the Task it was seen in said them
+ * (`blocked` waiting for `authentication` was `AUTH_REQUIRED`, `WAITS`). The file keeps its words until it is next written.
+ * A word neither vocabulary has is `failed`, as the other drivers read one: no session the runtime can wait on.
+ */
+const upgraded = (e: Entry): Entry => {
+  const seen = e.seen as (Omit<Sighting, 'state'> & { state: string }) | undefined;
+  if (!seen || isSessionState(seen.state)) return e;
+  const state = seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : formerStateOf(seen.state) ?? 'failed';
+  return { ...e, seen: { ...seen, state } };
+};
 
 /**
  * A remote A2A agent's `RunnerOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
@@ -250,7 +263,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
   const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
 
   const readEntry = (file: string): Entry | undefined => {
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')) as Entry; } catch (e) {
+    try { return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry); } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw e;
     }
@@ -414,7 +427,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
       write({
         ...intent, taskId: answer.messageId, contextId: answer.contextId, reply: text, ended: true,
         seen: {
-          sessionId: answer.messageId, state: 'done', ...(answer.contextId ? { nativeId: answer.contextId } : {}),
+          sessionId: answer.messageId, state: 'completed', ...(answer.contextId ? { nativeId: answer.contextId } : {}),
           ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
         },
       });

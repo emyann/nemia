@@ -93,7 +93,7 @@ test('a task is run as a job unless it asks for a background session, which is `
     await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
     const seen = await until(async () => {
       const s = (await Effect.runPromise(ops.observe)).get('ae/j/1');
-      return s?.state === 'done' ? s : undefined;
+      return s?.state === 'completed' ? s : undefined;
     }, 'the job done');
     assert.equal(f.read('job-args')?.[0], '-p');
     assert.deepEqual(f.read('job-stdin')?.map((l) => JSON.parse(l).message.content), ['go'], 'the brief on its stdin, and its stdin ended at the result');
@@ -166,14 +166,14 @@ test('a stop, a release and words reach the mode the id belongs to, by its shape
     assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'a background session is stopped by `claude stop`, a job never');
     const stopped = await until(async () => {
       const s = (await Effect.runPromise(ops.observe)).get('ae/j/2');
-      return s?.state === 'stopped' ? s : undefined;
+      return s?.state === 'canceled' ? s : undefined;
     }, 'the job stopped by its worker');
     assert.equal(stopped.sessionId, 'ae/j/2');
 
     // A job's run file is its record: nothing to let go of. A background session is removed from Claude Code's list.
     await Effect.runPromise(ops.release!(stopped, {}));
     assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'releasing a job asks Claude Code for nothing');
-    await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'done' }, {}));
+    await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'completed' }, {}));
     assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011']);
 
     const toJob = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
@@ -193,7 +193,7 @@ test('words said to a running job reach its stdin as the next user message, and 
     await Effect.runPromise(ops.say!({ name: 'ae/s/1', sessionId: 'ae/s/1' }, 'hello'));
     const done = await until(async () => {
       const s = (await Effect.runPromise(ops.observe)).get('ae/s/1');
-      return s?.state === 'done' ? s : undefined;
+      return s?.state === 'completed' ? s : undefined;
     }, 'the job done on the words it was told');
     assert.deepEqual(f.read('job-stdin')?.map((l) => JSON.parse(l)), [
       { type: 'user', message: { role: 'user', content: 'wait' } },
@@ -227,7 +227,7 @@ test("finding a job reads its run file and nothing else — no other job's, and 
     // Both ended, and each has printed its stream: a find that listed the jobs would read every log that changed since.
     await until(async () => {
       const seen = await Effect.runPromise(ops.observe);
-      return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'done') || undefined;
+      return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'completed') || undefined;
     }, 'both jobs done');
     const runs = path.join(root, 'runs', 'claude');
     for (const log of fs.readdirSync(runs).filter((n) => n.endsWith('.log'))) fs.appendFileSync(path.join(runs, log), '\n');
@@ -284,7 +284,7 @@ test('a job resumed from a background session is a job — and, its parent not o
     await Effect.runPromise(ops.spawn({ name: 'ae/u/2', brief: 'go', cwd: f.dir, resumeFrom: BG_ID }));
     const seen = await until(async () => {
       const s = (await Effect.runPromise(ops.observe)).get('ae/u/2');
-      return s?.state === 'done' ? s : undefined;
+      return s?.state === 'completed' ? s : undefined;
     }, 'the resumed job done');
     const args = f.read('job-args')!;
     assert.equal(args[0], '-p');

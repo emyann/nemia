@@ -28,7 +28,7 @@ const board = async () => {
   const cwd = scratch('ae-list-some-cwd-');
   const settled = [await engine.file({ brief: 'a', cwd }), await engine.file({ brief: 'b', cwd }), await engine.file({ brief: 'c', cwd })];
   await engine.tick();
-  for (const id of settled) h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'done', busy: false });
+  for (const id of settled) h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'completed', busy: false });
   await engine.tick();
   const flying = [await engine.file({ brief: 'd', cwd }), await engine.file({ brief: 'e', cwd })];
   await engine.tick();

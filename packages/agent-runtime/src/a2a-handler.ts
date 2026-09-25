@@ -31,7 +31,7 @@ import {
   TaskNotFoundError, UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import { fold, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
+import { fold, isLive, phaseWordOf, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
 import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   canceledTask, contextRefusal, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION,
@@ -195,8 +195,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     if (!seen) throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
     const elsewhere = contextRefusal(m.taskId, m.contextId, seen);
     if (elsewhere) throw new RequestMalformedError(elsewhere);
-    if (seen.state !== 'working' && seen.state !== 'blocked') {
-      throw new UnsupportedOperationError(`session \`${m.taskId}\` has ended (${seen.state}): it takes no more words.`);
+    if (!isLive(seen.state)) {
+      throw new UnsupportedOperationError(`session \`${m.taskId}\` has ended (${phaseWordOf(seen.state)}): it takes no more words.`);
     }
     await this.run(this.ops.say({ name: m.taskId, sessionId: seen.sessionId }, followUpText(m)));
     return taskOfSighting(m.taskId, seen);
@@ -209,14 +209,14 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   /**
    * One session: as the harness sees it, or, when it lists no such session, as the journal records the attempt — open,
    * or how it ended. Neither knows it: `TaskNotFoundError`. A session that signed and whose task is held open for a person
-   * is `INPUT_REQUIRED`, whether its harness still lists it `done` — a Claude Code job, never let go — or has let it go:
-   * the journal is read for that, once, for a session listed `done` or listed not at all. `listTasks` still says
+   * is `INPUT_REQUIRED`, whether its harness still lists it `completed` — a Claude Code job, never let go — or has let it go:
+   * the journal is read for that, once, for a session listed `completed` or listed not at all. `listTasks` still says
    * `COMPLETED` of it, the harness's word, which is what `observe` reads.
    */
   async getTask(params: GetTaskRequest, _context: ServerCallContext): Promise<Task> {
     const seen = (await this.run(this.ops.observe)).get(params.id);
     const parts = nameParts(params.id);
-    if (seen && (seen.state !== 'done' || !parts)) return taskOfSighting(params.id, seen);
+    if (seen && (seen.state !== 'completed' || !parts)) return taskOfSighting(params.id, seen);
     const state = parts && fold(parts.taskId, await this.events(parts.taskId));
     const attempt = parts && state?.attempts.find((a) => a.n === parts.n);
     const waiting = state !== undefined && waitsForInput(state) && state.attempts.at(-1) === attempt;
@@ -232,10 +232,10 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   async cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
     const seen = (await this.run(this.ops.observe)).get(params.id);
     if (!seen) throw new TaskNotFoundError(`no session \`${params.id}\` for the \`${this.harness}\` harness to stop: it lists none.`);
-    if (seen.state === 'done' || seen.state === 'failed') {
-      throw new TaskNotCancelableError(`session \`${params.id}\` has ended (${seen.state}): there is nothing to stop.`);
+    if (!isLive(seen.state) && seen.state !== 'canceled') {
+      throw new TaskNotCancelableError(`session \`${params.id}\` has ended (${phaseWordOf(seen.state)}): there is nothing to stop.`);
     }
-    if (seen.state !== 'stopped') await this.run(this.ops.stop(seen.sessionId));
+    if (seen.state !== 'canceled') await this.run(this.ops.stop(seen.sessionId));
     return canceledTask(params.id, seen);
   }
 

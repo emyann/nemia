@@ -58,7 +58,7 @@ const spy = () => {
     async find(name) { saw('find'); const s = sessions.get(name); return s && { sessionId: s.sessionId }; },
     async stop(id) {
       saw('stop');
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs(id) { saw('logs'); return `logs of ${id}`; },
     async release() { saw('release'); return { turns: 1 }; },
@@ -106,10 +106,10 @@ test('REFUSED: a driver asked directly, as the seam asked it before part 3, is n
   const seam = a2aOps('fake', direct, async () => []);
   const partTwo = { ...direct, spawn: seam.spawn, observe: seam.observe, stop: seam.stop };
   await marked(async () => {
-    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'done' });
+    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
     await Effect.runPromise(partTwo.find!('ae/t-1/1'));
     await Effect.runPromise(partTwo.logs('s-9'));
-    await Effect.runPromise(partTwo.release!({ sessionId: 's-9', state: 'done' }, {}));
+    await Effect.runPromise(partTwo.release!({ sessionId: 's-9', state: 'completed' }, {}));
     await Effect.runPromise(partTwo.say!({ name: 'ae/t-1/1', sessionId: 's-9' }, 'hi'));
     await Effect.runPromise(partTwo.observe);
   });
@@ -123,7 +123,7 @@ test('REFUSED: the transcript read directly, as part 3 left it, is named', async
   // Part 3's shape: every verb through the seam but the transcript, spread from the driver beside them.
   const partThree = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
   await marked(async () => {
-    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'done' });
+    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
     await Effect.runPromise(partThree.transcript('s-9'));
     await Effect.runPromise(partThree.logs('s-9'));
   });

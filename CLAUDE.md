@@ -751,6 +751,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **The runtime's `io().reads` counts every file it reads, not only journals.** A look at Codex, check or claude-detached reads every run
   file the harness ever wrote (871 on the live store on 2026-09-25): they have no `observeFor`. A measurement labelled *journals* off
   `io().reads` counts those too; with a task in flight, the api's poll read 643 files and about 25 journals (same run).
+- **An absence read off a failed look is not an absence.** The composite and Claude Code's `observeFor` caught a registry that could not
+  be read to an empty map, and the pass read the empty map as every session gone: the tick memo stopped looking for a finished session
+  whose release the harness had refused, and an attempt past its grace was ended `lost` on one unread pass. `observeFor` answers
+  `{ seen, unread }` now, and the pass reads an unread name as neither there nor gone (`UNREAD` in the lifecycle, `releaseFinished`'s
+  `listed`). A new harness, or a new way to list one, says which names a failed read left unread and fails whole only when it read
+  nothing; a fake that fails whole, through the composite, is the test (`flakyHarness` in `agent-runtime/test/engine.test.ts`). The
+  full `observe` and every view still read a failed harness as nothing (runtime open issue 35; learned by the run that made a failed
+  observe say so).
 
 ## Rules the code keeps
 

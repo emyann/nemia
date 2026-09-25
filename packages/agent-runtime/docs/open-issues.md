@@ -855,6 +855,26 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
   try. Either way the attempt is read `lost`, so the task fails as any lost attempt does, and a person or the orchestrator
   tries again; the orphan's cost is the other party's.
 
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, two gaps left)
+
+The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
+pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
+release the harness had refused was never asked again; and an attempt past its grace read `LOST`, so one unread pass ended a live
+session's attempt `failed`. **Fixed for the pass:** `observeFor` answers an `Observation`, `{ seen, unread }`; a harness that fails
+leaves the names routed to it unread, and Claude Code only those the failed read could have listed (its jobs are read apart from
+its registry). `decide` reads an unread name as `UNREAD` — nothing in `working`, where the deadline, read first, still ends it; in
+`stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
+finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
+`wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
+`test/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
+
+- **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
+  harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
+  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before.
+- **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
+  no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
+  stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

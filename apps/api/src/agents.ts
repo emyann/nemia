@@ -332,7 +332,7 @@ export const agents = new Hono()
     }
     const given = draftOf(read.body, to, route, PUT_SHAPE);
     if ('status' in given) return c.json({ error: given.error }, given.status);
-    const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, card: given.card }, 200);
+    const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, card: given.card, repo: repoOf() }, 200);
     return c.json(answer.body, answer.status);
   })
   // An agent of yours removed, against the version it was read at — refused while a step still names it, saying which.
@@ -352,7 +352,8 @@ export const agents = new Hono()
       return c.json({ error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(version)}.` }, 400);
     }
     try {
-      return c.json(removeAgent(place.dir, name, { version }));
+      // The repository the board serves is read too, for a step its workflows are given this agent by; another is not known here.
+      return c.json(removeAgent(place.dir, name, { version, repo: repoOf() }));
     } catch (err) {
       const answer = refusalOf(err);
       if (answer) return c.json(answer.body, answer.status);

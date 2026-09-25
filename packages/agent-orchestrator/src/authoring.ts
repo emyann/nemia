@@ -169,6 +169,22 @@ const inUse = (name: string, users: readonly string[], does: string): string =>
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} beside it — ${users.join(', ')} — and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent, or remove the \`agent:\` line, first.`;
 
 /**
+ * The steps of `repo`'s workflows that are given the store's agent `name`, as `<workflow>/<step>` — none unless `at` is the store's folder
+ * of agents and the repository has no agent of that name of its own, in `workflows/agents/` or `.claude/agents/`, which its workflows find
+ * first (`lookupRoots`). The one repository the caller names: the store does not know which others give their workflows its agents.
+ */
+function repoUsers(at: string, name: string, repo: string | undefined): string[] {
+  if (repo === undefined || at !== path.join(HOME, 'workflows', AGENTS_FOLDER)) return [];
+  const own = [path.join(repo, 'workflows', AGENTS_FOLDER), path.join(repo, '.claude', AGENTS_FOLDER)];
+  if (own.some((dir) => path.resolve(dir) === at || fs.existsSync(path.join(dir, `${name}.md`)))) return [];
+  return agentUsers(path.join(repo, 'workflows'), name);
+}
+
+/** `inUse`, for the steps of a repository's workflows that are given the store's agent (`repoUsers`). */
+const inUseByRepo = (name: string, users: readonly string[], repo: string, does: string): string =>
+  `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} of the repository ${repo} — ${users.join(', ')} — which has no ${name} of its own, so its workflows are given this one, and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent or remove the \`agent:\` line, or copy this agent into ${path.join(repo, 'workflows', AGENTS_FOLDER)}/ (git shows it as a change to commit), first.`;
+
+/**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir` is
  * a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps name, at
  * `wf start`, so a write changes what a later `wf start` freezes and nothing else.
@@ -184,7 +200,7 @@ const inUse = (name: string, users: readonly string[], does: string): string =>
  * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
  * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
  */
-export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, card, anywhere = false }: { version: string | null; from?: string; schema?: AgentSidecar | null; card?: AgentSidecar | null; anywhere?: boolean }): AgentWritten {
+export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, card, anywhere = false, repo }: { version: string | null; from?: string; schema?: AgentSidecar | null; card?: AgentSidecar | null; anywhere?: boolean; repo?: string }): AgentWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
   refuse(agentPlaceRefusal(at, anywhere));
@@ -209,6 +225,8 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     if (fs.existsSync(file(name)) && !sameFile(file(name), file(old))) refuse(`${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`, 'exists');
     const users = agentUsers(path.dirname(at), old);
     if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
+    const theirs = repoUsers(at, old, repo);
+    if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), 'in-use', theirs);
   }
   const text = renderAgent(draft);
   // Each file the agent names beside it, judged whole before a byte is written: its name, that the agent's own key names it, that it is not
@@ -268,9 +286,11 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
  * An agent removed: its file, and each file it names beside it — the card its `card:` names, the result schema its `output:` names —
  * unless another agent names that one too. Refused, by name, as a write
  * is — the place, the name, a link, an agent not there or changed since `version` was read — and while any step of any workflow beside
- * it still names it, saying which: removed, each of those workflows would stop loading.
+ * it still names it, saying which: removed, each of those workflows would stop loading. An agent of the store is refused too while a step
+ * of `repo`'s workflows is given it, the repository having none of that name (`repoUsers`); other repositories are not read, since the
+ * store does not know them, and one that named the agent refuses to load its workflow until given another.
  */
-export function removeAgent(dir: string, name: string, { version, anywhere = false }: { version: string; anywhere?: boolean }): { dir: string; removed: string[] } {
+export function removeAgent(dir: string, name: string, { version, anywhere = false, repo }: { version: string; anywhere?: boolean; repo?: string }): { dir: string; removed: string[] } {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
   refuse(agentPlaceRefusal(at, anywhere));
@@ -282,6 +302,8 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
   if (now !== version) refuse(`${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`, 'stale');
   const users = agentUsers(path.dirname(at), name);
   if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
+  const theirs = repoUsers(at, name, repo);
+  if (theirs.length) refuse(inUseByRepo(name, theirs, repo!, 'removing it'), 'in-use', theirs);
   const read = (f: string) => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
   const mine = SIDECARS.map(({ key }) => ({ key, named: besideFile(read(`${name}.md`) ?? '', key) }));
   fs.rmSync(file);

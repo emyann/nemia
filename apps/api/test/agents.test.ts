@@ -391,3 +391,28 @@ test('REFUSED at shipped defaults: a card for an agent that is not there, one wi
     for (const f of ['mute.md', 'nameless.md', 'nameless.skills.json']) fs.rmSync(path.join(AGENTS, f));
   }
 });
+
+test("an agent of yours a step of the repository's workflows is given — the repository having none of that name — is refused removal and renaming, naming the repository; once it has its own, removed", async () => {
+  fs.writeFileSync(path.join(AGENTS, 'lender.md'), '---\ndescription: Lent to the repository.\n---\nDo it.\n');
+  const lent = path.join(repo, 'workflows', 'lent');
+  fs.mkdirSync(lent, { recursive: true });
+  fs.writeFileSync(path.join(lent, 'borrow.md'), '---\nagent: lender\n---\nBorrow it.\n');
+  const own = path.join(repo, '.claude', 'agents', 'lender.md');
+  try {
+    const lender = (await listed()).find((a) => a.from === 'yours' && a.name === 'lender')!;
+    const inUse = await refused(send('DELETE', '/api/agents/yours/lender', { version: lender.version }), 409,
+      new RegExp(`^agents/lender\\.md is named by a step of the repository ${repo} — lent/borrow — which has no lender of its own, so its workflows are given this one, and removing it would`));
+    assert.deepEqual(inUse.users, ['lent/borrow']);
+    await refused(send('PUT', '/api/agents/yours/lender', { ...scribe, name: 'giver', version: lender.version }), 409, /of the repository .* renaming it to giver would/);
+    // The repository's own lender is what its workflows are given now, so yours may go.
+    fs.mkdirSync(path.dirname(own), { recursive: true });
+    fs.writeFileSync(own, '---\ndescription: The repository\'s own.\n---\nDo it.\n');
+    const res = await send('DELETE', '/api/agents/yours/lender', { version: lender.version });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.ok(!fs.existsSync(path.join(AGENTS, 'lender.md')));
+  } finally {
+    fs.rmSync(path.join(AGENTS, 'lender.md'), { force: true });
+    fs.rmSync(lent, { recursive: true, force: true });
+    fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
+  }
+});

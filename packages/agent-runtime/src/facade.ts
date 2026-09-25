@@ -178,10 +178,11 @@ export type Engine = {
    */
   admit(taskIds: readonly string[]): Promise<string[]>;
   /**
-   * One task. An attempt in flight is observed, as a pass observes: its phase is its session's state, and only a
-   * registry has that. Any other task is read off its record — its phase is there, and so is its session's id once an
-   * attempt has ended — and the registry is not asked. A session whose id the record lacks is found by name when its
-   * harness can `find` one, and observed when it cannot or finds none; a harness without `find` is observed as ever.
+   * One task. A settled task is read off its record, on every harness, and no registry is asked: its phase is its
+   * outcome, and its session's id is the harness's own where it can `find` one, found by name when the record lacks it,
+   * and otherwise the id its harness reported when the attempt ended. An attempt in flight is observed, as a pass
+   * observes: its phase is its session's state, and only a registry has that. A task not settled with no attempt in
+   * flight is read off its record on a harness that can `find`, and observed on one that cannot.
    * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other.
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
@@ -287,6 +288,15 @@ const journalOf = (j: PromiseJournal) => Journal.layer({
   list: wrap(() => j.list(), (m) => new JournalError({ taskId: '*', message: m })),
   feed: (after) => wrap(() => j.feed(after), (m) => new JournalError({ taskId: '*', message: m })),
 });
+
+/**
+ * The session an attempt ended as, as its harness named it then (the `ended` entry's `sessionId`, the sighting's): what an
+ * observe would have listed it by. Undefined for an attempt no harness ever named, whose end says so in parentheses.
+ */
+const handleOf = (events: readonly Event[], attempt: number): string | undefined => {
+  const end = [...events].reverse().find((e) => e.kind === 'ended' && e.attempt === attempt);
+  return end?.kind === 'ended' && !['(never seen)', '(never started)'].includes(end.sessionId) ? end.sessionId : undefined;
+};
 
 const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 /** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
@@ -405,27 +415,40 @@ export function createEngine(options: EngineOptions = {}): Engine {
   /**
    * One task's view, asking a registry only what the record cannot answer (`Engine.view`).
    *
-   * Observed for an attempt in flight, whose phase is its session's state; and for a harness that cannot `find`, since
-   * a detached runner's handle for a session is not the id on the record. Otherwise the record holds the phase and,
-   * once an attempt has ended, its session's id, which a registry could only confirm. A session whose id the record
-   * lacks — a task settled with its attempt open, before `settled` carried one — is found by name, or observed.
+   * A settled task is read off its record alone, on every harness: its phase is its outcome, and a sighting gives such
+   * a view nothing else but its session's id — `waitingFor` is only a `needs-human` phase's, and `usage` only an
+   * attempt in flight's (an ended one's is on its `ended` entry, read off the sighting it ended on). That id is on the
+   * record too: the harness's own (`nativeId`) where the harness can `find`, as a registry would confirm it; and where
+   * it cannot, the handle the harness reported the session under when its attempt ended, which is what it lists it by
+   * and what its `logs` take (a detached runner's is the attempt's name, never `nativeId`: a check's `logs` are its verdict).
+   * Before 2026-09-25 a harness that cannot `find` was observed for every view, even of a task settled days ago: a
+   * `check` harness listing every run file it ever ran, once for each check of each run the tick viewed, every pass.
+   *
+   * A task not settled is observed while an attempt is in flight, whose phase is its session's state, and on a harness
+   * that cannot `find`, for its session's id. Otherwise the record holds the phase and, once an attempt has ended, its
+   * session's id. A session whose id the record lacks is found by name, or observed.
    *
    * Observed on the task's own harness alone, as `transcript` and `logs` reach it: no other registry can name its
    * session, and asking every one made a view of a `check` or a Codex task a `claude agents` call. A registry that
    * cannot be read this time is nothing observed, as `composite` reads it for a pass.
    */
   const viewOf = (taskId: string) => Effect.gen(function* () {
-    const state = fold(taskId, yield* Effect.flatMap(Journal, (j) => j.read(taskId)));
+    const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
+    const state = fold(taskId, events);
     const last = state.attempts.at(-1);
     const { find, observe } = runners[harnessOf(state)]!;
     const observed = observe.pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
       Effect.flatMap((o) => view(taskId, o)),
     );
-    if (!find || (!state.settled && last?.ended === null)) return yield* observed;
-    if (!last || last.nativeId) return yield* view(taskId, new Map());
-    const found = yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined)));
-    return found ? { ...(yield* view(taskId, new Map())), sessionId: found.sessionId } : yield* observed;
+    const recorded = view(taskId, new Map());
+    if (!state.settled && (!find || last?.ended === null)) return yield* observed;
+    if (!last || (find && last.nativeId)) return yield* recorded;
+    const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;
+    if (found) return { ...(yield* recorded), sessionId: found.sessionId };
+    if (!state.settled) return yield* observed;
+    const v = yield* recorded;
+    return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
   });
 
   const engine: Engine = {

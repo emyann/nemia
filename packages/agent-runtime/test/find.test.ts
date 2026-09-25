@@ -210,7 +210,7 @@ test("a registration and the registry that disagree: the registry's word is take
   });
 });
 
-test("a PromiseRunner without find is observed as before; one with find is asked by name, and only for an attempt's session", async () => {
+test("a PromiseRunner without find is observed while its task runs; one with find is asked by name, and only for an attempt's session; neither once settled", async () => {
   const harness = (withFind: boolean) => {
     const sessions = new Map<string, Sighting>();
     const counts = { observe: 0, find: [] as string[] };
@@ -246,7 +246,7 @@ test("a PromiseRunner without find is observed as before; one with find is asked
     assert.equal(v.phase, 'succeeded', at);
     assert.equal(v.sessionId, 's-1', at);
     assert.equal(await engine.logs(id), 'logs of s-1', at);
-    assert.equal(h.counts.observe, before + (withFind ? 0 : 2), `${at}: a settled task, viewed and its logs read`);
+    assert.equal(h.counts.observe, before, `${at}: a settled task, viewed and its logs read, off its record`);
     assert.equal(h.counts.find.length, withFind ? 1 : 0, `${at}: its id is on the record, and nobody is asked for it`);
   }
 });
@@ -279,7 +279,7 @@ test("a view asks its task's own harness and no other — and a task whose harne
   assert.equal((await engine.view(settled)).phase, 'succeeded', 'a settled task on a harness that cannot find');
   assert.equal(await engine.logs(running), 'b logs of b-1');
   assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");
-  assert.equal(b.counts.observe, before.b + 3, "each asks b's, once");
+  assert.equal(b.counts.observe, before.b + 2, "each read of the task in flight asks b's, once; the settled task's, none (`settled-view.test.ts`)");
 
   // The same board, without b. `harnessOf` falls back to `defaultHarness`, not to the first harness named.
   const c = harness('c');

@@ -41,7 +41,9 @@ test('a tick says what it took and what each harness listed, and a directory of 
 });
 
 test('a tick counts only the observes made during it; io() counts every observe, a view\'s too', async () => {
-  const { engine, id } = await settledEngine();
+  const { engine } = await settledEngine();
+  // A settled task is viewed off its record (`settled-view.test.ts`); one not settled, on a harness that cannot find, is observed.
+  const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   const first = await engine.tick();
   const before = engine.io().observed.quick!;
   await engine.view(id);
@@ -50,6 +52,8 @@ test('a tick counts only the observes made during it; io() counts every observe,
   const second = await engine.tick();
   assert.equal(second.observed.quick!.calls, first.observed.quick!.calls, 'the view\'s observe is not charged to the next pass');
   assert.equal(engine.io().observed.quick!.calls, afterView.calls + second.observed.quick!.calls, 'the running total has both');
+  const until = Date.now() + 20_000;
+  while (!(await engine.view(id)).state.settled && Date.now() < until) { await engine.tick(); await sleep(50); }
 });
 
 test('io() counts the bytes of a journal a view reads, and the worker a pass starts', async () => {

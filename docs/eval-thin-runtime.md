@@ -453,6 +453,10 @@ orchestrator's calls to the runtime change.
    - Found in review, round 2: an agent given by its URL has its card read beneath that URL's path, and requests go only
      to an interface on that URL's origin; a redirect is never followed; and every request, the card's included, is
      given up after `REQUEST_MS` (10 s), so an agent that holds a request no longer holds the runtime's pass.
+   - Found in review, round 3: the send keeps that bound, since a spawn runs inside the pass, so an agent that works
+     before it answers (a reply in a Message after thirty seconds) is read in doubt on every try, and each try is `lost`
+     with the work done. The in-doubt words name the bound, the README says an agent must answer a send within it, and
+     open issue 34 counts this beside the crash; a test at shipped defaults shows it happen.
 
    The rest is filed as three parts:
    - **Part 2: a workflow step names a remote agent through its `harness:` key.** The orchestrator's `runtime-client.ts`

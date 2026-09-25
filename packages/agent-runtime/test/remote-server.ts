@@ -34,8 +34,10 @@ export type StateWord = 'working' | 'input-required' | 'auth-required' | 'comple
 /**
  * One thing the agent does: an artifact published (`data`, or `text`), then a move to `state` with `words` as its status
  * message. A first turn whose first step is a `reply` makes no Task: the agent answers with that Message, `data` beside it.
+ * A turn's first step with `after` is taken that many milliseconds late, and nothing of the turn is answered before it:
+ * an agent slow to answer a message.
  */
-export type Step = { state?: StateWord; words?: string; data?: unknown; text?: string; reply?: string };
+export type Step = { state?: StateWord; words?: string; data?: unknown; text?: string; reply?: string; after?: number };
 
 /** A message the agent was sent, as its script is handed it: the turn is 1 for the message that made the task, then 2, 3… */
 export type Turn = { taskId: string; contextId: string; text: string; turn: number; metadata: Record<string, unknown> | undefined };
@@ -80,6 +82,8 @@ export type RemoteServer = {
   paths: string[];
   /** The tasks the agent made, in order. */
   tasks: () => string[];
+  /** How many first turns the agent answered with a Message, making no Task. */
+  replies: () => number;
   /** Move a held task on: its steps published in order, as a script's are. */
   move: (taskId: string, ...steps: Step[]) => void;
   close: () => Promise<void>;
@@ -129,6 +133,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const headers: http.IncomingHttpHeaders[] = [];
   const paths: string[] = [];
   const made: string[] = [];
+  let replied = 0;
   const cards: string[] = [];
   const hanging = { card: false, a2a: false };
   const prefix = o.prefix ?? '';
@@ -171,9 +176,12 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
         taskId, contextId, turn, metadata: ctx.userMessage.metadata,
         text: part?.content?.$case === 'text' ? part.content.value : '',
       });
+      const late = steps[0]?.after;
+      if (late) await new Promise((resolve) => setTimeout(resolve, late));
       const reply = turn === 1 ? steps[0]?.reply : undefined;
       if (reply !== undefined) {
         const first = steps[0]!;
+        replied++;
         bus.publish(AgentEvent.message({
           messageId: `m-${Math.random().toString(36).slice(2)}`, contextId, taskId: '', role: Role.ROLE_AGENT,
           parts: [textPart(reply), ...(first.data !== undefined ? [{ content: { $case: 'data' as const, value: first.data as Record<string, unknown> }, metadata: undefined, filename: '', mediaType: '' }] : [])],
@@ -262,6 +270,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   return {
     url: `${base}${prefix}`, counts, sent, headers, paths, cards, hanging,
     tasks: () => [...made],
+    replies: () => replied,
     move: (taskId, ...steps) => {
       const wake = waiting.get(taskId);
       waiting.delete(taskId);

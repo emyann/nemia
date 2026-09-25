@@ -27,7 +27,10 @@
  *
  * **Every request is bounded** (`REQUEST_MS`), since a pass waits on every harness's observe and an agent that holds a
  * request would hold the runtime: a GetTask not answered in time reads the session as last seen, a send not answered is
- * in doubt as a send that failed on the way, and a card not read is a spawn refused.
+ * in doubt as a send that failed on the way, and a card not read is a spawn refused. The send is bounded as the rest are,
+ * since a spawn runs inside the pass too: an agent must answer it within the bound, with a Task as `returnImmediately`
+ * asks or with its reply, and one that works before it answers is read in doubt every time, its work lost to the runtime
+ * (open issue 34).
  *
  * What the client learns of the card and the binding it chose is kept in memory, a view dropped at the first failure and
  * read again: the registry is the record.
@@ -202,6 +205,9 @@ class Redirected extends Untaken {}
 /** A spawn that nothing started, in words: the attempt ends `unstartable`. */
 class Refusal extends Error {}
 
+/** A request the agent did not answer within its bound: whether it was taken is not known. */
+class Late extends Error {}
+
 /** An A2A error an agent answers before it has done anything with a message: the send was refused, not lost. */
 const REFUSALS = [
   ContentTypeNotSupportedError, ExtensionSupportRequiredError, RequestMalformedError, UnsupportedOperationError,
@@ -209,6 +215,7 @@ const REFUSALS = [
 ];
 
 const untaken = (e: unknown): boolean => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
+const late = (e: unknown): boolean => e instanceof Late || (e instanceof Error && e.cause instanceof Late);
 const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => e instanceof E);
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -291,11 +298,11 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
 
   /** A fetch that gives up after `requestMs`, in words that say so. */
   const bounded = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
-    const late = AbortSignal.timeout(requestMs);
+    const bound = AbortSignal.timeout(requestMs);
     try {
-      return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, late]) : late });
+      return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, bound]) : bound });
     } catch (e) {
-      if (late.aborted) throw new Error(`${input instanceof Request ? input.url : String(input)} did not answer within ${requestMs / 1000} s`);
+      if (bound.aborted) throw new Late(`${input instanceof Request ? input.url : String(input)} did not answer within ${requestMs / 1000} s`);
       throw e;
     }
   };
@@ -372,7 +379,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
       const recorded = readEntry(fileOf(r.name));
       if (recorded?.taskId) return; // Sent before, and answered: the Task is adopted, and nothing is sent again.
       if (recorded) {
-        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded: whether the agent made a Task of it is not known, and it is not sent twice.`);
+        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since the agent did not answer within ${requestMs / 1000} s or the runtime stopped first: whether the agent made a Task of it is not known, and it is not sent twice.`);
       }
       const { card, agentUrl } = await client();
       const auth = authOf(card, agentUrl, credentials);
@@ -390,6 +397,10 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
         if (sendRefused(e)) {
           fs.rmSync(fileOf(r.name), { force: true });
           throw new Refusal(`${messageOf(e)}${untaken(e) ? '' : ' Nothing was started.'}`);
+        }
+        // Not answered in time: the agent may be at work on it, and it is not sent again.
+        if (late(e)) {
+          throw new Error(`the agent did not answer the send of \`${r.name}\` within ${requestMs / 1000} s: whether it made a Task of it is not known, and it is not sent twice. An agent must answer a send within that bound, with a Task as \`returnImmediately\` asks or with its reply; one that works before it answers is read so every time.`, { cause: e });
         }
         throw e;
       }

@@ -432,7 +432,10 @@ moment is not a session gone, and a deadline bounds one gone for good. The entry
 **A request is bounded.** A pass waits on every harness's observe, so an agent that holds a request would hold the whole
 runtime: each request, the card's included, is given up after `REQUEST_MS` (10 s). A GetTask given up reads the session as
 last seen; a send given up is in doubt, as one that failed on the way is, and ends `lost` past the grace window; a card not
-read refuses the spawn.
+read refuses the spawn. The send has the same bound, since a spawn runs inside the pass as an observe does: an agent must
+answer a send within 10 s, with a Task as the send's `returnImmediately` asks or with its reply. One that works before it
+answers — a reply in a Message after thirty seconds — is read in doubt on every try, and each try's work is lost to the
+runtime (open issue 34).
 
 **Which binding.** The card's interfaces are read in its order, and the first one this runtime speaks is used for every
 call: JSON-RPC (`JSONRPC`) or REST (`HTTP+JSON`), at A2A 1.0. A card that offers only gRPC, or only a version before 1.0,

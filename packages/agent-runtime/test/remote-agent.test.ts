@@ -391,7 +391,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   await e.tick();
   const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
   const spawned = events.find((ev) => ev.kind === 'spawned');
-  assert.match(spawned?.error ?? '', /its answer was never recorded: whether the agent made a Task of it is not known, and it is not sent twice/);
+  assert.match(spawned?.error ?? '', /its answer was never recorded, since the agent did not answer within 10 s or the runtime stopped first: whether the agent made a Task of it is not known, and it is not sent twice/);
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
   // The grace window passes with nothing listed under the name.
@@ -498,7 +498,7 @@ test('a request the agent holds is given up after its bound: a card not read ref
   const [sendMs, send] = await timed(() => spawnOf('ae/send/1'));
   assert.ok(sendMs < 3_000, `${sendMs} ms`);
   assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
-  assert.match(send.message, /did not answer within 0\.3 s/);
+  assert.match(send.message, /did not answer the send of `ae\/send\/1` within 0\.3 s: whether it made a Task of it is not known, and it is not sent twice/);
   assert.equal(JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).taskId, undefined, 'the intent stays, with no Task');
   s.hanging.a2a = false;
 
@@ -520,6 +520,29 @@ test(`at shipped defaults an agent that holds every request holds a pass ${REQUE
   const [ms] = await timed(() => e.tick());
   assert.ok(ms >= REQUEST_MS - 100 && ms < REQUEST_MS + 5_000, `${ms} ms`);
   assert.equal((await e.view(id)).phase, 'running (working)');
+});
+
+test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is in doubt, its reply lost, the attempt \`lost\`, and nothing sent twice`, async () => {
+  const s = await serve({ script: () => [{ reply: 'slow and sure', after: REQUEST_MS + 500 }] });
+  const { root, e } = engineOn(s);
+  const id = await e.file(task());
+  const spawned = () => (journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>).find((ev) => ev.kind === 'spawned');
+  for (let i = 0; i < 5 && !spawned(); i++) await e.tick();
+  assert.match(spawned()?.error ?? '', /the agent did not answer the send of `[^`]+` within 10 s: whether it made a Task of it is not known, and it is not sent twice\. An agent must answer a send within that bound/);
+  assert.equal((await e.view(id)).state.settled, null, 'in doubt, not refused: the agent may be at work');
+  // The agent answers after all, to a request the runtime gave up: nothing reads it.
+  const t0 = Date.now();
+  while (s.replies() === 0 && Date.now() - t0 < 5_000) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(s.replies(), 1);
+  await e.tick();
+  assert.equal(s.counts.sendMessage, 1, 'a pass in the grace window sends nothing');
+  const events = journalOf(root, id);
+  const back = new Date(Date.now() - 31_000).toISOString();
+  writeJournal(root, id, events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)));
+  const done = await settled(createEngine({ root, harnesses: { remote: { url: s.url } } }), id);
+  assert.equal(done.state.attempts[0]!.reason, 'lost');
+  assert.equal(done.state.attempts.length, 1);
+  assert.equal(s.counts.sendMessage, 1, 'sent once, and never again');
 });
 
 // ─── every verb reaches the agent ───────────────────────────────────────────

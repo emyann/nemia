@@ -1,5 +1,8 @@
-/** The cap on runs in flight, and the runs it counts and holds: what the Factory says over its floor (`GET /api/ceilings`, app.ts). */
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, lastCeilings, listRuns, parentOf, type ParentRun, phaseOfView, readAsks, slotWord, spendReader, stepsOf } from 'agent-orchestrator';
+/**
+ * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
+ * (`GET /api/ceilings`, app.ts).
+ */
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, lastCeilings, lastPassCost, listRuns, parentOf, type ParentRun, type PassCost, phaseOfView, readAsks, slotWord, spendReader, stepsOf } from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { everyView, seenBy } from './store.ts';
@@ -15,12 +18,16 @@ import { everyView, seenBy } from './store.ts';
  * or a started run nobody called off with something due. Not the Factory's own count of runs in flight, which also has a run waiting on runs,
  * or held for a slot, whose roots the tick will file. Null with no cap, when nothing is read, as `runSlots` reads nothing. `held` are the runs
  * the cap holds, in the order a pass admits them, each with the count it is held at and `wf ls`'s words on its roots (`heldRuns`, `slotWord`).
+ *
+ * `pass` is what the last pass cost, phase by phase, as it wrote it (`lastPassCost`, `$WF_ROOT/tick-stats.json`) — what `wf up --stats`
+ * prints; null before any pass has written it, or when the file does not read as one.
  */
 export type Ceilings = {
   last: { sessions: number; runs: number } | null;
   cap: number;
   inFlight: string[] | null;
   held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
+  pass: PassCost | null;
 };
 
 /**
@@ -31,8 +38,9 @@ export type Ceilings = {
  */
 export async function ceilingsOf(): Promise<Ceilings> {
   const last = lastCeilings() ?? null;
+  const pass = lastPassCost() ?? null;
   const cap = last?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
-  if (cap <= 0) return { last, cap: 0, inFlight: null, held: [] };
+  if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
   const runs = listRuns();
   const views = await everyView();
   const reader = seenBy(views);
@@ -56,5 +64,6 @@ export async function ceilingsOf(): Promise<Ceilings> {
     cap,
     inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id),
     held: [...heldRuns(needs, cap)].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) })),
+    pass,
   };
 }

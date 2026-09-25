@@ -376,7 +376,8 @@ session cannot load is a name in its prompt (F11); skills or a system prompt on 
 as before; skills or a system prompt on a step that continues another's session, which keeps its own (F13); `systemPrompt: own` on an
 agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
-`default` would ask about (F21).
+`default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+(`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
 
 A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
 file that is not there.

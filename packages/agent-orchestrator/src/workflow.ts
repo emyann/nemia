@@ -571,17 +571,28 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
 
 /**
  * Refused: a Claude Code step that runs in `auto` — named, or the mode it is filed with when it names none — on a model that drops it
- * (`keepsAuto`, F21). Such a session says `default` from its first turn, and a job denies every call `default` would ask about, which no
- * line of the step says: the refusal names the modes that keep what the step is for. Codex has sandboxes, not modes, and is not asked.
+ * (`autoDropped`, F21). The refusal names the modes that keep what the step is for.
  */
 function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined): void {
-  if (harness === 'codex' || keepsAuto(model)) return;
-  const mode = permissionMode ?? DEFAULT_PERMISSION_MODE;
-  if (mode !== 'auto') return;
+  const dropped = autoDropped(harness, model, permissionMode);
+  if (!dropped) return;
+  refuse(`${step}: \`model: ${model}\` ${dropped}. Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`);
+}
+
+/**
+ * Why a Claude Code session filed in `permissionMode` — the mode a step names, or `undefined` for none — would not run in it on `model`, as
+ * the words after what names the model: `names no \`permissionMode:\`, … (F21, …)`. `undefined` when it would: on codex, which has
+ * sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says `default` from its
+ * first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording for the load's
+ * refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
+ */
+export function autoDropped(harness: string | undefined, model: string | undefined, permissionMode: string | undefined): string | undefined {
+  if (harness === 'codex' || keepsAuto(model)) return undefined;
+  if ((permissionMode ?? DEFAULT_PERMISSION_MODE) !== 'auto') return undefined;
   const asked = permissionMode === undefined
     ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
     : 'says `permissionMode: auto`';
-  refuse(`${step}: \`model: ${model}\` ${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about (F21, Claude Code 2.1.282, measured). Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`);
+  return `${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about (F21, Claude Code 2.1.282, measured)`;
 }
 
 /**

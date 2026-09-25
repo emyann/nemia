@@ -17,7 +17,7 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { allowRuleOf, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, modeOf, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
 import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
@@ -2038,7 +2038,8 @@ const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 /**
  * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
- * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a cancelled
+ * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
+ * `auto` would run in `default` on (`autoDropped`, F21, as the load refuses it on the step's own `model:`); a cancelled
  * run, which files nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
  * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
@@ -2070,6 +2071,11 @@ export function retryRefusal(
   if (wrong) return wrong;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  const dropped = how.model === undefined ? undefined : autoDropped(step.harness, how.model, modeOf(step));
+  if (dropped) {
+    return `\`--model ${how.model}\`: ${name} ${dropped}. The step's mode is frozen with the run, so ask for a model that keeps \`auto\` — ${command} --model sonnet, or opus, or fable — `
+      + `or, to run it on ${how.model}, start a run of a folder whose step names a mode the model keeps: \`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules.`;
+  }
   if (run.cancelledAt) {
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
   }

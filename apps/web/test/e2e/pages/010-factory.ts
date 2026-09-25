@@ -3,7 +3,7 @@ import type { Page } from 'playwright';
 import { nextVisit, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { cardOf, cardsOf, dragBy, edgeOf, expectClearOfEachOther, expectClearOfPanels, onTheFloor, photographCard, placeOf, said, samePlace, showFinished } from '../canvas.ts';
 import { expectApart, expectBetween, expectCount, expectInside, expectLeftOf, expectMovedAlone, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
-import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, FOLDER, GATED, HELD, LOOPING, NEIGHBOUR, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
+import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, FOLDER, GATED, HELD, LOOPING, NEIGHBOUR, PASS, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -62,9 +62,24 @@ export default {
     await expectLeftOf(ghosts, floor, "the ghosts wait at the floor's left edge");
     await expectTexts(
       page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued`],
-      `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight`,
+      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued · ${PASS.line}`],
+      `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight — and what the daemon's last pass took`,
     );
+    // What the last pass cost, whole, on hover: the pass's totals, each phase in the package's order, the harness observed, and what measuring took.
+    const pass = page.locator('[data-cap] [data-pass]');
+    await expectTexts(pass, [`· ${PASS.line}`], 'the pass is said beside the cap');
+    const passTitle = (await pass.getAttribute('title')) ?? '';
+    const passLines = passTitle.split('\n');
+    if (!passLines[0]?.startsWith("The daemon's last pass, at ") || !passLines[0].endsWith(`: ${PASS.totals}`)) {
+      throw new Refused(`the pass's title opens on its totals, ${JSON.stringify(PASS.totals)} — it says ${JSON.stringify(passLines[0])}`);
+    }
+    const phasesSaid = passLines.slice(1, 9).map((l) => l.split(':')[0]).join(' ');
+    if (phasesSaid !== 'records asks journals observe runtime git assess act' || passLines[4] !== 'observe: 120 ms, 1 call, 0 B read, 1 process started') {
+      throw new Refused(`the pass's title says each phase in the package's order, observe's 120 ms among them — it says ${JSON.stringify(passLines.slice(1, 9))}`);
+    }
+    if (!passLines.includes('claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started') || passLines.at(-1) !== 'Measuring it took 0.40 ms. wf up --stats says the same.') {
+      throw new Refused(`the pass's title names the harness observed and what measuring took — it says ${JSON.stringify(passTitle)}`);
+    }
     const { card, pills, tiles, pill, tile } = onTheFloor(page);
     const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
     // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
@@ -380,7 +395,7 @@ export default {
     await expectCount(tile('review').and(page.locator('[aria-pressed="true"]')), 1, "review's, the step inspected");
     // Beside the inspector, the queue's lane gives the floor its width back; the header still counts the queue.
     await expectCount(page.locator('aside[aria-label="Queued cards"]'), 0, "the queue's lane is off while a step's inspector is open beside the floor");
-    await expectTexts(page.locator('[data-cap]'), [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued`], 'and the header still counts the queue');
+    await expectTexts(page.locator('[data-cap]'), [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued · ${PASS.line}`], 'and the header still counts the queue');
     await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
     // The floor narrows for the inspector and brings the run back into view; judged once it has.
     await settled(page);

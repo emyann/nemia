@@ -849,7 +849,34 @@ export const refusedWhy = (root: string, repo: string): string =>
 export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string): string =>
   `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
 
-/** Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, and `tick.json`. */
+/**
+ * What the daemon's last pass cost, as the tick writes it to `tick-stats.json` (`recordPassCost`): 212 ms over twelve run records, most of it
+ * observing claude, which the Factory's header says beside the cap (`a pass takes 212 ms`), with the breakdown on hover.
+ */
+export const PASS = {
+  ms: 212.4,
+  line: 'a pass takes 212 ms',
+  totals: '212 ms, 12 run records read, 812.0 kB read, 1 process started.',
+  cost: (at: string) => ({
+    at, ms: 212.4, records: 12, bytes: 812_000, spawned: 1, overheadMs: 0.4,
+    phases: {
+      records: { ms: 20, calls: 12, bytes: 12_000, reads: 12, spawned: 0 },
+      asks: { ms: 5, calls: 40, bytes: 0, reads: 0, spawned: 0 },
+      journals: { ms: 40, calls: 30, bytes: 800_000, reads: 30, spawned: 0 },
+      observe: { ms: 120, calls: 1, bytes: 0, reads: 0, spawned: 1 },
+      runtime: { ms: 8, calls: 1, bytes: 0, reads: 0, spawned: 0 },
+      git: { ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 },
+      assess: { ms: 16.4, calls: 0, bytes: 0, reads: 0, spawned: 0 },
+      act: { ms: 3, calls: 2, bytes: 0, reads: 0, spawned: 0 },
+    },
+    harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 } },
+  }),
+} as const;
+
+/**
+ * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and what
+ * the pass that wrote it cost (`tick-stats.json`, PASS).
+ */
 export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { first, refused, third } = QUEUE;
@@ -867,6 +894,7 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const tried = { at: ago(refused.triedMinutesAgo), text: cards[1]!.text, repo, why: refusedWhy(root, repo), refused: true };
   write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
+  write(path.join(root, 'tick-stats.json'), JSON.stringify(PASS.cost(ago(1)), null, 2));
 }
 
 /**

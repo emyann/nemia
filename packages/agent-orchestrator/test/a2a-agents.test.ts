@@ -15,7 +15,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-a2a-agents-');
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, readRun, remoteAgents, start } = await import('../src/runner.ts');
+const { advance, readRun, remoteAgents, retry, start } = await import('../src/runner.ts');
 const { credentials, missingCredential, readRemote } = await import('../src/runtime-client.ts');
 const { remoteBrief } = await import('../src/run.ts');
 
@@ -271,6 +271,26 @@ test("the tick files a remote step with no harness arguments, schema, hold or se
     assert.match(ask.brief, /Files were given with it \(`wf start --input`\): `tides\.csv`\. They stay on the machine that runs this workflow/);
     assert.equal(ask.brief.includes(ROOT), false, `no path under the store: ${ask.brief}`);
     assert.doesNotMatch(ask.brief, /closeout|artifacts|## Finishing/i, 'no contract a remote agent could not keep');
+  } finally {
+    fs.rmSync(FILE, { force: true });
+  }
+});
+
+test('wf retry refuses --model and --budget on a remote step, in the words its load refuses the keys in, and asks a try without them', async () => {
+  declare({ reviewer: { url: 'https://a.example/reviewer' } });
+  try {
+    const dir = team('retried', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
+    const run = start({ brief: 'a review', repo: HERE, workflowDir: dir });
+    const { e, settle } = board();
+    await advance(e, readRun(run.id));
+    settle(`${run.id}-ask`, 'failed');
+    const model = await retry(e, run.id, 'ask', { mode: 'fresh', model: 'haiku' }).then(() => assert.fail('--model was not refused'), (err: Error & { exitCode?: number }) => err);
+    assert.equal(model.exitCode, 2);
+    assert.equal(model.message, `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: wf retry ${run.id} ask.`);
+    await assert.rejects(retry(e, run.id, 'ask', { mode: 'nudge', budget: 5 }), (err: Error) => err.message.startsWith('`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none'));
+    // Without them, the same try is asked for.
+    const asked = await retry(e, run.id, 'ask', { mode: 'fresh' });
+    assert.equal(asked.ask.try, 2);
   } finally {
     fs.rmSync(FILE, { force: true });
   }

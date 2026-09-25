@@ -17,7 +17,7 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, modeOf, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, modeOf, outputFields, remoteRetryRefusal, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
 import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
@@ -2071,6 +2071,9 @@ export function retryRefusal(
   if (wrong) return wrong;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  const remote = (how.model === undefined ? undefined : remoteRetryRefusal(step, 'model', how.model, command))
+    ?? (how.budget === undefined ? undefined : remoteRetryRefusal(step, 'budget', how.budget, command));
+  if (remote) return remote;
   const dropped = how.model === undefined ? undefined : autoDropped(step.harness, how.model, modeOf(step));
   if (dropped) {
     return `\`--model ${how.model}\`: ${name} ${dropped}. The step's mode is frozen with the run, so ask for a model that keeps \`auto\` — ${command} --model sonnet, or opus, or fable — `

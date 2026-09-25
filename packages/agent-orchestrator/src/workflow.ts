@@ -391,6 +391,15 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   check: 'is a command the run executes in the step\'s workspace, and a remote agent works on another party\'s machine: nothing it does reaches the workspace, and a check would judge work nobody did there',
 };
 
+/**
+ * Why a remote step's try may not be asked for with `wf retry --<key>` — `--model`, `--budget` — in the words its load refuses the key in,
+ * or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be dropped.
+ */
+export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
+  if (!isRemoteHarness(step.harness)) return undefined;
+  return `\`--${flag} ${value}\` ${REMOTE_REFUSED[flag]}, and ${step.name} runs on \`harness: ${step.harness}\`, a remote A2A agent: its try would be sent without it. Ask without --${flag}: ${command}.`;
+}
+
 /** The keys a step on a remote A2A agent may not set (`REMOTE_REFUSED`), in `STEP_KEYS`' order: what the board's form leaves off such a step. */
 export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
 

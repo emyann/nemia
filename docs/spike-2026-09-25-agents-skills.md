@@ -513,3 +513,39 @@ asks it to load its skill and write the code word into `note.md`. The skill `cod
 
 *For the design:* the flags reach Claude Code as the spike measured them, from the run's own files: the default is kept, the body follows it,
 and a skill given by `skills:` loads under its plugin's namespace in a `dontAsk` job whose `tools:` allow `Skill`.
+
+## 9. Measured by card 1b (2026-09-25)
+
+### F24. The shipped agents, their procedures moved into skills, run as they did
+
+The live proof card 1b was asked for: `wf start` and `wf up` of this branch (`node packages/agent-orchestrator/bin/wf.ts`), Claude Code
+2.1.282, on a store made for it (`mktemp -d /tmp/wf-1b.XXXX`, `WF_ROOT=<it>/store`), outside every worktree and outside `~/.claude/`.
+Two runs, $0.62 in all:
+
+- **The shipped `note` team**, `--workflows workflows/note` of this branch: *"Write a short note (under 150 words) on why a shell script
+  should quote its variables."* The review step's `init` lists `hkb-note-reviewer:review-a-note` among its skills, its plugin
+  `hkb-note-reviewer@inline` at `runs/<id>/agents/review/`, `Skill` among its tools, `dontAsk`, `claude-sonnet-5`. It read `note.md`,
+  called `Skill` with `hkb-note-reviewer:review-a-note` (*"Launching skill"*), and signed off `done` with the skill's `verdict` and
+  `findings`: `needs work`, the note over its 150 words and ending on a paragraph about the writer's own certainty, each quoted. The
+  write step likewise loaded `hkb-note-writer:write-a-note` before its one `Write`. No denial in either.
+- **A plan → implement folder** made for it in a scratch git repository (`greet.sh` and `test.sh`): `plan.md` is `dev-planned`'s file,
+  `implement.md` names `agent: implementer` with `check: sh test.sh` in place of the repository's suite, and the folder's `agents/` and
+  `skills/` are this branch's, copied and compared with `diff -r`. The brief: let `greet.sh` take an optional name.
+  - `wf start` wrote the planner's `prompt.md` (2,094 characters): the body, then *"Your skills, each loaded with the Skill tool by its
+    name when you need it: `hkb-planner:plan-a-change`."*, then `## Skill \`hkb-planner:ask-when-it-reads-two-ways\`` and the skill's
+    body whole — the SKILL.md less its frontmatter, 721 characters, found in the file verbatim. The engine's task carried
+    `config.claude` = `{ appendSystemPromptFile: …/agents/plan/prompt.md, pluginDir: [ …/agents/plan/hkb-planner ] }`, and the
+    session's last `prompt_snapshot` holds 12 blocks, the last of them the prompt file's whole text, character for character.
+    The planner loaded `hkb-planner:plan-a-change` with `Skill`, read the two files, and signed off `done` with a plan. One Bash call,
+    `git ls-files; for f in …; do cat …; done`, was denied in `dontAsk`, as a compound command is; it read the files with `Read`.
+  - The implement step's `init` lists `hkb-implementer:implement-a-change` and `hkb-implementer:weigh-a-plan`; it called `Skill` with
+    `implement-a-change` first, then `weigh-a-plan` (its brief has *From plan*), as its body says, and committed `Let greet.sh take an
+    optional name`. The run's check `sh test.sh` passed: `verified ✓`.
+
+The evidence is in the run's artifacts, `implement/f24/`: the four jobs' stream-json logs, the planner's `prompt.md`, the note and the
+implement diff.
+
+*For the design:* the procedures reach the session as the agents' bodies did — a skill to load by the session's own `Skill` call when
+its body says, a preloaded one in the system prompt whole — and the note reviewer's verdict came off its skill's rules. The note's
+overrun and its closing paragraph are the writer's, following wording that moved into its skill unchanged (*"mark what you are not"*);
+the reviewer caught both, which is what the team is for.

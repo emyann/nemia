@@ -233,6 +233,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `wf rm` still drew the run, and said nothing. Reading a query again is not a page saying what the read found: a page that must say a
   thing is gone reads the query's `error` beside its `data`, and a query whose 404 is an answer does not retry it (`runGone` and `retryRun`
   in `apps/web/src/lib/api/detail.ts`; learned by the run that made a `removed` event read the run's record again, round 2).
+- **A scroll made as a run's page opens lands short, whether an effect or the router's hash makes it.** The router resets the scroll after
+  the first render, which undoes an effect's `scrollIntoView`, and a `#hash` is scrolled to before `Decide` has read its decision and grown,
+  which then pushes the target back under the first screen (552 of 800, measured). A page opened on a step (`?step=`) scrolls again on each
+  change of the article's height for a few seconds, until the person moves the page themselves (`useLanding` in `routes/runs.$runId.tsx`);
+  the e2e's `expectOnScreen` wants the element wholly in the window, since its top alone was in it with no scroll at all (learned by the run
+  that linked a gate's card to what it approves).
 - **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
   a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
   node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the

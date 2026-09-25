@@ -52,6 +52,7 @@ function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
+  fs.cpSync(path.join(SHIPPED, '..', 'skills'), path.join(STORE, 'skills'), { recursive: true });
   for (const file of fs.readdirSync(SHIPPED)) fs.copyFileSync(path.join(SHIPPED, file), path.join(dir, file));
   return dir;
 }

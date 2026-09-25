@@ -393,7 +393,13 @@ on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
 
 A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
-file that is not there.
+file that is not there. With no plugin there is nothing to load, so the brief tells each of the agent's skills whole after the
+instructions, read again from where a start of the run's folder finds them — an edit made since `wf start` reaches it, and a folder run,
+which keeps no repository, finds none in the one it was started in — or says which it could not tell and why (`unrendered`, `skillsAgain`).
+
+The shipped agents give skills (since 2026-09-25): each entry of an agent's card is a skill in the repository's `workflows/skills/`,
+the procedure the entry describes, and the agent's body keeps its role and its limits and says when to load each
+(`workflows/agents/README.md`). `test/shipped-skills.test.ts` reads each SKILL.md's frontmatter as YAML and holds it to its card entry.
 
 ### What a step may have: `tools:` and `effort:`
 
@@ -1397,19 +1403,20 @@ where no `WF_BASE_REF` is set, which a check the run executes never is: a round'
 e2e, and the ship runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
 every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
 seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
-have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
-own directory, after its last commit, and read the PNGs — those are the screenshots review reads — and to use
-the look skill on every page it changed. It declares
+have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told by its skill `look-at-a-page`
+to run it into its own directory, after its last commit, and read the PNGs — those are the screenshots review reads —
+and to use the look skill on every page it changed. It declares
 `screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
-else of implement, and uses the look skill on the screenshots and the pages side by side — read by its
-file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and with it the Skill tool. Its schema is
+else of implement, and uses the look skill on the screenshots and the pages side by side, as its skill `read-a-screenshot`
+says — which names the look skill's file, `.claude/skills/look/SKILL.md`, too, for Read. Its schema is
 `workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
 `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
 names neither does not fit the closeout the step is filed with. `again: true` sends the change round
 again, at most `rounds: 3`, as in `workflows/`. `ship` is `dev-build`'s: gated, the shipper in the repository's
 own checkout, which stages the merge of the run's branch and signs off its message; the run executes that line on it as
 ship's `check:`, with no `WF_BASE_REF`, and commits or aborts. Its agent,
-`shipper`, is copied into this package's `workflows/agents/` beside ui's two.
+`shipper`, is copied into this package's `workflows/agents/` beside ui's two, and the six skills the three give into its
+`workflows/skills/`, each the repository's file for file.
 
 ```bash
 wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/workflows/ui

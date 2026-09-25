@@ -35,6 +35,8 @@
     "SendMessage,CronCreate,CronDelete,RemoteTrigger",
     "--append-system-prompt-file",
     "<store>/runs/<run>/agents/implement/prompt.md",
+    "--plugin-dir",
+    "<store>/runs/<run>/agents/implement/hkb-implementer",
     "--permission-mode",
     "auto",
     "--strict-mcp-config",

@@ -1,6 +1,7 @@
 ---
 description: Ends a run in the repository's own checkout: stages the merge of its result and writes its commit message, which the run commits on its check.
 card: shipper.skills.json
+skills: trial-merge-a-branch, say-why-it-aborted
 harness: claude
 model: opus
 # Said here, or the session takes Claude Code's default: a job reads no user settings (F24 in docs/spike-2026-09-25-agents-skills.md),
@@ -27,34 +28,8 @@ You are in the repository's own checkout, where the base branch is, and not in a
 section below names the branches to merge and the base to merge them onto. Nothing you do here is undone for you,
 so leave the checkout as you found it but for the merge.
 
-1. Look before you touch anything: `git status --porcelain` says nothing, and `git rev-parse --abbrev-ref HEAD`
-   is the base branch. If either is not so, somebody else is working in this checkout — stop, and sign off
-   `blocked` saying what is in the way. Do not stash, reset or check anything out.
-2. Merge, without committing, every branch the section below names, in one command: `git merge --no-ff --no-commit
-   <branch>…`. If it conflicts, `git merge --abort` and sign off `blocked`, naming the conflicting paths: resolving a
-   merge is the work's job, not this step's.
-3. Write the commit message — never git's default. The subject is one plain line saying what shipped, for a person
-   scanning `git log --oneline`: the run's own title — the first line under *What was asked for* — trimmed to about
-   72 characters. Not a description of git: "Merge branch …" is what this message replaces. Then a blank line, and a
-   body of two to six lines: what was built, in plain words, then one line naming the run, its branch, how many
-   commits it brought, and the check the run executes on the merged tree. Write it from what you can verify in this
-   checkout — `git log --format='%s' <base>..<branch>`, `git diff --stat <base>...<branch>`, `git rev-list --count
-   <base>..<branch>`, and the run and branch this brief names — never from anyone's account of the work. No trailers
-   of any kind: no `Co-Authored-By`, no `Signed-off-by`, no session URL.
-4. Leave the merge staged, and sign off `done`, the message whole as your closeout's `message`. Do not run the check,
-   do not commit, and do not abort a merge that is clean: the run does each, on the check's exit, and a session
-   cannot hold a turn open for a suite that runs for minutes. A check that refuses, or does not finish, has the run
-   abort the merge, and nothing lands. The check runs with no `WF_BASE_REF`, so it runs the e2e, where the folder
-   has one, which no round's check ran: this is the one time the work meets it before it reaches the base branch.
-5. Anything else that goes wrong before you sign off — a command failed, the checkout is not what step 1 wants —
-   `git merge --abort` if a merge is staged, then sign off `blocked` saying what happened. A checkout left mid-merge
-   is worse than a branch not merged.
-
-Where this brief has no such section — a folder whose ship step names no `check:` — the run lands nothing here, and
-the merge is yours to finish: run the check named under *Where to look*, whole, from the repository root, mid-merge;
-on exit 0, and only then, commit with the message of step 3, written to a file in the directory named under *Files
-for the person who decides* and committed with `git commit -F <that file>`; on anything else `git merge --abort` and
-sign off `blocked` with what the check said. Sign off `done` there only once the merge is committed.
+Follow your skills `trial-merge-a-branch` and `say-why-it-aborted`, each given you whole after these instructions:
+the first is the merge and its message, step by step; the second is what to do when anything goes wrong on the way.
 
 You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
 (`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run long work in the

@@ -386,7 +386,13 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
       ship(check),
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
-    assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);
+    // The package's review is a codex step, which takes no skills, and keeps the reviewer's procedure in its body. Since agents card 1b the
+    // reviewer's is in its skills (`workflows/skills/`): every sentence of the package's is told to this review, by its body or a skill.
+    const told = [review.body, ...(review.agent?.skills ?? []).map((skill) => fs.readFileSync(path.join(HOME_REPO, 'workflows', 'skills', skill, 'SKILL.md'), 'utf8'))]
+      .join('\n\n').replace(/\s+/g, ' ');
+    const sentences = reviewer.body.replace(/\s+/g, ' ').split(/(?<=\.) /);
+    assert.ok(sentences.length >= 6, 'the package review, sentence by sentence');
+    for (const sentence of sentences) assert.ok(told.includes(sentence), `${name}/review is told the package's review: ${sentence}`);
     for (const said of [/`npm test` and `npm run typecheck`/, /`npx turbo run test --filter=<package>`/, /`cd packages\/<package> && node --test /, /`git diff`, `git log`, `git show`, `git status`/, /Do not run `npm run build` or `npm run e2e`: they write\s+into the workspace\./]) {
       assert.match(review.body, said, `${name}/review.md says which commands it may run`);
     }

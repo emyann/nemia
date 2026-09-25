@@ -25,6 +25,7 @@ const AGENTS = path.join(STORE, 'agents');
 function fresh(): void {
   fs.rmSync(STORE, { recursive: true, force: true });
   fs.cpSync(path.join(SHIPPED, 'agents'), AGENTS, { recursive: true });
+  fs.cpSync(path.join(SHIPPED, 'skills'), path.join(STORE, 'skills'), { recursive: true });
   fs.cpSync(path.join(SHIPPED, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 }
 

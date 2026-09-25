@@ -19,7 +19,7 @@ import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen
 import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
-import { agentFilesDir, artifactsDir, cancelFile, isDirectory, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
+import { agentFilesDir, artifactsDir, cancelFile, skillsAgain, isDirectory, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
@@ -27,7 +27,8 @@ import { collectArtifacts } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, reportedEngine, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
-import { startQueued } from './start.ts';
+import { placesOf, startQueued } from './start.ts';
+import { skillsFor } from './workflow-store.ts';
 import { renderedFlags, rendersAgent, unrendered } from './rendering.ts';
 import { momentumOf, toAdmit } from './admission.ts';
 import { addRuntime, aside, countRested, metered, within, type Tallies } from './tally.ts';
@@ -903,13 +904,16 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
  * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
- * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start. And
+ * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start, so its
+ * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). And
  * bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true` — never a default: Claude Code's own
  * flag, among its others (`claude.remoteControl`), first, where the runtime put it while it was a harness argument (until 2026-09-25).
  */
 function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
-  const told = rendersAgent(step) && !isDirectory(dir) ? unrendered(step) : step;
+  const told = rendersAgent(step) && !isDirectory(dir)
+    ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
+    : step;
   const rendered = renderedFlags(told, dir);
   return { step: told, claude: told.remote ? { remoteControl: true, ...rendered } : rendered };
 }

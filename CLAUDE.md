@@ -426,6 +426,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   there. The package's `workflows/ui` copy has its three agents in the package's `workflows/agents`, held byte for byte by the ui copy
   test: a change to `ui-implementer.md`, `ui-reviewer.md` or `shipper.md` (and its skills) is copied there too (learned by the run that
   put the roles in `agents/`; the shipper joined when ui gained its ship).
+- **Nor without `workflows/skills/`, and a shipped step's procedure is in its skills, not its body.** Since agents card 1b each shipped
+  agent's body keeps its role and limits and names its skills; a test that copies `agents/` copies `skills/` beside it, or the load
+  refuses the agent's `skills:` as not found, and ui's six skills are copied into the package's `workflows/skills/`, held by the ui copy
+  test. A test that looks for a sentence a step is told reads `toldIn(dir, step)` (`test/told.ts`: the body and its skills), and
+  `shipped-skills.test.ts` reads each SKILL.md as YAML, since Claude Code drops one whose frontmatter does not parse with nothing said
+  (learned by the run that moved the procedures into skills).
+- **What a rendered step is told, its fallback tells too.** A step whose `runs/<id>/agents/<step>/` was removed by hand is filed
+  with no flags (`unrendered`), and a body that says to load its skills, or that they follow, then names what is not there: the
+  shipper would have merged without its `--no-commit`. The fallback tells each skill whole in the brief, read again by `skillsAgain`;
+  something new a render gives a session is given there too, or said missing (learned in review of the same run, round 1).
+- **`fixtures/argv-shipped.json` pins dev's implement argv whole, so a change to what a shipped agent gives moves it.** Card 4 recorded
+  it while the implementer gave no skills, and the merge with card 1b failed on `--plugin-dir`: record it again with `ARGV_RECORD=1`
+  and read the diff, as `argv.test.ts` says (same run, round 2).
 - **The board's listing of a step is resolved; its file is not.** `spec` holds the agent's keys merged in, so a PUT that sends `spec`
   alone writes every one of them into the step file, and `renderStep` of an edited resolved step writes any inherited key whose value
   moved off the agent's (`given`). A step's own keys and note travel as `own` (`ListedStep.own`), and the builder writes those (same run).

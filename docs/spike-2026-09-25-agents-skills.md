@@ -579,3 +579,44 @@ The mode, tools, allow and deny rules, MCP servers and budget were already passe
 *For the design:* a job reads the checkout's `.claude/settings.json` and `settings.local.json` and what the runtime's flags give. It reads
 nothing of `~/.claude/` but auto memory, which Claude Code keys by the repository. A background session (`claude --bg`, the supervisor) is
 not given the flag, and reads the user's settings as before.
+
+## 10. Measured by card 1b (2026-09-25)
+
+### F25. The shipped agents, their procedures moved into skills, run as they did
+
+The live proof card 1b was asked for: `wf start` and `wf up` of this branch merged with main (`node packages/agent-orchestrator/bin/wf.ts`),
+so every job carried card 4's `--setting-sources project,local` beside its `--plugin-dir`, read off each job's arguments. Claude Code
+2.1.282, on a store made for it (`mktemp -d /tmp/wf-1b.XXXX`, `WF_ROOT=<it>/store`), outside every worktree and outside `~/.claude/`.
+Two runs, $0.36 in all:
+
+- **The shipped `note` team**, `--workflows workflows/note` of this branch: *"Write a short note (under 150 words) on why a shell script
+  should quote its variables."* The write step's `init` lists `hkb-note-writer:write-a-note`, its plugin `hkb-note-writer@inline` at
+  `runs/<id>/agents/write/`, `Skill` among its tools, `dontAsk`, `claude-sonnet-5`; it called `Skill` with that name before its one
+  `Write`. The review step likewise lists `hkb-note-reviewer:review-a-note`, read `note.md`, called `Skill` with it, and signed off
+  `done` with the skill's `verdict` and `findings`: `needs work`, the note at about 180 words of 150 and ending on a paragraph about the
+  writer's own certainty, each quoted. No denial in either.
+- **A plan → implement folder** made for it in a scratch git repository (`greet.sh` and `test.sh`): `plan.md` is `dev-planned`'s file,
+  `implement.md` names `agent: implementer` with `check: sh test.sh` in place of the repository's suite, and the folder's `agents/` and
+  `skills/` are this branch's, copied and compared with `diff -r`. The brief: let `greet.sh` take an optional name.
+  - `wf start` wrote the planner's `prompt.md` (2,100 characters): the body, then *"Your skills, each loaded with the Skill tool by its
+    name when you need it: `hkb-planner:plan-a-change`."*, then `## Skill \`hkb-planner:ask-when-it-reads-two-ways\`` and the skill's
+    body whole — the SKILL.md less its frontmatter, 720 characters, found in the file verbatim. The session's last `prompt_snapshot`
+    holds 12 blocks, the eleventh of them the prompt file's whole text, character for character. The planner loaded
+    `hkb-planner:plan-a-change` with `Skill`, read the two files, and signed off `done` with a plan. One Bash call,
+    `git ls-files; echo ---; for f in …`, was denied in `dontAsk`, as a compound command is; it ran `git ls-files` alone and read the
+    files with `Read`.
+  - The implement step's `init` lists `hkb-implementer:implement-a-change` and `hkb-implementer:weigh-a-plan`; it called `Skill` with
+    `implement-a-change` first, then `weigh-a-plan` (its brief has *From plan*), as its body says, and committed `Let greet.sh take an
+    optional name`. The run's check `sh test.sh` passed: `verified ✓`.
+
+The evidence is in the run's artifacts, `implement/f25/`: each job's arguments, the four jobs' stream-json logs, the planner's
+`prompt.md`, the note and the implement diff. A first run of the same proof, before main's `--setting-sources`, read the same.
+
+*For the design:* the procedures reach the session as the agents' bodies did — a skill to load by the session's own `Skill` call when
+its body says, a preloaded one in the system prompt whole — and the note reviewer's verdict came off its skill's rules. The note's
+overrun and its closing paragraph are the writer's, following wording that moved into its skill unchanged (*"mark what you are not"*),
+in both runs; the reviewer caught both, which is what the team is for.
+
+A step whose rendered folder is removed by hand has no plugin and no prompt file, so it is told each skill whole in its brief instead
+(`unrendered`, since round 2 of the card): the shipper's `trial-merge-a-branch` and its `--no-commit` reach it there. Proven by the
+suite, not live.

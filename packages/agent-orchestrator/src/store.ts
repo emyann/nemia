@@ -13,7 +13,7 @@ import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type
 import { spentAsks, type RetryAsk } from './retry.ts';
 import { asNamed, asRan, orderSteps, splitFrontmatter, withFormerNames, type SkillsFound, type Workflow } from './workflow.ts';
 import { loadWorkflows, preloads } from './workflow-store.ts';
-import { noCodingStyle, NO_CODING_STYLE, pluginManifest, pluginOf, PROMPT_FILE, renderedPrompt, rendersAgent } from './rendering.ts';
+import { noCodingStyle, NO_CODING_STYLE, pluginManifest, pluginOf, PROMPT_FILE, renderedPrompt, rendersAgent, type SkillAgain } from './rendering.ts';
 import { inputsRoot } from './places.ts';
 import { countRecord, readText, within } from './tally.ts';
 
@@ -560,6 +560,22 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
     }
     fs.writeFileSync(path.join(dir, PROMPT_FILE), renderedPrompt(step, told));
   }
+}
+
+/**
+ * The skills of a step whose rendered folder is gone (`unrendered`), read again from where the load finds them now (`skills`): each SKILL.md's
+ * body, or why it is not there. The copy `wf start` froze went with the folder, so this is the one read of a skill after a run started.
+ */
+export function skillsAgain(step: Workflow, skills: SkillsFound): SkillAgain[] {
+  return (step.agent?.skills ?? []).map((name) => {
+    const from = skills.at.get(name);
+    if (typeof from !== 'string') return { name, missing: from ? from.message : `no folder holds it in ${skills.looked.join(', ')}.` };
+    try {
+      return { name, text: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body };
+    } catch (err) {
+      return { name, missing: `${path.join(from, 'SKILL.md')} could not be read — ${(err as Error).message}.` };
+    }
+  });
 }
 
 export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });

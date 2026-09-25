@@ -20,6 +20,7 @@ import path from 'node:path';
 import { createEngine, type Engine, type TaskView } from 'agent-runtime';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
+import { toldIn } from './told.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -97,8 +98,10 @@ test('an interactive session in the checkout is given the same server, and it is
 });
 
 test('the ui implement step is told it has the browser', () => {
-  const implement = loadWorkflows(path.join(REPO, 'packages', 'agent-orchestrator', 'workflows', 'ui')).find((s) => s.name === 'implement');
-  assert.match(implement?.body ?? '', /`browser_\*` tools/);
+  // By its agent's skill `look-at-a-page`, since agents card 1b.
+  const dir = path.join(REPO, 'packages', 'agent-orchestrator', 'workflows', 'ui');
+  const implement = loadWorkflows(dir).find((s) => s.name === 'implement')!;
+  assert.match(toldIn(dir, implement), /`browser_\*` tools/);
 });
 
 test('the server starts as configured, from the repository root, and offers browser_navigate', async () => {

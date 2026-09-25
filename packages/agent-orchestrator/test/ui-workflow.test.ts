@@ -20,6 +20,7 @@ import { closeoutSchemaOf, outputLines, type Closeout } from '../src/closeout.ts
 import { loopSpan, terminalSteps } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
+import { toldIn } from './told.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
@@ -32,6 +33,8 @@ const steps = Object.fromEntries(ui.map((s) => [s.name, s]));
 
 /** A step's prose with its line breaks as spaces, so a sentence is found wherever the file wraps it. */
 const said = (text: string) => text.replace(/\s+/g, ' ');
+/** What a ui step is told, its agent's skills with it (`toldIn`), as one line. */
+const told = (step: (typeof ui)[number]) => said(toldIn(path.join(WORKFLOWS, 'ui'), step));
 
 /**
  * The skills a step's body tells it to use and it could not reach: one named by a file the repository does not have, and one named
@@ -64,9 +67,11 @@ test("the ui workflow loads as two steps, the loop between them and the ship aft
 
 test('look and respond are gone: both steps use the look skill, which the repository carries, and the loop answers the review', () => {
   for (const gone of ['look.md', 'look.schema.json', 'respond.md']) assert.equal(fs.existsSync(path.join(WORKFLOWS, 'ui', gone)), false, `${gone} is gone`);
-  assert.ok(said(steps.implement!.body).includes('Before you sign off, use the look skill on every page you changed'), steps.implement!.body);
-  assert.ok(said(steps.review!.body).includes("Read the diff."), steps.review!.body);
-  assert.ok(said(steps.review!.body).includes("use the look skill on implement's screenshots and on the pages, side by side"), steps.review!.body);
+  // Since agents card 1b both are told so by their agents' skills, `look-at-a-page` and `read-a-screenshot`.
+  assert.ok(told(steps.implement!).includes('Before you sign off, use the look skill on every page you changed'), told(steps.implement!));
+  assert.ok(told(steps.review!).includes("Read the diff."), told(steps.review!));
+  assert.ok(told(steps.review!).includes("use the look skill on implement's screenshots and on the pages, side by side"), told(steps.review!));
+  assert.ok(!said(steps.review!.body).includes('Read the diff.'), 'and the review is the skill, not the body');
 
   // The skill the two briefs name is there, under that name, and the one browser tool it forbids is refused by the settings too.
   const skill = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md'), 'utf8');
@@ -77,25 +82,25 @@ test('look and respond are gone: both steps use the look skill, which the reposi
 });
 
 test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
-  // review has the Skill tool, and its body names the file too. The guard is exercised on a copy without the tool.
+  // review has the Skill tool, and its skill `read-a-screenshot` names the file too. The guard is exercised on a copy without the tool.
   assert.equal(steps.review?.tools?.includes('Skill'), true);
   const fenced = { ...steps.review!, tools: steps.review!.tools!.filter((t) => t !== 'Skill') };
   // The ship looks at nothing: it merges, and runs the check.
   for (const step of ui.filter((s) => s.name !== 'ship')) {
-    assert.match(said(step.body), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
-    assert.deepEqual(unreachableSkills(step), [], step.name);
+    assert.match(told(step), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
+    assert.deepEqual(unreachableSkills({ ...step, body: told(step) }), [], step.name);
   }
 
-  const review = steps.review!;
-  const told = '`.claude/skills/look/SKILL.md`';
-  assert.deepEqual(unreachableSkills({ ...fenced, body: review.body.replaceAll(told, 'the skill') }), [
+  const review = { ...steps.review!, body: told(steps.review!) };
+  const file = '`.claude/skills/look/SKILL.md`';
+  assert.deepEqual(unreachableSkills({ ...fenced, body: review.body.replaceAll(file, 'the skill') }), [
     'the look skill is named, and this step has no Skill tool and is not told its file',
   ]);
-  assert.ok(unreachableSkills({ ...fenced, body: review.body.replaceAll(told, '`.claude/skills/looking/SKILL.md`') }).includes(
+  assert.ok(unreachableSkills({ ...fenced, body: review.body.replaceAll(file, '`.claude/skills/looking/SKILL.md`') }).includes(
     '.claude/skills/looking/SKILL.md is not in the repository',
   ), 'a renamed skill');
   // The rule is the Skill tool's: a step that has it loads the skill by name.
-  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(told, 'the skill') }), []);
+  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(file, 'the skill') }), []);
 });
 
 test('implement is checked by the build, and in a browser only on the merged tree; review, which writes nothing, declares no check', () => {
@@ -160,7 +165,8 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
     assert.equal(terminalSteps(loadWorkflows(dir)).map((s) => s.name).join(), 'ship', `${folder} ends there`);
 
     // The prose is the recipe, one for every folder (the shipper's): stage the merge, write the message, leave the rest to the run.
-    const body = said(ship.body);
+    // Told by the shipper's body and its two skills, `trial-merge-a-branch` and `say-why-it-aborted`, given whole (since agents card 1b).
+    const body = said(toldIn(dir, ship));
     for (const sentence of [
       "Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
       'git merge --no-ff --no-commit <branch>…',
@@ -329,6 +335,16 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
     'implement.schema.json', 'shipper.md', 'shipper.schema.json', 'shipper.skills.json', 'ui-implementer.md', 'ui-implementer.skills.json', 'ui-reviewer.md', 'ui-reviewer.skills.json',
   ]);
   for (const file of fs.readdirSync(agents)) assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
+
+  // And the skills those three agents give, beside agents/ as in the repository: every one of them and nothing else, each folder the
+  // repository's file for file.
+  const skills = path.join(WORKFLOWS, 'skills');
+  const given = loadWorkflows(path.join(WORKFLOWS, 'ui')).flatMap((s) => s.agent?.skills ?? []);
+  assert.deepEqual(fs.readdirSync(skills).sort(), [...new Set(given)].sort());
+  assert.deepEqual(fs.readdirSync(skills).sort(), [
+    'implement-a-web-change', 'look-at-a-page', 'read-a-screenshot', 'review-a-web-change', 'say-why-it-aborted', 'trial-merge-a-branch',
+  ]);
+  for (const skill of fs.readdirSync(skills)) assert.deepEqual(differences(path.join(skills, skill), path.join(REPO, 'workflows', 'skills', skill)), [], `skills/${skill}`);
 });
 
 test("review is handed implement's screenshots and pages, and not its summary, beside the loop's contract", () => {

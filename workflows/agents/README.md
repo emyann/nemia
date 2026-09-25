@@ -20,9 +20,13 @@ who it is — `description:`, `card:`, `skills:` and `systemPrompt:`, then the k
 
 At `wf start` each step is resolved and frozen on the run: the agent's keys are the defaults, a key the step
 writes wins. On Claude Code the agent's instructions are appended to the session's system prompt, which is kept, and the
-step's brief is its own note; on codex the brief is the instructions with the step's note after them. So a change
-here reaches every step that names the agent, on the next run — a run already started keeps what it froze. An
-`output:` schema sits here, beside the agent that declares it.
+step's brief is its own note. So a change here reaches every step that names the agent, on the next run — a run already
+started keeps what it froze. An `output:` schema sits here, beside the agent that declares it.
+
+Every agent here gives skills (below), so each runs on Claude Code alone: a step that names one and says `harness: codex`,
+or continues another step's session with `resume:`, is refused at load (`composedRefusal`), since codex loads no plugin and
+a continued session keeps the system prompt it was started with. Such a step names an agent of its own, without `skills:` —
+codex is then handed that agent's instructions in the brief, with the step's note after them.
 
 `card:` names a second file beside the agent — `<name>.skills.json`, a list of what it can do, written as A2A's
 `AgentSkill` is: an `id`, a `name`, a `description`, `tags`, and the `examples` of when to reach for it. It is
@@ -33,8 +37,16 @@ REQUIRED but `supportedInterfaces`, because nothing here serves an agent over A2
 `skills:` gives a Claude Code agent skills by name — folders holding a `SKILL.md`, looked for in `skills/` beside this folder,
 then in the repository's `.claude/skills/`, then the store's — which the step's session loads with the `Skill` tool, so the
 agent's `tools:` must allow `Skill`. `systemPrompt:` says what becomes of Claude Code's own prompt: `default` keeps it,
-`no-coding` keeps it less its coding instructions, `own` replaces it with the instructions. None of the shipped agents gives
-skills yet. The package's README, *An agent rendered for Claude Code*, says how and what refuses.
+`no-coding` keeps it less its coding instructions, `own` replaces it with the instructions. The package's README, *An agent
+rendered for Claude Code*, says how and what refuses.
+
+Every shipped agent gives skills (since 2026-09-25, agents card 1b): each entry of its card is a folder in `workflows/skills/`,
+the procedure that entry describes, with the entry's `description`, `tags` and `examples` as its frontmatter, so the card says what
+the agent can do and the skill is how. The agent's body keeps its role and its limits — what it may run, that a job's turn is its
+last — and says when to load each skill. Three are told whole after the instructions (`preload: true`), since a session must follow
+them before it signs off: the planner's `ask-when-it-reads-two-ways`, and the shipper's `trial-merge-a-branch` and
+`say-why-it-aborted`. `shipped-skills.test.ts` holds each SKILL.md to its card entry and reads its frontmatter as YAML, since
+Claude Code drops a skill whose frontmatter does not read, with nothing said. A test that copies these agents copies `skills/` with them.
 
 A step may still write words of its own under its frontmatter: a team's note to its agent (*in this team, also check
 …*), told in the step's brief. It is an escape hatch, not the normal case. Three shipped steps have one: `ship` in `dev-build`,

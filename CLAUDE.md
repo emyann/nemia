@@ -628,6 +628,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   that stopped blocked with nothing staged was never written down, so a merge a person staged there after it, by hand or on trial,
   read as the run's, and the next pass aborted it. It is written `landed: {untouched}` on the first pass that reads it settled (same
   run, round 3).
+- **Admission reads the views the runtime's pass hands back, never a read of its own.** Since thin runtime stage 4c the orchestrator
+  decides what starts: `tick()` in `agent-orchestrator/src/tick.ts` takes `TickReport.views`, the view of every unsettled task the
+  runtime's pass built off its one observation (`viewOfState`), hands them to `toAdmit` (`src/admission.ts`, pure), and calls
+  `e.admit(ids)`, which only journals the word. A new admission input is taken off those views or off the run records, never off
+  `e.list()` or `e.view`: each is a `claude agents` call more on every pass, and `test/pool.test.ts` counts exactly one for a pass with
+  claude tasks at work and waiting, on the fake's counter and on the pass's own cost (`harnesses`, `spawned`). `admit` is metered in `act`
+  (`ENGINE_PHASES`); a new engine verb goes there too, or the Proxy passes it through and its time reads as `assess`. `advance` still views each task in flight on its own; moving it onto the same report is a card of
+  its own. And an admitted task starts on the runtime's *next* pass, so a test that files and wants a start ticks twice (learned by
+  thin runtime stage 4c, part 1).
 
 ## Rules the code keeps
 

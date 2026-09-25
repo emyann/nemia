@@ -1705,16 +1705,17 @@ export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spe
 }
 
 /**
- * The engine's `priority` on every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting
- * task a free slot goes to first when a pool is at its ceiling, higher first and filing order within (agent-runtime's README, *Which waiting
- * task starts first*). A run's next step is filed a check and a pass after its last ended, and in filing order alone any run's first step
- * filed in that gap took the slot; above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at
- * admission and nowhere else: the cap on runs in flight and the queue are the tick's, and unchanged.
+ * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting task a free
+ * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `admission.ts`). A run's next step
+ * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap took the slot; above
+ * them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap on
+ * runs in flight and the queue are the tick's, and unchanged. It was the runtime's `priority` on the filing until thin runtime stage 4c;
+ * now nothing is carried on the filing, and `momentumOf` reads it back off the run records by these rules.
  */
 export const MOMENTUM = 1;
 
 /**
- * The `priority` a step's own filing carries (`MOMENTUM`): none — 0 to the engine — for a run's first steps, which wait on nothing and are
+ * The momentum a step's own filing has (`MOMENTUM`, read by `momentumOf`): none — 0 — for a run's first steps, which wait on nothing and are
  * filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a check
  * are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  */

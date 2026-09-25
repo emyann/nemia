@@ -571,6 +571,33 @@ Claude Code names the session itself. `remoteControl: false` asks for nothing an
 is not true or false is refused. It is not a key a brief has. What it leaves open — nothing reads whether a session was
 bridged, and what a person types into it from the web is not journalled — is open issue 23.
 
+## Queued and admitted: `queued`, `admit`
+
+A task filed with `queued: true` waits for a word before it starts: a pass starts nothing of it, `view` says
+`admission: 'queued'` beside a phase that stays `pending`, and `ae ls` prints `queued`. `admit(ids)` — `ae admit <id>...` —
+gives the word: it journals an `admitted` entry for each task whose current turn waits for one, and returns those ids. It
+reads the journal alone and asks no harness anything. The **next** pass starts an admitted task, under the ceiling as any
+task, so a task admitted after a pass starts one pass (about 4 s under `ae up`) after the word. The word is per turn: a task
+held open (`holdOpen`) waits for another before each later turn. `admit` does nothing for a task already admitted, filed
+unqueued, or whose turn has started, and refuses one it has no record of and a settled one (exit 2, nothing written for
+any task in the call). `queued` that is not true or false is refused at `file()`, at both doors.
+
+It is for a layer above that decides itself what runs when: agent-orchestrator files every task `queued`, and admits per
+pool, under its own ceiling and in its own order (its `admission.ts`, thin runtime stage 4c). It reads what to admit
+off the pass it just ran: `tick()` returns the view of every task it left unsettled (`TickReport.views`, built by
+`viewOfState` off the pass's one observation), so the layer above decides with no second look at any harness.
+
+`file` writes the key on every filing, `false` when not asked for. **A filing with no key reads as queued**: it is a
+journal from before stage 4c, and a daemon restarted onto it must start nothing it has not admitted, since the layer above
+counts what is at work before it lets more start. So a task filed into an `ae` store by an older engine, and not yet
+started, stays `pending` — `ae ls` says `queued` — until `ae admit` names it. A task it had already started goes on as
+before. An older engine reading a store this one wrote passes over the `admitted` entries and the key, and reads each task
+as it did.
+
+Until thin runtime stage 4c's second part, the runtime's own ceiling (`AE_MAX_CONCURRENT`), its pools and `priority`
+(below) still hold for anything that uses the runtime without the orchestrator — `ae` among them. The orchestrator files
+with no `priority` and builds its engine with no ceiling; part 2 retires all three here.
+
 ## Which waiting task starts first: `priority`
 
 `priority: 1` says which waiting task a free slot goes to first when its pool is at its ceiling: higher first; within one
@@ -583,6 +610,7 @@ stopped for a higher priority, which waits for a slot like any task.
 **What it is for: a run in flight keeping its momentum.** A run's next step is filed a check and a pass after its last
 ended, so in filing order any task filed in that gap goes first, and the run waits behind work that arrived after it
 started. A workflow layer that files every step after a run's first above a new run's first keeps that slot with the run.
+agent-orchestrator did so until stage 4c, and orders its own admission by the same rule now (*Queued and admitted*, above).
 
 `file()` refuses a `priority` that is not a finite number — `NaN`, `Infinity`, `"high"` — naming the fix, at both doors, and
 a journal written before it did that holds one is read as 0. `ae ls` shows
@@ -1403,6 +1431,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
+| `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
 | `test/pool.test.ts` | pools by subscription, at shipped defaults — fake `claude` and `codex` whose sessions run until the test lets them go: a `claude-detached` session counted against `claude`'s ceiling, `codex` and a `check` each in their own |
 | `test/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
@@ -1445,6 +1474,7 @@ node bin/ae.ts ls                # every task, desired vs observed
 node bin/ae.ts show <id>         # the journal, then one line per attempt, with what it cost
 node bin/ae.ts logs <id>         # the session's own output
 node bin/ae.ts say <id> "…"      # tell its running session something; journalled
+node bin/ae.ts admit <id>        # let a task filed queued start, on the next pass
 node bin/ae.ts stop <id>
 ```
 

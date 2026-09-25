@@ -399,5 +399,16 @@ orchestrator's calls to the runtime change.
    ls`, `wf decide` and the board say about a budget did not change (the api's `app.test.ts` reads both journal shapes).
    What stays out of reach: no harness reports a running session's spend, so the orchestrator judges a budget only once an
    attempt has ended; the live bound is still the harness's own cap (open issue 17).
+   **Stage 4c, part 1 done, 2026-09-25: the orchestrator admits.** A task filed `queued: true` starts only once the layer above
+   `admit`s it, on the runtime's next pass; `tick()` reports every unsettled task's view (`TickReport.views`, `viewOfState`) and
+   `admit` journals the word without observing a harness; a filing with no key, from before, reads as queued, and `ae admit` gives the
+   word by hand. The orchestrator files every task `queued` on an engine with no ceiling, and admits per pool under `WF_MAX_CONCURRENT`,
+   by momentum (read off the run records, `momentumOf`), filing time and id, off the report's views (`toAdmit` in
+   `agent-orchestrator/src/admission.ts`), so a pass makes one `claude agents` call for admission (`pool.test.ts` counts it). A start
+   comes one pass (about 4 s) later than when the runtime admitted and started in one. A daemon restarted onto an old store starts
+   nothing it has not admitted, counts the sessions at work first, and admits in the old order per pool (`restart.test.ts`); an old
+   engine reads the new store as before. **Part 2 retires** the runtime's ceiling (`maxConcurrent`, `decide`'s branch, `Now.used/max`),
+   its pools (`poolsOf`, `pool?`, `CLAUDE_POOL`), `priority`, `AE_MAX_CONCURRENT`, `DEFAULT_MAX_CONCURRENT` and `admissionOrder`, each
+   refused with a test, and the client's `maxConcurrent: Infinity`.
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

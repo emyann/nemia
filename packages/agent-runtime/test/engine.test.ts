@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal, type FeedEntry } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
-import { answer, file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
+import { admit, answer, file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
 import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
@@ -267,6 +267,10 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
   const id = 'legacy';
   await b.run(Effect.flatMap(Journal, (j) => j.append(id,
     { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always' } as Event)));
+  // Older than stage 4c too, with no `queued` key: it waits for the word, as the layer above now gives it.
+  await b.run(tick(9));
+  assert.equal(b.spawned.length, 0, 'a journal from before stage 4c waits to be admitted');
+  await b.run(admit([id]));
   await b.run(tick(9));
   const first = [...b.sessions.keys()][0]!;
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
@@ -401,7 +405,7 @@ test('a blocked session that works again counts again on the next pass — level
 
 /** File `id` as of `at`: the entry `file` writes, with the time chosen by the test. */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
-  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', ...fields })));
+  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
 
 /** Tick at a ceiling of one until every task has run, ending each session once it is seen: the order they started in. */
 const admitted = async (b: ReturnType<typeof board>, count: number) => {

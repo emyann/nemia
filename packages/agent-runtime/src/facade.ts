@@ -31,7 +31,7 @@ import { a2aOps } from './a2a-client.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  answer, answerRefusalOf, close, closeRefusalOf, DEFAULT_MAX_CONCURRENT, file, filingOf, refusalOf, requestStop, tick, view, type TaskView,
+  admit, answer, answerRefusalOf, close, closeRefusalOf, DEFAULT_MAX_CONCURRENT, file, filingOf, refusalOf, requestStop, tick, view, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -111,15 +111,26 @@ export type TaskSpec = {
    * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
    */
   holdOpen?: true;
+  /**
+   * Wait for the word to start (stage 4c): the task is filed and a pass starts nothing of it until `admit` names it — then
+   * the next pass starts it, under the ceiling as any task. A task held open waits for the word again before each later
+   * turn. For a layer above that decides itself what runs when; `view` says `admission: 'queued'` while it waits, and its
+   * phase stays `pending`. Absent, or `false`, starts it on the next pass as ever. Refused unless true or false.
+   */
+  queued?: boolean;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
 
 /**
- * One pass: how many tasks it read, how many actions it took, and the sessions at work in each pool as it left them — and what the pass
+ * One pass: how many tasks it read, how many actions it took, the sessions at work in each pool as it left them, and the
+ * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
+ * layer above that decides what to `admit` reads the board without asking any harness again (stage 4c) — and what the pass
  * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
  */
-export type TickReport = { tasks: number; actions: number; running: Record<string, number>; ms: number; observed: Record<string, ObserveCount> };
+export type TickReport = {
+  tasks: number; actions: number; running: Record<string, number>; views: TaskView[]; ms: number; observed: Record<string, ObserveCount>;
+};
 
 /**
  * One harness's observes, counted: how many were made, their wall time in ms, the sessions or run files they listed, and the processes
@@ -158,6 +169,14 @@ export type Engine = {
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
   tick(): Promise<TickReport>;
+  /**
+   * Let tasks filed `queued` start (stage 4c): journals an `admitted` entry for each whose current turn waits for one, and
+   * returns their ids; the next tick starts them, under the ceiling as any task. Reads the tasks' records and asks no
+   * harness. Idempotent: a task already admitted, not filed queued, or whose turn has started is left as it is, and not
+   * returned. Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled for any of them — when one
+   * is a task this engine has no record of, or has settled.
+   */
+  admit(taskIds: readonly string[]): Promise<string[]>;
   /**
    * One task. An attempt in flight is observed, as a pass observes: its phase is its session's state, and only a
    * registry has that. Any other task is read off its record — its phase is there, and so is its session's id once an
@@ -428,6 +447,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
         return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];
       }));
       return { ...report, ms: performance.now() - t0, observed: during };
+    },
+    admit: async (taskIds) => {
+      const refuse = (why: string) => Object.assign(new Error(`admit: ${why}`), { exitCode: 2 });
+      return go(admit(taskIds).pipe(Effect.catchTag('AdmitRefused', (e) => Effect.fail(refuse(e.message)))));
     },
     io: () => ({ ...ioCounts(), observed: observedNow() }),
     view: (taskId) => go(viewOf(taskId)),

@@ -51,7 +51,7 @@ const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9
 
 /** An engine whose tick counts the passes and runs `each` on each, which may throw to stop the daemon. */
 const engineOf = (each: (pass: number) => void = () => { throw STOP; }) => {
-  const e = { passes: 0, tick: async () => { e.passes++; each(e.passes); } };
+  const e = { passes: 0, tick: async () => { e.passes++; each(e.passes); return ({ tasks: 0, actions: [], running: {}, views: [] }); }, admit: async () => [] };
   return e as typeof e & Engine;
 };
 
@@ -227,7 +227,7 @@ test('`wf up` stopped by a signal lets the store go on the way out, with the sig
   clear();
   // A real process, since a signal stops it; its engine a fake, so no harness is asked anything.
   const cli = new URL('../src/cli.ts', import.meta.url).href;
-  const child = spawn(process.execPath, ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => {} });`], {
+  const child = spawn(process.execPath, ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`], {
     env: { ...process.env, WF_ROOT: ROOT }, stdio: 'ignore',
   });
   const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));

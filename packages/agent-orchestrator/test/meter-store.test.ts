@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { Run } from '../src/run.ts';
-import { PHASES, type PassCost } from '../src/meter.ts';
+import { breakdownLines, PHASES, type PassCost } from '../src/meter.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-meter-');
@@ -30,9 +30,10 @@ const busy = (ms: number) => { const until = performance.now() + ms; while (perf
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
  * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
- * totals at all.
+ * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word.
  */
-const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0 } = {}) => {
+const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0, queued = [] as string[], admitMs = 0 } = {}) => {
+  const admitted: string[][] = [];
   const io = { bytesRead: 0, reads: 0, spawned: 0, observed: {} as Record<string, { calls: number; ms: number; listed: number; spawned: number }> };
   const e = {
     tick: async () => {
@@ -42,7 +43,10 @@ const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0 } = {}) => {
       io.spawned += 1;
       io.bytesRead += 1000;
       io.reads += 2;
+      const views = queued.map((id) => ({ id, phase: 'pending', admission: 'queued', state: { harness: 'claude', filedAt: '2026-09-25T10:00:00.000Z' } }));
+      return { tasks: queued.length, actions: 0, running: {}, views };
     },
+    admit: async (ids: string[]) => { busy(admitMs); admitted.push(ids); return ids; },
     view: async (id: string) => ({ id, phase: 'pending', sessionId: null, state: { brief: '', settled: null, stopRequested: false, said: [], attempts: [] } }),
     file: async (spec: { id: string }) => spec.id,
     stop: async () => {},
@@ -50,7 +54,7 @@ const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0 } = {}) => {
     feed: async () => ({ entries: [], cursor: 0 }),
     ...(withIo ? { io: () => { busy(ioMs); return structuredClone(io); } } : {}),
   } as unknown as Engine;
-  return e;
+  return Object.assign(e, { admitted });
 };
 
 const emptyStore = () => {
@@ -184,4 +188,22 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   });
   assert.ok(outer.tallies!.records >= 2, 'the outer meter counted its own read and the inner pass\'s');
   assert.ok(outer.tallies!.kinds.act.ms >= 2);
+});
+
+test('the word that admits a queued task is charged to act, and `wf tick --stats` says so', async () => {
+  emptyStore();
+  const e = fake({ queued: ['t-1'], admitMs: 25 });
+  const { cost } = await tick(e);
+  assert.deepEqual(e.admitted, [['t-1']], 'the pass admitted the task its runtime reported queued, once');
+  assert.ok(cost);
+  assert.ok(cost.phases.act.ms >= 25, `the admit's 25 ms are act's (act took ${cost.phases.act.ms} ms)`);
+  assert.ok(cost.phases.assess.ms < 25, `and not assess's, the time in no phase (${cost.phases.assess.ms} ms)`);
+  const row = breakdownLines(cost).find((l) => /^ {2}act /.test(l));
+  assert.ok(row, breakdownLines(cost).join('\n'));
+  const [, ms] = row.trim().split(/ +/);
+  assert.ok(Number(ms) >= 25, `the breakdown's act row carries it: ${row}`);
+
+  const idle = fake({ admitMs: 25 });
+  await tick(idle);
+  assert.deepEqual(idle.admitted, [], 'nothing queued, no word said');
 });

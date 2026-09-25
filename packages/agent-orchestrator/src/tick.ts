@@ -15,7 +15,7 @@ import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
 import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
-import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
@@ -26,6 +26,7 @@ import { collectArtifacts } from './artifacts.ts';
 import { refsOf, resultBranches } from './branches.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
+import { momentumOf, toAdmit } from './admission.ts';
 import { addRuntime, aside, metered, within, type Tallies } from './tally.ts';
 import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
@@ -546,8 +547,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           budgetUsd,
         },
         deadlineSeconds: step.deadlineSeconds,
-        // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
-        priority: MOMENTUM,
         resumeFrom,
         // Held open when it signs, as the step's first try is (`holdsOpenOn`).
         ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -614,7 +613,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         },
         deadlineSeconds: target.deadlineSeconds,
-        priority: MOMENTUM,
         resumeFrom,
         ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
         // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
@@ -655,8 +653,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // One attempt, as every task is (the runtime makes one a start): a check that refused has said what it has to say, and running
         // a suite until it passes would let a flaky suite decide what ships.
         deadlineSeconds: CHECK_DEADLINE_SECONDS,
-        // In its own pool, before a newer run's check: what follows the step waits on it.
-        priority: MOMENTUM,
       });
     }
     run.steps[name] = { ...run.steps[name]!, check: { taskId } };
@@ -728,8 +724,6 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
       },
       deadlineSeconds: step.deadlineSeconds,
-      // None on a run's first steps, and `MOMENTUM` on a step after another: a run in flight goes before a newer run's first step.
-      priority: priorityOf(step),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
       // Held open when it signs, on a Claude Code job (`holdsOpenOn`): a person's answer to it — a blocked sign-off answered, a send-back from
       // its gate — is the task's next turn, and the run closes it once nothing waits on a person's word (`holdsOpen`).
@@ -931,6 +925,10 @@ export type Pass = {
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon.
  *
+ * First, what the engine's tick saw waiting is admitted per pool under `WF_MAX_CONCURRENT` (`toAdmit`), off the views its pass built from its
+ * one observation of each harness; the engine starts it on its next pass. So a task filed on this pass is admitted on the next and started on
+ * the one after, and a slot freed is taken a pass later than when the engine admitted by itself (thin runtime stage 4c).
+ *
  * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is done
  * is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far — and
  * counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one queued card
@@ -952,12 +950,17 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
 }
 
 async function pass(e: Engine, repo: string): Promise<Pass> {
-  await e.tick();
+  const report = await e.tick();
   const ran = ceilings();
   // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
   within('act', () => recordCeilings(ran));
   const cap = ran.runs;
   const runs = listRuns();
+  // Which queued tasks start, off the views the runtime's pass built from its one observation: a read of `e.list()` or `e.view` here would
+  // ask each harness again (`admission.ts`). The runtime starts what is admitted on its next pass.
+  // A word with nothing in it is not said: a call to the engine is counted, in `act`, with two reads of its totals.
+  const admitting = toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions });
+  if (admitting.length) await e.admit(admitting);
   const done = new Map<string, Advanced>();
   // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
   for (const run of runs.filter(hasStarted)) done.set(run.id, await advance(e, run));
@@ -978,12 +981,21 @@ async function pass(e: Engine, repo: string): Promise<Pass> {
   return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}) };
 }
 
+/** Each run with its workflow's steps, for `momentumOf`; a run whose workflow no longer reads names no task. */
+function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Workflow[] }> {
+  for (const run of runs) {
+    let steps: Workflow[];
+    try { steps = stepsOf(run); } catch { continue; }
+    yield { run, steps };
+  }
+}
+
 // ─── what the pass cost ─────────────────────────────────────────────────────
 
 /** The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a task is `act`. */
 const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   tick: 'runtime', view: 'journals', list: 'journals', feed: 'journals', logs: 'journals', transcript: 'journals',
-  file: 'act', stop: 'act', close: 'act', answer: 'act', say: 'act',
+  file: 'act', admit: 'act', stop: 'act', close: 'act', answer: 'act', say: 'act',
 };
 
 type EngineIo = ReturnType<Engine['io']>;

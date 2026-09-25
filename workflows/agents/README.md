@@ -33,8 +33,16 @@ REQUIRED but `supportedInterfaces`, because nothing here serves an agent over A2
 `skills:` gives a Claude Code agent skills by name — folders holding a `SKILL.md`, looked for in `skills/` beside this folder,
 then in the repository's `.claude/skills/`, then the store's — which the step's session loads with the `Skill` tool, so the
 agent's `tools:` must allow `Skill`. `systemPrompt:` says what becomes of Claude Code's own prompt: `default` keeps it,
-`no-coding` keeps it less its coding instructions, `own` replaces it with the instructions. None of the shipped agents gives
-skills yet. The package's README, *An agent rendered for Claude Code*, says how and what refuses.
+`no-coding` keeps it less its coding instructions, `own` replaces it with the instructions. The package's README, *An agent
+rendered for Claude Code*, says how and what refuses.
+
+Every shipped agent gives skills (since 2026-09-25, agents card 1b): each entry of its card is a folder in `workflows/skills/`,
+the procedure that entry describes, with the entry's `description`, `tags` and `examples` as its frontmatter, so the card says what
+the agent can do and the skill is how. The agent's body keeps its role and its limits — what it may run, that a job's turn is its
+last — and says when to load each skill. Three are told whole after the instructions (`preload: true`), since a session must follow
+them before it signs off: the planner's `ask-when-it-reads-two-ways`, and the shipper's `trial-merge-a-branch` and
+`say-why-it-aborted`. `shipped-skills.test.ts` holds each SKILL.md to its card entry and reads its frontmatter as YAML, since
+Claude Code drops a skill whose frontmatter does not read, with nothing said. A test that copies these agents copies `skills/` with them.
 
 A step may still write words of its own under its frontmatter: a team's note to its agent (*in this team, also check
 …*), told in the step's brief. It is an escape hatch, not the normal case. Three shipped steps have one: `ship` in `dev-build`,

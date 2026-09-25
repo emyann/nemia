@@ -110,6 +110,8 @@ out until Codex has a place for them, and the load says so for a codex agent tha
      and the codex refusal at load; the store and repository lookup; `--append-system-prompt-file`, the per-step `--plugin-dir` and
      the `no-coding` output style, rendered at `wf start`. The shipped agents change one line each, `skills:` to `card:`.
    - **1b, the shipped agents**: their procedures moved into `SKILL.md` skills, their bodies cut to the role and its limits.
+     Built 2026-09-25: fourteen skills in `workflows/skills/`, three preloaded, ui's six copied into the package; proven live as the
+     spike's F24.
 2. **The card from the skills**: the A2A card generated from composed skills; the `.skills.json` files retired.
 3. **The board**: compose skills on an agent from a list, write a new skill, try an agent on a short brief.
 4. **Jobs without user settings**, if open question 1 is decided that way.

@@ -794,6 +794,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   nothing; a fake that fails whole, through the composite, is the test (`flakyHarness` in `agent-runtime/test/engine.test.ts`). The
   full `observe` and every view still read a failed harness as nothing (runtime open issue 35; learned by the run that made a failed
   observe say so).
+- **A step on a remote A2A agent is filed with its local fields left out, never set to `undefined`.** The runtime refuses a remote task
+  whose `config` has any key (`remoteRefuses` counts `Object.keys`), an own `undefined` included, so `{ model: step.model }` for a step
+  with no model is refused at `file`. Every filing site builds its local fields through `localFields` (`agent-orchestrator/src/tick.ts`),
+  which gives `{}` for `harness: a2a:<name>`; a new field on the task goes inside it, or every remote step fails to file (learned by thin
+  runtime stage 6, part 2).
+- **A remote Task waiting on its caller is the view's `needs-human`, and it is answered with `wf say`, not in Claude Code.** A2A's
+  `input-required` never reaches the orchestrator as a phase: a test loop that waited for `input-required` timed out. The advice is
+  `answerIn`'s, given `{ run, step }` for a remote harness (read off the view's `state.harness`) by `wf decide` and by the api's `needsOf`;
+  a new place that says where a wait is answered passes it too, or tells a person to find a remote agent in `claude agents`. And a
+  remote step's `wf logs` asks the agent, so a test reads it while its server is up: after `close()` it is `fetch failed` (same run).
+- **An address from `a2a-agents.json` is shown as origin and path, never whole.** A query string can carry a key, and the api's run
+  detail and anything else a person reads print `${origin}${pathname}` (`remoteOf` in `apps/api/src/detail.ts`); its test puts a secret
+  in the query and asserts it is on no answer (same run).
 
 ## Rules the code keeps
 

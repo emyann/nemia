@@ -140,7 +140,7 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 
 ```md
 ---
-harness: codex             # claude (default) | codex | claude-detached
+harness: codex             # claude (default) | codex | claude-detached | a2a:<name>, a remote agent
 after: implement           # what must finish first: verified, or unverified if it has no check
 sandbox: read-only         # Codex's sandbox; a Claude Code step's fence is permissionMode:
 output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
@@ -1740,6 +1740,53 @@ agent: note-writer
   copy of what a step did not name in its closeout. (`docs/features.md`, *Decided: a folder lives as long as its run*.)
 
 What is not there yet: the Factory drawing a run's workspace, and connections to anything off the machine.
+
+## A remote A2A agent as a step: `harness: a2a:<name>`
+
+A step can be an agent another party runs, reached over HTTP by the [A2A protocol](https://a2a-protocol.org/latest/specification/)
+(the runtime's *A2A agent as a harness*). The step names it; the store says where it is:
+
+```md
+---
+harness: a2a:reviewer
+after: [draft]
+---
+Read the note and say whether it is right.
+```
+
+```json
+{ "reviewer": { "url": "https://agents.example.com/reviewer" } }
+```
+
+- **`~/.agent-workflows/a2a-agents.json`** (`$WF_ROOT/a2a-agents.json`, `src/a2a-agents.ts`) maps each name to `{ "url": … }`, the
+  agent's base URL, whose card is read at `.well-known/agent-card.json` beneath it, or to `{ "card": { … } }`, the card itself. A name
+  is lowercase words joined by dashes. The runtime judges each entry by its own rule (an `http:` or `https:` address with no user name or
+  password, a card with an interface), and a file it refuses is refused by `wf start` in those words, naming the file. It is read when a
+  process makes its engine, so an edit reaches a running `wf up` or api when it restarts. `wf start` refuses a step whose name the file
+  does not declare, before a run is written.
+- **No secret is in it.** A scheme the agent's card asks a secret for is read from the environment on every request,
+  `WF_A2A_<NAME>_<SCHEME>` — `reviewer`'s `token` is `WF_A2A_REVIEWER_TOKEN`, upper case, anything but a letter or a digit `_`. One not
+  set sends nothing, and the step fails with the variable's name in its words. Two names whose variables can meet (`acme` and
+  `acme-internal`: `WF_A2A_ACME_INTERNAL_TOKEN` is both) are refused together, since a card the other party writes could otherwise be
+  handed the other's secret. The api names a step's agent and its address, origin and path only: a query string can carry a key.
+- **What such a step may not say.** The keys that tell a harness of ours how to run a session are refused at load, from the step and
+  from the agent it names, each with why: `model`, `effort`, `context`, `background`, `remote`, `permissionMode`, `sandbox`, `tools`,
+  `disallowedTools`, `allowedTools`, `denials`, `budget`, `output`, `loop`, `resume` and `check` — and `workspace: main`, an agent's
+  skills and system prompt, and being a loop's target. The agent runs as its operator configured it, under their fence, and nothing
+  here would hold it. The board's form leaves those keys off such a step (`KeyForm.remote`).
+- **What it is sent.** The step is filed with no harness arguments, no closing statement's schema and no session to continue, and its
+  brief names nothing of this machine: its note (with its agent's instructions), what was asked for, what the runs it waited on concluded, what the steps it reads
+  declared (`input:`), what a person approved or accepted, and the names — never the paths — of files given with `--input`, which stay here. A try is a
+  new Task, told which try it is.
+- **How it ends.** A Task the agent completes is the step's sign-off. With no data part on its reply, the step reads `unverified`,
+  as a signed step with nothing to verify; a data part is read as a closeout, so `{"outcome": "blocked", "needs": …}` reads blocked.
+  A Task that fails, or is refused, is the step's `failed`, and `wf retry` sends a new one.
+- **When it asks.** A Task left `input-required` is the step's `needs-human: waiting for an input`, and `wf decide` says where to
+  answer: `wf logs <run> <step>` prints the question, and `wf say <run> <step> "…"` sends the answer as a follow-up on the Task. Not in
+  Claude Code: the agent is in no session of ours.
+
+What is not there yet: a remote step's transcript on the board, and a declared `output:` sent to the agent as its reply's shape.
+`test/remote-step.test.ts` runs each of these against the A2A SDK's own server over HTTP.
 
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 

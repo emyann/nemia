@@ -4734,6 +4734,39 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
   of the tick — reads every run file each ever wrote. An `observeFor` on the detached runner is the runtime's card. `wf ls` shows every
   run and still reads every run's journals. The api's `/api/ceilings` reads every journal (`everyView`) when a cap is set.
 
+## Shipped: a step on a remote A2A agent — `harness: a2a:<name>` (thin runtime stage 6, part 2)
+
+Shipped 2026-09-25. Part 1 made a remote A2A agent a harness of the runtime; this part lets a workflow step name one. The README's
+*A remote A2A agent as a step* says how it reads.
+
+- **Declared in the store.** `a2a-agents.json` maps a name to `{ url }` or `{ card }` (`src/a2a-agents.ts`); the runtime client hands
+  each to the engine as the harness `a2a:<name>`, judged by the runtime's own rule (`remoteConfigRefusal`, exported for it). `wf start`
+  refuses a name the file does not declare.
+- **Secrets from the environment**, `WF_A2A_<NAME>_<SCHEME>`, read on every request and never written: a spawn refused for one not
+  set says the variable (`missingCredential`). Two names whose variables can meet are refused together.
+- **Filed bare.** A remote step's task carries no `config`, no schema, no `claude` block and no `holdOpen` — left out, not emptied,
+  since the runtime counts the keys (`localFields` in `tick.ts`) — and its brief (`remoteBrief`) names no path of this machine.
+- **Refused at load**, from the step or its agent: the keys that tell a harness of ours how to run (`REMOTE_REFUSED`), `workspace:
+  main`, an agent's skills and system prompt, and being a loop's target.
+- **The send leaves the pass** (the runtime's half): a spawn waits a second for the agent's answer, and one that answers later is
+  written by the process that sent it, so a slow agent holds no other task.
+- **Answered with `wf say`.** A Task left `input-required` reads `needs-human: waiting for an input` on `wf ls`, and `wf decide` and the
+  api say to read the question with `wf logs` and answer with `wf say` (`answerIn`), not in Claude Code.
+- **The api and the board.** The builder's form offers each declared agent as a harness and hides the refused keys on such a step
+  (`KeyForm.remote`); a run's detail names the agent a try was sent to and its address, origin and path only (`StepFiled.remote`), and
+  the run's page shows those in place of the model, effort, context, fence and tools rows.
+- **Proved** against the A2A SDK's own server over HTTP (`test/a2a-server.ts`, `test/remote-step.test.ts`): the brief sent, the
+  secret in its header and nowhere in the store, a completed Task read `unverified`, a data part read `blocked`, a secret not set
+  sending nothing, and a question answered with `wf say`. The SDK and express are the package's devDependencies.
+
+Where it departs from the plan: the api names the agent in a field of its own, `StepFiled.remote`, rather than in `runsIn`, which is a
+permission mode and has none to say; `specOf` needed no change, since `harness` already carries the name. The form still offers
+`workspace: main` on a remote step, and the save refuses it in the package's words.
+
+Left for later: **a remote step's transcript** — the runtime has no `transcript` for another party's agent, so the board's session
+view is empty for it — and **`output:` on a remote step**, a declared shape sent as the reply's schema and read as the closeout's,
+which A2A has no field for yet.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

@@ -8,7 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine, TaskView } from './runtime-client.ts';
+import { refusedText, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
@@ -920,7 +920,29 @@ export type Pass = {
    * `overheadMs` here with that write in it, which the file cannot hold of itself.
    */
   cost?: PassCost;
+  /**
+   * The moves the runtime's lifecycle had no edge for on this pass (`TickReport.refused`): each task stalls, asked again every pass, until
+   * what it sees changes or the machine gains the edge. Absent when there were none. `wf up` says each once while it lasts (`refusalLines`).
+   */
+  refused?: RefusedMove[];
 };
+
+/**
+ * What a daemon says of a pass's refused moves, and what it has then said: a refusal it said on an earlier pass and that is still refused is
+ * not said again, one that cleared is forgotten, so it is said again if it comes back. `said` holds the refusals of the last pass alone, by
+ * task, state and event: a daemon that restarts says every refusal still standing once more, since what it printed before is on a terminal
+ * that may be gone. Nothing is decided on it: this is only what has been printed, as `wf up`'s queue and feed failures are.
+ */
+export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
+  const now = new Set<string>();
+  const lines: string[] = [];
+  for (const m of refused) {
+    const key = `${m.taskId}\t${m.state}\t${m.event}`;
+    if (!said.has(key) && !now.has(key)) lines.push(refusedText(m));
+    now.add(key);
+  }
+  return { lines, said: now };
+}
 
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon.
@@ -978,7 +1000,9 @@ async function pass(e: Engine, repo: string): Promise<Pass> {
   } catch (err) {
     feedError = `the feed (${feedFile()}) was not written on this pass: ${(err as Error).message}`;
   }
-  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}) };
+  // An engine's report from before the runtime reported refusals — a test's fake — carries none.
+  const refused = report.refused ?? [];
+  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}), ...(refused.length ? { refused } : {}) };
 }
 
 /** Each run with its workflow's steps, for `momentumOf`; a run whose workflow no longer reads names no task. */

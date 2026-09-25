@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { addPass, breakdownLines, lastPassCost, summaryDue, summaryLine, type Interval, AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, formerKeyLines, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
+import { addPass, breakdownLines, lastPassCost, summaryDue, summaryLine, type Interval, AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, prunedBytes, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, refusalLines, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, findAgent, formerKeyLines, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, workflowFolder } from './runner.ts';
 import { agentCard, dollarsOf } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -774,8 +774,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // The pass's cost is on disk all the same, written by the daemon's last pass: said where to read it, with no second writer.
       if (held) throw Object.assign(new Error(stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held), { exitCode: 2 });
       // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
-      const { runs: results, queue, feedError, cost } = await tick(e, { repo: path.resolve('.') });
+      const { runs: results, queue, feedError, cost, refused } = await tick(e, { repo: path.resolve('.') });
       if (feedError) console.error(feedError);
+      for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
       if (queue) console.log(queueLine(queue));
       if (!results.length && !queue) console.log('no runs');
       for (const r of results) {
@@ -836,6 +837,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         let said: string | undefined;
         // And the feed's failure, said once until it changes, the same way: a feed that cannot be written fails every pass alike.
         let feedSaid: string | undefined;
+        // And each move the runtime's lifecycle refused, said once while it lasts and again if it comes back (`refusalLines`): a stalled task
+        // is refused on every pass alike, and a line every pass is noise nobody reads.
+        let refusedSaid: ReadonlySet<string> = new Set();
         // What the passes since the last line cost, said once an interval (`STATS_EVERY_MS`) and started afresh: numbers, and nothing decided on them.
         let interval: Interval | undefined;
         for (;;) {
@@ -843,7 +847,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           const by = stillHeld(held);
           if (by) throw new Error(takenFromLine(by, store));
           // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
-          const { runs: advanced, queue, feedError, cost } = await tick(e, { repo: path.resolve('.') });
+          const { runs: advanced, queue, feedError, cost, refused } = await tick(e, { repo: path.resolve('.') });
           // The heartbeat: a pass completed, written down for `wf ls` and for the next `wf up`.
           passed(held);
           if (cost) interval = addPass(interval, cost, Date.now());
@@ -853,6 +857,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           }
           if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
           feedSaid = feedError;
+          const stalled = refusalLines(refused ?? [], refusedSaid);
+          for (const line of stalled.lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
+          refusedSaid = stalled.said;
           if (queue) {
             // A pass at a full cap reads no queue at all (`tick`), so the first pass that does is the first that can say anything.
             const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;

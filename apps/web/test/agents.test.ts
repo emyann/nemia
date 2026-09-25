@@ -106,6 +106,10 @@ test("each harness has its own fence on the form: Claude Code a permission mode,
   assert.equal(hasKey(form, 'remote', 'codex'), true, 'a key that is not a harness word is every harness\'s');
   assert.equal(hasKey(form, 'sandbox', 'nowhere'), true, 'a harness the form does not know is judged on save, not here');
   assert.equal(hasKey(undefined, 'sandbox', 'claude'), true, 'and nothing is hidden before the form is read');
+  // An agent on a remote A2A agent has none of the keys the package refuses there.
+  const remote = { ...form, remote: { prefix: 'a2a:', refuses: ['permissionMode', 'sandbox', 'remote'] } } as unknown as KeyForm;
+  assert.deepEqual([hasKey(remote, 'permissionMode', 'a2a:reviewer'), hasKey(remote, 'sandbox', 'a2a:reviewer'), hasKey(remote, 'remote', 'a2a:reviewer')], [false, false, false]);
+  assert.deepEqual([hasKey(remote, 'permissionMode', 'claude'), hasKey(remote, 'remote', 'codex')], [true, true], 'a harness of ours keeps them');
   assert.deepEqual(choicesOf(form, 'sandbox', 'codex'), ['read-only', 'workspace-write']);
   assert.ok(ROLE_KEYS.includes('sandbox') && KEY_LABELS.sandbox === 'Sandbox');
 });

@@ -164,6 +164,16 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
   assert.equal(journals(await measured()), journals(twoHundred));
 });
 
+test('a pass that answers the finished runs from memory carries no refused move: their tasks are settled, and the runtime moves none', async () => {
+  // The refusals are the runtime's pass's (`TickReport.refused`), taken before the memo is read, and a settled task is asked nothing
+  // (`settledQuiet` in the runtime's domain.ts): three passes over two hundred runs at rest say nothing stalled.
+  for (let k = 0; k < 3; k++) {
+    const pass = await verified();
+    assert.ok((pass.cost!.rested ?? 0) >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
+    assert.equal(pass.refused, undefined, `pass ${k + 1}: no refused move`);
+  }
+});
+
 // ─── what takes a run out of the memo ───────────────────────────────────────
 
 /** How many runs the next pass answers from memory, every one of them judged again in full. */

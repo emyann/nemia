@@ -558,6 +558,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   what an answer's turn continues — not the Task's id, so a `logs` that asked GetTask for it read *no longer has the Task*.
   A harness whose `nativeId` is not the id its verbs take resolves one to the other in the driver (`bySession`: a context
   reads as the latest Task sent in it), and a test reads `logs` after the task settles (same run).
+- **A request to another party's address is bounded, goes to the origin it was given, and follows no redirect.** Three traps, each
+  missed until review: `new URL('/.well-known/…', base)` is an absolute path and drops the base's own (`cardUrlOf` resolves beneath it);
+  a card read from one origin can name its interfaces on any other, so a secret asked for the address given went to wherever the card
+  said (an agent given by its URL is reached only on that origin); and `fetch` follows a redirect across origins keeping every header
+  but `Authorization`, so an API key in a header of its own goes too (`redirect: 'manual'`, and a 3xx refuses). A pass awaits every
+  harness's observe, and undici waits five minutes for headers: a request with no `AbortSignal.timeout` held the whole runtime
+  (`REQUEST_MS` in `a2a-remote.ts`; learned in review of thin runtime stage 6, part 1, round 2).
 - **A paged read is served from the listing its token names, never from the latest.** The runtime's A2A handler kept one
   snapshot behind its page tokens, and every view, transcript, `say` and tick in one process observes: with more than a
   hundred sessions — `check`, `codex` and `claude-detached` list every session they ever ran — a second listing made while

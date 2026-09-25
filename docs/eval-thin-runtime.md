@@ -450,6 +450,9 @@ orchestrator's calls to the runtime change.
      sent.
    - `release` moves a settled session's entry aside, which is what makes a settled task cost a pass nothing.
    - JSON-RPC is served in the test through the SDK's express handler, beside REST's.
+   - Found in review, round 2: an agent given by its URL has its card read beneath that URL's path, and requests go only
+     to an interface on that URL's origin; a redirect is never followed; and every request, the card's included, is
+     given up after `REQUEST_MS` (10 s), so an agent that holds a request no longer holds the runtime's pass.
 
    The rest is filed as three parts:
    - **Part 2: a workflow step names a remote agent through its `harness:` key.** The orchestrator's `runtime-client.ts`

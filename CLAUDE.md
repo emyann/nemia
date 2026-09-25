@@ -412,6 +412,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   digest it. Every reader outside `wf start` passes `Places` — the api's listing, version and save take `placesOf(repo)` — and a test of a
   reader puts a skill in `.claude/skills/` to prove it (`apps/api/test/builder.test.ts`, learned by the run that rendered an agent for
   Claude Code).
+- **Who names an agent is read in every place that falls back to it, and a guard added at load is added to each verb that sets the same thing.**
+  A repository's workflows are given the store's agent when the repository has none of that name (`lookupRoots`), so `removeAgent`, reading
+  only the workflows beside the agent, let the board delete one a repository's step named: it reads the board's repository too now
+  (`repoUsers` in `authoring.ts`). And F21 was refused on a step's `model:` at load while `wf retry --model haiku` filed that model unchecked;
+  both word it through `autoDropped` (learned in review of the run that rendered an agent for Claude Code, round 1).
 - **A Claude Code step's brief no longer opens with its agent's instructions.** A rendered step's instructions are in
   `runs/<id>/agents/<step>/prompt.md`, appended to Claude Code's system prompt, and its brief is its own note (`briefBody` in
   `rendering.ts`); codex, and a step that says `resume:`, still read them in the brief. A test or a fixture that looks for the instructions

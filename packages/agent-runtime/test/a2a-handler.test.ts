@@ -49,7 +49,7 @@ const harness = (o: {
     stop: (id) => Effect.suspend(() => {
       asked.push(['stop', id]);
       if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
       return Effect.void;
     }),
     logs: (id) => Effect.suspend(() => {
@@ -67,7 +67,7 @@ const harness = (o: {
     ...(o.bare ? {} : {
       release: (session: Sighting, task: { worktree?: string | boolean }) => Effect.suspend(() => {
         asked.push(['release', [session, task]]);
-        return Effect.succeed(session.state === 'done' ? { turns: 3, costUsd: 0.25 } : undefined);
+        return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
       }),
       say: (session: { name: string; sessionId: string }, text: string) => Effect.suspend(() => {
         asked.push(['say', [session, text]]);
@@ -160,7 +160,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(TaskNotFoundError, 'no session `fake-1`: the `fake` harness lists none, and no attempt was journalled under it.')],
   ['a stop of a session nobody lists', (h) => h.handler.cancelTask({ tenant: '', id: 'ae/t-9/1', metadata: undefined }, ctx),
     refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to stop: it lists none.')],
-  ['a stop of a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done' }); return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx); },
+  ['a stop of a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' }); return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx); },
     refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (done): there is nothing to stop.')],
   ['a stop of a session that failed', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' }); return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx); },
     refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (failed): there is nothing to stop.')],
@@ -208,11 +208,11 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(UnsupportedOperationError, "the `fake` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId."), { bare: true }],
   ['words to a session nobody lists', (h) => h.handler.sendMessage(said('ae/t-9/1'), ctx),
     refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.')],
-  ['words to a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done' }); return h.handler.sendMessage(said(), ctx); },
+  ['words to a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' }); return h.handler.sendMessage(said(), ctx); },
     refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (done): it takes no more words.')],
   ['words to a session that failed', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' }); return h.handler.sendMessage(said(), ctx); },
     refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (failed): it takes no more words.')],
-  ['words to a session that was stopped', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'stopped' }); return h.handler.sendMessage(said(), ctx); },
+  ['words to a session that was stopped', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'canceled' }); return h.handler.sendMessage(said(), ctx); },
     refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (stopped): it takes no more words.')],
   ['a find on a harness that cannot find', (h) => h.handler.findSession({ name: 'ae/t-1/1' }, ctx),
     refusedWith(UnsupportedOperationError, 'the `fake` harness cannot find a session by name: list its sessions (listTasks).'), { bare: true }],
@@ -220,7 +220,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
   ['the logs of no session', (h) => h.handler.sessionLogs({ sessionId: '' }, ctx),
     refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`.')],
-  ['a release on a harness with nothing to let go of', (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'done' }, task: {} }, ctx),
+  ['a release on a harness with nothing to let go of', (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'completed' }, task: {} }, ctx),
     refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'), { bare: true }],
   ['a release of no session', (h) => h.handler.releaseSession({ session: undefined as unknown as Sighting, task: {} }, ctx),
     refusedWith(RequestMalformedError, 'the request names no session: send the session as the last listing saw it.')],
@@ -330,7 +330,7 @@ test('listing 250 sessions: sorted by name, in pages, every sighting whole, and 
   for (let i = 250; i >= 1; i--) {
     const name = `ae/t-${String(i).padStart(3, '0')}/${i % 2 ? 1 : 2}`;
     names.push(name);
-    h.sessions.set(name, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'blocked' : 'working', nativeId: `n-${i}`, usage: { turns: i } });
+    h.sessions.set(name, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'input-required' : 'working', nativeId: `n-${i}`, usage: { turns: i } });
   }
   const seen: string[] = [];
   const sizes: number[] = [];
@@ -364,10 +364,10 @@ test('a listing the harness could not make throws its words, unchanged', async (
 
 test('a session is answered as the harness sees it, and else as the journal has its attempt', async () => {
   const h = harness();
-  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'blocked', waitingFor: 'permission prompt' });
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
   const live = await h.handler.getTask({ tenant: '', id: 'ae/t-1/1' }, ctx);
   assert.equal(live.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
-  assert.deepEqual(sightingOf(live), { sessionId: 's-1', state: 'blocked', waitingFor: 'permission prompt' });
+  assert.deepEqual(sightingOf(live), { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
 
   const at = '2026-09-23T10:00:00.000Z';
   const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r' };
@@ -408,8 +408,8 @@ test("a listing by context is every attempt that continued the conversation, wha
   const h = harness();
   // Filed in the opposite order to the names, so a listing that kept the harness's order or sorted by id alone would differ.
   h.sessions.set('ae/t-2/1', { sessionId: 'job-3', state: 'working', nativeId: 'conv-a' });
-  h.sessions.set('ae/t-1/2', { sessionId: 'job-2', state: 'done', nativeId: 'conv-a' });
-  h.sessions.set('ae/t-1/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-b' });
+  h.sessions.set('ae/t-1/2', { sessionId: 'job-2', state: 'completed', nativeId: 'conv-a' });
+  h.sessions.set('ae/t-1/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-b' });
   h.sessions.set('ae/t-1/3', { sessionId: 'job-4', state: 'working' });
   const a = await h.handler.listTasks(listing({ contextId: 'conv-a' }), ctx);
   assert.deepEqual(a.tasks.map((t) => [t.id, t.contextId]), [['ae/t-1/2', 'conv-a'], ['ae/t-2/1', 'conv-a']]);
@@ -420,7 +420,7 @@ test("a listing by context is every attempt that continued the conversation, wha
 test('a listing carries what each session closed with only when it asks for artifacts; a read of one session always does', async () => {
   const h = harness();
   const closeout = { payload: { outcome: 'done' }, at: 1790000000000 };
-  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done', nativeId: 'conv-a', closeout });
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed', nativeId: 'conv-a', closeout });
   h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'working' });
   const bare = await h.handler.listTasks(listing(), ctx);
   assert.deepEqual(bare.tasks.map((t) => t.artifacts), [[], []], "A2A's default: no artifacts");
@@ -449,7 +449,7 @@ test('a signed session its task holds open is INPUT_REQUIRED on a read, listed b
   const listed = harness();
   listed.journal.set('t-h', held());
   // A Claude Code job is never let go: its harness lists it done while its task waits.
-  const job: Sighting = { sessionId: 'job-1', state: 'done', nativeId: 'conv-h', closeout: { payload: { outcome: 'done' }, at: 1790000000000 } };
+  const job: Sighting = { sessionId: 'job-1', state: 'completed', nativeId: 'conv-h', closeout: { payload: { outcome: 'done' }, at: 1790000000000 } };
   listed.sessions.set('ae/t-h/1', job);
   const read = await listed.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
   assert.deepEqual([read.status!.state, read.contextId, closeoutOf(read)], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }]);
@@ -476,7 +476,7 @@ test('REFUSED: a held task answered or closed waits on nobody, and a task not he
     for (const listedDone of [true, false]) {
       const h = harness();
       h.journal.set('t-h', events);
-      if (listedDone) h.sessions.set('ae/t-h/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-h' });
+      if (listedDone) h.sessions.set('ae/t-h/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-h' });
       assert.equal((await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status!.state, TaskState.TASK_STATE_COMPLETED,
         `${what}, ${listedDone ? 'listed done' : 'let go'}`);
     }
@@ -498,11 +498,11 @@ test('REFUSED: a held task answered or closed waits on nobody, and a task not he
 test('a stop: a live session is stopped and CANCELED, one already stopped is CANCELED again, and the harness asked once', async () => {
   const h = harness();
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
-  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'blocked' });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'input-required' });
   const cancel = (id: string) => h.handler.cancelTask({ tenant: '', id, metadata: undefined }, ctx);
   assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED);
   assert.equal((await cancel('ae/t-2/1')).status!.state, TaskState.TASK_STATE_CANCELED);
-  assert.equal(h.sessions.get('ae/t-1/1')!.state, 'stopped');
+  assert.equal(h.sessions.get('ae/t-1/1')!.state, 'canceled');
   assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel answers as the first');
   assert.deepEqual(h.acted(), [['stop', 's-1'], ['stop', 's-2']]);
 });
@@ -533,7 +533,7 @@ test("REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
 test('observeSessions hands the driver what is expected, and answers what it listed as Tasks', async () => {
   const h = harness();
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
-  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'done' });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed' });
   const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
   const { tasks } = await h.handler.observeSessions({ expected }, ctx);
   assert.deepEqual(tasks.map((t) => [t.id, t.status!.state]), [['ae/t-1/1', TaskState.TASK_STATE_WORKING]]);
@@ -555,7 +555,7 @@ test('REFUSED: observeSessions on a driver without the verb, and with a list tha
 test('words to a running session reach the harness with the id it lists, and the Task answers as it was seen', async () => {
   const h = harness();
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
-  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'blocked', waitingFor: 'permission prompt' });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'input-required', waitingFor: 'permission prompt' });
   const working = await h.handler.sendMessage(said('ae/t-1/1', 'look at the tests again'), ctx);
   assert.ok('status' in working);
   assert.equal(working.status!.state, TaskState.TASK_STATE_WORKING);
@@ -580,12 +580,12 @@ test('the extension answers as the driver does: a session found or none, its log
   assert.deepEqual(await h.handler.findSession({ name: 'ae/t-1/1' }, ctx), { sessionId: 's-1' });
   assert.equal(await h.handler.findSession({ name: 'ae/t-1/2' }, ctx), null);
   assert.deepEqual(await h.handler.sessionLogs({ sessionId: 's-1' }, ctx), { logs: 'logs of s-1' });
-  const done: Sighting = { sessionId: 's-1', state: 'done' };
+  const done: Sighting = { sessionId: 's-1', state: 'completed' };
   assert.deepEqual(await h.handler.releaseSession({ session: done, task: { worktree: true } }, ctx), { usage: { turns: 3, costUsd: 0.25 } });
-  assert.deepEqual(await h.handler.releaseSession({ session: { sessionId: 's-2', state: 'stopped' }, task: {} }, ctx), { usage: null });
+  assert.deepEqual(await h.handler.releaseSession({ session: { sessionId: 's-2', state: 'canceled' }, task: {} }, ctx), { usage: null });
   assert.deepEqual(h.asked, [
     ['find', 'ae/t-1/1'], ['find', 'ae/t-1/2'], ['logs', 's-1'],
-    ['release', [done, { worktree: true }]], ['release', [{ sessionId: 's-2', state: 'stopped' }, {}]],
+    ['release', [done, { worktree: true }]], ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
   ], 'each asked once, and no listing made for any');
 });
 
@@ -621,7 +621,7 @@ test('a transcript of an attempt in flight: found by name when the harness can f
 
   const lists = harness({ noFind: true });
   lists.journal.set('t-1', flight);
-  lists.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'blocked' });
+  lists.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'input-required' });
   assert.equal((await lists.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
   assert.deepEqual(lists.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
 });
@@ -653,7 +653,7 @@ test('a transcript of an ended attempt with no id on the record, or of a name no
   // Ended before `ended` carried an id: no find, which reads only what is in flight — the listing.
   h.journal.set('t-1', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
     { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness' }]);
-  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'done' });
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
   assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
   assert.deepEqual(h.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
 

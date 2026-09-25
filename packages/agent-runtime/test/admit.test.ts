@@ -98,7 +98,7 @@ const memoryJournal = (reads: { n: number } = { n: 0 }): PromiseJournal & { task
 const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }): PromiseRunner => ({
   async spawn(r) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
   async observe() { observes.n++; return new Map(sessions); },
-  async stop(id) { for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'stopped' }); },
+  async stop(id) { for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' }); },
   async logs() { return ''; },
 });
 
@@ -139,7 +139,7 @@ test('a tick reports the view of every task it left unsettled, and none it settl
   const done = await b.engine.file({ brief: 'finishes', cwd: '/r' });
   const waits = await b.engine.file({ brief: 'waits', cwd: '/r', queued: true });
   await b.engine.tick();
-  b.sessions.set(nameFor(done, 1), { ...b.sessions.get(nameFor(done, 1))!, state: 'done' });
+  b.sessions.set(nameFor(done, 1), { ...b.sessions.get(nameFor(done, 1))!, state: 'completed' });
   const r = await b.engine.tick();
   assert.deepEqual(r.views.map((v) => v.id), [waits]);
   // The same view `view` gives of it, off the same record.

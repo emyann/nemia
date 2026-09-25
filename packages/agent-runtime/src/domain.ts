@@ -18,24 +18,90 @@
  * Why there are no leases here: for a harness that keeps its own registry, the session is owned by
  * the harness and outlives us, so "is it still running" is a question we ASK. For one that does
  * not, `runner-detached.ts` keeps the registry and a heartbeat, and answers the same question with
- * the same word. Either way the answer arrives as `Observed`, and nothing in this file can tell
- * which kind of harness produced it.
+ * the same word. Either way the answer arrives as a `SessionState` — A2A's word for a task's state — and nothing in this
+ * file can tell which kind of harness produced it.
  */
 
 import type { HarnessArgs } from './harness-args.ts';
 import { transition, type LifecycleEvent, type LifecycleState, type Move, type Refusal } from './lifecycle.ts';
 
 /**
- * What a harness reports for a session. Exactly the documented `state` values, no more.
+ * What a harness reports for a session: A2A's `TaskState`, in the names `lifecycle.ts` gives its states — the protocol's
+ * words, spelled as a literal union so the pure core imports no SDK (`test/a2a-boundary.test.ts`). Each driver translates
+ * its harness's own words into these at its own edge, once (Claude Code's registry and the detached worker's run file in
+ * their runners; a remote agent's Task is already in them), and nothing past a driver reads any other word.
  *
- * `busy` used to be in here and did not belong: it is a value of a DIFFERENT field. See
- * `Sighting.busy`.
+ *   submitted       accepted, not yet at work — a remote agent's Task it has not started. At work, as far as the
+ *                   runtime can act on it: it runs until it ends or is stopped, and the deadline times it.
+ *   working         at work. With `busy` and `quietMs` beside it, which say whether it computes and how long it is quiet.
+ *   input-required  waiting on a person for words — a permission prompt, a question.
+ *   auth-required   waiting on a person to sign in: the same wait for the runtime, a different thing for the person.
+ *   completed       ended on its own. Its end is recorded `done`.
+ *   failed          ended on its own, and says it failed. Recorded `failed`.
+ *   rejected        the agent refused the work once it had it. Recorded `failed`, as any end the harness calls a failure:
+ *                   a refusal *at spawn*, before anything started, is `unstartable` and never a sighting.
+ *   canceled        stopped under it, by its harness or a person at the harness's side. Recorded `stopped`.
+ *
+ * `busy` used to be in here and did not belong: it is a value of a DIFFERENT field. See `Sighting.busy`.
  */
-export type Observed = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
+export const SESSION_STATES = ['submitted', 'working', 'input-required', 'auth-required', 'completed', 'failed', 'canceled', 'rejected'] as const;
+export type SessionState = typeof SESSION_STATES[number];
+/** Whether a word is one of A2A's names for a session's state. */
+export const isSessionState = (word: unknown): word is SessionState => (SESSION_STATES as readonly unknown[]).includes(word);
 
-const RUNNING: ReadonlySet<Observed> = new Set(['working']);
+/**
+ * How an attempt ended, as the journal records it: `ended.observed`, the `record-end` action, `Attempt.ended`. Not A2A's
+ * words, and on purpose: every journal written since the first keeps them, an older `wf up` folds what a newer one wrote,
+ * and the layers above compare them (`ended === 'done'`). A sighting's state becomes one of these through `endOf` alone.
+ */
+export type Ended = 'done' | 'failed' | 'stopped';
+
+/** At work, as far as the runtime can act on it. */
+const RUNNING: ReadonlySet<SessionState> = new Set(['submitted', 'working']);
 /** Waiting on a person — running, but nobody is coming unless the operator is told. */
-const NEEDS_HUMAN: ReadonlySet<Observed> = new Set(['blocked']);
+const NEEDS_HUMAN: ReadonlySet<SessionState> = new Set(['input-required', 'auth-required']);
+/** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
+const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
+
+/** A session its harness still holds and the engine still waits on: at work, or waiting on a person. */
+export const isLive = (s: SessionState | undefined): boolean => s !== undefined && (RUNNING.has(s) || NEEDS_HUMAN.has(s));
+/** A session waiting on a person: for words or to sign in. */
+export const waitsOnPerson = (s: SessionState | undefined): boolean => s !== undefined && NEEDS_HUMAN.has(s);
+/** A session at work: submitted or working. */
+export const atWorkState = (s: SessionState | undefined): boolean => s !== undefined && RUNNING.has(s);
+
+const ENDS: Record<SessionState, Ended | undefined> = {
+  // At work and let go of — quiet, or closed out — is an end the harness vouches for, as a quiet session has always been.
+  submitted: 'done', working: 'done', completed: 'done',
+  failed: 'failed', rejected: 'failed',
+  canceled: 'stopped',
+  // Waiting on a person has not ended: no edge records its end off such a sighting (`harnessEnd`).
+  'input-required': undefined, 'auth-required': undefined,
+};
+
+/** The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person. */
+export const endOf = (state: SessionState): Ended | undefined => ENDS[state];
+
+/**
+ * A session's state in the words every view above the runtime has always printed: `running (working)` is compared exactly
+ * by the orchestrator's admission, and `wf ls`, the board and `phaseOfView` read the rest. A2A's names stop at the runtime.
+ */
+export type PhaseWord = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
+const PHASE_WORDS: Record<SessionState, PhaseWord> = {
+  submitted: 'working', working: 'working',
+  'input-required': 'blocked', 'auth-required': 'blocked',
+  completed: 'done', failed: 'failed', rejected: 'failed', canceled: 'stopped',
+};
+export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state];
+
+/**
+ * The five words `Sighting.state` spoke until A2A's replaced them (2026-09-25), as the runtime's own former vocabulary: what
+ * a `PromiseRunner` written before may still report, and what a remote registry entry written before still says. `blocked`
+ * is `input-required`, since those words never said which wait; `undefined` for any other word.
+ */
+export const formerStateOf = (word: unknown): SessionState | undefined =>
+  typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;
+const FORMER = { working: 'working', blocked: 'input-required', done: 'completed', failed: 'failed', stopped: 'canceled' } as const satisfies Record<PhaseWord, SessionState>;
 
 export type Outcome = 'succeeded' | 'failed' | 'stopped';
 
@@ -49,7 +115,7 @@ export type Outcome = 'succeeded' | 'failed' | 'stopped';
  */
 export type Sighting = {
   sessionId: string;
-  state: Observed;
+  state: SessionState;
   /**
    * Is the session's process doing something *right now*?
    *
@@ -97,8 +163,8 @@ export type Sighting = {
    *
    * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
    * `state.waiting.reason`, a word a person reads, and Claude Code may add another next month. `decide` does not
-   * read it, and nothing here turns it into a state — `state` already says a session is `blocked`, and this says
-   * what it is blocked on. Level-triggered like every other field of a sighting: read afresh each pass, so a
+   * read it, and nothing here turns it into a state — `state` already says a session waits on a person
+   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a sighting: read afresh each pass, so a
    * session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;
@@ -297,7 +363,7 @@ export type Event =
    * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
    * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; limit?: string; error?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Ended; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; limit?: string; error?: string }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -351,7 +417,7 @@ export type Attempt = {
   startedAt: string;
   /** Null until the spawn call returned: the window a crash can land in. */
   spawnedAt: string | null;
-  ended: Observed | null;
+  ended: Ended | null;
   /** The `at` of the `ended` entry: when the engine wrote the end down. Null while the attempt runs. */
   endedAt: string | null;
   reason: EndReason | null;
@@ -534,7 +600,7 @@ export type Action =
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
   /** The harness says this attempt is over — or, `unstartable`, refused to start it, in its words (`error`). Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; error?: string }
+  | { do: 'record-end'; attempt: number; sessionId: string; observed: Ended; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; error?: string }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -616,13 +682,13 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
     // A pass steps a task until nothing moves, so an end recorded past the deadline is read past it too: before
     // 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end. A person's
     // stop outranks the deadline.
-    const endedOwn = sighting?.state === 'done' || sighting?.state === 'failed';
+    const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
     if (overdue && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
     // Note the order: the SIGHTING is read before our own `spawnedAt`. A crash between the spawn call and its journal
     // entry leaves a session running under a name we can still find, so it is adopted rather than started a second
     // time. That is the whole reason the name is ours.
     if (sighting) {
-      const ending = sighting.state === 'working' ? 'done' : sighting.state;
+      const ending = endOf(sighting.state);
       const seen = {
         attempt: last.n, sighting, asked: state.closeoutSchema !== undefined,
         holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
@@ -631,7 +697,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
       // asked for is recorded beside it (`stated`), and judged by the layer above: the engine reports, and never nudges.
       if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
       if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
-      return { type: sighting.state === 'stopped' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
+      return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
     }
     if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
     // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
@@ -671,13 +737,9 @@ export function spawnRefused(state: State, attempt: number, error: string, move:
   return 'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused } : moved.action;
 }
 
-const isLive = (o: Observed | undefined): boolean =>
-  o !== undefined && (RUNNING.has(o) || NEEDS_HUMAN.has(o));
-
 /** Is this task waiting on a person? The one thing a fleet operator must be told about. */
 export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>): boolean {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
-  const seen = observed.get(nameFor(state.taskId, last.n))?.state;
-  return seen !== undefined && NEEDS_HUMAN.has(seen);
+  return waitsOnPerson(observed.get(nameFor(state.taskId, last.n))?.state);
 }

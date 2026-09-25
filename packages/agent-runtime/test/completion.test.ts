@@ -32,11 +32,27 @@ const row = (state: string, status: string) => JSON.stringify([{
   name: 'ae/t-1/1', sessionId: 's-1', state, status, kind: 'background',
 }]);
 
+test('the registry\'s words, read through `claude agents`: each is A2A\'s name once, and a blocked session\'s wait says which', async () => {
+  const rows = [
+    ['working', undefined, 'working'], ['done', undefined, 'completed'], ['failed', undefined, 'failed'], ['stopped', undefined, 'canceled'],
+    ['blocked', 'permission prompt', 'input-required'], ['blocked', 'authentication', 'auth-required'], ['blocked', 'sign in to continue', 'auth-required'],
+    ['vanished', undefined, 'failed'],
+  ] as const;
+  const restore = withFakeClaude(JSON.stringify(rows.map(([state, waitingFor], i) => ({
+    name: `ae/t-${i}/1`, sessionId: `s-${i}`, state, status: 'idle', kind: 'background', ...(waitingFor ? { waitingFor } : {}),
+  }))));
+  try {
+    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
+    assert.deepEqual(rows.map((_, i) => seen.get(`ae/t-${i}/1`)?.state), rows.map(([, , name]) => name));
+    assert.equal(seen.get('ae/t-5/1')?.waitingFor, 'authentication', 'the wait is carried in the harness\'s own words');
+  } finally { restore(); }
+});
+
 test('state=done is taken at its word, immediately', async () => {
   const restore = withFakeClaude(row('done', 'idle'));
   try {
     const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
-    assert.equal(seen.get('ae/t-1/1')?.state, 'done');
+    assert.equal(seen.get('ae/t-1/1')?.state, 'completed');
   } finally { restore(); }
 });
 
@@ -229,7 +245,7 @@ test('blocked is never quiescent — a session waiting on a person is not finish
     await Effect.runPromise(ops.observe);
     t += 10 * QUIESCENT_AFTER_MS;
     const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
-    assert.equal(seen?.state, 'blocked');
+    assert.equal(seen?.state, 'input-required');
     assert.equal(seen?.quietMs, undefined, 'never quiet');
   } finally { restore(); }
 });
@@ -325,7 +341,7 @@ test('a blocked, idle session reports what it said too — and stays blocked, fo
   try {
     const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe);
     assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
-    assert.equal(seen.get('ae/t-1/1')?.state, 'blocked');
+    assert.equal(seen.get('ae/t-1/1')?.state, 'input-required');
   } finally { restore(); }
 });
 

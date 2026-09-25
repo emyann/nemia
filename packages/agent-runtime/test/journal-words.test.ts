@@ -46,7 +46,7 @@ const board = (spawnFails?: Error) => {
     async observe() { return new Map(sessions); },
     async stop(sessionId) {
       asked.push(['stop', sessionId]);
-      for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs() { return ''; },
   };
@@ -79,7 +79,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
   await b.engine.tick();
   const name = 'ae/t-words/1';
   b.sessions.set(name, {
-    ...b.sessions.get(name)!, state: 'done', busy: false,
+    ...b.sessions.get(name)!, state: 'completed', busy: false,
     closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: Date.now() + 60_000 },
     usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
   });
@@ -99,7 +99,7 @@ test('a session that ends with no statement where one was asked: ended as its ha
   const b = board();
   const id = await b.engine.file(filing);
   await b.engine.tick();
-  b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'done', busy: false });
+  b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'completed', busy: false });
   await b.engine.tick();
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
@@ -153,7 +153,7 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
   await b.engine.tick();
   await b.engine.stop(id);
   await b.engine.tick();
-  assert.equal(b.sessions.get('ae/t-words/1')?.state, 'stopped', 'the harness was asked to stop the session');
+  assert.equal(b.sessions.get('ae/t-words/1')?.state, 'canceled', 'the harness was asked to stop the session');
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
@@ -197,7 +197,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   const id = await b.engine.file({ ...filing, holdOpen: true });
   await b.engine.tick();
   const sign = (n: number, summary: string) => b.sessions.set(`ae/t-words/${n}`, {
-    ...b.sessions.get(`ae/t-words/${n}`)!, state: 'done', busy: false,
+    ...b.sessions.get(`ae/t-words/${n}`)!, state: 'completed', busy: false,
     closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
   });
   sign(1, 'a first draft');

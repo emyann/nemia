@@ -74,3 +74,28 @@ test('io() counts the bytes of a journal a view reads, and the worker a pass sta
   const until = Date.now() + 20_000;
   while (!(await engine.view(id)).state.settled && Date.now() < until) { await engine.tick(); await sleep(50); }
 });
+
+test('a view reads its journal once, settled or observed', async () => {
+  // `viewOf` folds the journal to choose what to ask, and views that fold; it once read the journal again to view it, so each view was
+  // two reads and `wf ls` read 418 journals for 209 tasks (2026-09-25). A harness held in memory, so every read counted is the journal's.
+  const sessions = new Map<string, { sessionId: string; state: 'working' | 'done'; busy: boolean }>();
+  const inMemory = {
+    spawn: async (r: { name: string }) => { sessions.set(r.name, { sessionId: `s-${sessions.size}`, state: 'working', busy: true }); },
+    observe: async () => new Map(sessions),
+    stop: async () => {},
+    logs: async () => '',
+  };
+  const engine = createEngine({ root: scratch('ae-io-root-'), harnesses: { inMemory }, defaultHarness: 'inMemory' });
+  const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
+  await engine.tick();
+  await engine.tick();
+  const observed0 = engine.io().reads;
+  const working = await engine.view(id);
+  assert.equal(working.phase, 'running (working)');
+  assert.equal(engine.io().reads - observed0, 1, 'a task in flight, observed, is one read');
+  for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'done', busy: false });
+  await engine.tick();
+  const settled0 = engine.io().reads;
+  assert.ok((await engine.view(id)).state.settled, 'the task settled');
+  assert.equal(engine.io().reads - settled0, 1, 'a settled task, read off its record, is one read');
+});

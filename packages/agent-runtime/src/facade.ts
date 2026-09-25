@@ -32,7 +32,7 @@ import { ioCounts, type IoCounts } from './io-tally.ts';
 import { tickMemoLayer } from './tick-memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type RefusedMove, type TaskView,
+  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, viewOfState, type RefusedMove, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -470,9 +470,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
     const look = observeFor ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))) : observe;
     const observed = look.pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
-      Effect.flatMap((o) => view(taskId, o)),
+      Effect.map((o) => viewOfState(state, o)),
     );
-    const recorded = view(taskId, new Map());
+    // The fold already made, never a second read of the journal: `view` reads it again, which made every view two reads (measured
+    // 2026-09-25: `wf ls` read 418 journals for 209 tasks).
+    const recorded = Effect.sync(() => viewOfState(state, new Map()));
     if (!state.settled && (!find || last?.ended === null)) return yield* observed;
     if (!last || (find && last.nativeId)) return yield* recorded;
     const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;

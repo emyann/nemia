@@ -21,7 +21,7 @@ import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
+import { Runner, RunnerError, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods, type TranscriptRequest,
 } from './a2a-handler.ts';
@@ -107,7 +107,7 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 
-  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[] }> {
+  observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[]; unread: string[] }> {
     return this.handler.observeSessions(params, new ServerCallContext());
   }
 }
@@ -207,12 +207,13 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   });
 
   // What it lists is all `stop` has to go by, as for `observe`: a session it left out is listed in full when a stop asks for it.
-  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Map<string, Sighting>, RunnerError> => Effect.gen(function* () {
+  // What the driver could not look for crosses as it said it, names and nothing more.
+  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> => Effect.gen(function* () {
     const seen = new Map<string, Sighting>();
-    const { tasks } = yield* call('observe', () => transport.observeSessions({ expected }));
+    const { tasks, unread } = yield* call('observe', () => transport.observeSessions({ expected }));
     yield* sightingsOf('observe', tasks, seen);
     names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
-    return seen;
+    return { seen, unread: new Set(unread) };
   });
 
   const stop = (sessionId: string): Effect.Effect<void, RunnerError> => Effect.gen(function* () {

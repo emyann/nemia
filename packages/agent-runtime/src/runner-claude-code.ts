@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Sighting } from './domain.ts';
 import { nameParts } from './a2a-map.ts';
-import { claudeOps, type ClaudeOptions, type RunnerOps } from './runner.ts';
+import { claudeOps, type ClaudeOptions, type Observation, type RunnerOps } from './runner.ts';
 import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from './runner-claude-detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
@@ -70,8 +70,13 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
-  // One mode's registry unreadable must not blind the engine to the other's sessions, as for the composite's harnesses.
-  const seen = (ops: RunnerOps) => ops.observe.pipe(Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())));
+  // One mode's registry unreadable must not blind the engine to the other's sessions, as for the composite's harnesses: a read
+  // that failed is `undefined`, which a full listing reads as nothing and `observeFor` as its expected names unread.
+  const read = (ops: RunnerOps) => ops.observe.pipe(
+    Effect.map((m): Map<string, Sighting> | undefined => m),
+    Effect.catchCause(() => Effect.succeed(undefined)),
+  );
+  const seen = (ops: RunnerOps) => read(ops).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
 
   return {
     spawn: (r) => (r.config?.background ? bg : job).spawn(r),
@@ -87,13 +92,19 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * the world, never off a task's config: a task filed on this harness before jobs were its default runs `--bg` without
      * saying so, and a job whose run file is not there is looked for in the registry too — once its grace is past, the
      * pass reads it lost either way. A job listing that cannot be read this time asks the registry, as `observe` would.
+     *
+     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job listing, or
+     * the registry once asked. A job's name the registry was asked for and does not list, with the jobs read, is absent.
      */
-    observeFor: (expected) => job.observe.pipe(
-      Effect.map((jobs) => ({ jobs, read: true })),
-      Effect.catchCause(() => Effect.succeed({ jobs: new Map<string, Sighting>(), read: false })),
-      Effect.flatMap(({ jobs, read }) => !read || expected.some((e) => !jobs.has(e.name))
-        ? seen(bg).pipe(Effect.map((sessions) => new Map([...jobs, ...sessions])))
-        : Effect.succeed(jobs)),
+    observeFor: (expected) => read(job).pipe(
+      Effect.flatMap((jobs) => !jobs || expected.some((e) => !jobs.has(e.name))
+        ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+        : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() })),
+      Effect.map(({ jobs, sessions }): Observation => {
+        const seen = new Map([...(jobs ?? []), ...(sessions ?? [])]);
+        const failed = !jobs || !sessions;
+        return { seen, unread: new Set(failed ? expected.map((e) => e.name).filter((name) => !seen.has(name)) : []) };
+      }),
     ),
 
     // The job's own run file first — one file, never the jobs' output, which a transcript in flight would re-read on

@@ -19,8 +19,11 @@ export type Phase = typeof PHASES[number];
 /** One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. */
 export type PhaseCost = { ms: number; calls: number; bytes: number; reads: number; spawned: number };
 
-/** One harness's observes in the pass, as the runtime reported them: how many, their time, what they listed, the processes started. */
-export type HarnessCost = { calls: number; ms: number; listed: number; spawned: number };
+/**
+ * One harness's observes in the pass, as the runtime reported them: how many, their time, what they listed, the processes started, and
+ * how many could not read all they were to (`unread`), written only when there were some.
+ */
+export type HarnessCost = { calls: number; ms: number; listed: number; spawned: number; unread?: number };
 
 /**
  * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass. `records`
@@ -105,7 +108,8 @@ export const breakdownLines = (c: PassCost): string[] => {
   const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k]!.length)));
   const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]!) : cell.padStart(widths[k]!))).join('  ')}`;
   const harnesses = Object.entries(c.harnesses).sort(([a], [b]) => a.localeCompare(b)).map(([name, h]) =>
-    `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started`);
+    `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started` +
+      `${h.unread ? `, ${h.unread} could not read it` : ''}`);
   return [
     `the last pass, at ${c.at}: ${msWord(c.ms)} ms, ${plural(c.records, 'run record')} read, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started` +
       `${c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''}`,

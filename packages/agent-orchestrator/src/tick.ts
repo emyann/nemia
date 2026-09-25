@@ -1212,8 +1212,10 @@ const ioOf = (e: Engine): EngineIo | undefined => (typeof e.io === 'function' ? 
 /** Each harness's observes between two of the runtime's totals. */
 const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined): Record<string, HarnessCost> =>
   Object.fromEntries(Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
-    const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
-    return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];
+    const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
+    // `unread` only when some observe could not read: a runtime from before it has none, and a pass that read everything says nothing of it.
+    const unread = (o.unread ?? 0) - (b.unread ?? 0);
+    return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned, ...(unread > 0 ? { unread } : {}) }]] : [];
   }));
 
 /**

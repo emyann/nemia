@@ -152,9 +152,11 @@ export type TickReport = {
  * One harness's observes, counted: how many were made, their wall time in ms, the sessions or run files they listed, and the processes
  * started while they ran (`claude agents` for Claude Code's background sessions; none for a directory of run files). The harnesses of a
  * pass observe at once, so their `ms` can add up to more than the pass's, and a process another harness started in the same moment is
- * counted in both.
+ * counted in both. `unread` is how many of the observes could not read all they were to: one that failed, or one that left an
+ * expected name unread (`Observation`) — a harness that keeps failing shows there, where the pass waits on it rather than reading its
+ * sessions gone.
  */
-export type ObserveCount = { calls: number; ms: number; listed: number; spawned: number };
+export type ObserveCount = { calls: number; ms: number; listed: number; spawned: number; unread: number };
 
 /**
  * What this engine's reads and spawns have cost since the process started, as running totals: the runtime's own reads and spawns
@@ -441,19 +443,25 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const observed: Record<string, ObserveCount> = {};
   // `observeFor` is an observe too, told what to look for, and counted as one: `spawned` is what says whether it asked a registry.
   const counted = <R extends RunnerOps>(name: string, ops: R): R => {
-    const count = (look: Effect.Effect<Map<string, Sighting>, RunnerError>) => Effect.suspend(() => {
+    const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) => Effect.suspend(() => {
       const t0 = performance.now();
       const spawned = ioCounts().spawned;
       return Effect.onExit(look, (exit) => Effect.sync(() => {
-        const o = (observed[name] ??= { calls: 0, ms: 0, listed: 0, spawned: 0 });
+        const o = (observed[name] ??= { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 });
         o.calls++;
         o.ms += performance.now() - t0;
         o.spawned += ioCounts().spawned - spawned;
-        if (Exit.isSuccess(exit)) o.listed += exit.value.size;
+        const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
+        o.listed += r.listed;
+        if (r.unread) o.unread++;
       }));
     });
     const observeFor = ops.observeFor;
-    return { ...ops, observe: count(ops.observe), ...(observeFor ? { observeFor: (expected: readonly ExpectedSession[]) => count(observeFor(expected)) } : {}) };
+    return {
+      ...ops,
+      observe: count(ops.observe, (m) => ({ listed: m.size, unread: false })),
+      ...(observeFor ? { observeFor: (expected: readonly ExpectedSession[]) => count(observeFor(expected), (o) => ({ listed: o.seen.size, unread: o.unread.size > 0 })) } : {}),
+    };
   };
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
   // A remote agent is A2A already, spoken to by the SDK's client over HTTP: counted, and wrapped in no seam of ours.
@@ -499,7 +507,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
     const last = state.attempts.at(-1);
     const { find, observe, observeFor } = runners[harnessOf(state)]!;
     // Told this task's own sessions, where the harness can be: a view of a Claude Code job lists the jobs and asks no `claude agents`.
-    const look = observeFor ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))) : observe;
+    const look = observeFor ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))).pipe(Effect.map((o) => o.seen)) : observe;
     const observed = look.pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
       Effect.map((o) => viewOfState(state, o)),
@@ -539,8 +547,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const before = observedNow();
       const report = await go(tick());
       const during = Object.fromEntries(Object.entries(observedNow()).flatMap(([name, o]): Array<[string, ObserveCount]> => {
-        const b = before[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
-        return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];
+        const b = before[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
+        return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned, unread: o.unread - b.unread }]] : [];
       }));
       return { ...report, ms: performance.now() - t0, observed: during };
     },

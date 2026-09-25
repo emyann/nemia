@@ -536,7 +536,7 @@ export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
 
 /**
  * Whether an unsettled task's session is at work as the pass left it: its last attempt open, and its harness listing it
- * `working` — or not yet listing it, as one started this pass is not. A `blocked` session is waiting on a person, and is not.
+ * `submitted` or `working` — or not yet listing it, as one started this pass is not. One waiting on a person is not.
  */
 const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean => {
   const last = state.attempts.at(-1);

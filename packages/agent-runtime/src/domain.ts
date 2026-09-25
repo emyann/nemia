@@ -163,8 +163,8 @@ export type Sighting = {
    *
    * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
    * `state.waiting.reason`, a word a person reads, and Claude Code may add another next month. `decide` does not
-   * read it, and nothing here turns it into a state — `state` already says a session is `blocked`, and this says
-   * what it is blocked on. Level-triggered like every other field of a sighting: read afresh each pass, so a
+   * read it, and nothing here turns it into a state — `state` already says a session waits on a person
+   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a sighting: read afresh each pass, so a
    * session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;

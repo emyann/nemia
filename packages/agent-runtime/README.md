@@ -103,9 +103,24 @@ session found under the name.
 The states are A2A's `TaskState` — `submitted`, `working`, `input-required`, `completed`, `failed`, `canceled` — and three
 of the runtime's own: `starting` (an attempt's intent journalled, no spawn: the crash window), `stopping` (a person asked it
 to stop) and `ending` (no attempt runs and the record says how the turn ended). A2A's `rejected` is an attempt's
-`unstartable` end, and `auth-required` is reported by no harness. A person's word — `stop`, `answer`, `close` — enters a
-state by the journal entry its verb writes; the machine's edges are what a pass does. The phases a person reads on `ae
-show`, `wf ls` and the board are `viewOfState`'s, and did not change.
+`unstartable` end. A person's word — `stop`, `answer`, `close` — enters a state by the journal entry its verb writes; the
+machine's edges are what a pass does. The phases a person reads on `ae show`, `wf ls` and the board are `viewOfState`'s,
+and did not change.
+
+**A sighting speaks the same names** (since 2026-09-25). `Sighting.state` is `SessionState`, a literal union of A2A's
+eight `TaskState` names in `src/domain.ts`: the SDK stays out of the pure core. Each driver translates its harness's words
+once, at its own edge, and says why there: Claude Code's registry in `claudeStateOf` (`done` is `completed`, `stopped`
+`canceled`, and `blocked` is `auth-required` when what it waits for names signing in, `AUTH_WAIT`, else `input-required`);
+the detached worker's run file, which keeps the worker's words, in `detachedStateOf`; a remote agent passes its Task's
+state through; a `PromiseRunner` reports A2A's names or the five former words, read by `formerStateOf`, and anything else
+refuses the pass. `observe` gives the three names no harness spoke before no event of their own, since each asks nothing
+the journal can tell apart: `submitted` is at work (`SESSION_LIVE`, or quiet), `auth-required` waits on a person as
+`input-required` does (`SESSION_BLOCKED`, `waitingFor` says which), and `rejected` is an end recorded `failed`. So the
+machine and its diagram did not change. The journal keeps its three end words (`Ended`: `done`, `failed`, `stopped`,
+`endOf`), so a journal written before folds as it did, and a view prints each name in the words views always printed
+(`phaseWordOf`: `running (working)` is what admission compares). `test/session-state.test.ts` holds the corpus as it
+stood before the names changed, translated, to the action `decide` answered then in every case
+(`test/fixtures/decide-corpus.json`), and each of the three names to the one it joins.
 
 **An event with no edge is refused, never guessed.** `decide` answers `nothing` with the refusal on it (`refused`), the
 pass reports every one on its `TickReport` (`refused`: task, state, event), `ae tick` prints each, and the orchestrator's
@@ -407,10 +422,10 @@ schema (in the message's metadata, under the runtime's extension) is sent; `cwd`
 **What the verbs are.** A spawn is one SendMessage, asked to return at once; `observe` is one GetTask per open session;
 `stop` is a CancelTask; `logs` is a GetTask with its history. The session is the agent's Task, named by its id, and its
 context is the attempt's `nativeId`, so `answer` on a task held open is a new Task in the same context, as A2A continues
-a conversation. A Task's state reads as a session's: `SUBMITTED` and `WORKING` at work, `INPUT_REQUIRED` and
-`AUTH_REQUIRED` `blocked` — the view's `needs-human`, `waitingFor` `input` or `authentication` — `COMPLETED` done,
-`FAILED` and `REJECTED` failed, `CANCELED` stopped, and a state no version of A2A this runtime knows at work, which a
-deadline bounds. The closing statement is the data part of the last artifact that has one, read only once the Task has
+a conversation. A Task's state is the session's, under its own name (`submitted`, `input-required`, …): `INPUT_REQUIRED`
+and `AUTH_REQUIRED` are the view's `needs-human`, `waitingFor` `input` or `authentication`, and a state no version of A2A
+this runtime knows is `working`, which a deadline bounds. A registry entry written before 2026-09-25 says how its Task was
+last seen in the runtime's former words, and is read in A2A's names, in `remote/` and in `remote/done/` alike. The closing statement is the data part of the last artifact that has one, read only once the Task has
 completed; a completed Task with none ends `stated: false`, which the orchestrator reads as unsigned, and a remote agent
 is free to ignore the schema it was sent. An agent that answers the message with a Message and makes no Task has given
 the whole session in its reply: it ends at once, its data part the statement, and its logs are its words. `say` reaches a
@@ -863,7 +878,7 @@ rather than `state` — the same conclusion, reached independently by the people
 
 Two fields, two questions. Reading them as `state ?? status` discarded the useful one, and also let
 an interactive session's `status: idle` be recorded as a *failure*, since `idle` is not a state at
-all. `busy` is likewise a status, and no longer sits in `Observed` pretending otherwise.
+all. `busy` is likewise a status, and no longer sits in the sighting's state (`SessionState`) pretending otherwise.
 
 So `claudeOps` answers the half of the question that is its harness's vocabulary — whether a session has stopped:
 

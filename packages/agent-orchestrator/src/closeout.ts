@@ -73,8 +73,8 @@ export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): Cl
  *
  * The reviewer never sees `summary`. Passing the implementer's account of the work to the person
  * judging it would anchor the judgement on the context that produced the work, and offer
- * unverifiable claims beside verifiable evidence — the rule `composeBrief` already keeps. Hermes
- * Kanban injects the parent's summary into the child's prompt; this is the one place worth
+ * unverifiable claims beside verifiable evidence — the rule `composeBrief` already keeps. An agent
+ * kanban we compared with injects the parent's summary into the child's prompt; this is the one place worth
  * diverging, and the field earns its place by travelling to the human instead.
  */
 export type Closeout = {

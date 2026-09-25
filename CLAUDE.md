@@ -42,6 +42,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (`~/.agent-workflows`, `~/.agent-engine`, whose names stay), or on a line that says `renamed on 2026-09-23`. New dated writing that
   quotes the old names joins `HISTORY`. Turbo caches the package's pass by the package's own files, so a change only to a doc or to
   another package replays it: run `npx turbo run test --force` after such a change (learned by the run that renamed the packages).
+- **Another project is described, never named, history included.** Before the repository went public the owner chose to say what
+  two groups of other projects do, in a few words, with no name and no link (an agent kanban; a Go agent SDK, its sandbox runtime and
+  an A2A adapter for Claude Code). `packages/agent-orchestrator/test/others.test.ts` reads every file but `package-lock.json` and the
+  vendored `.claude/skills/shadcn/`, and refuses a line naming one; the names sit there in base64. What we integrate (Claude Code,
+  Codex, A2A, `@a2a-js/sdk`) and what is compared by name on purpose (TypeSafe, Tekton, Argo, n8n, Kubernetes) are not on it.
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).

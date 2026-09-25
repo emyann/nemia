@@ -860,8 +860,8 @@ belongs to the attempt that made it, and needs no path.
 **Three things, one answer.**
 
 *It is how the run knows a step is finished* — the moment the answer is given, not ninety seconds of
-quiet later. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban)
-`kanban_complete(...)`, in the form every harness here already supports.
+quiet later. This is an agent kanban's terminal "complete" tool call, in the form every harness here
+already supports.
 
 *It stops a step claiming success it did not have.* `"outcome": "blocked"` ends the session honestly,
 and the DAG treats it as final — nothing downstream runs — while `wf decide` says **waiting on you**
@@ -900,8 +900,8 @@ forgot to say "commit this", and fixing that prose would have left the next work
 it.
 
 **`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and no account of
-the work — *read the change, not an account of it* is unchanged. Hermes injects the parent's summary
-into the child's prompt; this is the one place worth diverging. The only part of a closeout that
+the work — *read the change, not an account of it* is unchanged. An agent kanban we compared with injects the
+parent's summary into the child's prompt; this is the one place worth diverging. The only part of a closeout that
 reaches another step is what its `output:` declares, and only a step that asks with `input:` gets it.
 
 **At a gate, the closeout is what a person approves.** A gated step's `done` does not file what follows:

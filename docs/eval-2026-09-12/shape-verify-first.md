@@ -399,7 +399,7 @@ is the moment Addy's fourth point is about, and no report replaces it.
   a machine verdict; the gate waits for a file. Neither reads the work. If anyone reaches for a rung
   that depends on *what* failed, the README's argument was right and the rung is a step's job.
 - **An agent in the control flow.** No LLM judge, no agent decider, no auto-decomposition
-  (Hermes' decomposer runs in the dispatcher; `wf` still files nothing a person did not start). The
+  (an agent kanban runs a decomposer in its dispatcher; `wf` still files nothing a person did not start). The
   reviewer is a step; the decider is a person (`README.md:247-249`).
 - **Parsing test output into findings.** Exit code and tail, nothing else (`hkb:src/check.ts:15-19`).
   Findings are what a review step writes.

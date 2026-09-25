@@ -17,11 +17,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-
-const REPO = path.join(import.meta.dirname, '..', '..', '..');
+import { files, textOf } from './repo-files.ts';
 
 const MARK = 'renamed on 2026-09-23';
 const FORMER = ['agent-engine', 'agent-workflows']; // renamed on 2026-09-23
@@ -72,19 +68,6 @@ function unnoted(text: string): string | undefined {
 function formerNames(text: string): string[] {
   return text.split('\n').flatMap((line, i) => (!line.includes(MARK) && line.match(NAME) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
-
-/** Every file the repository holds, tracked or not yet added, ignored ones left out: git's list, as a path from the root. */
-const files = (): string[] =>
-  execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 })
-    .split('\0').filter(Boolean);
-
-/** Text, not an image: a NUL in its first bytes is a binary file, which says no name a person reads. */
-const textOf = (file: string): string | undefined => {
-  const at = path.join(REPO, file);
-  if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) return undefined; // deleted, not yet staged; or a link
-  const bytes = fs.readFileSync(at);
-  return bytes.subarray(0, 8000).includes(0) ? undefined : bytes.toString('utf8');
-};
 
 test('no live file names a package by its former name', () => {
   const found = files().filter((f) => !inHistory(f)).flatMap((f) => {

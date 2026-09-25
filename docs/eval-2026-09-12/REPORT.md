@@ -61,7 +61,7 @@ layer runs a command over the tree in between (`domain.ts:269`; `run.ts:97`; `ru
 - **Precedent.** hkb admission gate, "the only layer that held when `permissionMode` did not" (`hkb:docs/workflow-study.md:137`);
   founding failure a prompt instruction ignored (`hkb:docs/wiki/concepts/admission-control.md:37-48`); ADR-018:243-244 puts
   `allowedTools` in the core as serviceAccountName + RBAC. Kubernetes: a validating webhook refuses and never mutates — the
-  definition of a reviewer. Hermes' reviewer answers with `kanban_request_changes`, not a commit.
+  definition of a reviewer. An agent kanban's reviewer answers with a request-changes call, not a commit.
 - **Corrections.** A handOff commit is authored `wf` with `review: hand off…` (`runner.ts:270-273`), so "under the implementer's
   name" overstates; the accurate claim is that `wf decide` shows only the terminal branch's `--shortstat` (`cli.ts:158-160`).
   Codex `workspace-write` is a real fence *outside* the worktree; absent is any restriction *inside* it and any fence for the

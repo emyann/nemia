@@ -1302,11 +1302,23 @@ test("REFUSED at load: a `resume:` on a step that runs in the repository's check
   assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
 });
 
-test("REFUSED at load: a `check:` on a step that runs in the repository's checkout — the run would execute it there, on whatever a person has in it", () => {
-  assert.throws(() => fm('ship', 'workspace: main\ncheck: npm test'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work\. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found\. Delete one of the two lines\.$/.test(e.message));
-  // Whichever order the two lines are written in, and with the check's own refusals still its own.
+test("REFUSED at load: a `check:` on a step that runs in the repository's checkout with no `gate: true` — the run would commit onto the base branch on the check's word, which only a person's approval may start", () => {
+  assert.throws(() => fm('ship', 'workspace: main\ncheck: npm test'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no `gate: true`\. Add `gate: true`, or delete the `check:` line\.$/.test(e.message));
+  // Whichever order the lines are written in, and with the check's own refusals still its own.
   assert.throws(() => fm('ship', 'check: npm test\nworkspace: main'), /`workspace: main` runs the step in the repository's own checkout, and `check: npm test`/);
   assert.throws(() => fm('ship', 'workspace: main\ncheck: none'), /`workspace: main` runs the step in the repository's own checkout, and `check: none`/, 'the two together are refused before the check is read on its own');
+  // Gated, it loads: the run executes the check on the merge the step staged, and lands or aborts it.
+  const ship = fm('ship', 'workspace: main\ngate: true\ncheck: npm test');
+  assert.deepEqual([ship.workspace, ship.gate, ship.check], ['main', true, 'npm test']);
+  assert.deepEqual([fm('ship', 'check: npm test\ngate: true\nworkspace: main').check], ['npm test'], 'whichever order');
+  assert.throws(() => fm('ship', 'workspace: main\ngate: true\ncheck: none'), /check/, "the check's own refusals still hold beside the gate");
+});
+
+test("REFUSED at load: `retries:` on a step that runs in the repository's checkout — a try of an ending is a person's to ask for", () => {
+  for (const lines of ['workspace: main\ngate: true\ncheck: npm test\nretries: 1', 'retries: 1\nworkspace: main', 'workspace: main\nretries: 0']) {
+    assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `retries: [01]` would have the run do it again there on its own, on a refusal nobody read\. A step that ends a run is tried again on a person's word: wf retry <run> ship\. Delete the `retries:` line\.$/.test(e.message), lines);
+  }
+  assert.equal(fm('implement', 'check: npm test\nretries: 1').retries, 1, 'any other step keeps its retries');
 });
 
 test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` does not, and a step without the line has neither; REFUSED at load: a word that is not `true` or `false`, no value, and the line twice", () => {

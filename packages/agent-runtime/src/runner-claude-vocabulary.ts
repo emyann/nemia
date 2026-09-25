@@ -47,6 +47,13 @@ export type ClaudeFlags = {
   pluginDir?: string[];
   /** Settings for the session alone, as a file or as JSON: `{"outputStyle":"<plugin>:<style>"}`. */
   settings?: string;
+  /**
+   * Bridge a background session to claude.ai (`--remote-control`, with a name for it as a string), where anyone signed in to the
+   * account can drive it — type into it, answer its prompts, stop it — from a browser or a phone. Never a default, for that reason.
+   * A harness argument of its own until 2026-09-25 (`FORMER_ARGS`). Refused on a job — `claude -p` opens no bridge — and on any
+   * harness but Claude Code; a harness brought as a `PromiseRunner` is handed it on the spawn and asked nothing.
+   */
+  remoteControl?: true | string;
   [flag: string]: string | number | true | string[] | undefined;
 };
 
@@ -60,7 +67,9 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print', 'p', 'bg', 'name', 'inputFormat', 'outputFormat', 'verbose', 'resume', 'continue', 'sessionId', 'forkSession',
   'permissionPrompts', 'permissionMode', 'dangerouslySkipPermissions', 'allowDangerouslySkipPermissions',
   'model', 'effort', 'tools', 'disallowedTools', 'allowedTools', 'mcpConfig', 'strictMcpConfig', 'noChrome', 'chrome',
-  'autocompact', 'jsonSchema', 'worktree', 'maxBudgetUsd', 'remoteControl',
+  'autocompact', 'jsonSchema', 'worktree', 'maxBudgetUsd',
+  // Every job reads its checkout's settings and not the operator's (`claudePrintFlags`); a background session is not given it.
+  'settingSources',
 ];
 
 /** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */
@@ -75,6 +84,12 @@ export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
     if (Array.isArray(value)) return value.flatMap((v) => [flag, v]);
     return [flag, String(value)];
   });
+
+/**
+ * Whether a task asks for its session bridged to claude.ai: Claude Code's `--remote-control`, given in its flags
+ * (`config.claude.remoteControl`, a harness argument of its own until 2026-09-25). Only a background session opens one.
+ */
+export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
@@ -91,6 +106,15 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   }
   return undefined;
 };
+
+/**
+ * What Claude Code run as `claude -p` cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a bridge to claude.ai,
+ * which only a background session opens, and which `claudeFlagsOf` would otherwise spell onto a prompt that runs and exits. The
+ * engine's own door words it with the harnesses that do bridge (`harnessRefusalOf` in `facade.ts`); this is the Effect door's.
+ */
+export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task) ?? (bridgeAsked(task)
+  ? '`claude.remoteControl` asks for a session bridged to claude.ai, and `claude -p` runs a prompt and exits: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
+  : undefined);
 
 /**
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
@@ -114,8 +138,8 @@ export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | un
     return task.config?.budgetUsd === undefined ? undefined
       : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
   }
-  return task.config?.remoteControl
-    ? '`remoteControl: true` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge. Give `config.background: true` as well, or leave `remoteControl` off.'
+  return bridgeAsked(task)
+    ? '`claude.remoteControl` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge. Give `config.background: true` as well, or leave `claude.remoteControl` off.'
     : undefined;
 };
 

@@ -35,7 +35,7 @@
  * unsigned since stage 4a (before, the runtime judged it `unsigned` itself). Whether Claude Code nudges such a session
  * itself, or ends it on its own, is what the diagnostic says.
  *
- * And `remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
+ * And `claude.remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
  * engine never reads: a session filed with it must be registered under `sessions/` with a `bridgeSessionId`, beside a
  * control identical but for the field, which must have none — or the flag is not what bridged it. Both have no tools,
  * so a session anyone on the account can drive from claude.ai for the minute it lives can do nothing.
@@ -489,14 +489,14 @@ const registrationOf = (name: string): Record<string, unknown> | undefined => {
   return undefined;
 };
 
-test('a --bg session filed with remoteControl: true is bridged — its registration carries a bridgeSessionId — and the same session filed without it is not', {
+test('a --bg session filed with claude.remoteControl is bridged — its registration carries a bridgeSessionId — and the same session filed without it is not', {
   skip,
   timeout: 6 * 60_000,
 }, async (t) => {
   const engine = createEngine({ root: tmp('remote-board') });
   const common = { brief: 'Reply with the single word ok, and nothing else.', config: { model: 'haiku', tools: [] as string[], background: true } };
   const ids = {
-    bridged: await engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, remoteControl: true } }),
+    bridged: await engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, claude: { remoteControl: true } } }),
     control: await engine.file({ ...common, cwd: tmp('remote-none') }),
   };
   const found: Record<string, Record<string, unknown> | undefined> = {};
@@ -513,7 +513,7 @@ test('a --bg session filed with remoteControl: true is bridged — its registrat
     read();
     const shown = (r: Record<string, unknown> | undefined) => (r ? `${r.version} ${r.sessionId}, bridgeSessionId ${r.bridgeSessionId ?? 'none'}` : 'not registered');
     t.diagnostic(`bridged: ${shown(found.bridged)}; control: ${shown(found.control)}`);
-    assert.ok(found.bridged, 'the session filed with remoteControl registered');
+    assert.ok(found.bridged, 'the session filed with claude.remoteControl registered');
     assert.equal(typeof found.bridged.bridgeSessionId, 'string', 'and is bridged: the agents view lists it');
     assert.ok(found.control, 'the control registered');
     assert.equal(found.control.bridgeSessionId, undefined,

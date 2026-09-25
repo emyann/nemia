@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type HarnessSpec } from '../src/facade.ts';
+import { createEngine, type HarnessSpec, type PromiseRunner, type PromiseSighting } from '../src/facade.ts';
 import { scratch } from './scratch.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -38,6 +38,29 @@ test('a tick says what it took and what each harness listed, and a directory of 
   assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
   assert.equal(o.spawned, 0, 'reading run files starts nothing');
   assert.ok(o.ms >= 0 && o.ms <= report.ms + 1, 'an observe inside the pass takes no longer than the pass');
+});
+
+test('a tick counts the observes that could not read their harness (`unread`), and the attempt they could not read is left as it was', async () => {
+  const sessions = new Map<string, PromiseSighting>();
+  let failing = false;
+  const flaky: PromiseRunner = {
+    spawn: async (r) => { sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' }); },
+    observe: async () => { if (failing) throw new Error('registry: timed out'); return new Map(sessions); },
+    stop: async () => {},
+    logs: async () => '',
+  };
+  const engine = createEngine({ root: scratch('ae-io-root-'), harnesses: { flaky }, defaultHarness: 'flaky' });
+  const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
+  await engine.tick();
+  const read = await engine.tick();
+  assert.equal(read.observed.flaky!.unread, 0, 'a read that answered left nothing unread');
+  failing = true;
+  const unread = await engine.tick();
+  assert.deepEqual([unread.observed.flaky!.calls, unread.observed.flaky!.listed, unread.observed.flaky!.unread], [1, 0, 1], 'one observe, nothing listed, one unread');
+  assert.equal(engine.io().observed.flaky!.unread, 1, 'and the running total has it');
+  failing = false;
+  assert.equal((await engine.tick()).observed.flaky!.unread, 0);
+  assert.equal((await engine.view(id)).state.attempts[0]!.ended, null, 'the attempt still runs');
 });
 
 test('a tick counts only the observes made during it; io() counts every observe, a view\'s too', async () => {

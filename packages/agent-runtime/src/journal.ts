@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
-import { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
+import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 import { countRead, readText } from './io-tally.ts';
 
 /**
@@ -74,7 +74,7 @@ export type JournalOps = {
  * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
  * line is what was said when it was said, so a change to an event's shape is made where it is read.
  *
- * Two changes so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
+ * Three changes so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
  * they are the adapter's configuration now, under `config` (`harness-args.ts`). A `filed` event with any of them at
  * its top level has them moved under `config`, where a value already there is kept: `config` is the newer word. So
  * `fold` reads one shape, and a store holding tasks filed on both sides of the change lists them alike.
@@ -83,6 +83,11 @@ export type JournalOps = {
  * event (lifted above, as it is one of the harness's arguments now), on an `input` (moved under that turn's `config`),
  * and as an end's reason — `reason: 'budget'` — which is read as the harness ending the session at a limit its
  * configuration set: `reason: 'harness'`, `limit: 'budget'`.
+ *
+ * And until 2026-09-25 a bridge to claude.ai was a harness argument of its own, `remoteControl`, and is Claude Code's flag now,
+ * in `config.claude` (`FORMER_ARGS`). A `filed` event with it — under `config`, or at its top level from before either change —
+ * has it moved there: `true` as the flag, where a flag already in `claude` is kept, and `false`, which asked for nothing, dropped.
+ * So a task filed bridged before the move is bridged again on its next attempt.
  */
 export const upgrade = (event: Event): Event => {
   if (event.kind === 'input') {
@@ -96,16 +101,24 @@ export const upgrade = (event: Event): Event => {
   }
   if (event.kind !== 'filed') return event;
   const legacy = event as Event & Record<string, unknown>;
-  const moved = HARNESS_ARGS.filter((key) => Object.hasOwn(legacy, key));
-  if (!moved.length) return event;
+  const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS)].filter((key) => Object.hasOwn(legacy, key));
+  const given = legacy.config as Record<string, unknown> | undefined;
+  const former = Object.keys(FORMER_ARGS).filter((key) => given !== undefined && Object.hasOwn(given, key));
+  if (!moved.length && !former.length) return event;
   const lifted: Record<string, unknown> = {};
-  const { config: given, ...rest }: Record<string, unknown> = legacy;
+  const { config: _, ...rest }: Record<string, unknown> = legacy;
   for (const key of moved) {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
     delete rest[key];
   }
-  const config = { ...lifted, ...(given as HarnessArgs | undefined) };
-  return { ...(rest as Event & { kind: 'filed' }), ...(Object.keys(config).length ? { config } : {}) };
+  const config: Record<string, unknown> = { ...lifted, ...given };
+  const flags: Record<string, unknown> = {};
+  for (const key of Object.keys(FORMER_ARGS)) {
+    if (config[key] === true) flags[FORMER_ARGS[key]!] = true;
+    delete config[key];
+  }
+  if (Object.keys(flags).length) config.claude = { ...flags, ...(config.claude as HarnessArgs['claude']) };
+  return { ...(rest as Event & { kind: 'filed' }), ...(Object.keys(config).length ? { config: config as HarnessArgs } : {}) };
 };
 
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {

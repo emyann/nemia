@@ -1778,12 +1778,12 @@ test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits
 
 test('a step with `background: true` and `remote: true` reaches `e.file` with both — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the lines, with neither', async () => {
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nbackground: true\nremote: true', 'failed', 1);
-  const both = (id: string) => [tasks.get(id)!.spec.config?.background, tasks.get(id)!.spec.config?.remoteControl];
+  const both = (id: string) => [tasks.get(id)!.spec.config?.background, tasks.get(id)!.spec.config?.claude?.remoteControl];
   assert.deepEqual(both(`${run.id}-implement`), [true, true], 'the first filing');
 
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([nudged.config?.background, nudged.config?.remoteControl, nudged.resumeFrom], [true, true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+  assert.deepEqual([nudged.config?.background, nudged.config?.claude?.remoteControl, nudged.resumeFrom], [true, true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
 
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
@@ -1805,30 +1805,30 @@ test('a round files its target bridged as the target says, and the looping step 
   const run = started(looped('background: true\nremote: true\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
-  assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl, undefined);
+  assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.claude?.remoteControl, undefined);
   await toReview(b, run.id, 1, true);
-  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.config?.remoteControl, true);
+  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.config?.claude?.remoteControl, true);
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
-  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.config?.remoteControl, undefined, 'the round, continuing implement');
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.config?.claude?.remoteControl, undefined, 'the round, continuing implement');
   await toReview(b, run.id, 2, false);
-  assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.config?.remoteControl, true, "round 2's review");
+  assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.config?.claude?.remoteControl, true, "round 2's review");
 
   const other = started(looped('', 'background: true\nremote: true\n'));
   const c = board();
   await advance(c.e, readRun(other.id));
   await toReview(c, other.id, 1, true);
   assert.deepEqual((await advance(c.e, readRun(other.id))).looped, ['review']);
-  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.config?.remoteControl], [true, undefined]);
+  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.claude?.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.config?.claude?.remoteControl], [true, undefined]);
   // And run as the target says, a round being a session of it: a background session again, and review a job.
   assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.background, c.tasks.get(`${other.id}-review`)!.spec.config?.background], [true, undefined]);
 });
 
-test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
+test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `claude.remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
   const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
-  /** What the engine's own door says to `remoteControl: true` on `harness`: the whole message, or undefined when it files the task. */
+  /** What the engine's own door says to `claude.remoteControl` on `harness`: the whole message, or undefined when it files the task. */
   const engineRefuses = async (harness: string, background?: boolean): Promise<string | undefined> => {
     try {
-      await engine.file({ brief: 'b', cwd: '/w', harness, config: { remoteControl: true, ...(background ? { background } : {}) } });
+      await engine.file({ brief: 'b', cwd: '/w', harness, config: { claude: { remoteControl: true }, ...(background ? { background } : {}) } });
       return undefined;
     } catch (err) {
       return (err as Error).message;
@@ -1838,7 +1838,7 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
   const engineSays = async (harness: string): Promise<string | undefined> => {
     const said = await engineRefuses(harness);
     if (said === undefined) return undefined;
-    const reason = new RegExp(`^file: \`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec(said)?.[1];
+    const reason = new RegExp(`^file: \`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec(said)?.[1];
     assert.ok(reason, said);
     return reason;
   };
@@ -1867,7 +1867,7 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
 
   // On claude, a job opens no bridge: the engine refuses it, and so does start — named, or by default — in its words.
   const job = await engineRefuses('claude');
-  const why = /^file: `remoteControl: true` bridges a session to claude\.ai, and (.*?)\. Give `config\.background: true` as well/.exec(job ?? '')?.[1];
+  const why = /^file: `claude\.remoteControl` bridges a session to claude\.ai, and (.*?)\. Give `config\.background: true` as well/.exec(job ?? '')?.[1];
   assert.ok(why, job);
   for (const [dir, label] of [[withRemote('claude'), 'claude named'], [folder('remote: true'), 'claude by default']] as const) {
     refusedAtStart(dir, `implement: \`remote: true\` bridges a session to claude.ai, and ${why}. Write \`background: true\` beside it, or delete \`remote: true\`.`, label);
@@ -1879,7 +1879,7 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
     const run = started(dir);
     const b = board();
     await advance(b.e, readRun(run.id));
-    assert.deepEqual([b.tasks.get(`${run.id}-implement`)!.spec.config?.background, b.tasks.get(`${run.id}-implement`)!.spec.config?.remoteControl], [true, true]);
+    assert.deepEqual([b.tasks.get(`${run.id}-implement`)!.spec.config?.background, b.tasks.get(`${run.id}-implement`)!.spec.config?.claude?.remoteControl], [true, true]);
   }
 });
 
@@ -1895,7 +1895,7 @@ test('a run frozen before steps were jobs, with `remote: true` and no `backgroun
   const b = board();
   await advance(b.e, readRun(run.id));
   const spec = b.tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([spec.config?.background, spec.config?.remoteControl], [true, true]);
+  assert.deepEqual([spec.config?.background, spec.config?.claude?.remoteControl], [true, true]);
 
   // The engine files what the tick filed; the step as written — a job with a bridge — it refuses, and a refusal out of `advance` stops the pass.
   const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });

@@ -69,6 +69,9 @@ test('the breakdown names every phase, each harness observed, and what measuring
   assert.ok(lines.includes('  check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started'), lines.join('\n'));
   assert.equal(lines.at(-1), 'measuring it: 0.40 ms');
   assert.ok(breakdownLines({ ...COST, harnesses: {} }).includes('no harness was observed'));
+  // An observe that could not read its harness is said beside the rest, and none is said of a harness read in full.
+  assert.ok(breakdownLines({ ...COST, harnesses: { claude: { calls: 2, ms: 118, listed: 0, spawned: 2, unread: 2 } } })
+    .includes('  claude: 2 observes, 118 ms, 0 sessions or run files listed, 2 processes started, 2 could not read it'));
   assert.equal(breakdownLines({ ...COST, rested: 200 })[0],
     'the last pass, at 2026-09-25T10:00:00.000Z: 212 ms, 12 run records read, 812.0 kB read, 1 process started, 200 runs at rest answered from memory');
   assert.equal(breakdownLines({ ...COST, rested: 0 })[0], lines[0], 'none answered, nothing said of it');

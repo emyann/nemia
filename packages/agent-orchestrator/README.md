@@ -362,6 +362,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude
   Code's prompt (`--system-prompt-file`, F15).
 
+Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
+project,local` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
+carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A step's `model:` and `effort:` go on
+the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
+must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
+the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
+
 `skills:` names skills, each lowercase words joined by dashes. A skill is a folder holding a `SKILL.md`, looked for in `skills/`
 beside `agents/` in each place agents are, in order: the workflow's own folder of agents' parent, then the repository's `.claude/`
 (`.claude/agents/`, `.claude/skills/`), then the store's `workflows/`. The first place that has a name wins, so the repository's
@@ -555,14 +562,14 @@ remote: true     # every session of this step is bridged to claude.ai, and can b
 Implement what was asked, in this repository.
 ```
 
-`remote: true` is carried on every filing of the step — the first, each try and each round — as the engine's `remoteControl: true`, so
-Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
+`remote: true` is carried on every filing of the step — the first, each try and each round — as Claude Code's own flag, `config.claude.remoteControl`
+(a harness argument of its own, `remoteControl`, until 2026-09-25), so Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
 from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
 phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
-`wf start`, with nothing written, on a harness the engine refuses `remoteControl` for, in the engine's words: `codex` and
+`wf start`, with nothing written, on a harness the engine refuses `claude.remoteControl` for, in the engine's words: `codex` and
 `claude-detached` run a prompt and exit, and only a Claude Code background session, `claude` with `background: true`, is bridged; and on
 a `claude` step without `background: true`, since a job opens no bridge. The words are a copy, since `start` cannot wait on the engine's
 door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`

@@ -17,7 +17,7 @@ import { claudeDetached, codex, createEngine, type Engine } from 'agent-runtime'
 import { CHECK } from './check.ts';
 import { HOME } from './store.ts';
 
-export type { Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
+export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */

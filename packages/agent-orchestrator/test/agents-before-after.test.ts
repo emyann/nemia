@@ -128,6 +128,10 @@ const STEPS_ADDED: Record<string, string> = {
  * Each dev folder's ship gained a `check:` and the shipper's `output:` when the run began landing the ending's merge on its check: the
  * run executes the folder's check on the merge the step stages, and commits it with the `message` the step's closeout gives. The check is
  * the folder's implement's, read here; the schema is the shipper's file, read here too.
+ *
+ * The ui agents say `model: opus` since every job reads its checkout's settings and not the operator's (`--setting-sources
+ * project,local`, F24 in docs/spike-2026-09-25-agents-skills.md): their steps named no model and ran the operator's, Opus, and a job
+ * given none now runs Claude Code's default. The model they ran is written where the role is, as the modes were.
  */
 const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allowedTools!;
 const SHIPPER_OUTPUT = { file: 'shipper.schema.json', schema: JSON.parse(fs.readFileSync(path.join(REPO, 'workflows', 'agents', 'shipper.schema.json'), 'utf8')) };
@@ -136,8 +140,10 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
   'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allowedTools: SUPERVISOR_ALLOW },
   ...Object.fromEntries(Object.entries(AGENTS).filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at, agent]) => {
     const folder = at.slice('workflows/'.length, at.lastIndexOf('/'));
-    return [at, agent === 'shipper' ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT } : { permissionMode: 'auto' }];
+    return [at, agent === 'shipper' ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT }
+      : agent === 'ui-implementer' ? { permissionMode: 'auto', model: 'opus' } : { permissionMode: 'auto' }];
   })),
+  ...Object.fromEntries(Object.entries(AGENTS).filter(([, agent]) => agent === 'ui-reviewer').map(([at]) => [at, { model: 'opus' }])),
 };
 
 /**

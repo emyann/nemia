@@ -242,6 +242,7 @@ test("REFUSED: words sent in a context that is not their session's", () => {
 /** A driver a test moves by hand, what it was asked, and the same driver behind the A2A client. */
 const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: string; fails?: unknown; bare?: boolean } = {}) => {
   const sessions = new Map<string, Sighting>();
+  const unread = new Set<string>();
   const asked: Array<[string, unknown]> = [];
   let n = 0;
   const ops: RunnerOps = {
@@ -272,7 +273,11 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
       say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
       // Told what is expected, the sessions it names alone.
       observeFor: (expected: readonly ExpectedSession[]) =>
-        answer('observeFor', expected, new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)))),
+        answer('observeFor', expected, {
+          seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
+          // A name it was told to leave unread, as a driver whose registry could not be read leaves one.
+          unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
+        }),
     }),
   };
   /** A verb that answers `value`, or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect. */
@@ -285,7 +290,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
     });
   }
   const runner = a2aOps('fake', ops, async () => []);
-  return { ops, runner, sessions, asked, acted: () => asked.filter(([verb]) => verb !== 'observe') };
+  return { ops, runner, sessions, unread, asked, acted: () => asked.filter(([verb]) => verb !== 'observe') };
 };
 
 /** A line of a session's conversation, as a driver reads it. */
@@ -450,10 +455,20 @@ test('observeFor through the seam is the driver\'s, told what the engine expects
   d.sessions.set('ae/t-2/1', full);
   const expected = [{ name: 'ae/t-2/1', harness: 'fake' }];
   const seen = await Effect.runPromise(d.runner.observeFor!(expected));
-  assert.deepEqual(seen, new Map([['ae/t-2/1', full]]), 'every key of the sighting, over the wire');
+  assert.deepEqual(seen, { seen: new Map([['ae/t-2/1', full]]), unread: new Set() }, 'every key of the sighting, over the wire');
   assert.deepEqual(d.asked, [['observeFor', expected]], 'the driver told, and never asked to list in full');
   await Effect.runPromise(d.runner.stop(full.sessionId));
   assert.deepEqual(d.acted().at(-1), ['stop', full.sessionId], 'a session it listed is stopped with no listing first');
+});
+
+test('observeFor through the seam carries the names the driver could not read', async () => {
+  const d = driven();
+  d.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
+  d.unread.add('ae/t-2/1');
+  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }, { name: 'ae/t-2/1', harness: 'fake' }];
+  const o = await Effect.runPromise(d.runner.observeFor!(expected));
+  assert.deepEqual([...o.seen.keys()], ['ae/t-1/1']);
+  assert.deepEqual(o.unread, new Set(['ae/t-2/1']), 'an unread name crosses the seam as unread, not as a session gone');
 });
 
 test("find, logs and release through the seam answer as the driver does, and the driver is asked with the engine's keys", async () => {

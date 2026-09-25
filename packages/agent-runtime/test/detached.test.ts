@@ -16,7 +16,7 @@ import { trustedProjects } from '../src/runner-codex.ts';
 import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
-import { testOps } from '../src/runner.ts';
+import { RunnerError, testOps } from '../src/runner.ts';
 import type { SessionState, Sighting } from '../src/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
 
@@ -542,7 +542,7 @@ test('the composite tells each harness only the sessions routed to it, and lists
   const told: Record<string, string[]> = {};
   const telling = (name: string, sessions: Map<string, Sighting>) => ({
     ...testOps({ sessions }),
-    observeFor: (expected: readonly { name: string }[]) => Effect.sync(() => { told[name] = expected.map((e) => e.name); return new Map(sessions); }),
+    observeFor: (expected: readonly { name: string }[]) => Effect.sync(() => { told[name] = expected.map((e) => e.name); return { seen: new Map(sessions), unread: new Set<string>() }; }),
   });
   const plain = new Map<string, Sighting>([['ae/z/1', { sessionId: 's-c', state: 'working' }]]);
   const ops = composite({ alpha: telling('alpha', a), beta: telling('beta', b), gamma: testOps({ sessions: plain }) }, 'alpha');
@@ -552,9 +552,25 @@ test('the composite tells each harness only the sessions routed to it, and lists
     { name: 'ae/w/1' }, { name: 'ae/v/1', harness: 'gone' },
   ]));
   assert.deepEqual(told, { alpha: ['ae/x/1', 'ae/w/1', 'ae/v/1'], beta: ['ae/y/1'] }, 'no harness, or one not here, is the fallback, where its spawn went');
-  assert.deepEqual([...merged.keys()].sort(), ['ae/x/1', 'ae/y/1', 'ae/z/1'], 'a harness without the verb is observed all the same');
+  assert.deepEqual([...merged.seen.keys()].sort(), ['ae/x/1', 'ae/y/1', 'ae/z/1'], 'a harness without the verb is observed all the same');
+  assert.deepEqual(merged.unread, new Set());
   await Effect.runPromise(ops.stop('s-b'));
   assert.equal(b.get('ae/y/1')?.state, 'canceled', 'and who owns what is learned from it, as from observe');
+});
+
+test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {
+  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+  const failing = (verb: string) => Effect.fail(new RunnerError({ verb, message: 'claude agents: timed out' }));
+  const broken = { ...testOps({ sessions: new Map() }), observe: failing('observe'), observeFor: () => failing('observeFor') };
+  const plain = { ...testOps({ sessions: new Map() }), observe: failing('observe') };
+  const ops = composite({ alpha: testOps({ sessions: a }), beta: broken, gamma: plain }, 'alpha');
+
+  const o = await Effect.runPromise(ops.observeFor!([
+    { name: 'ae/x/1', harness: 'alpha' }, { name: 'ae/w/1', harness: 'alpha' }, { name: 'ae/y/1', harness: 'beta' }, { name: 'ae/z/1', harness: 'gamma' },
+  ]));
+  assert.deepEqual([...o.seen.keys()], ['ae/x/1'], 'the harnesses that answered still arrive');
+  assert.deepEqual(o.unread, new Set(['ae/y/1', 'ae/z/1']), 'each unread harness leaves its own names unread, by either verb; one that answered leaves none');
+  assert.deepEqual([...(await Effect.runPromise(ops.observe)).keys()], ['ae/x/1'], 'a full listing reads an unread harness as nothing, as views do');
 });
 
 test('the composite routes stop to whichever harness owns that session', async () => {

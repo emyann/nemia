@@ -34,7 +34,8 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
   canceled: { state: 'canceled' },
 };
 
-const corpus = (): Case[] => corpusOf(SIGHTINGS);
+// And a pass that could not read the harness, as well as every sighting it can read.
+const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true });
 
 /** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
 const journalled = (action: Action, ms: number): Event[] => {
@@ -197,4 +198,57 @@ test("the README's lifecycle diagram is the machine's, generated", () => {
   assert.ok(block, 'the README holds the diagram between its markers');
   assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/lifecycle.ts\').then((m) => console.log(m.diagram()))"');
   assert.notEqual(diagram(machineWithout('working', 'LOST')), diagram(), 'the pin sees an edge taken away');
+});
+
+test('UNREAD: a pass that could not read the harness does nothing to an attempt in flight, past its grace too, and never reads it lost', () => {
+  const unread = new Set([nameFor(TASK, 1)]);
+  const state = fold(TASK, JOURNALS.spawned!);
+  for (const ms of [2 * S, 45 * S, 3600 * S]) {
+    const now = { at: new Date(T0.getTime() + ms), graceMs: 30_000, unread };
+    assert.deepEqual(observe(state, new Map(), now), { type: 'UNREAD', attempt: 1, overdue: false });
+    assert.deepEqual(decide(state, new Map(), now), { do: 'nothing', why: 'its harness could not be read this pass' });
+  }
+  // Read, and not there: the grace still tells a late registration from a session gone.
+  assert.deepEqual(observe(state, new Map(), { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000 }), { type: 'LOST', attempt: 1 });
+  // Another task's name unread says nothing of this one.
+  assert.deepEqual(observe(state, new Map(), { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000, unread: new Set([nameFor('t-2', 1)]) }), { type: 'LOST', attempt: 1 });
+  // Past its deadline, the deadline ends it, as it does a session nobody sees.
+  const timed = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1)]);
+  const past = { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000, unread };
+  assert.deepEqual(decide(timed, new Map(), past), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'deadline', nativeId: undefined, closeout: undefined });
+});
+
+test("UNREAD in `stopping`: a person's stop waits for a read before the deadline, and ends the attempt once it has passed, so the stop is bounded", () => {
+  const unread = new Set([nameFor(TASK, 1)]);
+  const stop = { kind: 'stop-requested', at: at(2 * S) } as const;
+  const untimed = fold(TASK, [filed(), starting(1), spawned(1), stop]);
+  const timed = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1), stop]);
+  const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
+  assert.equal(lifecycleOf(timed), 'stopping');
+  assert.deepEqual(decide(untimed, new Map(), read(3600 * S)), { do: 'nothing', why: 'its harness could not be read this pass' }, 'no deadline: it waits for a read');
+  assert.deepEqual(decide(timed, new Map(), read(30 * S)), { do: 'nothing', why: 'its harness could not be read this pass' }, 'before the deadline: it waits');
+  const cut = { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'stopped', reason: 'operator', nativeId: undefined, closeout: undefined };
+  assert.deepEqual(decide(timed, new Map(), read(45 * S)), cut, 'past the deadline: cut as a lost one is');
+  assert.deepEqual(transition('stopping', { type: 'UNREAD', attempt: 1, overdue: true }), { to: 'stopping', action: cut });
+  assert.deepEqual(transition('stopping', { type: 'UNREAD', attempt: 1, overdue: false }), { to: 'stopping', action: { do: 'nothing', why: 'its harness could not be read this pass' } });
+  // What the cut then leads to: nothing open, and the stop settles the task, as ever.
+  const after = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1), stop, ...journalled(cut as Action, 45 * S)]);
+  assert.deepEqual(decide(after, new Map(), read(46 * S)), { do: 'settle', outcome: 'stopped', note: 'operator' });
+});
+
+test('UNREAD before the missing spawn: an intent with no spawn on the record whose harness could not be read is neither spawned again nor cut by a stop, until a read or its deadline', () => {
+  const unread = new Set([nameFor(TASK, 1)]);
+  const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
+  const nothing = { do: 'nothing', why: 'its harness could not be read this pass' };
+  // A crash between the spawn and its entry: a session may run under the name, which an unread harness cannot rule out.
+  const intent = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1)]);
+  assert.equal(lifecycleOf(intent), 'starting');
+  assert.deepEqual(observe(intent, new Map(), read(2 * S)), { type: 'UNREAD', attempt: 1, overdue: false });
+  assert.deepEqual(decide(intent, new Map(), read(2 * S)), nothing, 'not spawned a second time');
+  assert.deepEqual(decide(intent, new Map(), { at: new Date(T0.getTime() + 2 * S), graceMs: 30_000 }), { do: 'spawn', attempt: 1, name: nameFor(TASK, 1) }, 'read, and not there: spawned');
+  assert.deepEqual(decide(intent, new Map(), read(45 * S)).do, 'record-end', 'the deadline, read first, still ends it');
+  // A person's stop on it waits for a read as a spawned one does, and is cut once the deadline has passed.
+  const stopped = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), { kind: 'stop-requested', at: at(2 * S) }]);
+  assert.deepEqual(decide(stopped, new Map(), read(30 * S)), nothing, 'not cut on a read that failed');
+  assert.deepEqual(decide(stopped, new Map(), read(45 * S)), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'stopped', reason: 'operator', nativeId: undefined, closeout: undefined });
 });

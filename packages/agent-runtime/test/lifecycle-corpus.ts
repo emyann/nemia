@@ -58,13 +58,21 @@ export const JOURNALS: Record<string, Event[]> = {
 export const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
 export const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as const;
 
-export type Case = { name: string; events: Event[]; observed: Map<string, Sighting>; now: { at: Date; graceMs: number } };
+/** The corpus's name for a pass that could not read the last attempt's harness. */
+const UNREAD = 'unread';
 
-/** Every journal shape, under every deadline, sighting and time: `sightings` keyed by the name a case takes. */
-export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>): Case[] => Object.entries(JOURNALS).flatMap(([j, base]) =>
-  Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) => Object.entries(SIGHTINGS).flatMap(([s, sighting]) => Object.entries(TIMES).map(([t, ms]) => {
+export type Case = { name: string; events: Event[]; observed: Map<string, Sighting>; now: { at: Date; graceMs: number; unread?: ReadonlySet<string> } };
+
+/**
+ * Every journal shape, under every deadline, sighting and time: `sightings` keyed by the name a case takes. With `unread`, one
+ * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`, 2026-09-25). Asked
+ * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded.
+ */
+export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>, options: { unread?: boolean } = {}): Case[] => Object.entries(JOURNALS).flatMap(([j, base]) =>
+  Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) => [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) => Object.entries(TIMES).map(([t, ms]) => {
     const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
     const last = fold(TASK, events).attempts.at(-1);
     const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);
-    return { name: `${j} · ${d} · ${s} · ${t}`, events, observed, now: { at: new Date(T0.getTime() + ms), graceMs: 30_000 } };
+    const unread = s === UNREAD && last ? { unread: new Set([nameFor(TASK, last.n)]) } : {};
+    return { name: `${j} · ${d} · ${s} · ${t}`, events, observed, now: { at: new Date(T0.getTime() + ms), graceMs: 30_000, ...unread } };
   }))));

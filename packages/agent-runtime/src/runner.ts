@@ -105,6 +105,15 @@ export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor }
 export type ExpectedSession = { name: string; harness?: string };
 
 /**
+ * What a look told what to expect saw (`observeFor`): the sessions it listed, by name, and the names expected of it that it could
+ * not look for this time — a harness, or one mode of it, whose read failed (`claude agents` timing out, the registry busy). A name
+ * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
+ * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
+ * an absence (2026-09-25).
+ */
+export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string> };
+
+/**
  * The seam itself, as a plain value.
  *
  * Four verbs. A harness that cannot do one of them is not a harness this engine can drive, and a
@@ -126,8 +135,13 @@ export type RunnerOps = {
    * observed in full. Told names, never asked for them: the pass reads them off the journal on every pass, so a session
    * started before a restart is expected on the first pass after it. `harness` is the harness the task was filed on, for
    * a runner that routes (`composite`), and read by no other.
+   *
+   * Answers what it listed and what it could not read (`Observation`): a runner that reads in parts — several harnesses,
+   * or Claude Code's jobs and its registry — says which expected names a failed part left unread, and fails as a whole only
+   * when it read nothing. `observe` keeps its Map: a full listing is read by views and verbs, where an unread harness is
+   * nothing observed, and by no rule that ends or forgets on an absence.
    */
-  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Map<string, Sighting>, RunnerError>;
+  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Observation, RunnerError>;
   /**
    * The one session running under `name`, found without observing every other: which session it is, and nothing of
    * its state. Optional — for a harness that can answer by name for less than `observe` costs (Claude Code: the
@@ -410,12 +424,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
       // lists above are, and a deny still beats it.
       ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
-      // Remote Control, only when the task asks: the session bridged to claude.ai and listed in its agents view, where it
-      // can be driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this
-      // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt
-      // taken as its name — so it goes here, where the `--permission-mode` that always follows cannot be taken for one.
-      ...(r.config?.remoteControl ? ['--remote-control'] : []),
-      // The caller's own flags (`config.claude`), as a job is given them: after the variadic lists, before the mode.
+      // The caller's own flags (`config.claude`), after the variadic lists and before the mode. Remote Control among them, only
+      // when the task asks (`claude.remoteControl`): the session bridged to claude.ai and listed in its agents view, where it can be
+      // driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag (measured on
+      // 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt taken as its name — and here
+      // the `--permission-mode` that always follows cannot be taken for one.
       ...claudeFlagsOf(r.config?.claude),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first

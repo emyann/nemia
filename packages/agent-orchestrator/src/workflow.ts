@@ -155,7 +155,7 @@ export type Workflow = {
    */
   denials?: 'fail';
   /**
-   * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
+   * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's `--remote-control`, filed as `config.claude.remoteControl` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
    * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
    * `wf start` on a harness the engine has no such flag for, and on `claude` without `background: true`: only Claude Code's background

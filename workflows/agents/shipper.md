@@ -4,8 +4,8 @@ card: shipper.skills.json
 skills: trial-merge-a-branch, say-why-it-aborted
 harness: claude
 model: opus
-# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
-# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). An ending follows a script: a merge staged, and a message for it.
+# Said here, or the session takes Claude Code's default: a job reads no user settings (F24 in docs/spike-2026-09-25-agents-skills.md),
+# and before it did, it took the effort of whoever ran the daemon (`xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). An ending follows a script: a merge staged, and a message for it.
 effort: medium
 # The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-runtime open issue 26).
 context: 200k

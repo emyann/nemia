@@ -100,7 +100,8 @@ fails with it out of either (a runner built with `Runner.of` through `file`, and
 **What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
 window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;
-`remoteControl: true` on a `HarnessSpec`; `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
+`claude.remoteControl`, and every other flag under `claude`, on `codex` or a `check` (Claude Code's own `-p` specs refuse
+the bridge there since 2026-09-25, `claudePrintRefuses`); `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
 that an unknown harness and a bad mode are still journalled there, so the day this moves, that test says so.
 
 The issue used to say `RunnerOps` has no verb for this, and so it would be a value passed to `file`. The first half is
@@ -349,7 +350,7 @@ until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read o
 and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
 run's first step waiting for as long as it lasts.
 
-### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
+### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
 (`claudeOps` in `agent-runtime/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
@@ -360,6 +361,12 @@ harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and
 the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
 retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
 `test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
+
+**What changed again** (2026-09-25). The bridge is Claude Code's own flag, `config.claude.remoteControl`, no harness argument
+of its own: the runtime grows no named field per harness flag. `config.remoteControl` is refused at both doors at any value,
+naming the new place (`FORMER_ARGS`), and a journal filed before reads as filed under `claude` (`upgrade`). The argv did not
+move (`packages/agent-orchestrator/test/argv.test.ts`, recorded before). In the bag it could reach a `claude -p` spec at the Effect
+door, which the named key never did, so `claudeJob` and `claudeDetached` refuse it there (`claudePrintRefuses`).
 
 **What is left.**
 
@@ -372,9 +379,9 @@ retry, and never for a task without it; `test/engine.test.ts`: carried to every 
   told.
 - **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
   drops a released session at once was not looked at.
-- **The Effect door refuses no harness's words** (issue 6): it refuses a `remoteControl` that is not true or false, and a
-  `remoteControl: true` that reaches `codex` or `claude-detached` through it is dropped without a word.
-- **Not a brief key**, and agent-orchestrator files none yet: a step key (`remote:`, features.md §2) is a run of its own.
+- **The Effect door refuses no harness's words** (issue 6): it refuses a `claude.remoteControl` the bag refuses of any flag
+  (`false`, `''`), and one on `claude-detached` (since 2026-09-25); one that reaches `codex` or a `check` through it is dropped without a word.
+- **Not a brief key.** agent-orchestrator files it for a step that says `remote: true` (features.md §2).
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
   fails the day the control is bridged without it, or the flagged session is not.
@@ -854,6 +861,36 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **What bounds it.** For a crash, the window is one request long, at most `REQUEST_MS`; for a slow agent it is every
   try. Either way the attempt is read `lost`, so the task fails as any lost attempt does, and a person or the orchestrator
   tries again; the orphan's cost is the other party's.
+
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day, three gaps left)
+
+The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
+pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
+release the harness had refused was never asked again; and an attempt past its grace read `LOST`, so one unread pass ended a live
+session's attempt `failed`. **Fixed for the pass:** `observeFor` answers an `Observation`, `{ seen, unread }`; a harness that fails
+leaves the names routed to it unread, and Claude Code only those the failed read could have listed (its jobs are read apart from
+its registry). `decide` reads an unread name as `UNREAD` — nothing in `working`, where the deadline, read first, still ends it; nothing in
+`starting`, where it is read before the missing spawn, so an intent a crash left with a session under its name is not spawned twice
+(found in review); in `stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
+finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
+`wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
+`test/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
+
+- **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
+  harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
+  is written. `list`, `viewsOf` and `viewOf` catch the failure to an empty map, as before.
+- **A harness never read again holds its tasks in flight until their deadline.** `UNREAD` ends nothing, by design, so a task with
+  no deadline on a harness that is gone for good waits for ever, where before it failed `lost` 30 s after its spawn. A person's
+  stop on such a task without a deadline waits too. The board shows it working; `wf up --stats` shows the harness's unread count.
+- **The deadline ends an unread attempt without stopping what may run under it.** Past its deadline, an attempt whose harness could
+  not be read gets `DEADLINE_PASSED` with no sighting, so `live` is false and the edge records the end, `failed`, `deadline`, with no
+  `stop`: the session was unread, not gone. A `--bg` session is let go by `release` on the next pass that reads it, since the memo
+  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`runner-claude-code.ts`), so a job past
+  its deadline on a pass that could not read it runs on to its own end, in its worktree, after its attempt is recorded ended. This
+  predates the change (a failed read was an empty map, and read the same). Neither fix is small: a stop needs the session's id, which
+  for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
+  to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
+  gap above already leaves too wide. Found in review of the run that made a failed observe say so.
 
 ## Verified live, once
 

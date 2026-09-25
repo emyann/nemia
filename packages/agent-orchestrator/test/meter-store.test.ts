@@ -33,15 +33,16 @@ const busy = (ms: number) => { const until = performance.now() + ms; while (perf
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
  * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
  * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word.
+ * `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a runtime that counts none.
  */
-const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0, queued = [] as string[], admitMs = 0 } = {}) => {
+const fake = ({ passMs = 0, observeMs = 0, withIo = true, ioMs = 0, queued = [] as string[], admitMs = 0, unread = undefined as number | undefined } = {}) => {
   const admitted: string[][] = [];
-  const io = { bytesRead: 0, reads: 0, spawned: 0, observed: {} as Record<string, { calls: number; ms: number; listed: number; spawned: number }> };
+  const io = { bytesRead: 0, reads: 0, spawned: 0, observed: {} as Record<string, { calls: number; ms: number; listed: number; spawned: number; unread?: number }> };
   const e = {
     tick: async () => {
       busy(passMs);
       const o = io.observed.claude ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
-      io.observed.claude = { calls: o.calls + 1, ms: o.ms + observeMs, listed: o.listed + 4, spawned: o.spawned + 1 };
+      io.observed.claude = { calls: o.calls + 1, ms: o.ms + observeMs, listed: o.listed + 4, spawned: o.spawned + 1, ...(unread !== undefined ? { unread: (o.unread ?? 0) + unread } : {}) };
       io.spawned += 1;
       io.bytesRead += 1000;
       io.reads += 2;
@@ -140,6 +141,11 @@ test('a harness\'s observe is moved out of the runtime\'s pass into observe, and
   const { cost } = await tick(fake({ passMs: 30, observeMs: 20 }));
   assert.ok(cost);
   assert.deepEqual(cost.harnesses, { claude: { calls: 1, ms: 20, listed: 4, spawned: 1 } });
+  // What could not be read is counted per pass, and said only when there was some.
+  const e = fake({ observeMs: 20, unread: 1 });
+  assert.equal((await tick(e)).cost!.harnesses.claude!.unread, 1, 'an observe that could not read its harness');
+  assert.equal((await tick(e)).cost!.harnesses.claude!.unread, 1, 'counted for the pass, not the running total');
+  assert.equal(Object.hasOwn((await tick(fake({ unread: 0 }))).cost!.harnesses.claude!, 'unread'), false, 'none unread, nothing said');
   assert.equal(cost.phases.observe.ms, 20, 'the observe\'s time, as the runtime reported it');
   assert.equal(cost.phases.observe.calls, 1);
   assert.equal(cost.phases.observe.spawned, 1, 'the process the observe started is observe\'s');

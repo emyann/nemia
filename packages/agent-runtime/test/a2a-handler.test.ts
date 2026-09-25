@@ -31,6 +31,7 @@ const harness = (o: {
   bare?: boolean; noFind?: boolean;
 } = {}) => {
   const sessions = new Map<string, Sighting>();
+  const unread = new Set<string>();
   const asked: Array<[string, unknown]> = [];
   const journal = new Map<string, Event[]>();
   let n = 0;
@@ -76,7 +77,9 @@ const harness = (o: {
       // Told what is expected, it lists those alone: what a driver that reads less when told looks like.
       observeFor: (expected: readonly ExpectedSession[]) => Effect.suspend(() => {
         asked.push(['observeFor', expected]);
-        return Effect.succeed(new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))));
+        // A name it was told to leave unread (`unread`), as a driver whose registry could not be read leaves one.
+        const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
+        return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
       }),
       transcript: (sessionId: string, after?: string) => Effect.suspend(() => {
         asked.push(['transcript', [sessionId, after]]);
@@ -92,7 +95,7 @@ const harness = (o: {
   const handler = new HarnessHandler('fake', ops, async (id) => journal.get(id) ?? []);
   /** What the harness was asked, reads left out. */
   const acted = () => asked.filter(([verb]) => verb !== 'observe');
-  return { handler, sessions, asked, acted, journal };
+  return { handler, sessions, unread, asked, acted, journal };
 };
 
 const spawn = (name = 'ae/t-1/1', change: Partial<Message> = {}, configuration: SendMessageRequest['configuration'] = {
@@ -535,9 +538,20 @@ test('observeSessions hands the driver what is expected, and answers what it lis
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
   h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed' });
   const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
-  const { tasks } = await h.handler.observeSessions({ expected }, ctx);
+  const { tasks, unread } = await h.handler.observeSessions({ expected }, ctx);
   assert.deepEqual(tasks.map((t) => [t.id, t.status!.state]), [['ae/t-1/1', TaskState.TASK_STATE_WORKING]]);
+  assert.deepEqual(unread, []);
   assert.deepEqual(h.acted(), [['observeFor', expected]]);
+});
+
+test('observeSessions answers the names the driver could not read, beside the Tasks it listed', async () => {
+  const h = harness();
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
+  h.unread.add('ae/t-2/1');
+  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }, { name: 'ae/t-2/1', harness: 'fake' }];
+  const answered = await h.handler.observeSessions({ expected }, ctx);
+  assert.deepEqual(answered.tasks.map((t) => t.id), ['ae/t-1/1']);
+  assert.deepEqual(answered.unread, ['ae/t-2/1']);
 });
 
 test('REFUSED: observeSessions on a driver without the verb, and with a list that names no session', async () => {

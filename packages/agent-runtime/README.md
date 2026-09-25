@@ -42,10 +42,17 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `remoteControl`, `worktree`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
+
+**No named field per harness flag** (the owner, 2026-09-25). A flag only Claude Code has goes under `claude`; a key is named
+on `HarnessArgs` only when more than one harness is given it (the model, the effort, the tools, the fence, `mcp`, the budget),
+another harness translates it (`worktree`, which Codex turns into a worktree of its own and the A2A release carries), a spec
+declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
+into the bag is read at its old place off a journal (`upgrade` in `src/journal.ts`) and refused there at both doors, naming
+the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
 
 ### One attempt per start
 
@@ -148,6 +155,7 @@ stateDiagram-v2
   starting --> starting: DEADLINE_PASSED [live] / stop
   starting --> ending: DEADLINE_PASSED / record-end
   starting --> working: UNSPAWNED / spawn
+  starting --> starting: UNREAD / nothing
   starting --> ending: SPAWN_REFUSED / record-end
   working --> working: SESSION_LIVE / nothing
   working --> working: SESSION_BLOCKED / nothing
@@ -159,6 +167,7 @@ stateDiagram-v2
   working --> working: DEADLINE_PASSED [live] / stop
   working --> ending: DEADLINE_PASSED / record-end
   working --> working: UNSEEN_IN_GRACE / nothing
+  working --> working: UNREAD / nothing
   working --> ending: LOST / record-end
   input_required --> input_required: AWAITING_INPUT / nothing
   stopping --> stopping: SESSION_LIVE / stop
@@ -169,6 +178,8 @@ stateDiagram-v2
   stopping --> stopping: UNSPAWNED / record-end
   stopping --> stopping: UNSEEN_IN_GRACE / record-end
   stopping --> stopping: LOST / record-end
+  stopping --> stopping: UNREAD [overdue] / record-end
+  stopping --> stopping: UNREAD / nothing
   stopping --> canceled: NOTHING_OPEN / settle
   ending --> completed: CLOSED [lastDone] / settle
   ending --> failed: CLOSED / settle
@@ -183,7 +194,12 @@ stateDiagram-v2
 <!-- lifecycle:end -->
 
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
-still running is stopped rather than ended; `lastDone`, `endedDone` and `endedStopped`, the end a task settles on. XState
+still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
+the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
+end a task settles on. `UNREAD` is a pass that could not read the attempt's harness (`Observation.unread`): nothing is
+known of the session, so nothing is done in `working` — where the deadline, read first, still ends it — and it never
+counts toward `LOST`; in `starting` it is read before the missing spawn, so an intent a crash left with a session running
+under its name is neither spawned a second time nor cut until a pass reads the harness. XState
 is a dependency of this package alone, imported by `src/lifecycle.ts` alone (`test/xstate-boundary.test.ts`), and no
 entry exports the machine, as none exports `decide`.
 
@@ -659,6 +675,25 @@ operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 
+### Settings: the checkout's, never the operator's
+
+A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project,local` (`claudePrintFlags`). It reads the
+`.claude/settings.json` and `.claude/settings.local.json` of its `cwd`, and nothing of the operator's `~/.claude/settings.json`: not their
+default mode, allow and deny rules, `additionalDirectories`, enabled plugins, `~/.claude/skills`, hooks, `statusLine`, `outputStyle`, `model`,
+`effortLevel`, `env`, `attribution` or `autoMode` profile. So a job does the same whoever runs the engine, and an agent's own skills do
+not share Claude Code's 8,000-character skill listing with a person's (the owner's decision of 2026-09-25). What the runtime gives on the
+command line still reaches it: `--permission-mode`, `--tools`, the allow and deny lists, `--mcp-config`, and `config.claude`'s `--settings`
+and `--plugin-dir`. Claude Code's auto memory still loads; it is keyed by the repository.
+
+A project's allow rules hold only in a directory Claude Code trusts. A worktree is trusted as its repository is. A setting a job needs goes in
+the checkout's settings or on the task, never in `~/.claude/settings.json`. For instance, a repository whose commits carry no
+`Co-Authored-By` trailer says `attribution` in its own `.claude/settings.json`. Measured on 2.1.282:
+`../../docs/spike-2026-09-25-agents-skills.md`, F24.
+
+`settingSources` is on `CLAUDE_OWNED_FLAGS`, so `config.claude` cannot give it again. A background session (`config.background`,
+`claude --bg`) is not given the flag and reads the operator's settings as before: a job is what was measured, and the supervisor, which
+runs as a background session, is a session a person may attach to. `test/claude-code.test.ts` holds both.
+
 ## What a session may spend: `budgetUsd`
 
 `config: { budgetUsd: 0.25 }` is the most one attempt's session may spend, in dollars: a harness argument like `tools`,
@@ -724,43 +759,48 @@ the `cost-state` Claude Code writes as it exits, which counts the summary's call
 
 `ae start` takes `contextTokens: 200000` in a brief, digits only, and `ae show` prints it.
 
-## Reachable from a phone: `remoteControl`
+## Reachable from a phone: `claude.remoteControl`
 
-`remoteControl: true` bridges a task's Claude Code session to claude.ai: `claude --bg` is given `--remote-control`, and
-the session is listed in the web's agents view, where it can be **driven** — typed into, its prompts answered, stopped —
-from a browser or a phone, by anyone signed in to the account, and not only seen. That is why it is never a default. A
-field on the task, carried on the `filed` event and `State`, read only by the Claude runner, on every attempt's spawn;
-`decide` never reads it. The Kubernetes neighbour is a container's `stdin` and `tty`: whether anything may attach to the
-workload, declared on the workload.
+`config: { background: true, claude: { remoteControl: true } }` bridges a task's Claude Code session to claude.ai: `claude --bg`
+is given `--remote-control`, and the session is listed in the web's agents view, where it can be **driven** — typed into, its
+prompts answered, stopped — from a browser or a phone, by anyone signed in to the account, and not only seen. That is why it is
+never a default. Claude Code's own flag, among its others under `claude` (below), carried on the `filed` event and `State`, read
+only by the Claude runner, on every attempt's spawn; `decide` never reads it. The Kubernetes neighbour is a container's `stdin`
+and `tty`: whether anything may attach to the workload, declared on the workload.
 
-| harness | `remoteControl: true` |
+| harness | `claude.remoteControl` |
 |---|---|
 | `claude` with `background: true` | `--remote-control`, on every attempt |
 | `claude`, a job | refused at `file()`: file it with `background: true`, since a job runs a prompt and exits |
-| `claude-detached` | refused at `file()`: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
+| `claude-detached` | refused at `file()`, and by its spec at the Effect door: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
 | `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
-| a `PromiseRunner` | asked nothing: handed `remoteControl` on the spawn, to honour or not |
+| a `PromiseRunner` | asked nothing: handed `claude.remoteControl` on the spawn, to honour or not |
+
+**It was a harness argument of its own until 2026-09-25**, `config.remoteControl`. That place is refused at both doors, at any
+value, `false` included, at the top level too, naming the new one (`FORMER_ARGS` in `src/harness-args.ts`), and a journal
+filed before reads as filed under `claude` (`upgrade` in `src/journal.ts`): `true` as the flag, first in the bag, and `false`,
+which asked for nothing, dropped. Nothing on disk is rewritten. The argv did not move: `packages/agent-orchestrator/test/argv.test.ts`
+pins what the shipped supervisor and dev's implement are spawned with, recorded before the move.
 
 **Measured before it was built** (2026-09-16, Claude Code 2.1.273, three throwaway haiku sessions): a `claude --bg`
 session is listed in the agents view only when its registration under `~/.claude/sessions/` carries a
 `bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appeared, from a
 clean environment or from a daemon's. A worker of 2.1.266 carried one unasked, so Claude Code used to bridge background
-sessions on its own. **Measured again under the engine** by `test/live.test.ts` (2.1.274): a session filed with
-`remoteControl: true` registered with a `bridgeSessionId`, and an identical one filed without it registered with none.
+sessions on its own. **Measured again under the engine** by `test/live.test.ts` (2.1.274): a session filed bridged
+registered with a `bridgeSessionId`, and an identical one filed without it registered with none.
 
 **`--remote-control [name]` takes an optional value** — the `--worktree` trap: directly before the prompt, it would take
-the prompt as the session's name. So it goes before `--permission-mode`, which always follows, and no name is given;
-Claude Code names the session itself. `remoteControl: false` asks for nothing and is filed on any harness; a value that
-is not true or false is refused. It is not a key a brief has. What it leaves open — nothing reads whether a session was
-bridged, and what a person types into it from the web is not journalled — is open issue 23.
+the prompt as the session's name. The bag goes before `--permission-mode`, which always follows, so `true` names nothing and
+Claude Code names the session itself; a string is the name. It is not a key a brief has. What it leaves open — nothing reads
+whether a session was bridged, and what a person types into it from the web is not journalled — is open issue 23.
 
 ## Claude Code's own flags: `claude`
 
 `config: { claude: { appendSystemPromptFile: '/…/prompt.md', pluginDir: ['/…/hkb-note'] } }` hands Claude Code flags as they
 are written: a key is the long flag in camelCase (`--append-system-prompt-file`), `true` the flag alone, a string or a number
 the flag and its value, and a list the flag once per entry. They go after the variadic lists and directly before
-`--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The four
-agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings` — are typed
+`--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The five
+agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings`, and `remoteControl` (above) — are typed
 (`ClaudeFlags`), and any other the CLI has is taken. It is how an agent's body reaches the system prompt and its skills a
 plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
 
@@ -1285,8 +1325,8 @@ could not say whether a result was an error. What the records do not give, and s
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
 `claude agents`, and a registry that cannot be read does not stop it. An attempt in flight is found by
 name when its task's harness can `find` it — for Claude Code, from the session's registration, with no `claude
-agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed,
-as a pass counts it. So does a session not started yet: no events, and the cursor asked with (or one from
+agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed
+here: a view is read again. A pass, which acts on what it reads, does not count it so (`observeFor`, below). So does a session not started yet: no events, and the cursor asked with (or one from
 the start). Neither is a refusal: ask again.
 
 **Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a harness
@@ -1466,6 +1506,16 @@ before jobs were the default, or a job whose run file is gone. So a pass with on
 background sessions spawns one (measured at 0.2-0.4 s a call, 2026-09-25). Nothing is remembered of what a pass did: `expected` is read
 off the journal and the last observation, so a session started before a restart is expected on the first pass after it. The composite tells each harness the names
 routed to it, as a spawn is routed, and observes a harness without the verb in full.
+
+`observeFor` answers an `Observation`: the sessions it listed (`seen`), and the names expected that it could not read (`unread`). A
+harness whose read fails — `claude agents` timing out, a directory that cannot be listed — leaves every name routed to it unread, and
+the composite still merges what the others listed; Claude Code, which reads its jobs and its registry apart, leaves unread only the names
+the failed read could have listed. A name unread is neither there nor gone, and the pass reads it so (since 2026-09-25; before, a failed
+read was an empty listing): its attempt is not counted toward `lost` (`UNREAD` in the lifecycle — a person's stop is cut once the deadline
+has passed), and a settled task whose finished session was listed stays looked for, so a release the harness refused is asked again on the
+next pass that reads it. A harness's `unread` crosses the A2A seam beside its Tasks (`observeSessions`), and each observe that left
+something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
+reads an unread harness as nothing.
 
 What a blocked session waits for is the harness's own word, carried and never judged: Claude Code prints
 `waitingFor: 'permission prompt'` beside `state: 'blocked'`, `observe` puts it on the sighting, and `view` puts it

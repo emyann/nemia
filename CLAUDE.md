@@ -486,6 +486,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   either. A command on Claude Code's own read-only list (`git merge-base`) still ran, so the probe half-looked right. A run's worktree
   is trusted as its repository is. Measure a project rule in a checkout Claude Code trusts, or pass the file as `--settings <file>`,
   and read the job's stderr (learned by the run that gave planners and reviewers git's read-only verbs).
+- **A job reads no user-level settings, so what it needs is said in the checkout or on the step.** Since card 4, every `claude -p` the
+  runtime spawns passes `--setting-sources project,local`. A job reads the checkout's `.claude/settings.json` and `settings.local.json`,
+  and nothing of `~/.claude/settings.json`: not its model, effort, allow rules, plugins, skills, hooks or `attribution`. The last was
+  load-bearing. Without the owner's `attribution: {commit: ""}`, Claude Code tells the session to end every commit with `Co-Authored-By`,
+  and only this file's prose kept the trailer off. It is in `.claude/settings.json` now. The ui agents named no `model:` and ran on the
+  owner's `opus[1m]`; they say `opus` now. A hand probe that means to reproduce a job passes the same flag. A rule, model or effort a step
+  needs goes on the step, its agent or the checkout's settings, never in your own. A `--bg` session, the supervisor included, still reads
+  them (learned by agents card 4, F24 in `docs/spike-2026-09-25-agents-skills.md`).
 - **A rule offered for the next run must not name this one.** A step works in `worktrees/<run id>/<step>`, and the harness records a
   denied write by its absolute path, so the first `denials: fail` offer told a person to add `Edit(//…/worktrees/<this id>/implement/notes.md)`,
   which the next run's worktree never matches; its tests used `/tmp/w/notes.md` and passed. `allowRuleOf` writes a path in the step's own
@@ -538,6 +546,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   untyped tests for the old key, read the passing ones too, and check a comparison still fails with a mutant (learned by the run
   that made the harness's arguments one `config`). The runtime refuses the old place at `file` (`argsRefusalOf`), which is how an
   untyped `...(worktree ? { worktree: true } : {})` in its own tests was found at all.
+- **A flag only Claude Code has is filed under `config.claude`, never as a harness argument of its own.** The runtime grows no named
+  field per harness flag (the owner, 2026-09-25). A key stays named on `HarnessArgs` only when more than one harness is given it,
+  another harness translates it (`worktree`), a spec declares it or a layer judges it (`contextTokens`), or it chooses the runtime's
+  own process (`background`). A key moved into the bag is read at its old place off a journal (`upgrade` in `journal.ts`) and refused
+  there at both doors (`FORMER_ARGS` in `harness-args.ts`), at any value, `false` included, so a caller still writing
+  `remoteControl: step.remote` is told where it went. And in the bag a flag reaches every spec that spells the bag out, `claude -p`
+  ones included, where the named key reached only `--bg`: a flag a job cannot take is refused by the job's own spec
+  (`claudePrintRefuses`). Pin the argv before a move and compare after (`agent-orchestrator/test/argv.test.ts`; learned by the run
+  that moved `remoteControl`).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages are the main checkout's, hardlinked file by file into directories of the
@@ -757,6 +774,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **The runtime's `io().reads` counts every file it reads, not only journals.** A look at Codex, check or claude-detached reads every run
   file the harness ever wrote (871 on the live store on 2026-09-25): they have no `observeFor`. A measurement labelled *journals* off
   `io().reads` counts those too; with a task in flight, the api's poll read 643 files and about 25 journals (same run).
+- **An absence read off a failed look is not an absence.** The composite and Claude Code's `observeFor` caught a registry that could not
+  be read to an empty map, and the pass read the empty map as every session gone: the tick memo stopped looking for a finished session
+  whose release the harness had refused, and an attempt past its grace was ended `lost` on one unread pass. `observeFor` answers
+  `{ seen, unread }` now, and the pass reads an unread name as neither there nor gone (`UNREAD` in the lifecycle, `releaseFinished`'s
+  `listed`). A new harness, or a new way to list one, says which names a failed read left unread and fails whole only when it read
+  nothing; a fake that fails whole, through the composite, is the test (`flakyHarness` in `agent-runtime/test/engine.test.ts`). The
+  full `observe` and every view still read a failed harness as nothing (runtime open issue 35; learned by the run that made a failed
+  observe say so).
 
 ## Rules the code keeps
 

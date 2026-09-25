@@ -114,9 +114,10 @@ export interface SessionMethods {
   /**
    * The sessions the harness lists, each a Task as `listTasks` gives it, told which ones the journal expects: every one of
    * those it lists, and whatever else it lists for no more (`RunnerOps.observeFor`). Answered whole, on no page: its caller
-   * is a pass in this process, which reads every task at once.
+   * is a pass in this process, which reads every task at once. `unread` is every expected name the driver could not look for
+   * this time (`Observation`): neither listed nor gone.
    */
-  observeSessions(params: { expected: readonly ExpectedSession[] }, context: ServerCallContext): Promise<{ tasks: Task[] }>;
+  observeSessions(params: { expected: readonly ExpectedSession[] }, context: ServerCallContext): Promise<{ tasks: Task[]; unread: string[] }>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -353,15 +354,15 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return this.run(this.ops.transcript(sessionId, params.after));
   }
 
-  async observeSessions(params: { expected: readonly ExpectedSession[] }, _context: ServerCallContext): Promise<{ tasks: Task[] }> {
+  async observeSessions(params: { expected: readonly ExpectedSession[] }, _context: ServerCallContext): Promise<{ tasks: Task[]; unread: string[] }> {
     if (!this.ops.observeFor) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`);
     }
     if (!Array.isArray(params.expected) || !params.expected.every((e) => typeof e?.name === 'string' && nameParts(e.name))) {
       throw new RequestMalformedError('`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.');
     }
-    const listed = await this.run(this.ops.observeFor(params.expected));
-    return { tasks: [...listed].map(([name, s]) => taskOfSighting(name, s)) };
+    const { seen, unread } = await this.run(this.ops.observeFor(params.expected));
+    return { tasks: [...seen].map(([name, s]) => taskOfSighting(name, s)), unread: [...unread] };
   }
 
   async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext): Promise<TaskPushNotificationConfig> {

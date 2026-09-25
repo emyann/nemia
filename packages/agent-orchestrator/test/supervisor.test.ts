@@ -207,7 +207,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
   await advance(e, readRun(run.id));
   assert.deepEqual(filings, [`${run.id}-supervise`], 'filed once, in the repository\'s own checkout');
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, repo);
-  assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.remoteControl, true, 'bridged, as `remote: true` says');
+  assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.claude?.remoteControl, true, 'bridged, as `remote: true` says');
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.contextTokens, 200_000, 'capped, as `context: 200k` says');
 
   for (let n = 1; n <= 5; n++) {

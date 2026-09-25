@@ -443,7 +443,8 @@ is the length of the operator's own agent body.
       stay either way (F15).
 - **Left open.**
   - Whether a style in a project's `.claude/output-styles/` takes a bare name (F16). Only a plugin's style was measured.
-  - Whether a job should read the owner's user-level settings, plugins and skills at all (F9).
+  - ~~Whether a job should read the owner's user-level settings, plugins and skills at all (F9).~~ Card 4: it does not; every job runs
+    with `--setting-sources project,local`, and what that took from the shipped steps is said on them (F24).
   - Whether an edited agent should reach a resumed session. It does not by default, and it would take `--system-prompt-snapshot off` and a cache rewrite (F13).
   - ~~How HKB resolves a name clash between the store's skills and the repository's.~~ Card 1a: the repository's wins, and a name one
     repository has in both `workflows/` and `.claude/` is refused (`lookupRoots` in `agent-orchestrator/src/workflow-store.ts`).
@@ -514,9 +515,74 @@ asks it to load its skill and write the code word into `note.md`. The skill `cod
 *For the design:* the flags reach Claude Code as the spike measured them, from the run's own files: the default is kept, the body follows it,
 and a skill given by `skills:` loads under its plugin's namespace in a `dontAsk` job whose `tools:` allow `Skill`.
 
-## 9. Measured by card 1b (2026-09-25)
+## 9. Measured by card 4 (2026-09-25)
 
-### F24. The shipped agents, their procedures moved into skills, run as they did
+Card 4 runs every job with `--setting-sources project,local` (`claudePrintFlags` in `agent-runtime/src/runner-claude-detached.ts`). Before
+that was trusted, this section measured what a job loses on Claude Code 2.1.282: short `claude -p` probes in the run's own worktree, which
+Claude Code trusts, and one run of `dev-planned`, end to end. The measurement cost $3.76.
+
+### F24. What a job loses without the user's settings, and what a shipped step had depended on
+
+**What the user's settings held.** Only the key names are recorded here, and no value that names the account. `~/.claude/settings.json` holds:
+
+- `model: opus[1m]` and `effortLevel: xhigh`, also under `modelSettings`;
+- `permissions.defaultMode: auto`, and one `allow` rule, for a plugin's own scripts. It has no `deny` rules and no `additionalDirectories`;
+- `enabledPlugins`: `typesafe` and one plugin from the official marketplace;
+- `attribution: { commit: "", pr: "" }`;
+- `autoMode.environment`: 24 lines of a generated profile, mostly *None configured*, which describe another project of the owner's and
+  name the home directory as the trusted repository;
+- `env` (`BROWSER`), `skillOverrides`, and some UI keys.
+
+There are no `hooks`, `statusLine` or `outputStyle`, and no `~/.claude/CLAUDE.md`. `~/.claude/skills` holds three entries, and the synced
+`anthropic-skills:*` come from the account.
+
+**The probes.** Each probe was run once without the flag and once with it (`--output-format stream-json --verbose --permission-prompts none
+--strict-mcp-config --no-chrome --mcp-config .mcp.json`, plus what each row names). The costs are rounded.
+
+| question | without the flag | with `--setting-sources project,local` |
+|---|---|---|
+| the init line (haiku, `dontAsk`) | 29 skills; plugins `typesafe`, `agents-md`, `telemetry` | 19 skills: the eight `anthropic-skills:*`, `archify` and `typesafe:typesafe-ai` are gone; plugins `agents-md`, `telemetry` |
+| the model of a job that names none (the ui agents) | `claude-opus-5-5[1m]` | `claude-opus-5-5`. Both report a 1,000,000-token `contextWindow`, and a step caps it with `--autocompact` all the same |
+| auto memory; `~/.claude/CLAUDE.md` | `memory_paths.auto` set, and `# Memory` in the prompt | the same. There is no user CLAUDE.md to lose |
+| a commit (haiku, `bypassPermissions`, a scratch repository with no CLAUDE.md) | `Add a` | `Add a` + `Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>` |
+| the same commit, the session in this checkout | — | the attribution reminder is in the prompt; the model left the trailer off only because CLAUDE.md says so. With `attribution` in `.claude/settings.json`, no reminder is given at all |
+| trust and the project's allow rules (`dontAsk`) | — | `git log -1` and `node --test …` ran, `npm --version` was denied, and nothing said *Ignoring … permissions.allow* |
+| auto mode writing into the run's `artifacts/implement` (sonnet): Write, and `mkdir -p … && cp …` | both written | both written |
+| card 1a's `--plugin-dir` style and skill, with `--settings '{"outputStyle":"hkb-probe:no-coding"}'` | — | `output_style: hkb-probe:no-coding`, `hkb-probe:probe-skill` listed, `# Doing tasks` gone. Without `--settings` it stays (the control) |
+
+**The run.** One run of `dev-planned`, on a scratch store (`mktemp -d /tmp/card4-live.XXXX`) with this branch's `wf`. The card was *add
+`docs/card4-probe.md`*, and `--repo` was a `git worktree` of the repository on a throwaway branch, so the ship's merge landed there and the
+owner's `main` was never touched. Every attempt's argv carries `--setting-sources project,local`:
+
+| step | agent | model | mode | skills / plugins / MCP | denials | end |
+|---|---|---|---|---|---|---|
+| plan | planner | `claude-opus-5-5` | `dontAsk` | 19 / `agents-md`, `telemetry` / `playwright` | none; ran `git ls-files` | signed off, $0.48 |
+| implement | implementer | `claude-opus-5-5` | `auto` | the same | none; ran `npx turbo run test` and committed | check passed, $0.51 |
+| review | reviewer | `claude-opus-5-5` | `dontAsk` | the same | none; ran `git diff` | signed off, $0.47 |
+| ship | shipper | `claude-opus-5-5` | `auto` | the same | none | the run's check passed and it committed the merge, $0.50 |
+
+No commit carried a trailer. The worktrees were under `/tmp` and trusted, as their repository is. For the baseline, recent runs in the
+owner's store were read while they still read the user's settings: their `dontAsk` roles were already denied compound `cd …; …`, `node -e`
+and piped commands. The user's single allow rule covers none of those, so none is new. `note`, `dev`, `dev-build` and `ui` were not run.
+The `note` roles name their model, mode and `allowedTools:`. `ui` uses the same roles as `dev`, but two of its agents named no model.
+
+**What depended on the user's settings, and where it is said now:**
+
+- **The commit trailer.** Only the user's `attribution` kept Claude Code from asking for one. The repository's `.claude/settings.json` says
+  it now. Another repository a run works on says it in its own settings, or its commits carry the trailer.
+- **The ui agents' model.** `ui-implementer` and `ui-reviewer` named none, so they ran on the user's `opus[1m]`. They say `model: opus` now,
+  as every other role does.
+- **Effort.** Every shipped agent names its `effort:`. A step that names none now gets Claude Code's default rather than `xhigh`.
+
+The mode, tools, allow and deny rules, MCP servers and budget were already passed explicitly, so none of them moved.
+
+*For the design:* a job reads the checkout's `.claude/settings.json` and `settings.local.json` and what the runtime's flags give. It reads
+nothing of `~/.claude/` but auto memory, which Claude Code keys by the repository. A background session (`claude --bg`, the supervisor) is
+not given the flag, and reads the user's settings as before.
+
+## 10. Measured by card 1b (2026-09-25)
+
+### F25. The shipped agents, their procedures moved into skills, run as they did
 
 The live proof card 1b was asked for: `wf start` and `wf up` of this branch (`node packages/agent-orchestrator/bin/wf.ts`), Claude Code
 2.1.282, on a store made for it (`mktemp -d /tmp/wf-1b.XXXX`, `WF_ROOT=<it>/store`), outside every worktree and outside `~/.claude/`.

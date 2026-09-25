@@ -35,7 +35,7 @@ export type { FeedEntry, Cursor, JournalOps } from './journal.ts';
 
 // ─── harnesses: bring your own ──────────────────────────────────────────────
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
-export type { ExpectedSession, McpServer, RunnerOps, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
+export type { ExpectedSession, McpServer, Observation, RunnerOps, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness-args.ts';
 export type { HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';

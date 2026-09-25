@@ -350,6 +350,9 @@ export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): s
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0 ? undefined
     : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
+/** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */
+const ALL_READ: ReadonlySet<string> = new Set();
+
 export const step = Effect.fn('step')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
@@ -357,13 +360,22 @@ export const step = Effect.fn('step')(function* (
   // Typed to take two, and asked all the same: a caller built against the old door still passes the ceiling's slots.
   const refused = stepRefusalOf([...arguments].slice(2));
   if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
+  return yield* stepOn(taskId, observed, ALL_READ);
+});
+
+/** A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not take. */
+const stepOn = Effect.fn('stepOn')(function* (
+  taskId: string,
+  observed: ReadonlyMap<string, Sighting>,
+  unread: ReadonlySet<string>,
+) {
   const journal = yield* Journal;
   const runner = yield* Runner;
 
   const move = yield* Lifecycle;
 
   const state = fold(taskId, yield* journal.read(taskId));
-  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS }, move);
+  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS, unread }, move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -464,9 +476,19 @@ export const settleTask = Effect.fn('settleTask')(function* (
 ) {
   const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
   if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
+  return yield* settleOn(taskId, observed, ALL_READ, maxSteps);
+});
+
+/** `settleTask`, told which names the pass could not read, as `stepOn` is. */
+const settleOn = Effect.fn('settleOn')(function* (
+  taskId: string,
+  observed: ReadonlyMap<string, Sighting>,
+  unread: ReadonlySet<string>,
+  maxSteps: number,
+) {
   const taken: Action[] = [];
   for (let i = 0; i < maxSteps; i++) {
-    const action = yield* step(taskId, observed);
+    const action = yield* stepOn(taskId, observed, unread);
     taken.push(action);
     if (!PROGRESSES.has(action.do)) break;
   }
@@ -493,9 +515,11 @@ export const settleTask = Effect.fn('settleTask')(function* (
  *
  * It reads a task's settling, its config and each attempt's end, session and usage, and no more (`Releasable`): a settled
  * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`, and whether the
- * harness listed a finished session of the task — the memo keeps looking for one it did (`TickMemoState.listed`).
+ * harness listed a finished session of the task — the memo keeps looking for one it did (`TickMemoState.listed`). A finished
+ * session whose harness could not be read this pass (`unread`) counts as listed, released nothing: it may still be there, and
+ * before 2026-09-25 one failed read dropped it from the memo's look, so a release the harness had refused was never asked again.
  */
-const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasable, observed: ReadonlyMap<string, Sighting>) {
+const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
   const runner = yield* Runner;
   const journal = yield* Journal;
   let wrote = false;
@@ -503,8 +527,12 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasabl
   if (!runner.release) return { wrote, listed };
   for (const attempt of state.attempts) {
     const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
-    const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
-    if (!session) continue;
+    const name = nameFor(state.taskId, attempt.n);
+    const session = finished ? observed.get(name) : undefined;
+    if (!session) {
+      if (finished && unread.has(name)) listed = true;
+      continue;
+    }
     listed = true;
     // The task's harness arguments, unopened: the runner reads there whether it cut a worktree it must keep.
     const released = yield* runner.release(session, state.config ?? {}).pipe(
@@ -551,7 +579,8 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  * A pass folds every task not settled, so every session that can still move is on it; a settled task it folds is — on an
  * engine's first pass, every one — so a session whose release a crash cut short is let go after a restart. A kept task stays on
  * it while its harness lists it, so a release the harness refused is asked again on every pass, as `releaseFinished` promises,
- * and drops off on the first pass that sees it gone: an absence read as every absence is, off the pass's one observation.
+ * and drops off on the first pass that sees it gone: an absence read as every absence is, off the pass's one observation — and
+ * only an absence: a pass that could not read its harness keeps it (`unread`).
  * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
  * first pass after it.
  */
@@ -575,9 +604,9 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  * The memo's proof, in `verify` alone: a skipped task folded all the same, and decided, as the pass would have without the
  * memo. A difference fails the pass, naming the task, rather than being mended quietly.
  */
-const verifyKept = Effect.fn('verifyKept')(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>) {
+const verifyKept = Effect.fn('verifyKept')(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
-  const decided = decide(fresh, closedOut(fresh, observed), { at: new Date(), graceMs: GRACE_MS }, yield* Lifecycle);
+  const decided = decide(fresh, closedOut(fresh, observed), { at: new Date(), graceMs: GRACE_MS, unread }, yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
 });
@@ -620,7 +649,11 @@ export const tick = Effect.fn('tick')(function* () {
   const folded = new Map<string, State>();
   for (const id of ids) if (!memo?.settled.has(id)) folded.set(id, fold(id, yield* journal.read(id)));
   const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
-  const observed = yield* (runner.observeFor ? runner.observeFor(expectedOf(lookedFor)) : runner.observe);
+  // What a harness could not read is said (`unread`), and neither decided on nor let go of as gone. A runner that cannot be
+  // told what to look for lists everything, and fails the pass when it cannot.
+  const { seen: observed, unread } = yield* (runner.observeFor
+    ? runner.observeFor(expectedOf(lookedFor))
+    : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ }))));
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -629,21 +662,21 @@ export const tick = Effect.fn('tick')(function* () {
   for (const id of ids) {
     const kept = memo?.settled.get(id);
     if (kept) {
-      if (memo!.verify) yield* verifyKept(kept, observed);
-      const { listed } = yield* releaseFinished(kept, observed);
+      if (memo!.verify) yield* verifyKept(kept, observed, unread);
+      const { listed } = yield* releaseFinished(kept, observed, unread);
       if (listed) memo!.listed.add(id);
       else memo!.listed.delete(id);
       continue;
     }
     const before = folded.get(id)!;
-    const actions = yield* settleTask(id, observed);
+    const actions = yield* settleOn(id, observed, unread, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
     // Against the journal as this pass left it — so an end written just now is let go now — read again
     // only when the pass wrote to it.
     const stepped = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
     // And again when the release wrote down what an attempt consumed, so the view the pass reports is what `view` reads after it.
-    const released = yield* releaseFinished(stepped, observed);
+    const released = yield* releaseFinished(stepped, observed, unread);
     const after = released.wrote ? fold(id, yield* journal.read(id)) : stepped;
     if (memo && settledQuiet(after)) {
       memo.settled.set(id, releasableOf(after));
@@ -692,7 +725,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
   for (const id of new Set(taskIds)) states.push(fold(id, yield* journal.read(id)));
   const open = states.filter((state) => !state.settled && state.attempts.length);
   const observed = open.length
-    ? yield* (runner.observeFor ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) })))) : runner.observe).pipe(
+    ? yield* (runner.observeFor ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) })))).pipe(Effect.map((o) => o.seen)) : runner.observe).pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
     : new Map<string, Sighting>();
   return states.map((state) => viewOfState(state, observed));

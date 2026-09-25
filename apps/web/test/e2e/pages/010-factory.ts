@@ -388,6 +388,8 @@ export default {
 
     // The step whose check refused: its Details say what the check ran, what it exited with, and how its output ended.
     await tile(FAKE.refused).click();
+    // Signed off, it opens on its Output; its check is under Details.
+    await page.locator(`aside[aria-label="Step ${FAKE.refused}"]`).getByRole('tab', { name: 'Details' }).click();
     const check = page.locator(`aside[aria-label="Step ${FAKE.refused}"] section[aria-label="Check"]`);
     await expectVisible(check.getByText(FAKE.check, { exact: true }), `the inspector of ${FAKE.refused} shows its check's command (${FAKE.check})`);
     await expectVisible(check.getByText('exit 1', { exact: true }), `the inspector of ${FAKE.refused} shows what its check exited with`);

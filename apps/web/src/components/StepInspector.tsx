@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
 import { isGate, stepState, type StepState } from '../lib/status';
+import { gateOfStep } from '../lib/gate';
 import { foldTranscript } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
@@ -29,9 +30,19 @@ type Props = {
   className?: string;
 };
 
-/** What is going on in one step, beside the canvas, for the node that was clicked. */
+/**
+ * The tab the inspector opens on for a step nobody has picked a tab for: Output once the step has a closeout — it signed off, at its gate,
+ * blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before that.
+ */
+export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
+
+/**
+ * What is going on in one step, beside the canvas, for the node that was clicked. It opens on the step's `openingTab`, and a tab a
+ * person picks is kept while the panel stays open, whichever step they click next.
+ */
 export function StepInspector({ run, step, onClose, runTitle, className }: Props) {
-  const [tab, setTab] = useState<Tab>('Details');
+  const [picked, setTab] = useState<Tab | null>(null);
+  const tab = picked ?? openingTab(step);
   // The try a Rounds row selected, and of which step: the panel stays mounted as another step is clicked, and that one's current try is shown.
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
   const runCancelled = run.cancelledAt !== null;
@@ -103,7 +114,21 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
 
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
         {tab === 'Details' && <Details run={run} step={step} state={state} runCancelled={runCancelled} current={current} selected={selected} onSelect={select} />}
-        {tab === 'Output' && <Output step={step} state={state} selected={selected} />}
+        {tab === 'Output' && (
+          <>
+            {/* Opened here at a gate, the answer is a tab away: said first, so the plan read is not a dead end. */}
+            {gateOfStep(run, step) && (
+              <p data-answer-at="Details" className="text-xs text-amber-800 dark:text-amber-300">
+                {step.name} waits at its gate on you: read what it handed on, then{' '}
+                <button type="button" onClick={() => setTab('Details')} className="font-medium underline underline-offset-2">
+                  approve it or send it back
+                </button>
+                .
+              </p>
+            )}
+            <Output step={step} state={state} selected={selected} />
+          </>
+        )}
         {/* Keyed by run and step, so a conversation never stands in for another step's while that one is read. */}
         {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} run={run} step={step} />}
       </div>

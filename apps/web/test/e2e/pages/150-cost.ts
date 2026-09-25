@@ -148,6 +148,7 @@ export default {
     // tokens' Details: what its tries cost of its cap, red past it. Left open for the photograph.
     await node(over.step).click();
     const inspector = page.locator(`aside[aria-label="Step ${over.step}"]`);
+    await inspector.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(inspector.locator('[data-spent="over"]', { hasText: over.of }), `the inspector's Details say what ${over.step}'s tries cost of its cap (${over.of}), red past it`);
     await expectVisible(inspector.locator('[data-state="over-budget"]', { hasText: over.status }), `and its word, ${over.status}`);
     // And what its try read: its peak at its `context: 200k` cap, and its resumed session's rebuilt cache, each marked.

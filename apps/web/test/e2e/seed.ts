@@ -300,6 +300,21 @@ export const GATED = {
   gated: 'plan',
   /** What plan handed on, which a person approves: its summary, as the markdown it is. */
   plan: { heading: 'The plan', items: ['Parse the --flag option in cli.ts', 'Store it on the run record'] },
+  /**
+   * And its declared output, as the shipped planner's schema has it (`workflows/agents/plan.schema.json`): an approach, drawn whole at the
+   * gate; four files, which the gate folds; two steps and one risk, which it does not.
+   */
+  output: {
+    approach: 'Read the flag where the other options are read, and keep it on the run record beside them.',
+    files: [
+      { path: 'packages/agent-orchestrator/src/cli.ts', change: 'parse --flag' },
+      { path: 'packages/agent-orchestrator/src/run.ts', change: 'carry it on the run' },
+      { path: 'packages/agent-orchestrator/src/store.ts', change: 'write it on the record' },
+      { path: 'packages/agent-orchestrator/README.md', change: 'say what it does' },
+    ],
+    steps: ['Parse the flag and refuse a bad value', 'Store it and read it back'],
+    risks: ['A record written before the flag has none'],
+  },
   /** What the `gate` page approves plan with, and what it sends plan back with. */
   words: 'Ship the second reading.\nStore the flag before you parse it.',
   objection: 'Say where the flag is stored, and for how long.',
@@ -1334,7 +1349,17 @@ export function seed(root: string, now = Date.now()): void {
 
   // GATED: plan signed off at its gate, the gate the run was started with; implement waits on it, not filed.
   const gateDir = path.join(root, 'workflow-gate');
-  write(path.join(gateDir, 'plan.md'), '---\nharness: claude\n---\nPlan it.\n');
+  const planSchema = {
+    type: 'object', additionalProperties: false, required: ['approach', 'files', 'steps', 'risks'],
+    properties: {
+      approach: { type: 'string' },
+      files: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { path: { type: 'string' }, change: { type: 'string' } }, required: ['path', 'change'] } },
+      steps: { type: 'array', items: { type: 'string' } },
+      risks: { type: 'array', items: { type: 'string' } },
+    },
+  };
+  write(path.join(gateDir, 'plan.md'), '---\nharness: claude\noutput: plan.json\n---\nPlan it.\n');
+  write(path.join(gateDir, 'plan.json'), `${JSON.stringify(planSchema, null, 2)}\n`);
   write(path.join(gateDir, 'implement.md'), '---\nharness: claude\nafter: plan\n---\nImplement the plan.\n');
   const gatedPlan = `${GATED.id}-plan`;
   const gatedLane = path.join(root, 'worktrees', GATED.id, 'plan');
@@ -1343,7 +1368,7 @@ export function seed(root: string, now = Date.now()): void {
     brief: `${GATED.title}\n\nA sixth run seeded by npm run e2e, started --gate plan: plan signed off, and nothing after it is filed until a person approves it.`,
     workflowDir: gateDir,
     workflow: [
-      { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
+      { name: 'plan', after: [], body: 'Plan it.', harness: 'claude', output: { file: 'plan.json', schema: planSchema } },
       { name: 'implement', after: ['plan'], body: 'Implement the plan.', harness: 'claude' },
     ],
     gates: [GATED.gated],
@@ -1357,7 +1382,10 @@ export function seed(root: string, now = Date.now()): void {
     { kind: 'spawned', at: ago(1.19), attempt: 1 },
     {
       kind: 'ended', at: ago(1.1), attempt: 1, sessionId: `ae/${gatedPlan}/1`, observed: 'done', reason: 'harness',
-      closeout: { outcome: 'done', summary: `## ${GATED.plan.heading}\n\n${GATED.plan.items.map((item) => `- ${item}`).join('\n')}`, needs: null, artifacts: [] },
+      closeout: {
+        outcome: 'done', summary: `## ${GATED.plan.heading}\n\n${GATED.plan.items.map((item) => `- ${item}`).join('\n')}`, needs: null, artifacts: [],
+        ...GATED.output,
+      },
     },
     { kind: 'settled', at: ago(1.1), outcome: 'succeeded' },
   ]));

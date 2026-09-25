@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  decideLine, firstLine, gateBrief, gateCardLine, gateFacts, gateNodeLine, gateOfStep, gateOfSummary, needWords, takenLine,
+  decideLine, firstLine, gateBrief, gateCardLine, gateFacts, gateNodeLine, gateOfStep, gateOfSummary, needWords, readLink, takenLine,
 } from '../src/lib/gate.ts';
 import type { Decidable, RunDetail, RunSummary } from '../src/lib/api.ts';
 
@@ -147,4 +147,11 @@ test("REFUSED: a run a person holds has no gate on its card, whether a to-decide
   assert.notEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), null);
   assert.equal(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding }), null);
   assert.notEqual(gateOfSummary({ ...summary({ steps, waitingOnYou: ['plan'] }), holding: null }), null, 'a run nobody holds');
+});
+
+test("the card's link to what a gate approves: a plan's inspector, any other step's, and an ending's section, which has handed nothing on", () => {
+  assert.deepEqual(readLink({ step: 'plan', ends: false }), { words: 'Read the plan', step: 'plan' });
+  assert.deepEqual(readLink({ step: 'review', ends: false }), { words: 'Read what it handed on', step: 'review' });
+  assert.deepEqual(readLink({ step: 'ship', ends: true }), { words: 'Read what it acts on', hash: 'step-ship' });
+  assert.deepEqual(readLink({ step: 'plan', ends: true }), { words: 'Read what it acts on', hash: 'step-plan' }, 'an ending named plan has no plan to read yet');
 });

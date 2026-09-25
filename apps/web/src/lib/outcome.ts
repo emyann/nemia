@@ -124,3 +124,13 @@ export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts
 /** An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, `unreadable`, the machine's reason, or `no closeout`. */
 export const outcomeWord = (o: Outcome): string =>
   o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';
+
+/** How many entries a list holds before the gate folds it: a plan's three risks are read at a glance, its dozen files are not. */
+export const FOLD_AT = 4;
+
+/**
+ * Whether a closeout's field is folded where a person reads it beside a gate (`HandedOn`): a list or a table of `FOLD_AT` entries or
+ * more, under its name and how many. Never the first field declared — a plan's `approach`, what the step is saying — and never a text,
+ * which is read whole or not at all; the Output tab folds nothing.
+ */
+export const foldsAtGate = (value: unknown, first: boolean): boolean => !first && Array.isArray(value) && value.length >= FOLD_AT;

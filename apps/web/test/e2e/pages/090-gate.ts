@@ -8,7 +8,7 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // The gate on the board: a run waiting at plan's gate, the closeout plan handed on rendered, and beside it Approve and Send back. Refused
+  // The gate on the board: a run waiting at plan's gate, the closeout plan handed on rendered in it, beside Approve and Send back. Refused
   // first, in a page of its own whose one refusal is the point: an approval of a step that is not gated — the page read the gate, and the
   // record lost it before Approve was pressed — in the package's words beside the button, and nothing written. Then approved from the page,
   // with words: the approval's file as `wf approve` writes it, and the page reads the approval under the step. Taken back, and sent back
@@ -44,12 +44,22 @@ export default {
     await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${gated}` }), `${gated} is a human gate on the graph, and says approve ${gated}`);
     await expectCount(node.getByRole('img', { name: 'running now' }), 0, 'and no spinner: nobody runs a step at its gate');
 
-    // Its section: what it handed on, rendered, and beside it the gate, with Approve and Send back.
+    // The folder beside the record reads as the workflow the run froze, its plan's declared output with it.
+    await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder');
+    // Its section: the gate, and in it what is being approved — the summary, rendered, then each field plan declared — beside Approve and
+    // Send back, with no tab to press. The approach is drawn whole; the four files are folded, and nothing of them is drawn until opened.
     const section = page.locator(`article > section#step-${gated}`);
-    const handedOn = section.locator('div.grid > div', { has: page.getByRole('heading', { level: 4, name: GATED.plan.heading }) });
-    await expectRendered(handedOn, { heading: GATED.plan.heading, items: GATED.plan.items });
     await expectVisible(gateOf(page), `${gated}'s section has its gate`);
-    await expectLeftOf(handedOn, gateOf(page), 'the gate is beside what the step handed on');
+    const handedOn = gateOf(page).locator(`section[aria-label="What ${gated} handed on"]`);
+    await expectRendered(handedOn.locator('[data-handed-on] > [data-markdown]'), { heading: GATED.plan.heading, items: GATED.plan.items });
+    await expectVisible(handedOn.locator('[data-field="approach"]', { hasText: GATED.output.approach }), `the plan's approach is at the gate, read without a tab (${GATED.output.approach})`);
+    for (const [name, entries] of [['steps', GATED.output.steps], ['risks', GATED.output.risks]] as const) {
+      await expectVisible(handedOn.locator(`[data-field="${name}"]`, { hasText: entries[0] }), `its ${name}, ${entries.length} of them, drawn unfolded`);
+    }
+    const files = handedOn.locator('details[data-fold="files"]:not([open])');
+    await expectVisible(files.locator('summary', { hasText: `files · ${GATED.output.files.length}` }), `its ${GATED.output.files.length} files are folded, the fold saying how many`);
+    await expectCount(handedOn.getByText(GATED.output.files[0].path), 0, 'and no file is drawn while the fold is shut');
+    await expectLeftOf(handedOn, gateOf(page).locator(`form[aria-label^="Approve"]`), 'what is being approved is beside Approve, on its left');
     await expectVisible(wordsOf(page), 'a box for the words to approve with');
     if (!(await approveOf(page).isEnabled())) throw new Refused('Approve is enabled with no words: an approval needs none');
     const objection = gateOf(page).getByRole('textbox', { name: `What to change, sent back to ${gated}` });
@@ -66,6 +76,22 @@ export default {
     await expectCount(decide.getByText('None yet: the run is still moving.'), 0, 'and does not say the run is still moving: it waits on you');
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), fullPage: true });
+    // Opened, the fold draws the files; shut again, as the page began.
+    await files.locator('summary').click();
+    await expectVisible(handedOn.getByText(GATED.output.files[0].path), 'opened, the fold draws the files');
+    await handedOn.locator('details[data-fold="files"] summary').click();
+    await expectCount(handedOn.locator('details[data-fold="files"][open]'), 0, 'and shuts again');
+
+    // The step signed off, so its inspector opens on what it handed on, and says the answer is under Details.
+    await node.click();
+    const inspector = page.locator(`aside[aria-label="Step ${gated}"]`);
+    await expectVisible(inspector.getByRole('tab', { name: 'Output', selected: true }), `${gated}'s inspector opens on Output: it has signed off`);
+    await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), 'with the approach in it');
+    await expectVisible(inspector.locator('[data-answer-at="Details"]', { hasText: `${gated} waits at its gate on you` }), 'and says the answer is under Details');
+    await settled(page);
+    await page.screenshot({ path: path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), fullPage: true });
+    await inspector.getByRole('button', { name: "Close the step's panel" }).click();
+    await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');
 
     // Refused, in a page of its own: the page read plan's gate, and the record lost it — as a run started without --gate reads — before
     // Approve was pressed. The run as the page read it is held, so the button is there to press; the package refuses an approval of a step

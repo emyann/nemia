@@ -264,7 +264,7 @@ At `wf start` each node is resolved and frozen on the run, so a run never reads 
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
 read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
 words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: two shipped steps have one, the `ship` of `dev-build` and `dev-planned-build`, which tell the shipper why a build
+case: the shipped steps that have one are the `ship` of `dev-build`, `dev-planned-build` and `ui`, which tell the shipper why a build
 and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
@@ -959,7 +959,7 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
 check a person used to run by hand at every trial merge — and every round of it is checked again.
 `workflows/ui/`, for a change to the web app, adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF`
-is set: a round's check runs no e2e, and a person merging runs the line whole on the merged tree. Point the folder
+is set: a round's check runs no e2e, and its gated ship runs the line whole on the merged tree. Point the folder
 at another repository and change that line.
 
 ### What a step's line says
@@ -1320,12 +1320,12 @@ the absolute paths of its PNGs, and `review` reads them with `input: implement`.
 ### `workflows/ui/`: a change a person will see
 
 ```
-implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
+implement ⇄ review → ship   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
 `implement` carries `check: npm test && npm run typecheck && npm run build`, and then `npm run e2e` only
 where no `WF_BASE_REF` is set, which a check the run executes never is: a round's check builds and runs no
-e2e, and whoever merges runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
+e2e, and the ship runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
 every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
 seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
 have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
@@ -1337,7 +1337,9 @@ file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and
 `workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
 `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
 names neither does not fit the closeout the step is filed with. `again: true` sends the change round
-again, at most `rounds: 3`, as in `workflows/`.
+again, at most `rounds: 3`, as in `workflows/`. `ship` is `dev-build`'s: gated, the shipper in the repository's
+own checkout, which trial merges the run's branch, runs that line with nothing set, and commits or aborts. Its agent,
+`shipper`, is copied into this package's `workflows/agents/` beside ui's two.
 
 ```bash
 wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/workflows/ui

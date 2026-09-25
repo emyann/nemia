@@ -48,7 +48,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
   or `WF_ARTIFACTS=<your files directory> npm run e2e` in a run, whose PNGs are the screenshots the ui reviewer reads). A
   round's check builds but runs no e2e: the shipped lines run it only where no `WF_BASE_REF` is set, so once, on the merged
-  tree, in the shipper's hands (or a person's merging a `ui` run), and your own run is the only e2e the change meets before
+  tree, in the shipper's hands, and your own run is the only e2e the change meets before
   the merge (since 2026-09-25). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
   export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
   `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
@@ -365,8 +365,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `skills:`).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
-  there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy
-  test: a change to `ui-implementer.md` or `ui-reviewer.md` is copied there too (learned by the run that put the roles in `agents/`).
+  there. The package's `workflows/ui` copy has its three agents in the package's `workflows/agents`, held byte for byte by the ui copy
+  test: a change to `ui-implementer.md`, `ui-reviewer.md` or `shipper.md` (and its skills) is copied there too (learned by the run that
+  put the roles in `agents/`; the shipper joined when ui gained its ship).
 - **The board's listing of a step is resolved; its file is not.** `spec` holds the agent's keys merged in, so a PUT that sends `spec`
   alone writes every one of them into the step file, and `renderStep` of an edited resolved step writes any inherited key whose value
   moved off the agent's (`given`). A step's own keys and note travel as `own` (`ListedStep.own`), and the builder writes those (same run).

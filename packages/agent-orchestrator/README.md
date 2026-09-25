@@ -362,6 +362,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude
   Code's prompt (`--system-prompt-file`, F15).
 
+Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
+project,local` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
+carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A step's `model:` and `effort:` go on
+the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
+must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
+the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
+
 `skills:` names skills, each lowercase words joined by dashes. A skill is a folder holding a `SKILL.md`, looked for in `skills/`
 beside `agents/` in each place agents are, in order: the workflow's own folder of agents' parent, then the repository's `.claude/`
 (`.claude/agents/`, `.claude/skills/`), then the store's `workflows/`. The first place that has a name wins, so the repository's

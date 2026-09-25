@@ -46,7 +46,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
   ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
   // The spend cap: `claude -p` ends the session once a response takes it past, and says so in its result.
-  ...(r.budgetUsd !== undefined ? ['--max-budget-usd', String(r.budgetUsd)] : []),
+  ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
 ];
 
 /** The regex that finds Claude Code's own session id in what `claude -p` prints. */

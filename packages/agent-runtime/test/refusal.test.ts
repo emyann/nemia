@@ -57,9 +57,11 @@ const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAtt
   [{ config: { allowedTools: ['Write(**'] } }, /^`allowedTools: \["Write\(\*\*"\]` is not a list of permission rules\./],
   [{ config: { mcp: [] } }, /^`mcp: \[\]` is not a map of MCP servers by name\./],
   [{ config: { mcp: { web: {} } } }, /^`mcp\.web` has neither `command` nor `url`\./],
-  [{ budgetUsd: 0 }, /^`budgetUsd: 0` is not an amount of dollars\./],
-  [{ budgetUsd: Number.NaN }, /^`budgetUsd: NaN` is not an amount of dollars\./],
-  [{ budgetUsd: '5' }, /^`budgetUsd: "5"` is not an amount of dollars\./],
+  [{ config: { budgetUsd: 0 } }, /^`budgetUsd: 0` is not an amount of dollars\./],
+  [{ config: { budgetUsd: -1 } }, /^`budgetUsd: -1` is not an amount of dollars\./],
+  [{ config: { budgetUsd: Number.NaN } }, /^`budgetUsd: NaN` is not an amount of dollars\./],
+  [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
+  [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
   [{ priority: Number.NaN }, /^`priority: NaN` is not a number\./],
   [{ priority: Infinity }, /^`priority: Infinity` is not a number\./],
   [{ priority: 'high' }, /^`priority: "high"` is not a number\./],
@@ -74,9 +76,11 @@ const REFUSALS: Array<[Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAtt
   [{ model: 'opus' }, /^`model` is the harness's configuration: file it under `config`, as `config: \{ model: … \}`\.$/],
   [{ permissionMode: 'dontAsk', config: { model: 'opus' } }, /^`permissionMode` is the harness's configuration: file it under `config`/],
   [{ worktree: true }, /^`worktree` is the harness's configuration/],
+  // The spend cap was the runtime's own field until stage 4b (2026-09-25): a caller built before it is told where it went.
+  [{ budgetUsd: 5 }, /^`budgetUsd` is the harness's configuration: file it under `config`, as `config: \{ budgetUsd: … \}`\.$/],
   [{ config: 'opus' }, /^`config: "opus"` is not a harness's configuration\. Give an object of its arguments, like \{ "model": "opus" \}, or leave it out\.$/],
   [{ config: null }, /^`config: null` is not a harness's configuration\./],
-  [{ config: { budgetUsd: 5 } }, /^`config\.budgetUsd` is not a harness argument\. A harness's arguments are: model, permissionMode, /],
+  [{ config: { priority: 1 } }, /^`config\.priority` is not a harness argument\. A harness's arguments are: model, permissionMode, /],
 ];
 
 for (const [bad, says] of REFUSALS) {
@@ -103,10 +107,11 @@ for (const [bad, says] of REFUSALS) {
 test('the Effect door journals a filing that refuses nothing, with every checked key set', async () => {
   const effect = effectDoor();
   const full: Filing = {
-    ...ok, deadlineSeconds: 60, resumeFrom: 's-1', budgetUsd: 0.25, priority: -1,
+    ...ok, deadlineSeconds: 60, resumeFrom: 's-1', priority: -1,
     config: {
       model: 'opus', effort: 'high', tools: ['Read', 'Grep'], disallowedTools: ['SendMessage', 'Bash(npm run build)'],
       allowedTools: ['Edit(**)'], mcp: { web: { command: 'npx', args: ['web'] } }, remoteControl: false, background: false, contextTokens: 200000,
+      budgetUsd: 0.25,
     },
   };
   const id = await effect.run(file(full));

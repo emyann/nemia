@@ -68,12 +68,26 @@ export type JournalOps = {
  * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
  * line is what was said when it was said, so a change to an event's shape is made where it is read.
  *
- * One change so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
+ * Two changes so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
  * they are the adapter's configuration now, under `config` (`harness-args.ts`). A `filed` event with any of them at
  * its top level has them moved under `config`, where a value already there is kept: `config` is the newer word. So
  * `fold` reads one shape, and a store holding tasks filed on both sides of the change lists them alike.
+ *
+ * And until 2026-09-25 (stage 4b) the spend cap was the runtime's own field, `budgetUsd`, which it judged: on a `filed`
+ * event (lifted above, as it is one of the harness's arguments now), on an `input` (moved under that turn's `config`),
+ * and as an end's reason — `reason: 'budget'` — which is read as the harness ending the session at a limit its
+ * configuration set: `reason: 'harness'`, `limit: 'budget'`.
  */
 export const upgrade = (event: Event): Event => {
+  if (event.kind === 'input') {
+    const { budgetUsd, ...rest } = event as Event & { kind: 'input'; budgetUsd?: unknown };
+    if (budgetUsd === undefined) return event;
+    return { ...rest, config: { budgetUsd, ...rest.config } as HarnessArgs };
+  }
+  if (event.kind === 'ended') {
+    if ((event.reason as string) !== 'budget') return event;
+    return { ...event, reason: 'harness', limit: 'budget' };
+  }
   if (event.kind !== 'filed') return event;
   const legacy = event as Event & Record<string, unknown>;
   const moved = HARNESS_ARGS.filter((key) => Object.hasOwn(legacy, key));

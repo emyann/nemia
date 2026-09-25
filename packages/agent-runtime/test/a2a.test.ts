@@ -60,7 +60,7 @@ const full: Sighting = {
     costUsd: 0.42, apiMs: 5000, toolMs: 700, unpricedModel: true,
   },
   exitCode: 0, closeout: { payload: { outcome: 'done', notes: ['a', 'b'] }, at: 1790000000000 }, quietMs: 95_000,
-  waitingFor: 'permission prompt', budgetSpent: true, denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
+  waitingFor: 'permission prompt', limit: 'budget', denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
 };
 
 test('a sighting rides whole in its Task, and survives a transport that serialises', () => {
@@ -128,8 +128,8 @@ const ended: Attempt = {
 
 const request: SpawnRequest = {
   name: 'ae/t-1/2', brief: 'write the words down\n\nand then stop.', cwd: '/repo', harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'], mcp: { web: { command: 'npx', args: ['web'] } } },
-  resumeFrom: 'native-1', closeoutSchema: { type: 'object', required: ['outcome'] }, budgetUsd: 2.5,
+  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'], mcp: { web: { command: 'npx', args: ['web'] } }, budgetUsd: 2.5 },
+  resumeFrom: 'native-1', closeoutSchema: { type: 'object', required: ['outcome'] },
 };
 
 test('a spawn is a user Message: the name its task, the brief its one text part, the session it continues its context, the rest its metadata', () => {
@@ -138,7 +138,7 @@ test('a spawn is a user Message: the name its task, the brief its one text part,
     messageId: 'm-1', contextId: 'native-1', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
     parts: [{ content: { $case: 'text', value: 'write the words down\n\nand then stop.' }, metadata: undefined, filename: '', mediaType: '' }],
     metadata: {
-      cwd: '/repo', harness: 'fake', config: request.config, closeoutSchema: request.closeoutSchema, budgetUsd: 2.5,
+      cwd: '/repo', harness: 'fake', config: request.config, closeoutSchema: request.closeoutSchema,
     },
     extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
   });
@@ -167,7 +167,7 @@ test('a spawn with its optional keys unset comes back with every key, as the eng
   assert.deepEqual(m.metadata, { cwd: '/r' }, 'no undefined in metadata');
   assert.equal(m.contextId, '', 'a spawn that starts cold continues no context');
   assert.deepEqual(spawnOf(overTheWire(m)), {
-    name: 'ae/t-1/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined, budgetUsd: undefined,
+    name: 'ae/t-1/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined,
     resumeFrom: undefined,
   });
 });
@@ -295,7 +295,7 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
   assert.deepEqual(d.acted(), [['spawn', request]]);
   // The engine's spawn has every key, some undefined: the driver is handed the same keys back.
   const bare: SpawnRequest = {
-    name: 'ae/t-2/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined, budgetUsd: undefined,
+    name: 'ae/t-2/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined,
     resumeFrom: undefined,
   };
   await Effect.runPromise(d.runner.spawn(bare));

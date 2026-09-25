@@ -14,6 +14,10 @@
  * came — the fact the runtime reports where it once judged. A journal written before has no such key, and folds the same.
  * And by stage 4a part 2: `filed` no longer carries `maxAttempts` or `resume` — the runtime makes one attempt per start. A
  * journal written before carries both, and folds and decides as if it did not (the last test here; `decide.test.ts`).
+ * And by stage 4b: the spend cap is one of the harness's arguments, so `filed` and a spawn no longer carry `budgetUsd` beside
+ * `config` and an `input` carries its turn's under `config`; and an `ended` carries `limit` beside `denials`, the limit its
+ * harness says it stopped at, where the runtime once wrote `reason: 'budget'`. A journal written before is read in this shape
+ * (`upgrade` in `journal.ts`, `journal.test.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,13 +64,13 @@ const filing = {
 const spawnAsked = {
   name: 'ae/t-words/1', brief: 'write the words down', cwd: '/repo', harness: 'fake',
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, closeoutSchema: { type: 'object' },
-  budgetUsd: undefined, resumeFrom: undefined,
+  resumeFrom: undefined,
 };
 
 const filed = {
   kind: 'filed', at: '<at>', brief: 'write the words down', cwd: '/repo', harness: 'fake',
   config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, deadlineSeconds: undefined,
-  resumeFrom: undefined, closeoutSchema: { type: 'object' }, budgetUsd: undefined, priority: undefined, holdOpen: undefined,
+  resumeFrom: undefined, closeoutSchema: { type: 'object' }, priority: undefined, holdOpen: undefined,
 };
 
 test('a session that signs off: spawned, ended with its statement and usage, settled succeeded', async () => {
@@ -85,7 +89,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
-      closeout: { outcome: 'done', summary: 'wrote them' }, stated: true, usage: { turns: 3, outputTokens: 120, costUsd: 0.25 }, exitCode: undefined, denials: undefined },
+      closeout: { outcome: 'done', summary: 'wrote them' }, stated: true, usage: { turns: 3, outputTokens: 120, costUsd: 0.25 }, exitCode: undefined, denials: undefined, limit: undefined },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
@@ -103,7 +107,7 @@ test('a session that ends with no statement where one was asked: ended as its ha
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
-      closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined },
+      closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged');
@@ -157,7 +161,7 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'stop-requested', at: '<at>' },
     { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'stopped', reason: 'operator', nativeId: 's-1',
-      closeout: undefined, usage: undefined, exitCode: undefined, denials: undefined },
+      closeout: undefined, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined },
     { kind: 'settled', at: '<at>', outcome: 'stopped', note: 'operator' },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked], ['stop', 's-1']]);
@@ -174,7 +178,7 @@ test('what the harness denied the session is written on its end, as it said it, 
   const ended = (await b.record(id)).find((e) => e.kind === 'ended');
   assert.deepEqual(ended, {
     kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'failed', reason: 'harness', nativeId: 's-1',
-    closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials,
+    closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials, limit: undefined,
   });
   assert.deepEqual((await b.engine.view(id)).state.attempts[0]?.denials, denials);
 
@@ -199,20 +203,20 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   sign(1, 'a first draft');
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'input-required');
-  await b.engine.answer(id, 'shorter, please', { budgetUsd: 0.5 });
+  await b.engine.answer(id, 'shorter, please', { config: { budgetUsd: 0.5 } });
   await b.engine.tick();
   sign(2, 'a shorter draft');
   await b.engine.tick();
   await b.engine.close(id);
   await b.engine.tick();
   const ended = (n: number, summary: string) => ({ kind: 'ended', at: '<at>', attempt: n, sessionId: `s-${n}`, observed: 'done', reason: 'harness',
-    nativeId: `s-${n}`, closeout: { outcome: 'done', summary }, stated: true, usage: undefined, exitCode: undefined, denials: undefined });
+    nativeId: `s-${n}`, closeout: { outcome: 'done', summary }, stated: true, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined });
   assert.deepEqual(await b.record(id), [
     { ...filed, holdOpen: true },
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     ended(1, 'a first draft'),
-    { kind: 'input', at: '<at>', text: 'shorter, please', budgetUsd: 0.5 },
+    { kind: 'input', at: '<at>', text: 'shorter, please', config: { budgetUsd: 0.5 } },
     { kind: 'starting', at: '<at>', attempt: 2, resumeFrom: 's-1', nudge: 'shorter, please' },
     { kind: 'spawned', at: '<at>', attempt: 2 },
     ended(2, 'a shorter draft'),
@@ -221,7 +225,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   ]);
   assert.deepEqual(b.asked, [
     ['spawn', spawnAsked],
-    ['spawn', { ...spawnAsked, name: 'ae/t-words/2', brief: 'shorter, please', resumeFrom: 's-1', budgetUsd: 0.5 }],
+    ['spawn', { ...spawnAsked, name: 'ae/t-words/2', brief: 'shorter, please', resumeFrom: 's-1', config: { ...spawnAsked.config, budgetUsd: 0.5 } }],
   ]);
 });
 

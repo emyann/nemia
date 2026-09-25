@@ -911,6 +911,19 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
   assert.deepEqual([closeoutAsked(unasked)('t1'), words(unasked)], [false, [{ ended: 'done', reason: 'harness' }]], 'a task asked for no statement');
 });
 
+test("BUDGET off what the runtime reports since stage 4b: an attempt its harness cut at its cap carries `limit: 'budget'` on an end that is the harness's own, and `endWords` says `failed · budget`, the words the board read when the runtime judged it — whatever the harness called the end, and before `unsigned`", async () => {
+  const { endWords } = await import('../src/runner.ts');
+  type Attempt = TaskView['state']['attempts'][number];
+  const state = { closeoutSchema: CLOSEOUT_SCHEMA } as unknown as TaskView['state'];
+  const attempt = (end: object) => ({ n: 1, startedAt: 'a', spawnedAt: 'a', endedAt: 'b', nativeId: 'n', usage: null, exitCode: 1, ...end }) as unknown as Attempt;
+  assert.deepEqual(endWords(state, attempt({ ended: 'failed', reason: 'harness', limit: 'budget' })), { ended: 'failed', reason: 'budget' });
+  assert.deepEqual(endWords(state, attempt({ ended: 'done', reason: 'harness', stated: false, limit: 'budget' })), { ended: 'failed', reason: 'budget' },
+    'cut while its harness called it done, with no statement: the cap is why, and what the board said of it');
+  // The controls: no limit, and a limit that is not the budget, are the runtime's words, as before.
+  assert.deepEqual(endWords(state, attempt({ ended: 'failed', reason: 'harness' })), { ended: 'failed', reason: 'harness' });
+  assert.deepEqual(endWords(state, attempt({ ended: 'failed', reason: 'harness', limit: 'turns' })), { ended: 'failed', reason: 'harness' });
+});
+
 test('a cancelled run files no check, however due', () => {
   const a = assess(CHECKED, withCheck(null, CANCELLED), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual(a.check, []);
@@ -2828,10 +2841,13 @@ const refusedTwice = () => onTry([{ taskId: 't0', check: { taskId: 'c0' }, then:
 const REFUSED_TWICE = { t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'failed' } as const;
 
 test('`taskSpend`: what a task cost is the dollars on its attempts that are over — one still running counts in neither, one that never started ran nothing — and whether its harness ended the last at its budget', () => {
-  const attempt = (endedAt: string | null, reason: string | null, costUsd?: number) =>
-    ({ startedAt: clock(0), spawnedAt: clock(0, 5), endedAt, reason, usage: costUsd === undefined ? null : { costUsd } });
+  const attempt = (endedAt: string | null, reason: string | null, costUsd?: number, limit?: string) =>
+    ({ startedAt: clock(0), spawnedAt: clock(0, 5), endedAt, reason, usage: costUsd === undefined ? null : { costUsd }, ...(limit ? { limit } : {}) });
   const view = (settled: string | null, ...attempts: Array<ReturnType<typeof attempt>>): TaskClock => ({ state: { brief: 'filed', settled, attempts } });
-  assert.deepEqual(taskSpend(view('failed', attempt(clock(5), 'harness', 1.25), attempt(clock(9), 'budget', 3.5))), { usd: 4.75, measured: 2, unmeasured: 0, budgetEnded: true });
+  // The runtime judges no budget (stage 4b): its harness's cut is a fact on the attempt, `limit`, on an end that is the harness's own.
+  assert.deepEqual(taskSpend(view('failed', attempt(clock(5), 'harness', 1.25), attempt(clock(9), 'harness', 3.5, 'budget'))), { usd: 4.75, measured: 2, unmeasured: 0, budgetEnded: true });
+  assert.equal(taskSpend(view('failed', attempt(clock(9), 'harness', 3.5, 'budget'), attempt(clock(12), 'harness', 0.5)))!.budgetEnded, false, 'the last attempt says it, not an earlier one');
+  assert.equal(taskSpend(view('failed', attempt(clock(9), 'budget', 3.5)))!.budgetEnded, false, 'a `budget` reason is no longer a word the runtime says: only its `limit` is read');
   assert.deepEqual(taskSpend(view(null, attempt(clock(5), 'lost', 1.25), attempt(null, null))), { usd: 1.25, measured: 1, unmeasured: 0, budgetEnded: false },
     'the attempt in flight has written no cost yet, and is not a part missing');
   assert.deepEqual(taskSpend(view('failed', attempt(clock(5), 'unstartable'), attempt(clock(9), 'harness'))), { usd: 0, measured: 0, unmeasured: 1, budgetEnded: false },
@@ -2925,6 +2941,10 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   const nothingSaid = () => undefined;
   assert.equal(stepStatus(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED, ended), 'budget exhausted');
   assert.equal(stepStatus(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED), 'failed', 'read with nothing of what the engine measured, the failure it settled');
+  // The runtime settles a capped task as its harness ended the session, and judges no budget (stage 4b): a cap reached on a session its
+  // harness called done is judged here, and read as spent as a failed one was when the runtime settled every cut `failed`.
+  assert.equal(stepStatus(DETACHED[0]!, r, phases({ t1: 'succeeded' }), nothingSaid, asked, DETACHED, ended), 'budget exhausted', 'a cut its harness called done');
+  assert.equal(ownStatus(DETACHED[0]!, r, phases({ t1: 'stopped' }), nothingSaid, asked, DETACHED, ended), 'stopped', 'a person stopped it: theirs, not the cap');
   const a = assess(DETACHED, r, p, nothingSaid, asked, () => undefined, [], [], () => false, ended);
   assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
   const l = listing(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, ended);
@@ -3622,7 +3642,7 @@ test('`hasGate` and `gatesOf`: a step is gated by its own `gate: true` or by the
 
 test('`holdsOpen`: a step keeps its task open while a word from a person is what moves it — signed off blocked, or at its gate unapproved, or checked on the way there — and REFUSES every other standing, and every step of a run called off or pruned', () => {
   const holds = (w: Workflow, r: Run, phase: TaskPhase, closeout: Closeout | undefined, checkPhase?: TaskPhase) =>
-    holdsOpen(w, r, phases({ t1: phase, ...(checkPhase ? { c1: checkPhase } : {}) }), () => closeout, asked, [w, step('implement', [w.name])]);
+    holdsOpen(w, r, phases({ t1: phase, ...(checkPhase ? { c1: checkPhase } : {}) }), () => closeout, asked, [w, step('implement', [w.name])], () => undefined);
   const plan = step('plan');
   const at = (extra: Partial<Run> = {}) => run({ plan: 't1', implement: null }, extra);
   assert.equal(holds(plan, at(), 'succeeded', said('blocked')), true, 'signed off blocked');

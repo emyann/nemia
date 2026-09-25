@@ -115,13 +115,15 @@ export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: 
 };
 
 /**
- * How an attempt ended, in the words a person has read for it since 2026-09-19: an attempt that ended without the statement its task
- * asked for is `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) — and any other is as
- * the runtime recorded it. The one writer of those words for a surface that shows an attempt's end, so the board says what it said
- * when the runtime judged it: never read an attempt's raw `reason` for `unsigned`.
+ * How an attempt ended, in the words a person has read for it since 2026-09-19: an attempt its harness cut at its spend cap is `failed`,
+ * `budget` — off the runtime's `limit: 'budget'`, since stage 4b a fact it carries and no longer an end it judges — one that ended without
+ * the statement its task asked for is `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) —
+ * and any other is as the runtime recorded it. The one writer of those words for a surface that shows an attempt's end, so the board says
+ * what it said when the runtime judged it: never read an attempt's raw `reason` for `unsigned` or `budget`.
  */
 export const endWords = (state: TaskView['state'], a: TaskView['state']['attempts'][number]): { ended: string | null; reason: string | null } =>
-  unsignedEnd(state, a) ? { ended: 'failed', reason: 'unsigned' } : { ended: a.ended, reason: a.reason };
+  a.limit === 'budget' ? { ended: 'failed', reason: 'budget' }
+  : unsignedEnd(state, a) ? { ended: 'failed', reason: 'unsigned' } : { ended: a.ended, reason: a.reason };
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What

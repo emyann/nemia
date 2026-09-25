@@ -503,23 +503,24 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
   assert.deepEqual((filed as { config?: { mcp?: unknown } }).config?.mcp, mcp, 'on the record, for the runner');
 });
 
-test('file() refuses a budgetUsd that is not dollars above 0, and one on a session that would keep no cap — and journals one a job keeps', async () => {
+test('file() refuses a config.budgetUsd that is not dollars above 0, and one on a session that would keep no cap — and journals one a job keeps, under config', async () => {
   const { journal, engine } = shipped();
   for (const budgetUsd of [0, -1, Number.NaN, Infinity, '5' as unknown as number]) {
-    await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', budgetUsd }, /is not an amount of dollars\. Give dollars above 0/);
+    await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', config: { budgetUsd } }, /is not an amount of dollars\. Give dollars above 0/);
   }
   // Measured: a `claude --bg` session given a $0.01 cap spent $0.19. The default harness runs one when asked for a background session.
-  await refused(engine, { brief: 'b', cwd: '/r', budgetUsd: 5, config: { background: true } },
+  await refused(engine, { brief: 'b', cwd: '/r', config: { budgetUsd: 5, background: true } },
     /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*Leave `config\.background` off to run the task as a job \(`claude -p`\), which ends the session at its cap/);
-  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', budgetUsd: 5 }, /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', config: { budgetUsd: 5 } }, /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   // A job keeps its cap: `claude -p` ends the session at it, on the default harness as on `claude-detached`.
   for (const harness of ['claude-detached', 'claude']) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', harness, budgetUsd: 0.25 });
+    const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { budgetUsd: 0.25 } });
     const [filed] = await journal.read(id);
-    assert.equal((filed as { budgetUsd?: number }).budgetUsd, 0.25, 'on the record, for the runner');
-    assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
+    assert.deepEqual((filed as { config?: object }).config, { budgetUsd: 0.25 }, 'on the record, for the runner');
+    assert.equal('budgetUsd' in filed!, false, 'and nowhere else');
+    assert.equal((await engine.view(id)).state.config?.budgetUsd, 0.25);
   }
 });
 

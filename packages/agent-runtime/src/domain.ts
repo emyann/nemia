@@ -102,11 +102,12 @@ export type Sighting = {
    */
   waitingFor?: string;
   /**
-   * The harness ended the session because it spent the budget its task gave it — as the harness printed it (`claude -p`'s
-   * result, `subtype: error_max_budget_usd`), never a cost compared with a budget, which nothing here does. `decide`
-   * records it as the end's reason, and settles the task: no attempt follows one that spent its budget.
+   * A limit its configuration set that the harness says it ended the session at, in one word — `budget`, when `claude -p`'s
+   * result says `subtype: error_max_budget_usd` (the cap its `config` gave it). As the harness printed it, never a measure
+   * compared with a limit, which nothing here does. **Carried, never judged**: written on the attempt's end, and `decide`
+   * does not read it — the session's end is its state, and whether a limit reached is a failure is the caller's to say.
    */
-  budgetSpent?: true;
+  limit?: string;
   /**
    * Every tool call the harness denied the session, as the harness recorded it, in the order it first did: a session
    * with no approval surface carries on past a denial, and this is the only trace of it. Absent when the harness denied
@@ -200,8 +201,10 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  *                  such an end is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles
  *                  `failed` with the note it always had.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
- *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
- *                  task settles `failed`, saying the budget was spent.
+ *                  A harness that ended the session at a limit its configuration set — a spend cap — ends it `harness`
+ *                  too, with the limit beside it (`limit`), a fact the layer above judges. A journal written before stage
+ *                  4b (2026-09-25) recorded such an end `budget`, and is read as `harness` with `limit: 'budget'`
+ *                  (`upgrade` in `journal.ts`).
  *   `operator`     a person asked the task to stop, and the attempt was stopped before its harness ended it. Recorded
  *                  `stopped`. Journals before 2026-09-19 settled such an attempt without ending it.
  *   `deadline`     the task ran past its deadline, and the attempt was stopped before its harness ended it. Recorded
@@ -216,7 +219,7 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  * above, which decides whether to try again and which session to continue, can tell a lost session's unjudged work
  * from a conclusion and from a spawn that ran nothing.
  */
-export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget' | 'operator' | 'deadline';
+export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'operator' | 'deadline';
 
 // ─── the journal ────────────────────────────────────────────────────────────
 // Every side effect is bracketed by two entries: the intent, then the result. That bracket is
@@ -251,12 +254,10 @@ export type Event =
        * it never learns the shape, because the shape is somebody else's vocabulary.
        */
       closeoutSchema?: object;
-      /**
-       * The most one attempt's session may spend, in dollars — per attempt, as the harness keeps it: `claude -p
-       * --max-budget-usd` counts one process's spend. Carried, never read here: a runner hands it to its harness, and
-       * `decide` learns only that a harness ended a session on it (`Sighting.budgetSpent`).
+      /*
+       * A journal written before stage 4b (2026-09-25) carries the spend cap here too, beside `config`; it is read as one
+       * of the harness's arguments, under it (`upgrade` in `journal.ts`).
        */
-      budgetUsd?: number;
       /**
        * Which waiting task a free slot goes to first: higher first, and filing order within one; absent is 0. Read by the
        * pass when it orders the board (`admissionOrder` in `engine.ts`), and nowhere else — not by `decide`, which is
@@ -283,13 +284,13 @@ export type Event =
    */
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
   /**
-   * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode` and `denials`
+   * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials` and `limit`
    * come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
    * read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict —
    * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
    * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; error?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; limit?: string; error?: string }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -307,7 +308,8 @@ export type Event =
   | ({ kind: 'said' } & Said)
   /**
    * A person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the words
-   * its next turn is told, continuing the session that signed, and that turn's spend cap when they gave one. Read by
+   * its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself when
+   * they gave any — its spend cap. Read by
    * `decide`: an input starts a turn. Refused by the facade unless the task waits for one.
    */
   | ({ kind: 'input' } & Input)
@@ -323,8 +325,11 @@ export type Event =
 /** Words said to a running attempt's session, and when the engine wrote them down. See the `said` event. */
 export type Said = { at: string; attempt: number; text: string };
 
-/** A person's answer to a task held open, and the spend cap of the turn it starts when they gave one. See the `input` event. */
-export type Input = { at: string; text: string; budgetUsd?: number };
+/**
+ * A person's answer to a task held open, and what the turn it starts gives its configuration for itself when they gave any
+ * (`TURN_ARGS` in `harness-args.ts`: its spend cap), over the task's own. Carried whole, never opened here. See the `input` event.
+ */
+export type Input = { at: string; text: string; config?: HarnessArgs };
 
 export type Attempt = {
   n: number;
@@ -357,6 +362,8 @@ export type Attempt = {
   exitCode: number | null;
   /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
   denials?: Denial[];
+  /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
+  limit?: string;
   /**
    * Which turn of a task held open it belongs to: how many `input`s were journalled before it started. Absent for turn 0,
    * so every attempt of a task not held open — and of every journal written before — folds as it did.
@@ -382,8 +389,6 @@ export type State = {
   config?: HarnessArgs;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
-  /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
-  budgetUsd?: number;
   /** Which waiting task a free slot goes to first. See the `filed` event. `decide` never reads it. */
   priority?: number;
   attempts: Attempt[];
@@ -414,7 +419,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds;
         s.resumeFrom = e.resumeFrom;
         s.config = e.config; s.closeoutSchema = e.closeoutSchema;
-        s.budgetUsd = e.budgetUsd; s.priority = e.priority;
+        s.priority = e.priority;
         if (e.holdOpen) s.holdOpen = true;
         break;
       case 'starting':
@@ -427,7 +432,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; if (e.stated !== undefined) a.stated = e.stated; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; a.error = e.error ?? a.error; }
+        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; if (e.stated !== undefined) a.stated = e.stated; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; if (e.limit) a.limit = e.limit; a.error = e.error ?? a.error; }
         break;
       }
       case 'measured': {
@@ -437,7 +442,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'stop-requested': s.stopRequested = true; break;
       case 'said': s.said.push({ at: e.at, attempt: e.attempt, text: e.text }); break;
-      case 'input': s.inputs.push({ at: e.at, text: e.text, ...(e.budgetUsd !== undefined ? { budgetUsd: e.budgetUsd } : {}) }); break;
+      case 'input': s.inputs.push({ at: e.at, text: e.text, ...(e.config ? { config: e.config } : {}) }); break;
       case 'closed': s.closed = true; break;
       case 'settled': {
         s.settled = e.outcome;
@@ -456,8 +461,9 @@ export function fold(taskId: string, events: readonly Event[]): State {
 /**
  * Turn `n` of a task (the current one by default): its attempts; the session it continues — for a later turn, the one that
  * signed the turn before it, and none if its harness recorded none; for the first, what the task was filed against; the words it is told instead of the brief — every answer given since the turn
- * before it started, so two answers that raced are both heard; and its spend cap per attempt — the last one given with
- * those words, else the filing's. Turn 0 is the task as filed: every attempt of a task not held open, told the brief.
+ * before it started, so two answers that raced are both heard; and what its configuration gives for itself — the last one
+ * given with those words, whole, which the engine lays over the filing's (`configForTurn`). Turn 0 is the task as filed:
+ * every attempt of a task not held open, told the brief, with nothing of its own.
  */
 export function turnOf(state: State, n = state.inputs.length) {
   const attempts = state.attempts.filter((a) => (a.turn ?? 0) === n);
@@ -467,7 +473,7 @@ export function turnOf(state: State, n = state.inputs.length) {
     n, attempts,
     continues: n === 0 ? state.resumeFrom : before.at(-1)?.nativeId ?? undefined,
     words: given.length ? given.map((i) => i.text).join('\n\n') : undefined,
-    budgetUsd: [...given].reverse().find((i) => i.budgetUsd !== undefined)?.budgetUsd ?? state.budgetUsd,
+    config: [...given].reverse().find((i) => i.config)?.config,
   };
 }
 
@@ -523,7 +529,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // had one before the cut came; otherwise with the cut as its reason. Never settled open, with neither.
   const cut = (reason: 'operator' | 'deadline'): Action | undefined =>
     !last || last.ended !== null ? undefined
-      : sighting?.state === 'done' || sighting?.state === 'failed' || sighting?.budgetSpent ? endOf(state, last, sighting)
+      : sighting?.state === 'done' || sighting?.state === 'failed' ? endOf(state, last, sighting)
       : { do: 'record-end', attempt: last.n, sessionId: sighting?.sessionId ?? '(never seen)', observed: reason === 'operator' ? 'stopped' : 'failed',
           reason, nativeId: sighting?.nativeId, closeout: sighting?.closeout?.payload };
 
@@ -571,7 +577,6 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     const ended = turn.attempts.at(-1);
     if (ended?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
     if (ended?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
-    if (ended?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${ended.n} spent its budget. File the task again with a larger one to run it again` };
     // A journal from before stage 4a part 2 may hold several attempts of a turn: the note counts them all.
     const none = `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded`;
     // An end the engine judged `unsigned`, in a journal from before stage 4a: settled with the note it always had.
@@ -622,9 +627,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
 /** The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. */
 function endOf(state: State, last: Attempt, sighting: Sighting): Action {
   const quiet = sighting.state === 'working';
-  // A spent budget is `failed` whatever state the harness left it in: cut off, not concluded — `done` would settle it succeeded.
-  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: sighting.budgetSpent ? 'failed' : quiet ? 'done' : sighting.state,
-    reason: sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
+  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: quiet ? 'done' : sighting.state,
+    reason: 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
     // Whether the statement its task asked for came: a fact for the layer above, which judges it.
     ...(state.closeoutSchema !== undefined ? { stated: sighting.closeout !== undefined } : {}) };
 }

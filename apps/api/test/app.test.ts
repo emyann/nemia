@@ -541,6 +541,19 @@ test('each step says how many attempts it has had, when the latest began, and ho
   const old = await (await app.request('/api/runs/r-8o')).json();
   assert.deepEqual([old.steps[0].attempts, old.steps[0].status], [unsignedWords, 'unsigned']);
 
+  // A session its harness cut at its spend cap: since stage 4b the runtime carries the cut as a fact, `limit: 'budget'`, on an end that is
+  // the harness's own, and judges nothing of it — the api says what it said when the runtime did, off the orchestrator's reading. And a
+  // journal from before, whose end the runtime judged `budget`, reads the same.
+  const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
+  quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
+  writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
+  const capped = await (await app.request('/api/runs/r-8b')).json();
+  assert.deepEqual([capped.steps[0].attempts, capped.steps[0].status], [cappedWords, 'budget exhausted']);
+  quiet('t-8c', { observed: 'failed', reason: 'budget', exitCode: 1 }, 'failed');
+  writeRun({ ...r2, id: 'r-8c', steps: { implement: { taskId: 't-8c', branch: 'wf/r-8c/implement' }, review: { taskId: null } } });
+  const cappedBefore = await (await app.request('/api/runs/r-8c')).json();
+  assert.deepEqual([cappedBefore.steps[0].attempts, cappedBefore.steps[0].status], [cappedWords, 'budget exhausted']);
+
   // A task the engine has no record of has had no attempts it can speak for.
   assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
 

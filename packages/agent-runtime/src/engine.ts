@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
+import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
@@ -51,7 +51,7 @@ export type TaskView = {
 export type Filing = {
   brief: string; cwd: string;
   harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resumeFrom?: string;
-  closeoutSchema?: object; budgetUsd?: number; priority?: number; id?: string;
+  closeoutSchema?: object; priority?: number; id?: string;
   /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
 };
@@ -102,9 +102,6 @@ export const refusalOf = (spec: Filing): string | undefined => {
     return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
   }
   if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
-  if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
-    return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
-  }
   if (spec.holdOpen !== undefined && spec.holdOpen !== true) {
     return `\`holdOpen: ${JSON.stringify(spec.holdOpen)}\` is not a yes. Give true to have the task wait for an answer when an attempt signs, or leave it out to settle it then.`;
   }
@@ -128,7 +125,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
     harness: spec.harness, config: spec.config,
     deadlineSeconds: spec.deadlineSeconds, resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema, budgetUsd: spec.budgetUsd, priority: spec.priority, holdOpen: spec.holdOpen,
+    closeoutSchema: spec.closeoutSchema, priority: spec.priority, holdOpen: spec.holdOpen,
   });
   return id;
 });
@@ -169,13 +166,10 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   return `\`${taskId}\`'s attempt ${last.n} ended \`${last.ended}\`, and the task is between attempts, not waiting for an answer. Ask again once \`ae ls\` says \`input-required\`, or \`stop\` it.`;
 };
 
-/** Why `answer` would not journal these words — the task's state, the words, the budget — or `undefined`. */
-export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, budgetUsd?: unknown): string | undefined => {
+/** Why `answer` would not journal these words — the words, what the turn gives its configuration, the task's state — or `undefined`. */
+export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown): string | undefined => {
   if (typeof text !== 'string' || !text.trim()) return '`text` is empty. Give the words the next turn should begin with.';
-  if (budgetUsd !== undefined && !(typeof budgetUsd === 'number' && Number.isFinite(budgetUsd) && budgetUsd > 0)) {
-    return `\`budgetUsd: ${typeof budgetUsd === 'number' ? budgetUsd : JSON.stringify(budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for the task's own.`;
-  }
-  return waitRefusalOf('answer', taskId, state);
+  return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
 };
 
 /** Why `close` would not journal a close, or `undefined`. */
@@ -183,18 +177,19 @@ export const closeRefusalOf = (taskId: string, state: State | undefined): string
 
 /**
  * A person's answer to a task held open (R1) that waits for one. Journalled as an `input`, and returned; the next pass
- * starts the task's next turn — an attempt that continues the session that signed, told `text` — under `budgetUsd` if
- * given, else the task's own. A budget is the harness's to keep, so one given here is asked of it as a filing's is.
+ * starts the task's next turn — an attempt that continues the session that signed, told `text` — with `config` laid
+ * over the task's own when given (`TURN_ARGS`: its spend cap). The configuration is the harness's to keep, so the one
+ * the turn would start with is asked of it as a filing's is.
  */
-export const answer = Effect.fn('answer')(function* (taskId: string, text: string, budgetUsd?: number) {
+export const answer = Effect.fn('answer')(function* (taskId: string, text: string, config?: HarnessArgs) {
   const journal = yield* Journal;
   const events = yield* journal.read(taskId);
   const state = events.length ? fold(taskId, events) : undefined;
   const runner = yield* Runner;
-  const refused = answerRefusalOf(taskId, state, text, budgetUsd)
-    ?? (budgetUsd !== undefined && state ? runner.refuses?.(filingOf(state, budgetUsd)) : undefined);
+  const refused = answerRefusalOf(taskId, state, text, config)
+    ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
   if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
-  const input: Input = { at: new Date().toISOString(), text, ...(budgetUsd !== undefined ? { budgetUsd } : {}) };
+  const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
   yield* journal.append(taskId, { kind: 'input', ...input });
   return input;
 });
@@ -208,9 +203,9 @@ export const close = Effect.fn('close')(function* (taskId: string) {
   yield* journal.append(taskId, { kind: 'closed', at: new Date().toISOString() });
 });
 
-/** The task as it was filed, with another budget: what a harness is asked of an answer's budget. */
-export const filingOf = (state: State, budgetUsd?: number): Filing => ({
-  brief: state.brief, cwd: state.cwd, harness: state.harness, config: state.config, budgetUsd,
+/** The task as it was filed, with a turn's own configuration laid over its own: what a harness is asked of an answer's. */
+export const filingOf = (state: State, turn?: HarnessArgs): Filing => ({
+  brief: state.brief, cwd: state.cwd, harness: state.harness, config: configForTurn(state.config, turn),
 });
 
 /**
@@ -311,10 +306,10 @@ export const step = Effect.fn('step')(function* (
       const attempt = state.attempts.find((a) => a.n === action.attempt);
       const failed = yield* runner.spawn({
         name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd, harness: state.harness,
-        // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's.
-        config: state.config, closeoutSchema: state.closeoutSchema, resumeFrom: attempt?.resumeFrom,
-        // The turn's: an answer may give its own (`answer`), and a task that is never answered has only the filing's.
-        budgetUsd: turnOf(state, attempt?.turn ?? 0).budgetUsd,
+        // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's. An
+        // answer may give its turn its own (`answer`), laid over the filing's without being read; a task never answered has the filing's.
+        config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
+        closeoutSchema: state.closeoutSchema, resumeFrom: attempt?.resumeFrom,
       }).pipe(
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
@@ -326,13 +321,13 @@ export const step = Effect.fn('step')(function* (
     }
 
     case 'record-end': {
-      // What the attempt consumed, how its process exited and what its harness denied it are read off the same sighting
-      // the ending came from, and written beside it. Facts for the record; `decide` sees none of them.
+      // What the attempt consumed, how its process exited, what its harness denied it and the limit it says it stopped at are
+      // read off the same sighting the ending came from, and written beside it. Facts for the record; `decide` sees none of them.
       const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}), usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials,
+        closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}), usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials, limit: seen?.limit,
       });
       break;
     }

@@ -224,7 +224,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
  *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap (`roundSpans`)
- *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
+ *   budget exhausted its harness ended its session at the step's `budget:` (a `claude -p` job: the runtime's `limit: 'budget'` on the attempt)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is filed and
  *                    no check is run on work done without the tool; `retries:` never files a try of it, since the try would run under the
  *                    same frozen `allowedTools:` — a person does, `wf retry`
@@ -1336,7 +1336,7 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for.
  *
  * **A budget is spent once the engine says so.** A task whose harness ended its last attempt at its cap is `budget exhausted`, whatever
- * else its session left. A step whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to
+ * else its session left: the runtime reports the cut (`limit: 'budget'`) and judges nothing of it, so this is where it is judged. A step whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to
  * spend, is `over budget` where another session of it would be the way on (`held`): its try ended without letting what waits on it run —
  * which `retries:` would try again, or a person — or its loop asks for a round that would file it again. A check that did not finish is no
  * such end: its way on is the check again, which costs nothing, so the step reads `failed (check)` as before, and only a check that
@@ -1445,8 +1445,9 @@ export function ownStatus(
   if (said?.outcome === 'blocked') return 'blocked';
 
   const phase = phaseOf(st.taskId);
-  // Cut off at its cap, not concluded: the engine settles it `failed`, naming the budget, and no attempt follows (agent-runtime's README).
-  if (phase === 'failed' && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
+  // Cut off at its cap, not concluded, and no attempt follows (agent-runtime's README). The runtime settles the task as its harness ended
+  // the session and carries the cut unjudged (stage 4b), so a cap reached on a session its harness called done is as spent as a failed one.
+  if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -1476,7 +1477,7 @@ export function ownStatus(
 export type Spend = { usd: number; measured: number; unmeasured: number };
 
 /**
- * What one task's sessions cost (`Spend`), whether its harness ended its last attempt at its budget — the engine's reason `budget` — and
+ * What one task's sessions cost (`Spend`), whether its harness ended its last attempt at its budget — the runtime's `limit: 'budget'` — and
  * what its sessions were denied, in the runtime's words (`deniedOf` in views.ts, which `spendReader` fills it from: this file reads no
  * runtime). Not money, and here all the same: every reader of a step's standing is handed a `SpendOf` already, and a reader handed a
  * parameter of its own could leave it out and read no denial. Absent where nobody read them, as `taskSpend` alone leaves it.
@@ -1500,7 +1501,7 @@ export function taskSpend(view: TaskClock | undefined): TaskSpend | undefined {
     usd: costs.reduce<number>((n, c) => n + (c ?? 0), 0),
     measured: costs.filter((c) => c !== undefined).length,
     unmeasured: costs.filter((c) => c === undefined).length,
-    budgetEnded: view.state.attempts.at(-1)?.reason === 'budget',
+    budgetEnded: view.state.attempts.at(-1)?.limit === 'budget',
   };
 }
 

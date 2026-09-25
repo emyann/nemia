@@ -71,14 +71,62 @@ export type HarnessArgs = {
    * other harness, none of which has two ways to run.
    */
   background?: boolean;
+  /**
+   * The most one attempt's session may spend, in dollars — `0.25`, `5` — as its harness keeps a cap natively: Claude Code
+   * is given it as `--max-budget-usd`, and `claude -p` ends the session once a response takes it past, printing so in its
+   * result (`Sighting.limit`: `budget`). The harness counts one process's spend, so a cap is per attempt. A harness
+   * feature carried as one of its arguments, and no policy of the runtime's: nothing here compares a cost with it, and
+   * whether a step is over its budget is the caller's judgement (agent-orchestrator's `budget:`). Refused unless dollars
+   * above 0, and on a harness that keeps no cap: `claude --bg`, which spends past one (measured), and `codex`, which has none.
+   * A later turn of a task held open may give its own (`TURN_ARGS`).
+   */
+  budgetUsd?: number;
 };
 
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
   model: true, permissionMode: true, effort: true, tools: true, allowedTools: true, disallowedTools: true,
-  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true,
+  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true, budgetUsd: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
+
+/**
+ * The harness arguments a later turn of a task held open may give for itself (`answer`), on top of the task's own. A turn
+ * continues the session its task was filed with, so what starts that session — its model, its tools, how it runs — is the
+ * filing's; only the cap on what the turn itself may spend is the turn's, since each turn is a process of its own.
+ */
+export const TURN_ARGS: ReadonlyArray<keyof HarnessArgs> = ['budgetUsd'];
+
+/** Dollars above 0: what a spend cap is. */
+const isDollars = (usd: unknown): boolean => typeof usd === 'number' && Number.isFinite(usd) && usd > 0;
+const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
+
+/**
+ * The configuration a turn's session is started with: the task's, with what the turn gave for itself (`TURN_ARGS`) over it.
+ * The one place a turn's configuration is merged, so the runtime's core hands both on without opening either.
+ */
+export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined): HarnessArgs | undefined =>
+  turn === undefined ? base : { ...base, ...turn };
+
+/**
+ * Why what an answer gives its turn cannot be journalled — or `undefined`. Only the turn's own arguments (`TURN_ARGS`), in
+ * the words a filing's have, except that leaving a cap out keeps the task's own.
+ */
+export const turnArgsRefusalOf = (turn: unknown): string | undefined => {
+  if (turn === undefined) return undefined;
+  if (typeof turn !== 'object' || turn === null || Array.isArray(turn)) {
+    return `\`config: ${JSON.stringify(turn)}\` is not a turn's configuration. Give an object, like { "budgetUsd": 2 }, or leave it out for the task's own.`;
+  }
+  const other = Object.keys(turn).find((key) => !(TURN_ARGS as readonly string[]).includes(key));
+  if (other) {
+    return `\`config.${other}\` cannot be given to one turn: a turn continues the session its task was filed with, and only its spend cap (\`budgetUsd\`) is its own. File a task that continues the session (\`resumeFrom\`) with the configuration it should have.`;
+  }
+  const { budgetUsd } = turn as HarnessArgs;
+  if (budgetUsd !== undefined && !isDollars(budgetUsd)) {
+    return `\`budgetUsd: ${shown(budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for the task's own.`;
+  }
+  return undefined;
+};
 
 /**
  * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses —
@@ -130,6 +178,9 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   }
   if (config.contextTokens !== undefined && !(typeof config.contextTokens === 'number' && Number.isSafeInteger(config.contextTokens) && config.contextTokens > 0)) {
     return `\`contextTokens: ${typeof config.contextTokens === 'number' ? config.contextTokens : JSON.stringify(config.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
+  }
+  if (config.budgetUsd !== undefined && !isDollars(config.budgetUsd)) {
+    return `\`budgetUsd: ${shown(config.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
   }
   return undefined;
 };

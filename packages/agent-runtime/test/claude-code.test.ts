@@ -72,8 +72,8 @@ const until = async <T>(read: () => Promise<T | undefined>, what: string, ms = 1
 
 test('a job is `claude -p` reading a stream and printing one, verbose, that no prompt can hold — its brief the first line on its stdin', () => {
   const args = claudeJob.command({
-    name: 'ae/t/1', brief: 'the prompt', cwd: '/r', budgetUsd: 0.5, resumeFrom: BG_ID,
-    config: { tools: ['Read', 'Bash'], permissionMode: 'dontAsk' },
+    name: 'ae/t/1', brief: 'the prompt', cwd: '/r', resumeFrom: BG_ID,
+    config: { tools: ['Read', 'Bash'], permissionMode: 'dontAsk', budgetUsd: 0.5 },
   }).args;
   assert.deepEqual(args.slice(0, 8), ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none']);
   assert.equal(args.includes('the prompt'), false, 'the brief is not an argument');
@@ -272,12 +272,12 @@ test('a job resumed from a background session is a job — and, its parent not o
 });
 
 test('what the default Claude Code refuses depends on the mode: a job refuses a bridge, a background session a spend cap — each naming the other', () => {
-  assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', budgetUsd: 1 }), undefined, 'a job keeps a cap');
+  assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background: true, remoteControl: true } }), undefined);
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r' }), undefined);
   const bridge = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { remoteControl: true } });
   assert.ok(bridge && /^`remoteControl: true` bridges a session to claude\.ai/.test(bridge) && bridge.includes('`config.background: true`'), bridge);
-  const cap = claudeCodeRefuses({ brief: 'b', cwd: '/r', budgetUsd: 0.5, config: { background: true } });
+  const cap = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 0.5, background: true } });
   assert.ok(cap && /^`budgetUsd: 0\.5` is a spend cap/.test(cap) && cap.includes('Leave `config.background` off'), cap);
   for (const background of [undefined, true]) {
     assert.match(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background, effort: 'huge' } }) ?? '', /^`effort: huge` is not an effort Claude Code has/);

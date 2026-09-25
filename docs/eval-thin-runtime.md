@@ -384,5 +384,20 @@ orchestrator's calls to the runtime change.
    the failed session, or for a lost or unstartable turn the session that signed the turn before (`an answer's turn that
    FAILED` / `was LOST` / `COULD NOT START` in `agent-orchestrator/test/held.test.ts`). `retries:` still spends nothing on
    such an end.
+   **Stage 4b done, 2026-09-25: budgets are the orchestrator's.** The runtime measures a session's spend and reports it, and
+   knows no budget: `budgetUsd` is a harness argument under `config`, handed to a harness that keeps a cap as its own flag
+   (`claude -p --max-budget-usd`) and refused by the harness that keeps none (`claude --bg`, `codex`), in the same words as
+   before. A cut its harness reports is carried on the attempt as `limit: 'budget'` — on the `Sighting`, the `ended` event
+   and the `Attempt` — beside an end that is the harness's own (`failed`, reason `harness`), and changes no decision: the
+   task settles as any failed end does, noting `1 attempt(s), none succeeded`. `domain.ts` and `engine.ts` name no budget
+   (`test/core-reads.test.ts`). An answer's turn gives its cap as `answer(id, text, { config: { budgetUsd } })`, laid over
+   the filing's by `configForTurn` and refused for any other key (`TURN_ARGS`); a top-level `budgetUsd` is refused naming
+   `config`, at `file` and at `answer`. A journal written before is read in today's shape by `upgrade`, rewriting nothing: a
+   filing's and an answer's cap under `config`, and an end `budget` as `harness` with `limit: 'budget'`. The orchestrator
+   files the cap under `config`, reads the limit (`taskSpend`), reads a step so cut as `budget exhausted` whether its harness
+   called the end failed or done (`ownStatus`), and `endWords` gives the board `failed · budget` as before — the words `wf
+   ls`, `wf decide` and the board say about a budget did not change (the api's `app.test.ts` reads both journal shapes).
+   What stays out of reach: no harness reports a running session's spend, so the orchestrator judges a budget only once an
+   attempt has ended; the live bound is still the harness's own cap (open issue 17).
 5. **The lifecycle as an XState statechart on `TaskState`.**
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.

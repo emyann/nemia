@@ -177,8 +177,8 @@ export type Workflow = {
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
    * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). On `claude` and
-   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `budgetUsd` too, and the harness
-   * ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which has none, and beside `background: true`,
+   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `config.budgetUsd` too — a harness
+   * argument the runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which has none, and beside `background: true`,
    * whose `claude --bg` keeps none either.
    */
   budget?: number;

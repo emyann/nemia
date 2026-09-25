@@ -43,7 +43,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
       Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
     const phase = async (id: string) => (await run(Effect.flatMap(Runner, (r) => r.observe).pipe(Effect.flatMap((o) => view(id, o))))).phase;
 
-    const id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, budgetUsd: 1 }));
+    const id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
     await run(tick());
     signed(sessions, `ae/${id}/1`, 'a first draft');
     await run(tick());
@@ -53,17 +53,17 @@ test('the Effect door: signed, it waits with its session released; answered afte
     assert.equal(spawned.length, 1, 'and nothing is started while it waits, pass after pass');
     assert.equal(await phase(id), 'input-required');
 
-    const input = await run(answer(id, 'shorter, please', 0.5));
+    const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
     assert.equal(input.text, 'shorter, please');
-    assert.equal(input.budgetUsd, 0.5);
+    assert.deepEqual(input.config, { budgetUsd: 0.5 });
     // A new process, reading only the store: the answer is on the record, so the turn is too.
     await run(tick());
     assert.equal(spawned.length, 2);
     assert.equal(spawned[1]!.name, `ae/${id}/2`);
     assert.equal(spawned[1]!.resumeFrom, 'fake-1', 'it continues the session that signed');
     assert.equal(spawned[1]!.brief, 'shorter, please', 'told the answer, not the brief again');
-    assert.equal(spawned[1]!.budgetUsd, 0.5, "under the answer's budget");
-    assert.equal(spawned[0]!.budgetUsd, 1, "the first turn under the filing's");
+    assert.deepEqual(spawned[1]!.config, { model: 'opus', budgetUsd: 0.5 }, "under the answer's budget, laid over the rest of the filing's configuration");
+    assert.deepEqual(spawned[0]!.config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
     assert.equal(await phase(id), 'running (working)');
 
     signed(sessions, `ae/${id}/2`, 'a shorter draft');
@@ -84,7 +84,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
 
 test('the Effect door refuses as the facade does: InputRefused, and nothing journalled', async () => {
   const journal = Journal.test();
-  const layer = Layer.mergeAll(journal, Runner.layer({ ...testOps(), refuses: (t) => (t.budgetUsd !== undefined ? 'keeps no cap' : undefined) }));
+  const layer = Layer.mergeAll(journal, Runner.layer({ ...testOps(), refuses: (t) => (t.config?.budgetUsd !== undefined ? 'keeps no cap' : undefined) }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(Effect.result(e).pipe(Effect.provide(layer)));
   const refusedWith = async (e: Effect.Effect<unknown, unknown, Journal | Runner>, pattern: RegExp) => {
     const r = await run(e);
@@ -108,7 +108,10 @@ test('the Effect door refuses as the facade does: InputRefused, and nothing jour
   assert.equal(await count(unrecorded), 4, 'nothing journalled');
   // Waiting, the words are taken; a budget its harness would not keep is refused by the harness, at this door too.
   await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(held, e))));
-  await refusedWith(answer(held, 'go on', 2), /^keeps no cap$/);
+  await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
+  // A turn gives its own spend cap and nothing else: the session it continues was started with the rest.
+  await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
+  await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
   assert.equal(await count(held), 4);
   assert.equal((await run(answer(held, 'go on')))._tag, 'Success');
   assert.equal(await count(held), 5);
@@ -166,7 +169,7 @@ test('the facade: signed, it waits; answered, it resumes; a stop settles it stop
   assert.equal(v.phase, 'input-required');
   assert.equal(v.state.settled, null);
   const said = await b.engine.answer(id, 'again');
-  assert.deepEqual(Object.keys(said), ['at', 'text'], 'no budget given, none journalled');
+  assert.deepEqual(Object.keys(said), ['at', 'text'], 'no configuration given, none journalled');
   assert.deepEqual((await b.engine.view(id)).state.inputs, [said]);
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'running (working)');
@@ -178,17 +181,22 @@ test('the facade: signed, it waits; answered, it resumes; a stop settles it stop
   assert.equal((await b.engine.view(id)).phase, 'stopped');
 });
 
-test('answer refuses what is no answer: empty words, a budget that is not dollars, one its harness would not keep', async () => {
+test('answer refuses what is no answer: empty words, a budget that is not dollars, one its harness would not keep, one beside config, and any other key of a turn\'s', async () => {
   const b = board();
   b.write('t-w', signedJournal());
   await refuses(b, 't-w', () => b.engine.answer('t-w', ''), /^answer: `text` is empty\. Give the words/);
   await refuses(b, 't-w', () => b.engine.answer('t-w', '  \n'), /^answer: `text` is empty/);
   for (const budgetUsd of [0, -1, Number.NaN, Infinity, '5' as unknown as number]) {
-    await refuses(b, 't-w', () => b.engine.answer('t-w', 'go', { budgetUsd }), /^answer: `budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/);
+    await refuses(b, 't-w', () => b.engine.answer('t-w', 'go', { config: { budgetUsd } }), /^answer: `budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/);
   }
+  // The cap was an option of its own until stage 4b: a caller built before it is told where it goes, not ignored.
+  await refuses(b, 't-w', () => b.engine.answer('t-w', 'go', { budgetUsd: 1 } as never),
+    /^answer: `budgetUsd` is the harness's configuration: give it under `config`, as `answer\(id, text, \{ config: \{ budgetUsd: … \} \}\)`\.$/);
+  await refuses(b, 't-w', () => b.engine.answer('t-w', 'go', { config: { model: 'opus' } }), /^answer: `config\.model` cannot be given to one turn/);
+  await refuses(b, 't-w', () => b.engine.answer('t-w', 'go', { config: 'cheap' as never }), /^answer: `config: "cheap"` is not a turn's configuration/);
   const bg = board({ bg: 'claude-bg' });
   bg.write('t-bg', signedJournal(), { harness: 'bg' });
-  await refuses(bg, 't-bg', () => bg.engine.answer('t-bg', 'go', { budgetUsd: 1 }), /^answer: `budgetUsd: 1` is a spend cap, and a `claude --bg` session does not keep one/);
+  await refuses(bg, 't-bg', () => bg.engine.answer('t-bg', 'go', { config: { budgetUsd: 1 } }), /^answer: `budgetUsd: 1` is a spend cap, and a `claude --bg` session does not keep one/);
 });
 
 test('answer and close refuse a task that is not waiting for one, each saying what to do', async () => {
@@ -263,7 +271,7 @@ test('ae answer prints the line it journalled, the words being everything after 
     assert.equal(ok.status, 0, ok.stderr);
     assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
     const last = (await journal(a)).at(-1)!;
-    assert.deepEqual(last.kind === 'input' ? [last.text, last.budgetUsd] : last, ['shorter, please', 0.5]);
+    assert.deepEqual(last.kind === 'input' ? [last.text, last.config] : last, ['shorter, please', { budgetUsd: 0.5 }]);
     const again = run('close', a);
     assert.equal(again.status, 2);
     assert.match(again.stderr, /^close: `t-.*` has been answered already/);

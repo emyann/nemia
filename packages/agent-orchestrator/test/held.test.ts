@@ -181,7 +181,7 @@ test('an answer carries what is left of the cap in force; over it, the task stay
   const under = await signedPlan({ plan: 'budget: 4' }, BLOCKED, undefined, { costUsd: 1.5 });
   await retry(under.e, under.run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' });
   await under.pass(under.run.id);
-  assert.equal((await stateOf(under.e, `${under.run.id}-plan`)).state.inputs[0]!.budgetUsd, 2.5, '$4 less the $1.50 its first turn cost');
+  assert.equal((await stateOf(under.e, `${under.run.id}-plan`)).state.inputs[0]!.config?.budgetUsd, 2.5, '$4 less the $1.50 its first turn cost');
 
   const { run, e, pass } = await signedPlan({ plan: 'budget: 4' }, BLOCKED, undefined, { costUsd: 5 });
   assert.match((await statuses(e, run.id)).plan!, /^over budget \$5\.00 of \$4/);
@@ -189,7 +189,7 @@ test('an answer carries what is left of the cap in force; over it, the task stay
   assert.equal((await stateOf(e, `${run.id}-plan`)).phase, 'input-required', 'a blocked step over its budget waits for a person all the same');
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag', budget: 6 });
   assert.deepEqual((await pass(run.id)).tried, ['plan']);
-  assert.equal((await stateOf(e, `${run.id}-plan`)).state.inputs[0]!.budgetUsd, 1, '$6 less the $5 spent');
+  assert.equal((await stateOf(e, `${run.id}-plan`)).state.inputs[0]!.config?.budgetUsd, 1, '$6 less the $5 spent');
 });
 
 test('a try of a waiting step that is not an answer — `--fresh`, `--model` — closes the task, and files a task of its own as every try was', async () => {

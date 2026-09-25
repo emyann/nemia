@@ -40,15 +40,15 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `remoteControl`, `worktree` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+`contextTokens`, `remoteControl`, `worktree`, `budgetUsd` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
-`test/core-reads.test.ts` refuses either the day it reads one. `budgetUsd` is the task's own, read by a runner; `priority` is
+`test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `priority` is the task's own,
 read by the pass that orders the board.
 
 ### One attempt per start
 
 The engine starts one attempt at a task, and whatever ends it settles the task: `succeeded` when its harness ended it done,
-`failed` when it failed, was lost, could not start, spent its budget or ran out of time, `stopped` when it was asked to stop.
+`failed` when it failed, was lost, could not start or ran out of time, `stopped` when it was asked to stop.
 Nothing here tries again. Whether to — and whether to continue the session or start clean — is a judgement about the work,
 so it is the caller's: file the task again, with `resumeFrom` the session's id to continue it. In a workflow the orchestrator
 does it, as `retries:` after a check refuses a step and as `wf retry` for a try that failed, was lost or could not start.
@@ -319,7 +319,7 @@ after a space starts a comment. The keys are a closed list:
 | `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
-`tools`, `effort`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
+`tools`, `effort`, `budgetUsd`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
@@ -478,13 +478,16 @@ operator's args and env.
 
 ## What a session may spend: `budgetUsd`
 
-`budgetUsd: 0.25` is the most one attempt's session may spend, in dollars: a field on the task like `tools`, carried on
-the `filed` event and `State` and read only by a runner. `decide` never reads it, nor a cost — a test reads `decide` to keep
-it so. What `decide` learns is that a harness *ended* a session on its cap, a fact the harness printed:
+`config: { budgetUsd: 0.25 }` is the most one attempt's session may spend, in dollars: a harness argument like `tools`,
+carried on the task's `config` and read only by a runner, which hands it to the harness as its own cap. The runtime knows
+no budget (stage 4b, 2026-09-25): `decide` and the engine never name one, nor judge a cost — `test/core-reads.test.ts`
+reads their code to keep it so. It measures what a session spent and reports it (`usage`), and when a harness says it
+*ended* a session on its cap, it carries that fact on the attempt as `limit: 'budget'`, unjudged. Whether a run went over
+its budget is the orchestrator's to decide:
 
 | harness | given | a session that reaches the cap |
 |---|---|---|
-| `claude` (a job), `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost, and its task settles `failed` |
+| `claude` (a job), `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason `harness`, with **`limit: 'budget'`** and what it cost, and its task settles `failed` as any failed end does |
 | `claude` with `background: true` | refused at `file()`: a `--bg` session keeps no cap | — |
 | `codex` | refused at `file()`: `codex exec` has no spend cap, and its stream no cost | — |
 
@@ -498,23 +501,25 @@ a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task tha
 no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
-**A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
-spent its budget`, and no attempt follows, as none follows any end. To run it again,
+**A budget spent is spent.** An attempt that ended on its cap ends its task as any end does: it settles `failed`, noting
+`1 attempt(s), none succeeded`, and the attempt carries `limit: 'budget'` — `ae show` prints it `failed (budget)`. To run it again,
 file the task again with a larger budget; to continue that session, with `resumeFrom` its id: a cap on `claude -p --resume` bounds
 only its own process's spend (measured on 2.1.280: a resume capped at half of what its session had spent finished). What it
 prints is not its own: on 2.1.280 a resume's `total_cost_usd` and `duration_api_ms` carry its parent's on (2.1.272 printed
 its own), so the runner takes off what the run it continues printed (`resumeCostCarried`, open issue 4). The harness counts one session's spend, and the engine counts none: a task filed again is handed its cap anew,
 so what a chain of filings spends together is the caller's to count (the orchestrator's `budget:`).
 
-`ae start` takes `budgetUsd: 0.25` in a brief, digits only.
+`ae start` takes `budgetUsd: 0.25` in a brief, digits only, and files it under `config`. A journal written before stage 4b
+carried the cap beside `config` and recorded a capped end with reason `budget`; the journal's reader (`upgrade`) reads both in
+today's shape — the cap under `config`, the end `harness` with `limit: 'budget'` — and rewrites nothing on disk.
 
 ## How much a session keeps in mind: `contextTokens`
 
 `contextTokens: 200000` is the context window a task's sessions are given, in tokens: past about it, Claude Code compacts
 the conversation — a summary in place of what the session read — and carries on. Absent, the session runs on the model's
 whole window, which on this machine was a million tokens, and none of 234 worker sessions ever compacted: every token that
-entered one was read again on every call after it (the pivot measurement of 2026-09-18, open issue 26). A field on the task like
-`budgetUsd`, carried on the `filed` event and `State` and read only by a runner, on every attempt's spawn — a continuation
+entered one was read again on every call after it (the pivot measurement of 2026-09-18, open issue 26). A harness argument like
+`budgetUsd`, carried on the task's `config` and read only by a runner, on every attempt's spawn — a continuation
 included, since a resumed session keeps only the flags it is given. `decide` never reads it. The Kubernetes neighbour is
 `resources.limits`: what a workload may hold, set by whoever files it and kept by the node, not the scheduler.
 
@@ -795,7 +800,7 @@ statement it read is recorded as read.
 | `unsigned` | `failed` | only in a journal written before stage 4a: the engine judged an end without its statement (above) |
 | `lost` | `failed` | vanished, or its worker stopped beating: nobody said anything |
 | `unstartable` | `failed` | its spawn was refused, and nothing ran |
-| `budget` | `failed` | its harness cut it at the task's spend cap — `failed` whatever state it was left in |
+| `budget` | `failed` | only in a journal written before stage 4b, and read as `harness` with `limit: 'budget'`: the runtime judged its harness's cut at the task's spend cap. A cut is now carried on the attempt, unjudged, and the end is the harness's own |
 | `operator` | `stopped` | a person stopped its task, and the session was stopped before its harness ended it |
 | `deadline` | `failed` | its task ran past `deadlineSeconds`, and the session was stopped before its harness ended it |
 
@@ -808,10 +813,11 @@ deadline in the same pass, and a check that exited 0 at 607 s of 600 settled `fa
 **Two ends left neither, until 2026-09-19.** A stop and a deadline settled the task over its open attempt, with no
 `ended` at all: 4 of the 511 settled tasks in this machine's store, all stopped by a person, every one on a task that
 had asked for a statement. `decide` now ends the attempt first (`cut`, beside `endOf`), and the task settles on the next
-step as before. And an attempt its harness cut at its budget while listing it `done`, or quiet, was recorded `done`,
-reason `budget` — and its task settled `succeeded`, past the rule that a spent budget settles `failed`. None is on the
-record here; the contract test found it. `test/decide.test.ts`'s CONTRACT walks every sighting, with and without a
-schema, a statement, a spent budget and a cut, to its settle, and fails on either.
+step as before. (Until stage 4b, an attempt its harness cut at its budget while listing it `done` was recorded `done`,
+reason `budget`, and settled `succeeded` past the rule the runtime then kept, that a spent budget settles `failed`. The
+runtime keeps no such rule now: a `limit` is carried and changes no decision.) `test/decide.test.ts`'s CONTRACT walks every
+sighting, with and without a schema, a statement, a harness's limit and a cut, to its settle, and fails on either — and on
+a limit that changes what `decide` does.
 
 A check (agent-orchestrator's `check:`) keeps its verdict in its exit code, not a statement: one cut at its deadline is
 `deadline`, and its exit code, if its process left one, says how it died, not what it found.
@@ -1157,8 +1163,8 @@ kept alive for it, and how its next turn keeps the conversation that made the pl
 ```ts
 const id = await engine.file({ brief: 'Draft the plan.', cwd, holdOpen: true, closeoutSchema })
 // … it signs: view(id).phase is 'input-required', and its session is let go as any ended attempt's is
-await engine.answer(id, 'Cut step 3; keep the rest.', { budgetUsd: 2 })
-// { at: '…', text: 'Cut step 3; keep the rest.', budgetUsd: 2 } — the next tick resumes the session, told that
+await engine.answer(id, 'Cut step 3; keep the rest.', { config: { budgetUsd: 2 } })
+// { at: '…', text: 'Cut step 3; keep the rest.', config: { budgetUsd: 2 } } — the next tick resumes the session, told that
 await engine.close(id)      // once it signs again and waits: the next tick settles it succeeded
 ```
 
@@ -1167,14 +1173,14 @@ node bin/ae.ts answer <id> Cut step 3, keep the rest. --budget 2   # the words a
 node bin/ae.ts close <id>
 ```
 
-**On the journal.** `filed` carries `holdOpen: true`; an answer is an `input` entry — `at`, `text`, and `budgetUsd` when
-given — and a close is `closed`. Each attempt folds with the `turn` it belongs to: the number of `input`s journalled before
+**On the journal.** `filed` carries `holdOpen: true`; an answer is an `input` entry — `at`, `text`, and `config` when
+given, the turn's own harness arguments laid over the filing's (`configForTurn`; only `budgetUsd` today, `TURN_ARGS`) — and a close is `closed`. Each attempt folds with the `turn` it belongs to: the number of `input`s journalled before
 its `starting`, absent for the first turn, so a journal written before any of this folds and decides as it did. `decide`
 reads the three, and nothing else about them: the task waits while its current turn's last attempt signed; an `input`
 after it starts the next turn; a `closed` settles it. Level-triggered like the rest — a restarted engine reads the wait,
 the answer or the close off the record.
 
-**A turn is one attempt.** `deadlineSeconds` runs from the current turn's attempt, and the budget is the answer's if it gave
+**A turn is one attempt.** `deadlineSeconds` runs from the current turn's attempt, and the budget is the answer's `config` if it gave
 one, the filing's if not. So a task may wait on a person for as long as they take — the deadline times work, not reading —
 and a turn whose attempt fails, is lost or cannot start settles the task `failed`, noting the turn, as a first turn's does;
 nothing is retried within the task. A caller that wants the conversation to go on files a task again with `resumeFrom`: on
@@ -1184,7 +1190,7 @@ Two answers journalled before the next turn starts are told to it both, in order
 nothing serialises two writers of one journal, so the record says both and the turn reads both. A `stop` settles a
 waiting task `stopped`, as it does any other.
 
-**Refused, with exit code 2**, nothing journalled, and the fix in the sentence: empty words; a budget that is not dollars
+**Refused, with exit code 2**, nothing journalled, and the fix in the sentence: empty words; a `config` that is not an object, or gives a turn any key but `budgetUsd`; a budget that is not dollars
 above 0, or one the task's harness would not keep (as `file` refuses one: `claude --bg` and `codex` keep none); a task the
 engine has no record of; one not filed to be held open; one settled, closed or asked to stop; and one that is not waiting —
 not started, an attempt running (`say` reaches a running session; `stop` ends it), between attempts, or answered already
@@ -1394,7 +1400,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
-| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
+| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/pool.test.ts` | pools by subscription, at shipped defaults — fake `claude` and `codex` whose sessions run until the test lets them go: a `claude-detached` session counted against `claude`'s ceiling, `codex` and a `check` each in their own |
 | `test/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
@@ -1521,7 +1527,7 @@ engine, not the worst.
 
 Not "todo" — *excluded*, so the core stays legible: no board, no DAG or dependencies, no worktree
 management (the harness cuts worktrees; the engine only asks for one), no pull requests, no spend
-ceilings across tasks (one attempt's own cap is a field on its task, `budgetUsd`), no approvals, no multi-machine anything. Each is a kind built **on** this one, the way
+ceilings across tasks (one attempt's own cap is a harness argument on its task, `config.budgetUsd`), no approvals, no multi-machine anything. Each is a kind built **on** this one, the way
 `tekton.dev` is built on `batch/v1`. None of them requires changing `decide`, which is the test of
 whether this core is the right size.
 

@@ -716,7 +716,7 @@ export const AGENTS = {
     model: 'sonnet',
     edited: 'opus',
     /**
-     * Typed into the Skills field, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name, seeded
+     * Picked from your library in the skill list, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name, seeded
      * in the store's `workflows/skills/`, whose SKILL.md is `skill`, the entry its card is generated with.
      */
     skills: 'write-a-decision',

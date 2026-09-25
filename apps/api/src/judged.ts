@@ -2,7 +2,7 @@
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
  */
-import { answerIn, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord, wordOfView } from 'agent-orchestrator';
+import { answerIn, type BranchReader, branchReader, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord, wordOfView } from 'agent-orchestrator';
 import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
@@ -126,10 +126,10 @@ export type StepNeeds = {
  * The runs a run's roots wait on (`waitsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
  * none, without a look, for a run the gate no longer applies to (`gated`): one started without `--after`, called off, or already started.
  */
-export async function waitsIn(run: Run, reader: typeof e): Promise<Wait[]> {
+export async function waitsIn(run: Run, reader: typeof e, git: BranchReader = branchReader()): Promise<Wait[]> {
   if (!gated(run)) return [];
   const read = new Map<string, ParentRun>();
-  for (const id of new Set(run.after)) read.set(id, await parentOf(reader, id));
+  for (const id of new Set(run.after)) read.set(id, await parentOf(reader, id, git));
   return waitsOf(run, (id) => read.get(id) ?? { shipped: false });
 }
 
@@ -157,10 +157,10 @@ export function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
  * The runs a held run waits on to ship (`holdsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
  * none, without a look, for a run nobody holds or one called off, of which the package says no hold (`listing`, `decide`).
  */
-export async function holdsIn(run: Run, reader: typeof e): Promise<Wait[]> {
+export async function holdsIn(run: Run, reader: typeof e, git: BranchReader = branchReader()): Promise<Wait[]> {
   if (!run.hold || run.cancelledAt) return [];
   const read = new Map<string, ParentRun>();
-  for (const id of new Set(run.hold.until)) read.set(id, await parentOf(reader, id));
+  for (const id of new Set(run.hold.until)) read.set(id, await parentOf(reader, id, git));
   return holdsOf(run, (id) => read.get(id) ?? { shipped: false });
 }
 
@@ -261,21 +261,31 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  * only a gate says there is something to decide.
  *
  * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it.
+ *
+ * `git` is the request's reader (`branchReader`: one listing of a repository's branches for every run of it). `asked`, where given, is told
+ * what git was asked of — the branches it did not find on the base, and whether git answered — which is what the list's memo of runs at
+ * rest watches (`resting.ts`).
  */
-export function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus): BranchStanding[] {
+export function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus, git: BranchReader = branchReader(), asked?: Asked): BranchStanding[] {
   // A folder run has no branch to stand anywhere.
   if (!isGitRun(run)) return [];
   const filed = workFiled(run, steps);
   const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
   if (!branches.length) return [];
   try {
-    const read = branchStandings(run, branches);
+    const read = branchStandings(run, branches, git);
     for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
+    // A branch on the base stays there, as `onTheBase` has it: only the others' tips can move the answer.
+    asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     return read;
   } catch {
+    if (asked) asked.failed = true;
     return [];
   }
 }
+
+/** What `standingsOf` asked git about for one run: the result branches git did not find on the base, and whether git failed to answer. */
+export type Asked = { branches: string[]; failed: boolean };
 
 /**
  * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves.

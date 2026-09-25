@@ -20,18 +20,37 @@ export type Views = ReadonlyMap<string, TaskView>;
 /**
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
  * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the package's views.ts).
- * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
- * observation per filed task, read once for each state of a run. A run's page, which is polled, and the list of every
- * run read theirs with `everyView`.
+ * A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness — a scan of the detached
+ * runs' files for a job, a `claude agents` call for a background session. Read through `reader`, a request's own (`viewsFor`), a task two
+ * runs read is viewed once.
  */
-export async function viewsOf(run: Run): Promise<Views> {
+export async function viewsOf(run: Run, reader: typeof e = e): Promise<Views> {
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, await e.view(taskId));
-    if (check) views.set(check.taskId, await e.view(check.taskId));
-    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
+    if (taskId) views.set(taskId, await reader.view(taskId));
+    if (check) views.set(check.taskId, await reader.view(check.taskId));
+    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await reader.view(t.taskId));
   }
   return views;
+}
+
+/** Every task a run has filed: each step's and its check's, and each earlier try's and its check's — what a run's page reads of every try. */
+const tasksOf = (run: Run): string[] =>
+  Object.values(run.steps).flatMap(({ taskId, check, tries }) => [
+    ...(taskId ? [taskId] : []), ...(check ? [check.taskId] : []), ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
+  ]);
+
+/**
+ * The views a request judges `runs` by, and the engine it hands the package's `parentOf` for the runs they wait on: the tasks of those runs
+ * alone, over one look at the harnesses (`list(taskIds)`), which reads their journals and no other and asks `claude agents` only for a
+ * background session in flight among them — once, however many. A run waited on is read off the same views, and a task of it they do not
+ * hold is viewed (`seenBy`).
+ *
+ * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at rest.
+ */
+export async function viewsFor(runs: readonly Run[]): Promise<{ views: Views; reader: typeof e }> {
+  const views: Views = new Map((await e.list(runs.flatMap(tasksOf))).map((view) => [view.id, view]));
+  return { views, reader: seenBy(views) };
 }
 
 /**

@@ -204,12 +204,14 @@ test("a run started when its first task was filed, off the engine's feed, not wh
 
 test('reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them', async () => {
   // a-shipped's branch is on main, so `parentOf` reads its tasks to ask its `wf decide` — off the views the request already read.
+  // The tasks in flight here are Codex's: the list and the detail look at the harnesses of the runs' own tasks (`viewsFor`), and ask Claude
+  // Code's registry nothing. Before, each read every harness once, `claude agents` included.
   const before = observations();
   await listedRuns();
-  assert.equal(observations() - before, 1, 'the list');
+  assert.equal(observations() - before, 0, 'the list');
   const again = observations();
   assert.equal((await app.request('/api/runs/d-waits')).status, 200);
-  assert.equal(observations() - again, 1, 'the detail');
+  assert.equal(observations() - again, 0, 'the detail');
 });
 
 test("the decision of a run waiting on runs is `waiting`, and nothing else: what `wf decide` prints for it", async () => {

@@ -34,6 +34,9 @@ export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'
   fs.readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 
+// Every answer the list's memo of runs at rest gives (`resting.ts`) is judged afresh too, and a difference fails the request.
+process.env.WF_VERIFY_REST = '1';
+
 fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');
 fs.writeFileSync(answer, recorded('plan'));

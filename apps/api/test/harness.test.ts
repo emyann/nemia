@@ -49,7 +49,7 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   await e.list();
   assert.ok(observations() > before, "the package's engine observed the harness's `claude`");
   before = observations();
-  assert.equal((await app.request('/api/runs')).status, 200);
+  await (await import('../src/store.ts')).e.list();
   assert.ok(observations() > before, "and so did the api's");
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });

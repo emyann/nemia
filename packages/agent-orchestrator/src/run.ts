@@ -3332,7 +3332,7 @@ export function heldRefusal(run: Run, what: string): string | null {
 /**
  * What `wf prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `wf decide` says
  * (`decision`), undefined for a record from before runs froze their workflow whose folder no longer reads; `held` is why `wf rm` would not
- * forget it (`forgetRefusal`, worded for `wf prune`); `owed` the steps a pass still owes a hand-off (`handOffDue`); and each worktree git
+ * forget it (`forgetRefusal`, worded for `wf prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in tick.ts); and each worktree git
  * lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch (`heldWorktree`), and each
  * change `git status --porcelain` lists in it.
  */

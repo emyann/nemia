@@ -9,12 +9,12 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
-import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, handOffDue, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruning, type Run } from './run.ts';
+import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruning, type Run } from './run.ts';
 import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
 import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, resultTips, unrecordedSteps } from './tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, handOffOwed, resultTips, unrecordedSteps } from './tick.ts';
 
 /** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
 const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
@@ -200,7 +200,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     // No other run is asked: one waiting on this run reads its record, which stays.
     held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps));
-    owed = handOffDue(steps, run, phaseOf);
+    owed = handOffOwed(steps, run, phaseOf);
   }
   // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.
   const facts = listed.map((w) => {

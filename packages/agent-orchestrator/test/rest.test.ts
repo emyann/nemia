@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { atRest, evictedBy, type RestFacts } from '../src/rest.ts';
+import { atRest, evictedBy, restBlockers, type RestFacts } from '../src/rest.ts';
 
 /** A run at rest: succeeded, frozen, every task settled, nothing due, nothing done, nothing said, nothing of another run read. */
 const RESTING: RestFacts = {
@@ -62,6 +62,35 @@ test('REFUSED: what another run says — a claim on the checkout, a run waited o
   assert.equal(atRest({ ...RESTING, waiting: [{ run: 'other' }] }), false, 'waiting');
   assert.equal(atRest({ ...RESTING, inFlight: true }), false, 'in flight');
   assert.equal(atRest({ ...RESTING, held: true }), false, 'held by the cap');
+});
+
+test('restBlockers names each clause that holds a run out, and none of a run at rest: what the memo\'s check and a count by clause read', () => {
+  assert.deepEqual(restBlockers(RESTING), []);
+  const cases: Array<[string, Partial<RestFacts>]> = [
+    ['status', { status: 'running' }],
+    ['workflow', { run: {} }],
+    ['hold', { run: { workflow: [], hold: { at: '2026-09-25T10:00:00.000Z', until: ['other'] } } }],
+    ['settled', { settled: false }],
+    ['acted', { acted: true }],
+    ['due.ready', { due: { ...RESTING.due, ready: ['work'] } }],
+    ['due.check', { due: { ...RESTING.due, check: ['work'] } }],
+    ['due.retry', { due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }],
+    ['due.round', { due: { ...RESTING.due, round: [{ step: 'review', target: 'work', round: 2, by: 'again' }] } }],
+    ['due.held', { due: { ...RESTING.due, held: ['work'] } }],
+    ['notes', { notes: ['work: said'] }],
+    ['handOffDue', { handOffDue: ['work'] }],
+    ['landingOwed', { landingOwed: true }],
+    ['checkoutAsked', { checkoutAsked: true }],
+    ['waiting', { waiting: [{ run: 'other' }] }],
+    ['inFlight', { inFlight: true }],
+    ['held', { held: true }],
+  ];
+  for (const [clause, change] of cases) {
+    const f = { ...RESTING, ...change };
+    assert.deepEqual(restBlockers(f), [clause], clause);
+    assert.equal(atRest(f), false, `${clause}: atRest agrees`);
+  }
+  assert.deepEqual(restBlockers({ ...RESTING, settled: false, notes: ['said'], inFlight: true }), ['settled', 'notes', 'inFlight'], 'every clause, in order');
 });
 
 test('a task on the feed takes out the run whose id and a dash begin it — a step, a try, a check — and nothing else', () => {

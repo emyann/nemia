@@ -914,14 +914,6 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
 }
 
 /**
- * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
- * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
- * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start, so its
- * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). And
- * bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true` — never a default: Claude Code's own
- * flag, among its others (`claude.remoteControl`), first, where the runtime put it while it was a harness argument (until 2026-09-25).
- */
-/**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema — for a
  * step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured it. The
  * runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left out, not
@@ -929,6 +921,14 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
  */
 const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> => (isRemoteHarness(step.harness) ? {} : fields());
 
+/**
+ * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
+ * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
+ * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start, so its
+ * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). And
+ * bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true` — never a default: Claude Code's own
+ * flag, among its others (`claude.remoteControl`), first, where the runtime put it while it was a harness argument (until 2026-09-25).
+ */
 function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
   const told = rendersAgent(step) && !isDirectory(dir)

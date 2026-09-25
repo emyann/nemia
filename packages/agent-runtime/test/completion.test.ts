@@ -425,7 +425,7 @@ test('remoteControl reaches Claude Code as --remote-control, and a flag follows 
   assert.equal((await argvOf({ config: { remoteControl: false } })).includes('--remote-control'), false, 'false asks for nothing');
 });
 
-test('at shipped defaults, a background task filed with remoteControl: true is spawned with --remote-control, on every attempt, and one filed without it never is', async () => {
+test('at shipped defaults, a background task filed with remoteControl: true is spawned with --remote-control, and one filed without it never is', async () => {
   const dir = scratch('fake-claude-');
   const registry = path.join(dir, 'registry.json');
   const runs = path.join(dir, 'runs.jsonl');
@@ -446,18 +446,16 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const engine = createEngine({ root: scratch('ae-remote-') });
-    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, remoteControl: true }, maxAttempts: 2 });
-    await engine.file({ brief: 'plain', cwd: dir, config: { background: true }, maxAttempts: 2 });
+    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, remoteControl: true } });
+    await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
     await engine.tick();
-    // Both fail: each is retried, and the retry is spawned from the record as the first attempt was.
-    fs.writeFileSync(registry, JSON.stringify(JSON.parse(fs.readFileSync(registry, 'utf8')).map((r: object) => ({ ...r, state: 'failed' }))));
-    await engine.tick();
+    // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
 
     const argvs = fs.readFileSync(runs, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
     const of = (brief: string) => argvs.filter((a) => a.at(-1) === brief);
-    assert.equal(of('bridged').length, 2, 'the first attempt and its retry');
+    assert.equal(of('bridged').length, 1, 'its attempt');
     for (const args of of('bridged')) assert.ok(args.includes('--remote-control'), args.join(' '));
-    assert.equal(of('plain').length, 2);
+    assert.equal(of('plain').length, 1);
     for (const args of of('plain')) assert.equal(args.includes('--remote-control'), false, args.join(' '));
   } finally { process.env.PATH = prev; }
 });

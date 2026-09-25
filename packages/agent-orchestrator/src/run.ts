@@ -1695,8 +1695,7 @@ export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${do
  * refuses one on a background session, which keeps none (open issue 17), and the parser refuses a budget beside `background: true`.
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
- * left is `over budget`, and filed nothing (`overBudget`). An attempt the engine starts again within one filing (`maxAttempts:`) is handed
- * the same amount, since the engine counts no spend of its own.
+ * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is left anew.
  */
 export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
   const job = step.harness === 'claude-detached' || ((step.harness ?? 'claude') === 'claude' && !step.background);

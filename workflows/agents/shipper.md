@@ -44,7 +44,8 @@ so leave the checkout as you found it but for the merge.
 4. Leave the merge staged, and sign off `done`, the message whole as your closeout's `message`. Do not run the check,
    do not commit, and do not abort a merge that is clean: the run does each, on the check's exit, and a session
    cannot hold a turn open for a suite that runs for minutes. A check that refuses, or does not finish, has the run
-   abort the merge, and nothing lands.
+   abort the merge, and nothing lands. The check runs with no `WF_BASE_REF`, so it runs the e2e, where the folder
+   has one, which no round's check ran: this is the one time the work meets it before it reaches the base branch.
 5. Anything else that goes wrong before you sign off — a command failed, the checkout is not what step 1 wants —
    `git merge --abort` if a merge is staged, then sign off `blocked` saying what happened. A checkout left mid-merge
    is worse than a branch not merged.

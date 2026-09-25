@@ -2,35 +2,38 @@
 
 > The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
 >
-> The cards in `jev/cards/` are the briefs Jev was measured on, as they were sent, and carry no such note: one would change what was measured (`packages/agent-orchestrator/test/names.test.ts` exempts them by name).
+> The Jev experiments (`jev/`, `jev-split/`, `jev-design/`) were taken out of the tree on 2026-09-25, before the repository went public, and are kept outside the repository since then. Their results are still quoted below and in the pivot document; the history keeps the files.
 
 The scripts, labels and results that `docs/pivot-2026-09-18.md` cites. They were written in a scratch
 directory during one session and copied here so the evidence outlives it. Nothing here is imported by
-the packages or run by `npm test`.
+the packages or run by `npm test`. Only `cost/` is still here; the three Jev folders below are kept
+outside the repository since 2026-09-25, and the commits before then hold them.
 
 | Folder | What it is |
 |---|---|
 | `cost/` | The token and cost analysis of §1, over `~/.claude/projects/-home-*--agent-workflows-worktrees-*/*.jsonl` and `~/.agent-workflows/engine/tasks/`. `tx.py` reads one transcript; `corpus.py` the totals and context sizes; `resume.py` and `verify.py` the cold resumes and their cause; `ttl.py` the cache TTLs; `fit2.py` the fitted prices; `fill.py` what fills a context and spend by step and day; `whatif.py` the context-cap counterfactual. |
-| `jev/` | Round one's result (`workflow-result.json`), the latency and consistency check (`smoke.mjs`), the finding-to-brief probe (`dataset.py`, `probe.mjs`, `score.py`, `probe-result.json`), the fate of every open finding (`fates.mjs`, `fates.json`), the dispatcher trial (`dispatch.mjs`) and the two GTD runs (`gtd.mjs`, `gtd2.mjs`). `dispatch2.mjs` (2026-09-19) sends the eleven cards Claude filed that day (`cards/`) to Jev, as a title and as the full brief, and `dispatch2-result.json` holds its answers beside the workflow Claude chose and whether the run's branch really touched `apps/web`: from the full brief, 10 of 10 right on the web app and 7 of 11 on the team, every disagreement being a plan step Jev wanted and Claude skipped; from the title alone, every card lands in the unsure band. |
-| `jev-split/` | 2026-09-22: which large file to split and how. One file at a time (a Noul that says yes to everything, and a `purposes` Score that does not), one Choice over every source file (`run.ts`, stably), and one Choice per `run.ts` declaration over its own sections (63% agree; the disagreements name real misplacements). `README.md` there has the numbers. |
-| `jev-design/` | Round two: `MEASURED.md` (what the designers were handed), `result.json` (the four designs and both skeptics, in full), and one folder per track with its scripts, labels and scored results. `skeptic-measurement/` is the skeptic's own re-check on terse cards. |
+| `jev/` (outside) | Round one's result (`workflow-result.json`), the latency and consistency check (`smoke.mjs`), the finding-to-brief probe (`dataset.py`, `probe.mjs`, `score.py`, `probe-result.json`), the fate of every open finding (`fates.mjs`, `fates.json`), the dispatcher trial (`dispatch.mjs`) and the two GTD runs (`gtd.mjs`, `gtd2.mjs`). `dispatch2.mjs` (2026-09-19) sends the eleven cards Claude filed that day (`cards/`) to Jev, as a title and as the full brief, and `dispatch2-result.json` holds its answers beside the workflow Claude chose and whether the run's branch really touched `apps/web`: from the full brief, 10 of 10 right on the web app and 7 of 11 on the team, every disagreement being a plan step Jev wanted and Claude skipped; from the title alone, every card lands in the unsure band. |
+| `jev-split/` (outside) | 2026-09-22: which large file to split and how. One file at a time (a Noul that says yes to everything, and a `purposes` Score that does not), one Choice over every source file (`run.ts`, stably), and one Choice per `run.ts` declaration over its own sections (63% agree; the disagreements name real misplacements). `README.md` there has the numbers. |
+| `jev-design/` (outside) | Round two: `MEASURED.md` (what the designers were handed), `result.json` (the four designs and both skeptics, in full), and one folder per track with its scripts, labels and scored results. `skeptic-measurement/` is the skeptic's own re-check on terse cards. |
 
-**Left out, on purpose:** `node_modules` and lockfiles; raw judgment logs and datasets over 600 KB
+**Left out of the Jev folders, on purpose:** `node_modules` and lockfiles; raw judgment logs and datasets over 600 KB
 (`context/judgments.jsonl`, `results-record.json`, `results-replay.json`, `files_dataset.json`,
 `decls_dataset.json`, `effect/judgments.jsonl`, `effect/hostile.jsonl`, `supervisor/tasks.json`);
 the designers' saved copies of TypeSafe's documentation; and everything sampled from the owner's own
 session transcripts (`supervisor/sample-3f69.txt`, `operator-asks.json`, `ask-rows.json`). So the
 context track's scoring, the effect track's hermetic replay and the supervisor track's E2 cannot be
-re-run from this folder alone; their scored tables are here.
+re-run from those folders alone; their scored tables are in them.
 
-**To run anything that calls Jev:** in a directory outside the repository,
+**To run anything that calls Jev** (from the folders kept outside the repository): in a directory outside the repository,
 `npm init -y && npm install @typesafe-ai/sdk effect@4.0.0-rc.115`, then
-`node --env-file=<repo>/.env <script>`. The key is `TYPESAFE_API_KEY`; no file here contains it. The
+`node --env-file=<repo>/.env <script>`. The key is `TYPESAFE_API_KEY`; no file of them contains it. The
 scripts carry the absolute paths of the machine they ran on. The model was pinned to `jev-1.13.0`.
 Everything sent to TypeSafe was this project's own briefs, findings, closeouts and step markdown;
 its retention terms had not been read (§8 of the pivot document).
 
 ## `jev/judge-runs-2026-09-19.*` — the judge scored against 75 dispatches already made
+
+The report and its data are kept outside the repository since 2026-09-25; these are its results.
 
 `judge runs` (packages/agent-judge), live on the owner's store on 19 September: 74 requests, 296 questions, 136,503 input
 tokens, 17 s, no failed answer, well under a cent. The label is the folder a person chose; it is agreement, not accuracy.

@@ -468,9 +468,11 @@ What it leaves:
   `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.
   Reading `where.file`/`where.line` and `where.page`/`where.theme` there is a few lines and a case in
   `test/run.test.ts`, outside this change's files. The board reads no finding's place, so it needs nothing.
-- **The pictures `review` reads are the check's.** `implement`'s check runs `npm run e2e` into the directory its
-  `screenshots` name, after it signs off and before `review` is filed, so each round's reviewer reads the
-  change as it stands under the same paths. A photograph `implement` takes with the browser is not among them.
+- **The pictures `review` reads were the check's, until 2026-09-25.** `implement`'s check ran `npm run e2e` into the directory its
+  `screenshots` name, after it signed off and before `review` was filed, so each round's reviewer read the
+  change as it stood under the same paths. A photograph `implement` takes with the browser is not among them. Since the
+  e2e left the rounds' checks (*Shipped: the e2e runs once, on the merged tree*), the pictures are implement's own run
+  alone, which its brief asks for after its last commit each round and nothing checks.
 
 ## Shipped: the decider screen
 
@@ -1528,7 +1530,8 @@ What it leaves:
 - **The cap is per step.** Nothing sets a budget for a run or a workflow: the run's total is shown, and held to nothing.
 - **`maxAttempts:` on a `claude-detached` step hands each attempt what is left.** The engine starts an attempt that failed under its cap
   again within one filing, with the same `budgetUsd`, and counts no spend of its own. So `maxAttempts: 3` can spend nearly three times
-  what was left. The run's own default is one attempt.
+  what was left. The run's own default is one attempt. (Gone on 2026-09-23: the runtime makes one attempt per start, and a step
+  that says `maxAttempts:` is refused.)
 - **Only what was measured counts.** An attempt killed before its harness wrote a cost, or run on a model it could not price, adds
   nothing to what a step has spent. `wf ls` marks such a step's cost `≥`, and a step that such an attempt took past its cap is not
   held.
@@ -3827,6 +3830,38 @@ What it leaves:
   main. Leaving `packages/` out was the ask's choice (§6, P0.6: the packages' sources reach no browser); adding
   `packages/agent-orchestrator/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
   e2e on most package runs.
+## Shipped: the e2e runs once, on the merged tree
+
+The owner's decision of 2026-09-25. Over the 113 checks since 2026-09-20 a round's check took a median 6.0 min (p90 6.8), the e2e 3-4
+of them, and every implement round ran it before the ship ran it again on the merged tree: about 25 minutes of checks for a three-round
+run, and the e2e seldom changed a review's verdict between rounds.
+
+- **Every shipped folder with an e2e ends its build the same way:** `if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a
+  round's check; …"; else npm run e2e; fi` — `dev` and `dev-planned` inside their touched-paths condition, `dev-build`,
+  `dev-planned-build`, `ui` and the package's `ui` after an unconditional build. A round's check, which the run gives `WF_BASE_REF` on
+  every git run, builds and says why no e2e ran; the shipper's run of the line, mid-merge with nothing set, runs it.
+- **Keyed on that variable, not on `WF_STEP` or a key on `ship.md`.** The ship has no `check:`; it runs `workChecks`' line by hand, so
+  the run never executes a check as `ship` and `WF_STEP=ship` never occurs. A ship-only key would be a `STEP_KEYS` change with its three
+  obligations outside the package, and would not reach `ui`, which has no ship. The line stays in the frozen folder and says both halves,
+  and anything that runs it without the run's environment — the shipper, a person merging a ui run by hand — runs the whole of it.
+- **The screenshots the ui reviewer reads are implement's own run** into its files directory, after its last commit each round; the
+  implementer's brief asks for the same run when its work changes a page, and CLAUDE.md says so.
+- **Tests.** `test/web-check.test.ts` runs each of the six folders' lines as a round's check (the build, no e2e, and the line saying so)
+  and by the shipper's hand mid-merge (the build and the e2e); the lines with the e2e put back in every round, as they were, run it in a
+  round, and a failing e2e fails the merge's check and cannot fail a round's; an empty `WF_BASE_REF` runs it. The pins moved on
+  purpose: `KEYS_CHANGED` and `BODIES_REWORDED` in `agents-before-after.test.ts`, `git-runs-before.json`, and the api's picture of `dev`
+  and `dev-build`.
+
+What it leaves:
+
+- **`ui` has no ship, so no check the run executes runs its e2e.** It rests on the implementer's own run, which is a brief's words,
+  and on whoever merges running the folder's line by hand. A gated `ship.md` for `ui` would give it the dev folders' guarantee.
+  Closed the same day: *Shipped: `ui` ends in a gated ship*, below.
+- **A web break the e2e would have caught in a round surfaces at the ship**, as an aborted merge and a `wf retry` late rather than a
+  failed round early.
+- **The ship's e2e depends on the shipper's shell having no `WF_BASE_REF`.** A daemon started from a shell that carries one would skip
+  it there, as it would already read the wrong range for `dev`'s condition; the brief says to set nothing, and nothing refuses it.
+- **Runs started before keep their frozen folder**, and run the e2e every round until they finish.
 ## Shipped: every run of an agent ends in its statement or the reason it has none (P0.5)
 
 docs/pivot-2026-09-18.md, P0.5. A session asked for a closing statement could still end, by the harness's `done`, with none, and settle
@@ -3958,7 +3993,8 @@ is the account.
 - **Effect** is inside the package only. The facade is plain Promises.
 - **`judge card <file>`** asks four properties of a card: web, plan, clear and size. It prints the shipped `dev*` folder they
   map to, or why the card stays in the inbox.
-- **Tried live** on 2026-09-19 against two real cards, each asked twice, with the record in a job's temp directory; the
+- **Tried live** on 2026-09-19 against two real cards (from the pivot's Jev experiments, kept outside the repository since
+  2026-09-25), each asked twice, with the record in a job's temp directory; the
   second asking made 0 requests. `card-p06.md` stayed in the inbox, unsure about planning first (P 0.74).
   `card-agents-board.md` mapped to `dev-planned-build`. The thresholds have not been measured on held-out cards.
 ## Shipped: a run with no repository — `workspace: folder` (P2, its first slice)
@@ -4361,7 +4397,10 @@ Until 2026-09-25 the shipper ran the ship's check itself, mid-merge, in its own 
 wait for a suite that runs twenty minutes (the harness demands the closing statement at once, `[structured-output-enforce]`), and
 whose check nobody but the shipper read. The run executes it now, as it executes a step's check, and commits or aborts on its exit.
 
-- **A gated `workspace: main` step may carry `check:`**, and the four `dev*` folders' `ship.md` carry implement's line (cb4141e).
+- **A gated `workspace: main` step may carry `check:`**, and the four `dev*` folders' `ship.md` carry implement's line (cb4141e), and
+  so do both ui folders' since main gave them a ship (round 4, the merge of main: their `ship.md` is dev-build's, byte for byte).
+  Implement's line runs the e2e only where no `WF_BASE_REF` is set, and the tick sets none on an ending's check, so the ship's check is
+  where the e2e runs; `web-check.test.ts` runs each folder's line through `CHECK` with the environment the tick hands an ending.
   An ungated one is still refused, and so is `retries:` beside it: a try of an ending is a person's word. `wf retry <run> ship` is that
   word, and needs no new approval.
 - **The ending stages; the run lands.** The shipper merges `--no-ff --no-commit` and signs off `done` with the commit message as its
@@ -4405,6 +4444,28 @@ whose check nobody but the shipper read. The run executes it now, as it executes
 **What it leaves.** A folder whose ending has no `check:` lands nothing: the shipper's brief keeps the old recipe for it (run the check
 and commit itself), with the job's limit on long work said beside it. The board draws `checking` and the verdict from the step's
 status, and what landed in the step's note, as `wf ls` prints it.
+## Shipped: `ui` ends in a gated ship
+
+Review's finding on the run that moved the e2e to the merged tree (2026-09-25): `ui` had no ship, so no check the run executes ever ran
+the e2e for a ui run, and the change reached main tested by the implementer's own run and whatever the person merging ran by hand.
+
+- **Both ui folders end in `ship`, a copy of `workflows/dev-build/ship.md`**: `after: review`, `workspace: main`, `agent: shipper`,
+  `gate: true`, and the build folders' note on why the build and the e2e matter on the merged tree, which holds for `ui` word for word
+  since its implement check is theirs. No code changed: `composeBrief` already names the folder's check under *Where to look*, and the
+  shipper runs it mid-merge with nothing set, so the e2e runs there. A ui run now waits at the gate once the loop is done, for
+  `wf approve <run> ship`, and the ship's check runs the build and the e2e (3-4 min) in the repository's checkout.
+- **The package's `ui` copy names the shipper too**, so `packages/agent-orchestrator/workflows/agents/` holds `shipper.md` and
+  `shipper.skills.json`, byte for byte the repository's, held by the ui copy test.
+- **Tests.** `test/web-check.test.ts` takes the line off the ui ship's composed brief, in both folders, and runs it by the shipper's hand
+  mid-merge (the build and the e2e) and as a round's check (no e2e). `test/ui-workflow.test.ts` holds ui to three steps ending in a gated
+  ship equal to dev-build's. The pins moved on purpose: `agents-before-after.test.ts` gained `STEPS_ADDED`, each added step keyed by its
+  full path and held to the step it copies, and absent from the snapshot; `git-runs-before.json`'s two ui entries were written again from
+  `pin()`, and nothing else in it moved; the api's picture of the shipped folders lists ui's ship.
+
+**What it leaves.** Runs started before keep their frozen folder and end at review, to be merged by hand. The ship's e2e still depends on
+the shipper's shell having no `WF_BASE_REF` (*Shipped: the e2e runs once*, above). Since then the run executes the ship's check
+itself (*Shipped: the run checks the ending's merge and lands it*, above): the ui ships carry implement's line as `check:`, the tick
+sets no `WF_BASE_REF` on it, and the shipper stages the merge and signs off its message.
 
 ## 1. A run that grows steps from a plan
 

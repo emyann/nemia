@@ -42,7 +42,6 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
-  ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
 
 /** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */

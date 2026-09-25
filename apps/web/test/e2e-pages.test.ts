@@ -33,7 +33,8 @@ test('every file in pages/ but NAMES is a page the e2e visits, once, named as it
 
 test('the runner visits what loadPages reads, and no list of its own', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  assert.match(runner, /visitAll\(browser, base, pages, OUT\)/);
+  // And the store the api serves, so a store swept from under the e2e is said, not blamed on a page (`storeGone`).
+  assert.match(runner, /visitAll\(browser, base, pages, OUT, store\)/);
   assert.match(runner, /const pages = await loadPages\(\);/);
   assert.doesNotMatch(runner, /from '\.\/pages\//, 'run.ts imports no page by its file');
   assert.doesNotMatch(runner, /PageSpec\[\]/, 'run.ts keeps no array of pages');

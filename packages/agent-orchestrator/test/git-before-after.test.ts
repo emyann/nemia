@@ -12,12 +12,20 @@
  * when the supervisor became a background session in `dontAsk`: its wait is `sleep 60` alone, as its `allow:` lets no shell loop through.
  * And when `denials: fail` gave the decision a list of its own, `denied`: the diff was that key, empty, beside every `budgetExhausted`.
  * And again when `disallow:` and `allow:` took Claude Code's names, `disallowedTools:` and `allowedTools:`: the supervisor's brief names both.
- * And on 2026-09-25, when the run began executing ship's check on the merge ship stages and landing it itself: each dev folder's ship brief
+ * And on 2026-09-25, when the e2e left every round's check for the merged tree: what moved is each implement check, as implement's brief
+ * and the ship's *Where to look* print it, and the sentences of the implementer, ui implementer, ui reviewer, shipper and build ships that
+ * say so. And later that day, when both ui folders gained the build folders' gated ship: only their two entries moved, each written from
+ * `pin()` — ship's brief and plan, `ship` beside `review` where implement's brief names who worked in its workspace, and the decisions and
+ * listings ending on `ship`, which waits for approval once the loop has succeeded, where they ended on the result branches.
+ * And the same day, when the run began executing ship's check on the merge ship stages and landing it itself: each dev folder's ship brief
  * is the shipper's new recipe, with *The run checks and lands your merge* where the work's check was, and every implement and review brief
  * gained the paragraph on a job's turn. The one diff past the briefs is each dev folder's `succeeded` pin: its ship now has a check, and a
  * signed ending whose merge the run has not landed is `checking` and the run `running` — the pin writes no landing — where it read
  * `awaiting approval` before. Every other phase, plan and the forget lines are as they were. In review of that run, its round 1, each ship
- * brief gained one line under that section, that `git commit` and `git merge --continue` are denied it: the diff was that line, eight times.)
+ * brief gained one line under that section, that `git commit` and `git merge --continue` are denied it: the diff was that line, eight times.
+ * Then that run merged main in, with the two changes above: the ship's new recipe reached both ui folders, whose ship is dev-build's,
+ * each ship's check became its implement's new line, and the shipper's fourth item and the build ships' note say that check runs the
+ * e2e no round's check ran. Past the briefs, the ui folders' `succeeded` pins moved to `checking` and `running`, as the dev folders' had.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

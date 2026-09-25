@@ -16,38 +16,33 @@ const N2 = nameFor(TASK, 2);
 const seen = (...pairs: Array<[string, Observed]>): Map<string, Sighting> =>
   new Map(pairs.map(([name, state], i) => [name, { sessionId: `s${i}`, state }]));
 
-const filed = (maxAttempts = 1): Event =>
-  ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts });
+const filed = (): Event =>
+  ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo' });
 
-test('a session its harness ended at its spend cap ends failed, reason budget — and the task settles failed saying so, with attempts left, whatever the policy', () => {
-  for (const resume of ['interrupted', 'always'] as const) {
-    const events: Event[] = [
-      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume, budgetUsd: 0.01 },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(2), attempt: 1 },
-    ];
+/**
+ * A `filed` entry as a journal written before stage 4a part 2 has it: with `maxAttempts` and a `resume` policy, which
+ * the type no longer names and `fold` reads past.
+ */
+const legacyFiled = (extra: object = {}): Event =>
+  ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts: 3, resume: 'always', ...extra }) as Event;
+
+test('a session its harness ended at its spend cap ends failed, reason budget — and the task settles failed saying so, a journal that allowed more attempts included', () => {
+  for (const first of [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', budgetUsd: 0.01 } as Event, legacyFiled({ budgetUsd: 0.01 })]) {
+    const events: Event[] = [first, { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }];
+    const label = 'maxAttempts' in first ? 'legacy' : 'filed';
     const spent = new Map([[N1, { sessionId: 's0', state: 'failed' as const, nativeId: 'native-1', budgetSpent: true as const }]]);
     assert.deepEqual(decide(fold(TASK, events), spent, now(5)),
-      { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1', closeout: undefined }, resume);
+      { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1', closeout: undefined }, label);
     const ended = fold(TASK, [...events, { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1' }]);
     const settled = { do: 'settle', outcome: 'failed', note: 'attempt 1 spent its budget. File the task again with a larger one to run it again' };
-    assert.deepEqual(decide(ended, new Map(), now(7)), settled, `${resume}: a budget spent is spent — no attempt 2, resumed or clean`);
-    assert.deepEqual(decide(ended, new Map(), now(7, 30_000, 3, 3)), settled, `${resume}: a terminal answer, so a full board does not hold it`);
+    assert.deepEqual(decide(ended, new Map(), now(7)), settled, `${label}: a budget spent is spent`);
+    assert.deepEqual(decide(ended, new Map(), now(7, 30_000, 3, 3)), settled, `${label}: a terminal answer, so a full board does not hold it`);
   }
-  // The control: the same failure with no word from the harness about a budget is its verdict, and `always` continues it.
-  const always = fold(TASK, [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always', budgetUsd: 0.01 },
-    { kind: 'starting', at: at(1), attempt: 1 },
-    { kind: 'spawned', at: at(2), attempt: 1 },
-  ]);
-  assert.equal((decide(always, new Map([[N1, { sessionId: 's0', state: 'failed' as const, nativeId: 'native-1' }]]), now(5)) as { reason?: string }).reason, 'harness');
-  const failed = fold(TASK, [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always', budgetUsd: 0.01 },
-    { kind: 'starting', at: at(1), attempt: 1 },
-    { kind: 'spawned', at: at(2), attempt: 1 },
-    { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'native-1' },
-  ]);
-  assert.deepEqual(decide(failed, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: 'native-1' });
+  // The control: the same failure with no word from the harness about a budget is its verdict, and settles failed with the count.
+  const events: Event[] = [legacyFiled({ budgetUsd: 0.01 }), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }];
+  assert.equal((decide(fold(TASK, events), new Map([[N1, { sessionId: 's0', state: 'failed' as const, nativeId: 'native-1' }]]), now(5)) as { reason?: string }).reason, 'harness');
+  const failed = fold(TASK, [...events, { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'native-1' }]);
+  assert.deepEqual(decide(failed, new Map(), now(7)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
 });
 
 test('a filed task starts its first attempt', () => {
@@ -80,7 +75,7 @@ test('a QUIESCENT session is still left alone — being between steps is legitim
 
   // ...but with a deadline, it ends.
   const bounded = fold(TASK, [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, deadlineSeconds: 10 },
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', deadlineSeconds: 10 },
     { kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 },
   ]);
   assert.deepEqual(decide(bounded, quiescent, now(30_000)), { do: 'stop', sessionId: 's0', why: 'deadline' });
@@ -96,8 +91,8 @@ test('a blocked session is running, and says why', () => {
 // ─── quiet: stopped, and whether it said it had finished ───────────────────
 
 /** Attempt 1 in flight, and the task filed with a closing statement asked for, or not. */
-const inFlight = (schema: boolean, maxAttempts = 1, resume?: 'interrupted' | 'always' | 'never'): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts, resume, ...(schema ? { closeoutSchema: { type: 'object' } } : {}) },
+const inFlight = (schema: boolean, legacy = false): Event[] => [
+  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', ...(legacy ? { maxAttempts: 3, resume: 'always' } : {}), ...(schema ? { closeoutSchema: { type: 'object' } } : {}) } as Event,
   { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 },
 ];
 const quiet = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
@@ -131,13 +126,13 @@ test("the HARNESS'S `done` without a statement is recorded as the harness said i
   assert.equal((decide(fold(TASK, inFlight(true)), done({ budgetSpent: true }), now(5)) as { reason?: string }).reason, 'budget');
 });
 
-test('an end with `stated: false` settles SUCCEEDED, with attempts left and under every policy: the engine neither nudges nor retries it', () => {
-  for (const resume of [undefined, 'interrupted', 'always', 'never'] as const) {
-    const s = fold(TASK, [...inFlight(true, 3, resume),
+test('an end with `stated: false` settles SUCCEEDED, a journal that allowed more attempts included: the engine neither nudges nor retries it', () => {
+  for (const legacy of [false, true]) {
+    const s = fold(TASK, [...inFlight(true, legacy),
       { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', stated: false }]);
     assert.equal(s.attempts[0]?.stated, false);
-    assert.deepEqual(decide(s, quiet(), now(9)), { do: 'settle', outcome: 'succeeded' }, `resume ${resume}: quiet, and not stopped to be continued`);
-    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'succeeded' }, `resume ${resume}`);
+    assert.deepEqual(decide(s, quiet(), now(9)), { do: 'settle', outcome: 'succeeded' }, `legacy ${legacy}: quiet, and not stopped to be continued`);
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'succeeded' }, `legacy ${legacy}`);
   }
 });
 
@@ -154,26 +149,21 @@ test('quiet ends only a WORKING session: not a blocked one, and no session its r
 });
 
 /** A journal from before stage 4a, whose engine judged attempt 1 `unsigned`. */
-const unsigned = (maxAttempts: number, resume?: 'interrupted' | 'always' | 'never'): Event[] => [
-  ...inFlight(true, maxAttempts, resume),
+const unsigned = (legacy = false): Event[] => [
+  ...inFlight(true, legacy),
   { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1' },
 ];
 
-test('an old UNSIGNED end with attempts left settles failed and says why, under every policy — never continued, never nudged: the nudge is the orchestrator\'s now', () => {
-  for (const resume of [undefined, 'interrupted', 'always', 'never'] as const) {
+test('an old UNSIGNED end settles failed and says why, a journal that allowed more attempts included — never continued, never nudged: the nudge is the orchestrator\'s now', () => {
+  for (const legacy of [false, true]) {
     const note = { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for' };
-    assert.deepEqual(decide(fold(TASK, unsigned(2, resume)), seen(), now(9)), note, `resume ${resume}`);
-    assert.deepEqual(decide(fold(TASK, unsigned(3, resume)), quiet(), now(9)), note, `resume ${resume}: still quiet, not stopped to be continued`);
+    assert.deepEqual(decide(fold(TASK, unsigned(legacy)), seen(), now(9)), note, `legacy ${legacy}`);
+    assert.deepEqual(decide(fold(TASK, unsigned(legacy)), quiet(), now(9)), note, `legacy ${legacy}: still quiet, not stopped to be continued`);
   }
 });
 
-test('UNSIGNED with no attempt left settles failed, and says why', () => {
-  assert.deepEqual(decide(fold(TASK, unsigned(1)), quiet(), now(9)),
-    { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for' });
-});
-
 test('a nudge is on the attempt it started, from the journal', () => {
-  const s = fold(TASK, [...unsigned(2), { kind: 'starting', at: at(4), attempt: 2, resumeFrom: 'n1', nudge: 'finish' }]);
+  const s = fold(TASK, [...unsigned(true), { kind: 'starting', at: at(4), attempt: 2, resumeFrom: 'n1', nudge: 'finish' }]);
   assert.deepEqual(s.attempts.map((a) => a.nudge), [undefined, 'finish']);
   assert.equal('nudge' in s.attempts[0]!, false, 'and no key on one that had none');
 });
@@ -184,8 +174,8 @@ test('a spawned session the harness has not registered yet is given a grace wind
   assert.deepEqual(decide(s, seen(), now(60_000)), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' });
 });
 
-const ran = (outcome: Observed, maxAttempts = 1): Event[] => [
-  filed(maxAttempts),
+const ran = (outcome: Observed, first: Event = filed()): Event[] => [
+  first,
   { kind: 'starting', at: at(1), attempt: 1 },
   { kind: 'spawned', at: at(2), attempt: 1 },
   { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: outcome, reason: 'harness', nativeId: 'n1' },
@@ -195,18 +185,12 @@ test('done settles as succeeded', () => {
   assert.deepEqual(decide(fold(TASK, ran('done')), seen([N1, 'done']), now(9)), { do: 'settle', outcome: 'succeeded' });
 });
 
-test('failed with no attempts left settles as failed', () => {
-  const a = decide(fold(TASK, ran('failed')), seen([N1, 'failed']), now(9));
-  assert.equal(a.do, 'settle');
-  assert.equal(a.do === 'settle' && a.outcome, 'failed');
+test('failed settles as failed: one attempt per start', () => {
+  assert.deepEqual(decide(fold(TASK, ran('failed')), seen([N1, 'failed']), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
 });
 
-test('failed with an attempt left starts the next one', () => {
-  assert.deepEqual(decide(fold(TASK, ran('failed', 2)), seen([N1, 'failed']), now(9)), { do: 'start', attempt: 2, resumeFrom: undefined });
-});
-
-test('a session stopped by hand settles as stopped, and costs no retry', () => {
-  const a = decide(fold(TASK, ran('stopped', 3)), seen([N1, 'stopped']), now(9));
+test('a session stopped by hand settles as stopped', () => {
+  const a = decide(fold(TASK, ran('stopped')), seen([N1, 'stopped']), now(9));
   assert.equal(a.do === 'settle' && a.outcome, 'stopped');
 });
 
@@ -230,7 +214,7 @@ test('settled is terminal — nothing moves after it, whatever the machine says'
 });
 
 test('the fold re-derives the same state from a replayed journal — restart safety', () => {
-  const events = ran('failed', 2);
+  const events = ran('failed');
   assert.deepEqual(fold(TASK, events), fold(TASK, [...events].map((e) => JSON.parse(JSON.stringify(e)) as Event)));
 });
 
@@ -241,17 +225,19 @@ test('ADOPTION: a session running under our name is adopted, never started twice
   assert.deepEqual(decide(s, seen([N1, 'working']), now(5)).do, 'nothing', 'already out there: adopt it');
 });
 
-test('a second attempt gets its own name, so the first cannot be mistaken for it', () => {
-  const s = fold(TASK, ran('failed', 2));
-  assert.deepEqual(decide(s, seen([N1, 'failed']), now(9)), { do: 'start', attempt: 2, resumeFrom: undefined });
+test('a journal from before stage 4a part 2 caught between two attempts runs its second to its end: each has its own name, so the first cannot be mistaken for it', () => {
+  const s = fold(TASK, [...ran('failed', legacyFiled()), { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 }]);
   assert.notEqual(N1, N2);
+  assert.equal(decide(s, seen([N1, 'failed'], [N2, 'working']), now(9)).do, 'nothing', 'its second attempt runs');
+  assert.deepEqual(decide(s, new Map([[N1, { sessionId: 's0', state: 'failed' }], [N2, { sessionId: 's1', state: 'done', nativeId: 'n2' }]]), now(9)),
+    { do: 'record-end', attempt: 2, sessionId: 's1', observed: 'done', reason: 'harness', nativeId: 'n2', closeout: undefined }, 'and is ended off its own sighting');
 });
 
 
 // ─── the deadline ───────────────────────────────────────────────────────────
 
 const withDeadline = (seconds: number): Event =>
-  ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', maxAttempts: 1, deadlineSeconds: seconds });
+  ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', deadlineSeconds: seconds });
 
 const started = (extra: Event[] = []): Event[] =>
   [{ kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 }, ...extra];
@@ -295,17 +281,14 @@ test('a session that ended DONE is judged by that end, even read past the deadli
   assert.deepEqual(decide(stopped, seen(), now(20_001)), { do: 'settle', outcome: 'stopped', note: 'session stopped' });
 });
 
-test('an attempt that FAILED past the deadline is never followed by another, even with attempts left and a full pool', () => {
-  const events: Event[] = [{ ...withDeadline(10), maxAttempts: 2 } as Event,
+test('an attempt that FAILED past the deadline is judged by its end, never followed by another, and never waits on a full pool', () => {
+  // Its harness ended it, so the deadline cut nothing: the note is the end's, as it is inside the deadline.
+  const events: Event[] = [withDeadline(10),
     ...started([{ kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', exitCode: 1 }])];
-  for (const n of [now(20_001), now(20_001, 30_000, 3, 3)]) {
-    const a = decide(fold(TASK, events), seen(), n);
-    assert.equal(a.do, 'settle', `${n.used}/${n.max}: never start, never wait`);
-    assert.equal(a.do === 'settle' && a.outcome, 'failed');
-    assert.match(a.do === 'settle' ? a.note ?? '' : '', /^deadline exceeded after 19s$/);
+  for (const n of [now(20_001), now(20_001, 30_000, 3, 3), now(5_000), now(5_000, 30_000, 3, 3)]) {
+    assert.deepEqual(decide(fold(TASK, events), seen(), n), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+      `${n.at.getTime() - T0.getTime()} ms, ${n.used}/${n.max}: never start, never wait`);
   }
-  // Inside the deadline, the same end starts attempt 2: the deadline is what refuses it.
-  assert.equal(decide(fold(TASK, events), seen(), now(5_000)).do, 'start');
 });
 
 test('the deadline runs from the first ATTEMPT, not from filing — a queued task burns nothing', () => {
@@ -319,41 +302,30 @@ test('no deadline means no limit', () => {
   assert.equal(decide(s, seen([N1, 'working']), now(999_999_999)).do, 'nothing');
 });
 
-// ─── resume ─────────────────────────────────────────────────────────────────
+// ─── one attempt per start ──────────────────────────────────────────────────
 
-const endedWith = (observed: Observed, reason: 'harness' | 'lost', policy?: 'interrupted' | 'always' | 'never'): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', maxAttempts: 2, resume: policy },
+const endedWith = (observed: Observed, reason: 'harness' | 'lost' | 'unstartable', first: Event = filed()): Event[] => [
+  first,
   { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-  { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed, reason, nativeId: 'native-1' },
+  ...(reason === 'unstartable' ? [] : [{ kind: 'spawned', at: at(2), attempt: 1 } as Event]),
+  { kind: 'ended', at: at(3), attempt: 1, ...(reason === 'unstartable' ? { sessionId: '(never started)', error: 'refused' } : { sessionId: 's0', nativeId: 'native-1' }), observed, reason },
 ];
 
-test('default policy: a LOST attempt is resumed', () => {
-  const a = decide(fold(TASK, endedWith('failed', 'lost')), seen(), now(9));
-  assert.deepEqual(a, { do: 'start', attempt: 2, resumeFrom: 'native-1' });
+test('an attempt that ended LOST, UNSTARTABLE or on its harness\'s failure settles the task failed: trying again is the layer above\'s', () => {
+  for (const reason of ['lost', 'unstartable', 'harness'] as const) {
+    assert.deepEqual(decide(fold(TASK, endedWith('failed', reason)), seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' }, reason);
+    assert.deepEqual(decide(fold(TASK, endedWith('failed', reason)), seen(), now(9, 30_000, 3, 3)).do, 'settle', `${reason}: a terminal answer, so a full board does not hold it`);
+  }
 });
 
-test('default policy: a HARNESS failure starts clean', () => {
-  const a = decide(fold(TASK, endedWith('failed', 'harness')), seen(), now(9));
-  assert.deepEqual(a, { do: 'start', attempt: 2, resumeFrom: undefined });
-});
-
-test("resume: 'always' continues a harness failure too", () => {
-  const a = decide(fold(TASK, endedWith('failed', 'harness', 'always')), seen(), now(9));
-  assert.equal(a.do === 'start' && a.resumeFrom, 'native-1');
-});
-
-test("resume: 'never' starts clean even after a lost attempt", () => {
-  const a = decide(fold(TASK, endedWith('failed', 'lost', 'never')), seen(), now(9));
-  assert.equal(a.do === 'start' && a.resumeFrom, undefined);
-});
-
-test('nothing is resumed when the harness never gave us an id', () => {
-  const events = endedWith('failed', 'lost');
-  const noId = events.map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e));
-  assert.equal(decide(fold(TASK, noId), seen(), now(9)).do === 'start' ? undefined : 'x', undefined);
-  const a = decide(fold(TASK, noId), seen(), now(9));
-  assert.equal(a.do === 'start' && a.resumeFrom, undefined);
+test('a journal from before stage 4a part 2, filed with attempts to spare and `resume: always`, settles on its first failed attempt all the same', () => {
+  for (const reason of ['lost', 'unstartable', 'harness'] as const) {
+    const s = fold(TASK, endedWith('failed', reason, legacyFiled()));
+    assert.equal('maxAttempts' in s || 'resume' in s, false, `${reason}: the retired keys are folded unread`);
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' }, reason);
+  }
+  // And it folds to the state the same filing without them does.
+  assert.deepEqual(fold(TASK, [legacyFiled()]), fold(TASK, [filed()]));
 });
 
 // ─── the ceiling, in the pure layer ─────────────────────────────────────────
@@ -371,76 +343,38 @@ test('a finished task settles even when the board is full', () => {
 });
 
 test('a task filed AGAINST a session continues it on the first attempt', () => {
-  const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, resumeFrom: 'sess-1' }]);
+  const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1' }]);
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
 
-test("...and `resume: never` does not override that — they are different statements", () => {
-  // "do not resume a FAILURE" is a retry policy. "this task IS a continuation" is what the work is.
-  const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, resume: 'never', resumeFrom: 'sess-1' }]);
-  const action = decide(s, seen(), now());
-  assert.equal(action.do === 'start' ? action.resumeFrom : null, 'sess-1');
+test('...a journal from before stage 4a part 2 that said `resume: never` included: that was a retry policy, and this is what the work is', () => {
+  const s = fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' })]);
+  assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
 
 /** A continuation of `sess-1` whose first attempt ended as `then` says: `unstartable` with no spawn, or after one. */
-const continuation = (then: Event[], extra: { maxAttempts?: number; resume?: 'interrupted' | 'always' | 'never' } = {}): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: extra.maxAttempts ?? 2, resume: extra.resume, resumeFrom: 'sess-1' },
+const continuation = (then: Event[], first: Event = { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1' }): Event[] => [
+  first,
   { kind: 'starting', at: at(1), attempt: 1, resumeFrom: 'sess-1' },
   ...then,
 ];
-const refused = (attempt: number, ms: number): Event =>
-  ({ kind: 'ended', at: at(ms), attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: 'refused' });
 
-test('a continuation whose first spawn was REFUSED continues its session on the second attempt, not cold (issue 5)', () => {
-  const s = fold(TASK, continuation([refused(1, 2)]));
-  assert.deepEqual(decide(s, seen(), now(9)), { do: 'start', attempt: 2, resumeFrom: 'sess-1' });
-});
-
-test('...under any policy, and after as many refusals as there are attempts to spend', () => {
-  for (const resume of ['interrupted', 'always', 'never'] as const) {
-    const s = fold(TASK, continuation([
-      refused(1, 2),
-      { kind: 'starting', at: at(3), attempt: 2, resumeFrom: 'sess-1' },
-      refused(2, 4),
-    ], { maxAttempts: 3, resume }));
-    assert.deepEqual(decide(s, seen(), now(9)), { do: 'start', attempt: 3, resumeFrom: 'sess-1' }, resume);
+test('a continuation whose spawn was REFUSED settles failed, and its attempt keeps what it was to continue — which the layer above reads to try again (issue 5)', () => {
+  const refused: Event = { kind: 'ended', at: at(2), attempt: 1, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: 'refused' };
+  for (const first of [undefined, legacyFiled({ resumeFrom: 'sess-1' })]) {
+    const s = fold(TASK, continuation([refused], first));
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
+    assert.deepEqual(s.attempts.map((a) => [a.resumeFrom, a.nativeId, a.reason]), [['sess-1', null, 'unstartable']]);
   }
 });
 
-test('an ADOPTED attempt ran, though its spawn was never journalled: it is judged by the policy, as one that spawned', () => {
-  // The crash between the spawn call and its `spawned` entry: the session is found under our name and ended
-  // from its sighting, so the attempt has a session id and an ending, and no `spawnedAt`.
-  const ended = (reason: 'lost' | 'harness'): Event =>
-    ({ kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason, nativeId: 'n1' });
-  // A task filed against no session: a lost attempt is continued, as it always was.
-  const plain = fold(TASK, [filed(2), { kind: 'starting', at: at(1), attempt: 1 }, ended('lost')]);
-  assert.equal(plain.attempts[0]?.spawnedAt, null, 'the fixture is an adoption: no spawn on the record');
-  assert.deepEqual(decide(plain, seen(), now(9)), { do: 'start', attempt: 2, resumeFrom: 'n1' });
-  // A continuation of `sess-1`: the retry goes to the session that did this attempt's work, not to `sess-1`.
-  const b = decide(fold(TASK, continuation([ended('lost')])), seen(), now(9));
-  assert.equal(b.do === 'start' && b.resumeFrom, 'n1');
-  // And `resume: never` still starts a harness failure clean.
-  assert.deepEqual(decide(fold(TASK, continuation([ended('harness')], { resume: 'never' })), seen(), now(9)),
-    { do: 'start', attempt: 2, resumeFrom: undefined });
-});
-
-test('a continuation whose first attempt DID spawn is judged by the policy, as any retry: its own session or none, never the one it was filed against', () => {
-  const spawnedThen = (reason: 'harness' | 'lost', nativeId?: string, error?: string): Event[] => [
-    { kind: 'spawned', at: at(2), attempt: 1, ...(error ? { error } : {}) },
-    { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason, nativeId },
-  ];
-  // A harness verdict starts clean by default, and `always` continues the session that gave it.
-  assert.deepEqual(decide(fold(TASK, continuation(spawnedThen('harness', 'native-1'))), seen(), now(9)),
-    { do: 'start', attempt: 2, resumeFrom: undefined });
-  assert.deepEqual(decide(fold(TASK, continuation(spawnedThen('harness', 'native-1'), { resume: 'always' })), seen(), now(9)),
-    { do: 'start', attempt: 2, resumeFrom: 'native-1' });
-  // A lost one continues where it got to, not where it began.
-  assert.deepEqual(decide(fold(TASK, continuation(spawnedThen('lost', 'native-1'))), seen(), now(9)),
-    { do: 'start', attempt: 2, resumeFrom: 'native-1' });
-  // A spawn call that errored without a refusal is journalled as spawned: a session may exist, so it is no refusal,
-  // and one lost with no id is resumed from nothing, as before.
-  assert.deepEqual(decide(fold(TASK, continuation(spawnedThen('lost', undefined, 'timed out'))), seen(), now(9)),
-    { do: 'start', attempt: 2, resumeFrom: undefined });
+test('a continuation whose attempt ran and was lost settles failed too, its own session on the record', () => {
+  const s = fold(TASK, continuation([
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'lost', nativeId: 'native-1' },
+  ]));
+  assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
+  assert.equal(s.attempts[0]!.nativeId, 'native-1');
 });
 
 // ─── when an attempt ended ──────────────────────────────────────────────────
@@ -452,7 +386,7 @@ test('an ended attempt keeps the time it ended: the `at` of its `ended` entry', 
 });
 
 test('an attempt in flight has no end time, and does not borrow the one before it', () => {
-  const s = fold(TASK, [...ran('failed', 2), { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 }]);
+  const s = fold(TASK, [...ran('failed', legacyFiled()), { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 }]);
   assert.deepEqual(s.attempts.map((a) => [a.ended, a.endedAt]), [['failed', at(3)], [null, null]]);
 });
 
@@ -464,12 +398,12 @@ const told = (events: Event[], text = 'widen the scope to the api'): Event[] => 
   return [...events.slice(0, i + 1), { kind: 'said', at: at(1_500), attempt: 1, text }, ...events.slice(i + 1)];
 };
 
-test('a `said` event changes no decision: running, blocked, ended done, failed with an attempt left, past the deadline, lost', () => {
+test('a `said` event changes no decision: running, blocked, ended done, failed, past the deadline, lost', () => {
   const cases: Array<[string, Event[], Map<string, Sighting>, ReturnType<typeof now>]> = [
     ['running', [filed(), ...started()], seen([N1, 'working']), now(5_000)],
     ['blocked', [filed(), ...started()], seen([N1, 'blocked']), now(5_000)],
     ['ended done', ran('done'), seen([N1, 'done']), now(9)],
-    ['failed with an attempt left', ran('failed', 2), seen([N1, 'failed']), now(9)],
+    ['failed', ran('failed'), seen([N1, 'failed']), now(9)],
     ['past the deadline', [withDeadline(10), ...started()], seen([N1, 'working']), now(20_000)],
     ['never registered', [filed(), ...started()], seen(), now(60_000)],
   ];
@@ -500,16 +434,16 @@ test('`waitingFor` changes no decision: it is the harness\'s word for a person t
 });
 
 test('a journal with no `said` in it — every journal written before `say` — folds to `said: []` and otherwise the same state', () => {
-  const { said: none, ...legacy } = fold(TASK, ran('failed', 2));
+  const { said: none, ...legacy } = fold(TASK, ran('failed'));
   assert.deepEqual(none, []);
-  const { said, ...rest } = fold(TASK, told(ran('failed', 2)));
+  const { said, ...rest } = fold(TASK, told(ran('failed')));
   assert.deepEqual(said, [{ at: at(1_500), attempt: 1, text: 'widen the scope to the api' }]);
   assert.deepEqual(rest, legacy, 'nothing else on the state moved');
 });
 
 test('the fold keeps every `said` in order, each with the attempt it was said to', () => {
   const s = fold(TASK, [
-    ...told(ran('failed', 2), 'first'),
+    ...told(ran('failed', legacyFiled()), 'first'),
     { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 },
     { kind: 'said', at: at(6), attempt: 2, text: 'second' },
   ]);
@@ -528,7 +462,7 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
   for (const budgetSpent of [false, true]) for (const cut of ['none', 'operator', 'deadline'] as const) {
     const at_ = `${state} schema=${schema} said=${said} budget=${budgetSpent} cut=${cut}`;
     const events: Event[] = [
-      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, ...(schema ? { closeoutSchema: { type: 'object' } } : {}), ...(cut === 'deadline' ? { deadlineSeconds: 10 } : {}) },
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', ...(schema ? { closeoutSchema: { type: 'object' } } : {}), ...(cut === 'deadline' ? { deadlineSeconds: 10 } : {}) },
       { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 },
       ...(cut === 'operator' ? [{ kind: 'stop-requested', at: at(3) } as Event] : []),
     ];
@@ -568,7 +502,7 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
 const N3 = nameFor(TASK, 3);
 /** A task held open whose first attempt signed at 3 s; `extra` on the filing. */
 const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'draft the plan', cwd: '/r', maxAttempts: 2, closeoutSchema: { type: 'object' }, holdOpen: true, ...extra },
+  { kind: 'filed', at: at(0), brief: 'draft the plan', cwd: '/r', closeoutSchema: { type: 'object' }, holdOpen: true, ...extra },
   { kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 },
   { kind: 'ended', at: at(3_000), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'native-1', closeout: { plan: 'v1' } },
 ];
@@ -594,8 +528,8 @@ test('HELD OPEN: an answer is a turn — an attempt continuing the session that 
   const s = fold(TASK, [...held(), answer(60_000)]);
   assert.deepEqual(decide(s, seen(), now(61_000)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' });
   assert.deepEqual(decide(s, seen(), now(61_000, 30_000, 3, 3)).do, 'nothing', 'a new turn waits for a slot like any start');
-  // Under any policy: the answer continues a conversation, which `never` is no word about.
-  assert.deepEqual(decide(fold(TASK, [...held({ resume: 'never' }), answer(60_000)]), seen(), now(61_000)),
+  // A journal from before stage 4a part 2 that said `resume: never` too: the answer continues a conversation, which no retry policy was a word about.
+  assert.deepEqual(decide(fold(TASK, [...held({ resume: 'never' } as object), answer(60_000)]), seen(), now(61_000)),
     { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' });
   // The turn's attempt carries its turn; the first does not, as none before holding open did.
   const t = fold(TASK, [...held(), answer(60_000), ...turn1(61_000)]);
@@ -632,13 +566,19 @@ test('HELD OPEN: the deadline runs from the current turn\'s first attempt, not t
     'an answer waiting for its turn is not past a deadline');
 });
 
-test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed turn retries, continuing where the turn began', () => {
+test('HELD OPEN: a turn is one attempt — one that fails, is lost or cannot start settles the task failed, and trying again is the layer above\'s', () => {
+  const settled = { do: 'settle', outcome: 'failed', note: '1 attempt(s) of turn 1, none succeeded' };
   const failed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', nativeId: 'native-1' })]);
-  assert.deepEqual(decide(failed, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-1', nudge: 'make it smaller' },
-    'two attempts on the task, one in this turn: one left; the harness failed, so not its own session but the one the turn continued — ' +
-    'which on a harness that resumes under the same id, as claude -p does, holds the failed attempt too (open issue 28)');
+  assert.deepEqual(decide(failed, seen(), now(70_000)), settled, 'failed on its harness');
   const lost = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' })]);
-  assert.deepEqual(decide(lost, seen(), now(70_000)), { do: 'start', attempt: 3, resumeFrom: 'native-2', nudge: 'make it smaller' }, 'a lost one continues its own');
+  assert.deepEqual(decide(lost, seen(), now(70_000)), settled, 'lost');
+  const unstartable = fold(TASK, [...held(), answer(60_000),
+    { kind: 'starting', at: at(61_000), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' },
+    { kind: 'ended', at: at(61_100), attempt: 2, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: 'refused' }]);
+  assert.deepEqual(decide(unstartable, seen(), now(70_000)), settled, 'unstartable');
+  // A journal from before stage 4a part 2 that allowed a turn more attempts settles the same.
+  const legacy = fold(TASK, [...held({ maxAttempts: 3, resume: 'always' } as object), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' })]);
+  assert.deepEqual(decide(legacy, seen(), now(70_000)), settled, 'legacy');
   // A turn that ended `done` without its statement waits on a person like any other: the engine does not nudge it.
   const unstated = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done', nativeId: 'native-2', stated: false })]);
   assert.deepEqual(decide(unstated, seen(), now(70_000)), { do: 'nothing', why: 'input-required' });
@@ -646,6 +586,7 @@ test('HELD OPEN: maxAttempts counts the current turn\'s attempts — a failed tu
   const unsigned = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' })]);
   assert.deepEqual(decide(unsigned, seen(), now(70_000)),
     { do: 'settle', outcome: 'failed', note: '1 attempt(s) of turn 1, none succeeded: the last ended without the closing statement it was asked for' });
+  // A journal caught with two attempts in a turn counts both.
   const twice = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed' }),
     { kind: 'starting', at: at(70_000), attempt: 3 }, { kind: 'spawned', at: at(70_100), attempt: 3 },
     { kind: 'ended', at: at(72_000), attempt: 3, sessionId: 's2', observed: 'failed', reason: 'harness', nativeId: 'native-1' }]);
@@ -679,7 +620,7 @@ test('HELD OPEN: a close settles it — succeeded on a signed turn, failed after
   const mid = fold(TASK, [...held(), answer(60_000), ...turn1(61_000), closed]);
   assert.equal(decide(mid, seen([N2, 'working']), now(91_000)).do, 'nothing', 'a close that raced an answer lets its attempt run');
   assert.deepEqual(decide(fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'failed' }), closed]), seen(), now(91_000)),
-    { do: 'settle', outcome: 'failed', note: 'closed: attempt 2 ended failed' }, 'with an attempt left: closed is closed');
+    { do: 'settle', outcome: 'failed', note: 'closed: attempt 2 ended failed' }, 'closed: said as closed');
   assert.deepEqual(decide(fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done' }), closed]), seen(), now(91_000)),
     { do: 'settle', outcome: 'succeeded', note: 'closed' });
   // The control: `closed` on a task not held open is no word decide reads — it settles as it would have.

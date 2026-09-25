@@ -42,11 +42,19 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   (`~/.agent-workflows`, `~/.agent-engine`, whose names stay), or on a line that says `renamed on 2026-09-23`. New dated writing that
   quotes the old names joins `HISTORY`. Turbo caches the package's pass by the package's own files, so a change only to a doc or to
   another package replays it: run `npx turbo run test --force` after such a change (learned by the run that renamed the packages).
+- **Another project is described, never named, history included.** Before the repository went public the owner chose to say what
+  two groups of other projects do, in a few words, with no name and no link (an agent kanban; a Go agent SDK, its sandbox runtime and
+  an A2A adapter for Claude Code). `packages/agent-orchestrator/test/others.test.ts` reads every file but `package-lock.json` and the
+  vendored `.claude/skills/shadcn/`, and refuses a line naming one; the names sit there in base64. What we integrate (Claude Code,
+  Codex, A2A, `@a2a-js/sdk`) and what is compared by name on purpose (TypeSafe, Tekton, Argo, n8n, Kubernetes) are not on it.
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
-  or `$WF_ARTIFACTS` in a run). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
+  or `WF_ARTIFACTS=<your files directory> npm run e2e` in a run, whose PNGs are the screenshots the ui reviewer reads). A
+  round's check builds but runs no e2e: the shipped lines run it only where no `WF_BASE_REF` is set, so once, on the merged
+  tree, in ship's check, and your own run is the only e2e the change meets before
+  the merge (since 2026-09-25). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
   export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
   `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
   page, so a page deleted by mistake fails `npm test` (delete its line too when you mean it). The pages are
@@ -78,6 +86,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
+  every check it executes of a git run; the ship has no `check:` and its shipper runs `workChecks`' line by hand, mid-merge, with
+  nothing set, so `WF_STEP=ship` never occurs. The shipped lines read what was touched and hold the e2e for the merged tree on that
+  one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
+  runs each both ways; learned by the run that took the e2e out of the rounds).
 - **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
   `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
   the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'
@@ -123,6 +136,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
   e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
   calendar day — rather than hardcoding which form it will take (learned by the second round of the run that gave an agent its skills).
+- **The e2e's store is in `/tmp`, and a boot can empty `/tmp` under a running check.** WSL let the daemon run a check twelve
+  seconds after it booted, while `systemd-tmpfiles --create --remove --boot` (`D /tmp`: everything, whatever its age) was still walking
+  `/tmp` — twelve and a half minutes. It reached `/tmp/hkb-e2e-*` in the dark theme, every run read 404, the board said the seeded run
+  was removed with `wf rm`, and the answer page failed on a box it never drew, blamed on the branch. `journalctl -b | grep tmpfiles-setup`
+  and `find /tmp -maxdepth 1 ! -newermt <boot>` (nothing) said so; three e2es run at once passed. `visitAll` now checks the store before
+  each page and on a failure, and says it is gone in place of the page's assertion (`storeGone`, proven by `visit.test.ts`). When a failure
+  says so, run the e2e again (learned by thin runtime stage 4a part 2, try 5).
 - **A picture of one card on the fitted Factory is a third of its size.** `card.screenshot()` photographs the node as the floor draws it,
   zoomed out to fit every run, so a card at rest came out 110 pixels wide and nothing on it could be read. Photograph a card with
   `photographCard` (`apps/web/test/e2e/canvas.ts`): it zooms the floor in about the card with the wheel, drags the pane from an empty spot to
@@ -263,6 +283,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   concerned (freeze the worker with `SIGSTOP` after its first rename, delay its `fs.write`, pause the watch's child after its
   banner), and the test for the worker keeps its hook. Wait on a frozen process with `ps -o stat=` before continuing it: a
   `SIGCONT` sent before its own `SIGSTOP` leaves it stopped for good (learned by the run that found them).
+- **A statement on disk is not an end the engine may record before it knows the session.** Codex writes `-o` and prints its
+  thread on a pipe the detached worker reads when it is next scheduled, so under load the run file carried a statement and no
+  `nativeId`; `closedOut` ended the held attempt on the statement, an ended attempt never takes a session later, and `answer`
+  refused the task as having no conversation (`codex-agent.test.ts`, once in a loaded `turbo --force` on 2026-09-25). `closedOut`
+  now waits for the session, and the fake's `threadOn` writes `-o` before its thread line, which makes the race happen every
+  time (learned by thin runtime stage 4a part 2, round 5).
 - **A rule about order or names is not proven by a fixture that already has it.** The equal-times admission test read
   a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping
@@ -357,8 +383,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `skills:`).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
-  there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy
-  test: a change to `ui-implementer.md` or `ui-reviewer.md` is copied there too (learned by the run that put the roles in `agents/`).
+  there. The package's `workflows/ui` copy has its three agents in the package's `workflows/agents`, held byte for byte by the ui copy
+  test: a change to `ui-implementer.md`, `ui-reviewer.md` or `shipper.md` (and its skills) is copied there too (learned by the run that
+  put the roles in `agents/`; the shipper joined when ui gained its ship).
 - **The board's listing of a step is resolved; its file is not.** `spec` holds the agent's keys merged in, so a PUT that sends `spec`
   alone writes every one of them into the step file, and `renderStep` of an edited resolved step writes any inherited key whose value
   moved off the agent's (`given`). A step's own keys and note travel as `own` (`ListedStep.own`), and the builder writes those (same run).
@@ -543,6 +570,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   and is never unsigned, except one the old runtime recorded `reason: 'unsigned'`, which still settles `failed` with its old note.
   A fixture seeded with `reason: 'unsigned'` tests that legacy reading only; a new one writes `ended: 'done', stated: false`
   (learned by the run that moved the judgement up).
+- **A test that slices a source file between two names reads to its end once the second name is gone.** "`decide` never reads
+  a harness argument" in `agent-runtime/test/engine.test.ts` took `decide`'s text as `slice(indexOf('export function decide('),
+  indexOf('function resumeTarget('))`; with `resumeTarget` deleted, `indexOf` gave -1 and the slice ran on through `endOf` and the
+  rest of `domain.ts`. It failed, on words that are not `decide`'s; one asserting an absence the rest also lacks would have passed
+  over code it never meant to read. When you delete a function, grep the tests for its name in a string, and end such a slice on a
+  name that must be there (learned by the run that retired `maxAttempts:`).
 - **A step's fence is read through `modeOf`, never off `permissionMode`.** Claude Code's fence is `permissionMode:` and Codex's `sandbox:`
   (since 2026-09-23), and the engine's task still calls either `config.permissionMode`. A codex step's `permissionMode` is undefined now, so
   code that files a step, or compares it with what the engine filed, and reads that field sends Codex no `-s`: the read-only reviewer runs in

@@ -12,9 +12,12 @@ gate: true
 # The run executes this on the merge the step leaves staged, as it executes any step's check — the check harness, its
 # deadline, at low priority — and commits the merge with the step's message on exit 0, or aborts it on anything else,
 # a check that did not finish included (`landingDue`). The command is implement's, the same line.
+# With no WF_BASE_REF there, it runs the e2e that a round's check leaves for the merged tree.
 # The run's, not the shipper's: a job cannot hold its turn open for a suite that runs for minutes.
-check: npm test && npm run typecheck && npm run build && npm run e2e
+check: npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi
 ---
 In this team the check the run executes on your merge builds the web app and runs its e2e, and both matter on the merged
 tree though the branch's own check was green: `npm run build` regenerates the web app's route tree, `npm run e2e` visits
-every page in both themes, and the merged tree is the first tree either has seen. Say so in the message's last line.
+every page in both themes, and the merged tree is the first tree either has seen. No round's check ran the e2e — the run
+sets `WF_BASE_REF` there, and the line leaves it for the merged tree — so this is the first time it meets the work at all.
+Say so in the message's last line.

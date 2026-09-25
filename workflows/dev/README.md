@@ -2,21 +2,30 @@
 
 Implement what was asked, then a second engineer reviews it, round again while the review finds
 something worth another round, three rounds at most. Implement is verified by npm test and npm run
-typecheck, and by npm run build and npm run e2e when the work touched the web app.
+typecheck, and by npm run build when the work touched the web app; the e2e runs once, on the merged tree.
 
 ```
 implement ⇄ review → ship
 ```
 
 `implement` runs on Claude (opus), and its `check:` is what makes it verified, not its word:
-`npm test && npm run typecheck`, then `npm run build && npm run e2e` when, and only when, the work touched what
-they read. That is git's fact, not a guess from the card's words: the line asks `git diff --name-only
+`npm test && npm run typecheck`, then `npm run build` when, and only when, the work touched what the build and the
+e2e read. That is git's fact, not a guess from the card's words: the line asks `git diff --name-only
 "$WF_BASE_REF"...HEAD`, and builds when a path is under `apps/web/` or `apps/api/` (the api serves the e2e), or
 is the root's `package.json`, `package-lock.json` or `turbo.json`. A change only to the packages, the docs or
 the workflows runs neither, and the check's log says so; the packages' sources reach no browser, and their
 own tests judge them. When git cannot say — a shallow clone, a base it does not have — the check fails with
 words rather than skipping the build. The condition is written in the `check:` line itself, not in a script
-the step could edit, and `packages/agent-orchestrator/test/web-check.test.ts` runs it against real repositories. `review` runs on Claude (opus), fenced by machinery rather than
+the step could edit, and `packages/agent-orchestrator/test/web-check.test.ts` runs it against real repositories.
+
+A round's check runs no e2e. It was 3-4 of a round's six minutes and seldom changed a review's verdict, so the
+line runs `npm run e2e` only where no `WF_BASE_REF` is set — in ship's check, on the merged tree — and in a
+round says `wf check: no e2e in a round's check` instead. The key is that variable, not a step's name or a key on
+`ship.md`: the run sets it on the check of every step in a worktree and never on one in the repository's checkout
+(the ship's, below), so anything that runs the line without the run's environment runs the whole of it.
+The implementer runs the e2e itself, into its files directory, when the work changes a page.
+
+`review` runs on Claude (opus), fenced by machinery rather than
 by its brief: `tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it
 has no tool that writes and a command `.claude/settings.json` does not allow is denied without a prompt.
 The settings allow `npm run build` and `npm run e2e` for implement's sake, and both write into the
@@ -38,9 +47,10 @@ checkout — a check task, with its deadline and at low priority, its log and st
 commits the merge with the shipper's message on exit 0, or `git merge --abort`s it on anything else, a check
 that did not finish included. Only the gate lets the step be filed, so only a person's approval lets anything
 merge. The check runs where no `WF_BASE_REF` is set: there the line reads what the merge brings (`git diff
---name-only HEAD...MERGE_HEAD`), so a merge that brings the web app is built and visited on the merged tree,
-and with neither a base nor a merge in progress it fails loudly. A try of ship after a check that did not
-finish is `wf retry <run> ship`, which merges again: `--recheck` has nothing staged to judge.
+--name-only HEAD...MERGE_HEAD`), so a merge that brings the web app is built and visited on the merged tree —
+the one time the e2e runs in the run's checks — and with neither a base nor a merge in progress it fails
+loudly. A try of ship after a check that did not finish is `wf retry <run> ship`, which merges again:
+`--recheck` has nothing staged to judge.
 
 Each step names who does it — `implementer`, `reviewer`, `shipper`, in `workflows/agents/` — and keeps only its
 wiring: the keys above that are a role's (harness, model, tools, denies, the schema) are the agent's, and the step
@@ -53,5 +63,5 @@ wf start "<what to do>" --workflows workflows/dev
 ```
 
 A change to the web app no longer needs `dev-build` to be built: `dev` builds it when git says it was touched.
-Pick `dev-build` when the build and the e2e should run whatever the diff says; for a change a person will
+Pick `dev-build` when the build should run every round, and the e2e at the ship, whatever the diff says; for a change a person will
 see, `ui`, which also has the screenshots read.

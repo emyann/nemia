@@ -7,6 +7,9 @@
  * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` and `KEYS_CHANGED` name. The bodies are compared too, and the
  * steps whose body moved must be exactly `BODIES_REWORDED`: the reworded briefs of the change that wrote the agents, each printed as a
  * diff for the person who reads the run.
+ *
+ * A step can be added to a shipped folder only as a copy of one that is there: `STEPS_ADDED` names each by `<folder>/<step>` beside the
+ * step it copies, and holds it to that step's keys, agent and body as they resolve today, and to being absent from the snapshot.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,12 +49,16 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
  * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
  *
+ * The ui reviewers' bodies moved when the e2e left every round's check for the merged tree (2026-09-25): the screenshots they read are
+ * implement's own run of the e2e, no longer its check's. The implementer, ui implementer, shipper and build ships said so in the same change.
+ *
  * Every implementer and reviewer was told that a job's turn cannot end to wait for a process in the background (2026-09-25,
  * `[structured-output-enforce]`), the lesson the owner gave at a plan gate. So each reviewer's body is on the list now, beside the
  * implementers already there.
  *
  * The four ship bodies moved again when the run began landing an ending's merge on the ending's own check (2026-09-25): the shipper
- * stages the merge and signs off its message, and a build folder's note speaks of the check the run executes.
+ * stages the merge and signs off its message, and a build folder's note speaks of the check the run executes. Both ui folders' ships,
+ * added on main meanwhile as dev-build's, came in with that body when the run merged main.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),
@@ -83,6 +90,18 @@ const AGENTS: Record<string, string> = {
   'workflows/ui/review': 'ui-reviewer',
   'packages/agent-orchestrator/workflows/ui/implement': 'ui-implementer',
   'packages/agent-orchestrator/workflows/ui/review': 'ui-reviewer',
+  'workflows/ui/ship': 'shipper',
+  'packages/agent-orchestrator/workflows/ui/ship': 'shipper',
+};
+
+/**
+ * The steps a shipped folder gained after the snapshot, as `<folder>/<step>` and the step each copies, by the same name. Both ui folders
+ * got the build folders' ship (2026-09-25), once the e2e ran only on the merged tree: without a ship no check the run executes ran it
+ * for a ui run. Each is keyed by its full path, so a dev folder that lost or gained a ship still fails.
+ */
+const STEPS_ADDED: Record<string, string> = {
+  'workflows/ui/ship': 'workflows/dev-build/ship',
+  'packages/agent-orchestrator/workflows/ui/ship': 'workflows/dev-build/ship',
 };
 
 /**
@@ -104,7 +123,7 @@ const SHIPPER_OUTPUT = { file: 'shipper.schema.json', schema: JSON.parse(fs.read
 const checkOf = (folder: string) => loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'implement')!.check!;
 const KEYS_ADDED: Record<string, Record<string, unknown>> = {
   'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allowedTools: SUPERVISOR_ALLOW },
-  ...Object.fromEntries(Object.entries(AGENTS).filter(([, agent]) => ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at, agent]) => {
+  ...Object.fromEntries(Object.entries(AGENTS).filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at, agent]) => {
     const folder = at.slice('workflows/'.length, at.lastIndexOf('/'));
     return [at, agent === 'shipper' ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT } : { permissionMode: 'auto' }];
   })),
@@ -116,11 +135,18 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
  * and the e2e when, and only when, the work touched the web app (docs/pivot-2026-09-18.md §6, P0.6): three runs changed `apps/web/src` on
  * `dev`, whose check was the suite and the types, and no build and no e2e ever ran on them. The line is `dev`'s own, read here rather than
  * copied, and held equal between the two folders; web-check.test.ts runs it against real git.
+ *
+ * Every implement check with an e2e moved again when the e2e left the rounds for the merged tree (2026-09-25): a round's check, which the
+ * run gives `WF_BASE_REF`, builds and runs no e2e, and the shipper's run of the line, with none, runs it. The build folders' and ui's line
+ * is dev-build's, read here too, and web-check.test.ts runs every one of them.
  */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
+const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')!.check!;
 const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
   'workflows/dev/implement': { check: DEV_CHECK },
   'workflows/dev-planned/implement': { check: DEV_CHECK },
+  ...Object.fromEntries(['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui']
+    .map((folder) => [`${folder}/implement`, { check: BUILD_CHECK }])),
 };
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
@@ -152,7 +178,18 @@ test('every shipped folder resolves to the keys it had before agents, and only t
   for (const [folder, before] of Object.entries(BEFORE)) {
     const dir = path.join(REPO, folder);
     assert.ok(fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory(), `${folder} is still shipped`);
-    const after = loadWorkflows(dir) as unknown as Array<Record<string, unknown>>;
+    const loaded = loadWorkflows(dir) as unknown as Array<Record<string, unknown>>;
+    const after = loaded.filter((s) => !Object.hasOwn(STEPS_ADDED, `${folder}/${String(s.name)}`));
+    for (const step of loaded.filter((s) => !after.includes(s))) {
+      const at = `${folder}/${String(step.name)}`;
+      const from = STEPS_ADDED[at]!;
+      const copied = loadWorkflows(path.join(REPO, from.slice(0, from.lastIndexOf('/')))).find((s) => s.name === step.name) as unknown as Record<string, unknown>;
+      assert.ok(copied, `${at}: ${from} is there to copy`);
+      assert.deepEqual(keysOf(step), keysOf(copied), `${at}: every key as ${from} resolves`);
+      assert.equal(step.body, copied.body, `${at}: the body of ${from}`);
+      assert.deepEqual(step.agent, copied.agent, `${at}: the agent of ${from}, and its note`);
+      named[at] = (step.agent as { name: string }).name;
+    }
     assert.deepEqual(after.map((s) => s.name), before.map((s) => s.name), `${folder}: the same steps, in the same order`);
     for (const [i, step] of after.entries()) {
       const was = before[i]!;
@@ -172,6 +209,11 @@ test('every shipped folder resolves to the keys it had before agents, and only t
         t.diagnostic(`${folder}/${String(step.name)}.md, its brief before and after:\n${lineDiff(String(was.body), String(step.body))}`);
       }
     }
+  }
+  // Each step added is one the snapshot did not have.
+  for (const at of Object.keys(STEPS_ADDED)) {
+    const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
+    assert.equal(BEFORE[folder]!.some((s) => s.name === name), false, `${at} was in the snapshot`);
   }
   // Each key added is one the snapshot did not have: a key that moved is never passed off as one added.
   for (const [at, keys] of Object.entries(KEYS_ADDED)) {

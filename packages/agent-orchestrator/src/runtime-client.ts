@@ -1,6 +1,6 @@
 /**
- * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as google/ax
- * reaches agent-substrate through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
+ * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
+ * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
  * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `nameFor` and `denialText`), which they import from here and never from the runtime.
  *
  * It passes the runtime's surface through, and wraps none of it. What the orchestrator does with the runtime — file a task, view one, tick,

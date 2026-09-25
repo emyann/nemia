@@ -51,7 +51,7 @@ process.exitCode = 1;
 
   await onPath(bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', budgetUsd: 0.01, maxAttempts: 2, resume: 'always' });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', budgetUsd: 0.01 });
     const until = Date.now() + 20_000;
     while (!(await engine.view(id)).state.settled && Date.now() < until) {
       await engine.tick();
@@ -60,7 +60,7 @@ process.exitCode = 1;
     for (let i = 0; i < 3; i++) await engine.tick();
     const { state } = await engine.view(id);
     assert.equal(state.settled, 'failed');
-    assert.equal(state.attempts.length, 1, 'a budget spent is spent: maxAttempts 2 and resume always start no attempt 2');
+    assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     const [a] = state.attempts;
     assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1], 'it ended at its cap');
     assert.deepEqual(a!.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
@@ -74,7 +74,7 @@ process.exitCode = 1;
   });
 });
 
-test('claude --bg is given --max-budget-usd on every attempt of a task that reaches it with one — through the Effect door, since file() refuses a cap a --bg session would not keep', async () => {
+test('claude --bg is given --max-budget-usd on the attempt of a task that reaches it with one — through the Effect door, since file() refuses a cap a --bg session would not keep', async () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
   const runs = path.join(bin, 'runs.jsonl');
@@ -104,13 +104,12 @@ if (args[0] === '--bg') {
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
 
   await onPath(bin, async () => {
-    await run(file({ brief: 'the prompt', cwd: tmp('cwd'), budgetUsd: 0.5, maxAttempts: 2 }));
-    await run(tick());
-    fs.writeFileSync(registry, JSON.stringify(JSON.parse(fs.readFileSync(registry, 'utf8')).map((r: object) => ({ ...r, state: 'failed' }))));
+    await run(file({ brief: 'the prompt', cwd: tmp('cwd'), budgetUsd: 0.5 }));
     await run(tick());
 
+    // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
     const argvs = runsIn(runs);
-    assert.equal(argvs.length, 2, 'the first attempt, and its retry');
+    assert.equal(argvs.length, 1, 'the attempt');
     for (const args of argvs) {
       assert.equal(valueOf(args, '--max-budget-usd'), '0.5', 'the cap on each');
       assert.equal(args.at(-1), 'the prompt', 'a flag that takes a value of its own, so it cannot take the prompt');

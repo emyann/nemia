@@ -251,7 +251,7 @@ test("a resumed attempt's classes and peak are its own lines', and its peak star
 test('a journal written before the classes were measured folds as it did: inputTokens alone, and no class standing in as 0', () => {
   // Two lines as the engine wrote them on 2026-09-18, verbatim in shape.
   const journal = [
-    '{"kind":"filed","at":"2026-09-18T09:00:00Z","brief":"b","cwd":"/r","maxAttempts":1}',
+    '{"kind":"filed","at":"2026-09-18T09:00:00Z","brief":"b","cwd":"/r"}',
     '{"kind":"starting","at":"2026-09-18T09:00:01Z","attempt":1}',
     '{"kind":"ended","at":"2026-09-18T09:05:00Z","attempt":1,"sessionId":"s","observed":"done","reason":"harness","usage":{"turns":85,"toolCalls":40,"inputTokens":21861234,"outputTokens":40100}}',
     '{"kind":"measured","at":"2026-09-18T09:05:02Z","attempt":1,"usage":{"costUsd":14.72,"apiMs":679931,"toolMs":29305}}',
@@ -278,7 +278,7 @@ test('a session that used a model its harness could not price has no cost — a 
 test("fold carries a cost onto the attempt — on its end, or measured after it — and a journal written before cost was measured folds as it did", () => {
   const at = '2026-09-12T09:05:00Z';
   const begun: Event[] = [
-    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
   ];
   const counted = { turns: 3, toolCalls: 5, inputTokens: 10, outputTokens: 2 };
@@ -303,7 +303,7 @@ test("fold carries a cost onto the attempt — on its end, or measured after it 
 
 test('an attempt its runner measured nothing about records null, and a person reads "not measured"', () => {
   const events: Event[] = [
-    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
     { kind: 'spawned', at: '2026-09-12T09:00:02Z', attempt: 1 },
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' },
@@ -331,7 +331,7 @@ test('a measured attempt prints what was measured, and names what was not', () =
   );
   assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
   const [a] = fold('t', [
-    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', exitCode: 3, usage: { turns: 1, toolCalls: 0 } },
   ]).attempts;
@@ -345,23 +345,23 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
   assert.equal(usageLine({ turns: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }), '1 turns · 0 tool calls · tokens not measured · cost not measured (a model without a price)');
 
   const base: Event[] = [
-    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', maxAttempts: 1, harness: 'claude-detached', budgetUsd: 0.01 },
+    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', harness: 'claude-detached', budgetUsd: 0.01 },
     { kind: 'starting', at: '2026-09-15T09:00:01Z', attempt: 1 },
   ];
   const spent = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:00:04Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'budget', exitCode: 1, usage: { costUsd: 0.01804, apiMs: 718 } }]);
   assert.equal(attemptLine(spent.attempts[0]!), 'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02');
 
   const shown = (state: ReturnType<typeof fold>, usage?: object) => taskLine({ id: 't-1', state, phase: state.settled ?? 'running (working)', sessionId: null, ...(usage ? { usage } : {}) });
-  assert.match(shown(spent), /  1\/1  \$0\.02  read the notes$/);
+  assert.match(shown(spent), /\(working\) {3}\$0\.02  read the notes$/);
   const measured = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { turns: 12 } }, { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { turns: 12, costUsd: 3.0054 } }]);
-  assert.match(shown(measured), /  1\/1  \$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
-  assert.match(shown(fold('t-1', base), { turns: 3 }), /  1\/1  cost not measured · 3t  read the notes$/, 'running: no cost written yet');
-  assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
+  assert.match(shown(measured), /\(working\) {3}\$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
+  assert.match(shown(fold('t-1', base), { turns: 3 }), /\(working\) {3}cost not measured · 3t  read the notes$/, 'running: no cost written yet');
+  assert.match(shown(fold('t-1', base.slice(0, 1))), /\(working\) {3}read the notes$/, 'no attempt, nothing to cost');
 });
 
 test('ae show prints what the harness denied an attempt, as the rules that would allow it, and nothing when it denied nothing', () => {
   const base: Event[] = [
-    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: '2026-09-23T09:00:01Z', attempt: 1 },
   ];
   const ended = (extra: object) => fold('t-1', [...base, { kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra }]).attempts[0]!;
@@ -373,7 +373,7 @@ test('ae show prints what the harness denied an attempt, as the rules that would
 
 test('ae show and ae feed say an end gave no statement where its task asked for one — `done (no statement)` — and nothing where it gave one or none was asked', () => {
   const base: Event[] = [
-    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, closeoutSchema: { type: 'object' } },
+    { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', closeoutSchema: { type: 'object' } },
     { kind: 'starting', at: '2026-09-23T09:00:01Z', attempt: 1 },
   ];
   const end = (extra: object): Event => ({ kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra });
@@ -391,18 +391,18 @@ test('ae show and ae feed say an end gave no statement where its task asked for 
 });
 
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
-  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, ...extra });
+  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra });
   assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000 }, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 
 test('ae ls shows a task\'s priority when it was filed with one, and nothing when it was not', () => {
-  const filed = (priority?: number): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', maxAttempts: 1, ...(priority !== undefined ? { priority } : {}) });
+  const filed = (priority?: number): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...(priority !== undefined ? { priority } : {}) });
   const shown = (priority?: number) => taskLine({ id: 't-1', state: fold('t-1', [filed(priority)]), phase: 'pending', sessionId: null });
-  assert.match(shown(3), /  0\/1  priority 3  review it$/);
-  assert.match(shown(-1), /  0\/1  priority -1  review it$/);
-  assert.match(shown(0), /  0\/1  priority 0  review it$/, 'set, though 0 is what none means');
-  assert.match(shown(), /  0\/1  review it$/, 'not set, not shown');
+  assert.match(shown(3), /pending {11}  priority 3  review it$/);
+  assert.match(shown(-1), /pending {11}  priority -1  review it$/);
+  assert.match(shown(0), /pending {11}  priority 0  review it$/, 'set, though 0 is what none means');
+  assert.match(shown(), /pending {11}  review it$/, 'not set, not shown');
 });
 
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
@@ -459,7 +459,7 @@ test('a Codex stream with no turn in it measured nothing, and reports no usage a
 const ranAt = (startedAt: string, endedAt?: string) => {
   const ended: Event[] = endedAt ? [{ kind: 'ended', at: endedAt, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' }] : [];
   return fold('t', [
-    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: startedAt, attempt: 1 },
     ...ended,
   ]).attempts[0]!;

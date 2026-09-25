@@ -92,7 +92,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
-  deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
+  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
 test('GET /api/workflows/keys is the form a step is drawn in: every key in the package\'s order with its line of meaning, how it is set, and the words it may take', async () => {
@@ -345,7 +345,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.deepEqual(after.workflow.schemas, ['build.schema.json'], 'the schema is left as it is');
 });
 
-test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a line break, no steps — and the folder is as it was", async () => {
+test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, `maxAttempts`, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a line break, no steps — and the folder is as it was", async () => {
   const dir = planned('refused');
   const before = snapshot(dir);
   const [plan, build] = await listedSteps('refused') as [ListedStep, ListedStep];
@@ -353,6 +353,7 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     ['a cycle', [{ ...plan, spec: { ...plan.spec, after: ['build'] } }, build], ['build', 'plan']],
     ['an after naming no step', [plan, { ...build, spec: { ...build.spec, after: ['plan', 'nope'] } }], ['build']],
     ['a key no step has', [plan, { ...build, spec: { ...build.spec, afer: ['plan'] } }], ['build']],
+    ['a count of attempts, retired with the runtime\'s', [plan, { ...build, spec: { ...build.spec, maxAttempts: 2 } }], ['build']],
     ['a loop with no output', [plan, { ...build, spec: { ...build.spec, loop: 'plan' } }], ['build']],
     ['a schema not there', [plan, { ...build, spec: { ...build.spec, output: 'nope.schema.json' } }], ['build']],
     ['a schema outside the folder', [plan, { ...build, spec: { ...build.spec, output: '../drawn/build.schema.json' } }], ['build']],

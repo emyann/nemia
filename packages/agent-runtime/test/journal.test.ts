@@ -86,10 +86,10 @@ test('a missing board is empty, not an error', async () => {
 
 /** A `filed` line as the engine wrote one until 2026-09-23: the harness's arguments beside the task's own fields. */
 const LEGACY = {
-  kind: 'filed', at: '2026-09-01T00:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, budgetUsd: 2,
+  kind: 'filed', at: '2026-09-01T00:00:00Z', brief: 'b', cwd: '/r', budgetUsd: 2,
   model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000,
 };
-const TODAY = { kind: 'filed', at: '2026-09-24T00:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, config: { model: 'haiku' } };
+const TODAY = { kind: 'filed', at: '2026-09-24T00:00:00Z', brief: 'b', cwd: '/r', config: { model: 'haiku' } };
 const STARTING = { kind: 'starting', at: '2026-09-01T00:00:01Z', attempt: 1, name: 'ae-t-old-1' };
 
 /** A store on disk with `lines` for each task, in the task files and the feed, as they were written. */
@@ -112,7 +112,7 @@ test("an old filed event is read with the harness's arguments under config, and 
 
   const [filed, starting] = await run(dir, Effect.flatMap(Journal, (j) => j.read('t-old')));
   assert.deepEqual(filed, {
-    kind: 'filed', at: LEGACY.at, brief: 'b', cwd: '/r', maxAttempts: 1, budgetUsd: 2,
+    kind: 'filed', at: LEGACY.at, brief: 'b', cwd: '/r', budgetUsd: 2,
     config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 },
   });
   assert.deepEqual(starting, STARTING, 'an event that never carried them is as written');

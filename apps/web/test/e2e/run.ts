@@ -200,7 +200,7 @@ async function main(): Promise<void> {
   const browser = await launch();
   let shots: string[];
   try {
-    shots = await visitAll(browser, base, pages, OUT);
+    shots = await visitAll(browser, base, pages, OUT, store);
   } finally {
     await browser.close();
   }

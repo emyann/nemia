@@ -198,10 +198,10 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  *   `unsigned`     only in a journal written before stage 4a (2026-09-23): the session ended without the closing
  *                  statement its task asked for, and the engine judged it, recorded `failed`. It judges no longer:
  *                  such an end is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles
- *                  `failed` with the note it always had, whatever attempts it has left, and is never continued.
+ *                  `failed` with the note it always had.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
- *                  cap is the task's, once: the task settles `failed`, and no attempt follows, resumed or clean.
+ *                  task settles `failed`, saying the budget was spent.
  *   `operator`     a person asked the task to stop, and the attempt was stopped before its harness ended it. Recorded
  *                  `stopped`. Journals before 2026-09-19 settled such an attempt without ending it.
  *   `deadline`     the task ran past its deadline, and the attempt was stopped before its harness ended it. Recorded
@@ -211,21 +211,12 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  * neither, and never words the machine wrote in the agent's name. (`harness` on a task that asked for no statement:
  * the harness's own state is all it has, and all it was asked for.)
  *
- * Everything about resume policy hangs on this distinction, which is why it is recorded rather
- * than inferred later.
+ * The runtime makes one attempt per start (stage 4a part 2): whatever the reason, an attempt that did not succeed and
+ * was not stopped settles its task `failed`. The reason is recorded rather than inferred later so that the layer
+ * above, which decides whether to try again and which session to continue, can tell a lost session's unjudged work
+ * from a conclusion and from a spawn that ran nothing.
  */
 export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget' | 'operator' | 'deadline';
-
-/** What a new attempt does with the one before it. A workload property, not a callback. */
-export type ResumePolicy =
-  /** Continue only when the last attempt was LOST: work nobody has judged, the session
-   *  included. A harness that reached a conclusion we did not like is usually not improved by being
-   *  dropped back into the context that produced it. */
-  | 'interrupted'
-  /** Always continue. Right for long, expensive work where any progress beats a clean start. */
-  | 'always'
-  /** Never continue. Right when an attempt's context is the thing suspected of being wrong. */
-  | 'never';
 
 // ─── the journal ────────────────────────────────────────────────────────────
 // Every side effect is bracketed by two entries: the intent, then the result. That bracket is
@@ -234,12 +225,17 @@ export type ResumePolicy =
 export type Event =
   /** The desired state, stated once. */
   | {
-      kind: 'filed'; at: string; brief: string; cwd: string; maxAttempts: number;
+      kind: 'filed'; at: string; brief: string; cwd: string;
       /** Which harness runs it: the adapter's name. */
       harness?: string;
-      deadlineSeconds?: number; resume?: ResumePolicy;
-      /** A session of this harness that the FIRST attempt should continue rather than start cold. */
+      deadlineSeconds?: number;
+      /** A session of this harness that the task's attempt should continue rather than start cold. */
       resumeFrom?: string;
+      /*
+       * A journal written before stage 4a part 2 (2026-09-23) carries `maxAttempts` and `resume` here too: how many
+       * attempts a turn had and which session a later one continued. Folded unread: the runtime makes one attempt per
+       * start, and trying again is the layer above's.
+       */
       /**
        * The harness's arguments — model, permission mode, effort, tools, MCP servers, context window, worktree, bridge —
        * as one object, `HarnessArgs`. Carried, never read here: a runner hands them to its harness, and `decide` never
@@ -376,13 +372,11 @@ export type State = {
   filedAt?: string;
   brief: string;
   cwd: string;
-  maxAttempts: number;
   /** Which harness runs it. `decide` never reads this — only the runner dispatches on it. */
   harness?: string;
   /** Wall clock across all attempts. Absent means no limit. */
   deadlineSeconds?: number;
-  resume: ResumePolicy;
-  /** What attempt 1 continues. Set at filing; later attempts follow `resume` policy instead. */
+  /** What the task's first turn continues. Set at filing. */
   resumeFrom?: string;
   /** The harness's arguments, as filed. See the `filed` event. `decide` never reads them. */
   config?: HarnessArgs;
@@ -408,16 +402,16 @@ export type State = {
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
-    taskId, brief: '', cwd: '', maxAttempts: 1, resume: 'interrupted',
+    taskId, brief: '', cwd: '',
     attempts: [], said: [], inputs: [], closed: false, stopRequested: false, settled: null,
   };
   for (const e of events) {
     switch (e.kind) {
       case 'filed':
         s.filedAt = e.at;
-        s.brief = e.brief; s.cwd = e.cwd; s.maxAttempts = e.maxAttempts;
+        s.brief = e.brief; s.cwd = e.cwd;
         s.harness = e.harness;
-        s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
+        s.deadlineSeconds = e.deadlineSeconds;
         s.resumeFrom = e.resumeFrom;
         s.config = e.config; s.closeoutSchema = e.closeoutSchema;
         s.budgetUsd = e.budgetUsd; s.priority = e.priority;
@@ -477,7 +471,7 @@ export function turnOf(state: State, n = state.inputs.length) {
   };
 }
 
-/** A task held open, its current turn signed, not closed and not settled: it waits on a person's answer, with no process running. */
+/** A task held open, its current turn ended `done` (with its statement or without), not closed and not settled: it waits on a person's answer, with no process running. */
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
   return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
@@ -488,7 +482,7 @@ export function waitsForInput(state: State): boolean {
 export type Action =
   /** Nothing to do. Not an error — the common case on a busy board. */
   | { do: 'nothing'; why: string }
-  /** Journal the intent to run attempt N, continuing `resumeFrom` when policy says so — told `nudge`, a later turn's answer, instead of the brief. */
+  /** Journal the intent to run attempt N, continuing `resumeFrom`, what its turn continues — told `nudge`, a later turn's answer, instead of the brief. */
   | { do: 'start'; attempt: number; resumeFrom?: string; nudge?: string }
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
@@ -557,44 +551,41 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
   // counts sessions at work, and one on a permission prompt makes no API calls.
   //
-  // It stops what runs and refuses what would start; an end its harness recorded is judged by that end. A pass steps a
-  // task until nothing moves, so an end recorded past the deadline is read past it too: before 2026-09-24 a check that
-  // exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end.
-  let overdue: Action | undefined;
+  // It stops what runs and settles what it cut; an end its harness recorded is judged by that end, below, and no attempt
+  // follows an ended one. A pass steps a task until nothing moves, so an end recorded past the deadline is read past it
+  // too: before 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end.
   if (state.deadlineSeconds !== undefined && turn.attempts.length > 0) {
     const ranFor = now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {
       if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
       const ending = cut('deadline');
       if (ending) return ending;
-      overdue = { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
-      if (last?.reason === 'deadline') return overdue;
+      if (last?.reason === 'deadline') return { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
     }
   }
 
-  // ---- no attempt in flight: either we are done, out of attempts, or we start one. Judged on the current turn's
-  // attempts, which are all of them for a task not held open; a turn with none yet starts its first.
+  // ---- no attempt in flight: either the turn's attempt has ended, and settles the task, or the turn starts its one.
+  // Judged on the current turn's attempts, which are all of them for a task not held open. One attempt per start: trying
+  // again — lost, unstartable or failed — is the layer above's, a new filing that continues the session it names.
   if (!last || last.ended !== null) {
     const ended = turn.attempts.at(-1);
     if (ended?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
     if (ended?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
-    // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
     if (ended?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${ended.n} spent its budget. File the task again with a larger one to run it again` };
+    // A journal from before stage 4a part 2 may hold several attempts of a turn: the note counts them all.
     const none = `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded`;
-    // An end the engine judged `unsigned`, in a journal from before stage 4a: settled as it would have been, never continued —
-    // the nudge that continued it is the orchestrator's now, and a session nudged from both layers would be told twice.
+    // An end the engine judged `unsigned`, in a journal from before stage 4a: settled with the note it always had.
     if (ended?.reason === 'unsigned') return { do: 'settle', outcome: 'failed', note: `${none}: the last ended without the closing statement it was asked for` };
-    if (turn.attempts.length >= state.maxAttempts) return { do: 'settle', outcome: 'failed', note: none };
+    if (ended) return { do: 'settle', outcome: 'failed', note: none };
     // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
     if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
-    // Past the deadline, no attempt follows, and none waits on the pool for one.
-    if (overdue) return overdue;
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {
       return { do: 'nothing', why: `${state.harness ?? 'default'}'s pool is at its ceiling (${now.used}/${now.max})` };
     }
-    const resumeFrom = resumeTarget(state, turn);
+    // The first turn continues what the task was filed against; a later one, the session that signed the turn before it.
+    const resumeFrom = turn.continues;
     // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
     // would share one conversation.
     if (resumeFrom && sighting && isLive(sighting.state)) return { do: 'stop', sessionId: sighting.sessionId, why: 'to continue it' };
@@ -636,31 +627,6 @@ function endOf(state: State, last: Attempt, sighting: Sighting): Action {
     reason: sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
     // Whether the statement its task asked for came: a fact for the layer above, which judges it.
     ...(state.closeoutSchema !== undefined ? { stated: sighting.closeout !== undefined } : {}) };
-}
-
-/**
- * The session a new attempt should continue, if any. THE policy call of this engine.
- *
- * Default `interrupted`: resume what was lost, start clean after a harness verdict.
- * A lost session's transcript is real work nobody has judged; a failed one is a conclusion, and dropping
- * a model back into the context that produced a conclusion tends to reproduce it. Both other
- * answers are defensible for particular work, which is why this is a field on the task.
- */
-function resumeTarget(state: State, turn: ReturnType<typeof turnOf>): string | undefined {
-  // Attempt 1 continues whatever the task was filed against — a previous step's session, usually.
-  // That is a fact about the work, not a retry policy, so `resume: 'never'` does not override it:
-  // "do not resume a failure" and "this task IS a continuation" are different statements.
-  // The same holds while every attempt so far was refused: an `unstartable` spawn ran nothing, and the
-  // next attempt is still the first to run, the continuation the task was filed as. Not `spawnedAt`:
-  // an attempt adopted after a crash never journalled its spawn, and its session did run.
-  // A later turn of a task held open is a continuation the same way, of the session that signed the turn before it.
-  const last = turn.attempts.at(-1);
-  if (!last || turn.attempts.every((a) => a.reason === 'unstartable')) return turn.continues;
-  const own = !last.nativeId || state.resume === 'never' ? undefined
-    : state.resume === 'always' || last.reason === 'lost' ? last.nativeId : undefined;
-  // Clean, in a later turn, is where the turn began: the conversation its session signed is judged work, and an answer
-  // told to a session that never heard the question means nothing.
-  return own ?? (turn.n > 0 ? turn.continues : undefined);
 }
 
 const isLive = (o: Observed | undefined): boolean =>

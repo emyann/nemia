@@ -181,9 +181,11 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
-it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
+it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
+the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
+([below](#trying-again-retries-and-wf-retry)). A run frozen with the key still loads, lists and files, without it.
 
 `disallowedTools:` and `allowedTools:` are Claude Code's names for its two rule lists, and the keys took them on 2026-09-23;
 until then they were `disallow:` and `allow:`. The former names are still read, in a step and in an agent, as the new ones —
@@ -264,7 +266,7 @@ At `wf start` each node is resolved and frozen on the run, so a run never reads 
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
 read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
 words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: two shipped steps have one, the `ship` of `dev-build` and `dev-planned-build`, which tell the shipper why a build
+case: the shipped steps that have one are the `ship` of `dev-build`, `dev-planned-build` and `ui`, which tell the shipper why a build
 and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
@@ -407,7 +409,7 @@ filing of the step (the first, each try and each round), and a deny beats every 
 `.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallowedTools:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
 for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
-`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace — those two
+`npm run build` and `npm run e2e`, which implement's check and its own run need and which write into the workspace — those two
 commands, and not the build and the e2e by another name (below). Every
 `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
 
@@ -528,7 +530,7 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
 | `codex` | refused at load | — |
@@ -597,7 +599,7 @@ Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s tw
 ```md
 ---
 harness: claude
-check: npm test && npm run typecheck && npm run build && npm run e2e
+check: npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi
 output: implement.schema.json   # screenshots, pages
 ---
 Implement what was asked, in this repository. It changes what a person sees in the web app. …
@@ -860,8 +862,8 @@ belongs to the attempt that made it, and needs no path.
 **Three things, one answer.**
 
 *It is how the run knows a step is finished* — the moment the answer is given, not ninety seconds of
-quiet later. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban)
-`kanban_complete(...)`, in the form every harness here already supports.
+quiet later. This is an agent kanban's terminal "complete" tool call, in the form every harness here
+already supports.
 
 *It stops a step claiming success it did not have.* `"outcome": "blocked"` ends the session honestly,
 and the DAG treats it as final — nothing downstream runs — while `wf decide` says **waiting on you**
@@ -900,8 +902,8 @@ forgot to say "commit this", and fixing that prose would have left the next work
 it.
 
 **`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and no account of
-the work — *read the change, not an account of it* is unchanged. Hermes injects the parent's summary
-into the child's prompt; this is the one place worth diverging. The only part of a closeout that
+the work — *read the change, not an account of it* is unchanged. An agent kanban we compared with injects the
+parent's summary into the child's prompt; this is the one place worth diverging. The only part of a closeout that
 reaches another step is what its `output:` declares, and only a step that asks with `input:` gets it.
 
 **At a gate, the closeout is what a person approves.** A gated step's `done` does not file what follows:
@@ -958,8 +960,9 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 
 This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
 check a person used to run by hand at every trial merge — and every round of it is checked again.
-`workflows/ui/`, for a change to the web app, adds `npm run build && npm run e2e`. Point the folder at
-another repository and change that line.
+`workflows/ui/`, for a change to the web app, adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF`
+is set: a round's check runs no e2e, and its gated ship runs the line whole on the merged tree. Point the folder
+at another repository and change that line.
 
 ### What a step's line says
 
@@ -1022,7 +1025,11 @@ retries: 1
   own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
   of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
-  step waits on you, as before.
+  step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
+  runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
+  `wf retry`. A `--nudge` of one whose harness never named its session — it could not start, or was lost — continues the
+  session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
+  is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
@@ -1034,9 +1041,10 @@ retries: 1
   `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
-  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine's `maxAttempts`: an engine allowance is per
-  task, so a person's try would earn another in the same round; each engine attempt gets the whole
-  `budgetUsd`; and `maxAttempts: 2` also restarts a session the harness failed.
+  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
+  engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
+  whole `budgetUsd`; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  2026-09-23, and `maxAttempts:` is refused.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
@@ -1319,21 +1327,27 @@ the absolute paths of its PNGs, and `review` reads them with `input: implement`.
 ### `workflows/ui/`: a change a person will see
 
 ```
-implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
+implement ⇄ review → ship   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
-`implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`.
-`npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a seeded
-store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
+`implement` carries `check: npm test && npm run typecheck && npm run build`, and then `npm run e2e` only
+where no `WF_BASE_REF` is set, which a check the run executes never is: a round's check builds and runs no
+e2e, and the ship runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
+every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
+seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
 have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
-own directory and read the PNGs, and to use the look skill on every page it changed. It declares
+own directory, after its last commit, and read the PNGs — those are the screenshots review reads — and to use
+the look skill on every page it changed. It declares
 `screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
 else of implement, and uses the look skill on the screenshots and the pages side by side — read by its
 file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and with it the Skill tool. Its schema is
 `workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
 `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
 names neither does not fit the closeout the step is filed with. `again: true` sends the change round
-again, at most `rounds: 3`, as in `workflows/`.
+again, at most `rounds: 3`, as in `workflows/`. `ship` is `dev-build`'s: gated, the shipper in the repository's
+own checkout, which stages the merge of the run's branch and signs off its message; the run executes that line on it as
+ship's `check:`, with no `WF_BASE_REF`, and commits or aborts. Its agent,
+`shipper`, is copied into this package's `workflows/agents/` beside ui's two.
 
 ```bash
 wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/workflows/ui

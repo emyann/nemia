@@ -15,7 +15,8 @@ harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and po
 admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-orchestrator
 `0e7b02a`. Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a step as a job, `claude -p`, and as `claude --bg`
 only when its task asks with `config.background: true` (issue 28). Since stage 3 (the same day), Codex is proven as an A2A agent in the
-same shape (issue 31).
+same shape (issue 31). Since stage 4a part 2 (the same day), the runtime makes one attempt per start, and trying again is the
+orchestrator's (*One attempt per start*, under Fixed).
 
 ## Bugs
 
@@ -701,11 +702,11 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
   `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
   `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
-  conversation at full price. Nor a failed later turn retried: since `-p --resume` keeps the id, the turn's failed attempt
-  ends with the id the turn continued, and the retry resumes a conversation that holds the failure — under any `resume`,
-  so a later turn's `interrupted` is `always` on Claude Code. Where the turn began would be kept by resuming each turn
-  with `--fork-session`, a new id per turn and the signed session left as it was: not built, a change to the runner's
-  arguments for one harness.
+  conversation at full price. A failed later turn is not retried since stage 4a part 2 — it settles its task `failed` — but
+  a caller that files it again with `resumeFrom` meets what the retry met: since `-p --resume` keeps the id, the turn's failed
+  attempt ends with the id the turn continued, and a continuation resumes a conversation that holds the failure. Where the
+  turn began would be kept by resuming each turn with `--fork-session`, a new id per turn and the signed session left as it
+  was: not built, a change to the runner's arguments for one harness.
 
 What a job gives up, or what is not done:
 
@@ -788,7 +789,8 @@ that has ended instead.
   resumed the thread (attempt 2's `resumeFrom` its first's id), which answered the code word only that thread was told, under
   the same thread id; `codexRolloutFile` named one file for both. So a held Codex task is one A2A context across its turns,
   as a Claude Code job's is (M12), and a resumed attempt's transcript holds its parent's conversation. A close settled it
-  `succeeded`. Not measured: a turn that fails and is retried, whose conversation then holds the failure as a job's does.
+  `succeeded`. Not measured: a turn that fails and is continued by a new filing, whose conversation then holds the failure as
+  a job's does.
 
 What `codex exec` cannot do, said and not faked:
 
@@ -1072,6 +1074,7 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
 | the nudge sent to a session that ended in prose asked for "your closing statement" and named no tool: twice it got no sign-off, and a person's sentence naming `StructuredOutput` got one in thirty seconds | the nudge names the tool and says the work stands, with its words pinned by a test (issue 25) | engine, 2026-09-17 |
 | a session held busy by a background shell it left running was never read: its closeout sat unread for seventy-seven minutes, and only a person killing the shell let the run go on | a busy session whose own closeout is the last word in its conversation, and whose transcript has been cold for the quiescence floor, is read as quiet: the attempt ends on that statement (issue 24) | engine, 2026-09-17 |
 | a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |
+| with one attempt per start, the runtime continues no attempt, so issue 5's case — an `unstartable` continuation — would start its next try cold | the orchestrator's `continuesFrom` hands a `--nudge` try, a round or a `resume:` step the last attempt's session, or, where the harness never named that one — it could not start, or was lost — the `resumeFrom` it was started with; for a held task's later turn, the session that signed the turn before (`test/run.test.ts`, `test/store.test.ts`, `test/held.test.ts`) | orchestrator, 2026-09-23 (stage 4a part 2) |
 | a check that exited 0 at 607 s of a 600 s deadline settled `failed`, `deadline exceeded`: the pass that recorded its `done` end read it again past the deadline, and the deadline settled first | an end on record is judged by that end; past the deadline, `decide` still stops a live session, cuts an open attempt, settles one the deadline cut, and starts no other attempt | engine, 2026-09-24 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
@@ -1174,6 +1177,17 @@ attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`c
 journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles `failed` with its
 note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`; retiring them
 is part 2 of stage 4a.
+
+**One attempt per start (stage 4a part 2, 2026-09-23).** Retired: `decide` starts one attempt at a task, and any end but
+`done` — failed, lost, unstartable, budget, deadline — settles it `failed`, noting the attempts (`1 attempt, none
+succeeded`; `… of turn N` on a held-open task's later turn). A held turn that fails, is lost or cannot start is not tried
+again inside the task either. `file()` and `ae start` refuse `maxAttempts` and `resume` at any value, the sentence naming
+`resumeFrom`, `retries:` and `wf retry` (`retiredKeyRefusal`, `test/refusal.test.ts`); a journal filed with them still
+folds, and one holding several attempts reads as it did. Trying again is the orchestrator's: `retries:` after a check
+refuses a step, `wf retry` for a try that failed, was lost or could not start, each a new `-tryN` task. Issue 5's case moved
+with it: the orchestrator's `continuesFrom` (`agent-orchestrator/src/retry.ts`) continues the `resumeFrom` of an attempt
+its harness never named — one that could not start, or was lost — since the runtime no longer does. A held turn's
+`-tryN` is proven in `agent-orchestrator/test/held.test.ts`, one test for each of the three ends.
 
 **Ends that carried neither statement nor reason, closed (2026-09-19, P0.5).** Every ended attempt now carries the agent's
 statement or the machine's reason (README, *Every ended attempt carries its statement or the reason it has none*). Measured

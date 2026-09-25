@@ -365,7 +365,7 @@ test('a session is answered as the harness sees it, and else as the journal has 
   assert.deepEqual(sightingOf(live), { sessionId: 's-1', state: 'blocked', waitingFor: 'permission prompt' });
 
   const at = '2026-09-23T10:00:00.000Z';
-  const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r', maxAttempts: 4 };
+  const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r' };
   h.journal.set('t-2', [
     filed,
     { kind: 'starting', at, attempt: 1 },
@@ -433,7 +433,7 @@ test('a listing carries what each session closed with only when it asks for arti
 
 /** A task held open whose first attempt signed: waiting on a person, `ae/t-h/1` its session. */
 const held = (after: Event[] = []): Event[] => [
-  { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', maxAttempts: 2, holdOpen: true },
+  { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', holdOpen: true },
   { kind: 'starting', at: '2026-09-23T10:00:00.000Z', attempt: 1 },
   { kind: 'spawned', at: '2026-09-23T10:00:01.000Z', attempt: 1 },
   { kind: 'ended', at: '2026-09-23T10:05:00.000Z', attempt: 1, sessionId: 'job-1', observed: 'done', reason: 'harness', nativeId: 'conv-h', closeout: { outcome: 'done' } },
@@ -563,7 +563,7 @@ test('the extension answers as the driver does: a session found or none, its log
 });
 
 const at = '2026-09-23T10:00:00.000Z';
-const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r', maxAttempts: 4 };
+const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r' };
 
 test("a transcript is read by the id the journal ended its attempt with, and no registry is asked, whatever it lists now", async () => {
   const h = harness();

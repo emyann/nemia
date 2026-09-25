@@ -181,9 +181,11 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`,
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
-it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
+it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
+the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
+([below](#trying-again-retries-and-wf-retry)). A run frozen with the key still loads, lists and files, without it.
 
 `disallowedTools:` and `allowedTools:` are Claude Code's names for its two rule lists, and the keys took them on 2026-09-23;
 until then they were `disallow:` and `allow:`. The former names are still read, in a step and in an agent, as the new ones —
@@ -528,7 +530,7 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
 | `codex` | refused at load | — |
@@ -1023,7 +1025,11 @@ retries: 1
   own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
   of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
-  step waits on you, as before.
+  step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
+  runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
+  `wf retry`. A `--nudge` of one whose harness never named its session — it could not start, or was lost — continues the
+  session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
+  is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
@@ -1035,9 +1041,10 @@ retries: 1
   `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
-  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine's `maxAttempts`: an engine allowance is per
-  task, so a person's try would earn another in the same round; each engine attempt gets the whole
-  `budgetUsd`; and `maxAttempts: 2` also restarts a session the harness failed.
+  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
+  engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
+  whole `budgetUsd`; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  2026-09-23, and `maxAttempts:` is refused.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`

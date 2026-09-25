@@ -43,7 +43,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word', sandbox: 'harness-word',
-  tools: 'list', disallowedTools: 'list', allowedTools: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
+  tools: 'list', disallowedTools: 'list', allowedTools: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
 

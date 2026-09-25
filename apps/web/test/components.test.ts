@@ -429,7 +429,7 @@ test('the legend draws an edge in each state as the canvas draws it: dashed and 
 
 test("the inspector's Details show `loop` and `rounds` beside `after` on a looping step, and not on another", () => {
   const run = runWith(null);
-  const spec = { harness: 'codex', model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 3 };
+  const spec = { harness: 'codex', model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: 'implement', rounds: 3 };
   const looping = { ...run.steps[0]!, spec };
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
   const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
@@ -635,7 +635,7 @@ async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; re
 
 const unset: WorkflowStepSpec = {
   harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
-  deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
+  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
 const unescaped = (text: string) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
@@ -1087,16 +1087,16 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     [...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
       .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
   );
-  const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline, rows['max attempts']];
-  const unset: StepSpec = { harness: 'claude', model: null, effort: null, context: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null };
+  const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline];
+  const unset: StepSpec = { harness: 'claude', model: null, effort: null, context: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: null, rounds: null };
 
-  // Filed as a step that sets none of them is, on a harness the api could not ask: one attempt, the engine's default, and nothing else said.
-  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
-  assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default', '1 · default']);
+  // Filed as a step that sets none of them is, on a harness the api could not ask: nothing said.
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null };
+  assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default']);
   const given: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600,
   };
-  assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default', '3 · default']);
+  assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default']);
 
   // The mode the session runs in, as its harness decides it: Claude Code's `auto` for a task filed with none — never "the harness's own",
   // which reads as Claude Code's prompting default — Codex's `workspace-write`, and a Codex sandbox its tools narrowed, whatever was named.
@@ -1125,11 +1125,13 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
 
   // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
-  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', context: 200_000, permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
+  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', context: 200_000, permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600 };
   const asSet: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, maxAttempts: 2,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600,
   };
-  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
+  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s']);
+  // No count of attempts: the runtime makes one per start, and a step that says a count is refused (stage 4a part 2).
+  assert.equal(['max attempts', 'attempts'].some((row) => row in rowsOf(set, asSet) || row in rowsOf(unset, bare) || row in rowsOf(unset, null)), false);
   assert.doesNotMatch(renderToStaticMarkup(createElement(Facts, { rows: specRows(set, asSet) })), /data-mark/);
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet' }).model, 'sonnet · this try');
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
@@ -1143,8 +1145,8 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(unset, null).context, '—');
 
   // Not filed: the workflow's words, or a dash.
-  assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—', '—']);
-  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
+  assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—']);
+  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s']);
 });
 
 
@@ -1476,7 +1478,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     ...base, name: 'ship', taskId: null, status: 'awaiting approval', branch: null, body: `${SHIPS}\n\nLook at the checkout first.`,
     closeout: null, approve: 'approve ship', gate: { awaiting: true, approval: null },
     // What the board tells an ending's gate from §6's by, off the workflow the run froze.
-    spec: { harness: 'claude', model: null, effort: null, after: ['review'], workspace: 'main', resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
+    spec: { harness: 'claude', model: null, effort: null, after: ['review'], workspace: 'main', resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
   };
   return {
     ...run, status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: toShip, gates: ['ship'],

@@ -53,7 +53,7 @@ test('the check refuses every way of opening config, and is not refused by carry
   const CARRIED = [
     'config?: HarnessArgs;',
     's.config = e.config; s.closeoutSchema = e.closeoutSchema;',
-    'maxAttempts: spec.maxAttempts ?? 1, harness: spec.harness, config: spec.config,',
+    'harness: spec.harness, config: spec.config,',
     'config: state.config, closeoutSchema: state.closeoutSchema,',
     'const released = yield* runner.release(session, state.config ?? {}).pipe(',
     '// a comment about the model is not a read of one',

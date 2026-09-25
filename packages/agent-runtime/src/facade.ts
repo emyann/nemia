@@ -13,7 +13,7 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type Input, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
+import { fold, nameFor, type Event, type Input, type Said, type Sighting, type State } from './domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
@@ -76,9 +76,7 @@ export type TaskSpec = {
   brief: string;
   cwd: string;
   harness?: string;
-  maxAttempts?: number;
   deadlineSeconds?: number;
-  resume?: ResumePolicy;
   /** Continue an existing session of this harness instead of starting cold. */
   resumeFrom?: string;
   /**
@@ -101,11 +99,9 @@ export type TaskSpec = {
   /**
    * The most one attempt's session may spend, in dollars — `0.25`, `5`. Given to Claude Code as `--max-budget-usd`:
    * `claude -p` ends the session once a response takes it past the cap, and the attempt ends `failed`, reason `budget`,
-   * with what it cost — and the task settles `failed`, saying so: a budget spent is spent, so no attempt follows, whatever
-   * `maxAttempts` or `resume` says. File the task again with a larger one to run it again. The harness counts one
-   * session's spend, so an attempt that fails under the cap is retried under the same cap. Refused unless a positive
-   * number, and on a harness that keeps no cap: `claude`, whose `--bg`
-   * sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
+   * with what it cost — and the task settles `failed`, saying so. File the task again with a larger one to run it again.
+   * The harness counts one session's spend. Refused unless a positive number, and on a harness that keeps no cap:
+   * `claude`, whose `--bg` sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
    */
   budgetUsd?: number;
   /**
@@ -118,8 +114,8 @@ export type TaskSpec = {
   /**
    * Hold the task open when an attempt signs, rather than settle it (R1): the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
-   * `close`s it, which settles it. A turn is attempts under `maxAttempts`, `deadlineSeconds` and a budget of its own, so a
-   * task may wait on a person for as long as they take. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
+   * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
+   * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
    */
   holdOpen?: true;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
@@ -134,8 +130,8 @@ export type Engine = {
    * File work. Returns the task id. Nothing runs until a tick.
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
-   * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
-   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd or resumeFrom;
+   * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
+   * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
    * a `cwd` that is not absolute; a `budgetUsd` that is not dollars above 0, or one its harness would not keep
    * (`claude`, `codex`); a `priority` that is not a finite number. And in its `config`: a key that is no harness
    * argument, or one filed beside `config` instead; an empty model or effort; a `tools` that is not a list of names; a
@@ -577,7 +573,8 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { denialText, nameFor } from './domain.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
+export { retiredKeyRefusal } from './engine.ts';
+export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';

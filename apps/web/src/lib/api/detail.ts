@@ -62,18 +62,17 @@ export type StepSpec = {
   /** Null for the harness's own set, empty for none. */
   tools: string[] | null;
   deadlineSeconds: number | null;
-  maxAttempts: number | null;
   /** The step a round runs again, for a looping step; and how many rounds its loop may run, the first included. */
   loop: string | null;
   rounds: number | null;
 };
 
 /**
- * Mirrors `StepFiled` in apps/api/src/detail.ts: what the engine filed a step's current try with. `maxAttempts` is always on the
- * record; any other field is null where the task was filed without it — no deadline, which is no limit, and the harness's own
- * model, effort and tools. `askedModel` is the model a person's `wf retry --model` asked this try for; `runsIn` the permission
- * mode the session runs in, as its harness decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a
- * Codex sandbox narrowed by `tools` — and null where the api could not ask the harness.
+ * Mirrors `StepFiled` in apps/api/src/detail.ts: what the engine filed a step's current try with. Each field is null where the
+ * task was filed without it — no deadline, which is no limit, and the harness's own model, effort and tools. `askedModel` is
+ * the model a person's `wf retry --model` asked this try for; `runsIn` the permission mode the session runs in, as its harness
+ * decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a Codex sandbox narrowed by `tools` — and
+ * null where the api could not ask the harness.
  */
 export type StepFiled = {
   model: string | null;
@@ -86,7 +85,6 @@ export type StepFiled = {
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
-  maxAttempts: number;
 };
 
 /** Mirrors `RunDetail` in apps/api/src/detail.ts. */

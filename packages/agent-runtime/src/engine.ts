@@ -8,7 +8,7 @@
 import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
+import { decide, fold, nameFor, needsHuman, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner } from './runner.ts';
@@ -49,8 +49,8 @@ export type TaskView = {
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
-  brief: string; cwd: string; maxAttempts?: number;
-  harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
+  brief: string; cwd: string;
+  harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resumeFrom?: string;
   closeoutSchema?: object; budgetUsd?: number; priority?: number; id?: string;
   /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
@@ -61,8 +61,21 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
   message: Schema.String,
 }) {}
 
-/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
-const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+/**
+ * The keys a task was once filed with and is no longer: the runtime makes one attempt per start (stage 4a part 2). Each
+ * is refused present, whatever its value — its old default included — since a key taken and then dropped is a promise
+ * nobody keeps. The words say where trying again went. Shared with `ae`'s brief (`retiredBriefKey` in `cli.ts`).
+ */
+export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
+  maxAttempts: 'the runtime makes one attempt per start, and trying again is the caller\'s',
+  resume: 'the runtime makes one attempt per start, so there is no later attempt for a policy to continue or not',
+};
+
+/** What to do instead of a retired key: file the task again, or, in a workflow, let the orchestrator try again. */
+export const RETIRED_INSTEAD = 'To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for a try with `wf retry <run> <step>` (`--nudge` continues the last try\'s session, `--fresh` starts clean).';
+
+/** Why a key a task no longer takes is refused, and what to do instead. */
+export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
 
 /**
  * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it that is the
@@ -83,14 +96,10 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (!path.isAbsolute(spec.cwd)) {
     return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
   }
-  if (spec.maxAttempts !== undefined && !(Number.isInteger(spec.maxAttempts) && spec.maxAttempts >= 1)) {
-    return `\`maxAttempts: ${spec.maxAttempts}\` is not a number of attempts. Give a whole number from 1.`;
-  }
+  // Asked of the spec as handed in, untyped: a caller built against the old `TaskSpec`, or from JSON, still sends them.
+  for (const key of Object.keys(RETIRED_KEYS) as (keyof typeof RETIRED_KEYS)[]) if (Object.hasOwn(spec, key)) return retiredKeyRefusal(key);
   if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
     return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
-  }
-  if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
-    return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
   }
   if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
   if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
@@ -117,8 +126,8 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
   yield* journal.append(id, {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
-    maxAttempts: spec.maxAttempts ?? 1, harness: spec.harness, config: spec.config,
-    deadlineSeconds: spec.deadlineSeconds, resume: spec.resume, resumeFrom: spec.resumeFrom,
+    harness: spec.harness, config: spec.config,
+    deadlineSeconds: spec.deadlineSeconds, resumeFrom: spec.resumeFrom,
     closeoutSchema: spec.closeoutSchema, budgetUsd: spec.budgetUsd, priority: spec.priority, holdOpen: spec.holdOpen,
   });
   return id;
@@ -251,6 +260,11 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   // Still computing: a statement it may yet revise. Measured once, with the file — a step declared
   // itself done, kept going, found it could not commit, and rewrote the verdict to blocked.
   if (seen.busy) return observed;
+  // Its session not yet known: the end recorded now would carry none, and nothing records one on an ended attempt, so an answer,
+  // or a later turn that continues the session, would have no conversation to go on. Codex writes `-o` and prints its thread on
+  // a pipe the worker reads when it is next scheduled — under load, after. The session is known a pass later, or the harness's
+  // own end brings what it printed.
+  if (!seen.nativeId) return observed;
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { holdsOpen, holdsOpenOn } from '../src/run.ts';
 import { answerIn, admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, composeBrief, decision, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, namesInOrder, owedFields, refusedCheck, askingTry, SIGNOFF, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentRoundAsks, acceptAsk, acceptedLines, spentAcceptances, stepStatus, stepTaskId, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, harnessWaitLine, deniedOffer, deniedWords, waitAdvice, waitingOn, waitingWords, waitsOf, waitWord, type Decision, type ParentCloseout, type ParentRun, type InputFile, type RetryBriefing, type RoundAsk, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, parseCloseout, placeText, REPLIES_SCHEMA, type Closeout } from '../src/closeout.ts';
-import { answerOf, dueNote, messageRefusal, nextTry, retriesSpent, sessionModel, signoffsSpent, spentAsks, tryOf, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry.ts';
+import { answerOf, continuesFrom, dueNote, messageRefusal, nextTry, retriesSpent, sessionModel, signoffsSpent, spentAsks, tryOf, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry.ts';
 import { firstFiledAt, runStartedAt, taskUsage, timeline, timelineLines, timelineTotalLines, type TaskClock } from '../src/timeline.ts';
 import type { TaskView } from 'agent-runtime';
 import type { Verdict } from '../src/check.ts';
@@ -844,15 +844,15 @@ test('UNSIGNED, though the engine settles it `failed`: a session that went quiet
   assert.match(brief(asked), /session ended `failed` before it signed off/);
 });
 
-test("UNSIGNED is the LAST attempt's word: a task of `maxAttempts: 2` whose attempt 1 went quiet `unsigned` and attempt 2 was `lost` reads `failed`, and is not waited on you — the other way round, it reads `unsigned`", async () => {
+test("UNSIGNED is the LAST attempt's word: a task journalled before stage 4a part 2, whose attempt 1 went quiet `unsigned` and attempt 2 was `lost` reads `failed`, and is not waited on you — the other way round, it reads `unsigned`", async () => {
   // `closeoutAsked` is views.ts's (re-exported by runner.ts), and pure: it reads the views it is handed, and nothing else.
   const { closeoutAsked } = await import('../src/runner.ts');
   const at = (n: number) => `2026-09-16T10:0${n}:00.000Z`;
-  /** The engine's view of a task filed with a closeout schema and `maxAttempts: 2`, settled `failed`, one attempt per reason, in order. */
+  /** The engine's view of a task filed with a closeout schema, from a journal old enough to hold two attempts, settled `failed`, one attempt per reason, in order. */
   const viewed = (...reasons: string[]) => new Map([['t1', {
     id: 't1', phase: 'failed', sessionId: 's',
     state: {
-      taskId: 't1', brief: 'filed', cwd: '/wt', maxAttempts: 2, closeoutSchema: CLOSEOUT_SCHEMA, settled: 'failed', stopRequested: false,
+      taskId: 't1', brief: 'filed', cwd: '/wt', closeoutSchema: CLOSEOUT_SCHEMA, settled: 'failed', stopRequested: false,
       attempts: reasons.map((reason, i) => ({
         n: i + 1, startedAt: at(i * 2), spawnedAt: at(i * 2), ended: 'failed', endedAt: at(i * 2 + 1), reason, nativeId: 'native-t1', resumeFrom: null, usage: null, exitCode: null,
       })),
@@ -884,7 +884,7 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
   const viewed = (settled: string, ends: End[], asked = true) => new Map([['t1', {
     id: 't1', phase: settled, sessionId: 's',
     state: {
-      taskId: 't1', brief: 'filed', cwd: '/wt', maxAttempts: 2, closeoutSchema: asked ? CLOSEOUT_SCHEMA : undefined, settled, stopRequested: false,
+      taskId: 't1', brief: 'filed', cwd: '/wt', closeoutSchema: asked ? CLOSEOUT_SCHEMA : undefined, settled, stopRequested: false,
       attempts: ends.map((end, i) => ({ n: i + 1, startedAt: at(i * 2), spawnedAt: at(i * 2), endedAt: at(i * 2 + 1), nativeId: 'native-t1', usage: null, exitCode: null, ...end })),
     },
   } as unknown as TaskView]]);
@@ -4450,4 +4450,17 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
 
   // The same shapes on a git run still say git's words: the folder's are said only on a folder run.
   assert.match(composeBrief(join, run({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join].map((s) => ({ ...s, workspace: undefined }))), /has been merged into this branch/);
+});
+
+test("continuesFrom (open issue 5): the session a try continues is its last attempt's own; an attempt with no id — it could not start, was lost, died unnamed — continues what it was started to; no attempt continues nothing", () => {
+  const attempt = (nativeId: string | null, reason: string | null, resumeFrom?: string) => ({ nativeId, reason, ...(resumeFrom ? { resumeFrom } : {}) });
+  assert.equal(continuesFrom([attempt('s-2', 'harness', 's-1')]), 's-2', 'its own id first, even when it continued another');
+  assert.equal(continuesFrom([attempt(null, 'unstartable', 's-1')]), 's-1', 'refused before a session ran: the chain it was handed');
+  assert.equal(continuesFrom([attempt(null, 'lost', 's-1')]), 's-1', 'lost with no id: the session it continued, where the work last stood');
+  assert.equal(continuesFrom([attempt(null, 'lost')]), undefined, 'lost on a fresh session: a fresh one again');
+  assert.equal(continuesFrom([attempt(null, 'harness', 's-1')]), 's-1', 'ended on its harness before it said its id: the same');
+  assert.equal(continuesFrom([attempt(null, 'unstartable')]), undefined, 'unstartable on a fresh session: a fresh one again');
+  assert.equal(continuesFrom([attempt('s-9', 'harness'), attempt(null, 'unstartable', 's-1')]), 's-1', 'the last attempt is read, not the first');
+  assert.equal(continuesFrom([]), undefined);
+  assert.equal(continuesFrom(undefined), undefined);
 });

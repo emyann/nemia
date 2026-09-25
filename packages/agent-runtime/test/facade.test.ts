@@ -325,7 +325,7 @@ test('watch() keeps its host process alive, even with a store that cannot push',
 
 // ─── the door refuses what the loop cannot run ──────────────────────────────
 
-import { claudeDetached, codex, type Engine, type HarnessSpec, type HarnessArgs, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
+import { claudeDetached, codex, type Engine, type HarnessSpec, type HarnessArgs, type TaskSpec } from '../src/facade.ts';
 
 /** An engine at shipped defaults — the three built-in harnesses — over a store a test can read. */
 const shipped = () => {
@@ -347,15 +347,19 @@ test('file() refuses a harness the engine does not have — it used to run on th
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 });
 
-test('file() refuses counts and seconds the loop cannot use — NaN was journalled as null', async () => {
+test('file() refuses seconds the loop cannot use — NaN was journalled as null', async () => {
   const { journal, engine } = shipped();
   for (const deadlineSeconds of [Number.NaN, 0, -5, Infinity]) {
     await refused(engine, { brief: 'b', cwd: '/r', deadlineSeconds }, /is not a number of seconds/);
   }
-  for (const maxAttempts of [0, 1.5, Number.NaN]) {
-    await refused(engine, { brief: 'b', cwd: '/r', maxAttempts }, /is not a number of attempts/);
-  }
-  await refused(engine, { brief: 'b', cwd: '/r', resume: 'sometimes' as ResumePolicy }, /is not a retry policy/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+});
+
+test('file() refuses the retired maxAttempts and resume, at what were their defaults, and says what to do instead', async () => {
+  const { journal, engine } = shipped();
+  // An untyped caller, or one written before stage 4a part 2: the type no longer names either key.
+  await refused(engine, { brief: 'b', cwd: '/r', maxAttempts: 1 } as TaskSpec, /^file: `maxAttempts` is retired: .*file it again.*`retries:`.*`wf retry <run> <step>`/);
+  await refused(engine, { brief: 'b', cwd: '/r', resume: 'interrupted' } as TaskSpec, /^file: `resume` is retired: .*`retries:`.*`wf retry <run> <step>`/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 });
 

@@ -77,7 +77,7 @@ const workflowFolder = (files: Record<string, string>) => {
 /** Two steps, the second reviewing the first. */
 const workflowDir = workflowFolder({
   'implement.md': '---\nharness: codex\nmodel: gpt-5\ndeadlineSeconds: 600\n---\nImplement the thing.\n',
-  'review.md': '---\nafter: implement\nmaxAttempts: 2\n---\nReview what implement did.\n',
+  'review.md': '---\nafter: implement\n---\nReview what implement did.\n',
 });
 
 const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] };
@@ -94,8 +94,8 @@ const firstTry = (step: { taskId: string | null; status: string; attempts: objec
   taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout, unreadable: null, answer: null,
 }];
 
-/** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
-const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+/** The engine's record of a task `filed` journals: a codex task with nothing else said — which Codex runs in `workspace-write`. */
+const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null };
 
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) =>
@@ -202,7 +202,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   };
   assert.deepEqual(implement, {
     name: 'implement',
-    spec: { harness: 'codex', model: 'gpt-5', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
+    spec: { harness: 'codex', model: 'gpt-5', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: 600, loop: null, rounds: null },
     // The engine's record, not the folder's words: this journal was written with none of them.
     filed: filedBare,
     body: 'Implement the thing.',
@@ -225,7 +225,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, unreadable: null, attempts: { count: 0, latest: null } };
   assert.deepEqual({ ...review, told: undefined }, {
     name: 'review',
-    spec: { harness: null, model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
+    spec: { harness: null, model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
     // Not filed: the engine has filed it with nothing yet.
     filed: null,
     body: 'Review what implement did.',
@@ -386,8 +386,8 @@ const frozenLoop = [
 ];
 
 const frozenSpecs = {
-  implement: { harness: 'claude', model: 'opus', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
-  review: { harness: 'codex', model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
+  implement: { harness: 'claude', model: 'opus', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
+  review: { harness: 'codex', model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: 'implement', rounds: 2 },
 };
 
 const frozenGraph = {
@@ -427,6 +427,17 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.deepEqual(gone.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
   assert.deepEqual(gone.graph, frozenGraph);
   assert.deepEqual((await listed('r-41')).graph, frozenGraph);
+});
+
+test('a run frozen before stage 4a part 2 with a step of `maxAttempts: 2` still reads, and its spec no longer carries the key', async () => {
+  const frozen = frozenLoop.map((s) => (s.name === 'review' ? { ...s, maxAttempts: 2 } : s));
+  writeRun({ ...r2, id: 'r-44', workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: frozen, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  const response = await app.request('/api/runs/r-44');
+  assert.equal(response.status, 200);
+  const run = await response.json();
+  assert.deepEqual(run.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
+  assert.equal('maxAttempts' in run.steps[1].spec, false);
+  assert.ok((await listed('r-44')), 'and it lists');
 });
 
 test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
@@ -1174,7 +1185,7 @@ test('a statement that could not be read reaches the board as it came, with why 
 });
 
 test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {
-  // Filed as the tick files a step — with its effort, window and tools — and, as a step that sets neither, with no deadline and no max attempts.
+  // Filed as the tick files a step — with its effort, window and tools — and, as a step that sets neither, with no deadline.
   await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] } });
   writeRun({
     ...r2, id: 'r-51', workflowDir: gone,
@@ -1184,12 +1195,12 @@ test('a step says what it runs with: the workflow\'s effort, context window and 
 
   const [implement, review] = (await (await app.request('/api/runs/r-51')).json()).steps;
   assert.deepEqual(implement.spec, {
-    harness: 'claude', model: null, effort: 'high', context: 200_000, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null,
+    harness: 'claude', model: null, effort: 'high', context: 200_000, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: ['Read', 'Grep'], deadlineSeconds: null, loop: null, rounds: null,
   });
   // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
   // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
   assert.deepEqual(implement.filed, {
-    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1,
+    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null,
   });
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);

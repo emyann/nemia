@@ -161,7 +161,7 @@ const rig = () => {
   const env = (step: string): CheckEnv => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace, WF_STDERR: path.join(root, `${step}.stderr`) });
   const file = (step: string, command: string, deadlineSeconds = 60) => e.file({
     id: `r-1-${step}-check`, harness: 'check', cwd: workspace, brief: checkBrief(command, env(step)),
-    deadlineSeconds, maxAttempts: 1, resume: 'never',
+    deadlineSeconds,
   });
   return { root, workspace, e, file };
 };

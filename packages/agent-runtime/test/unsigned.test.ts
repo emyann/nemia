@@ -103,7 +103,7 @@ test('a task that asked for a closeout, whose session goes quiet without one, en
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA, maxAttempts: 2 });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
 
@@ -119,7 +119,7 @@ test('a task that asked for a closeout, whose session goes quiet without one, en
     assert.deepEqual(claude.rows(), [], 'its session let go');
 
     await engine.tick();
-    assert.equal((await engine.view(id)).state.attempts.length, 1, 'with an attempt left, none follows');
+    assert.equal((await engine.view(id)).state.attempts.length, 1, 'no attempt follows');
     assert.equal(claude.spawns().length, 1, 'nothing continued, and nobody told a nudge');
     assert.equal(await settledNote(engine, id), undefined);
   });
@@ -129,7 +129,7 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), maxAttempts: 2 });
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));

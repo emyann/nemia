@@ -7,7 +7,7 @@
  * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, so what the run reads is
  * what the runtime says: its phase, its turns, its refusals. What `holdsOpen` judges is pure, and lives in run.test.ts.
  */
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,8 +67,11 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 const engine = () => {
   const sessions = new Map<string, Sighting>();
   const spawned: SpawnRequest[] = [];
+  /** Names whose spawn the harness refuses, as it refuses a start that ran nothing: the attempt ends `unstartable`. */
+  const refusing = new Set<string>();
   const runner: PromiseRunner = {
     async spawn(r) {
+      if (refusing.has(r.name)) throw Object.assign(new Error(`${r.name}: refused`), { refused: true });
       spawned.push(r);
       sessions.set(r.name, { sessionId: `s-${spawned.length}`, nativeId: `native-${spawned.length}`, state: 'working', busy: true });
     },
@@ -84,7 +87,7 @@ const engine = () => {
     sessions.set(name, { ...sessions.get(name)!, state: 'done', busy: false, closeout: { payload: closeout, at: Date.now() + 60_000 }, ...(usage ? { usage } : {}) });
   };
   const pass = async (id: string) => { await e.tick(); return advance(e, readRun(id)); };
-  return { e, sign, pass, spawned, sessions };
+  return { e, sign, pass, spawned, sessions, refusing };
 };
 
 /** Each step's line on `wf ls`, by name. */
@@ -244,6 +247,87 @@ test('a pass that answered and died before writing the run down is adopted: the 
   assert.deepEqual(readAsks(run.id).asks, [], 'and the ask consumed');
   await pass(run.id);
   assert.equal((await stateOf(e, plan)).state.inputs.length, 1, 'never answered twice');
+});
+
+// ─── an answer's turn that does not sign ────────────────────────────────────
+
+/**
+ * A plan that signed off blocked and was answered: the answer's turn is attempt 2 of the same task, filed to continue `native-1`, the
+ * session that asked. The runtime makes one attempt at a turn (stage 4a part 2), so each end below settles the task `failed`; what follows
+ * is the orchestrator's, a try of its own.
+ */
+const answeredTurn = async () => {
+  const h = await signedPlan({}, BLOCKED);
+  const plan = `${h.run.id}-plan`;
+  await retry(h.e, h.run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' });
+  assert.deepEqual((await h.pass(h.run.id)).tried, ['plan'], 'answered');
+  return { ...h, plan, turn: nameFor(plan, 2) };
+};
+
+/**
+ * What every end of the turn but a sign-off leaves: the task settled `failed` and the step read `failed`, nothing tried again on its own,
+ * and a person's `wf retry --message` filed as a task of its own — `-try3`, the answered turn being try 2 — and the settled task never
+ * answered again, continuing `from`.
+ */
+const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: string, end: string) => {
+  const { run, e, pass, plan, spawned } = h;
+  const settled = await stateOf(e, plan);
+  assert.deepEqual([settled.phase, settled.state.settled], ['failed', 'failed'], `${end}: one attempt at the turn, and the task settled`);
+  assert.equal(settled.state.attempts.length, 2, `${end}: nothing tried again inside the task`);
+  assert.equal((await statuses(e, run.id)).plan, 'failed', `${end}: the step reads failed`);
+  const idle = await pass(run.id);
+  assert.deepEqual([idle.tried, idle.filed], [[], []], `${end}: nothing filed until a person says`);
+  const decided = await decide(e, run.id);
+  assert.deepEqual(decided.decision.kind === 'awaiting' && [decided.decision.outcome, decided.decision.failed], ['failed', ['plan']], `${end}: the run failed, as any failed step fails it`);
+  assert.match(decided.offers.join('\n'), /wf retry \S+ plan/, `${end}: and \`wf decide\` offers the retry`);
+
+  await retry(e, run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag, again' });
+  assert.deepEqual((await pass(run.id)).tried, ['plan'], `${end}: the nudge`);
+  assert.equal((await stateOf(e, plan)).state.inputs.length, 1, `${end}: the settled task is not answered again`);
+  const next = await stateOf(e, `${plan}-try3`);
+  assert.match(next.state.brief, /the --dry-run flag, again/, `${end}: a task of its own, with the answer in its brief`);
+  assert.equal(next.state.holdOpen, true, `${end}: held open itself`);
+  assert.equal(next.state.resumeFrom, from, `${end}: continuing ${from}`);
+  assert.equal(readRun(run.id).steps.plan!.taskId, `${plan}-try3`, `${end}: the step's try now`);
+  await pass(run.id);
+  assert.deepEqual([spawned.at(-1)!.name, spawned.at(-1)!.resumeFrom], [nameFor(`${plan}-try3`, 1), from], `${end}: started, continuing ${from}`);
+};
+
+test("an answer's turn that FAILED settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that failed", async () => {
+  const h = await answeredTurn();
+  await h.pass(h.run.id);
+  assert.deepEqual([h.spawned.at(-1)!.name, h.spawned.at(-1)!.resumeFrom], [h.turn, 'native-1'], 'the turn, continuing the session that asked');
+  h.sessions.set(h.turn, { ...h.sessions.get(h.turn)!, state: 'failed', busy: false });
+  await h.pass(h.run.id);
+  assert.equal((await stateOf(h.e, h.plan)).state.attempts.at(-1)!.nativeId, 'native-2');
+  await triedAgain(h, 'native-2', 'failed');
+});
+
+test("an answer's turn that was LOST settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that asked, since the lost one was never named", async () => {
+  const h = await answeredTurn();
+  await h.pass(h.run.id);
+  assert.equal(h.spawned.at(-1)!.name, h.turn);
+  h.sessions.delete(h.turn);
+  // Past the runtime's grace for a session its harness never reports (30 s): the attempt is lost.
+  mock.timers.enable({ apis: ['Date'], now: Date.now() + 10 * 60_000 });
+  try {
+    await h.pass(h.run.id);
+  } finally {
+    mock.timers.reset();
+  }
+  const last = (await stateOf(h.e, h.plan)).state.attempts.at(-1)!;
+  assert.deepEqual([last.reason, last.nativeId, last.resumeFrom], ['lost', null, 'native-1'], 'lost, with no id of its own');
+  await triedAgain(h, 'native-1', 'lost');
+});
+
+test("an answer's turn that COULD NOT START settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that asked", async () => {
+  const h = await answeredTurn();
+  h.refusing.add(h.turn);
+  await h.pass(h.run.id);
+  assert.notEqual(h.spawned.at(-1)!.name, h.turn, 'never started');
+  const last = (await stateOf(h.e, h.plan)).state.attempts.at(-1)!;
+  assert.deepEqual([last.n, last.reason, last.nativeId, last.resumeFrom], [2, 'unstartable', null, 'native-1'], 'refused, with the session it was to continue');
+  await triedAgain(h, 'native-1', 'unstartable');
 });
 
 // ─── a gate ─────────────────────────────────────────────────────────────────

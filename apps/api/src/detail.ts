@@ -86,7 +86,6 @@ export type StepSpec = {
   /** The only tools the session may have: null for the harness's own set, empty for none. */
   tools: string[] | null;
   deadlineSeconds: number | null;
-  maxAttempts: number | null;
   /** The step a round runs again, on a looping step. */
   loop: string | null;
   /** How many rounds its loop may run, the first included: set on every looping step, as the parser sets it. */
@@ -95,9 +94,8 @@ export type StepSpec = {
 
 /**
  * What the engine filed a step's current try with, off its record of the task: what the step runs with where its workflow
- * leaves a field to the engine. `maxAttempts` is always on the record, the engine's default being 1. Each other field is null
- * where the task was filed without it — a deadline, which is then no limit; a model, effort or tools, which are then the
- * harness's own; a permission mode, which its harness chooses, and `runsIn` says.
+ * leaves a field to the engine. Each field is null where the task was filed without it — a deadline, which is then no limit; a
+ * model, effort or tools, which are then the harness's own; a permission mode, which its harness chooses, and `runsIn` says.
  */
 export type StepFiled = {
   model: string | null;
@@ -119,7 +117,6 @@ export type StepFiled = {
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
-  maxAttempts: number;
 };
 
 /** One run in full, for a person reading it: the spec, and per step what it was told and how it went. */
@@ -420,7 +417,6 @@ const specOf = (step: Workflow): StepSpec => ({
   sandbox: step.sandbox ?? null,
   tools: step.tools ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
-  maxAttempts: step.maxAttempts ?? null,
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
 });
@@ -532,7 +528,7 @@ export async function detail(run: Run): Promise<RunDetail> {
 function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
-  const { deadlineSeconds, maxAttempts } = view.state;
+  const { deadlineSeconds } = view.state;
   // The harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`); the engine carries them unread.
   const { model, effort, contextTokens, permissionMode, tools } = view.state.config ?? {};
   return {
@@ -544,7 +540,6 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
     runsIn: runsInOf(view.state),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
-    maxAttempts,
   };
 }
 

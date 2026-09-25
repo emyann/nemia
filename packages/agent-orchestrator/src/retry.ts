@@ -19,6 +19,21 @@ import type { Workflow } from './workflow.ts';
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
 /**
+ * The session a try continues, off the attempts of the task before it: the harness's own id for the last attempt's session — what
+ * `--resume` takes. An attempt its harness never named — one whose spawn it refused (`unstartable`), one it lost, one that died before it
+ * said its id — continues nothing of its own, but the session it was started to continue is still there, and where the work last stood:
+ * the try continues that one rather than starting cold (agent-runtime's open issue 5, which the runtime answered on its next attempt until
+ * stage 4a part 2 made it one attempt a start). For a later turn of a task held open, that is the session that signed the turn before,
+ * which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and left
+ * no id. Pure; typed by what it reads, so this file imports no runtime.
+ */
+export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined): string | undefined => {
+  const last = attempts?.at(-1);
+  if (!last) return undefined;
+  return last.nativeId ?? last.resumeFrom;
+};
+
+/**
  * A try that is over, kept on the step's record behind the one that replaced it.
  *
  * `then` is what replaced it: `retries`, the run re-filing the step itself after its check refused — a

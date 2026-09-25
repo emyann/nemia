@@ -13,7 +13,7 @@
 import { Effect, Exit, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type Input, type Said, type Sighting, type State } from './domain.ts';
+import { fold, isLive, nameFor, phaseWordOf, waitsOnPerson, type Event, type Input, type Said, type Sighting, type State } from './domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
@@ -641,12 +641,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // 16). `claude agents` does not say which wait a session is in, so neither is refused. A quiet session is
       // `working` too: its runner reports how long it has been quiet, not an end, and an idle session's inbox
       // starts a turn (open issue 14).
-      if (sighting.state !== 'working' && sighting.state !== 'blocked') {
-        throw refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`);
+      if (!isLive(sighting.state)) {
+        throw refuse(`\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: the next pass writes its end. ${resume}`);
       }
       // A remote agent's Task takes a message only where A2A lets its caller speak: once it asks for input. At work, a
       // message would be a second turn the agent never asked for.
-      if (isRemote(h) && sighting.state !== 'blocked') {
+      if (isRemote(h) && !waitsOnPerson(sighting.state)) {
         throw refuse(`\`${taskId}\` runs on the \`${harness}\` remote A2A agent, whose Task takes words only once it asks for input, and it is at work. Say them when \`ae ls\` shows it waiting, or ${resume.charAt(0).toLowerCase()}${resume.slice(1)}`);
       }
       try { await go(deliver({ name, sessionId: sighting.sessionId }, text)); } catch (e) {
@@ -739,7 +739,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 }
 
 // ─── the vocabulary, all plain data ─────────────────────────────────────────
-export type { PromiseRunner } from './runner-promise.ts';
+export type { PromiseRunner, PromiseSighting } from './runner-promise.ts';
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 // The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
@@ -749,7 +749,7 @@ export type { HarnessSpec } from './runner-detached.ts';
 export type { Credentials, RemoteAgent } from './a2a-remote.ts';
 export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
+export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';

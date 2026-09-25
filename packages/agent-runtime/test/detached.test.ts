@@ -17,14 +17,14 @@ import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
-import type { Sighting } from '../src/domain.ts';
+import type { SessionState, Sighting } from '../src/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 
-const settle = async (ops: ReturnType<typeof detachedOps>, name: string, want: string, ms = 15_000) => {
+const settle = async (ops: ReturnType<typeof detachedOps>, name: string, want: SessionState, ms = 15_000) => {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     const seen = (await Effect.runPromise(ops.observe)).get(name);
@@ -43,7 +43,7 @@ test('a detached session runs, is observable while running, and reports success'
   const running = (await Effect.runPromise(ops.observe)).get('ae/t1/1');
   assert.equal(running?.state, 'working', 'visible immediately, before it finishes');
 
-  await settle(ops, 'ae/t1/1', 'done');
+  await settle(ops, 'ae/t1/1', 'completed');
   assert.equal(fs.readFileSync(path.join(dir, 'out.txt'), 'utf8').trim(), 'done');
 });
 
@@ -63,7 +63,7 @@ test('the worker outlives the process that spawned it', async () => {
 
   await new Promise((r) => setTimeout(r, 500));
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t3/1')?.state, 'working');
-  await settle(ops, 'ae/t3/1', 'done');
+  await settle(ops, 'ae/t3/1', 'completed');
 });
 
 test('stop reaches the detached worker, which kills the harness and says so', async () => {
@@ -77,10 +77,10 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
-    if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'stopped') break;
+    if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled') break;
     await new Promise((r) => setTimeout(r, 200));
   }
-  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state, 'stopped');
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state, 'canceled');
 });
 
 test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', async () => {
@@ -122,7 +122,7 @@ test('a stop that lands the moment the worker has published its pid is heard, no
     await until(() => frozen(pid), 'the worker freezes after its first write');
     await Effect.runPromise(ops.stop('ae/t4/2'));
     process.kill(pid, 'SIGCONT');
-    await settle(ops, 'ae/t4/2', 'stopped');
+    await settle(ops, 'ae/t4/2', 'canceled');
     heard = true;
   } finally {
     // Only a worker that did not hear the stop is still there to take away.
@@ -192,7 +192,7 @@ test('a stop kills what of its harness ignored SIGTERM before the worker exits, 
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
   await Effect.runPromise(ops.stop('ae/g3/2'));
   await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 20_000);
-  await settle(ops, 'ae/g3/2', 'stopped');
+  await settle(ops, 'ae/g3/2', 'canceled');
 });
 
 test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async () => {
@@ -247,7 +247,7 @@ test('a stop that lands before the worker has published its pid is heard: the ha
   try {
     await Effect.runPromise(ops.stop('ae/t4/3'));
     process.kill(pid, 'SIGCONT');
-    await settle(ops, 'ae/t4/3', 'stopped');
+    await settle(ops, 'ae/t4/3', 'canceled');
     await until(() => !isAlive(pid), 'the worker exits');
     heard = true;
   } finally {
@@ -262,7 +262,7 @@ test('a stop that lands before the worker has published its pid is heard: the ha
   // Spawned again under the name, it runs: the stop asked of the one before is not asked of it.
   const again = detachedOps(sh(`touch ${ran}; exit 0`), dir);
   await Effect.runPromise(again.spawn(req('ae/t4/3', dir)));
-  await settle(again, 'ae/t4/3', 'done');
+  await settle(again, 'ae/t4/3', 'completed');
   assert.equal(fs.existsSync(ran), true, 'a run spawned again after a stop starts its harness');
 });
 
@@ -293,7 +293,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
     try { await Effect.runPromise(ops.stop('ae/t4/4')); } finally { fs.writeFileSync = write; }
     assert.equal(held, true, 'the stop wrote its marker');
     assert.equal(fs.existsSync(ran), true, 'the harness started before the marker was written');
-    await settle(ops, 'ae/t4/4', 'stopped');
+    await settle(ops, 'ae/t4/4', 'canceled');
     heard = true;
   } finally {
     if (!heard) {
@@ -326,7 +326,7 @@ test('logs come back from the worker capture', async () => {
   const dir = root();
   const ops = detachedOps(sh('echo hello-from-the-harness; exit 0'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t6/1', dir)));
-  await settle(ops, 'ae/t6/1', 'done');
+  await settle(ops, 'ae/t6/1', 'completed');
   assert.match(await Effect.runPromise(ops.logs('ae/t6/1')), /hello-from-the-harness/);
 });
 
@@ -386,7 +386,7 @@ const sayRefused = async (ops: ReturnType<typeof detachedOps>, name: string, tex
 };
 const stopped = async (ops: ReturnType<typeof detachedOps>, name: string) => {
   await Effect.runPromise(ops.stop(name));
-  await settle(ops, name, 'stopped');
+  await settle(ops, name, 'canceled');
 };
 
 test("a harness that reads its stdin is given its brief's line first, then each word said, in order — and a line half appended waits for its end", async () => {
@@ -435,7 +435,7 @@ test('a harness closing its input on its own words ends its run: done, its stdin
   const dir = root();
   const ops = detachedOps(listener(dir), dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/i3/1', brief: 'end', cwd: dir }));
-  await settle(ops, 'ae/i3/1', 'done');
+  await settle(ops, 'ae/i3/1', 'completed');
   assert.deepEqual(heardIn(dir), ['end', 'EOF']);
   await sayRefused(ops, 'ae/i3/1', 'late', /has given its result and reads no more words/);
 });
@@ -528,17 +528,17 @@ test('the composite sends each task to the harness it asked for', async () => {
 
 test('the composite merges what every harness sees into one map', async () => {
   const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
-  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'done' }]]);
+  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'completed' }]]);
   const ops = composite({ alpha: testOps({ sessions: a }), beta: testOps({ sessions: b }) }, 'alpha');
 
   const merged = await Effect.runPromise(ops.observe);
   assert.deepEqual([...merged.keys()].sort(), ['ae/x/1', 'ae/y/1']);
-  assert.equal(merged.get('ae/y/1')?.state, 'done');
+  assert.equal(merged.get('ae/y/1')?.state, 'completed');
 });
 
 test('the composite tells each harness only the sessions routed to it, and lists one that cannot be told in full', async () => {
   const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
-  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'done' }]]);
+  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'completed' }]]);
   const told: Record<string, string[]> = {};
   const telling = (name: string, sessions: Map<string, Sighting>) => ({
     ...testOps({ sessions }),
@@ -554,7 +554,7 @@ test('the composite tells each harness only the sessions routed to it, and lists
   assert.deepEqual(told, { alpha: ['ae/x/1', 'ae/w/1', 'ae/v/1'], beta: ['ae/y/1'] }, 'no harness, or one not here, is the fallback, where its spawn went');
   assert.deepEqual([...merged.keys()].sort(), ['ae/x/1', 'ae/y/1', 'ae/z/1'], 'a harness without the verb is observed all the same');
   await Effect.runPromise(ops.stop('s-b'));
-  assert.equal(b.get('ae/y/1')?.state, 'stopped', 'and who owns what is learned from it, as from observe');
+  assert.equal(b.get('ae/y/1')?.state, 'canceled', 'and who owns what is learned from it, as from observe');
 });
 
 test('the composite routes stop to whichever harness owns that session', async () => {
@@ -565,7 +565,7 @@ test('the composite routes stop to whichever harness owns that session', async (
   await Effect.runPromise(ops.observe); // learn who owns what
   await Effect.runPromise(ops.stop('s-b'));
 
-  assert.equal(b.get('ae/y/1')?.state, 'stopped', 'beta was told');
+  assert.equal(b.get('ae/y/1')?.state, 'canceled', 'beta was told');
   assert.equal(a.get('ae/x/1')?.state, 'working', 'alpha was not');
 });
 
@@ -580,17 +580,17 @@ test('one harness failing to answer does not blind the engine to the others', as
 
 test('the composite sends a release only to the harness that reported the session — never to the fallback', async () => {
   const released: string[] = [];
-  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'done' }]]);
-  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'done' }]]);
+  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'completed' }]]);
+  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'completed' }]]);
   const alpha = { ...testOps({ sessions: a }), release: (s: Sighting) => Effect.sync(() => { released.push(s.sessionId); }) };
   const ops = composite({ alpha, beta: testOps({ sessions: b }) }, 'alpha');
 
-  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'done' }, {}));
+  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'completed' }, {}));
   assert.deepEqual(released, [], 'no pass has said whose it is: nobody is asked, the fallback least of all');
   await Effect.runPromise(ops.observe);
-  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'done' }, {}));
+  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'completed' }, {}));
   assert.deepEqual(released, [], 'beta has no release, so there is nothing to do');
-  await Effect.runPromise(ops.release!({ sessionId: 's-a', state: 'done' }, {}));
+  await Effect.runPromise(ops.release!({ sessionId: 's-a', state: 'completed' }, {}));
   assert.deepEqual(released, ['s-a']);
 });
 
@@ -677,7 +677,7 @@ test("a detached harness's final answer is its closing statement — and nothing
   const ops = detachedOps(answers, dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/t9/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
 
-  const seen = await settle(ops, 'ae/t9/1', 'done');
+  const seen = await settle(ops, 'ae/t9/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
   assert.equal(typeof seen.closeout?.at, 'number');
   assert.deepEqual(fs.readdirSync(workspace), [], 'the workspace is the one place it must not be');
@@ -896,7 +896,7 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   process.chdir(parent);
   try { await Effect.runPromise(ops.spawn(req('ae/t19/1', 'repo'))); } finally { process.chdir(was); }
 
-  await settle(ops, 'ae/t19/1', 'done');
+  await settle(ops, 'ae/t19/1', 'completed');
   const repo = fs.realpathSync(path.join(parent, 'repo'));
   assert.equal(given && fs.realpathSync(given), repo, 'the spec is handed the resolved directory, so a `-C` names it too');
   assert.equal(fs.realpathSync(fs.readFileSync(path.join(repo, 'where.txt'), 'utf8').trim()), repo);
@@ -1086,7 +1086,7 @@ test("a spec that reads its harness's output reports the answer found there, sta
   const before = Date.now();
   await Effect.runPromise(ops.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
 
-  const seen = await settle(ops, 'ae/t20/1', 'done');
+  const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
   // A filesystem's clock, which some keep to the second: that much slack either side of the run.
   assert.ok(seen.closeout!.at >= before - 1_000 && seen.closeout!.at <= Date.now() + 1_000, `stamped ${seen.closeout!.at}, spawned ${before}`);
@@ -1099,10 +1099,10 @@ test("what a harness's output says it denied the session is on the session's sig
   const says = (read: HarnessOutput): HarnessSpec => ({ name: 'sh', readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) });
   const denied = detachedOps(says({ denials }), dir);
   await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
-  assert.deepEqual((await settle(denied, 'ae/t23/1', 'done')).denials, denials);
+  assert.deepEqual((await settle(denied, 'ae/t23/1', 'completed')).denials, denials);
   const none = detachedOps(says({ denials: [] }), dir);
   await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
-  assert.equal('denials' in (await settle(none, 'ae/t24/1', 'done')), false, 'an empty list is no key');
+  assert.equal('denials' in (await settle(none, 'ae/t24/1', 'completed')), false, 'an empty list is no key');
 });
 
 test("a run is not called over before the harness's last output is in its log — the answer read from it would be lost", async () => {
@@ -1123,7 +1123,7 @@ test("a run is not called over before the harness's last output is in its log �
     if (seen && seen.state !== 'working') break;
     await new Promise((r) => setTimeout(r, 20));
   }
-  assert.equal(seen?.state, 'done');
+  assert.equal(seen?.state, 'completed');
   assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' }, 'the first sighting that says done already has the answer');
 });
 
@@ -1132,7 +1132,7 @@ test('...and a child that holds a pipe open for good does not keep the run worki
   const ops = detachedOps(sh('(sleep 30) & exit 0'), dir);
   const started = Date.now();
   await Effect.runPromise(ops.spawn(req('ae/t22/1', dir)));
-  await settle(ops, 'ae/t22/1', 'done', 10_000);
+  await settle(ops, 'ae/t22/1', 'completed', 10_000);
   assert.ok(Date.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
 });
 

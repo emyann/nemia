@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Role, TaskState, type Artifact, type Part, type Task } from '@a2a-js/sdk';
 import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_EXTENSION, sightingOfTask } from '../src/a2a-map.ts';
+import type { SessionState } from '../src/domain.ts';
 
 const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
 const data = (value: Record<string, unknown>): Part => ({ content: { $case: 'data', value }, metadata: undefined, filename: '', mediaType: '' });
@@ -16,16 +17,16 @@ const taskIn = (state: TaskState, artifacts: Artifact[] = []): Task => ({
   id: 't-1', contextId: 'c-1', status: { state, message: undefined, timestamp: undefined }, artifacts, history: [], metadata: undefined,
 });
 
-test('each A2A state reads as the session state it stands for, and an interrupted one says what it waits for', () => {
-  const cases: Array<[TaskState, string, string | undefined]> = [
-    [TaskState.TASK_STATE_SUBMITTED, 'working', undefined],
+test('each A2A state is passed through as its own name, and an interrupted one says what it waits for', () => {
+  const cases: Array<[TaskState, SessionState, string | undefined]> = [
+    [TaskState.TASK_STATE_SUBMITTED, 'submitted', undefined],
     [TaskState.TASK_STATE_WORKING, 'working', undefined],
-    [TaskState.TASK_STATE_INPUT_REQUIRED, 'blocked', 'input'],
-    [TaskState.TASK_STATE_AUTH_REQUIRED, 'blocked', 'authentication'],
-    [TaskState.TASK_STATE_COMPLETED, 'done', undefined],
+    [TaskState.TASK_STATE_INPUT_REQUIRED, 'input-required', 'input'],
+    [TaskState.TASK_STATE_AUTH_REQUIRED, 'auth-required', 'authentication'],
+    [TaskState.TASK_STATE_COMPLETED, 'completed', undefined],
     [TaskState.TASK_STATE_FAILED, 'failed', undefined],
-    [TaskState.TASK_STATE_REJECTED, 'failed', undefined],
-    [TaskState.TASK_STATE_CANCELED, 'stopped', undefined],
+    [TaskState.TASK_STATE_REJECTED, 'rejected', undefined],
+    [TaskState.TASK_STATE_CANCELED, 'canceled', undefined],
     // No state, or one no version of A2A this runtime knows: nothing has ended, and the deadline bounds it.
     [TaskState.TASK_STATE_UNSPECIFIED, 'working', undefined],
     [99 as TaskState, 'working', undefined],

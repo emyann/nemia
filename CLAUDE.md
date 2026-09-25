@@ -731,6 +731,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   task's `measured` on its pass. And a test that takes "a run at rest" from a store earlier tests wrote takes one none of them touched:
   an acceptance of a step with no loop is read and never consumed, so it stays, and a run a test retried or approved is not like the rest
   (`aResting` in `test/rest-store.test.ts`; learned by the run that made a finished run cost a pass nothing).
+- **A sighting speaks A2A's names; a fake harness and the journal do not.** Since 2026-09-25 `Sighting.state` is `SessionState`,
+  A2A's eight `TaskState` names, and each driver translates its harness's own words once, at its edge (`claudeStateOf`,
+  `detachedStateOf`). So a fake `claude agents` row (`setRows`, `withFakeClaude(row('done', …))`) and a detached run file
+  (`{ state: 'stopped' }`) still say `done`, `blocked`, `stopped`, and a journal's `observed:` still says `done`, `failed`,
+  `stopped` (`Ended`). A mechanical rename across the tests turned registry rows into A2A's names, and the driver read them as
+  words it has no reading of, `failed`. Rename the sightings, and leave what a harness writes and what the journal records in
+  their own words. A decision recorded before a change of words (`test/fixtures/decide-corpus.json`) is what proves the
+  translation, case for case (learned by the run that made sightings speak A2A's names).
 - **Git refuses a whole `for-each-ref` for one base it cannot read.** `%(ahead-behind:<base>)` with a commit the repository does not have,
   or a branch it does not have, exits 128 and lists no ref at all, so one run whose base was pruned away would blind the listing to every
   other run of that repository. `branchReader` (`agent-orchestrator/src/branches.ts`) lists again without the bases it cannot read and asks

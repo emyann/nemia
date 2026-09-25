@@ -403,6 +403,53 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   assert.equal(s.counts.sendMessage ?? 0, 0);
 });
 
+test('a registry written before sightings spoke A2A\'s names is read in them, in `remote/` and in `remote/done/`, and left as written', async () => {
+  // An agent nothing answers: what is read here is read off the registry alone.
+  const dead = { card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] } };
+  const root = scratch('ae-remote-');
+  const e = createEngine({ root, harnesses: { remote: dead } });
+  const [signed, stopped, asked, odd] = [await e.file(task()), await e.file(task()), await e.file(task()), await e.file(task())];
+  const at = new Date().toISOString();
+  for (const id of [signed, stopped, asked, odd]) {
+    writeJournal(root, id, [...journalOf(root, id), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  }
+  // Each entry as the runtime before 2026-09-25 wrote it: `seen` in its former words.
+  const entry = (id: string, seen: object, ended: boolean) => ({
+    name: `ae/${id}/1`, agent: 'remote', messageId: `m-${id}`, contextId: `c-${id}`, sentAt: at, taskId: `t-${id}`,
+    seen: { sessionId: `t-${id}`, nativeId: `c-${id}`, ...seen }, ...(ended ? { ended: true } : {}),
+  });
+  const open = {
+    [signed]: entry(signed, { state: 'done', closeout: { payload: { outcome: 'done' }, at: 0 } }, true),
+    [stopped]: entry(stopped, { state: 'stopped' }, true),
+    [asked]: entry(asked, { state: 'blocked', waitingFor: 'authentication' }, false),
+    [odd]: entry(odd, { state: 'finished' }, true),
+  };
+  fs.mkdirSync(path.join(root, 'remote', 'done'), { recursive: true });
+  for (const [id, en] of Object.entries(open)) fs.writeFileSync(entryFile(root, `ae/${id}/1`), `${JSON.stringify(en)}\n`);
+  // Let go of before the change: a reply, as an agent that answered with a Message left it.
+  const replied = { name: 'ae/t-old/1', agent: 'remote', messageId: 'm-old', contextId: 'c-old', sentAt: at, taskId: 'm-old', reply: 'painted', ended: true, seen: { sessionId: 'm-old', state: 'done', nativeId: 'c-old' } };
+  const doneFile = path.join(root, 'remote', 'done', `${encodeURIComponent('ae/t-old/1')}.json`);
+  fs.writeFileSync(doneFile, `${JSON.stringify(replied)}\n`);
+
+  const ops = remoteOps('remote', dead, root);
+  const seen = await Effect.runPromise(ops.observe);
+  assert.deepEqual([signed, stopped, asked, odd].map((id) => seen.get(`ae/${id}/1`)?.state), ['completed', 'canceled', 'auth-required', 'failed']);
+  assert.deepEqual(await Effect.runPromise(ops.find!('ae/t-old/1')), { sessionId: 'm-old' });
+  assert.equal(await Effect.runPromise(ops.logs('m-old')), 'agent: painted', 'read from `remote/done/` by its session');
+  assert.equal(await Effect.runPromise(ops.logs('c-old')), 'agent: painted', 'and by its context');
+  for (const [id, en] of Object.entries(open)) assert.deepEqual(JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8')), en, `${id}: the file keeps its words`);
+  assert.deepEqual(JSON.parse(fs.readFileSync(doneFile, 'utf8')), replied);
+
+  // And the tasks settle as they did.
+  for (let i = 0; i < 3; i++) await e.tick();
+  const views = await Promise.all([signed, stopped, asked, odd].map((id) => e.view(id)));
+  assert.deepEqual(views.map((v) => v.state.settled), ['succeeded', 'stopped', null, 'failed']);
+  assert.equal(views[2]!.phase, 'needs-human');
+  assert.equal(views[2]!.waitingFor, 'authentication');
+  assert.ok(!fs.existsSync(entryFile(root, `ae/${signed}/1`)), 'an ended entry is let go of into `remote/done/`');
+  assert.ok(fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${signed}/1`)}.json`)));
+});
+
 test('an agent unreachable for a pass is not a session lost: the task reads as last seen, and settles once it answers', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);

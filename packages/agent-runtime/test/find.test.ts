@@ -239,7 +239,7 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
     assert.equal((await engine.view(id)).phase, 'running (working)', at);
     assert.equal(h.counts.observe, before + (withFind ? 1 : 2), `${at}: a view of it observes either way`);
 
-    h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'done' });
+    h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'completed' });
     await engine.tick();
     before = h.counts.observe;
     const v = await engine.view(id);
@@ -271,7 +271,7 @@ test("a view asks its task's own harness and no other — and a task whose harne
   const running = await engine.file({ brief: 'runs on b', cwd: tmp('cwd'), harness: 'b', id: 'running' });
   const settled = await engine.file({ brief: 'ends on b', cwd: tmp('cwd'), harness: 'b', id: 'settled' });
   await engine.tick();
-  b.sessions.set(`ae/${settled}/1`, { ...b.sessions.get(`ae/${settled}/1`)!, state: 'done' });
+  b.sessions.set(`ae/${settled}/1`, { ...b.sessions.get(`ae/${settled}/1`)!, state: 'completed' });
   await engine.tick();
 
   const before = { a: a.counts.observe, b: b.counts.observe };

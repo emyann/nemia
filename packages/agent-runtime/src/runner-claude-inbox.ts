@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { readTextAsync } from './io-tally.ts';
 
 /**
  * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and
@@ -136,7 +137,7 @@ export const claudeRegistered = async (
       const file = path.join(sessionsDir, f);
       const stat = await fs.promises.lstat(file);
       if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) continue;
-      r = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+      r = JSON.parse(await readTextAsync(file));
     } catch { continue; } // gone since the directory was read, or read mid-write: not found this time
     if (r?.name !== name || r.kind !== 'bg' || r.pid !== pid || typeof r.sessionId !== 'string' || !r.sessionId) continue;
     if (!signalable(pid)) continue;

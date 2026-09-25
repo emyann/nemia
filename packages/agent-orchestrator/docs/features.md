@@ -4496,6 +4496,41 @@ Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`max
 **What it leaves.** The runtime's ceiling, pools and `priority` still hold for `ae` and anything built without the client; part 2
 retires them (§12). `advance` still views each task in flight on its own, so a pass that advances claude runs makes more than one
 `claude agents` call; having it read the same report is a card of its own.
+## Shipped: planners and reviewers read git with its other read-only verbs
+
+Since 2026-09-23 the steps' recorded denials (`denied:` on `wf ls`) showed about 40 git calls refused to planners and reviewers in
+`dontAsk`, every one but a `git fetch` a read: `git merge-tree` (16, whether the branch still merges into main), `git merge-base`,
+`git ls-tree`, `git -C <worktree> log`, `git grep`. The owner decided (2026-09-25): the rest of git's read-only verbs, and nothing
+that can write, run a program or move a ref.
+
+- **`.claude/settings.json` allows** `merge-tree`, `merge-base`, `ls-tree`, `ls-files`, `rev-parse`, `rev-list`, `blame`, `shortlog`
+  and `describe`, beside `diff`, `log`, `show`, `status` and `branch --list`. Left out: `git -C` (a prefix rule for it admits
+  `git -C <dir> push`, which the deny `Bash(git push:*)` does not match), `git grep` (`-O<cmd>` runs a program; the Grep tool searches)
+  and `git fetch`. `workflows/dev/README.md` says so, under *What git a fenced step may run*. The deny list did not change.
+- **`test/git-reads.test.ts`** holds every `Bash(git …)` allow to a named list of reads, and that list to no verb that writes, runs a
+  program or moves a ref and no option before the verb; it failed with `Bash(git -C:*)` and with `Bash(git commit:*)` added.
+- **The agents say it in one line**: the planner, the reviewer and the ui reviewer name the reads, and that `git -C` and a `cd`
+  elsewhere are denied. A courtesy that saves a retry; the guard is the settings and the test.
+
+**Verified live** on 2026-09-25 against Claude Code 2.1.282, haiku, `claude -p --permission-mode dontAsk`, each job asked to run
+`git merge-tree --write-tree HEAD HEAD`, `git merge-base HEAD HEAD` and `git -C . log -1`, one call each:
+
+| where the job ran | merge-tree | merge-base | `-C` |
+|---|---|---|---|
+| this checkout's worktree of a run (a worktree of the trusted repository), its `.claude/settings.json` | ran | ran | denied |
+| a fresh repository under `/tmp`, the settings passed as `--settings <file>` | ran | ran | denied |
+| a fresh repository under `/tmp`, the settings copied into its `.claude/` and nothing else | denied | ran | denied |
+
+The third row is the control, and a trap: Claude Code 2.1.282 prints *"Ignoring 26 permissions.allow entries from .claude/settings.json:
+this workspace has not been trusted"* on stderr and drops every project allow, so the settings copied into an untrusted directory
+prove nothing. A new directory under a trusted parent (`~/projects`) was not trusted either. `merge-base` ran there all the same,
+because it is on Claude Code's own list of read-only commands; `merge-tree` is not, so the rule is what lets it run. A run's worktree
+loads the settings, which is the route the steps take. A live measurement of a project rule is taken in a checkout Claude Code trusts,
+or with `--settings`.
+
+**What it leaves.** `diff`, `log`, `show`, `rev-list`, `shortlog` and `blame` take `--output=<file>` and create or truncate that file
+(measured on git 2.43: `rev-list` and `blame` leave it empty). No prefix rule can refuse an option written anywhere on the line, and
+`log` could already do this before the list grew. Only the brief keeps a fenced step from it.
 
 ## 1. A run that grows steps from a plan
 

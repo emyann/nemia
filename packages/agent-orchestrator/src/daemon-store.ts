@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { HOME } from './store.ts';
 import { runCapOf } from './run.ts';
+import { parsePassCost, type PassCost } from './meter.ts';
 import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding, type Identity } from './daemon.ts';
 
 /**
@@ -51,6 +52,34 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
     fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
     fs.renameSync(hidden, tickFile());
   } catch { /* read from the reader's own environment instead */ }
+}
+
+/**
+ * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `wf up`'s or `wf tick`'s, and
+ * read by `wf up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
+ */
+export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
+
+/** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
+export function lastPassCost(): PassCost | undefined {
+  let text: string;
+  try { text = fs.readFileSync(statsFile(), 'utf8'); } catch { return undefined; }
+  return parsePassCost(text);
+}
+
+/**
+ * A pass's cost written down, through a hidden file renamed over the last, so a reader never reads half of it. A store that cannot be written
+ * loses only this, and the pass goes on. Answers with the time the write took, which is measuring's too.
+ */
+export function recordPassCost(cost: PassCost): number {
+  const t0 = performance.now();
+  const hidden = path.join(HOME, `.tick-stats.json.${process.pid}`);
+  try {
+    fs.mkdirSync(HOME, { recursive: true });
+    fs.writeFileSync(hidden, JSON.stringify(cost, null, 2));
+    fs.renameSync(hidden, statsFile());
+  } catch { /* the next pass writes it again */ }
+  return performance.now() - t0;
 }
 
 // ─── who ticks the store ────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
 import { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
+import { countRead, readText } from './io-tally.ts';
 
 /**
  * One entry of the board-wide feed: an event, and which task it happened to.
@@ -140,7 +141,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         Effect.try({
           try: () => {
             if (!fs.existsSync(file(taskId))) return [];
-            return fs.readFileSync(file(taskId), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as Event);
+            return readText(file(taskId)).split('\n').filter(Boolean).map((l) => JSON.parse(l) as Event);
           },
           catch: fail(taskId),
         }),
@@ -160,6 +161,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             const buf = Buffer.alloc(size - after);
             fs.readSync(fd, buf, 0, buf.length, after);
             fs.closeSync(fd);
+            countRead(buf.length);
 
             // Stop at the last COMPLETE line: a reader must never consume half an entry, and the
             // cursor must never advance past what was actually read.

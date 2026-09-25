@@ -282,3 +282,54 @@ test('REFUSED at shipped defaults, unconfirmed: a live pid whose start cannot be
   assert.equal(fs.readFileSync(FILE, 'utf8'), text);
   clear();
 });
+
+test('`wf up` says what its passes cost once a minute, not once a pass: nine passes twenty seconds apart are two lines, the third minute not yet over', async (t) => {
+  clear();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const e = engineOf((pass) => { if (pass === 10) throw STOP; t.mock.timers.tick(20_000); });
+  const { printed, threw } = await typed(t, ['up', '10'], e);
+  t.mock.timers.reset();
+  assert.equal(threw, STOP);
+  const said = printed.filter((l) => /^\d\d:\d\d:\d\d {2}cost: /.test(l));
+  assert.equal(said.length, 2, printed.join('\n'));
+  for (const line of said) assert.match(line, /cost: 4 passes in 60s, [\d.]+ ms a pass \(slowest [\d.]+\) — .* read, \d+ process(es)? started; measuring [\d.]+ ms$/);
+  clear();
+});
+
+test('`wf up --stats` reads the last pass\'s cost beside a daemon that holds the store, and ticks nothing', async (t) => {
+  clear();
+  fs.rmSync(path.join(ROOT, 'tick-stats.json'), { force: true });
+  const none = await typed(t, ['up', '--stats'], engineOf());
+  assert.equal(none.threw, undefined);
+  assert.deepEqual(none.printed, [`no pass has written what it cost to ${path.join(ROOT, 'tick-stats.json')} yet — no wf up holds this store: run wf tick --stats, or start wf up`]);
+
+  const byHand = await typed(t, ['tick', '--stats'], engineOf(() => {}));
+  assert.equal(byHand.threw, undefined);
+  const at = byHand.printed.findIndex((l) => l.startsWith('the last pass, at '));
+  assert.ok(at >= 0, byHand.printed.join('\n'));
+  assert.equal(byHand.printed.at(-1)!.startsWith('measuring it: '), true, 'the breakdown is said last');
+  assert.ok(byHand.printed.some((l) => /^ {2}runtime +[\d.]+ +1 /.test(l)), 'the runtime\'s pass, one call');
+
+  const text = holdBy(LIVE);
+  const e = engineOf();
+  const held = await typed(t, ['up', '--stats'], e);
+  assert.equal(held.threw, undefined);
+  assert.equal(e.passes, 0, 'no pass');
+  assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor the store taken');
+  assert.equal(held.printed[0], byHand.printed[at], 'the pass the hand tick wrote');
+  assert.equal(held.printed.at(-1), 'written by the wf up that holds this store, after its last pass');
+  clear();
+  assert.match((await typed(t, ['up', '--stats'], engineOf())).printed.at(-1)!, /^no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one/);
+});
+
+test('REFUSED at shipped defaults: `wf tick --stats` while a daemon holds the store, pointed at `wf up --stats`; and words either verb does not take', async () => {
+  holdBy(LIVE);
+  const e = engineOf();
+  await assert.rejects(main(['tick', '--stats'], e), refusedWith(new RegExp(`^wf tick: ${ROOT} is held by the wf up of pid ${LIVE}, `), / What its last pass cost is read without a pass: wf up --stats\.$/));
+  await assert.rejects(main(['tick'], e), (err: Error & { exitCode?: number }) => err.exitCode === 2 && !err.message.includes('--stats'), 'said only to one who asked');
+  clear();
+  await assert.rejects(main(['tick', '--bogus'], e), refusedWith(/wf tick takes no --bogus: /));
+  await assert.rejects(main(['up', '--stats', '20'], e), refusedWith(/wf up --stats reads what the last pass cost and ticks nothing, so it takes no 20: /));
+  assert.equal(e.passes, 0, 'nothing ticked');
+  assert.equal(fs.existsSync(FILE), false);
+});

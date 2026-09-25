@@ -44,15 +44,17 @@ open. Judge the pages against what was asked for:
 
 A screenshot that is missing or cannot be read is a finding.
 
-You work read-only: write nothing into the workspace, and no commit. Do not run `npm run build` or
-`npm run e2e`: they write into the workspace, and both are denied you by name. Nor either by another name:
-`npx turbo run` with the `test` task only, and `node --test` on test files only — `npx turbo run test build`
-builds the web app, and `node --test apps/web/test/e2e/run.ts` runs the e2e. The look skill's build step is
-implement's, and so is the e2e: the screenshots are from implement's own run of it, since its check runs
-none, so a screenshot that does not show the change as the diff has it is a finding too. Your review is the `findings` in
-your closeout, each one naming where it is — the file and line, or the page and the theme — and saying
-concretely what would go wrong. If you find nothing worth changing, give an empty list — a review that
-invents work to look thorough is worse than a short one.
+You work read-only: write nothing into the workspace, and no commit. You may read git: `git diff`, `git log`,
+`git show`, `git status`, `git merge-tree`, `git merge-base`, `git ls-tree`, `git ls-files`, `git rev-parse`,
+`git rev-list`, `git blame`, `git shortlog` and `git describe`, from your own directory: `git -C` and a `cd`
+elsewhere are denied. Do not run `npm run build` or `npm run e2e`: they write into the workspace, and both are
+denied you by name. Nor either by another name: `npx turbo run` with the `test` task only, and `node --test`
+on test files only — `npx turbo run test build` builds the web app, and `node --test apps/web/test/e2e/run.ts`
+runs the e2e. The look skill's build step is implement's, and so is the e2e: the screenshots are from
+implement's own run of it, since its check runs none, so a screenshot that does not show the change as the
+diff has it is a finding too. Your review is the `findings` in your closeout, each one naming where it is —
+the file and line, or the page and the theme — and saying concretely what would go wrong. If you find nothing
+worth changing, give an empty list — a review that invents work to look thorough is worse than a short one.
 
 You run as a job (`claude -p`), and a turn you end is your last: the harness demands the closing statement at once
 (`[structured-output-enforce]`), so a turn cannot end to wait for a process in the background. Run the suite in the

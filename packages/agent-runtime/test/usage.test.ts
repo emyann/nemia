@@ -396,13 +396,11 @@ test('ae show prints the budget and the context window a task was filed with, an
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 
-test('ae ls shows a task\'s priority when it was filed with one, and nothing when it was not', () => {
-  const filed = (priority?: number): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...(priority !== undefined ? { priority } : {}) });
-  const shown = (priority?: number) => taskLine({ id: 't-1', state: fold('t-1', [filed(priority)]), phase: 'pending', sessionId: null });
-  assert.match(shown(3), /pending {11}  priority 3  review it$/);
-  assert.match(shown(-1), /pending {11}  priority -1  review it$/);
-  assert.match(shown(0), /pending {11}  priority 0  review it$/, 'set, though 0 is what none means');
-  assert.match(shown(), /pending {11}  review it$/, 'not set, not shown');
+test('ae ls prints no priority, even of an old journal that carries one: the runtime keeps no order since stage 4c part 2', () => {
+  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra } as Event);
+  const shown = (extra: object) => taskLine({ id: 't-1', state: fold('t-1', [filed(extra)]), phase: 'pending', sessionId: null });
+  for (const extra of [{ priority: 3 }, { priority: -1 }, {}]) assert.match(shown(extra), /pending {11}  review it$/, JSON.stringify(extra));
+  assert.doesNotMatch(shown({ priority: 3 }), /priority/);
 });
 
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {

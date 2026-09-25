@@ -20,7 +20,7 @@ import {
   claudeOps, Runner, RunnerError, type RunnerOps, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
 import { claudeCodeOps, isClaudeJob } from './runner-claude-code.ts';
 import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
 import { detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -31,7 +31,7 @@ import { a2aOps } from './a2a-client.ts';
 import { ioCounts, type IoCounts } from './io-tally.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  admit, answer, answerRefusalOf, close, closeRefusalOf, DEFAULT_MAX_CONCURRENT, file, filingOf, refusalOf, requestStop, tick, view, type TaskView,
+  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -54,8 +54,8 @@ export type PromiseJournal = {
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
  *   a `PromiseRunner` anything else at all
  *
- * Each is counted in a pool under the ceiling: `'claude'` and `'claude-bg'` in Claude Code's, `claude`, as the engine's
- * `claudeDetached` is, whatever each is called; any other in the `pool` it names, or in its own name's.
+ * None is counted under a ceiling: the runtime starts what it is given, and a layer above that pools its harnesses under
+ * one rate limit files them `queued` and `admit`s them (stage 4c). A spec or a runner that still names a `pool` is refused.
  */
 export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | PromiseRunner;
 
@@ -65,12 +65,10 @@ export type EngineOptions = {
   journal?: PromiseJournal;
   harnesses?: Record<string, HarnessConfig>;
   defaultHarness?: string;
-  /**
-   * Sessions that may be at work at once in EACH pool — `claude`, which both of the engine's Claude Code harnesses are
-   * counted in, and each other harness's own unless it names one (`pool`). Your rate limit, mostly. A `blocked` session
-   * is not counted: it makes no API calls.
+  /*
+   * `maxConcurrent`, the sessions that could be at work at once in each pool, is retired (stage 4c part 2, 2026-09-25):
+   * given, `createEngine` refuses it. How many run at once is the layer above's, which files `queued` and `admit`s.
    */
-  maxConcurrent?: number;
 };
 
 export type TaskSpec = {
@@ -97,13 +95,10 @@ export type TaskSpec = {
    * engine: its shape is yours.
    */
   closeoutSchema?: object;
-  /**
-   * Which waiting task a free slot goes to first, when a pool is at its ceiling — `1`, `-1`, `0.5`. Higher first, and
-   * filing order within one; absent is 0. Read by a pass when it orders the board, and nowhere else: no runner is told it,
-   * `decide` never reads it, and nothing running is stopped for a higher one. Kubernetes' `priorityClassName`, without the
-   * preemption. Refused unless a finite number.
+  /*
+   * `priority`, which waiting task a free slot went to first, is retired with the runtime's ceiling (stage 4c part 2): a
+   * task that carries it, at any value, is refused. Which task starts first is the layer above's, when it `admit`s.
    */
-  priority?: number;
   /**
    * Hold the task open when an attempt signs, rather than settle it (R1): the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
@@ -113,7 +108,7 @@ export type TaskSpec = {
   holdOpen?: true;
   /**
    * Wait for the word to start (stage 4c): the task is filed and a pass starts nothing of it until `admit` names it — then
-   * the next pass starts it, under the ceiling as any task. A task held open waits for the word again before each later
+   * the next pass starts it. A task held open waits for the word again before each later
    * turn. For a layer above that decides itself what runs when; `view` says `admission: 'queued'` while it waits, and its
    * phase stays `pending`. Absent, or `false`, starts it on the next pass as ever. Refused unless true or false.
    */
@@ -123,7 +118,8 @@ export type TaskSpec = {
 };
 
 /**
- * One pass: how many tasks it read, how many actions it took, the sessions at work in each pool as it left them, and the
+ * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its
+ * last attempt open, and `working` or not yet listed; a `blocked` one is not — and the
  * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
  * layer above that decides what to `admit` reads the board without asking any harness again (stage 4c) — and what the pass
  * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
@@ -154,7 +150,7 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
-   * a `cwd` that is not absolute; a `priority` that is not a finite number. And in its `config`: a key that is no harness
+   * a `cwd` that is not absolute; a `priority`, whatever its value, which is retired: the runtime chooses no order. And in its `config`: a key that is no harness
    * argument, or one filed beside `config` instead — `budgetUsd` among them, the spend cap the runtime kept as its own
    * until stage 4b; a `budgetUsd` that is not dollars above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
    * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
@@ -167,11 +163,15 @@ export type Engine = {
    * A harness brought as a `PromiseRunner` is asked nothing of its own.
    */
   file(spec: TaskSpec): Promise<string>;
-  /** One pass: start what may start, notice what ended, settle what is over. */
+  /**
+   * One pass: start what may start — every task not queued, and each queued one `admit`ted — notice what ended, settle what
+   * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument, since the
+   * ceiling and the pools it once took are retired.
+   */
   tick(): Promise<TickReport>;
   /**
    * Let tasks filed `queued` start (stage 4c): journals an `admitted` entry for each whose current turn waits for one, and
-   * returns their ids; the next tick starts them, under the ceiling as any task. Reads the tasks' records and asks no
+   * returns their ids; the next tick starts them. Reads the tasks' records and asks no
    * harness. Idempotent: a task already admitted, not filed queued, or whose turn has started is left as it is, and not
    * returned. Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled for any of them — when one
    * is a task this engine has no record of, or has settled.
@@ -303,11 +303,21 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
   ]));
 
 /**
- * The pool each configured harness is counted in under the ceiling: Claude Code's for `'claude'` and `'claude-bg'` — the
- * pool the engine's `claudeDetached` names — whatever each is configured as; the one a spec or a runner names; or its own name.
+ * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
+ * options as handed in, untyped: a caller built against the options before stage 4c part 2 still sends the ceiling, and a
+ * harness brought as an object may still name its pool. Each would be taken and dropped, a ceiling nobody keeps.
  */
-const poolsOf = (harnesses: Record<string, HarnessConfig>): Record<string, string> =>
-  Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [name, isClaude(h) ? CLAUDE_POOL : h.pool ?? name]));
+const optionsRefusalOf = (options: EngineOptions): string | undefined => {
+  if (Object.hasOwn(options, 'maxConcurrent')) {
+    return `\`maxConcurrent\` is retired: the runtime keeps no ceiling, and starts every task it is given. ${ADMIT_INSTEAD}`;
+  }
+  for (const [name, h] of Object.entries(options.harnesses ?? {})) {
+    if (typeof h === 'object' && h !== null && Object.hasOwn(h, 'pool')) {
+      return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`admission.ts\`). ${ADMIT_INSTEAD}`;
+    }
+  }
+  return undefined;
+};
 
 // ─── what the door refuses ──────────────────────────────────────────────────
 
@@ -356,6 +366,8 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
 // ─── the engine ─────────────────────────────────────────────────────────────
 
 export function createEngine(options: EngineOptions = {}): Engine {
+  const refused = optionsRefusalOf(options);
+  if (refused) throw Object.assign(new Error(`createEngine: ${refused}`), { exitCode: 2 });
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const harnesses = options.harnesses ?? {
     claude: 'claude',
@@ -363,7 +375,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
     'claude-detached': claudeDetached,
   };
   const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
-  const max = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
 
   // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
   const journalOps = options.journal ? undefined : Journal.filesOps(root);
@@ -389,7 +400,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
   });
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
   const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, counted(name, a2aOps(name, ops, events))]));
-  const pools = poolsOf(harnesses);
   const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)));
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
   // services are shared across calls exactly as they would be inside one Effect program.
@@ -429,19 +439,21 @@ export function createEngine(options: EngineOptions = {}): Engine {
   });
 
   const engine: Engine = {
-    // The harness is RESOLVED here, never left implicit. A task filed without one would otherwise
-    // be counted in a pool called 'default' while an identical task that named its harness went
-    // in another — two ceilings for one subscription, each the full size.
+    // The harness is RESOLVED here, never left implicit: a task filed without one would otherwise read
+    // `default` on its record and its view, and a layer above that pools by harness would count it apart
+    // from an identical task that named its harness.
     file: async (spec) => {
       const task = { ...spec, harness: spec.harness ?? fallback };
       const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
       return go(file(task));
     },
-    tick: async () => {
+    tick: async (...args: unknown[]) => {
+      const refused = tickRefusalOf(args);
+      if (refused) throw Object.assign(new Error(`tick: ${refused}`), { exitCode: 2 });
       const t0 = performance.now();
       const before = observedNow();
-      const report = await go(tick(max, pools));
+      const report = await go(tick());
       const during = Object.fromEntries(Object.entries(observedNow()).flatMap(([name, o]): Array<[string, ObserveCount]> => {
         const b = before[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
         return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];

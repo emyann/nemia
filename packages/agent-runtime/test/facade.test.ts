@@ -77,16 +77,14 @@ test('the feed is enough to build a workflow on, with no Effect anywhere', async
   assert.notEqual(filed[0], first);
 });
 
-test('the ceiling, the stop and the list all work through the facade', async () => {
+test('the start, the stop and the list all work through the facade — and every task given starts, with no ceiling', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = createEngine({
-    journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake', maxConcurrent: 2,
-  });
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
   for (let i = 0; i < 5; i++) await engine.file({ brief: `t${i}`, cwd: '/repo', id: `task-${i}` });
 
   const report = await engine.tick();
-  assert.equal(sessions.size, 2, 'the ceiling holds');
-  assert.deepEqual(report.running, { fake: 2 }, 'counted under the harness that ran it, not "default"');
+  assert.equal(sessions.size, 5, 'the runtime holds nothing back: a layer above files `queued: true` to');
+  assert.deepEqual(report.running, { fake: 5 }, 'counted under the harness that ran it, not "default"');
   assert.equal((await engine.list()).length, 5);
 
   await engine.stop('task-0');
@@ -201,33 +199,17 @@ test('a tick under way when stop() is called finishes, and reports, and is the l
   assert.deepEqual(errors, []);
 });
 
-test('a free slot goes to the task filed first, by the time file() wrote — not to the id first in the alphabet', async () => {
+test('running is keyed by the harness the task resolved to: a task that names it and one that does not count together', async () => {
+  // An unresolved harness once counted as its own pool. The facade resolves the harness at filing,
+  // so three that name `fake` and three that name nothing are six under `fake`, none under "default".
   const sessions = new Map<string, Sighting>();
-  const engine = createEngine({
-    journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake', maxConcurrent: 1,
-  });
-  await engine.file({ brief: 'waiting', cwd: '/r', id: 'zz-waiting' });
-  await new Promise((r) => setTimeout(r, 5));
-  await engine.file({ brief: 'filed later', cwd: '/r', id: 'aa-later' });
-
-  await engine.tick();
-  assert.deepEqual([...sessions.keys()], [nameFor('zz-waiting', 1)], 'the task filed first started');
-  assert.equal((await engine.view('aa-later')).phase, 'pending');
-});
-
-test('tasks that name the harness and tasks that do not share ONE pool', async () => {
-  // The bug this pins: an unresolved harness counted as its own pool, so one subscription got
-  // two ceilings. Three explicit + three implicit, ceiling of two, must admit two in total.
-  const sessions = new Map<string, Sighting>();
-  const engine = createEngine({
-    journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake', maxConcurrent: 2,
-  });
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
   for (let i = 0; i < 3; i++) await engine.file({ brief: `e${i}`, cwd: '/r', id: `a-${i}`, harness: 'fake' });
   for (let i = 0; i < 3; i++) await engine.file({ brief: `i${i}`, cwd: '/r', id: `b-${i}` });
 
   const report = await engine.tick();
-  assert.equal(sessions.size, 2, 'two, not four');
-  assert.deepEqual(report.running, { fake: 2 });
+  assert.equal(sessions.size, 6);
+  assert.deepEqual(report.running, { fake: 6 });
 });
 
 // ─── watching ───────────────────────────────────────────────────────────────
@@ -524,22 +506,60 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
   }
 });
 
-test('file() refuses a priority that is not a finite number, on every harness — and journals one that is, below 0 or between whole numbers too', async () => {
+test('file() refuses `priority` at any value, on every harness, and journals nothing: the runtime chooses no order since stage 4c part 2', async () => {
   const { journal, engine } = shipped();
-  for (const harness of ['claude', 'codex', 'claude-detached']) {
-    await refused(engine, { brief: 'b', cwd: '/r', harness, priority: Number.NaN }, /`priority: NaN` is not a number\. Give a finite number/);
+  for (const harness of ['claude', 'codex', 'claude-detached', 'check']) {
+    for (const priority of [2, -1, 0.5, 0, Number.NaN, 'high', null, undefined]) {
+      await refused(engine, { brief: 'b', cwd: '/r', harness, priority } as unknown as TaskSpec,
+        /^file: `priority` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order\. File tasks `queued: true` and `admit` each when it may start/);
+    }
   }
-  await refused(engine, { brief: 'b', cwd: '/r', priority: 'high' as unknown as number }, /`priority: "high"` is not a number\. Give a finite number — a higher one is admitted first/);
-  await refused(engine, { brief: 'b', cwd: '/r', priority: Infinity }, /`priority: Infinity` is not a number/);
-  await refused(engine, { brief: 'b', cwd: '/r', priority: null as unknown as number }, /`priority: null` is not a number/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+});
 
-  for (const priority of [2, -1, 0.5, 0]) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', priority });
-    const [filed] = await journal.read(id);
-    assert.equal((filed as { priority?: number }).priority, priority, 'on the record, for the pass');
-    assert.equal((await engine.view(id)).state.priority, priority);
+test('createEngine refuses `maxConcurrent` at any value, as an own key: the runtime keeps no ceiling', () => {
+  for (const maxConcurrent of [2, 1, Infinity, 0, undefined]) {
+    assert.throws(() => createEngine({ journal: memoryJournal(), maxConcurrent } as unknown as Parameters<typeof createEngine>[0]), (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, e.message);
+      assert.match(e.message, /^createEngine: `maxConcurrent` is retired: the runtime keeps no ceiling, and starts every task it is given\. File tasks `queued: true` and `admit` each/);
+      return true;
+    });
   }
+});
+
+test('createEngine refuses a harness that names a `pool`, a spec or a Promise runner, and names the harness', () => {
+  const sessions = new Map<string, Sighting>();
+  const withPool = [
+    ['codex-pooled', { ...codex, pool: 'codex' }],
+    ['fake', { ...fakeHarness(sessions), pool: 'claude' }],
+    ['unpooled', { ...fakeHarness(sessions), pool: undefined }],
+  ] as const;
+  for (const [name, harness] of withPool) {
+    assert.throws(() => createEngine({ journal: memoryJournal(), harnesses: { [name]: harness } as unknown as Record<string, PromiseRunner> }), (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, e.message);
+      assert.match(e.message, new RegExp(`^createEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\. Take \`pool\` off it`));
+      assert.match(e.message, /the orchestrator's `POOLS` in `admission\.ts`/);
+      return true;
+    });
+  }
+  // Every shipped harness is taken as it is.
+  assert.doesNotThrow(() => createEngine({ journal: memoryJournal(), harnesses: { codex, bg: claudeDetached, fake: fakeHarness(sessions) } }));
+});
+
+test('the facade\'s tick refuses any argument, with exit 2 and nothing started — a ceiling handed to it is not dropped', async () => {
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  await engine.file({ brief: 'b', cwd: '/r', id: 'waits' });
+  const tick = engine.tick as unknown as (...args: unknown[]) => Promise<unknown>;
+  for (const args of [[3], [3, { fake: 'fake' }], [undefined]]) {
+    await assert.rejects(tick(...args), (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, e.message);
+      assert.match(e.message, new RegExp(`^tick: the pass takes no arguments, and was handed ${args.length}: it has no ceiling and no pools since stage 4c part 2\\. File tasks`));
+      return true;
+    });
+  }
+  assert.equal(sessions.size, 0, 'nothing started');
+  assert.equal((await engine.view('waits')).phase, 'pending');
 });
 
 test('file() refuses remoteControl on every harness with no such flag, by name — codex, claude-detached and a check — and a value that is not true or false; claude journals it', async () => {

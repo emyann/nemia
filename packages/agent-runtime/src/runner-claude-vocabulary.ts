@@ -1,6 +1,6 @@
 /**
- * Claude Code's vocabulary — the permission modes, efforts and context windows it takes, the pool its sessions are
- * counted in — and what it refuses to be asked for, as sentences. Harness vocabulary, so it lives beside the runners
+ * Claude Code's vocabulary — the permission modes, efforts and context windows it takes — and what it refuses to be
+ * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
 import type { SpawnRequest } from './runner.ts';
@@ -29,13 +29,6 @@ export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhig
  * handed over as its digits, never `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
  */
 export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
-
-/**
- * The pool Claude Code's sessions are counted in under the concurrency ceiling, whichever of the engine's runners starts
- * them: `claude --bg` and `claude -p` run on one subscription, under one rate limit. The name is the harness the engine
- * configures by default, so a board that names no pools reads the same as before.
- */
-export const CLAUDE_POOL = 'claude';
 
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {

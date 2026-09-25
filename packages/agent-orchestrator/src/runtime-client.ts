@@ -44,10 +44,10 @@ export const HARNESSES = {
 
 /**
  * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
- * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted, and the runtime's own
- * ceiling is lifted so it never binds a second time. The runtime keeps that ceiling for `ae` until thin runtime stage 4c part 2 retires it.
+ * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted. The runtime keeps no
+ * ceiling of its own since thin runtime stage 4c part 2, and refuses a `maxConcurrent` handed to it.
  */
 export const engine = (): Engine => {
-  const e = createEngine({ root: path.join(HOME, 'engine'), maxConcurrent: Infinity, harnesses: HARNESSES });
+  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: HARNESSES });
   return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
 };

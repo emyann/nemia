@@ -47,6 +47,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     contextTokens: ['200000', 200000],
     background: ['true', true],
     holdOpen: ['true', true],
+    queued: ['true', true],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
@@ -68,6 +69,14 @@ test('`background:` is true or false, as written — anything else is refused, n
   assert.equal(parse(brief('model: opus')).config?.background, undefined, 'absent: the harness default, a job');
   for (const bad of ['yes', 'True', '1', 'bg']) {
     refuses(brief(`background: ${bad}`), /is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job/);
+  }
+});
+
+test('`queued:` is true or false, as written — the one way to hold a task back from `ae` — and anything else is refused', () => {
+  assert.equal(parse(brief('queued: false')).queued, false);
+  assert.equal('queued' in parse(brief('model: opus')), false, 'absent: starts on the next tick');
+  for (const bad of ['yes', 'True', '1', 'held']) {
+    refuses(brief(`queued: ${bad}`), /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/);
   }
 });
 
@@ -172,4 +181,21 @@ test('`ae start` refuses what file() refuses, too — a harness this engine does
   assert.equal(r.status, 2);
   assert.match(r.stderr, /^file: `harness: banana` is not a harness this engine has/);
   assert.equal(r.filed, false);
+});
+
+test('`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too: exit 2, the sentence, nothing filed', () => {
+  // The runtime's ceiling until stage 4c part 2 (2026-09-25). Read and ignored, a person's `AE_MAX_CONCURRENT=1` would start every task at once.
+  for (const value of ['3', '1', '']) {
+    for (const args of [['ls'], ['tick']]) {
+      const dir = tmp();
+      const r = spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: dir, AE_MAX_CONCURRENT: value }, encoding: 'utf8' });
+      assert.equal(r.status, 2, `${args} with ${JSON.stringify(value)}: ${r.stderr}`);
+      assert.match(r.stderr, /^ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given\. Unset it, file with `queued: true` and start each with `ae admit <id>`/);
+      assert.deepEqual(fs.readdirSync(dir), [], 'nothing written');
+    }
+  }
+  // Unset, the same command runs.
+  const dir = tmp();
+  const { AE_MAX_CONCURRENT: _unset, ...env } = process.env;
+  assert.equal(spawnSync(process.execPath, [ae, 'ls'], { env: { ...env, AE_ROOT: dir }, encoding: 'utf8' }).status, 0);
 });

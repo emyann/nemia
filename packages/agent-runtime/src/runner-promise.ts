@@ -48,12 +48,6 @@ export type PromiseRunner = {
    * did not, and nothing is journalled. Without it, `say` refuses this harness's tasks.
    */
   say?(session: { name: string; sessionId: string }, text: string): Promise<void>;
-  /**
-   * Optional. The pool this harness's sessions are counted in under the concurrency ceiling: what one rate limit covers,
-   * a subscription. Harnesses that name the same pool share one ceiling — a runner that drives Claude Code says `claude`.
-   * Absent: the name the harness is configured under, a pool of its own.
-   */
-  pool?: string;
 };
 
 /** A `PromiseRunner` as the engine's verbs. */

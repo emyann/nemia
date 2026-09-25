@@ -689,6 +689,25 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   task's `measured` on its pass. And a test that takes "a run at rest" from a store earlier tests wrote takes one none of them touched:
   an acceptance of a step with no loop is read and never consumed, so it stays, and a run a test retried or approved is not like the rest
   (`aResting` in `test/rest-store.test.ts`; learned by the run that made a finished run cost a pass nothing).
+- **Git refuses a whole `for-each-ref` for one base it cannot read.** `%(ahead-behind:<base>)` with a commit the repository does not have,
+  or a branch it does not have, exits 128 and lists no ref at all, so one run whose base was pruned away would blind the listing to every
+  other run of that repository. `branchReader` (`agent-orchestrator/src/branches.ts`) lists again without the bases it cannot read and asks
+  that run's questions one by one; its test pins each shape against `oneByOne`, the reference that asks a process for each question
+  (learned by the run that made `wf ls` ask git once a repository).
+- **The api's list answers a finished run from memory, and `WF_VERIFY_REST=1` is set by the api's test harness.** `GET /api/runs` keeps a
+  run at rest (`apps/api/src/resting.ts`) while its `restStamps`, its record, the feed for its tasks and the tips of its unmerged branches and
+  base stand. A new input `summarize` (`apps/api/src/runs.ts`) reads for a finished run goes into one of those, or a poll answers that run
+  stale until the api restarts; every api test judges each kept answer afresh and fails the request on a difference, which is how it is
+  seen. A test that counts what a poll reads turns the check off for that request (`unverified` in `test/resting.test.ts`), since the check
+  reads everything again (same run).
+- **`list(taskIds)` looks at no harness when nothing among the tasks is in flight.** The api's list and a run's detail read their tasks
+  through it, so the tests that asserted one `claude agents` call or one observation per request now assert none where the tasks are
+  settled or Codex's: the one observation was the cost of reading every journal, not something the page needed. A run's tasks are every
+  step's, every check's, and every earlier try's *and its check's* (`tasksOf` in `apps/api/src/store.ts`); a list that left the tries' checks
+  out drew them `unknown` on the run's page (same run).
+- **The runtime's `io().reads` counts every file it reads, not only journals.** A look at Codex, check or claude-detached reads every run
+  file the harness ever wrote (871 on the live store on 2026-09-25): they have no `observeFor`. A measurement labelled *journals* off
+  `io().reads` counts those too; with a task in flight, the api's poll read 643 files and about 25 journals (same run).
 
 ## Rules the code keeps
 

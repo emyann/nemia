@@ -26,6 +26,17 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `apps/api/test/harness.ts` first — a fake `claude` first on PATH, the harness the api's engine runs — and
   `harness.test.ts` refuses a file that does not, so a new api test file imports it first. Measured parallel three
   times in a row with `npx turbo run test --force`: without `--force` turbo replays a cached pass and measures nothing.
+- **A file `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.** Turbo's default,
+  `--continue=never`, kills every task still running when one fails, and `node --test` reports each file it was in the middle of as
+  failed, *Promise resolution is still pending but the event loop has already resolved*, under `Interrupted while running:`. The
+  longest file is nearly always the one in flight, so three checks were read as `detached.test.ts` failing under load, at 20 to 31 s
+  of its 48: the api had failed in one, and a flaky wall-clock bound in `meter-store.test.ts` in two, each named only on the summary's
+  `Failed:` line. `npm test` passes `--continue` (`suite.test.ts` pins it) so every package runs to its end; type `npm test -- --force`,
+  or add `--continue` to `npx turbo run test --force`, and read `Failed:` first. It was made to happen on demand by a `--import` hook
+  that ends one web test file 15 s in (learned by the run that looked for a race in the detached worker and found none).
+- **A time measured on a machine is a floor, never a ceiling.** `meter-store.test.ts` spun 30 ms in its fake and wanted the runtime's
+  share under 30: a process parked for 21 ms after the spin failed it at 30.8. Assert what a meter moves as an identity — the phases
+  add up to no more than the pass — and force the park with a load hook that adds the time after the spin (same run).
 - `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite

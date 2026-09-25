@@ -3474,7 +3474,8 @@ What it leaves:
   the api reads the whole engine board for the Factory, so at five hundred answers those are five hundred reads — of a person's
   command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
   The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-runtime's open issues).
-  The tick, which is what runs every four seconds, no longer pays it.
+  The tick, which is what runs every four seconds, no longer pays it, and since 2026-09-25 the runtime's own pass keeps a settled
+  task's fold too (*Shipped: the runtime's pass skips a settled task until the feed names it*); a `view` still folds.
 
 ## Shipped: four leftovers from the reviews
 
@@ -4604,7 +4605,8 @@ runs in flight; `artifacts/implement/measure-ls-api.ts` of this run):
 runs. Making them pay by what is in flight, as the pass now does, is a card of its own.
 
 **What it leaves.** Two cards. The runtime's own pass still folds every task's journal (agent-runtime's open issue 33): the
-orchestrator's phases no longer grow with the store, and the `runtime` phase still does. And `wf ls` and `/api/runs`, above. The memo
+orchestrator's phases no longer grow with the store, and the `runtime` phase still does (shipped since, 2026-09-25: *Shipped: the
+runtime's pass skips a settled task until the feed names it*). And `wf ls` and `/api/runs`, above. The memo
 watches what `advance` reads today: a new input a finished run's pass reads goes into the stamp, the feed or the tips, or a daemon
 answers that run from a stale memo until it restarts, and only `WF_VERIFY_REST` in the tests says so, in the states they reach.
 
@@ -4651,6 +4653,35 @@ out (`restBlockers`, `src/rest.ts`, which `atRest` is now written on). There wer
 - **Left.** The owner's live `wf up --stats`, once `wf up` is restarted on the merged tree. The unclosed ship try of
   `measure-what-a-tick-costs-ph-5ep5` is a finding in its own right: an ended task that never settles keeps its run out of the memo,
   correctly, until something closes it.
+
+## Shipped: the runtime's pass skips a settled task until the feed names it
+
+Shipped 2026-09-25, split by the owner out of *a finished run costs a pass nothing* (its planner's step 7) to land after stage 4c part 2
+and stage 5, which rewrote the same `tick()`. The runtime's pass folded every task's journal on every pass, twice (once for the pass,
+once in its step): agent-runtime's open issue 33.
+
+- **The memo** (`agent-runtime/src/tick-memo.ts`). An engine keeps a cursor into its own feed and, for each settled task it has folded,
+  what `releaseFinished` still reads (`Releasable`). Each pass reads the feed on from the cursor before anything else, forgets every
+  task it names, and skips a task still kept: no read, no fold, no `settleTask`; its finished sessions are let go off the memo. A fresh
+  engine folds everything, and `createEngine` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on
+  `settledQuiet`, `decide`'s first line: a settled task decides nothing in every journal shape, whatever is appended after
+  (`test/lifecycle.test.ts`). `TickReport.views` and `refused` never held a settled task, so admission reads what it read.
+- **What could append to a settled task**: `requestStop` (unconditional), a second `file` under its id, `say`, the pass's `measured`
+  and, through the same store, `ae` and the api's engine. `answer`, `close` and `admit` refuse a settled task. Every one goes through
+  `Journal.append`, which writes the feed; the one gap is a process dying between the task's line and the feed's (open issue 33).
+- **The proof**: a check mode (`tickMemoLayer({ verify: true })`, on in `engine.test.ts`'s `board()`) folds and decides each skipped
+  task again and fails the pass with `TickMemoDiverged` on any difference. A test writes an entry past the feed and sees it fire. With
+  the feed's names ignored, check mode fails the measured-once test; with the skip taken out, the byte tests fail.
+- **Measured** over a copy of this machine's engine store (1,200 tasks, 13.7 MB of journals, a 14.2 MB feed), an engine whose harnesses
+  list nothing and start nothing, five passes each (a throwaway probe, not committed):
+
+  | | pass 1 | passes 2–5 |
+  |---|---|---|
+  | before (main at `872f7e3`) | 144 ms, 27.46 MB in 2,403 reads | 83–99 ms, 27.38 MB in 2,400 reads |
+  | after | 203 ms, 41.61 MB in 2,404 reads | 8–10 ms, 0.08–0.13 MB in 4–7 reads |
+
+  A first pass reads the feed whole to learn where it ends (open issue 33). The probe's times are a warm page cache with no harness
+  observed; the live `runtime` phase of `wf up --stats` after the merge is the confirmation.
 
 ## 1. A run that grows steps from a plan
 

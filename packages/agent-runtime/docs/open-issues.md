@@ -805,22 +805,30 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
   whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that
   nothing is left.
 
-### 33. A pass reads every task's journal, settled or not (2026-09-25)
+### 33. A pass reads every task's journal, settled or not (2026-09-25; the pass fixed the same day, two gaps left)
 
-`tick()` (`src/engine.ts`) lists every id in the journal and folds each on every pass, so a store's runtime phase grows
-with every task ever filed: on this machine's store, 16 MB of journals over 1,167 tasks. The orchestrator stopped paying
-for finished runs on its side (agent-orchestrator's *Shipped: a finished run costs a pass nothing unless something of it
-changed*), and the runtime's phase is what is left. Skipping a settled task is not simply `if (settled) continue`:
+`tick()` (`src/engine.ts`) listed every id in the journal and folded each on every pass, twice, so a store's runtime phase
+grew with every task ever filed: on this machine's store, 16 MB of journals over 1,167 tasks. **Fixed for an engine's passes
+after its first** (`src/tick-memo.ts`): an engine keeps a cursor into its own feed and the settled tasks it has folded, and a
+pass folds only the tasks not settled, the tasks the feed named since the last pass, and the ones this engine never folded.
+A settled task it skips is still let go of its sessions off what the memo kept, and a `measured` that writes goes through
+the feed, so the next pass folds it again. `decide` of a settled task is nothing in every journal shape, whatever is appended
+after (`test/lifecycle.test.ts`), and a check mode in `test/engine.test.ts` folds each skipped task again and fails the pass
+on a difference. Over a copy of this machine's store (1,200 tasks) a pass read 27.4 MB before, and 0.08 MB after its first.
+What is left:
 
-- **A settled task can still be written to.** `releaseFinished` releases a session the observation still lists after its
-  task settled, and appends its `measured` then, since Claude Code writes a session's cost only as its process exits. So a
-  pass may skip a settled task only while no session of it is listed. The orchestrator's memo reads the feed after the
-  runtime's pass for the same reason: a `measured` appended on that pass takes the run out on the pass that wrote it.
-- **The card**, for when it is taken up: fold the tasks not settled, the tasks the runtime's own feed names since a cursor
-  kept in the process, and the settled tasks whose sessions the pass's observation still lists; fold everything on a
-  process's first pass; prove that `decide` of a settled task does nothing in every case, a task settled with its attempt
-  still open among them, and that a `stop-requested` or a second `file` leaves it settled; and meter that a second pass over
-  N settled journals reads only the feed's new bytes.
+- **An append that reaches the record and not the feed is missed until the engine restarts.** The files store writes the
+  task's file, then the feed's line (`Journal.filesOps`): a process that dies between the two leaves an entry no running
+  engine reads, where before the next pass read it. The window is two `appendFileSync` calls. Writing the feed first would
+  have a restarted engine read a feed line the record lacks, which is worse. A hand edit of `tasks/*.jsonl` under a running
+  `wf up` is the same — one more reason never to make one — and so is a consumer's `PromiseJournal` whose `feed` drops an
+  append, which its doc now forbids.
+- **An engine's first pass reads the whole feed** to learn where it ends, since a store gives a cursor only by reading
+  (`JournalOps.feed`): 14 MB here, about as much again as the journals. `wf up` pays it once; a one-shot `wf tick` or `ae tick`
+  pays it every time, about half as much again as before (41.6 MB where 27.5 MB was read). The lever, if it matters, is an
+  optional `JournalOps.end()` that answers a cursor at the feed's end, on a line boundary, with no read.
+- **`wf ls`, `wf decide` and the api's reads still fold every journal they read**: they `view`, not `tick`, and the memo is the
+  pass's (agent-orchestrator's features, *What `wf ls` and `/api/runs` still pay*).
 
 ## Verified live, once
 

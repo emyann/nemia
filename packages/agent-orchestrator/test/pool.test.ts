@@ -165,15 +165,26 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
 test('one pass — the runtime\'s tick, admission and admit — asks `claude agents` once, with claude tasks at work and waiting', async () => {
   try {
     for (const id of ['s1', 's2', 's3', 's4']) await file(id, 'claude');
-    await tick(e);
+    // The pass that admits s1 and s2: its `admit` is a word to the journals, and asks no harness.
+    const admitting = fake.agentsCalls();
+    const first = (await tick(e)).cost;
+    assert.equal(fake.agentsCalls() - admitting, 1, 'one observe for the pass that admits');
+    assert.deepEqual([(await e.view('s1')).admission, (await e.view('s3')).admission], ['admitted', 'queued']);
+    assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the same one');
     await tick(e);
     await until(['s1', 's2'], 'running (working)');
     assert.equal((await e.view('s3')).admission, 'queued');
 
     // Admission here reads the views the runtime's pass built; a read of `e.list()` or `e.view` for it would ask the harness again.
     const before = fake.agentsCalls();
-    await tick(e);
+    const { cost } = await tick(e);
     assert.equal(fake.agentsCalls() - before, 1, 'one observe for the whole pass');
+    assert.ok(cost, 'the pass says what it cost');
+    assert.equal(cost.harnesses.claude?.calls, 1, 'one observe of claude, as the meter counts the pass');
+    // Each harness is observed once a pass, and a process one starts is counted against every harness observing in that moment
+    // (`ObserveCount`), so the pass's own count says how many were started in all: the one `claude agents`.
+    for (const [name, o] of Object.entries(cost.harnesses)) assert.equal(o.calls, 1, `${name} observed once`);
+    assert.equal(cost.spawned, 1, 'one process started in the whole pass');
     assert.equal(await attempts('s3'), 0, 'and s3 still waits');
   } finally {
     await drain();

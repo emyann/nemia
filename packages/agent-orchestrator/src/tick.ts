@@ -958,7 +958,9 @@ async function pass(e: Engine, repo: string): Promise<Pass> {
   const runs = listRuns();
   // Which queued tasks start, off the views the runtime's pass built from its one observation: a read of `e.list()` or `e.view` here would
   // ask each harness again (`admission.ts`). The runtime starts what is admitted on its next pass.
-  await e.admit(toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions }));
+  // A word with nothing in it is not said: a call to the engine is counted, in `act`, with two reads of its totals.
+  const admitting = toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions });
+  if (admitting.length) await e.admit(admitting);
   const done = new Map<string, Advanced>();
   // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
   for (const run of runs.filter(hasStarted)) done.set(run.id, await advance(e, run));

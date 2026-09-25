@@ -1,0 +1,128 @@
+/**
+ * A workflow step on a remote A2A agent, end to end: `wf start` on a folder team whose step says `harness: a2a:reviewer`, the store's
+ * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `wf up` makes (`engine()`),
+ * each run at rest judged in full as well (`WF_VERIFY_REST`). The agent is sent the brief as a message, with the secret its card asks for read
+ * from `WF_A2A_REVIEWER_TOKEN` and never written to the store; the brief names nothing of this machine; the Task it completes is the step's
+ * sign-off, and a data part on it is read as a closeout. A secret not given sends nothing, and the step's failure names the variable to set.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { a2aServer, type Answer } from './a2a-server.ts';
+import { scratch } from './scratch.ts';
+
+const ROOT = scratch('wf-remote-step-');
+// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
+process.env.WF_ROOT = ROOT;
+// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
+process.env.WF_VERIFY_REST = '1';
+delete process.env.WF_MAX_RUNS;
+const { engine, readRun, tick } = await import('../src/runner.ts');
+const { main } = await import('../src/cli.ts');
+
+type Engine = ReturnType<typeof engine>;
+
+/** What `main` printed, line by line, while it ran. */
+const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
+  const lines: string[] = [];
+  const log = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.join(' ')); };
+  try { await main(argv, e as Parameters<typeof main>[1]); } finally { console.log = log; }
+  return lines.join('\n').split('\n');
+};
+
+/** A folder team of one step on the remote agent `name`. */
+function team(name: string, agent: string): string {
+  const dir = path.join(ROOT, 'workflows', name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'ask.md'), `---\nworkspace: folder\nharness: a2a:${agent}\n---\nRead the note and say whether it is right.\n`);
+  return dir;
+}
+
+const declare = (agents: Record<string, { url: string }>): void => fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify(agents));
+
+const GIVEN = path.join(ROOT, 'tides.md');
+fs.writeFileSync(GIVEN, '# Tides\n');
+
+/** `wf start`, from a directory that is no repository, and the run's id. */
+async function started(dir: string): Promise<string> {
+  const cwd = process.cwd();
+  process.chdir(ROOT);
+  try {
+    const lines = await printed(['start', 'a note on tides', '--workflows', dir, '--input', GIVEN]);
+    return lines[0]!.split(/\s+/)[0]!;
+  } finally {
+    process.chdir(cwd);
+  }
+}
+
+/** Ticks until the step's task settles, a pass after, and once more so the run reads what it came to; bounded. */
+async function settle(e: Engine, id: string): Promise<void> {
+  const until = Date.now() + 60_000;
+  while (Date.now() < until) {
+    await tick(e, { repo: ROOT });
+    if ((await e.view(`${id}-ask`)).state.settled) {
+      await tick(e, { repo: ROOT });
+      await tick(e, { repo: ROOT });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.fail(`${id}-ask did not settle: ${JSON.stringify(await e.view(`${id}-ask`))}`);
+}
+
+/** An agent that asks for a bearer secret, declared as `name`, answering each message with `answer`; and its run, settled. */
+async function remoteRun(name: string, answer: Answer, secret: string | undefined) {
+  const server = await a2aServer({ token: 's3cret', answer: () => answer });
+  const variable = `WF_A2A_${name.toUpperCase()}_TOKEN`;
+  if (secret === undefined) delete process.env[variable];
+  else process.env[variable] = secret;
+  try {
+    declare({ [name]: { url: server.url } });
+    const id = await started(team(`${name}-team`, name));
+    const e = engine();
+    await settle(e, id);
+    return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
+  } finally {
+    delete process.env[variable];
+    await server.close();
+  }
+}
+
+test('a step on a remote agent is sent its brief, with the secret its card asks for, and the Task it completes signs it off', async () => {
+  const { server, id, e, decided, listed } = await remoteRun('reviewer', { text: 'It is right.' }, 's3cret');
+  assert.equal(server.sent.length, 1, 'one message, one Task');
+  const brief = server.sent[0]!;
+  assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
+  assert.match(brief, /Files were given with it \(`wf start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
+  assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);
+  assert.ok(server.headers.some((h) => h.authorization === 'Bearer s3cret'), 'the secret went in the header its card asks for');
+
+  const view = await e.view(`${id}-ask`);
+  assert.equal(view.phase, 'succeeded');
+  const run = readRun(id);
+  assert.ok(run.steps.ask?.taskId, 'filed');
+  assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
+  assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
+  // The secret is in no file of the store.
+  const everything = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
+  for (const file of everything(ROOT)) assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `${file} holds the secret`);
+});
+
+test("a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs", async () => {
+  const { server, decided } = await remoteRun('blocker', { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } }, 's3cret');
+  assert.equal(server.sent.length, 1);
+  const said = decided.join('\n');
+  assert.match(said, /blocked/, said);
+  assert.match(said, /a source for the tide tables/, said);
+});
+
+test('a secret not given sends nothing, and the step fails naming the variable to set', async () => {
+  const { server, id, e, decided } = await remoteRun('critic', { text: 'never sent' }, undefined);
+  assert.equal(server.sent.length, 0, 'no message went out without its secret');
+  const view = await e.view(`${id}-ask`);
+  assert.equal(view.phase, 'failed');
+  const words = JSON.stringify(view.state.attempts) + decided.join('\n');
+  assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
+});

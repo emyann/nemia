@@ -109,7 +109,7 @@ test("agent-orchestrator's exports are . (runner.ts), ./run and ./workflow, and 
 });
 
 /** What reads a workflow folder from disk: exported from the root, beside the controller, and never from the pure format's entry. */
-const READERS = ['agentUsers', 'agentVersion', 'loadAgents', 'loadWorkflows', 'workflowDescription', 'workflowFolder', 'workflowsIn'];
+const READERS = ['agentsFor', 'agentUsers', 'agentVersion', 'loadAgents', 'loadWorkflows', 'skillsFor', 'workflowDescription', 'workflowFolder', 'workflowsIn'];
 
 function readerBreaches(root: readonly string[], format: readonly string[]): string[] {
   return READERS.flatMap((name) => [

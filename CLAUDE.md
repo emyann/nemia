@@ -406,6 +406,21 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   role key on every step form. And a key that names a file beside the agent is digested twice — `agentVersion` in the package, `versionOf` in
   `apps/api/src/workflows.ts` — or an edit of that file moves the agent's version and not the folder's (learned by the run that added
   `skills:`).
+- **A folder is loaded with the places a start reads, or it is refused where the start accepts it.** Since 2026-09-25 an agent's
+  `skills:` are looked for in the workflow's own root, the repository's `.claude/` and the store's `workflows/` (`lookupRoots`), so
+  `loadWorkflows(dir)` alone refuses a step whose skill is in the repository's `.claude/skills/`, and `agentVersion` without them does not
+  digest it. Every reader outside `wf start` passes `Places` — the api's listing, version and save take `placesOf(repo)` — and a test of a
+  reader puts a skill in `.claude/skills/` to prove it (`apps/api/test/builder.test.ts`, learned by the run that rendered an agent for
+  Claude Code).
+- **Who names an agent is read in every place that falls back to it, and a guard added at load is added to each verb that sets the same thing.**
+  A repository's workflows are given the store's agent when the repository has none of that name (`lookupRoots`), so `removeAgent`, reading
+  only the workflows beside the agent, let the board delete one a repository's step named: it reads the board's repository too now
+  (`repoUsers` in `authoring.ts`). And F21 was refused on a step's `model:` at load while `wf retry --model haiku` filed that model unchecked;
+  both word it through `autoDropped` (learned in review of the run that rendered an agent for Claude Code, round 1).
+- **A Claude Code step's brief no longer opens with its agent's instructions.** A rendered step's instructions are in
+  `runs/<id>/agents/<step>/prompt.md`, appended to Claude Code's system prompt, and its brief is its own note (`briefBody` in
+  `rendering.ts`); codex, and a step that says `resume:`, still read them in the brief. A test or a fixture that looks for the instructions
+  in a filed brief reads the prompt file for a claude step, and the brief pin of the shipped chain moved with it (same run).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
   there. The package's `workflows/ui` copy has its three agents in the package's `workflows/agents`, held byte for byte by the ui copy
@@ -715,6 +730,27 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   words it has no reading of, `failed`. Rename the sightings, and leave what a harness writes and what the journal records in
   their own words. A decision recorded before a change of words (`test/fixtures/decide-corpus.json`) is what proves the
   translation, case for case (learned by the run that made sightings speak A2A's names).
+- **Git refuses a whole `for-each-ref` for one base it cannot read.** `%(ahead-behind:<base>)` with a commit the repository does not have,
+  or a branch it does not have, exits 128 and lists no ref at all, so one run whose base was pruned away would blind the listing to every
+  other run of that repository. `branchReader` (`agent-orchestrator/src/branches.ts`) lists again without the bases it cannot read and asks
+  that run's questions one by one; its test pins each shape against `oneByOne`, the reference that asks a process for each question
+  (learned by the run that made `wf ls` ask git once a repository).
+- **The api's list answers a finished run from memory, and `WF_VERIFY_REST=1` is set by the api's test harness.** `GET /api/runs` keeps a
+  run at rest (`apps/api/src/resting.ts`) while its `restStamps`, its record, the feed for its tasks and the tips of its unmerged branches and
+  base stand. A new input `summarize` (`apps/api/src/runs.ts`) reads for a finished run goes into one of those, or a poll answers that run
+  stale until the api restarts; every api test judges each kept answer afresh and fails the request on a difference, which is how it is
+  seen. A test that counts what a poll reads turns the check off for that request (`unverified` in `test/resting.test.ts`), since the check
+  reads everything again (same run). Requests overlap, and the memo's feed cursor is shared: a request keeps nothing once another has read
+  the feed on past where it read to, or a line of a run it judged before the line is consumed by a request that had nothing to evict, and the
+  answer stays stale. One request at a time never shows it; the test interleaves two reads by hand (found in review, round 1).
+- **`list(taskIds)` looks at no harness when nothing among the tasks is in flight.** The api's list and a run's detail read their tasks
+  through it, so the tests that asserted one `claude agents` call or one observation per request now assert none where the tasks are
+  settled or Codex's: the one observation was the cost of reading every journal, not something the page needed. A run's tasks are every
+  step's, every check's, and every earlier try's *and its check's* (`tasksOf` in `apps/api/src/store.ts`); a list that left the tries' checks
+  out drew them `unknown` on the run's page (same run).
+- **The runtime's `io().reads` counts every file it reads, not only journals.** A look at Codex, check or claude-detached reads every run
+  file the harness ever wrote (871 on the live store on 2026-09-25): they have no `observeFor`. A measurement labelled *journals* off
+  `io().reads` counts those too; with a task in flight, the api's poll read 643 files and about 25 journals (same run).
 
 ## Rules the code keeps
 

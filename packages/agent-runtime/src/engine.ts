@@ -678,6 +678,26 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
   return viewOfState(fold(taskId, yield* journal.read(taskId)), observed);
 });
 
+/**
+ * The views of `taskIds`, over one look at the harnesses: each journal read once, and the harnesses told the last attempt of each task not
+ * settled (`observeFor`), which is all a view reads of a sighting — so a look for Claude Code jobs alone lists their run files and asks no
+ * `claude agents`, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
+ * caller that shows some of the board reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
+ * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it.
+ */
+export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[]) {
+  const journal = yield* Journal;
+  const runner = yield* Runner;
+  const states: State[] = [];
+  for (const id of new Set(taskIds)) states.push(fold(id, yield* journal.read(id)));
+  const open = states.filter((state) => !state.settled && state.attempts.length);
+  const observed = open.length
+    ? yield* (runner.observeFor ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) })))) : runner.observe).pipe(
+      Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
+    : new Map<string, Sighting>();
+  return states.map((state) => viewOfState(state, observed));
+});
+
 /** A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the fold it made. */
 export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>): TaskView {
   const taskId = state.taskId;

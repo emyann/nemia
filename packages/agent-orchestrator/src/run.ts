@@ -17,8 +17,9 @@ import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import { allowRuleOf, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
+import { allowRuleOf, autoDropped, DEFAULT_ROUNDS, disallowedBy, type DeniedAt, LOOP_REPLIES, loopSpan, modeOf, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
 import type { TaskClock } from './timeline.ts';
+import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
 import { answerOf, dueNote, messageRefusal, modeWord, retriesSpent, signoffsSpent, spentAsks, tryOf, type EarlierTry, type Retry, type RetryAsk, type RetryHow, type RetryMode } from './retry.ts';
 
@@ -2037,7 +2038,8 @@ const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 /**
  * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
- * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a cancelled
+ * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
+ * `auto` would run in `default` on (`autoDropped`, F21, as the load refuses it on the step's own `model:`); a cancelled
  * run, which files nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
  * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
@@ -2069,6 +2071,11 @@ export function retryRefusal(
   if (wrong) return wrong;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  const dropped = how.model === undefined ? undefined : autoDropped(step.harness, how.model, modeOf(step));
+  if (dropped) {
+    return `\`--model ${how.model}\`: ${name} ${dropped}. The step's mode is frozen with the run, so ask for a model that keeps \`auto\` — ${command} --model sonnet, or opus, or fable — `
+      + `or, to run it on ${how.model}, start a run of a folder whose step names a mode the model keeps: \`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules.`;
+  }
   if (run.cancelledAt) {
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
   }
@@ -4317,7 +4324,7 @@ export function composeBrief(
   // pointing it at the workspace would be telling someone what they spent an hour doing. What it reads
   // is new to it all the same, and so is a tree the run installed. A new session for a step tried again,
   // or for a round, continues nothing, and is told what any step starting cold is.
-  if (step.resume && !retry && !round) return step.body + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
+  if (step.resume && !retry && !round) return briefBody(step) + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -4326,13 +4333,15 @@ export function composeBrief(
   // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
-  const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
+  // A rendered agent's instructions are in the system prompt, and a step with no note of its own then opens on what was asked for.
+  const opening = briefBody(step) ? [briefBody(step), ''] : [];
+  const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
   // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged,
   // or in a folder, where nothing is either (`folderPlace`): a folder step is told where the steps before it worked, below.
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
-      step.body, '', '## What was asked for', '', ...request, ...handed, '',
+      ...opening, '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',

@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { AgentWriteError, agentUsers, agentVersion, HOME, loadAgents, removeAgent, writeAgent, type AgentSchema } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, formerSandbox, frontmatterKey, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
+import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, besideFile, FORMER_KEYS, formerSandbox, frontmatterKey, isCardFile, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { sourcesOf, type WorkflowSource } from './workflows.ts';
@@ -21,15 +21,17 @@ import { sourcesOf, type WorkflowSource } from './workflows.ts';
 export type AgentUser = { from: WorkflowSource; workflow: string; step: string };
 
 /**
- * What an agent says it can do, as the board has it: the file its `skills:` names, that file's text for the form, and the skills read out of
- * it for anything that shows them. `list` is null when the file does not read — the listing's `error` then says why, in the parser's words.
+ * What an agent says it can do, as the board has it: the card its `card:` names (a `skills:` line written before 2026-09-25 that names one, as
+ * the parser reads it), that file's text for the form, and the A2A skills read out of it for anything that shows them. `list` is null when the
+ * file does not read — the listing's `error` then says why, in the parser's words.
  */
-export type ListedSkills = { file: string; text: string; list: AgentSkill[] | null };
+export type ListedCard = { file: string; text: string; list: AgentSkill[] | null };
 
 /**
- * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names and the skills its
- * `skills:` names as those files hold them, the file's text, its version (`agentVersion`, what a write carries), and the nodes that name it.
- * `error` is the parser's refusal of a file that does not read, whose keys are then its lines as written, so the form can show what to fix.
+ * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names and the card its
+ * `card:` names as those files hold them, the skills its `skills:` gives its sessions and its `systemPrompt:`, each as written, the file's
+ * text, its version (`agentVersion`, what a write carries), and the nodes that name it. `error` is the parser's refusal of a file that does
+ * not read, whose keys are then its lines as written, so the form can show what to fix.
  */
 export type AgentListing = {
   name: string;
@@ -40,15 +42,20 @@ export type AgentListing = {
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   schema: AgentSchema | null;
-  skills: ListedSkills | null;
+  card: ListedCard | null;
+  /** The skills its steps are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
+  skills: string | null;
+  /** What becomes of Claude Code's system prompt, as written: `default`, `no-coding` or `own`; null for none, which is `default`. */
+  systemPrompt: string | null;
   source: string;
   version: string;
   usedBy: AgentUser[];
   error: string | null;
 };
 
-// The keys a step has too. `description` and `skills` describe the agent and are no step's, so the form shows them apart (`RoleKey`).
-const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => key !== 'description' && key !== 'skills');
+// The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, card, skills and system prompt) are no step's, so the form
+// shows them apart (`RoleKey`).
+const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
@@ -82,10 +89,10 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
     if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
     try { return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') }; } catch { return null; }
   };
-  // The skills as the form edits them — the file's text — with what the parser read out of it, or null when it did not read. A file the
+  // The card as the form edits it — the file's text — with what the parser read out of it, or null when it did not read. A file the
   // agent names that is not there is still named: it is kept as `keys.output` is kept below, with nothing in it, or the next save would
-  // write the agent back with no `skills:` line and the only word that the file is missing — the package's refusal — would be gone.
-  const skillsOf = (named: string | undefined, list: AgentSkill[] | null): ListedSkills | null => {
+  // write the agent back with no `card:` line and the only word that the file is missing — the package's refusal — would be gone.
+  const cardOf = (named: string | undefined, list: AgentSkill[] | null): ListedCard | null => {
     if (named === undefined) return null;
     const sidecar = sidecarOf(named);
     return sidecar === null ? { file: named, text: '', list } : { ...sidecar, list };
@@ -112,16 +119,28 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
       keys,
       body,
       schema: sidecarOf(keys.output),
-      skills: skillsOf(frontmatterKey(source, 'skills'), null),
+      card: cardOf(besideFile(source, 'card'), null),
+      skills: skillsLineOf(source),
+      systemPrompt: frontmatterKey(source, 'systemPrompt') ?? null,
       source,
       error: agent ? agent.message : `${AGENTS_FOLDER}/${name}.md does not read.`,
     };
   }
-  return { name, from, dir, file, description: agent.description ?? null, keys: agent.keys, body: agent.body, schema: sidecarOf(agent.keys.output), skills: skillsOf(agent.skills?.file, agent.skills?.list ?? null), source, version, usedBy, error: null };
+  return {
+    name, from, dir, file, description: agent.description ?? null, keys: agent.keys, body: agent.body, schema: sidecarOf(agent.keys.output),
+    card: cardOf(agent.card?.file, agent.card?.list ?? null), skills: agent.skills?.join(', ') ?? null, systemPrompt: agent.systemPrompt ?? null,
+    source, version, usedBy, error: null,
+  };
+}
+
+/** A `skills:` line as written, for a file that does not read — none where it names a card, which is the card's line written before 2026-09-25. */
+function skillsLineOf(source: string): string | null {
+  const line = frontmatterKey(source, 'skills');
+  return line === undefined || isCardFile(line) ? null : line;
 }
 
 const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing =>
-  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, skills: null, source: '', version, usedBy, error: null });
+  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, skills: null, systemPrompt: null, source: '', version, usedBy, error: null });
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
@@ -135,7 +154,7 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 /** A refused write: the package's words, and the steps that still name the agent when that is why. */
 export type AgentRefused = { error: string; users: string[] };
 
-const DRAFT = '"description"?: "<use this when…>", "skills"?: "<name>.skills.json", "skillsText"?: "<a list of A2A skills>", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+const DRAFT = '"description"?: "<use this when…>", "card"?: "<name>.skills.json", "cardText"?: "<a list of A2A skills>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -176,12 +195,17 @@ async function jsonOf(req: { json: () => Promise<unknown> }, route: string, shap
 }
 
 /** A draft from a body, its shape checked: a key's value is judged by the package, which says what is wrong with it in its words. */
-function draftOf(body: Record<string, unknown>, name: unknown, route: string, shape: string): { draft: AgentDraft; schema: AgentSchema | null; skills: AgentSchema | null } | Refusal {
+function draftOf(body: Record<string, unknown>, name: unknown, route: string, shape: string): { draft: AgentDraft; schema: AgentSchema | null; card: AgentSchema | null } | Refusal {
   const wrong = (what: string) => ({ status: 400 as const, error: `${route}: ${what}. Send ${shape}.` });
   if (typeof name !== 'string') return wrong(`\`name\` is the agent's name, a string, and this request's was ${JSON.stringify(name)}`);
+  // A page drawn before 2026-09-25 sends the card's text as `skillsText`: taken as nothing, the card would be written back unchanged and the
+  // edit lost unsaid. Its `skills:` naming a card file is refused by the package, in the same words.
+  if (Object.hasOwn(body, 'skillsText')) return wrong('`skillsText` is `cardText` since 2026-09-25, the text of the card `card` names, and `skills` the skills the agent is given by name. A page open since before then sends the former names: reload it, and save again');
   if (body.description != null && typeof body.description !== 'string') return wrong('`description` is a line of text, or null');
-  if (body.skills != null && typeof body.skills !== 'string') return wrong('`skills` is the file beside the agent that says what it can do, `"<name>.skills.json"`, or null');
-  if (body.skillsText != null && typeof body.skillsText !== 'string') return wrong('`skillsText` is that file\'s text, or null to leave the file as it is');
+  if (body.card != null && typeof body.card !== 'string') return wrong('`card` is the file beside the agent that says what it can do, `"<name>.skills.json"`, or null');
+  if (body.cardText != null && typeof body.cardText !== 'string') return wrong('`cardText` is that file\'s text, or null to leave the file as it is');
+  if (body.skills != null && typeof body.skills !== 'string') return wrong('`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null');
+  if (body.systemPrompt != null && typeof body.systemPrompt !== 'string') return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
   if (body.keys !== undefined && !isObject(body.keys)) return wrong('`keys` is an object of the role keys the agent sets');
   const keys = (body.keys ?? {}) as Record<string, unknown>;
   const bad = Object.entries(keys).find(([, value]) => value !== null && typeof value !== 'string');
@@ -190,14 +214,15 @@ function draftOf(body: Record<string, unknown>, name: unknown, route: string, sh
   const schema = body.schema ?? null;
   if (schema !== null && (!isObject(schema) || typeof schema.file !== 'string' || typeof schema.text !== 'string')) return wrong('`schema` is the result schema its `output:` names, `{ "file", "text" }`, or null');
   const description = typeof body.description === 'string' && body.description.trim() ? body.description.trim() : null;
-  const skills = typeof body.skills === 'string' && body.skills.trim() ? body.skills.trim() : null;
-  // The skills file's text travels only when it changed; without the line there is no file to write it to, and the package says so.
-  if (typeof body.skillsText === 'string' && skills === null) return wrong('`skillsText` is the text of the file `skills` names, and this request named no `skills` file');
+  const line = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  const card = line(body.card);
+  // The card's text travels only when it changed; without the line there is no file to write it to, and the package says so.
+  if (typeof body.cardText === 'string' && card === null) return wrong('`cardText` is the text of the file `card` names, and this request named no `card` file');
   const trimmed = Object.fromEntries(Object.entries(keys).map(([key, value]) => [key, typeof value === 'string' && value.trim() ? value.trim() : null]));
   return {
-    draft: { name, description, skills, keys: trimmed as AgentDraft['keys'], body: (body.body as string | undefined) ?? '' },
+    draft: { name, description, card, skills: line(body.skills), systemPrompt: line(body.systemPrompt), keys: trimmed as AgentDraft['keys'], body: (body.body as string | undefined) ?? '' },
     schema: schema as AgentSchema | null,
-    skills: typeof body.skillsText === 'string' && skills !== null ? { file: skills, text: body.skillsText } : null,
+    card: typeof body.cardText === 'string' && card !== null ? { file: card, text: body.cardText } : null,
   };
 }
 
@@ -247,7 +272,7 @@ export const agents = new Hono()
   /**
    * One agent in the shape of an A2A Agent Card. Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is
    * a transport and a URL, and nothing here serves an agent over A2A — so `servedOverA2A` is false beside it, in the answer, rather than
-   * left for a reader to work out. An agent with no `description:` or no `skills:` has no card, and the package's refusal says which.
+   * left for a reader to work out. An agent with no `description:` or no `card:` has no card, and the package's refusal says which.
    */
   .get('/api/agents/:from/:name/card', (c) => {
     const { from, name } = c.req.param();
@@ -280,7 +305,7 @@ export const agents = new Hono()
     if ('status' in place) return c.json({ error: place.error }, place.status);
     const given = draftOf(read.body, read.body.name, route, POST_SHAPE);
     if ('status' in given) return c.json({ error: given.error }, given.status);
-    const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, skills: given.skills }, 201);
+    const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, card: given.card }, 201);
     return c.json(answer.body, answer.status);
   })
   // An agent of yours put back — and renamed, when the body names it otherwise — against the version it was read at.
@@ -307,7 +332,7 @@ export const agents = new Hono()
     }
     const given = draftOf(read.body, to, route, PUT_SHAPE);
     if ('status' in given) return c.json({ error: given.error }, given.status);
-    const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, skills: given.skills }, 200);
+    const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, card: given.card, repo: repoOf() }, 200);
     return c.json(answer.body, answer.status);
   })
   // An agent of yours removed, against the version it was read at — refused while a step still names it, saying which.
@@ -327,7 +352,8 @@ export const agents = new Hono()
       return c.json({ error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(version)}.` }, 400);
     }
     try {
-      return c.json(removeAgent(place.dir, name, { version }));
+      // The repository the board serves is read too, for a step its workflows are given this agent by; another is not known here.
+      return c.json(removeAgent(place.dir, name, { version, repo: repoOf() }));
     } catch (err) {
       const answer = refusalOf(err);
       if (answer) return c.json(answer.body, answer.status);

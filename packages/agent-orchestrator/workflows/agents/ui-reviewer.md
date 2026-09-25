@@ -1,6 +1,6 @@
 ---
 description: Reviews a web-app change read-only, the diff beside the screenshots of every page it changed, in both themes.
-skills: ui-reviewer.skills.json
+card: ui-reviewer.skills.json
 harness: claude
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings).
 # Every token a session writes it reads again on each later call, so a higher effort is paid for many times over.

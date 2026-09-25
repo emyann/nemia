@@ -17,7 +17,7 @@ const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/runner-claude-code.ts');
-const { claudeCodeRefuses } = await import('../src/runner-claude-vocabulary.ts');
+const { claudeCodeRefuses, claudeRefuses } = await import('../src/runner-claude-vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
@@ -307,4 +307,108 @@ test('what the default Claude Code refuses depends on the mode: a job refuses a 
     assert.match(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background, effort: 'huge' } }) ?? '', /^`effort: huge` is not an effort Claude Code has/);
     assert.match(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background, permissionMode: 'yolo' } }) ?? '', /^`permissionMode: yolo` is not a mode/);
   }
+});
+
+/** Every flag in `args` as `config.claude` would name it: `--permission-mode` is `permissionMode`, `-p` is `p`. */
+const flagsIn = (args: readonly string[]) => args.filter((a) => a.startsWith('-')).map((a) => a.replace(/^--?/, '').replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()));
+
+/** A config that makes a spawn give every flag it can. */
+const EVERYTHING = {
+  tools: ['Read'], disallowedTools: ['SendMessage'], allowedTools: ['Edit(**)'], permissionMode: 'dontAsk', model: 'opus', effort: 'high',
+  contextTokens: 200000, worktree: 'w', budgetUsd: 1, mcp: { m: { command: 'x' } },
+};
+
+test("Claude Code's own flags (`config.claude`) are handed over as written, after the variadic lists and directly before the mode — on a job, on claude -p's other spec and on a background session", async () => {
+  const claude = { appendSystemPromptFile: '/a/prompt.md', pluginDir: ['/a/hkb-x', '/a/hkb-y'], settings: '{"outputStyle":"hkb-x:no-coding"}', bare: true as const };
+  const want = ['--append-system-prompt-file', '/a/prompt.md', '--plugin-dir', '/a/hkb-x', '--plugin-dir', '/a/hkb-y', '--settings', '{"outputStyle":"hkb-x:no-coding"}', '--bare'];
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const job = claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { tools: ['Read', 'Skill'], claude } }).args;
+  const detached = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { tools: ['Read', 'Skill'], claude } }).args;
+  const f = fake();
+  let bg: string[];
+  try {
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'b', cwd: f.dir, config: { background: true, tools: ['Read', 'Skill'], claude } }));
+    bg = f.read('bg-args')!;
+  } finally { f.restore(); }
+  for (const [what, args] of [['a job', job], ['claude-detached', detached], ['a background session', bg]] as const) {
+    const at = args.indexOf('--append-system-prompt-file');
+    assert.deepEqual(args.slice(at, at + want.length), want, what);
+    assert.equal(args[at + want.length], '--permission-mode', `${what}: directly before the mode`);
+    assert.ok(args.indexOf('--tools') < at, `${what}: after the variadic list, which the first of them ends`);
+  }
+  // None given, none handed over: the argv is what it was.
+  assert.deepEqual(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } }).args, claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args);
+});
+
+test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, in `config.claude` — and every flag a spawn gives is on that list', async () => {
+  const { CLAUDE_OWNED_FLAGS } = await import('../src/runner-claude-vocabulary.ts');
+  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const request = { name: 'ae/t/1', brief: 'b', cwd: '/r', resumeFrom: BG_ID, closeoutSchema: { type: 'object' }, config: EVERYTHING };
+  const io = { checkoutMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };
+  const f = fake();
+  let bg: string[];
+  try {
+    await Effect.runPromise(opsIn(tmp('root')).spawn({ ...request, name: 'ae/b/1', cwd: f.dir, config: { ...EVERYTHING, budgetUsd: undefined, background: true, remoteControl: true } }));
+    bg = f.read('bg-args')!;
+  } finally { f.restore(); }
+  for (const [what, args] of [['a job', claudeJob.command(request, io).args], ['claude-detached', claudeDetached.command(request, io).args], ['a background session', bg]] as const) {
+    const stray = flagsIn(args).filter((flag) => !CLAUDE_OWNED_FLAGS.includes(flag));
+    assert.deepEqual(stray, [], `${what} gives flags the list does not name`);
+  }
+  for (const owned of CLAUDE_OWNED_FLAGS) {
+    for (const refuses of [claudeRefuses, claudeCodeRefuses]) {
+      const says = refuses({ brief: 'b', cwd: '/r', config: { claude: { [owned]: 'x' } } }) ?? '';
+      assert.ok(says.startsWith(`\`claude.${owned}\` is a flag the runtime gives Claude Code itself`), `${owned}: ${says}`);
+    }
+  }
+  assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { appendSystemPromptFile: 'p.md', pluginDir: ['d'] } } }), undefined, 'what the orchestrator gives is taken');
+});
+
+test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not Claude Code — codex, and any spec that does not say it is — at the engine's door and codex's own", async () => {
+  const { createEngine, codex } = await import('../src/facade.ts');
+  const other = { name: 'other', command: () => ({ cmd: 'true', args: [] }) };
+  const e = createEngine({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } });
+  const claude = { appendSystemPromptFile: '/a/prompt.md' };
+  for (const harness of ['codex', 'other']) {
+    await assert.rejects(e.file({ brief: 'b', cwd: '/r', harness, config: { claude } }), (err: Error & { exitCode?: number }) => {
+      assert.equal(err.exitCode, 2);
+      assert.ok(err.message.startsWith(`file: \`claude\` gives Claude Code flags of its own, and the \`${harness}\` harness is not Claude Code`), err.message);
+      assert.ok(err.message.includes('File the task on `claude`'), err.message);
+      return true;
+    });
+  }
+  assert.match(codex.refuses!({ brief: 'b', cwd: '/r', config: { claude } }) ?? '', /^`claude: \{"appendSystemPromptFile":"\/a\/prompt\.md"\}` gives Claude Code flags of its own, and `codex exec` is not Claude Code/);
+  assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined);
+  // A key that is no harness argument — `codex`, say — was refused before this card and still is: there is no bag for Codex.
+  await assert.rejects(e.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { codex: { x: 1 } } as never }), /`config\.codex` is not a harness argument/);
+});
+
+test("a flag Claude Code does not have fails the attempt as the CLI fails it, and the CLI's own words reach the attempt's logs", async () => {
+  // What 2.1.282 does given `--frobnicate` (F22): nothing on stdout, its words on stderr, exit 1.
+  const dir = tmp('bin');
+  fs.writeFileSync(path.join(dir, 'claude'), [
+    '#!/bin/sh',
+    'case "$1" in',
+    '  agents) echo "[]" ;;',
+    '  *) for a in "$@"; do case "$a" in --frobnicate) echo "error: unknown option \'--frobnicate\'" >&2; exit 1 ;; esac; done; exit 0 ;;',
+    'esac',
+    '',
+  ].join('\n'), { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const { createEngine } = await import('../src/facade.ts');
+    const e = createEngine({ root: tmp('root'), harnesses: { claude: 'claude' } });
+    const id = await e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } });
+    const until = Date.now() + 20_000;
+    while (!(await e.view(id)).state.settled) {
+      assert.ok(Date.now() < until, 'settled');
+      await e.tick();
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const v = await e.view(id);
+    assert.equal(v.phase, 'failed', 'an ordinary failed end');
+    assert.equal(v.state.attempts[0]?.exitCode, 1, 'with the exit code the CLI gave');
+    assert.match(await e.logs(id), /error: unknown option '--frobnicate'/, "and the CLI's words, where a person reads why");
+  } finally { process.env.PATH = prev; }
 });

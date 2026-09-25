@@ -187,8 +187,9 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       steps: Object.fromEntries(Object.keys(byName).map((name) => [name, name === 'ship' ? { taskId: null } : { taskId: `t-${name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
     };
     const brief = composeBrief(ship, run, loadWorkflows(dir), undefined, '/wf/runs/r-1/artifacts/ship');
-    // The title the recipe's subject is taken from is the brief's, under its heading.
-    assert.ok(brief.includes('\n## What was asked for\n\nShip it'), `${folder}\n\n${brief}`);
+    // The title the recipe's subject is taken from is the brief's, under its heading — the brief's first line where the step has no note of
+    // its own, since the shipper's instructions are in its system prompt (`briefBody`).
+    assert.match(brief, /(^|\n)## What was asked for\n\nShip it/, `${folder}\n\n${brief}`);
     // The brief says the run executes the folder's check on the merge and commits it — once — and never hands the step a check to run.
     assert.equal(brief.split(landingContract(check)).length, 2, `${folder}\n\n${brief}`);
     assert.ok(!brief.includes("This workflow's check, which its work was judged by:"), `${folder}\n\n${brief}`);

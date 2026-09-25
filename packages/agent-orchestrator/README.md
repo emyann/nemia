@@ -256,7 +256,7 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
-`output` — and two of its own, `description:` and `skills:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output` — and four of its own, `description:`, `card:`, `skills:` and `systemPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -264,8 +264,9 @@ workflow — the listings skip it, and a workflow named `agents` is refused by n
 
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
-read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
-words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
+read the merged keys and name the step. On codex, and on a step that continues another's session (`resume:`), the brief is the
+agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go into the session's system prompt
+(*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
 case: the shipped steps that have one are the `ship` of `dev-build`, `dev-planned-build` and `ui`, which tell the shipper why a build
 and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
@@ -276,9 +277,9 @@ board's builder edits the node — which agent, its own keys and its note — sh
 The board's Agents page edits the agent itself (`writeAgent`, `removeAgent`): yours only, against the version it was read at, its result
 schema and its skills with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
 
-#### What an agent says it can do: `skills:`, and a card in A2A's shape
+#### What an agent says it can do: `card:`, in A2A's shape
 
-`description:` says what an agent is for in a line. `skills:` says what it can do, in the shape the
+`description:` says what an agent is for in a line. `card:` says what it can do, in the shape the
 [A2A protocol](https://a2a-protocol.org/latest/specification/) gives an agent's skills, and names a `.json` file beside
 the agent — `reviewer.skills.json` — holding a list of them:
 
@@ -294,6 +295,10 @@ the agent — `reviewer.skills.json` — holding a list of them:
 ]
 ```
 
+The line was `skills:` until 2026-09-25, when `skills:` came to name Claude Code skills. A `skills:` line naming a `.json` file is
+still read as the card, `wf start` names the line to rename, and an agent that writes both is refused; the board's save refuses a card
+sent as `skills:` from a page opened before, saying to reload.
+
 `id`, `name`, `description` and `tags` are A2A's required fields and each is required here; `examples`, `inputModes` and
 `outputModes` are its optional ones, each a list of strings. An `id` is lowercase words joined by dashes, unique in the
 file. Anything else is refused by name — an unknown key, a blank field, a duplicate id, an empty list, a file that is not
@@ -302,14 +307,13 @@ skill, is refused too: nothing here serves an agent over A2A, so its card declar
 demanding one could never be satisfied.
 
 A skill is description, not machinery. Nothing reads one to decide anything: no step is routed by a tag, no tool is
-allowed or denied by a skill, and skills are *not* frozen on a run record — a run froze the keys that do the work, and
-what an agent says it can do can be corrected without touching a run in flight. `agentVersion` does digest the skills
+allowed or denied by a skill, and a card is *not* frozen on a run record — a run froze the keys that do the work, and
+what an agent says it can do can be corrected without touching a run in flight. `agentVersion` does digest the card
 file with the agent, so the board refuses a save against a stale read of either.
 
-A skill here is also not a Claude Code skill. `.claude/skills/` holds folders of instructions a session loads through the
-`Skill` tool, which `tools:` allows or denies — machinery a session uses. An A2A skill is a sentence about the agent that
-nothing loads and nothing reads. Two words, two meanings; where both could be meant, this README says *an A2A skill* or
-names the file.
+A skill on the card is also not a Claude Code skill, which `skills:` gives (below): a folder of instructions a session loads
+through the `Skill` tool — machinery a session uses. An A2A skill is a sentence about the agent that nothing loads and nothing
+reads. Two words, two meanings; where both could be meant, this README says *an A2A skill* or names the file.
 
 `wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
 in the shape of an A2A Agent Card, JSON on stdout and nothing else:
@@ -332,6 +336,57 @@ not a semantic version: it changes when the agent's file or a file beside it doe
 
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.
+
+#### An agent rendered for Claude Code: `skills:` and `systemPrompt:`
+
+```md
+---
+description: Writes a short note on what it is asked about.
+skills: write-a-note, mind-the-tone
+systemPrompt: no-coding
+tools: Read, Edit, Skill
+---
+You write notes. Load `write-a-note` before you start.
+```
+
+A Claude Code step whose agent has instructions, skills or a system prompt of its own is *rendered* at `wf start`, under
+`runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`rendering.ts`, `writeAgentFiles` in `store.ts`), and filed with
+Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
+
+- `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
+  SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own system prompt, which is kept (F1).
+- `hkb-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
+  it, so a session loads them with the `Skill` tool as `hkb-<agent>:<name>`, and nothing of the machine's own plugins is touched.
+- `systemPrompt:` — `default`, or no line, keeps Claude Code's prompt and appends the instructions after it; `no-coding` does too, less
+  Claude Code's coding instructions, through an output style in the plugin that says `keep-coding-instructions: false`, chosen by its
+  namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude
+  Code's prompt (`--system-prompt-file`, F15).
+
+`skills:` names skills, each lowercase words joined by dashes. A skill is a folder holding a `SKILL.md`, looked for in `skills/`
+beside `agents/` in each place agents are, in order: the workflow's own folder of agents' parent, then the repository's `.claude/`
+(`.claude/agents/`, `.claude/skills/`), then the store's `workflows/`. The first place that has a name wins, so the repository's
+wins over the store's, and a workflow of the store finds its own first. A name one repository has in both `workflows/` and `.claude/`
+is refused, naming both. A folder team, which has no repository, reads the `.claude/` of the directory it was started from.
+`agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
+refuses a stale read.
+
+A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
+are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
+back — and is not written back by the board's save. Claude Code's keys that change what a session may do or has, which a run does not
+carry to its sessions, are refused by name, each with what does that in a run (`maxTurns`, `mcpServers`, `hooks`, `memory`,
+`isolation`), and so is `model: inherit`, since a step's session has no conversation to take a model from.
+
+Refused at load, each in the name of the agent or of the step that names it (`composedRefusal`, `autoRefusal`): a skill no place has,
+naming each place looked in; skills with no `Skill` in the step's `tools:` or with `Skill` in its `disallowedTools:`, since a skill a
+session cannot load is a name in its prompt (F11); skills or a system prompt on codex, which is handed the instructions in its brief
+as before; skills or a system prompt on a step that continues another's session, which keeps its own (F13); `systemPrompt: own` on an
+agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
+on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
+`default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+(`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
+
+A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
+file that is not there.
 
 ### What a step may have: `tools:` and `effort:`
 

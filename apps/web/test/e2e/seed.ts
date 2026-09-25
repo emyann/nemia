@@ -692,7 +692,7 @@ export const WORKFLOWS = {
 
 /**
  * The agents the Agents page lists: the checkout's `implementer` (WORKFLOWS' `dev` › implement names it), and one of yours, `scribe`, in the
- * store's `workflows/agents/`, which sets a description, two role keys, a result schema and the skills it says it can do, and which no node
+ * store's `workflows/agents/`, which sets a description, two role keys, a result schema and the card that says what it can do, and which no node
  * of yours names. `made` is the agent the page creates, edits and removes; `naming` the folder of yours the refusal page writes, whose one
  * step names `scribe`.
  */
@@ -703,15 +703,19 @@ export const AGENTS = {
     keys: { model: 'sonnet', effort: 'low', output: 'scribe.schema.json' },
     body: 'You write the notes of a change.\n\n## What they say\n\n- What changed, and why.\n- What a reader should try first.',
     schema: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }, null, 2),
-    /** The file its `skills:` names, and what it holds: what it says it can do, in the A2A protocol's words. */
-    skills: 'scribe.skills.json',
+    /** The file its `card:` names, and what it holds: what it says it can do, in the A2A protocol's words. */
+    card: 'scribe.skills.json',
     skill: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change, and what to try first.', tags: ['notes', 'release'] },
   },
   made: {
     name: 'notary',
     description: 'Use this when a decision needs writing down.',
-    model: 'haiku',
+    // Not haiku: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused (F21).
+    model: 'sonnet',
     edited: 'opus',
+    /** Typed into the Skills field, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name. */
+    skills: 'write-a-decision',
+    tools: 'Read, Skill',
     body: 'You write down what was decided, and by whom.',
     /** Pasted into the form with no file named: the save names it notary.skills.json, beside the agent. */
     skill: { id: 'write-a-decision', name: 'Write a decision', description: 'Writes down what was decided, and by whom.', tags: ['decision'] },
@@ -724,7 +728,7 @@ export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
-  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), `---\nskills: ${good.agent.name}.skills.json\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`);
+  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), `---\ncard: ${good.agent.name}.skills.json\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`);
   write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.skills.json`), `${JSON.stringify([good.agent.skill], null, 2)}\n`);
   write(path.join(dev, 'implement.md'), `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallowedTools: ${good.disallowedTools}\n---\nImplement what was asked.\n`);
   write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
@@ -736,9 +740,9 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
   const { seeded } = AGENTS;
   const keys = Object.entries(seeded.keys).map(([key, value]) => `${key}: ${value}\n`).join('');
-  write(path.join(root, 'workflows', 'agents', `${seeded.name}.md`), `---\ndescription: ${seeded.description}\nskills: ${seeded.skills}\n${keys}---\n${seeded.body}\n`);
+  write(path.join(root, 'workflows', 'agents', `${seeded.name}.md`), `---\ndescription: ${seeded.description}\ncard: ${seeded.card}\n${keys}---\n${seeded.body}\n`);
   write(path.join(root, 'workflows', 'agents', seeded.keys.output), `${seeded.schema}\n`);
-  write(path.join(root, 'workflows', 'agents', seeded.skills), `${JSON.stringify([seeded.skill], null, 2)}\n`);
+  write(path.join(root, 'workflows', 'agents', seeded.card), `${JSON.stringify([seeded.skill], null, 2)}\n`);
 }
 
 /**

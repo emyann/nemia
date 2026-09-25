@@ -1008,7 +1008,7 @@ test("a refused check whose output cannot be read still answers, and says how to
   assert.match(test.check.refused.unreadable, /`wf decide r-22`/);
 });
 
-test('the list of runs observes the engine once, however many runs and steps are filed', async (t) => {
+test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
   // A `claude` ahead of the real one on PATH, which notes each call and sees no sessions of ours.
   const bin = scratch('hkb-api-bin-');
   const calls = path.join(bin, 'calls');
@@ -1031,7 +1031,9 @@ test('the list of runs observes the engine once, however many runs and steps are
   // A view per filed step would have observed once for each of these, and reading a refused check's log once more for each of those.
   assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
   assert.ok(runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'), 'a refused check, worded with its exit code, is on the list');
-  assert.equal(observations(), 1);
+  // Queued, settled and refused, none of them in flight: no harness is looked at (`list(taskIds)`). Once for any number of background
+  // sessions in flight is `asks.test.ts`'s, with three the harness blocked.
+  assert.equal(observations(), 0);
 });
 
 // ─── what each round did, what a step runs with, and its files ──────────────
@@ -1102,9 +1104,10 @@ test('a step on its third try, in the second round of its loop, carries every tr
 
   const observations = countingObservations(t);
   const run = await (await app.request('/api/runs/r-50')).json();
-  // Eight tasks — implement's three and their checks, review's two — read over one observation of the harnesses, and no refused check
-  // of the current try to read the output of. A `view` each was eight observations, one after another, on a page polled every five seconds.
-  assert.equal(observations(), 1);
+  // Eight tasks — implement's three and their checks, review's two — read over one look at the harnesses, and no refused check of the
+  // current try to read the output of. A `view` each was eight observations, one after another, on a page polled every five seconds; and
+  // with every one of them settled, the look is not made (`list(taskIds)`).
+  assert.equal(observations(), 0);
 
   const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
   // Each closeout with what was recorded, untouched, as `raw`: `replies` is read into the api's shape, and the statement is not.
@@ -1444,7 +1447,7 @@ test("the detail carries where each step's time went — per try and per check, 
 
   const observations = countingObservations(t);
   const run = await (await app.request('/api/runs/r-60')).json();
-  assert.equal(observations(), 1, 'the feed is a read of the store: the detail observes the harnesses once, as it did');
+  assert.equal(observations(), 0, 'the feed is a read of the store: the detail observes no harness for it, and none for tasks all settled');
   const [implement, review] = run.steps;
   const words = (s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null) =>
     s && { at: s.at, filedAt: s.filedAt, spawnedAt: s.spawnedAt, endedAt: s.endedAt, queued: s.queued, ran: s.ran };

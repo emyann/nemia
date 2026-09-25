@@ -9,14 +9,84 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, readmeDescription, stepFiles, WorkflowError, type Agent, type Workflow } from './workflow.ts';
+import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, besideFile, codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, isCardFile, isReadme, linkRefusal, parseAgent, parseFolder, readmeDescription, SKILLS_FOLDER, splitFrontmatter, stepFiles, WorkflowError, type Agent, type Agents, type SkillsFound, type Workflow } from './workflow.ts';
+
+/**
+ * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
+ * `.claude/skills/` are read, and the store (`WF_ROOT`), whose `workflows/agents/` and `workflows/skills/` are. Neither, and a workflow
+ * finds only what is beside it, as before 2026-09-25.
+ */
+export type Places = { repo?: string; home?: string };
+
+/**
+ * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the order a name is found:
+ * the workflow's own root (the folder beside it, `agentsDir`'s parent), then the repository's `.claude/`, then the store's `workflows/`.
+ * So the repository wins over the store, and a workflow of the store finds its own first. One folder is listed once.
+ */
+export function lookupRoots(workflowDir: string, places: Places = {}): string[] {
+  const roots = [path.dirname(agentsDir(workflowDir))];
+  if (places.repo) roots.push(path.join(path.resolve(places.repo), '.claude'));
+  if (places.home) roots.push(path.join(path.resolve(places.home), 'workflows'));
+  return [...new Set(roots)];
+}
+
+/**
+ * Whether two of `roots` are one repository's two places — its `workflows/` and its `.claude/` — where a name in both is refused rather than
+ * one of them chosen: a person reading either folder would take the one before them for the one that runs.
+ */
+const sameRepository = (a: string, b: string): boolean => path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
+
+/**
+ * Every agent a workflow's steps may name (`lookupRoots`), each read or the refusal of it, as `loadAgents` reads one folder: the first root
+ * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both.
+ */
+export function agentsFor(workflowDir: string, places: Places = {}): Agents {
+  const found = new Map<string, { at: string; agent: Agent | WorkflowError }>();
+  for (const root of lookupRoots(workflowDir, places)) {
+    const dir = path.join(root, AGENTS_FOLDER);
+    for (const [name, agent] of loadAgents(dir)) {
+      const first = found.get(name);
+      if (!first) { found.set(name, { at: root, agent }); continue; }
+      if (sameRepository(first.at, root)) {
+        found.set(name, { at: first.at, agent: new WorkflowError(`${name} is an agent in both ${path.join(first.at, AGENTS_FOLDER, `${name}.md`)} and ${path.join(dir, `${name}.md`)}, one repository's two places for agents, and nothing says which runs. Keep one of them.`) });
+      }
+    }
+  }
+  return new Map([...found].map(([name, { agent }]) => [name, agent]));
+}
+
+/**
+ * Every skill a workflow's agents may give (`lookupRoots`): each name, the folder it is — `<root>/skills/<name>`, holding a `SKILL.md` — or
+ * the refusal of a name one repository has in both `workflows/skills/` and `.claude/skills/`. The first root that has a name wins, and the
+ * roots are named for the refusal of a name none has (`skillAt`).
+ */
+export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
+  const roots = lookupRoots(workflowDir, places);
+  const found = new Map<string, { at: string; dir: string | WorkflowError }>();
+  for (const root of roots) {
+    const dir = path.join(root, SKILLS_FOLDER);
+    let names: string[];
+    try { names = fs.readdirSync(dir).sort(); } catch { continue; }
+    for (const name of names) {
+      const at = path.join(dir, name);
+      if (!fs.statSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false })?.isFile()) continue;
+      const first = found.get(name);
+      if (!first) { found.set(name, { at: root, dir: at }); continue; }
+      if (sameRepository(first.at, root)) {
+        found.set(name, { at: first.at, dir: new WorkflowError(`${name} is a skill in both ${path.join(first.at, SKILLS_FOLDER, name)} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`) });
+      }
+    }
+  }
+  return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked: roots.map((root) => path.join(root, SKILLS_FOLDER)) };
+}
 
 /**
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
  * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
- * (`orderSteps`), not the folder's, each resolved against the agent it names (`agentsDir`).
+ * (`orderSteps`), not the folder's, each resolved against the agent it names, found beside it or in `places` (`agentsFor`), and each skill
+ * that agent gives found (`skillsFor`).
  */
-export function loadWorkflows(dir: string): Workflow[] {
+export function loadWorkflows(dir: string, places: Places = {}): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -27,7 +97,7 @@ export function loadWorkflows(dir: string): Workflow[] {
   const read = (file: string): string | undefined => {
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
-  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, loadAgents(agentsDir(dir)));
+  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, agentsFor(dir, places), skillsFor(dir, places));
 }
 
 /**
@@ -62,9 +132,17 @@ export function formerKeyLines(dir: string): string[] {
     ...agents.flatMap((agent) => {
       const at = agentAt(agent);
       const text = read(at);
-      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, frontmatterKey(text, 'harness'))];
+      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, frontmatterKey(text, 'harness')), ...cardLine(at, text)];
     }),
   ];
+}
+
+/** The line `wf start` says of an agent whose `skills:` still names its card, as it did until 2026-09-25: read as `card:`. */
+function cardLine(at: string, text: string): string[] {
+  const legacy = frontmatterKey(text, 'skills');
+  return legacy !== undefined && isCardFile(legacy)
+    ? [`${at}: \`skills: ${legacy}\` is read as \`card: ${legacy}\`, the name the card's line took on 2026-09-25, when \`skills:\` became the skills the agent is given by name. The former line is still read; rename it, or save the agent from the board, which writes \`card:\`.`]
+    : [];
 }
 
 /**
@@ -85,7 +163,7 @@ export function workflowsIn(dir: string, entries?: readonly string[]): string[] 
   let names: readonly string[];
   try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
   return names.filter((name) => {
-    if (name === AGENTS_FOLDER) return false;
+    if (name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
     try {
       return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
     } catch {
@@ -165,24 +243,69 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
 }
 
 /**
- * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md` and of each file it names beside
- * it — the skills its `skills:` names and the schema its `output:` names — each by name with what it holds, so a file that cannot be read
- * counts as what it says. A write of the agent carries it, and is refused when the agent no longer holds it (`writeAgent`), rather than
- * written over what changed since it was read. A second sidecar has a second version function to keep right, the api's `versionOf`.
+ * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md`, of each file it names beside
+ * it — the card its `card:` names and the schema its `output:` names — and of each skill its `skills:` gives, every file of the skill's
+ * folder, each by name with what it holds, so a file that cannot be read counts as what it says. A write of the agent carries it, and is
+ * refused when the agent no longer holds it (`writeAgent`), rather than written over what changed since it was read. The api's `versionOf`
+ * digests a folder's agents through this, so an edit of a skill moves the folder's version too.
+ *
+ * `skills` are where the skills are found (`skillsFor`); without them, in the `skills/` beside `dir`. A skill found nowhere counts as missing.
  */
-export function agentVersion(dir: string, name: string): string | null {
+export function agentVersion(dir: string, name: string, skills?: SkillsFound): string | null {
   const at = path.join(dir, `${name}.md`);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
-  // A link counts as where it points, never as what it points at: that is outside the folder, and no write of the agent goes through it.
-  const read = (file: string): string | { unreadable: string } | { link: string } => {
-    if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
-    try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
-  };
-  const text = read(at);
+  const text = readForVersion(at);
   // Every file the agent names beside it, in the order `renderAgent` writes the keys: what it can do, and what its steps declare.
-  const beside = typeof text === 'string' ? (['skills', 'output'] as const).flatMap((key) => frontmatterKey(text, key) ?? []) : [];
-  const files = [[`${name}.md`, text], ...beside.map((file) => [file, read(path.resolve(dir, file))])];
+  const beside = typeof text === 'string' ? (['card', 'output'] as const).flatMap((key) => besideFile(text, key) ?? []) : [];
+  const given = typeof text === 'string' ? skillNamesIn(text) : [];
+  const found = skills ?? skillsFor(path.join(path.dirname(path.resolve(dir)), '_'));
+  const files = [
+    [`${name}.md`, text],
+    ...beside.map((file) => [file, readForVersion(path.resolve(dir, file))]),
+    ...given.map((skill) => {
+      const folder = found.at.get(skill);
+      return [`skills/${skill}`, typeof folder === 'string' ? folderForVersion(folder) : { missing: skill }];
+    }),
+  ];
   return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
+}
+
+/** A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through. */
+function readForVersion(file: string): string | { unreadable: string } | { link: string } {
+  if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
+  try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
+}
+
+/** Every file under a skill's folder, by its path in the folder, sorted, each as a version counts it. */
+function folderForVersion(dir: string): Array<[string, unknown]> {
+  let entries: string[];
+  try { entries = (fs.readdirSync(dir, { recursive: true }) as string[]).sort(); } catch (err) { return [['', { unreadable: (err as Error).message }]]; }
+  return entries.flatMap((entry) => {
+    const at = path.join(dir, entry);
+    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
+    return stat?.isDirectory() ? [] : [[entry, readForVersion(at)] as [string, unknown]];
+  });
+}
+
+/** The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card. */
+export function skillNamesIn(text: string): string[] {
+  const line = frontmatterKey(text, 'skills');
+  if (line === undefined || isCardFile(line)) return [];
+  return line.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Whether a skill asks to be told whole, in the system prompt after the agent's instructions, rather than named for the session to load:
+ * its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (F8: its own `preload` is inert on a plugin's skill), so
+ * the run does it when it renders the agent (`renderAgentFiles`).
+ */
+export function preloads(skillDir: string): boolean {
+  try {
+    const { block } = splitFrontmatter('SKILL.md', fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8'));
+    return frontmatterKey(`---\n${block ?? ''}---\n`, 'preload') === 'true';
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -1,12 +1,14 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
+import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
-import { listRuns, runStartedAt } from 'agent-orchestrator';
+import { type BranchReader, branchReader, listRuns, runStartedAt } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
-import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
+import { type Asked, holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { everyView, filedTimes, findRun, judgedSteps, noSuchRun, seenBy, stepNames, type Views, workflowsOf } from './store.ts';
+import { restingMemo, restingRead } from './resting.ts';
+import { e, filedTimes, findRun, judgedSteps, noSuchRun, stepNames, type Views, viewsFor, viewsOf, workflowsOf } from './store.ts';
 
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
 export type RunSummary = {
@@ -73,12 +75,15 @@ export type RunSummary = {
   toDecide: RunToDecide | null;
 };
 
-async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, string>): Promise<RunSummary> {
+/** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
+type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: Asked };
+
+async function summarize(run: Run, views: Views, reader: typeof e, git: BranchReader): Promise<Judged> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
-  const seen = seenBy(views);
-  const judged = judge(run, names, folder, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) => standingsOf(run, steps, status));
-  return {
+  const asked: Asked = { branches: [], failed: false };
+  const judged = judge(run, names, folder, views, await waitsIn(run, reader, git), await holdsIn(run, reader, git), (status, steps) => standingsOf(run, steps, status, git, asked));
+  const summary = {
     id: run.id,
     repo: run.repo ?? null,
     place: placeOf(run),
@@ -86,7 +91,6 @@ async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, stri
     brief: run.brief,
     workflowDir: run.workflowDir,
     createdAt: run.createdAt,
-    startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
     waiting: judged.waiting,
@@ -108,7 +112,24 @@ async function summarize(run: Run, views: Views, filed: ReadonlyMap<string, stri
     onYou: judged.onYou,
     toDecide: judged.toDecide,
   };
+  return { summary, asked };
 }
+
+/**
+ * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
+ * status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged by
+ * frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
+ * package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
+ */
+async function atRest(run: Run, judged: Judged, reader: typeof e): Promise<boolean> {
+  const { summary, asked } = judged;
+  if (!run.workflow || run.hold || asked.failed || summary.moving || summary.waiting || summary.holding) return false;
+  if (!run.pruned && !['succeeded', 'failed', 'cancelled'].includes(summary.status)) return false;
+  return [...(await viewsOf(run, reader)).values()].every((view) => view.state.settled);
+}
+
+/** The list's memo of runs at rest, for as long as the api runs. */
+export const resting = restingMemo<Omit<RunSummary, 'startedAt'>>();
 
 export const runs = new Hono()
   .get('/api/runs', async (c) => {
@@ -124,11 +145,40 @@ export const runs = new Hono()
     // A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed.
     //
     // And the feed's filing times, once, read on from where the last read stopped (`filedTimes`): when each run started.
+    //
+    // A run at rest is answered from the list's memo (`resting.ts`) while nothing it was judged on has moved, so a poll reads the journals of
+    // the runs still moving and of none other; the rest are read through the request's own engine and git (`viewsFor`, `branchReader`).
+    const read = await restingRead(resting);
     const runs = listRuns();
-    const views = await everyView();
+    read.only(runs.map((run) => run.id));
     const filed = await filedTimes();
-    const summaries: RunSummary[] = [];
-    for (const run of runs) summaries.push(await summarize(run, views, filed));
+    const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
+    const toJudge: Run[] = [];
+    for (const run of runs) {
+      const answer = read.kept(run);
+      if (answer) kept.set(run.id, answer);
+      if (!answer || read.verify) toJudge.push(run);
+    }
+    const { views, reader } = await viewsFor(toJudge, () => runs);
+    const git = branchReader();
+    git.prime(toJudge);
+    const judged = new Map<string, Judged>();
+    for (const run of toJudge) {
+      const one = await summarize(run, views, reader, git);
+      judged.set(run.id, one);
+      const was = kept.get(run.id);
+      if (was && !isDeepStrictEqual(was, one.summary)) {
+        throw new Error(`The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`);
+      }
+      if (was) continue;
+      if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
+      else read.drop(run);
+    }
+    const summaries: RunSummary[] = runs.map((run) => {
+      const summary = judged.get(run.id)?.summary ?? kept.get(run.id)!;
+      if (kept.has(run.id)) read.hit();
+      return { ...summary, startedAt: runStartedAt(run, filed) };
+    });
     return c.json(summaries);
   })
   .get('/api/runs/:id', async (c) => {

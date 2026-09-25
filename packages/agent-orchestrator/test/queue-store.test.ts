@@ -39,7 +39,7 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
  * `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says.
  */
 const board = () => {
-  const tasks = new Map<string, { spec: { id: string; brief: string; cwd: string; closeoutSchema?: object }; phase: TaskPhase; closeout?: unknown }>();
+  const tasks = new Map<string, { spec: { id: string; brief: string; cwd: string; closeoutSchema?: object }; phase: TaskPhase; closeout?: unknown; filedAt: string }>();
   const filings: string[] = [];
   const feed: Array<{ taskId: string; event: { kind: 'filed'; at: string } }> = [];
   const stopping = new Set<string>();
@@ -60,14 +60,14 @@ const board = () => {
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
-          brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled: t && settledPhase(t.phase) ? t.phase : null, stopRequested: stopping.has(id), said: [],
+          brief: t?.spec.brief ?? '', ...(t ? { filedAt: t.filedAt } : {}), closeoutSchema: t?.spec.closeoutSchema, settled: t && settledPhase(t.phase) ? t.phase : null, stopRequested: stopping.has(id), said: [],
           attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null, startedAt: new Date(now).toISOString(), spawnedAt: new Date(now).toISOString(), endedAt: null, reason: null }],
         },
       };
     },
     file: async (spec: { id: string; brief: string; cwd: string }) => {
       filings.push(spec.id);
-      tasks.set(spec.id, { spec, phase: 'pending' });
+      tasks.set(spec.id, { spec, phase: 'pending', filedAt: new Date(now).toISOString() });
       feed.push({ taskId: spec.id, event: { kind: 'filed', at: new Date(now).toISOString() } });
       return spec.id;
     },

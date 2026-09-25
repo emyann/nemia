@@ -75,7 +75,7 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
   if (opts.repo === undefined || opts.workflow === undefined) return null;
   let steps: readonly Workflow[];
   try {
-    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo));
+    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo), { repo: opts.repo, home: HOME });
   } catch {
     return null;
   }

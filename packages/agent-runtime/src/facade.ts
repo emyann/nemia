@@ -33,7 +33,7 @@ import { ioCounts, type IoCounts } from './io-tally.ts';
 import { tickMemoLayer } from './tick-memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
-  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, type RefusedMove, type TaskView,
+  ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, closeRefusalOf, file, filingOf, refusalOf, requestStop, tick, tickRefusalOf, view, viewOfState, viewsOf, type RefusedMove, type TaskView,
 } from './engine.ts';
 
 // ─── what a consumer implements, if anything ────────────────────────────────
@@ -212,7 +212,13 @@ export type Engine = {
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view(taskId: string): Promise<TaskView>;
-  list(): Promise<TaskView[]>;
+  /**
+   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
+   * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
+   * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
+   * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
+   */
+  list(taskIds?: readonly string[]): Promise<TaskView[]>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
   stop(taskId: string): Promise<void>;
   logs(taskId: string): Promise<string>;
@@ -403,6 +409,12 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`remoteControl: true\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`remoteControl\` off.` : "Leave `remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
+  // Claude Code's own flags, on a harness that is not Claude Code: its session would start without them, and a body meant for
+  // the system prompt would be read by nobody. A `PromiseRunner` is the consumer's own, and is handed them.
+  if (spec.config?.claude !== undefined && isSpec(h) && !h.claudeFlags) {
+    const takers = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return isClaude(o) || (isSpec(o) && o.claudeFlags); }).map((name) => `\`${name}\``);
+    return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
+  }
   return (h === 'claude' ? claudeCodeRefuses : h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : isRemote(h) ? remoteRefuses(spec.harness) : undefined)?.(spec);
 };
 
@@ -490,9 +502,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
     const look = observeFor ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))) : observe;
     const observed = look.pipe(
       Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
-      Effect.flatMap((o) => view(taskId, o)),
+      Effect.map((o) => viewOfState(state, o)),
     );
-    const recorded = view(taskId, new Map());
+    // The fold already made, never a second read of the journal: `view` reads it again, which made every view two reads (measured
+    // 2026-09-25: `wf ls` read 418 journals for 209 tasks).
+    const recorded = Effect.sync(() => viewOfState(state, new Map()));
     if (!state.settled && (!find || last?.ended === null)) return yield* observed;
     if (!last || (find && last.nativeId)) return yield* recorded;
     const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;
@@ -501,6 +515,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
     const v = yield* recorded;
     return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
   });
+
+  const everyTask = () => go(Effect.gen(function* () {
+    const observed = yield* (yield* Runner).observe;
+    const ids = yield* (yield* Journal).list;
+    return yield* Effect.forEach(ids, (id) => view(id, observed));
+  }));
 
   const engine: Engine = {
     // The harness is RESOLVED here, never left implicit: a task filed without one would otherwise read
@@ -530,11 +550,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
     },
     io: () => ({ ...ioCounts(), observed: observedNow() }),
     view: (taskId) => go(viewOf(taskId)),
-    list: () => go(Effect.gen(function* () {
-      const observed = yield* (yield* Runner).observe;
-      const ids = yield* (yield* Journal).list;
-      return yield* Effect.forEach(ids, (id) => view(id, observed));
-    })),
+    list: (...args: unknown[]) => {
+      const [taskIds] = args;
+      if (args.length > 1 || (taskIds !== undefined && (!Array.isArray(taskIds) || !taskIds.every((id) => typeof id === 'string')))) {
+        throw Object.assign(new Error(`list: takes the task ids to view, a list of strings, or nothing for every task; it was handed ${args.map((a) => JSON.stringify(a)).join(', ')}.`), { exitCode: 2 });
+      }
+      return taskIds === undefined ? everyTask() : go(viewsOf(taskIds as string[]));
+    },
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) => go(Effect.gen(function* () {
       const v = yield* viewOf(taskId);
@@ -729,6 +751,7 @@ export { denialText, nameFor } from './domain.ts';
 export { refusedText, retiredKeyRefusal } from './engine.ts';
 export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
+export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';

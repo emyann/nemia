@@ -71,7 +71,12 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
 
 /** One agent: its name, linked to its page, what it is for, what it says it can do, the keys it sets, and the nodes that name it. */
 function AgentCard({ agent }: { agent: AgentListing }) {
-  const set = ROLE_KEYS.filter((key) => agent.keys[key] !== undefined);
+  // The keys it sets on its nodes, then what its sessions are told beyond its instructions: the skills it gives and its system prompt.
+  const rows: [string, string][] = [
+    ...ROLE_KEYS.filter((key) => agent.keys[key] !== undefined).map((key): [string, string] => [KEY_LABELS[key].toLowerCase(), agent.keys[key]!]),
+    ...(agent.skills ? [['skills', agent.skills] as [string, string]] : []),
+    ...(agent.systemPrompt ? [['system prompt', agent.systemPrompt] as [string, string]] : []),
+  ];
   return (
     <section
       aria-label={`Agent ${agent.name}`}
@@ -93,17 +98,17 @@ function AgentCard({ agent }: { agent: AgentListing }) {
       </header>
       {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
       {agent.error === null && (
-        <Skills skills={agent.skills?.list} none={<>Says nothing it can do: no {code('skills:')} file beside it.</>} />
+        <Skills skills={agent.card?.list} none={<>Says nothing it can do: no {code('card:')} file beside it.</>} />
       )}
       {agent.error !== null ? (
         <p className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.error}</p>
       ) : (
-        set.length > 0 && (
+        rows.length > 0 && (
           <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {set.map((key) => (
-              <div key={key} className="flex gap-1.5">
-                <dt className="text-neutral-500">{KEY_LABELS[key].toLowerCase()}</dt>
-                <dd className="font-mono text-neutral-800 dark:text-neutral-200">{agent.keys[key]}</dd>
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex gap-1.5">
+                <dt className="text-neutral-500">{label}</dt>
+                <dd className="font-mono text-neutral-800 dark:text-neutral-200">{value}</dd>
               </div>
             ))}
           </dl>

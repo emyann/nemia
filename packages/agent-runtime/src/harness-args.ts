@@ -9,6 +9,7 @@
  * — its modes, its efforts, its windows — stays with that harness's runner.
  */
 import type { McpServer } from './runner.ts';
+import type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 import { mcpRefuses } from './runner-mcp.ts';
 
 export type HarnessArgs = {
@@ -81,12 +82,21 @@ export type HarnessArgs = {
    * A later turn of a task held open may give its own (`TURN_ARGS`).
    */
   budgetUsd?: number;
+  /**
+   * Flags handed to Claude Code as they are — `{ appendSystemPromptFile: 'prompt.md', pluginDir: ['hkb-note'] }` — on a
+   * job and a background session alike, directly before its `--permission-mode` (`ClaudeFlags`, `claudeFlagsOf`). A flag
+   * the runtime gives itself is refused (`CLAUDE_OWNED_FLAGS`), and so is the bag on a harness that is not Claude Code,
+   * which would start its session without them. A flag the CLI does not have fails the attempt as the CLI fails it, its
+   * words in the attempt's logs. Refused unless an object whose keys are flags in camelCase and whose values are `true`,
+   * a string, a number, or a list of strings.
+   */
+  claude?: ClaudeFlags;
 };
 
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
   model: true, permissionMode: true, effort: true, tools: true, allowedTools: true, disallowedTools: true,
-  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true, budgetUsd: true,
+  mcp: true, contextTokens: true, remoteControl: true, background: true, worktree: true, budgetUsd: true, claude: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -181,6 +191,30 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   }
   if (config.budgetUsd !== undefined && !isDollars(config.budgetUsd)) {
     return `\`budgetUsd: ${shown(config.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
+  }
+  return config.claude === undefined ? undefined : claudeFlagsRefusalOf(config.claude);
+};
+
+/** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
+const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;
+
+/**
+ * Why `config.claude` cannot be handed to Claude Code as flags — or `undefined`. Each value must say one thing on the
+ * command line: `false` and `null` would be dropped, an object has no flag's form, and an empty list gives nothing.
+ */
+const claudeFlagsRefusalOf = (flags: unknown): string | undefined => {
+  if (typeof flags !== 'object' || flags === null || Array.isArray(flags)) {
+    return `\`claude: ${JSON.stringify(flags)}\` is not a set of Claude Code's flags. Give an object keyed by flag in camelCase, like { "appendSystemPromptFile": "prompt.md" }, or leave it out.`;
+  }
+  for (const [key, value] of Object.entries(flags)) {
+    if (!FLAG_KEY.test(key)) {
+      return `\`claude.${key}\` is not a flag's name in camelCase. Write the long flag in camelCase, \`--append-system-prompt-file\` as \`appendSystemPromptFile\`.`;
+    }
+    const one = value === true || (typeof value === 'string' && value !== '') || (typeof value === 'number' && Number.isFinite(value));
+    const list = Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === 'string' && v !== '');
+    if (!one && !list) {
+      return `\`claude.${key}: ${JSON.stringify(value)}\` is not a flag's value. Give true for the flag alone, a string or a number for its value, or a list of strings to give it once each — or leave the key out.`;
+    }
   }
   return undefined;
 };

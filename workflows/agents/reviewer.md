@@ -1,6 +1,6 @@
 ---
 description: Reviews a change read-only as a second engineer would, and sends it round again while its findings are worth another round.
-skills: reviewer.skills.json
+card: reviewer.skills.json
 harness: claude
 model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,

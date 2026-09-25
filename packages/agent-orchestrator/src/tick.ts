@@ -19,7 +19,7 @@ import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen
 import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
-import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
+import { agentFilesDir, artifactsDir, cancelFile, isDirectory, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
@@ -28,6 +28,7 @@ import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, reportedEngine, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
+import { renderedFlags, rendersAgent, unrendered } from './rendering.ts';
 import { momentumOf, toAdmit } from './admission.ts';
 import { addRuntime, aside, countRested, metered, within, type Tallies } from './tally.ts';
 import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
@@ -509,7 +510,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       const reads = (name: string): Closeout | undefined =>
         (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
       const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
-      const brief = composeBrief(step, run, steps, reads, files, undefined, {
+      const told = toldOf(run, step);
+      const brief = composeBrief(told.step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}),
           ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
           // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
@@ -556,6 +558,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
           remoteControl: step.remote,
           // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
           budgetUsd,
+          // The agent `wf start` rendered for it: a try is told what the step is.
+          claude: told.claude,
         },
         deadlineSeconds: step.deadlineSeconds,
         resumeFrom,
@@ -600,10 +604,11 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       const files = artifactsDir(run, r.target);
       fs.mkdirSync(files, { recursive: true });
       const resumeFrom = record.taskId ? sessionIn(views, record.taskId) : undefined;
+      const told = toldOf(run, target);
       await e.file({
         id: taskId,
         // Read off the closeout that asked for the round, before the record moves it behind.
-        brief: composeBrief(target, run, steps, signedOff, files, undefined, undefined, {
+        brief: composeBrief(told.step, run, steps, signedOff, files, undefined, undefined, {
           loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
         }, undefined, inputsDir(run)),
@@ -622,6 +627,7 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
           background: target.background,
           remoteControl: target.remote,
           budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
+          claude: told.claude,
         },
         deadlineSeconds: target.deadlineSeconds,
         resumeFrom,
@@ -694,6 +700,7 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
     // Made before the step is told of it, so the directory its brief names is there when it starts.
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
+    const told = toldOf(run, step);
 
     const taskId = await e.file({
       // The task id is chosen, not generated, so the harness session reads `ae/<run>-<step>/1`.
@@ -705,7 +712,7 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
       // that waited on runs, what they concluded.
-      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
+      brief: composeBrief(told.step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
       cwd: place.workspace,
       harness: step.harness,
       // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
@@ -733,6 +740,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
         // over is this package's (`ownStatus`, `held`).
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
+        // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`).
+        claude: told.claude,
       },
       deadlineSeconds: step.deadlineSeconds,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
@@ -892,6 +901,17 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
     if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
     throw err;
   }
+}
+
+/**
+ * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
+ * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
+ * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start.
+ */
+function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ReturnType<typeof renderedFlags> } {
+  const dir = agentFilesDir(run, step.name);
+  const told = rendersAgent(step) && !isDirectory(dir) ? unrendered(step) : step;
+  return { step: told, claude: renderedFlags(told, dir) };
 }
 
 /**

@@ -13,7 +13,7 @@ import { decision, gated, resultSteps, taskSpend, type CloseoutAsked, type Paren
 import { parseCloseout, type Closeout } from './closeout.ts';
 import { signedAndHeld, taskUsage } from './timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './store.ts';
-import { parentRecord, shippedOf } from './branches.ts';
+import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
 import { continuesFrom } from './retry.ts';
 
 /**
@@ -83,6 +83,37 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
         const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
         if (named) for (const taskId of named(args)) reported.delete(taskId);
         else reported.clear();
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
+}
+
+/**
+ * The engine a command reads — `wf ls`, `wf decide` — whose `view` of a task is read once for the whole command: `wf ls` views a run's
+ * tasks, and again each run another waits on, and `wf decide` its current tries and then every try. A view is the engine's word at the
+ * moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of it,
+ * as `reportedEngine` does, and a pass drops all of it, so a command that acts reads the engine's word after its act.
+ */
+export function viewedOnce(e: Engine): Engine {
+  const read = new Map<unknown, Promise<TaskView>>();
+  return new Proxy(e, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver) as unknown;
+      if (key === 'view') {
+        return (taskId: string) => {
+          let v = read.get(taskId);
+          // A view that failed is not kept: the next read asks the engine again, as it would have.
+          if (!v) read.set(taskId, v = target.view(taskId).catch((err: unknown) => { read.delete(taskId); throw err; }));
+          return v;
+        };
+      }
+      // A pass moves every task, so a `tick` or a `start` is read as a verb this does not know: it drops every view.
+      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key) && key !== 'tick' && key !== 'start')) return value;
+      return (...args: unknown[]) => {
+        const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
+        if (named) for (const taskId of named(args)) read.delete(taskId);
+        else read.clear();
         return (value as (...a: unknown[]) => unknown).apply(target, args);
       };
     },
@@ -348,17 +379,17 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
  * the base — dropped unmerged, or deleted before any tick saw its run finish — is `gone`, and not shipped. A run that started before the
  * branch was deleted never asks (`gated`).
  */
-export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
-  const known = parentRecord(id);
+export async function parentOf(e: Engine, id: string, git: BranchReader = oneByOne): Promise<ParentRun> {
+  const known = parentRecord(id, git);
   const { record } = known;
   if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
   let steps: Workflow[];
   try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
   const branches = resultSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
-  if (!branches.length || !branches.every(shippedOf(record))) return { ...known, shipped: false };
+  if (!branches.length || !branches.every(shippedOf(record, git))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
-  const said = decision(steps, record, phaseOf, shippedOf(record), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
+  const said = decision(steps, record, phaseOf, shippedOf(record, git), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
   return { ...known, shipped: said.kind === 'shipped' };
 }
 
@@ -366,10 +397,10 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
  * The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate no longer applies to (`gated`).
  * And the runs a person holds it until (`Run.hold`), for as long as the hold stands.
  */
-export async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun> {
+export async function parentsOf(e: Engine, run: Run, git: BranchReader = oneByOne): Promise<(id: string) => ParentRun> {
   const read = new Map<string, ParentRun>();
   const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
-  for (const id of new Set(ids)) read.set(id, await parentOf(e, id));
+  for (const id of new Set(ids)) read.set(id, await parentOf(e, id, git));
   return (id) => read.get(id) ?? { shipped: false };
 }
 

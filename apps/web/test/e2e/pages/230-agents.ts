@@ -9,9 +9,9 @@ import { OUT, store } from '../world.ts';
 
 export default {
   // The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it, linked.
-  // Each card says what its agent can do, the skills its `skills:` names in A2A's words. The repository's `implementer` read, and the node
+  // Each card says what its agent can do, the skills its `card:` names in A2A's words. The repository's `implementer` read, and the node
   // that names it followed to its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and
-  // its skills; an agent made with skills pasted for it, edited and removed, each on disk as the package writes it. And, in a page of its own, a removal refused
+  // its card, and no skills given; an agent made with a card pasted for it and a skill given by name, edited and removed, each on disk as the package writes it. And, in a page of its own, a removal refused
   // because a node still names the agent. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
   name: 'agents',
   route: '/agents',
@@ -83,9 +83,10 @@ export default {
     await expectVisible(scribeForm, `${seeded.name}'s form`);
     if ((await scribeForm.getByRole('textbox', { name: 'Schema file' }).inputValue()) !== seeded.keys.output) throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}`);
     if ((await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue()) !== `${seeded.schema}\n`) throw new Refused(`and its fields are the schema's text — it shows ${JSON.stringify(await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue())}`);
-    if ((await scribeForm.getByRole('textbox', { name: 'Skills file' }).inputValue()) !== seeded.skills) throw new Refused(`${seeded.name}'s skills file is ${seeded.skills}`);
-    const said = await scribeForm.getByRole('textbox', { name: 'Its skills' }).inputValue();
-    if (said !== `${JSON.stringify([seeded.skill], null, 2)}\n`) throw new Refused(`and its skills are that file's text — it shows ${JSON.stringify(said)}`);
+    if ((await scribeForm.getByRole('textbox', { name: 'Card file' }).inputValue()) !== seeded.card) throw new Refused(`${seeded.name}'s card is ${seeded.card}`);
+    const said = await scribeForm.getByRole('textbox', { name: 'Its card' }).inputValue();
+    if (said !== `${JSON.stringify([seeded.skill], null, 2)}\n`) throw new Refused(`and its card is that file's text — it shows ${JSON.stringify(said)}`);
+    if ((await scribeForm.getByRole('textbox', { name: 'Skills', exact: true }).inputValue()) !== '') throw new Refused(`${seeded.name} gives its sessions no skills, and its Skills field is empty`);
     const instructions = await scribeForm.getByRole('textbox', { name: 'Instructions' }).inputValue();
     if (instructions.trim() !== seeded.body) throw new Refused(`and its instructions are its body — they read ${JSON.stringify(instructions)}`);
     await expectVisible(scribeForm.getByRole('button', { name: 'Save' }), 'yours offers Save');
@@ -104,7 +105,9 @@ export default {
       await form.getByRole('textbox', { name: 'Name' }).fill(made.name);
       await form.getByRole('textbox', { name: 'Description' }).fill(made.description);
       await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
-      await form.getByRole('textbox', { name: 'Its skills' }).fill(pasted);
+      await form.getByRole('textbox', { name: 'Tools', exact: true }).fill(made.tools);
+      await form.getByRole('textbox', { name: 'Skills', exact: true }).fill(made.skills);
+      await form.getByRole('textbox', { name: 'Its card' }).fill(pasted);
       await form.getByRole('textbox', { name: 'Instructions' }).fill(made.body);
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `agents-new-${await themeOf(page)}.png`), fullPage: true });
@@ -114,9 +117,9 @@ export default {
       ]);
       if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
       await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
-      const written = `---\ndescription: ${made.description}\nskills: ${made.name}.skills.json\nmodel: ${made.model}\n---\n${made.body}\n`;
+      const written = `---\ndescription: ${made.description}\ncard: ${made.name}.skills.json\nskills: ${made.skills}\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
       if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written) throw new Refused(`agents/${made.name}.md is written as the package writes an agent — it holds ${fs.existsSync(madeFile) ? JSON.stringify(fs.readFileSync(madeFile, 'utf8')) : 'nothing'}`);
-      // Pasted with no file named, the skills are written beside the agent, to the name the form suggested.
+      // Pasted with no file named, the card is written beside the agent, to the name the form suggested.
       if (!fs.existsSync(madeSkills) || fs.readFileSync(madeSkills, 'utf8') !== pasted) throw new Refused(`agents/${made.name}.skills.json holds what was pasted — it holds ${fs.existsSync(madeSkills) ? JSON.stringify(fs.readFileSync(madeSkills, 'utf8')) : 'nothing'}`);
       await expectVisible(page.locator(`[data-agent-skill="${made.skill.id}"]`), `and the page of ${made.name} says what it can do`);
 
@@ -145,7 +148,7 @@ export default {
       if (removed.status() !== 200) throw new Refused(`the api removes the agent — it answered ${removed.status()}: ${await removed.text()}`);
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
       await expectCount(card(page, 'yours', made.name), 0, `${made.name} is gone from the list`);
-      if (fs.existsSync(madeSkills)) throw new Refused(`the skills of ${made.name} go with it: agents/${made.name}.skills.json is still there`);
+      if (fs.existsSync(madeSkills)) throw new Refused(`the card of ${made.name} goes with it: agents/${made.name}.skills.json is still there`);
     } finally {
       for (const gone of [madeFile, madeSkills]) fs.rmSync(gone, { force: true });
     }

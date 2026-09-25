@@ -137,6 +137,10 @@ export const codex: HarnessSpec = {
     if (task.config?.budgetUsd !== undefined) {
       return `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: 0.154.0 has no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
     }
+    // Claude Code's flags would be dropped without a word: `codex exec` is another CLI.
+    if (task.config?.claude !== undefined) {
+      return `\`claude: ${JSON.stringify(task.config.claude)}\` gives Claude Code flags of its own, and \`codex exec\` is not Claude Code. Leave \`claude\` off a Codex task, and say what the session must know in its brief.`;
+    }
     const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {
       return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;

@@ -208,6 +208,7 @@ export const landingContract = (command: string): string => [
   '',
   'So stage the merge and sign off: merge every result branch in one `git merge --no-ff --no-commit`, leave it staged, and do not run',
   'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
+  '`git commit` and `git merge --continue` are denied you for that reason; a merge without `--no-commit` would commit it all the same.',
   "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
 ].join('\n');
 

@@ -706,6 +706,19 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
 export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, run: Pick<Run, 'gates'>): boolean =>
   approvedFirst(step, run) && step.check !== undefined;
 
+/**
+ * What the session of an ending that lands on its check is denied beyond its own `disallowedTools:`: the two commands that commit a staged
+ * merge. The run commits it, on the check's word; a shipper that committed first would put the merge on the base branch unchecked, and the
+ * pass after could only record it as committed before its check ran. A deny is a prefix, not a sandbox — `git merge` without `--no-commit`
+ * still commits a clean merge, and `git -C . commit` is not `git commit` — so the brief says it too, and a commit made anyway is recorded as
+ * such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list.
+ */
+export const LANDING_DENIED: readonly string[] = ['Bash(git commit:*)', 'Bash(git merge --continue:*)'];
+
+/** The deny list a step is filed with, each try and each round: its own, and `LANDING_DENIED` for an ending that lands on its check. Pure. */
+export const filedDenies = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>, run: Pick<Run, 'gates'>): string[] | undefined =>
+  landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...LANDING_DENIED])] : step.disallowedTools;
+
 /** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.ts). */
 export type MergeState = {
   /**
@@ -793,9 +806,16 @@ export const landingOpen = (step: Workflow, run: Run, own: StepStatus, phaseOf: 
   return busy(phaseOf(record.taskId)) || busy(record.check && phaseOf(record.check.taskId)) || own === 'checking' || merging === 'ours';
 };
 
-/** What the run did with an ending's merge, as `wf ls` and `wf decide` say it: `committed onto main as 1a2b3c4`, or why it made no commit. */
+/**
+ * What the run did with an ending's merge — `the run committed its merge onto main as 1a2b3c4`, or why it made no commit — as the tick's
+ * note says it (the daemon's log), `wf ls` on the step's line (`listing`, clipped), and `wf decide` in its offer of a try of a merge the run
+ * aborted (`retryLines`).
+ */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
   ('commit' in landed ? `the run committed its merge onto ${run.branch} as ${landed.commit.slice(0, 7)}` : `nothing landed on ${run.branch}: ${landed.aborted}`);
+
+/** The longest `landedWords` a `wf ls` line prints: the reason for an abort can be git's refusal, whole (`commitMerge`). */
+const LANDED_CAP = 160;
 
 // ─── one checkout, one ending step ──────────────────────────────────────────
 
@@ -2247,7 +2267,7 @@ export function retryLines(
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
     } else if (status === 'denied') {
-      lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], step, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
+      lines.push(`${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`);
     } else {
       lines.push(`${step.name}: ${status}.${shipAgain} Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
@@ -3917,7 +3937,11 @@ export function listing(
     // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh. And
     // what its current try's sessions were denied, last: a tool the step was not allowed, which it carried on without.
     const taskId = run.steps[step.name]?.taskId;
-    const note = [tried, gate, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : ''].filter(Boolean).join(' · ');
+    // What the run did with the merge of an ending that lands on its check, once it has: the commit it made, or why it made none. A new try
+    // clears it (`landed`).
+    const landed = run.steps[step.name]?.landed;
+    const landing = landed ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
+    const note = [tried, gate, landing, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : ''].filter(Boolean).join(' · ');
     return { ...row, ...(note ? { note } : {}), ...cost };
   });
 

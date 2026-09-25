@@ -14,7 +14,7 @@ import { modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
-import { feedPhase, feedWords, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
+import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
 import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
@@ -535,7 +535,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           permissionMode: modeOf(step),
           // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
           tools: step.tools,
-          disallowedTools: step.disallowedTools,
+          disallowedTools: filedDenies(step, run),
           allowedTools: step.allowedTools,
           // And the bridge to claude.ai, as the step asked for it: a try is a session of the step, run as the step is (`background`).
           background: step.background,
@@ -605,7 +605,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           contextTokens: sessionContext(target, steps),
           permissionMode: modeOf(target),
           tools: target.tools,
-          disallowedTools: target.disallowedTools,
+          disallowedTools: filedDenies(target, run),
           allowedTools: target.allowedTools,
           background: target.background,
           remoteControl: target.remote,
@@ -715,8 +715,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: modeOf(step),
         // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
         tools: step.tools,
-        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
-        disallowedTools: step.disallowedTools,
+        // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings. An ending that lands on its check may
+        // not commit its merge either: the run does, on the check's word (`filedDenies`).
+        disallowedTools: filedDenies(step, run),
         allowedTools: step.allowedTools,
         // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
         background: step.background,

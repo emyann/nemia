@@ -12,7 +12,8 @@ context: 200k
 # `auto` asks nobody — a call it may not make is denied, recorded on the attempt, and the session carries on (agent-runtime open issue 28, M1).
 permissionMode: auto
 # Denied by name what no step needs and an unattended session otherwise has, as the implementer is: messaging other
-# sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.
+# sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`. A step of it that lands on its `check:` is denied
+# `git commit` and `git merge --continue` beside these, by the run (`filedDenies`): the run commits that merge, on the check's word.
 disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger
 # The commit message travels as this step's closeout — `message`, in the shape shipper.schema.json declares — and the run
 # commits the merge with it once the step's `check:` passes on the merged tree (`landingContract`).

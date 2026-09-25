@@ -561,7 +561,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   mid-check, mid-commit or after a person aborted by hand reads the same, and a merge whose heads are not the run's result branches is
   never touched. That checkout is a person's, so a pass spawns git there only once a landing can be due — nothing in flight, and a
   merge staged or a check settled (`mergeInProgress` is one stat) — and reads conflicts with `ls-files --unmerged`: `git diff` refreshes
-  the index and takes `index.lock`, and a pass every few seconds would race the shipper's own git (learned in review, round 1). Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
+  the index and takes `index.lock`, and a pass every few seconds would race the shipper's own git (learned in review, round 1). The
+  session is filed denied `git commit` and `git merge --continue` (`filedDenies`), since only prose kept it from committing before
+  the check; a deny is a prefix, so a merge without `--no-commit` still commits, and codex, which takes no deny list, is refused a
+  landing at load. Until it has landed the checkout is held (`landingOpen`) and `wf rm` refuses. A check that did not finish lands
   nothing, and its offer is `wf retry <run> ship`, never `--recheck`: the merge it checked is gone (learned by the run that moved
   the ship's check into the run).
 

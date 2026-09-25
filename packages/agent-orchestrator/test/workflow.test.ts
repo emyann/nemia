@@ -1314,6 +1314,14 @@ test("REFUSED at load: a `check:` on a step that runs in the repository's checko
   assert.throws(() => fm('ship', 'workspace: main\ngate: true\ncheck: none'), /check/, "the check's own refusals still hold beside the gate");
 });
 
+test("REFUSED at load: a `check:` on a gated step in the repository's checkout that runs on codex — the run keeps the session from committing the merge by a deny list, which codex takes none of", () => {
+  for (const lines of ['workspace: main\ngate: true\ncheck: npm test\nharness: codex', 'harness: codex\ncheck: npm test\ngate: true\nworkspace: main']) {
+    assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` with `check: npm test` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying `git commit` — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one\. Run the ending on claude — delete `harness: codex` — or delete the `check:` line\.$/.test(e.message), lines);
+  }
+  assert.equal(fm('ship', 'workspace: main\ngate: true\nharness: codex').harness, 'codex', 'an ending on codex that runs its own check still loads');
+  assert.equal(fm('ship', 'workspace: main\ngate: true\ncheck: npm test\nharness: claude-detached').check, 'npm test', 'claude -p takes the deny list');
+});
+
 test("REFUSED at load: `retries:` on a step that runs in the repository's checkout — a try of an ending is a person's to ask for", () => {
   for (const lines of ['workspace: main\ngate: true\ncheck: npm test\nretries: 1', 'retries: 1\nworkspace: main', 'workspace: main\nretries: 0']) {
     assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `retries: [01]` would have the run do it again there on its own, on a refusal nobody read\. A step that ends a run is tried again on a person's word: wf retry <run> ship\. Delete the `retries:` line\.$/.test(e.message), lines);

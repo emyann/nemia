@@ -1529,12 +1529,17 @@ dropped. **Nothing in the packages knows what shipping means.**
   `git merge --abort` on anything else: a refusal, a check that did not finish, a message left blank, a merge that
   conflicts or leaves out a result branch, a run cancelled or held first, or the session ending any way but `done`.
   The step reads `checking` until then, `verified ✓` once the commit is made, and `failed ✗ check (…)` or `failed`
-  once the merge is aborted, and its record keeps which (`landed: {commit}` or `{aborted}`). A job cannot hold its
+  once the merge is aborted, and its record keeps which (`landed: {commit}` or `{aborted}`), which `wf ls` words on the
+  step's line — the commit, or why none was made — and the board with it. The session is filed denied `git commit` and
+  `git merge --continue` beside its own `disallowedTools:` (`filedDenies`), so it cannot commit the merge before the
+  check; a deny is a prefix, and a merge run without `--no-commit` would still commit, which the pass after records as
+  committed before its check ran. The parser refuses such an ending on codex, which takes no deny list. A job cannot hold its
   turn open for a suite that runs twenty minutes; the run can, and a check that did not finish is not a verdict, so
   it lands nothing — `wf decide` offers `wf retry <run> ship`, which merges and checks again, never `--recheck`,
   since the merge it checked is gone. While the landing is owed, the checkout stays the run's (next bullets) and
-  `wf rm` refuses it. **Level-triggered**: a `MERGE_HEAD` on the base branch with no ship running is read off git
-  on each pass. A merge that is not this run's — its heads are not the result branches — is never touched. This
+  `wf rm` refuses it. **Level-triggered**: a `MERGE_HEAD` on the base branch with no ship running is read off disk
+  on each pass; git is spawned in that checkout only once a landing can be due — the session and its check settled,
+  and a merge staged or a check to act on — and never takes its index lock (`ls-files --unmerged`, not `git diff`). A merge that is not this run's — its heads are not the result branches — is never touched. This
   run's is committed only on the word of an exit 0 already recorded, and aborted otherwise; after a restart, a commit
   already on the base branch is recorded as landed, and a merge a person aborted by hand is recorded with the
   check's words. A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check

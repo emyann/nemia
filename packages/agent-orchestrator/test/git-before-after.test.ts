@@ -16,7 +16,8 @@
  * is the shipper's new recipe, with *The run checks and lands your merge* where the work's check was, and every implement and review brief
  * gained the paragraph on a job's turn. The one diff past the briefs is each dev folder's `succeeded` pin: its ship now has a check, and a
  * signed ending whose merge the run has not landed is `checking` and the run `running` — the pin writes no landing — where it read
- * `awaiting approval` before. Every other phase, plan and the forget lines are as they were.)
+ * `awaiting approval` before. Every other phase, plan and the forget lines are as they were. In review of that run, its round 1, each ship
+ * brief gained one line under that section, that `git commit` and `git merge --continue` are denied it: the diff was that line, eight times.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

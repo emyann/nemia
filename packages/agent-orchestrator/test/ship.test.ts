@@ -272,8 +272,10 @@ test('an approved ending with no check of its own is filed, in the repository\'s
   assert.match(spec.brief, new RegExp(`git log --oneline main\\.\\.${branch}`));
   assert.match(spec.brief, /## Approved\n\nA person approved this step before it was filed/);
   assert.match(spec.brief, /Merge it\./);
-  // With no check of its own it is told nothing of the run's landing, which it does not have, and its recipe's fallback is its own.
+  // With no check of its own it is told nothing of the run's landing, which it does not have, and its recipe's fallback is its own: it
+  // commits the merge itself, and is denied only what its agent denies.
   assert.doesNotMatch(spec.brief, /## The run checks and lands your merge/);
+  assert.deepEqual((spec.config as { disallowedTools?: string[] }).disallowedTools, ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger']);
 
   // The step, played as its own prose says: trial merge, the check, the commit — with a message it writes, into the directory its brief
   // names under *Files for the person who decides*, outside the checkout, and commits with `-F`. Not git's `Merge branch '…'`.
@@ -386,6 +388,10 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.match(spec.brief, /do not run\nthe check, commit, or abort a clean merge yourself/);
   assert.doesNotMatch(spec.brief, /This workflow's check, which its work was judged by/);
   assert.deepEqual((spec.closeoutSchema as { required: string[] }).required.slice(-1), ['message']);
+  // REFUSED at shipped defaults: the session may not commit the merge it stages — the run does, on the check's word — beside what the
+  // shipper's own `disallowedTools:` denies (`filedDenies`).
+  assert.deepEqual((spec.config as { disallowedTools?: string[] }).disallowedTools,
+    ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger', 'Bash(git commit:*)', 'Bash(git merge --continue:*)']);
 
   // The check, filed as any step's is: on the check harness, in the checkout where the merge is, with its deadline — and no WF_BASE_REF,
   // since what it judges is the merge, which the command reads off MERGE_HEAD.
@@ -421,7 +427,10 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(landed.status, 'succeeded');
   const { decision } = await decide(e, id);
   assert.equal(decision.kind, 'shipped');
-  assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'verified ✓');
+  const shipLine = (await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!;
+  assert.equal(shipLine.status, 'verified ✓');
+  // `wf ls`, and the board after it, say what landed — the commit — where nothing else of a run names it.
+  assert.equal(shipLine.note, `the run committed its merge onto main as ${head.slice(0, 7)}`);
 
   // Once for the try: a pass after it commits nothing more, whatever the checkout holds.
   await advance(e, readRun(id));
@@ -433,7 +442,7 @@ for (const [said, exitCode, words] of [
   ['does not finish', undefined, 'its check did not finish'],
 ] as const) {
   test(`REFUSED at shipped defaults: a check that ${said} on the merge has the run abort it — the base branch never moves, and a try of ship merges again, never --recheck`, async (t) => {
-    const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
+    const { repo, id, e, tasks, settle, base, checkId } = await stagedAndSigned();
     settle(checkId, 'failed', undefined, exitCode);
     const pass = await advance(e, readRun(id));
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'nothing landed');
@@ -441,7 +450,9 @@ for (const [said, exitCode, words] of [
     assert.equal(mergeHead(repo), false);
     assert.deepEqual(readRun(id).steps.ship!.landed, { aborted: words });
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
-    assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
+    const shipLine = (await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!;
+    assert.equal(shipLine.status, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
+    assert.equal(shipLine.note, `nothing landed on main: ${words}`, 'and why nothing landed');
 
     const printed = (await decideLines(t, e, id)).flatMap((l) => l.split('\n'));
     const line = printed.find((l) => l.trimStart().startsWith('ship: '))?.trim();
@@ -459,6 +470,8 @@ for (const [said, exitCode, words] of [
     await retry(e, id, 'ship', { mode: 'nudge' });
     assert.deepEqual((await advance(e, readRun(id))).tried, ['ship']);
     assert.equal(readRun(id).steps.ship!.landed, undefined, 'and the new try has landed nothing yet');
+    const again = tasks.get(readRun(id).steps.ship!.taskId!)!.spec.config as { disallowedTools?: string[] };
+    assert.ok(again.disallowedTools?.includes('Bash(git commit:*)'), 'and it may not commit the merge either');
   });
 }
 
@@ -542,11 +555,14 @@ test("REFUSED at shipped defaults: a merge the run is not to commit is aborted �
   // A hook refuses the commit: the merge is aborted, and git's words are on the record.
   {
     const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
-    fs.writeFileSync(path.join(repo, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\necho "commit-msg: refused by the hook" >&2\nexit 1\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(repo, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\necho "commit-msg: refused by the hook" >&2\necho "  see CONTRIBUTING" >&2\nexit 1\n', { mode: 0o755 });
     settle(checkId, 'succeeded', undefined, 0);
     await advance(e, readRun(id));
     const landed = readRun(id).steps.ship!.landed as { aborted: string };
-    assert.match(landed.aborted, /^git refused the commit of its merge: .*refused by the hook/s);
+    assert.match(landed.aborted, /^git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/, "git's lines, joined on one");
+    // Which `wf ls` prints on the step's row: never a line break inside it.
+    const note = (await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.note!;
+    assert.match(note, /^nothing landed on main: git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/);
     assert.equal(mergeHead(repo), false);
     assert.equal(git(repo, 'status', '--porcelain'), '');
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base);

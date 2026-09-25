@@ -4370,15 +4370,22 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   niced, its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue`
   (pure, `run.ts`) says what the settled check calls for, and `landEnding` (`tick.ts`) applies it: `git commit -F -` with the message
   on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check (…)` /
-  `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and the feed says which.
+  `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and `wf ls` words it on the step's line
+  (`landedWords`), which the api carries to the board as the step's `note`. The daemon's log has the tick's note; the feed does not.
+- **The session cannot commit what the run commits.** A landing ending is filed with `Bash(git commit:*)` and
+  `Bash(git merge --continue:*)` beside its own `disallowedTools:` (`filedDenies` in `run.ts`), each try and each round, so the folder
+  need not repeat the agent's list. A deny is a prefix, not a sandbox: `git merge` without `--no-commit` still commits a clean merge, and
+  the pass after records that as committed before its check ran. On codex, which takes no deny list, the parser refuses `check:` beside
+  `workspace: main` (review round 1).
 - **Aborted, with what `wf decide` says:** a refusal (`exit N`); a check that did not finish — no verdict, so nothing lands, and the offer
   is `wf retry <run> ship`, never `--recheck`, since the merge it checked is gone (the owner's word at the plan gate); a blank message;
   a staged merge that conflicts or leaves out a result branch; the run cancelled, or held before its check was filed; the session ending
   any way but `done` with its merge staged; git refusing the commit (a hook), after which the merge is aborted too. A sign-off with
   nothing staged checks and commits nothing, and says so. A result already on the base branch when the check refused is said beside it.
 - **Nothing is left mid-merge on the base branch.** While the landing is owed the checkout stays the run's (`landingOpen`, so no other
-  run's ending is filed there) and `wf rm` refuses the run. The tick reads `MERGE_HEAD` off git on every pass, whatever the daemon did
-  before a restart: a merge whose heads are not this run's result branches is never touched; this run's is committed only on an exit 0 on
+  run's ending is filed there) and `wf rm` refuses the run. The tick reads `MERGE_HEAD` off disk on every pass (`mergeInProgress`),
+  whatever the daemon did before a restart, and spawns git in the person's checkout only once a landing can be due, reading conflicts
+  with `ls-files --unmerged`, which takes no index lock (review round 1). A merge whose heads are not this run's result branches is never touched; this run's is committed only on an exit 0 on
   record and aborted on anything else; a commit already on HEAD is recorded as landed, and a merge a person aborted by hand is recorded
   with the check's words. An abort git refuses is tried again on the next pass.
 - **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/test/decision.test.ts` asserts the bare
@@ -4392,7 +4399,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
 
 **What it leaves.** A folder whose ending has no `check:` lands nothing: the shipper's brief keeps the old recipe for it (run the check
 and commit itself), with the job's limit on long work said beside it. The board draws `checking` and the verdict from the step's
-status, and shows `landed` only through the feed's line.
+status, and what landed in the step's note, as `wf ls` prints it.
 
 ## 1. A run that grows steps from a plan
 

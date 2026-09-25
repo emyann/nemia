@@ -5,7 +5,7 @@
  * they do, in a few words, with no name and no link: an agent kanban this design was compared with, and a Go agent SDK, the sandbox
  * runtime it reaches through one file, and an A2A adapter for Claude Code that the thin runtime's evaluation read (2026-09-25). So
  * every file the repository holds is read, as `names.test.ts` reads them, and a line that names one is refused, history included:
- * history was rewritten too, the experiments' recorded quotes with a line in their README saying so.
+ * history was rewritten too, and the Jev experiments whose recorded quotes named them left the tree on 2026-09-25.
  *
  * The names are kept here in base64, so this file does not name them either, and a search of the repository finds none. What we
  * integrate — Claude Code, Codex, A2A and its SDK — and what is compared by name on purpose are not on the list.
@@ -41,7 +41,7 @@ test('no file names another project the owner chose to describe instead', () => 
     return text === undefined ? [] : othersNamed(text).map((l) => `${f}:${l}`);
   });
   assert.deepEqual(found, [], `these name another project; say what it does in a few words, and drop its link:\n${found.join('\n')}`);
-  for (const f of ['packages/agent-runtime/README.md', 'docs/eval-thin-runtime.md', 'docs/pivot-2026-09-18/experiments/jev/workflow-result.json']) {
+  for (const f of ['packages/agent-runtime/README.md', 'docs/eval-thin-runtime.md']) {
     assert.ok(read.includes(f), `${f} is read: the rule reads the files that named them`);
   }
 });
@@ -78,7 +78,7 @@ test('REFUSED: only the lockfile and the vendored skill are left unread, matched
   assert.equal(ours('.claude/skills/shadcn/SKILL.md'), false);
   for (const read of [
     'packages/agent-orchestrator/package-lock.json', 'package-lock.json.bak', '.claude/skills/shadcn-notes.md', '.claude/skills/look/SKILL.md',
-    'docs/eval-2026-09-12/REPORT.md', 'docs/pivot-2026-09-18/experiments/jev/workflow-result.json', 'CLAUDE.md',
+    'docs/eval-2026-09-12/REPORT.md', 'docs/pivot-2026-09-18/experiments/README.md', 'CLAUDE.md',
   ]) assert.equal(ours(read), true, read);
   const all = files();
   for (const entry of NOT_OURS) assert.ok(all.some((f) => !ours(f) && (f === entry || f.startsWith(entry))), `${entry} is left unread and holds no file`);

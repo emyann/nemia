@@ -1,10 +1,10 @@
 /**
  * A card's properties, and the shipped workflow folder they map to. Plain code, no Effect.
  *
- * The questions and the repository's description are dispatch2's words (`docs/pivot-2026-09-18/experiments/jev/
- * dispatch2.mjs`), asked of eleven real cards on 2026-09-19. A question's words are the program: a test pins their keys,
- * so a change of wording fails it, and says the thresholds below were measured on the old words. They were measured on
- * nothing held out: this is for trying the dispatcher on real cards, and nothing calls it.
+ * The questions and the repository's description are dispatch2's words (`jev/dispatch2.mjs` of the pivot's experiments, kept
+ * outside the repository since 2026-09-25), asked of eleven real cards on 2026-09-19. A question's words are the program: a
+ * test pins their keys, so a change of wording fails it, and says the thresholds below were measured on the old words. They
+ * were measured on nothing held out: this is for trying the dispatcher on real cards, and nothing calls it.
  */
 import { noul, score } from '@typesafe-ai/sdk';
 import { decide, why, type Judgment, type Verdict } from './decide.ts';

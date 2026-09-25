@@ -226,10 +226,11 @@ or when a property is unsure, and the command says which property.
 - The record defaults to `$WF_ROOT/judge`, or `~/.agent-workflows/judge` when `WF_ROOT` is unset.
   `--record` names another directory.
 
-Here are two real cards, each asked twice:
+Here are two real cards, each asked twice. They are from the pivot's Jev experiments, kept outside
+the repository since 2026-09-25, and the paths below are within that folder:
 
 ```
-$ judge card docs/pivot-2026-09-18/experiments/jev/cards/card-p06.md --record <tmp>
+$ judge card jev/cards/card-p06.md --record <tmp>
 judge card: …/card-p06.md · 4653 characters sent, frontmatter stripped · jev-1.13.0
   web    P 0.14           no      does it touch the web app or the api
   plan   P 0.74           unsure  should someone plan first
@@ -239,7 +240,7 @@ judge card: …/card-p06.md · 4653 characters sent, frontmatter stripped · jev
 record: <tmp>
 → stays in the inbox: unsure about planning first
 
-$ judge card docs/pivot-2026-09-18/experiments/jev/cards/card-agents-board.md --record <tmp>
+$ judge card jev/cards/card-agents-board.md --record <tmp>
   …
 → dev-planned-build
 ```

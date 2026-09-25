@@ -11,7 +11,7 @@ Each finding below gives its command, what was observed and where it was read, a
 
 ## How it was measured
 
-- **Claude Code 2.1.282**, `claude -p`, `--model haiku` (`claude-haiku-4-5-20251001`). 38 jobs and two probes in all, costing about $2.90 in total.
+- **Claude Code 2.1.282**, `claude -p`, `--model haiku` (`claude-haiku-4-5-20251001`). 40 jobs and two probes in all, costing about $3 in total.
 - **Where the jobs ran:** this run's own worktree, `~/.agent-workflows/worktrees/measure-how-an-hkb-agent-can-sqky/implement`. That is a
   worktree of a trusted repository, so the project's `.claude/settings.json` applied. Fixtures were kept in `/tmp/spike-sqky`, outside
   the worktree and outside `~/.claude/`.
@@ -21,8 +21,16 @@ Each finding below gives its command, what was observed and where it was read, a
   claude -p "<prompt>" --model haiku --output-format stream-json --verbose --permission-prompts none --strict-mcp-config < /dev/null
   ```
 
-  `--strict-mcp-config` with no config keeps the MCP servers out of the counts. Every exact command, the output of each job and
-  the fixtures are in the step's artifacts, in `spike-evidence.tgz` (one `<name>.cmd` and one `<name>.jsonl` per job).
+  `--strict-mcp-config` with no config keeps the MCP servers out of the counts.
+- **The evidence** is in the step's artifacts, in `spike-evidence.tgz`:
+  - every exact command, one `<name>.cmd` per job;
+  - the stream-json each job printed, one `<name>.jsonl` per job;
+  - the fixtures;
+  - the prompt each job recorded, in `prompts/`. This is copied out of the transcripts, which the stream-json does not carry and which
+    Claude Code cleans up. For each job there is a `<name>.prompt.json`: the last `prompt_snapshot`'s blocks in full, its tools, its
+    `cliPrefix`, and the block and character counts. There is also a `<name>.snap.txt` from `snap.sh`, and s7's subagent has a
+    `.subagent-*.prompt.json` of its own.
+  - The transcripts themselves are left out, since their `session_context` names the owner's account.
 - **Fixtures.**
   - `body.md`: *"HKB-APPEND-MARKER-7731. You are the note writer of an HKB team. End every reply with the word PINEAPPLE on its own line."*
   - `body2.md`: the same, with marker `5520` and the word `MANGO`.
@@ -164,15 +172,23 @@ surface an agent's skills, decide whether a job reads user settings at all. This
 
 ## 3. The agent's fence against the flags
 
-**F10. `--permission-mode` wins over the agent's `permissionMode` either way. With no flag, the agent's `permissionMode` is not applied at all.**
+**F10. `--permission-mode` wins over the agent's `permissionMode` either way. With no flag, the agent's `permissionMode` is not applied
+on the main thread, even when no settings name a mode.**
 
-Each job asked the model to Write `spike-probe.txt` in the cwd. The file was removed after each run.
+Each job asked the model to Write `spike-probe.txt` in the cwd. The file was removed after each run. The stream reports the mode twice:
+on the `system/init` line and on a `system/status` line after it, and the two can differ (m1).
 
-| job | agent `permissionMode` | `--permission-mode` | init `permissionMode` | the Write |
-|---|---|---|---|---|
-| m1 | `acceptEdits` | none | `auto` (the owner's `defaultMode`) | denied: *"requires approval, and this session has no approval surface"* |
-| m2 | `acceptEdits` | `dontAsk` | `dontAsk` | denied: *"… running in don't ask mode"* |
-| m3 | `dontAsk` | `acceptEdits` | `acceptEdits` | written |
+| job | agent `permissionMode` | `--permission-mode` | settings read | init, then status `permissionMode` | the Write |
+|---|---|---|---|---|---|
+| m1 | `acceptEdits` | none | all: the owner's `defaultMode` is `auto` | `auto`, then `default` | denied: *"requires approval, and this session has no approval surface"* |
+| m4 | `acceptEdits` | none | `--setting-sources project,local`: no `defaultMode` anywhere | `default` | denied, the same words |
+| m2 | `acceptEdits` | `dontAsk` | all | `dontAsk` | denied: *"… running in don't ask mode"* |
+| m3 | `dontAsk` | `acceptEdits` | all | `acceptEdits` | written |
+
+- m1 alone cannot tell "the agent's mode is ignored" from "the user's `defaultMode` outranks it". m4 settles that: with nothing naming a
+  mode, the session ran `default`, not the agent's `acceptEdits`. The project's `.claude/settings.json` sets no `defaultMode`, and there
+  is no `settings.local.json`.
+- m1's `auto` became `default` for the reason F20 gives.
 
 *Consequence:* HKB passes the fence as `--permission-mode` itself, as the runtime already does on every spawn. A `permissionMode` left in a
 converted agent does nothing on the main thread.
@@ -186,6 +202,23 @@ converted agent does nothing on the main thread.
 | t2 | `["Read","Bash"]` | `Read` | `Read` |
 
 *Consequence:* either list can only narrow. An agent whose `tools` leave out `Skill` cannot use its skills, whatever the step says.
+
+**F20. On haiku, `auto` falls back to `default` without a word, whether a flag or the settings ask for it. Under `-p`, `default` denies
+every call that needs approval.**
+
+m5 ran with `--permission-mode auto` and no agent. That is what the runtime passes to a step with no `permissionMode:`
+(`packages/agent-runtime/src/runner.ts`, `r.config?.permissionMode ?? 'auto'`). It asked for the same Write as F10.
+
+- The `system/init` line reads `permissionMode: auto`. The next line, `system/status`, reads `permissionMode: default`.
+- The Write was denied: *"It requires approval, and this session has no approval surface — nobody can answer a permission prompt
+  here — so it was denied automatically."* It is on `permission_denials`, and the reply was `DENIED`.
+- Nothing refused the job. The exit code was 0, stderr was empty, and the only trace is the debug log's line (F7): *"auto mode disabled:
+  model claude-haiku-4-5-20251001 does not support auto mode"*.
+- m1 fell back the same way from the owner's `defaultMode: auto`.
+
+*Consequence:* a haiku step left on the runtime's default mode runs `default`, and every call it would have been approved in `auto`
+comes back denied, with the job reporting success. HKB should give a haiku agent an explicit mode, or refuse `auto` on a model that
+lacks it. It should read the `system/status` line, not only `init`, to know the mode a job actually runs.
 
 ## 4. The runtime's flags with the two new ones
 
@@ -215,11 +248,13 @@ invoke `hkb-spike:code-word`, and then close out.
 resume is ignored unless the snapshot is turned off.**
 
 - **r1** resumed j1's session with the same runtime flags and **no** `--append-system-prompt`, and asked which word to end replies with
-  and what marker the instructions carry. It answered *"Word: PINEAPPLE. Marker: HKB-APPEND-MARKER-7731."* j1's history never mentions
-  either word.
-- **A fresh chain, clean of such history.** j2 was `"Reply with the single word OK." --append-system-prompt-file body.md`. Each resume
-  forked from j2 (`--resume <j2> --fork-session`), so each one sees only j2's turn. Each asked *"list every word your system instructions
-  tell you to end replies with, and every HKB-APPEND-MARKER code they carry"*:
+  and what marker the instructions carry. It answered *"Word: PINEAPPLE. Marker: HKB-APPEND-MARKER-7731."* The word proves nothing,
+  since j1's last assistant message ends with `PINEAPPLE`. The marker is the evidence: `7731` appears nowhere in j1's history, only in
+  the appended body.
+- **A second chain.** j2 was `"Reply with the single word OK." --append-system-prompt-file body.md`, and it replied `OK` `PINEAPPLE`, so
+  that word sits in the history of every fork of it too. Each resume forked from j2 (`--resume <j2> --fork-session`), so each one sees
+  only j2's turn. Each asked *"list every word your system instructions tell you to end replies with, and every HKB-APPEND-MARKER code
+  they carry"*. The evidence is the marker, which no history holds, and the cache:
 
 | job | on resume | answer | prompt tokens: written to cache / read from cache |
 |---|---|---|---|
@@ -227,10 +262,12 @@ resume is ignored unless the snapshot is turned off.**
 | r6 | `--append-system-prompt-file body2.md` | `PINEAPPLE`, `…-7731` (body2 ignored) | 0 / 47,547 |
 | r4 | `--append-system-prompt-file body2.md --system-prompt-snapshot off` | `MANGO`, `…-SECOND-5520` only | 33,842 / 13,694 |
 
-- r6's full cache hit shows that the system prompt sent was byte for byte j2's. r4's cache write shows that a new prompt was rendered,
+- r5 and r6 name marker `7731`, which is in their system prompt and in none of their history. r6's full cache hit shows that the
+  system prompt sent was byte for byte j2's.
+- r4 answered `MANGO` and `5520` alone, although `PINEAPPLE` sat in its history. Its cache write shows that a new prompt was rendered,
   with body2 in place of body.
-- r2 and r3 resumed the r1 chain with body2, the snapshot on and off. Both answered PINEAPPLE, but by then r1's answer sat in their
-  history, so they prove nothing either way. They are kept in the evidence, but the table above replaces them.
+- r2 and r3 resumed the r1 chain with body2, the snapshot on and off. Both answered PINEAPPLE, but by then r1's answer, marker
+  included, sat in their history, so they prove nothing either way. They are kept in the evidence, but the table above replaces them.
 - With the snapshot off, nothing new is recorded. A forked transcript still carries the parent's `prompt_snapshot`, and that record is
   then not what was sent.
 
@@ -410,4 +447,5 @@ is the length of the operator's own agent body.
   - Whether an edited agent should reach a resumed session. It does not by default, and it would take `--system-prompt-snapshot off` and a cache rewrite (F13).
   - How HKB resolves a name clash between the store's skills and the repository's. Claude Code does nothing here: a plugin's skills are
     namespaced and cannot clash (F4).
-  - `auto` is not available on haiku (F7's log). A step's default mode on a haiku agent would be refused.
+  - What HKB does with a haiku agent and no mode. `auto` quietly becomes `default`, and every call that needs approval is then denied (F20).
+    The choice is between an explicit mode for such an agent and a refusal of `auto` at load. The models that support `auto` were not measured.

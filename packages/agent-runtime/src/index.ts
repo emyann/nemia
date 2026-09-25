@@ -41,6 +41,8 @@ export type { HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export { detachedOps, STALE_MS } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
+export { remoteOps } from './a2a-remote.ts';
+export type { Credentials, RemoteAgent } from './a2a-remote.ts';
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 export { composite } from './runner-composite.ts';

@@ -830,6 +830,31 @@ What is left:
 - **`wf ls`, `wf decide` and the api's reads still fold every journal they read**: they `view`, not `tick`, and the memo is the
   pass's (agent-orchestrator's features, *What `wf ls` and `/api/runs` still pay*).
 
+### 34. A remote Task answered in the moment before the registry holds it is owned by nobody (2026-09-25)
+
+A remote A2A agent's spawn (`src/a2a-remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
+one SendMessage, and writes the Task's id beside the intent when the answer comes back. An answer that never reaches that
+write leaves an intent with no Task: the next spawn under the name refuses to send again, in words that are no refusal,
+and the grace window reads the attempt `lost`. Nothing is sent twice, which is the rule the registry keeps. But the Task
+the agent made runs on, and nothing here knows its id to read it or cancel it. Two things leave such an answer:
+
+- **A crash** after the agent made the Task and before the write.
+- **An answer later than `REQUEST_MS` (10 s).** The send is bounded as every request is, since a spawn runs inside the
+  runtime's pass (`case 'spawn'` in `settleTask`) and a longer bound would hold every other task's pass as long. An agent
+  that answers `returnImmediately` with its Task at once is never here. One that works before it answers — an LLM agent
+  that replies in a Message after thirty seconds — is here on every try, with no crash: each try does the work, is read in
+  doubt, and ends `lost`, and each retry does it again. The in-doubt words name the bound and say so; the test is *at
+  shipped defaults an agent that replies later than 10 s…* in `test/remote-agent.test.ts`. Such an agent is not one this
+  harness can drive: a bound per harness, or a spawn that leaves the pass, would be a change of its own.
+
+- **Not closable from this side.** GetTask needs the Task's id, and ListTasks on an agent others use lists theirs too, with
+  no field that says which message a Task was made of. The message's id is on the intent, and an agent that deduplicated
+  a SendMessage on its `messageId` would answer a resend with the same Task: then the spawn could send again under the
+  recorded id and adopt what comes back. A2A does not require that, and the SDK's server does not do it.
+- **What bounds it.** For a crash, the window is one request long, at most `REQUEST_MS`; for a slow agent it is every
+  try. Either way the attempt is read `lost`, so the task fails as any lost attempt does, and a person or the orchestrator
+  tries again; the orphan's cost is the other party's.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

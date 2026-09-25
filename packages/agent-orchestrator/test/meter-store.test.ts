@@ -144,7 +144,10 @@ test('a harness\'s observe is moved out of the runtime\'s pass into observe, and
   assert.equal(cost.phases.observe.calls, 1);
   assert.equal(cost.phases.observe.spawned, 1, 'the process the observe started is observe\'s');
   assert.equal(cost.phases.runtime.spawned, 0);
-  assert.ok(cost.phases.runtime.ms >= 9 && cost.phases.runtime.ms < 30, `the runtime's pass keeps the rest of its 30 ms (${cost.phases.runtime.ms})`);
+  // Its 30 ms is a floor, never a ceiling: a process parked after the spin takes longer, and `< 30` failed at 30.8 under load. Moved
+  // and not copied is what the phases adding up to no more than the pass says, whatever the scheduler did.
+  assert.ok(cost.phases.runtime.ms >= 9, `the runtime's pass keeps the rest of its 30 ms (${cost.phases.runtime.ms})`);
+  assert.ok(phaseSum(cost) <= cost.ms + 0.01, `the observe's 20 ms is counted once: the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
   assert.equal(cost.phases.runtime.bytes, 1000, 'what the runtime read is counted where it was called');
   assert.equal(cost.spawned, cost.phases.observe.spawned + cost.phases.git.spawned + PHASES.filter((p) => p !== 'observe' && p !== 'git').reduce((n, p) => n + cost.phases[p].spawned, 0));
 });

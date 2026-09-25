@@ -296,6 +296,21 @@ test('wf retry refuses --model and --budget on a remote step, in the words its l
   }
 });
 
+test("a remote step after a run (`--after`) is told that run's work stays here and is summarised below, never that it is in its workspace", () => {
+  const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\n---\nReview it.\n']]);
+  const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;
+  const built = parseFolder([['build', '---\n---\nBuild.\n']])[0]!;
+  const parents = [
+    { run: 'r-0', asked: 'build the tides page', steps: [{ step: built, said: { outcome: 'done', summary: 'Built it.', artifacts: [], needs: null } }] },
+    { run: 'r-00', unreadable: 'its record is gone' },
+  ] as never;
+  const brief = remoteBrief(steps[0]!, run, steps, undefined, undefined, parents);
+  assert.match(brief, /## From run r-0\n\nThis run waited on r-0 \(`--after`\) and started once it shipped\. Its work stays on the machine that runs this workflow and is not sent to you: what it was asked\nand what its last steps said when they signed off are summarised below/);
+  assert.match(brief, /## From run r-00\n\nThis run waited on r-00 .*not sent to you, and what it concluded cannot be given here — its record is gone\./);
+  assert.match(brief, /Built it\./);
+  assert.doesNotMatch(brief, /this workspace|on disk|Read the change/);
+});
+
 test("a remote step's try is a new task, told which try and what a person said, with no path", () => {
   const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\nretries: 1\n---\nReview it.\n']]);
   const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;

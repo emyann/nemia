@@ -335,3 +335,34 @@ test('REFUSED at shipped defaults: `wf tick --stats` while a daemon holds the st
   assert.equal(e.passes, 0, 'nothing ticked');
   assert.equal(fs.existsSync(FILE), false);
 });
+
+test('`wf up` says a move the runtime refused once while it lasts, and again once it clears and comes back — in its log, beside its other lines', async (t) => {
+  clear();
+  const stuck = { taskId: 't-stuck', state: 'working', event: 'SESSION_LIVE' };
+  const other = { taskId: 't-other', state: 'ending', event: 'CLOSED' };
+  // What each pass's report says was refused: pass 5 has cleared it, pass 6 has it back.
+  const byPass = [[stuck], [stuck], [stuck, other], [stuck, other], [], [stuck], [stuck]];
+  const e = engineOf();
+  e.tick = async () => {
+    e.passes++;
+    if (e.passes > byPass.length) throw STOP;
+    return { tasks: 2, actions: [], running: {}, views: [], refused: byPass[e.passes - 1]! };
+  };
+  const { printed, threw } = await typed(t, ['up', '1'], e);
+  assert.equal(threw, STOP);
+  assert.equal(e.passes, byPass.length + 1, 'every pass ran');
+  const said = printed.filter((l) => l.includes('stalled'));
+  const words = (m: typeof stuck) => `${m.taskId}  stalled: its lifecycle has no edge from ${m.state} on ${m.event}, so nothing is done; it is asked again each pass`;
+  assert.deepEqual(said.map((l) => l.slice(10)), [words(stuck), words(other), words(stuck)], printed.join('\n'));
+  assert.ok(said.every((l) => /^\d\d:\d\d:\d\d  t-/.test(l)), 'stamped as the daemon stamps every line');
+});
+
+test('`wf tick` says every move its one pass refused', async (t) => {
+  clear();
+  const stuck = { taskId: 't-stuck', state: 'submitted', event: 'READY' };
+  const e = engineOf();
+  e.tick = async () => ({ tasks: 1, actions: [], running: {}, views: [], refused: [stuck, stuck] });
+  const { printed, threw } = await typed(t, ['tick'], e);
+  assert.equal(threw, undefined);
+  assert.deepEqual(printed.filter((l) => l.includes('stalled')), ['t-stuck  stalled: its lifecycle has no edge from submitted on READY, so nothing is done; it is asked again each pass']);
+});

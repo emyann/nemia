@@ -1,7 +1,7 @@
 /**
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
- * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `nameFor` and `denialText`), which they import from here and never from the runtime.
+ * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText` and `refusedText`), which they import from here and never from the runtime.
  *
  * It passes the runtime's surface through, and wraps one method of it: `file`, so that every task the orchestrator files is `queued` and
  * starts only once the tick admits it (`admission.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
@@ -17,11 +17,13 @@ import { claudeDetached, codex, createEngine, type Engine } from 'agent-runtime'
 import { CHECK } from './check.ts';
 import { HOME } from './store.ts';
 
-export type { Denial, Engine, TaskView, Usage } from 'agent-runtime';
+export type { Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** A denied call as the runtime words it, and as a permission rule is written: `Skill(look)`, `Bash(pytest)` (`deniedOf`). */
 export { denialText } from 'agent-runtime';
+/** A move the runtime's lifecycle had no edge for, as a person reads it in `wf up`'s log (`refusalLines`). */
+export { refusedText } from 'agent-runtime';
 
 /**
  * The engine, with one harness of the run's own beside the three it ships.

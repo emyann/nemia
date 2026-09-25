@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, denialText, retiredKeyRefusal, type Attempt, type Engine, type Event, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
+import { createEngine, denialText, refusedText, retiredKeyRefusal, type Attempt, type Engine, type Event, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -412,7 +412,9 @@ export async function main(argv: string[]): Promise<void> {
     case 'tick': {
       const r = await engine.tick();
       const load = Object.entries(r.running).map(([h, n]) => `${h}:${n}`).join(' ') || 'idle';
-      return console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+      console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+      for (const m of r.refused) console.log(refusedText(m));
+      return;
     }
 
     case 'feed': {

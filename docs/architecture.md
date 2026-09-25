@@ -21,7 +21,10 @@ the orchestrator imports the runtime. A test of the api may import the runtime's
 ## Pure core, effectful shell
 
 Each package keeps its judgement in a pure function and applies it in a shell that does the I/O. In the runtime, the
-core is `decide` (`packages/agent-runtime/src/domain.ts`) and the shell is `src/engine.ts`. In the orchestrator, the
+core is `decide` (`packages/agent-runtime/src/domain.ts`) and the shell is `src/engine.ts`. Since thin runtime stage 5,
+`decide` reads a state off the journal and an event off the pass's observation, and asks a statechart
+(`src/lifecycle.ts`, XState used as a pure transition function, never run) for the edge: an event with no edge is
+refused and reported on the pass, never guessed at. In the orchestrator, the
 core is `assess` (`packages/agent-orchestrator/src/run.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
 data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
 
@@ -40,10 +43,12 @@ restart, so it never decides what a full pass would not; the tests that tick jud
 a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and
 `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk is exported
-from `agent-orchestrator`. The judge imports nothing from the workspace, and nothing imports it.
+from `agent-orchestrator`. The judge imports nothing from the workspace, and nothing imports it. XState is a dependency
+of the runtime alone: `src/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
+the machine, or the readings `decide` moves by.
 
-Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and
-`packages/agent-judge/test/boundary.test.ts`.
+Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
+`packages/agent-judge/test/boundary.test.ts` and `packages/agent-runtime/test/xstate-boundary.test.ts`.
 
 **2. Inside the orchestrator, every file is of one of four kinds**, named in
 `packages/agent-orchestrator/test/boundary.test.ts`.

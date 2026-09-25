@@ -66,7 +66,7 @@ export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, endWo
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
 export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';
-export { advance, checkoutHold, runSlots, tick } from './tick.ts';
+export { advance, checkoutHold, refusalLines, runSlots, tick } from './tick.ts';
 export type { Advanced, Pass } from './tick.ts';
 export { accept, approve, cancel, hold, retry, round, say, unhold } from './verbs.ts';
 export type { Accepted, Approved, Asked, Cancelled, Holding, RoundAsked, Told } from './verbs.ts';

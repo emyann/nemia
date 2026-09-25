@@ -1,0 +1,220 @@
+/**
+ * The lifecycle is a statechart, and `decide` moves a task only along its edges (thin runtime stage 5).
+ *
+ * The corpus below is every journal shape `decide.test.ts` walks — filed, queued, admitted, starting, spawned, ended each way,
+ * held open and answered or closed, asked to stop — under every sighting a harness can give, before and after the grace
+ * window and the deadline. Each case is read the way a pass reads it: the state off the journal (`lifecycleOf`), the event
+ * off the journal and the sighting (`observe`), and the machine's move. Every move must be an edge; applied to the journal,
+ * it must land where `lifecycleOf` then says; and every edge of the machine must be taken by some case, so the table holds
+ * no edge the runtime cannot reach. An event with no edge is refused, at shipped defaults, and the refusal is `decide`'s answer.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { decide, fold, lifecycleOf, nameFor, observe, settledQuiet, spawnRefused, type Action, type Event, type Observed, type Sighting } from '../src/domain.ts';
+import { diagram, edgesOf, FINAL, MACHINE, machineWithout, STATES, transition, withoutEdge, type LifecycleEvent, type LifecycleState } from '../src/lifecycle.ts';
+
+const T0 = new Date('2026-01-01T00:00:00Z');
+const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
+const TASK = 't-1';
+const S = 1_000;
+
+const filed = (extra: object = {}): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra }) as Event;
+const starting = (n: number, ms = 0, extra: object = {}): Event => ({ kind: 'starting', at: at(ms), attempt: n, ...extra });
+const spawned = (n: number, ms = S): Event => ({ kind: 'spawned', at: at(ms), attempt: n });
+const ended = (n: number, observed: Observed, reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' | 'unsigned' = 'harness', nativeId?: string): Event =>
+  ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
+const signed = (n: number) => ended(n, 'done', 'harness', `native-${n}`);
+
+/** Journal shapes, by name: what a task's record can say. */
+const JOURNALS: Record<string, Event[]> = {
+  filed: [filed()],
+  'filed, queued': [filed({ queued: true })],
+  'filed, queued, admitted': [filed({ queued: true }), { kind: 'admitted', at: at(0) }],
+  'filed against a session': [filed({ resumeFrom: 'native-0' })],
+  'filed with a statement asked': [filed({ closeoutSchema: { type: 'object' } })],
+  'intent, no spawn': [filed(), starting(1)],
+  'intent, no spawn, asked a statement': [filed({ closeoutSchema: { type: 'object' } }), starting(1)],
+  spawned: [filed(), starting(1), spawned(1)],
+  'ended done': [filed(), starting(1), spawned(1), signed(1)],
+  'ended failed': [filed(), starting(1), spawned(1), ended(1, 'failed')],
+  'ended stopped': [filed(), starting(1), spawned(1), ended(1, 'stopped')],
+  'ended lost': [filed(), starting(1), spawned(1), ended(1, 'failed', 'lost')],
+  'ended unstartable': [filed(), starting(1), ended(1, 'failed', 'unstartable')],
+  'ended unsigned, before stage 4a': [filed(), starting(1), spawned(1), ended(1, 'done', 'unsigned')],
+  'ended at the deadline': [filed(), starting(1), spawned(1), ended(1, 'failed', 'deadline')],
+  'held open, filed': [filed({ holdOpen: true })],
+  'held open, intent, no spawn': [filed({ holdOpen: true }), starting(1)],
+  'held open, in flight': [filed({ holdOpen: true }), starting(1), spawned(1)],
+  'held open, signed': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1)],
+  'held open, failed': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'failed')],
+  'held open, answered': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'input', at: at(3 * S), text: 'go on' }],
+  'held open, answered, no session recorded': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'done'), { kind: 'input', at: at(3 * S), text: 'go on' }],
+  'held open, second turn in flight': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'input', at: at(3 * S), text: 'go on' }, starting(2, 4 * S, { resumeFrom: 'native-1' }), spawned(2, 5 * S)],
+  'held open, closed after signing': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'closed', at: at(3 * S) }],
+  'held open, closed after failing': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'failed'), { kind: 'closed', at: at(3 * S) }],
+  'held open, closed before any attempt': [filed({ holdOpen: true }), { kind: 'closed', at: at(0) }],
+  'held open, closed in flight': [filed({ holdOpen: true }), starting(1), spawned(1), { kind: 'closed', at: at(2 * S) }],
+  'stop asked, nothing started': [filed(), { kind: 'stop-requested', at: at(0) }],
+  'stop asked, intent, no spawn': [filed(), starting(1), { kind: 'stop-requested', at: at(S) }],
+  'stop asked, spawned': [filed(), starting(1), spawned(1), { kind: 'stop-requested', at: at(2 * S) }],
+  'stop asked, ended': [filed(), starting(1), spawned(1), ended(1, 'stopped', 'operator'), { kind: 'stop-requested', at: at(2 * S) }],
+  settled: [filed(), starting(1), spawned(1), signed(1), { kind: 'settled', at: at(3 * S), outcome: 'succeeded' }],
+};
+
+/** What a harness can say of the name, keyed by the name of the record's last attempt. */
+const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
+  unseen: undefined,
+  working: { state: 'working', busy: true },
+  'working, quiet': { state: 'working', quietMs: 90_000, nativeId: 'native-q' },
+  'working, quiet, stated': { state: 'working', quietMs: 90_000, closeout: { payload: { outcome: 'done' }, at: 0 } },
+  blocked: { state: 'blocked', waitingFor: 'permission prompt' },
+  done: { state: 'done', nativeId: 'native-d', closeout: { payload: { outcome: 'done' }, at: 0 } },
+  'done, no statement': { state: 'done' },
+  failed: { state: 'failed', exitCode: 1 },
+  stopped: { state: 'stopped' },
+};
+
+/** When the pass reads it: in the grace window and before a deadline of 40 s, or past both. */
+const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
+const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as const;
+
+type Case = { name: string; events: Event[]; observed: Map<string, Sighting>; now: { at: Date; graceMs: number } };
+
+const corpus = (): Case[] => Object.entries(JOURNALS).flatMap(([j, base]) =>
+  Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) => Object.entries(SIGHTINGS).flatMap(([s, sighting]) => Object.entries(TIMES).map(([t, ms]) => {
+    const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
+    const last = fold(TASK, events).attempts.at(-1);
+    const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);
+    return { name: `${j} · ${d} · ${s} · ${t}`, events, observed, now: { at: new Date(T0.getTime() + ms), graceMs: 30_000 } };
+  }))));
+
+/** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
+const journalled = (action: Action, ms: number): Event[] => {
+  switch (action.do) {
+    case 'start': return [{ kind: 'starting', at: at(ms), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge }];
+    case 'spawn': return [{ kind: 'spawned', at: at(ms), attempt: action.attempt }];
+    case 'record-end': return [{ kind: 'ended', at: at(ms), attempt: action.attempt, sessionId: action.sessionId, observed: action.observed, reason: action.reason, nativeId: action.nativeId, closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}) }];
+    case 'settle': return [{ kind: 'settled', at: at(ms), outcome: action.outcome, note: action.note }];
+    case 'stop': case 'nothing': return [];
+  }
+};
+
+const edgeKey = (from: string, event: string, to: string) => `${from} --${event}--> ${to}`;
+
+test('every move of the corpus is an edge of the machine, and lands where the journal it writes then says', () => {
+  const edges = new Set(edgesOf().map((e) => edgeKey(e.from, e.event, e.to)));
+  const taken = new Set<string>();
+  let cases = 0;
+  for (const c of corpus()) {
+    const state = fold(TASK, c.events);
+    if (settledQuiet(state)) continue;
+    cases++;
+    const from = lifecycleOf(state);
+    const event = observe(state, c.observed, c.now);
+    const moved = transition(from, event);
+    assert.ok(!('refused' in moved), `${c.name}: ${from} refused ${event.type}`);
+    if ('refused' in moved) continue;
+    const key = edgeKey(from, event.type, moved.to);
+    assert.ok(edges.has(key), `${c.name}: ${key} is not an edge`);
+    taken.add(key);
+    assert.deepEqual(decide(state, c.observed, c.now), moved.action, `${c.name}: decide is the move`);
+    const after = fold(TASK, [...c.events, ...journalled(moved.action, c.now.at.getTime() - T0.getTime())]);
+    assert.equal(lifecycleOf(after), moved.to, `${c.name}: ${key} by ${moved.action.do}, and the journal then reads ${lifecycleOf(after)}`);
+  }
+  assert.ok(cases > 1000, `the corpus is the product it says (${cases} cases)`);
+  // The engine's one event, which only the spawn call can know: from the intent, the attempt's unstartable end.
+  const intent = fold(TASK, JOURNALS['intent, no spawn']!);
+  const end = spawnRefused(intent, 1, 'no such model');
+  assert.deepEqual(end, { do: 'record-end', attempt: 1, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: 'no such model' });
+  assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn']!, ...journalled(end, 2 * S)])), 'ending');
+  taken.add(edgeKey('starting', 'SPAWN_REFUSED', 'ending'));
+  assert.deepEqual([...edges].filter((e) => !taken.has(e)), [], 'every edge is taken by some case: the table holds no edge the runtime cannot reach');
+});
+
+test('ADOPTION after a crash: an intent with no spawn and a session under its name is followed, not spawned again, and its end recorded', () => {
+  const events = JOURNALS['intent, no spawn']!;
+  const state = fold(TASK, events);
+  const live = new Map([[nameFor(TASK, 1), { sessionId: 'adopted', state: 'working' as const }]]);
+  const now = { at: new Date(T0.getTime() + 60 * S), graceMs: 30_000 };
+  assert.equal(lifecycleOf(state), 'starting');
+  assert.deepEqual(transition('starting', observe(state, live, now)), { to: 'starting', action: { do: 'nothing', why: 'running (working)' } }, 'adopted: nothing to do, and no spawn');
+  const done = new Map([[nameFor(TASK, 1), { sessionId: 'adopted', state: 'done' as const, nativeId: 'n-1' }]]);
+  const moved = transition('starting', observe(state, done, now));
+  assert.ok(!('refused' in moved));
+  assert.deepEqual('action' in moved && moved.action, { do: 'record-end', attempt: 1, sessionId: 'adopted', observed: 'done', reason: 'harness', nativeId: 'n-1', closeout: undefined });
+  assert.equal(lifecycleOf(state), 'starting', 'the journal is the state: reading it again reads the same, restart or not');
+});
+
+test('REFUSED: an event with no edge in the state it meets is refused, at shipped defaults, and nothing is done', () => {
+  const sighting: Sighting = { sessionId: 's', state: 'working' };
+  const seen = { attempt: 1, sighting, asked: false, holds: false };
+  const cases: Array<[LifecycleState, LifecycleEvent]> = [
+    ['submitted', { type: 'UNSPAWNED', attempt: 1, name: 'n' }],
+    ['submitted', { type: 'SESSION_LIVE', ...seen }],
+    ['starting', { type: 'LOST', attempt: 1 }],
+    ['starting', { type: 'READY', attempt: 2 }],
+    ['working', { type: 'SPAWN_REFUSED', attempt: 1, error: 'e' }],
+    ['working', { type: 'NOTHING_OPEN' }],
+    ['input-required', { type: 'SESSION_LIVE', ...seen }],
+    ['input-required', { type: 'READY', attempt: 2 }],
+    ['stopping', { type: 'DEADLINE_PASSED', attempt: 1, live: true, sighting }],
+    ['stopping', { type: 'READY', attempt: 1 }],
+    ['ending', { type: 'READY', attempt: 2 }],
+    ['ending', { type: 'SESSION_ENDED', ...seen }],
+  ];
+  for (const [from, event] of cases) assert.deepEqual(transition(from, event), { refused: { state: from, event: event.type } }, `${from} on ${event.type}`);
+  // A final state takes nothing: every event is refused there.
+  for (const from of FINAL) for (const e of edgesOf()) assert.ok('refused' in transition(from, { type: e.event } as LifecycleEvent), `${from} took ${e.event}`);
+});
+
+test('REFUSED: decide answers a missing edge with nothing, and says which — it never guesses a move', () => {
+  const state = fold(TASK, JOURNALS.spawned!);
+  const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'done' as const }]]);
+  const now = { at: new Date(T0.getTime() + 5 * S), graceMs: 30_000 };
+  assert.equal(decide(state, observed, now).do, 'record-end', 'the shipped lifecycle ends it');
+  assert.deepEqual(decide(state, observed, now, withoutEdge('working', 'SESSION_ENDED')),
+    { do: 'nothing', why: 'refused: no edge from working on SESSION_ENDED', refused: { state: 'working', event: 'SESSION_ENDED' } });
+  assert.deepEqual(spawnRefused(fold(TASK, JOURNALS['intent, no spawn']!), 1, 'e', withoutEdge('starting', 'SPAWN_REFUSED')),
+    { do: 'nothing', why: 'refused: no edge from starting on SPAWN_REFUSED', refused: { state: 'starting', event: 'SPAWN_REFUSED' } });
+  // The pruned machine is a copy: the shipped one keeps the edge.
+  assert.equal(decide(state, observed, now).do, 'record-end');
+});
+
+test('a settled task is decided nothing before anything is observed of it, on any pass — its state is final and would refuse every event', () => {
+  for (const outcome of ['succeeded', 'failed', 'stopped'] as const) {
+    const state = fold(TASK, [...JOURNALS.spawned!, { kind: 'settled', at: at(3 * S), outcome }]);
+    assert.equal(settledQuiet(state), true);
+    const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
+    const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
+    assert.deepEqual(decide(state, observed, now), { do: 'nothing', why: `settled: ${outcome}` }, 'no refusal on it');
+    // What the short-circuit saves: asked, the machine would refuse it.
+    assert.ok(FINAL.has(lifecycleOf(state)));
+    assert.deepEqual(transition(lifecycleOf(state), observe(state, observed, now)), { refused: { state: lifecycleOf(state), event: 'SETTLED' } });
+  }
+  assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned!)), false);
+});
+
+test('the machine: its states are the ones named, each edge names one action, and every state but a final one leaves or holds by an edge', () => {
+  assert.deepEqual(Object.keys(MACHINE.root.states), [...STATES]);
+  assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
+  const actions = new Set(['nothing', 'start', 'spawn', 'record-end', 'stop', 'settle']);
+  for (const e of edgesOf()) assert.ok(actions.has(e.action), `${e.from} on ${e.event} does ${e.action}, not one action`);
+  for (const s of STATES) if (!FINAL.has(s)) assert.ok(edgesOf().some((e) => e.from === s), `${s} has no edge`);
+  // Reachable from where a task begins, or entered by a person's word, which its verb journals and no pass moves by
+  // (`requestStop`, `answer`, `close`): the stop from any state not final, an answer or a close from a turn that waits.
+  const reached = new Set<string>(['submitted', 'stopping']);
+  for (let grew = true; grew;) { grew = false; for (const e of edgesOf()) if (reached.has(e.from) && !reached.has(e.to)) { reached.add(e.to); grew = true; } }
+  assert.deepEqual(STATES.filter((s) => !reached.has(s)), []);
+  // Guarded edges fall through to one with no guard, so a guard never leaves an event unanswered by accident.
+  const last = new Map(edgesOf().map((e) => [`${e.from} ${e.event}`, e]));
+  for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
+});
+
+test("the README's lifecycle diagram is the machine's, generated", () => {
+  const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const block = readme.match(/<!-- lifecycle:begin.*-->\n```mermaid\n([\s\S]*?)\n```\n<!-- lifecycle:end -->/);
+  assert.ok(block, 'the README holds the diagram between its markers');
+  assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/lifecycle.ts\').then((m) => console.log(m.diagram()))"');
+  assert.notEqual(diagram(machineWithout('working', 'LOST')), diagram(), 'the pin sees an edge taken away');
+});

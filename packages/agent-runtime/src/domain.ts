@@ -23,6 +23,7 @@
  */
 
 import type { HarnessArgs } from './harness-args.ts';
+import { transition, type LifecycleEvent, type LifecycleState, type Move, type Refusal } from './lifecycle.ts';
 
 /**
  * What a harness reports for a session. Exactly the documented `state` values, no more.
@@ -526,14 +527,14 @@ export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
 // ─── the decision ───────────────────────────────────────────────────────────
 
 export type Action =
-  /** Nothing to do. Not an error — the common case on a busy board. */
-  | { do: 'nothing'; why: string }
+  /** Nothing to do. Not an error — the common case on a busy board. `refused` when the lifecycle has no edge for what was seen. */
+  | { do: 'nothing'; why: string; refused?: Refusal }
   /** Journal the intent to run attempt N, continuing `resumeFrom`, what its turn continues — told `nudge`, a later turn's answer, instead of the brief. */
   | { do: 'start'; attempt: number; resumeFrom?: string; nudge?: string }
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
-  /** The harness says this attempt is over. Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean }
+  /** The harness says this attempt is over — or, `unstartable`, refused to start it, in its words (`error`). Write it down. */
+  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; error?: string }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -547,40 +548,58 @@ export type Now = {
 };
 
 /**
+ * A settled task: nothing is observed of it and nothing is decided, on any pass. `decide`'s first question, ahead of the
+ * lifecycle — a settled task's state is final and takes no event, so asking would refuse every settled task in the store
+ * on every pass — and the one a pass may ask to skip a settled task before it reads anything else of it.
+ */
+export const settledQuiet = (state: State): boolean => state.settled !== null;
+
+/**
  * One step toward the desired state. Pure, total, and safe to call as often as you like —
  * calling it twice in a row with the same inputs returns the same answer, which is the whole
  * definition of level-triggered.
+ *
+ * Since thin runtime stage 5, three readings and a move: where the task stands, read off its journal (`lifecycleOf`);
+ * what the pass saw of it (`observe`); and the lifecycle's edge for that event in that state (`transition`, in
+ * `lifecycle.ts`), which names the next state and the one action. An event with no edge is refused, and the refusal is
+ * the answer: nothing is done, and the pass reports it. `move` is the lifecycle's; a test hands another to plant a refusal.
  */
-export function decide(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): Action {
-  if (state.settled) return { do: 'nothing', why: `settled: ${state.settled}` };
+export function decide(state: State, observed: ReadonlyMap<string, Sighting>, now: Now, move: Move = transition): Action {
+  if (settledQuiet(state)) return { do: 'nothing', why: `settled: ${state.settled}` };
+  const from = lifecycleOf(state);
+  const event = observe(state, observed, now);
+  const moved = move(from, event);
+  return 'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on ${event.type}`, refused: moved.refused } : moved.action;
+}
 
+/**
+ * Where a task stands in its lifecycle, off its journal alone: the state `decide` moves it from. The same journal reads the
+ * same state after any restart, so the machine keeps nothing, and a state is only what the record can tell apart — a
+ * session blocked on a person is `working` here, and its sighting says the rest.
+ */
+export function lifecycleOf(state: State): LifecycleState {
+  if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
+  // The operator's intent outranks everything except a terminal state.
+  if (state.stopRequested) return 'stopping';
+  const last = state.attempts.at(-1);
+  if (last && last.ended === null) return last.spawnedAt ? 'working' : 'starting';
+  if (state.holdOpen && state.closed) return 'ending';
+  if (waitsForInput(state)) return 'input-required';
+  return turnOf(state).attempts.length > 0 ? 'ending' : 'submitted';
+}
+
+/**
+ * What a pass saw of a task: one event, from its journal and the pass's sightings, recomputed on every pass. It names what
+ * was seen — the harness let the session go, the deadline passed, nothing runs and the turn ended `failed` — and never
+ * what to do about it, which is the edge's.
+ */
+export function observe(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): LifecycleEvent {
+  if (state.settled) return { type: 'SETTLED', outcome: state.settled };
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
-  const live = last !== undefined && last.ended === null && sighting !== undefined && isLive(sighting.state);
-
-  // An attempt cut short is ended before its task settles: with its harness's own end, statement untouched, when it
-  // had one before the cut came; otherwise with the cut as its reason. Never settled open, with neither.
-  const cut = (reason: 'operator' | 'deadline'): Action | undefined =>
-    !last || last.ended !== null ? undefined
-      : sighting?.state === 'done' || sighting?.state === 'failed' ? endOf(state, last, sighting)
-      : { do: 'record-end', attempt: last.n, sessionId: sighting?.sessionId ?? '(never seen)', observed: reason === 'operator' ? 'stopped' : 'failed',
-          reason, nativeId: sighting?.nativeId, closeout: sighting?.closeout?.payload };
-
-  // The operator's intent outranks everything except a terminal state.
-  if (state.stopRequested) {
-    if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'operator' };
-    return cut('operator') ?? { do: 'settle', outcome: 'stopped', note: 'operator' };
-  }
-
-  // ---- a task held open (R1), with no attempt in flight: closed, it settles on how its last attempt ended; signed, it
-  // waits on a person for as long as they take — before the deadline, which times work, not a person reading it.
   const turn = turnOf(state);
-  if (state.holdOpen && (!last || last.ended !== null)) {
-    if (state.closed) return last?.ended === 'done' ? { do: 'settle', outcome: 'succeeded', note: 'closed' } : { do: 'settle', outcome: 'failed', note: `closed${last ? `: attempt ${last.n} ended ${last.ended}` : ' before any attempt'}` };
-    if (waitsForInput(state)) return { do: 'nothing', why: 'input-required' };
-  }
 
-  // ---- the deadline, over the time the task has actually been RUNNING — its current turn, for a task held open.
+  // The deadline, over the time the task has actually been RUNNING — its current turn, for a task held open.
   //
   // Measured from the first attempt's intent rather than from filing: a task queued for admission
   // has not started burning its time, and a deadline that expires in the queue would be a
@@ -588,79 +607,68 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   //
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
   // forever, as far as every other rule here is concerned.
-  //
-  // It stops what runs and settles what it cut; an end its harness recorded is judged by that end, below, and no attempt
-  // follows an ended one. A pass steps a task until nothing moves, so an end recorded past the deadline is read past it
-  // too: before 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end.
-  if (state.deadlineSeconds !== undefined && turn.attempts.length > 0) {
-    const ranFor = now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime();
-    if (ranFor > state.deadlineSeconds * 1000) {
-      if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
-      const ending = cut('deadline');
-      if (ending) return ending;
-      if (last?.reason === 'deadline') return { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
+  const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime() : 0;
+  const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
+
+  // ---- an attempt is in flight.
+  if (last && last.ended === null) {
+    // It stops what runs and ends what it cut; an end its harness recorded is judged by that end, as it would be in time.
+    // A pass steps a task until nothing moves, so an end recorded past the deadline is read past it too: before
+    // 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end. A person's
+    // stop outranks the deadline.
+    const endedOwn = sighting?.state === 'done' || sighting?.state === 'failed';
+    if (overdue && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
+    // Note the order: the SIGHTING is read before our own `spawnedAt`. A crash between the spawn call and its journal
+    // entry leaves a session running under a name we can still find, so it is adopted rather than started a second
+    // time. That is the whole reason the name is ours.
+    if (sighting) {
+      const ending = sighting.state === 'working' ? 'done' : sighting.state;
+      const seen = {
+        attempt: last.n, sighting, asked: state.closeoutSchema !== undefined,
+        holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
+      };
+      // Quiet and working: its runner holds it has stopped, and that is its end. Whether it gave the statement its task
+      // asked for is recorded beside it (`stated`), and judged by the layer above: the engine reports, and never nudges.
+      if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
+      if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
+      return { type: sighting.state === 'stopped' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
     }
+    if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
+    // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
+    // race measured in seconds) or the session is gone. A grace window tells the two apart.
+    return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs ? { type: 'UNSEEN_IN_GRACE', attempt: last.n } : { type: 'LOST', attempt: last.n };
   }
 
-  // ---- no attempt in flight: either the turn's attempt has ended, and settles the task, or the turn starts its one.
-  // Judged on the current turn's attempts, which are all of them for a task not held open. One attempt per start: trying
-  // again — lost, unstartable or failed — is the layer above's, a new filing that continues the session it names.
-  if (!last || last.ended !== null) {
-    const ended = turn.attempts.at(-1);
-    if (ended?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
-    if (ended?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
-    // A journal from before stage 4a part 2 may hold several attempts of a turn: the note counts them all.
-    const none = `${turn.attempts.length} attempt(s)${turn.n ? ` of turn ${turn.n}` : ''}, none succeeded`;
-    // An end the engine judged `unsigned`, in a journal from before stage 4a: settled with the note it always had.
-    if (ended?.reason === 'unsigned') return { do: 'settle', outcome: 'failed', note: `${none}: the last ended without the closing statement it was asked for` };
-    if (ended) return { do: 'settle', outcome: 'failed', note: none };
-    // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
-    if (turn.n > 0 && !turn.continues) return { do: 'settle', outcome: 'failed', note: `turn ${turn.n} has no session to continue: its harness recorded none for the attempt that signed` };
-    // A queued turn waits for the layer above's word, and is started by the pass after the one that wrote it (stage 4c).
-    // Checked after every terminal answer, so a queued task can still settle.
-    if (awaitsAdmission(state)) return { do: 'nothing', why: 'queued — waits to be admitted' };
-    // The first turn continues what the task was filed against; a later one, the session that signed the turn before it.
-    const resumeFrom = turn.continues;
-    // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
-    // would share one conversation.
-    if (resumeFrom && sighting && isLive(sighting.state)) return { do: 'stop', sessionId: sighting.sessionId, why: 'to continue it' };
-    // In a later turn, told the person's answer; else the brief.
-    const nudge = turn.words;
-    return { do: 'start', attempt: state.attempts.length + 1, resumeFrom, ...(nudge ? { nudge } : {}) };
-  }
-
-  // ---- an attempt is in flight. What does the machine say about the name we gave it?
-  //
-  // Note the order: the SIGHTING is checked before our own `spawnedAt`. A crash between the
-  // spawn call and its journal entry leaves a session running under a name we can still find,
-  // so it is adopted rather than started a second time. That is the whole reason the name is ours.
-  if (sighting) {
-    // Quiet and working: its runner holds it has stopped, and that is its end. Whether it gave the statement its task
-    // asked for is recorded beside it (`stated`), and judged by the layer above: the engine reports, and never nudges.
-    const quiet = sighting.state === 'working' && sighting.quietMs !== undefined;
-    if (isLive(sighting.state) && !quiet) {
-      return { do: 'nothing', why: NEEDS_HUMAN.has(sighting.state) ? 'blocked — needs a person' : `running (${sighting.state})` };
-    }
-    return endOf(state, last, sighting);
-  }
-
-  if (!last.spawnedAt) return { do: 'spawn', attempt: last.n, name: nameFor(state.taskId, last.n) };
-
-  // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
-  // race measured in seconds) or the session is gone. A grace window tells the two apart.
-  const age = now.at.getTime() - new Date(last.spawnedAt).getTime();
-  return age < now.graceMs
-    ? { do: 'nothing', why: 'spawned, waiting for the harness to register it' }
-    : { do: 'record-end', attempt: last.n, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
+  // ---- nothing in flight.
+  if (state.stopRequested) return { type: 'NOTHING_OPEN' };
+  // A task held open (R1): closed, it settles on how its last attempt ended; signed, it waits on a person for as long as
+  // they take — before the deadline, which times work, not a person reading it.
+  if (state.holdOpen && state.closed) return { type: 'CLOSED', ...(last ? { last: { n: last.n, ended: last.ended } } : {}) };
+  if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
+  if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
+  // Judged on the current turn's attempts, which are all of them for a task not held open. One attempt per start.
+  const ended = turn.attempts.at(-1);
+  if (ended) return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts: turn.attempts.length, turn: turn.n };
+  if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
+  // A queued turn waits for the layer above's word, and is started by the pass after the one that wrote it (stage 4c).
+  // Read after every terminal answer, so a queued task can still settle.
+  if (awaitsAdmission(state)) return { type: 'QUEUED' };
+  // The first turn continues what the task was filed against; a later one, the session that signed the turn before it —
+  // which is stopped first if its harness still holds it.
+  if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
+  // In a later turn, told the person's answer; else the brief.
+  return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
 }
 
-/** The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. */
-function endOf(state: State, last: Attempt, sighting: Sighting): Action {
-  const quiet = sighting.state === 'working';
-  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: quiet ? 'done' : sighting.state,
-    reason: 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload,
-    // Whether the statement its task asked for came: a fact for the layer above, which judges it.
-    ...(state.closeoutSchema !== undefined ? { stated: sighting.closeout !== undefined } : {}) };
+/**
+ * The answer to a spawn its harness refused — nothing started — as the lifecycle gives it: the attempt's `unstartable` end,
+ * in the harness's words, or the refusal when the lifecycle has no edge for it. Asked by the engine, the one place that
+ * learns of it, so that every move of a task is an edge.
+ */
+export function spawnRefused(state: State, attempt: number, error: string, move: Move = transition): Action {
+  const from = lifecycleOf(state);
+  const moved = move(from, { type: 'SPAWN_REFUSED', attempt, error });
+  return 'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused } : moved.action;
 }
 
 const isLive = (o: Observed | undefined): boolean =>

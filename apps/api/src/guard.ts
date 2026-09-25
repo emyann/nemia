@@ -1,7 +1,7 @@
 /**
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
- * Sixteen writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
+ * Seventeen writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
  * for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts), each of which writes a
  * person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's
  * approval file, or an acceptance of a loop out of rounds as it stands (`POST /api/runs/:id/steps/:step/accept`, asks.ts), which writes a
@@ -12,8 +12,9 @@
  * the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts — each of which writes the store's `workflows/`, and removes a
  * step's file the folder no longer has; and an agent of yours made (`POST /api/agents/yours`), put back or renamed
  * (`PUT /api/agents/yours/:name`) or removed (`DELETE /api/agents/yours/:name`), agents.ts — each of which writes the store's
- * `workflows/agents/`, what every step naming the agent is told; and a skill HKB ships copied into your library (`POST /api/skills/yours`,
- * skills.ts), which writes the store's `workflows/skills/`, what every agent of yours giving it is told. Each is what an agent acts on in the repository — once a tick files it, or at once, or once a person
+ * `workflows/agents/`, what every step naming the agent is told; and a skill of yours made — written on the board, or one HKB ships copied
+ * into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:` alone (`PUT /api/skills/yours/:name`), skills.ts, each of
+ * which writes the store's `workflows/skills/`, what every agent giving it is told. Each is what an agent acts on in the repository — once a tick files it, or at once, or once a person
  * starts the card or the workflow, or once a run slot frees for a queued card — or a person's idea or step gone, or its place, so a page on
  * another site must not be able to make any of them; and a `fetch` with a body, from any page, reaches
  * the api without the browser asking it first, unless the body is JSON.

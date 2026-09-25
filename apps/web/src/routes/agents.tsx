@@ -97,9 +97,12 @@ function AgentCard({ agent }: { agent: AgentListing }) {
         <FromBadge from={agent.from} />
       </header>
       {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
-      {agent.error === null && (
-        <Skills skills={agent.card?.list} none={<>Says nothing it can do: no {code('card:')} file beside it.</>} />
-      )}
+      {agent.error === null &&
+        (agent.cardError !== null ? (
+          <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.cardError}</p>
+        ) : (
+          <Skills skills={agent.card} />
+        ))}
       {agent.error !== null ? (
         <p className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.error}</p>
       ) : (

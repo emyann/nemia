@@ -2254,3 +2254,26 @@ test("the run page's gate draws what is being approved beside Approve and Send b
   const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', framed: false }));
   assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
 });
+
+test("an agent's form shows its card read-only, generated from its skills: an entry each, no field to edit it, and the package's refusal where none can be made", async () => {
+  const { AgentForm } = await import('../src/components/AgentForm.tsx');
+  const agent = {
+    name: 'scribe', from: 'yours' as const, dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read, Skill' }, body: 'Write.\n',
+    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, cardError: null,
+    card: [
+      { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'] },
+      { id: 'file-it', name: 'File it away', description: 'Files a note where it belongs.', tags: ['file-it'] },
+    ],
+  };
+  const form = (listing: typeof agent | null) => renderToStaticMarkup(createElement(AgentForm, { listing, keyForm: undefined, saving: false, refusal: null, onSave: () => {} }));
+  const html = form(agent);
+  assert.deepEqual([...html.matchAll(/data-agent-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'file-it'], 'an entry for each skill, in its order');
+  assert.ok(textsOf(html).includes('Write a note') && textsOf(html).includes('Files a note where it belongs.'));
+  assert.doesNotMatch(html, /Card file|Its card|skills\.json/, 'no field edits it, and no card file is named');
+  assert.match(html, /Generated from its skills/);
+  const refused = form({ ...agent, card: null, cardError: 'agents/scribe.md gives the skill `file-it`, and no skills folder has it' } as never);
+  assert.match(refused, /data-card-error/);
+  assert.ok(textsOf(refused).some((t) => t.startsWith('agents/scribe.md gives the skill `file-it`, and no skills folder has it')));
+  assert.doesNotMatch(refused, /data-agent-skill/);
+  assert.match(form(null), /data-card-generated[^>]*>[^<]*Shown once it is saved\./, 'a new agent has no card until it is saved');
+});

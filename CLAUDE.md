@@ -532,6 +532,15 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   untyped tests for the old key, read the passing ones too, and check a comparison still fails with a mutant (learned by the run
   that made the harness's arguments one `config`). The runtime refuses the old place at `file` (`argsRefusalOf`), which is how an
   untyped `...(worktree ? { worktree: true } : {})` in its own tests was found at all.
+- **A flag only Claude Code has is filed under `config.claude`, never as a harness argument of its own.** The runtime grows no named
+  field per harness flag (the owner, 2026-09-25). A key stays named on `HarnessArgs` only when more than one harness is given it,
+  another harness translates it (`worktree`), a spec declares it or a layer judges it (`contextTokens`), or it chooses the runtime's
+  own process (`background`). A key moved into the bag is read at its old place off a journal (`upgrade` in `journal.ts`) and refused
+  there at both doors (`FORMER_ARGS` in `harness-args.ts`), at any value, `false` included, so a caller still writing
+  `remoteControl: step.remote` is told where it went. And in the bag a flag reaches every spec that spells the bag out, `claude -p`
+  ones included, where the named key reached only `--bg`: a flag a job cannot take is refused by the job's own spec
+  (`claudePrintRefuses`). Pin the argv before a move and compare after (`agent-orchestrator/test/argv.test.ts`; learned by the run
+  that moved `remoteControl`).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages are the main checkout's, hardlinked file by file into directories of the

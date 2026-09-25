@@ -42,10 +42,17 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `remoteControl`, `worktree`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
+
+**No named field per harness flag** (the owner, 2026-09-25). A flag only Claude Code has goes under `claude`; a key is named
+on `HarnessArgs` only when more than one harness is given it (the model, the effort, the tools, the fence, `mcp`, the budget),
+another harness translates it (`worktree`, which Codex turns into a worktree of its own and the A2A release carries), a spec
+declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
+into the bag is read at its old place off a journal (`upgrade` in `src/journal.ts`) and refused there at both doors, naming
+the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
 
 ### One attempt per start
 
@@ -709,43 +716,48 @@ the `cost-state` Claude Code writes as it exits, which counts the summary's call
 
 `ae start` takes `contextTokens: 200000` in a brief, digits only, and `ae show` prints it.
 
-## Reachable from a phone: `remoteControl`
+## Reachable from a phone: `claude.remoteControl`
 
-`remoteControl: true` bridges a task's Claude Code session to claude.ai: `claude --bg` is given `--remote-control`, and
-the session is listed in the web's agents view, where it can be **driven** — typed into, its prompts answered, stopped —
-from a browser or a phone, by anyone signed in to the account, and not only seen. That is why it is never a default. A
-field on the task, carried on the `filed` event and `State`, read only by the Claude runner, on every attempt's spawn;
-`decide` never reads it. The Kubernetes neighbour is a container's `stdin` and `tty`: whether anything may attach to the
-workload, declared on the workload.
+`config: { background: true, claude: { remoteControl: true } }` bridges a task's Claude Code session to claude.ai: `claude --bg`
+is given `--remote-control`, and the session is listed in the web's agents view, where it can be **driven** — typed into, its
+prompts answered, stopped — from a browser or a phone, by anyone signed in to the account, and not only seen. That is why it is
+never a default. Claude Code's own flag, among its others under `claude` (below), carried on the `filed` event and `State`, read
+only by the Claude runner, on every attempt's spawn; `decide` never reads it. The Kubernetes neighbour is a container's `stdin`
+and `tty`: whether anything may attach to the workload, declared on the workload.
 
-| harness | `remoteControl: true` |
+| harness | `claude.remoteControl` |
 |---|---|
 | `claude` with `background: true` | `--remote-control`, on every attempt |
 | `claude`, a job | refused at `file()`: file it with `background: true`, since a job runs a prompt and exits |
-| `claude-detached` | refused at `file()`: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
+| `claude-detached` | refused at `file()`, and by its spec at the Effect door: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
 | `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
-| a `PromiseRunner` | asked nothing: handed `remoteControl` on the spawn, to honour or not |
+| a `PromiseRunner` | asked nothing: handed `claude.remoteControl` on the spawn, to honour or not |
+
+**It was a harness argument of its own until 2026-09-25**, `config.remoteControl`. That place is refused at both doors, at any
+value, `false` included, at the top level too, naming the new one (`FORMER_ARGS` in `src/harness-args.ts`), and a journal
+filed before reads as filed under `claude` (`upgrade` in `src/journal.ts`): `true` as the flag, first in the bag, and `false`,
+which asked for nothing, dropped. Nothing on disk is rewritten. The argv did not move: `packages/agent-orchestrator/test/argv.test.ts`
+pins what the shipped supervisor and dev's implement are spawned with, recorded before the move.
 
 **Measured before it was built** (2026-09-16, Claude Code 2.1.273, three throwaway haiku sessions): a `claude --bg`
 session is listed in the agents view only when its registration under `~/.claude/sessions/` carries a
 `bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appeared, from a
 clean environment or from a daemon's. A worker of 2.1.266 carried one unasked, so Claude Code used to bridge background
-sessions on its own. **Measured again under the engine** by `test/live.test.ts` (2.1.274): a session filed with
-`remoteControl: true` registered with a `bridgeSessionId`, and an identical one filed without it registered with none.
+sessions on its own. **Measured again under the engine** by `test/live.test.ts` (2.1.274): a session filed bridged
+registered with a `bridgeSessionId`, and an identical one filed without it registered with none.
 
 **`--remote-control [name]` takes an optional value** — the `--worktree` trap: directly before the prompt, it would take
-the prompt as the session's name. So it goes before `--permission-mode`, which always follows, and no name is given;
-Claude Code names the session itself. `remoteControl: false` asks for nothing and is filed on any harness; a value that
-is not true or false is refused. It is not a key a brief has. What it leaves open — nothing reads whether a session was
-bridged, and what a person types into it from the web is not journalled — is open issue 23.
+the prompt as the session's name. The bag goes before `--permission-mode`, which always follows, so `true` names nothing and
+Claude Code names the session itself; a string is the name. It is not a key a brief has. What it leaves open — nothing reads
+whether a session was bridged, and what a person types into it from the web is not journalled — is open issue 23.
 
 ## Claude Code's own flags: `claude`
 
 `config: { claude: { appendSystemPromptFile: '/…/prompt.md', pluginDir: ['/…/hkb-note'] } }` hands Claude Code flags as they
 are written: a key is the long flag in camelCase (`--append-system-prompt-file`), `true` the flag alone, a string or a number
 the flag and its value, and a list the flag once per entry. They go after the variadic lists and directly before
-`--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The four
-agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings` — are typed
+`--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The five
+agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `pluginDir`, `settings`, and `remoteControl` (above) — are typed
 (`ClaudeFlags`), and any other the CLI has is taken. It is how an agent's body reaches the system prompt and its skills a
 plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
 

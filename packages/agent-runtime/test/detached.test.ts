@@ -551,11 +551,22 @@ test('the composite tells each harness only the sessions routed to it, and lists
     { name: 'ae/x/1', harness: 'alpha' }, { name: 'ae/y/1', harness: 'beta' },
     { name: 'ae/w/1' }, { name: 'ae/v/1', harness: 'gone' },
   ]));
-  assert.deepEqual(told, { alpha: ['ae/x/1', 'ae/w/1', 'ae/v/1'], beta: ['ae/y/1'] }, 'no harness, or one not here, is the fallback, where its spawn went');
+  assert.deepEqual(told, { alpha: ['ae/x/1', 'ae/w/1'], beta: ['ae/y/1'] }, 'no harness is the fallback, where its spawn went');
   assert.deepEqual([...merged.seen.keys()].sort(), ['ae/x/1', 'ae/y/1', 'ae/z/1'], 'a harness without the verb is observed all the same');
-  assert.deepEqual(merged.unread, new Set());
+  assert.deepEqual(merged.unread, new Set(['ae/v/1']), 'a harness not here is read by nobody: its name is neither there nor gone');
   await Effect.runPromise(ops.stop('s-b'));
   assert.equal(b.get('ae/y/1')?.state, 'canceled', 'and who owns what is learned from it, as from observe');
+});
+
+test('a task on a harness the composite does not have is spawned nowhere: refused, and never on the fallback', async () => {
+  const a = new Map<string, Sighting>();
+  const ops = composite({ alpha: testOps({ sessions: a }) }, 'alpha');
+
+  const e = await Effect.runPromise(Effect.flip(ops.spawn({ name: 'ae/v/1', brief: '', cwd: '/', harness: 'a2a:reviewer' })));
+  assert.equal(e.refused, true, 'nothing started, which the harness vouches for, so the attempt ends `unstartable` and is never adopted');
+  assert.match(e.message, /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started.*Its harnesses are: alpha\./);
+  assert.deepEqual([...a.keys()], [], 'the fallback was not handed it');
+  assert.equal(ops.refuses?.({ brief: '', cwd: '/', harness: 'a2a:reviewer' }), undefined, "and no other harness's vocabulary is asked of it");
 });
 
 test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {

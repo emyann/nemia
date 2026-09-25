@@ -1528,6 +1528,13 @@ next pass that reads it. A harness's `unread` crosses the A2A seam beside its Ta
 something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
 reads an unread harness as nothing.
 
+A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
+refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
+neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
+harness and the ones the engine has), so nothing starts; and a view of it is read off the record, asking no harness. Before 2026-09-25 it
+ran on the first harness: a queued remote task was spawned as a Claude Code job in its workspace, and one at work on the agent was looked
+for in Claude Code's listing and ended `lost` (found in review of thin runtime stage 6, part 2, round 3).
+
 What a blocked session waits for is the harness's own word, carried and never judged: Claude Code prints
 `waitingFor: 'permission prompt'` beside `state: 'blocked'`, `observe` puts it on the sighting, and `view` puts it
 on the task as `waitingFor` where the phase is `needs-human`. It is a container's `state.waiting.reason`, not an

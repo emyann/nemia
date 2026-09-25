@@ -251,7 +251,7 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
   }
 });
 
-test("a view asks its task's own harness and no other — and a task whose harness the engine no longer has is viewed on the fallback, as its logs are", async () => {
+test("a view asks its task's own harness and no other — and a task whose harness the engine no longer has is viewed off its record, asking no harness", async () => {
   /** A harness that cannot `find`, as a `check` or Codex cannot, and counts every observe. */
   const harness = (label: string) => {
     const sessions = new Map<string, Sighting>();
@@ -281,13 +281,17 @@ test("a view asks its task's own harness and no other — and a task whose harne
   assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");
   assert.equal(b.counts.observe, before.b + 2, "each read of the task in flight asks b's, once; the settled task's, none (`settled-view.test.ts`)");
 
-  // The same board, without b. `harnessOf` falls back to `defaultHarness`, not to the first harness named.
+  // The same board, without b. No other harness can name b's sessions, so none is asked: the view is the record's, as the pass reads
+  // such a task (`composite`: its names unread, its spawn refused). Before 2026-09-25 it was viewed on the fallback, where a remote
+  // agent's Task was looked for in Claude Code's registry on every view (found in review of thin runtime stage 6, part 2, round 3).
   const c = harness('c');
   for (const [name, s] of b.sessions) c.sessions.set(name, s);
   const reopened = createEngine({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' });
   const at = { a: a.counts.observe, c: c.counts.observe };
-  assert.equal((await reopened.view(running)).phase, 'running (working)', "viewed on the fallback's registry");
-  assert.equal(await reopened.logs(running), 'c logs of b-1', 'where its logs are read');
-  assert.equal(a.counts.observe, at.a, 'never on the first harness named');
-  assert.equal(c.counts.observe, at.c + 2);
+  const recorded = await reopened.view(running);
+  assert.equal(recorded.phase, 'starting', 'what the record says of an attempt it has seen spawned and nothing since');
+  assert.equal(recorded.state.attempts[0]?.ended, null, 'held open, not ended');
+  assert.equal(await reopened.logs(running), '(no session yet)', 'no harness it has can name the session');
+  assert.equal((await reopened.view(settled)).phase, 'succeeded', 'a settled task reads as ever');
+  assert.deepEqual({ a: a.counts.observe, c: c.counts.observe }, at, 'neither the first harness named nor the fallback was asked');
 });

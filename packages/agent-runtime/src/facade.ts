@@ -485,7 +485,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> =>
     Effect.runPromise(e.pipe(Effect.provide(layer)));
 
-  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has. */
+  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has, whose view asks none (`viewOf`). */
   const harnessOf = (state: State) => {
     const asked = state.harness ?? fallback;
     return Object.hasOwn(runners, asked) ? asked : fallback;
@@ -525,6 +525,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // The fold already made, never a second read of the journal: `view` reads it again, which made every view two reads (measured
     // 2026-09-25: `wf ls` read 418 journals for 209 tasks).
     const recorded = Effect.sync(() => viewOfState(state, new Map()));
+    // A harness this engine does not have is asked nothing: the record is all there is, as the pass reads it (`composite`).
+    if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;
     if (!state.settled && (!find || last?.ended === null)) return yield* observed;
     if (!last || (find && last.nativeId)) return yield* recorded;
     const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;

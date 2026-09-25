@@ -468,9 +468,11 @@ What it leaves:
   `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.
   Reading `where.file`/`where.line` and `where.page`/`where.theme` there is a few lines and a case in
   `test/run.test.ts`, outside this change's files. The board reads no finding's place, so it needs nothing.
-- **The pictures `review` reads are the check's.** `implement`'s check runs `npm run e2e` into the directory its
-  `screenshots` name, after it signs off and before `review` is filed, so each round's reviewer reads the
-  change as it stands under the same paths. A photograph `implement` takes with the browser is not among them.
+- **The pictures `review` reads were the check's, until 2026-09-25.** `implement`'s check ran `npm run e2e` into the directory its
+  `screenshots` name, after it signed off and before `review` was filed, so each round's reviewer read the
+  change as it stood under the same paths. A photograph `implement` takes with the browser is not among them. Since the
+  e2e left the rounds' checks (*Shipped: the e2e runs once, on the merged tree*), the pictures are implement's own run
+  alone, which its brief asks for after its last commit each round and nothing checks.
 
 ## Shipped: the decider screen
 
@@ -3828,6 +3830,37 @@ What it leaves:
   main. Leaving `packages/` out was the ask's choice (§6, P0.6: the packages' sources reach no browser); adding
   `packages/agent-orchestrator/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
   e2e on most package runs.
+## Shipped: the e2e runs once, on the merged tree
+
+The owner's decision of 2026-09-25. Over the 113 checks since 2026-09-20 a round's check took a median 6.0 min (p90 6.8), the e2e 3-4
+of them, and every implement round ran it before the ship ran it again on the merged tree: about 25 minutes of checks for a three-round
+run, and the e2e seldom changed a review's verdict between rounds.
+
+- **Every shipped folder with an e2e ends its build the same way:** `if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a
+  round's check; …"; else npm run e2e; fi` — `dev` and `dev-planned` inside their touched-paths condition, `dev-build`,
+  `dev-planned-build`, `ui` and the package's `ui` after an unconditional build. A round's check, which the run gives `WF_BASE_REF` on
+  every git run, builds and says why no e2e ran; the shipper's run of the line, mid-merge with nothing set, runs it.
+- **Keyed on that variable, not on `WF_STEP` or a key on `ship.md`.** The ship has no `check:`; it runs `workChecks`' line by hand, so
+  the run never executes a check as `ship` and `WF_STEP=ship` never occurs. A ship-only key would be a `STEP_KEYS` change with its three
+  obligations outside the package, and would not reach `ui`, which has no ship. The line stays in the frozen folder and says both halves,
+  and anything that runs it without the run's environment — the shipper, a person merging a ui run by hand — runs the whole of it.
+- **The screenshots the ui reviewer reads are implement's own run** into its files directory, after its last commit each round; the
+  implementer's brief asks for the same run when its work changes a page, and CLAUDE.md says so.
+- **Tests.** `test/web-check.test.ts` runs each of the six folders' lines as a round's check (the build, no e2e, and the line saying so)
+  and by the shipper's hand mid-merge (the build and the e2e); the lines with the e2e put back in every round, as they were, run it in a
+  round, and a failing e2e fails the merge's check and cannot fail a round's; an empty `WF_BASE_REF` runs it. The pins moved on
+  purpose: `KEYS_CHANGED` and `BODIES_REWORDED` in `agents-before-after.test.ts`, `git-runs-before.json`, and the api's picture of `dev`
+  and `dev-build`.
+
+What it leaves:
+
+- **`ui` has no ship, so no check the run executes runs its e2e.** It rests on the implementer's own run, which is a brief's words,
+  and on whoever merges running the folder's line by hand. A gated `ship.md` for `ui` would give it the dev folders' guarantee.
+- **A web break the e2e would have caught in a round surfaces at the ship**, as an aborted merge and a `wf retry` late rather than a
+  failed round early.
+- **The ship's e2e depends on the shipper's shell having no `WF_BASE_REF`.** A daemon started from a shell that carries one would skip
+  it there, as it would already read the wrong range for `dev`'s condition; the brief says to set nothing, and nothing refuses it.
+- **Runs started before keep their frozen folder**, and run the e2e every round until they finish.
 ## Shipped: every run of an agent ends in its statement or the reason it has none (P0.5)
 
 docs/pivot-2026-09-18.md, P0.5. A session asked for a closing statement could still end, by the harness's `done`, with none, and settle
@@ -4323,6 +4356,38 @@ refuse them (`formerKeyWritten`): the api answers 422, saying the name is the fo
 shipped folder, which now says `disallowedTools:`, a key it does not know, and refuses the start — loudly, but until it is restarted. The
 copies under the former names are written until a change removes `withFormerNames` from `recordText`, once no daemon from before
 2026-09-23 can be running.
+
+## Shipped: a codex step's sandbox under Codex's name — `sandbox:`
+
+A codex step named its sandbox `permissionMode:` until 2026-09-23: Claude Code's name for Claude Code's fence, over Codex's `-s`
+(`sandbox_mode`: `read-only`, `workspace-write`, `danger-full-access`). It is `sandbox:` now, and each harness has one fence under its
+own name. `permissionMode:` on a codex step is refused naming `sandbox:`, and `sandbox:` on a Claude Code step naming `permissionMode:`,
+at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test.ts`).
+
+- **The former line is read, not migrated,** on codex alone. `permissionMode: read-only`, `workspace-write` or `danger-full-access`
+  is read as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias for the widest sandbox, as
+  `sandbox: danger-full-access`; `wf start` prints a line naming each file to rewrite (`codexModeLine`). A word that was never a
+  sandbox — `dontAsk` on codex — is refused naming `sandbox:`, as is the former line written beside a `sandbox:`. An agent's line is
+  read against the harness the step runs on, the step's own or the agent's. A step's own fence, under either name, replaces both of its
+  agent's: a Claude Code agent's `permissionMode: dontAsk` is not given to a step that runs it on codex with a sandbox of its own — the
+  step could not unset it — and the other way round. A save of `permissionMode:` on codex is refused as the former name only when it names
+  a sandbox; a Claude Code mode a step kept when it was moved onto codex is written as sent and refused by the parser, naming `sandbox:`.
+- **A run frozen before loads**: `asNamed` reads a codex step's `permissionMode` as its `sandbox`. A record is written with the
+  sandbox under both names (`withFormerNames`), since a `wf up` from before files a codex step's `-s` from its `permissionMode` alone.
+- **The runtime is unchanged.** The engine's task still calls either fence `config.permissionMode`, and the tick files the one a step
+  has (`modeOf`). `validateFolderMode`'s judgement is unchanged, read off `modeOf`: it judges a step that says `background: true`, which
+  is refused on codex. Codex's approval policy is not a key: `codex exec` asks nobody, and the engine passes no `-a`.
+- **Outside the package**: the builder's `KINDS` (`sandbox` a harness word whose lists are `SANDBOXES`), `WorkflowStepSpec` and
+  `specOf`, the board's mirror with `UNSET`, the run detail's spec and the capabilities page's fence, the agent form's role keys and
+  label. The step and agent forms draw only the fence their harness has, and the other only where it is written, to be taken off. The
+  api's reading of an agent that does not load converts the former line as the parser does (`formerSandbox`). The shipped `review.md`
+  says `sandbox: read-only`.
+
+**What it leaves.** A board page opened before the change sends `permissionMode` on a codex step's save, and is refused (`codexModeWritten`,
+by `renderStep` and `renderAgent`, and by `writeWorkflow` where the codex harness is the agent's), saying to reload; a save of a legacy
+file that changes nothing keeps the file, former line and all. Restart `wf up` once this merges: an old daemon parses the shipped
+`review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted. The copies under
+`permissionMode` go when `withFormerNames` does.
 
 ## 1. A run that grows steps from a plan
 

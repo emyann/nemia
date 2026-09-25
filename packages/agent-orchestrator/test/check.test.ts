@@ -7,11 +7,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { codex, createEngine, type Engine } from 'agent-runtime';
-import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
+import { CHECK, CHECK_NICENESS, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, refusalSection, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
+import { modeOf } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
@@ -44,8 +46,51 @@ test('only WF_ names reach the environment — a name `env` would read as an opt
   const brief = JSON.stringify({ check: 'true', env: { WF_RUN: 'r', '-i': 'x', PATH: '/evil', WF_STEP: 7 } });
   assert.deepEqual(readCheckBrief(brief).env, { WF_RUN: 'r' });
   const { cmd, args } = CHECK.command({ brief });
-  assert.equal(cmd, 'env');
-  assert.deepEqual(args.slice(0, 3), ['WF_RUN=r', 'sh', '-c']);
+  assert.equal(cmd, 'nice');
+  assert.deepEqual(args.slice(0, 6), ['-n', '10', 'env', 'WF_RUN=r', 'sh', '-c']);
+});
+
+test('a filed check starts under `nice -n 10`, and its shell puts itself in the idle IO class before the command', () => {
+  // Several checks at once froze a workstation (CHECK_NICENESS). An agent session is filed on another harness, and never passes here.
+  assert.equal(CHECK_NICENESS, 10);
+  const { cmd, args } = CHECK.command({ brief: checkBrief('npm test', ENV) });
+  assert.deepEqual([cmd, ...args.slice(0, 3)], ['nice', '-n', '10', 'env']);
+  const script = args.at(-1)!;
+  const lines = script.split('\n');
+  const ionice = lines.findIndex((l) => /ionice -c3 -p \$\$/.test(l));
+  assert.ok(ionice >= 0 && ionice < lines.indexOf('wf_check() {'), script);
+  assert.match(lines[ionice]!, /^if command -v ionice /, 'only where the machine has it');
+});
+
+/** A PATH directory holding only the named programs, linked to where this machine keeps them. */
+const onlyPrograms = (names: string[]): string => {
+  const dir = scratch('wf-check-bin-');
+  for (const name of names) {
+    const at = execFileSync('sh', ['-c', `command -v ${name}`], { encoding: 'utf8' }).trim();
+    fs.symlinkSync(fs.realpathSync(at), path.join(dir, name));
+  }
+  return dir;
+};
+
+test("a check's own exit code comes back through `nice` — a failing command still fails", () => {
+  // What the worker gates on is the process's exit status; `nice` and `env` exec, and hand it on untouched.
+  const run = (command: string) => {
+    const { cmd, args } = CHECK.command({ brief: checkBrief(command, { ...ENV, WF_STDERR: path.join(scratch('wf-check-exit-'), 'x.stderr') }) });
+    return spawnSync(cmd, args, { encoding: 'utf8' });
+  };
+  const failed = run('exit 5');
+  assert.equal(failed.status, 5, failed.stderr);
+  assert.equal(readVerdict(failed.stdout), 5);
+  assert.equal(run('true').status, 0);
+});
+
+test('a machine without ionice still runs the check, to its own exit code', () => {
+  const bin = onlyPrograms(['nice', 'env', 'sh']);
+  const { cmd, args } = CHECK.command({ brief: checkBrief('command -v ionice || echo no-ionice; exit 7', { ...ENV, WF_STDERR: path.join(bin, 'x.stderr') }) });
+  const r = spawnSync(path.join(bin, cmd), args, { encoding: 'utf8', env: { PATH: bin } });
+  assert.equal(r.status, 7, r.stderr);
+  assert.match(r.stdout, /^no-ionice$/m, 'the check really ran with no ionice on its PATH');
+  assert.match(r.stdout, /\[wf check\] exit 7\n$/);
 });
 
 test('a step is told the command before it is judged by it, and that it comes from the run', () => {
@@ -174,6 +219,27 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
   assert.equal(readVerdict(await e.logs(hung)), 'unfinished');
 });
 
+test('LIVE: a check the engine runs is niced, and IO-idle where this machine lets it be', async () => {
+  const { e, file } = rig();
+  const id = await file('niced', 'echo "nice=$(nice)"; echo "io=$(ionice 2>/dev/null || echo none)"');
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'succeeded');
+  const log = await e.logs(id);
+  // Niceness adds to what the worker inherits from this process, and stops at 19.
+  assert.match(log, new RegExp(`^nice=${Math.min(19, os.getPriority() + CHECK_NICENESS)}$`, 'm'), log);
+  // Where an unprivileged process may take the idle class, the check is in it; elsewhere the line does nothing.
+  const idleAllowed = spawnSync('sh', ['-c', 'command -v ionice >/dev/null && ionice -c3 true']).status === 0;
+  if (idleAllowed) assert.match(log, /^io=idle$/m, log);
+});
+
+test('LIVE: a failing check still fails through `nice`, with its own exit code', async () => {
+  const { e, file } = rig();
+  const id = await file('five', 'exit 5');
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'failed');
+  assert.equal(readVerdict(await e.logs(id)), 5);
+});
+
 // ─── what this repository ships ─────────────────────────────────────────────
 
 test("this repository's own workflow checks the suite and the types after every step that edits — implement, every round — and its reviewer reads on codex, read-only, and hands its findings back as its closeout", () => {
@@ -185,7 +251,8 @@ test("this repository's own workflow checks the suite and the types after every 
   assert.equal(steps.review?.harness, 'codex');
   // Read-only again. It lost the line at C's merge because a read-only reviewer could not write the
   // REVIEW.md that respond read; the review now travels as its closeout (plan §4 J), so it writes nothing.
-  assert.equal(steps.review?.permissionMode, 'read-only');
+  assert.equal(steps.review?.sandbox, 'read-only');
+  assert.equal(steps.review?.permissionMode, undefined);
   assert.equal(steps.review?.output?.file, 'review.schema.json');
   const findings = steps.review?.output?.schema.properties.findings as { type: string; items: { required: string[] } } | undefined;
   assert.equal(findings?.type, 'array');
@@ -196,7 +263,8 @@ test("this repository's own workflow checks the suite and the types after every 
 });
 
 test('the shipped review is read-only on an engine that honours it, and that is fine: REVIEW.md is not how the review reaches implement', () => {
-  // review.md sets `permissionMode: read-only`, and the engine runs a read-only codex step `-s read-only`,
+  // review.md sets `sandbox: read-only`, the tick files it as the task's `permissionMode` (`modeOf`), and the engine runs a
+  // read-only codex step `-s read-only`,
   // so the reviewer cannot write a file. That pair was refused here while respond.md answered a REVIEW.md
   // the reviewer wrote. It is fine now because the file is not the transport: the findings are review's
   // closeout, declared with `output:`, and its `loop: implement` hands them back to implement as data. This
@@ -207,9 +275,9 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   // runtime's src/ by path, when node_modules was a link into the main checkout; docs/architecture.md now
   // refuses that route (packages/agent-runtime/test/contract.test.ts).
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
-  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: scratch('wf-check-probe-'), config: { permissionMode: 'read-only' } });
+  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: scratch('wf-check-probe-'), config: { permissionMode: steps.review && modeOf(steps.review) } });
   const sandbox = args[args.indexOf('-s') + 1];
-  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
+  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.sandbox === 'read-only';
   assert.ok(reviewCannotWrite, 'the shipped reviewer runs read-only on the engine in this tree');
   const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') || /REVIEW\.md/.test(steps.implement?.body ?? '');
   assert.ok(!(reviewCannotWrite && handedOnAsAFile),

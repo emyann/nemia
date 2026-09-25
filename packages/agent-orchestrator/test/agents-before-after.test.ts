@@ -45,11 +45,16 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * The supervisor's body moved when the packages were renamed (2026-09-23): it names the runtime's open issues and the orchestrator's
  * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
  * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
+ *
+ * The ui reviewers' bodies moved when the e2e left every round's check for the merged tree (2026-09-25): the screenshots they read are
+ * implement's own run of the e2e, no longer its check's. The implementer, ui implementer, shipper and build ships said so in the same change.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
   'workflows/ui/implement',
   'packages/agent-orchestrator/workflows/ui/implement',
+  'workflows/ui/review',
+  'packages/agent-orchestrator/workflows/ui/review',
   'workflows/supervisor/supervise',
 ];
 
@@ -98,11 +103,18 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
  * and the e2e when, and only when, the work touched the web app (docs/pivot-2026-09-18.md §6, P0.6): three runs changed `apps/web/src` on
  * `dev`, whose check was the suite and the types, and no build and no e2e ever ran on them. The line is `dev`'s own, read here rather than
  * copied, and held equal between the two folders; web-check.test.ts runs it against real git.
+ *
+ * Every implement check with an e2e moved again when the e2e left the rounds for the merged tree (2026-09-25): a round's check, which the
+ * run gives `WF_BASE_REF`, builds and runs no e2e, and the shipper's run of the line, with none, runs it. The build folders' and ui's line
+ * is dev-build's, read here too, and web-check.test.ts runs every one of them.
  */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
+const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')!.check!;
 const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
   'workflows/dev/implement': { check: DEV_CHECK },
   'workflows/dev-planned/implement': { check: DEV_CHECK },
+  ...Object.fromEntries(['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui']
+    .map((folder) => [`${folder}/implement`, { check: BUILD_CHECK }])),
 };
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */

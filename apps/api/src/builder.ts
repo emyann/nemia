@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, loadAgents, writeWorkflow } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, DENIALS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
@@ -29,7 +29,7 @@ import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, t
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
  * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
+ * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key: codex no `permissionMode`, Claude Code no `sandbox`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
  * `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`).
  * `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a
@@ -42,7 +42,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
+  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word', sandbox: 'harness-word',
   tools: 'list', disallowedTools: 'list', allowedTools: 'list', denials: 'choice', background: 'flag', remote: 'flag', deadlineSeconds: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
@@ -50,7 +50,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
 /** What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a step without the line. */
 const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] };
 
-/** The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then. The parser's, which it does not export. */
+/** The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The parser's, which it does not export. */
 export const DEFAULT_HARNESS = 'claude';
 
 /** One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are some. */
@@ -102,7 +102,7 @@ export const keyForm = (home: string = HOME): KeyForm => ({
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
     choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'denials' ? DENIALS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
-    byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : null,
+    byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : key === 'sandbox' ? SANDBOXES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],

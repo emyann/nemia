@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, draftOf, edited, formOf, ROLE_KEYS, schemaFileFor, skillsFileFor } from '../src/lib/agents.ts';
+import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, ROLE_KEYS, schemaFileFor, skillsFileFor } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -83,6 +83,28 @@ test("a key's choices are its harness's words, the default harness's when the ag
   assert.deepEqual(choicesOf(form, 'remote', 'codex'), ['true', 'false']);
   assert.equal(choicesOf(form, 'model', ''), null);
   assert.equal(choicesOf(undefined, 'effort', ''), null);
+});
+
+test("each harness has its own fence on the form: Claude Code a permission mode, codex a sandbox, and neither the other's", () => {
+  const form = {
+    defaultHarness: 'claude',
+    keys: [
+      { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'claude-detached'], byHarness: null },
+      { key: 'permissionMode', meaning: '', kind: 'harness-word', choices: null, byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] } },
+      { key: 'sandbox', meaning: '', kind: 'harness-word', choices: null, byHarness: { codex: ['read-only', 'workspace-write'] } },
+      { key: 'remote', meaning: '', kind: 'choice', choices: ['true', 'false'], byHarness: null },
+    ],
+    roleKeys: [],
+    agents: {},
+  } as unknown as KeyForm;
+  assert.deepEqual([hasKey(form, 'sandbox', 'codex'), hasKey(form, 'permissionMode', 'codex')], [true, false]);
+  assert.deepEqual([hasKey(form, 'sandbox', ''), hasKey(form, 'permissionMode', '')], [false, true], 'an agent that names no harness runs on the default, Claude Code');
+  assert.deepEqual([hasKey(form, 'sandbox', 'claude-detached'), hasKey(form, 'permissionMode', 'claude-detached')], [false, true]);
+  assert.equal(hasKey(form, 'remote', 'codex'), true, 'a key that is not a harness word is every harness\'s');
+  assert.equal(hasKey(form, 'sandbox', 'nowhere'), true, 'a harness the form does not know is judged on save, not here');
+  assert.equal(hasKey(undefined, 'sandbox', 'claude'), true, 'and nothing is hidden before the form is read');
+  assert.deepEqual(choicesOf(form, 'sandbox', 'codex'), ['read-only', 'workspace-write']);
+  assert.ok(ROLE_KEYS.includes('sandbox') && KEY_LABELS.sandbox === 'Sandbox');
 });
 
 const SAID = '[{ "id": "write-a-note", "name": "Write a note", "description": "Writes the notes of a change.", "tags": ["note"] }]\n';

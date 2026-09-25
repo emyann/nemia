@@ -192,6 +192,7 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
     lines.push(spec.tools.length > TOOLS_WRITTEN_OUT ? ['tools', String(spec.tools.length), names] : ['tools', names]);
   }
   if (spec.permissionMode) lines.push(['mode', spec.permissionMode]);
+  if (spec.sandbox) lines.push(['sandbox', spec.sandbox]);
   if (spec.loop) lines.push(['loop', `${spec.loop} · ${spec.rounds} ${spec.rounds === 1 ? 'round' : 'rounds'}`]);
   return lines;
 }

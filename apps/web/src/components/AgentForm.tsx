@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { AgentListing, AgentRoleKey, KeyForm } from '../lib/api';
-import { choicesOf, draftOf, edited, formOf, KEY_LABELS, meaningOf, schemaFileFor, skillsFileFor, type AgentForm as Form } from '../lib/agents';
+import { choicesOf, draftOf, edited, formOf, hasKey, KEY_LABELS, meaningOf, schemaFileFor, skillsFileFor, type AgentForm as Form } from '../lib/agents';
 
 /** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
 const UNSET = '(unset)';
@@ -52,6 +52,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
     />
   );
   const choice = (key: AgentRoleKey) => {
+    if (!hasKey(keyForm, key, harness)) return form.keys[key] ? text(key) : null;
     const choices = choicesOf(keyForm, key, harness);
     if (!choices) return text(key);
     return (
@@ -133,6 +134,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
           {choice('effort')}
           {text('context')}
           {choice('permissionMode')}
+          {choice('sandbox')}
           {choice('remote')}
           {text('tools')}
           {text('disallowedTools')}

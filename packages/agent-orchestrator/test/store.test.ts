@@ -1554,6 +1554,44 @@ test("a record written today holds each step's rule lists under their former nam
   assert.equal(bare.some((s) => Object.hasOwn(s, 'disallow') || Object.hasOwn(s, 'allow')), false);
 });
 
+test('a codex run frozen while its sandbox was `permissionMode` loads, files the sandbox it was written with, and is written back under both names', async () => {
+  const run = started(folder('harness: codex\nsandbox: read-only'));
+  // The record as a `wf` from before 2026-09-23 froze it: the codex step's sandbox under `permissionMode`, and no `sandbox`.
+  const at = path.join(ROOT, 'runs', `${run.id}.json`);
+  const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+  record.workflow = record.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({ ...step, ...(sandbox ? { permissionMode: sandbox } : {}) }));
+  fs.writeFileSync(at, JSON.stringify(record, null, 2));
+  assert.doesNotMatch(fs.readFileSync(at, 'utf8'), /"sandbox":/, 'the fixture is the old record');
+  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.deepEqual([read.sandbox, Object.hasOwn(read, 'permissionMode')], ['read-only', false], 'read as the sandbox, never as a Claude Code mode');
+  const { e, tasks } = board();
+  await advance(e, readRun(run.id));
+  assert.equal(tasks.get(`${run.id}-implement`)!.spec.config?.permissionMode, 'read-only', 'the engine is handed the sandbox it was written with, not Codex\'s default');
+  const written = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+  assert.deepEqual([written.sandbox, written.permissionMode], ['read-only', 'read-only'], 'written back under `sandbox`, and under the field an older daemon files from (`withFormerNames`)');
+
+  // The engine's alias, frozen: read under Codex's own name for it.
+  const wide = started(folder('harness: codex\nsandbox: danger-full-access'));
+  const wideAt = path.join(ROOT, 'runs', `${wide.id}.json`);
+  const wideRecord = JSON.parse(fs.readFileSync(wideAt, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+  wideRecord.workflow = wideRecord.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({ ...step, ...(sandbox ? { permissionMode: 'bypassPermissions' } : {}) }));
+  fs.writeFileSync(wideAt, JSON.stringify(wideRecord, null, 2));
+  assert.equal(readRun(wide.id).workflow!.find((s) => s.name === 'implement')!.sandbox, 'danger-full-access');
+});
+
+test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a Claude Code step's `permissionMode:` as itself — each on its first filing", async () => {
+  const codexRun = started(folder('harness: codex\nsandbox: read-only'));
+  const claudeRun = started(folder('permissionMode: dontAsk'));
+  const { e, tasks } = board();
+  await advance(e, readRun(codexRun.id));
+  await advance(e, readRun(claudeRun.id));
+  assert.equal(tasks.get(`${codexRun.id}-implement`)!.spec.config?.permissionMode, 'read-only');
+  assert.equal(tasks.get(`${claudeRun.id}-implement`)!.spec.config?.permissionMode, 'dontAsk');
+  // A record written today holds the codex sandbox under `permissionMode` too, which a daemon older than `sandbox:` files from.
+  const raw = (JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${codexRun.id}.json`), 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find((s) => s.name === 'implement')!;
+  assert.deepEqual([raw.sandbox, raw.permissionMode], ['read-only', 'read-only']);
+});
+
 test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallowedTools: Edit(**), Bash(npm test)', 'failed', 1);

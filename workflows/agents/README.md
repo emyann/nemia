@@ -4,7 +4,7 @@ An agent is a node's attachment, and we pass it a brief. A step is a node of its
 what it is handed (`input:`) and what it hands on (`output:`) — and what is attached to it does the work. A file here
 is one such attachment, written once and named by every node that uses it (`agent: reviewer`): its frontmatter says
 who it is — `description:` and `skills:`, then the keys of a role (`harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `output`) — and its body is its instructions. The step file keeps the wiring: `after`, `input`,
+`permissionMode` on Claude Code or `sandbox` on codex, `tools`, `disallowedTools`, `allowedTools`, `remote`, `output`) — and its body is its instructions. The step file keeps the wiring: `after`, `input`,
 `workspace`, `check`, `budget`, `loop`, `gate`.
 
 | agent | steps that name it |
@@ -31,8 +31,8 @@ REQUIRED but `supportedInterfaces`, because nothing here serves an agent over A2
 
 A step may still write words of its own under its frontmatter: a team's note to its agent (*in this team, also check
 …*), told after the agent's instructions. It is an escape hatch, not the normal case. Two shipped steps have one: `ship` in `dev-build` and
-`dev-planned-build`, whose check builds the web app and runs its e2e, tell the shipper why that matters on the merged
-tree. The shipper's own instructions name no check, and serve every dev folder.
+`dev-planned-build`, whose check builds the web app and runs its e2e on the merged tree alone, tell the shipper why that
+matters there. The shipper's own instructions name no check, and serve every dev folder.
 
 The package's README, *Agents*, says the rules: which keys an agent may carry, what refuses, and why a step's
 note comes after the instructions and never replaces them.

@@ -28,8 +28,8 @@ wf retry <run> plan --message "the second reading"    # plan's session continued
 The answer reaches `plan` in its try's brief as `## Your answer`, under `## Try 2`, and it plans again.
 `wf ls` and `wf decide` say the try was answered, and `wf decide` prints your answer beside the question.
 
-`implement` is `dev`'s, check and all — the build and the e2e run when git says the work touched the web
-app — with `after: plan` and `input: plan`: the plan reaches it under `## From plan`,
+`implement` is `dev`'s, check and all — the build runs when git says the work touched the web app, and the
+e2e on the merged tree — with `after: plan` and `input: plan`: the plan reaches it under `## From plan`,
 as data — the declared fields, never plan's summary — and it is told to say in its commit message where
 it departs from the plan. `review` and `review.schema.json` are `dev`'s, and the loop is `dev`'s: a round
 goes back to implement, not to planning. `ship` is `dev`'s too, file for file: the run's ending, gated,

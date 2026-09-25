@@ -46,7 +46,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
-  or `$WF_ARTIFACTS` in a run). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
+  or `WF_ARTIFACTS=<your files directory> npm run e2e` in a run, whose PNGs are the screenshots the ui reviewer reads). A
+  round's check builds but runs no e2e: the shipped lines run it only where no `WF_BASE_REF` is set, so once, on the merged
+  tree, in the shipper's hands (or a person's merging a `ui` run), and your own run is the only e2e the change meets before
+  the merge (since 2026-09-25). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
   export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
   `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
   page, so a page deleted by mistake fails `npm test` (delete its line too when you mean it). The pages are
@@ -78,6 +81,18 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
+  every check it executes of a git run; the ship has no `check:` and its shipper runs `workChecks`' line by hand, mid-merge, with
+  nothing set, so `WF_STEP=ship` never occurs. The shipped lines read what was touched and hold the e2e for the merged tree on that
+  one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
+  runs each both ways; learned by the run that took the e2e out of the rounds).
+- **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
+  `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
+  the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'
+  checks at once (turbo, the web build, the e2e's software-GL Chromium) froze the owner's Windows desktop for moments, with vmmemWSL
+  at up to 401% of a core. Agent sessions stay at normal priority, and so does an `npm test` or `npm run e2e` you run inside yours:
+  a niced process cannot be un-niced by its child, so niceing `package.json`'s scripts would nice them there too. `nice` ranks
+  processes inside the VM only; with nothing else busy in WSL, a niced check still uses every CPU it has.
 - **A step's check logs its stdout alone, and a person is shown the tail of its stderr.** The whole stderr is on disk at the check's
   `WF_STDERR` (`~/.agent-workflows/checks/<run>-<step>-check.stderr`), named on the check's record beside its `.log`. The e2e said why a
   page failed once, first, on stderr, and then thirty lines of the servers' output: the check read as an exit 1 after
@@ -549,6 +564,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   rest of `domain.ts`. It failed, on words that are not `decide`'s; one asserting an absence the rest also lacks would have passed
   over code it never meant to read. When you delete a function, grep the tests for its name in a string, and end such a slice on a
   name that must be there (learned by the run that retired `maxAttempts:`).
+- **A step's fence is read through `modeOf`, never off `permissionMode`.** Claude Code's fence is `permissionMode:` and Codex's `sandbox:`
+  (since 2026-09-23), and the engine's task still calls either `config.permissionMode`. A codex step's `permissionMode` is undefined now, so
+  code that files a step, or compares it with what the engine filed, and reads that field sends Codex no `-s`: the read-only reviewer runs in
+  Codex's default, `workspace-write`, which writes, and nothing says so (`vocabulary.test.ts` shows it). And a form that draws a harness
+  word draws only the fence its harness has (`takes`, `hasKey` in `apps/web`), or Claude Code gets an empty Sandbox picker (learned by the
+  run that named Codex's sandbox `sandbox:`).
 
 ## Rules the code keeps
 

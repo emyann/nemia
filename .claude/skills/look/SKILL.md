@@ -46,7 +46,7 @@ not the page.
 
 ## 2. Open the pages in the browser
 
-The pictures are what the check saw. The browser is where you see what a person does with a page. Serve
+The pictures are what the e2e saw. The browser is where you see what a person does with a page. Serve
 the app as `npm run e2e` does: built, and on ports of its own, never :8787 or :5173, so it runs beside a
 person's dev servers and beside another worktree's e2e.
 

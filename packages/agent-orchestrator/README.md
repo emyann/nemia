@@ -142,7 +142,7 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 ---
 harness: codex             # claude (default) | codex | claude-detached
 after: implement           # what must finish first: verified, or unverified if it has no check
-permissionMode: read-only
+sandbox: read-only         # Codex's sandbox; a Claude Code step's fence is permissionMode:
 output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
 ---
 Review the changes on this branch. Be specific about correctness, not style.
@@ -181,7 +181,7 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
@@ -195,6 +195,18 @@ names (`withFormerNames`), so a `wf up` started before the rename, which reads t
 names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
 the new name.
 
+`sandbox:` is Codex's name for its fence (`-s`, `sandbox_mode`), and a codex step took it on 2026-09-23; until then a codex step
+wrote its sandbox as `permissionMode:`, which is Claude Code's name for Claude Code's fence. So each harness has one fence under its
+own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is refused on the other harness with words naming the right
+key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
+as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
+prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
+`sandbox:`. A run frozen before is read the same way (`asNamed`), and a record is written with a codex step's sandbox under both
+names (`withFormerNames`), so a `wf up` started before still files it. The engine's task still calls either fence `permissionMode`,
+and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
+on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
+Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
+
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.
 
@@ -207,8 +219,8 @@ directory a step works in, `slot` says whether the run is one the cap on runs in
 who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
 (*Going round again*, under the check).
 
-`permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
-`read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
+`permissionMode` and `sandbox` are the harness's words, checked against the harness the step runs on: Claude Code's permission
+mode, and Codex's sandbox. `sandbox: read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
 the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
 a step its check refused (*Trying again*, under the check).
 
@@ -243,7 +255,7 @@ rounds: 3
 ---
 ```
 
-Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
+Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
 `output` — and two of its own, `description:` and `skills:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
@@ -339,7 +351,7 @@ session — not `--allowedTools`, where an unapproved one is still there to try.
 Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
 `Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex. Codex has no tool list, only
-one shell in a sandbox, so its fence is `permissionMode`, and `read-only` writes nothing.
+one shell in a sandbox, so its fence is `sandbox:`, and `read-only` writes nothing.
 
 `effort:` is one word the step's harness takes: `low`, `medium`, `high`, `xhigh` or `max` on Claude Code,
 and `none` and `minimal` besides on codex. Another word is refused by name with the list, as a permission
@@ -397,7 +409,7 @@ filing of the step (the first, each try and each round), and a deny beats every 
 `.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallowedTools:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
 for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
-`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace — those two
+`npm run build` and `npm run e2e`, which implement's check and its own run need and which write into the workspace — those two
 commands, and not the build and the e2e by another name (below). Every
 `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
 
@@ -587,7 +599,7 @@ Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s tw
 ```md
 ---
 harness: claude
-check: npm test && npm run typecheck && npm run build && npm run e2e
+check: npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi
 output: implement.schema.json   # screenshots, pages
 ---
 Implement what was asked, in this repository. It changes what a person sees in the web app. …
@@ -634,7 +646,7 @@ round, it is handed implement's replies to the last findings and nothing else, b
 asked for them. In `workflows/ui/`, `review` also reads implement's `screenshots` and `pages`: pictures
 of the change, which are artifacts, and not an account of it.
 
-The transport buys three things. The reviewer writes nothing, so it runs `permissionMode: read-only`.
+The transport buys three things. The reviewer writes nothing, so it runs `sandbox: read-only`.
 The harness enforces the review's shape. And the review lives on the engine's record of the attempt,
 not on a branch, so `git branch -D` no longer deletes the only copy. `wf decide` prints a declared
 output after the step's summary: `findings` as a list, any other field as `name: value`. A step that
@@ -932,6 +944,13 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   outlives a tick that dies, is stopped by `wf cancel`, ends at a twenty-minute deadline, runs once and is
   never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
   `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
+- **It starts at low priority:** under `nice -n 10`, and in the idle IO class (`ionice -c3`) where the machine has
+  `ionice` and lets it be taken; a machine without it runs the check as before. On 2026-09-24 several runs' checks at
+  once — turbo across five packages, the web build, the e2e's software-GL Chromium — froze a Windows desktop running
+  them in WSL for moments, video and typing, with vmmemWSL at up to 401% of a core. A check is a batch job nobody
+  watches while it runs; the agent sessions, filed on other harnesses, stay at normal priority, and so does a suite a
+  session runs itself. `nice` ranks processes inside one kernel: in WSL a check now yields to the sessions and to a
+  person's own Linux work, but with nothing else busy there it still uses every CPU the VM has. `CHECK_NICENESS`.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
   number shown to a person; a command that prints one of its own changes that number and nothing else.
 - The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, and `WF_ARTIFACTS` — the
@@ -941,8 +960,9 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 
 This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
 check a person used to run by hand at every trial merge — and every round of it is checked again.
-`workflows/ui/`, for a change to the web app, adds `npm run build && npm run e2e`. Point the folder at
-another repository and change that line.
+`workflows/ui/`, for a change to the web app, adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF`
+is set: a round's check runs no e2e, and a person merging runs the line whole on the merged tree. Point the folder
+at another repository and change that line.
 
 ### What a step's line says
 
@@ -1155,7 +1175,7 @@ person.
 ---
 harness: codex
 after: implement
-permissionMode: read-only
+sandbox: read-only
 output: review.schema.json   # findings, and again: boolean
 loop: implement
 rounds: 3
@@ -1310,11 +1330,14 @@ the absolute paths of its PNGs, and `review` reads them with `input: implement`.
 implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
-`implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`.
-`npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a seeded
-store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
+`implement` carries `check: npm test && npm run typecheck && npm run build`, and then `npm run e2e` only
+where no `WF_BASE_REF` is set, which a check the run executes never is: a round's check builds and runs no
+e2e, and whoever merges runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
+every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
+seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
 have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
-own directory and read the PNGs, and to use the look skill on every page it changed. It declares
+own directory, after its last commit, and read the PNGs — those are the screenshots review reads — and to use
+the look skill on every page it changed. It declares
 `screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
 else of implement, and uses the look skill on the screenshots and the pages side by side — read by its
 file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and with it the Skill tool. Its schema is

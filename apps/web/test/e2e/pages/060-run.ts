@@ -92,6 +92,10 @@ export default {
       tokens.locator('[data-mark="default"]', { hasText: 'workspace-write · default' }),
       `${FAKE.unverified}'s spec says the sandbox its Codex session runs in (workspace-write · default)`,
     );
+    // A codex step's fence under Codex's name, read off a record frozen when it was written `permissionMode: read-only`.
+    const review = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: 'review', exact: true }) });
+    await expectVisible(review.locator('[data-fact="sandbox"] dd', { hasText: /^read-only$/ }), "review's spec says its sandbox, read-only, from a record frozen before the key was named so");
+    await expectCount(review.locator('[data-fact="permission mode"]'), 0, 'and no permission mode, which codex has not');
     const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
     await expectVisible(blocked.locator('[data-mark="default"]', { hasText: 'auto · default' }), `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`);
 

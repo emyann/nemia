@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { agentNameRefusal, agentsDir, agentsFolderRefusal, AGENTS_FOLDER, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type StepDraft, type Workflow } from './workflow.ts';
+import { agentNameRefusal, agentsDir, agentsFolderRefusal, AGENTS_FOLDER, codexModeWritten, formerSandbox, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderStep, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type StepDraft, type Workflow } from './workflow.ts';
 import { agentUsers, agentVersion, loadAgents } from './workflow-store.ts';
 import { HOME, isDirectory } from './store.ts';
 
@@ -63,6 +63,11 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   };
   const agents = loadAgents(agentsDir(at));
   const parsed = parseFolder(texts, read, agents);
+  // A draft on codex by its agent's `harness:` alone, sending its sandbox as `permissionMode` — a page opened before `sandbox:` — would be
+  // written in the former name, which the parser still reads: `renderStep` refuses it on a draft that says `harness: codex`, and this on one
+  // whose agent says it.
+  const onCodex = steps.find((step) => step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined && parsed.find((s) => s.name === step.name)?.harness === 'codex');
+  if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];

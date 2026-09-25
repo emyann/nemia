@@ -3,8 +3,18 @@
  * added or removed, a value set — and put back in the listing's shape. Pure. What a step may say is the package's to judge when the draft is
  * saved; the draft judges only what it needs to stay a draft: one step per name, and a name to call it by.
  */
-import type { GraphEdge, KeyForm, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
+import type { GraphEdge, KeyField, KeyForm, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
 import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
+
+/**
+ * Whether a step on `harness` takes the key at all: a key whose words are the harness's (`byHarness`) is taken only on a harness that has
+ * some. Each harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and a form draws the other only where it is
+ * written, to be taken off. A harness the form does not know is not judged here: the package judges it on save.
+ */
+export function takes(form: Pick<KeyForm, 'keys'>, field: Pick<KeyField, 'byHarness'>, harness: string): boolean {
+  if (!field.byHarness || Object.hasOwn(field.byHarness, harness)) return true;
+  return !(form.keys.find((k) => k.key === 'harness')?.choices ?? []).includes(harness);
+}
 
 /** A step being built: as the listing has it, and a schema pasted for its `output:`, written beside it on save — null for none. */
 export type DraftStep = ListedStep & { schema: { file: string; text: string } | null };
@@ -14,7 +24,7 @@ export const DEFAULT_ROUNDS = 3;
 
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
   deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 

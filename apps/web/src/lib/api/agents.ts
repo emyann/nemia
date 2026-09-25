@@ -24,7 +24,7 @@ export type AgentSkill = {
 export type SkillsFile = { file: string; text: string; list: AgentSkill[] | null };
 
 /** The keys an agent sets on the steps that name it: every agent key but its description. Mirrors `RoleKey` in the package. */
-export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallowedTools' | 'allowedTools' | 'remote' | 'output';
+export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'sandbox' | 'tools' | 'disallowedTools' | 'allowedTools' | 'remote' | 'output';
 
 /** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };

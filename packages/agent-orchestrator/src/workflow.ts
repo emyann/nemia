@@ -96,19 +96,33 @@ export type Workflow = {
    * no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window (`sessionContext`).
    */
   context?: number;
+  /**
+   * Claude Code's permission mode, `--permission-mode`: one of `PERMISSION_MODES` for the harness the step runs on. Refused on codex, whose
+   * fence is its sandbox (`sandbox`), in words naming `sandbox:`.
+   */
   permissionMode?: string;
+  /**
+   * Codex's sandbox, `codex exec -s`: one of `SANDBOXES` for the harness the step runs on — `read-only`, `workspace-write`,
+   * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
+   *
+   * On codex the key was `permissionMode:` until 2026-09-23, and a folder or an agent that says so is still read: a sandbox's word is read
+   * as `sandbox:` (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename
+   * (`codexModeLine`). A run frozen before holds the field as `permissionMode` and is read the same way (`asNamed`). The engine's task
+   * still calls it `permissionMode`: the tick hands it over under that name (`modeOf`).
+   */
+  sandbox?: string;
   /**
    * The only tools the session may have, in the harness's names — `tools: Read, Grep, Glob, Bash`. Absent: the
    * harness's own set. Claude Code is given exactly the list (`--tools`), which names its built-in tools; the
    * servers of the checkout's `.mcp.json` are not on it. Refused on codex, which has no tool list: its fence is
-   * the sandbox `permissionMode` names.
+   * the sandbox `sandbox:` names.
    */
   tools?: string[];
   /**
    * What the session may not have, in Claude Code's permission rules — `disallowedTools: Bash(npm run build), SendMessage`.
    * Absent: nothing denied beyond the checkout's settings. Claude Code is given the list as `--disallowedTools`, and a
    * deny beats an allow, so a step is kept from a command `.claude/settings.json` allows for another step's sake by
-   * machinery, not by its brief. Refused on codex, which has no tool list: its fence is the sandbox `permissionMode` names.
+   * machinery, not by its brief. Refused on codex, which has no tool list: its fence is the sandbox `sandbox:` names.
    */
   disallowedTools?: string[];
   /**
@@ -251,7 +265,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -278,7 +292,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
   context: "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
-  permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
+  permissionMode: "Claude Code's permission mode — whether it asks, denies or allows what no rule decides — on `claude` and `claude-detached`; on codex the fence is `sandbox:`",
+  sandbox: "Codex's sandbox — `read-only`, `workspace-write` or `danger-full-access` — on `codex` only; on Claude Code the fence is `permissionMode:`; `workspace-write` when unset",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallowedTools: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
   allowedTools: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
@@ -323,8 +338,9 @@ const DEFAULT_HARNESS = 'claude';
 
 /*
  * The words each harness takes, copied from the engine — which is the source. agent-runtime exports them:
- * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, and `codex.refuses` also takes
- * `bypassPermissions`, as the widest sandbox.
+ * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`. `codex.refuses` also takes
+ * `bypassPermissions`, as the widest sandbox, since the engine's task names a sandbox as its `permissionMode`; a step does not
+ * (`sandbox:`), and says `danger-full-access`.
  *
  * A copy and not an import, because this file is pure and imports no runtime (`docs/architecture.md`), and the
  * engine refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked
@@ -335,20 +351,33 @@ const CLAUDE_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'do
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
- * The harnesses a step may run on, and the permission modes each takes.
+ * The harnesses a step may run on.
  *
  * Checked here because nothing below checks it early enough: an unknown `harness` falls silently to the
- * default, and an unknown mode is refused by the engine only when the run files the step.
+ * default.
  *
  * `check` is not on the list. That harness is the run's own: it executes a step's `check:`
  * command, and no step runs on it.
  */
+export const HARNESSES: readonly string[] = ['claude', 'codex', 'claude-detached'];
+
+/**
+ * The permission modes each harness takes: Claude Code's `--permission-mode`. Checked for the reason a harness is: an unknown mode is refused
+ * by the engine only when the run files the step. Codex has none: its fence is its sandbox (`SANDBOXES`).
+ */
 export const PERMISSION_MODES: Readonly<Record<string, readonly string[]>> = {
   claude: CLAUDE_MODES,
-  codex: ['read-only', 'workspace-write', 'danger-full-access', 'bypassPermissions'],
   'claude-detached': CLAUDE_MODES,
 };
-export const HARNESSES: readonly string[] = Object.keys(PERMISSION_MODES);
+
+/**
+ * The sandboxes each harness takes: Codex's `-s`, the one fence `codex exec` has around its one shell — `read-only` runs commands and writes
+ * nothing, `workspace-write` writes in the workspace, `danger-full-access` anywhere. Claude Code has none: its fence is its permission mode
+ * and its rule lists. `bypassPermissions`, which the engine takes for `danger-full-access`, is not among them: it is Claude Code's word.
+ */
+export const SANDBOXES: Readonly<Record<string, readonly string[]>> = {
+  codex: ['read-only', 'workspace-write', 'danger-full-access'],
+};
 
 /**
  * The efforts each harness takes: `--effort` for Claude Code, `model_reasoning_effort` for Codex. Checked for the
@@ -407,31 +436,46 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
- * the step's unless the step sets it too, and what the step is told is the agent's instructions, a blank line, then the step's own note —
+ * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key — and what the step is told is the agent's instructions, a blank line, then the step's own note —
  * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
  * parser sees the resolved step; `agent` on it says what was the step's own.
  */
 export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
-  const { meta: { agent: attached, ...meta }, spelled } = block === null
+  let { meta: { agent: attached, ...meta }, spelled } = block === null
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
     : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
-    return stepFrom(name, meta, own, read, spelled);
+    return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
   }
   const agent = agentOf(name, attached, agents);
+  // The step's own lines are read against the harness the step will run on, its agent's where it names none, before the two are merged: so a
+  // step's `permissionMode:` from before `sandbox:` is its own `sandbox:`, and wins over its agent's as any key of its own does.
+  meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
+  // A fence is one key on each harness, and a step's own replaces its agent's under either name: so a step that runs a Claude Code agent on
+  // codex with a sandbox of its own is not also given the agent's permission mode, which no line of it could unset — and the other way round.
+  const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
   if (!body) throw new WorkflowError(`${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`);
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
-  const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read, spelled);
+  const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
     const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
     return value === undefined ? [] : [[key, value]];
   }));
   return { ...step, agent: { name: agent.name, keys, body: own, given } };
+}
+
+/** The fence a step's lines write, under either name: Claude Code's permission mode or Codex's sandbox. */
+const fenceOf = (keys: Partial<Record<string, string>>): string | undefined => keys.sandbox ?? keys.permissionMode;
+
+/** An agent's keys with neither fence, for a step that writes its own. */
+function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
+  const { permissionMode: _mode, sandbox: _sandbox, ...rest } = keys;
+  return rest as T;
 }
 
 /** The agent `agent:` names, or why not: one there is not, listing those there are, or one whose file is refused, in its words. */
@@ -470,6 +514,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     effort: wordOf(name, 'effort', meta.effort, harness),
     context: contextOf(name, meta.context, harness),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
+    sandbox: wordOf(name, 'sandbox', meta.sandbox, harness),
     tools: toolsOf(name, meta.tools, harness),
     disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, harness, spelled.disallowedTools),
     allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, harness, spelled.allowedTools),
@@ -522,6 +567,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools',
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
   if (unknown !== undefined) refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
+  if (step.harness === 'codex' && step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined) refuse(codexModeWritten(step.name, step.permissionMode));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
@@ -603,6 +649,49 @@ const unknownKey = (step: string, key: string): string => (Object.hasOwn(REFUSED
  */
 export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disallow: 'disallowedTools', allow: 'allowedTools' };
 
+/**
+ * The date `sandbox:` took over from `permissionMode:` on a codex step: before it, a codex step named its sandbox as its permission mode, the
+ * engine's task field. Not a line of `FORMER_KEYS`, since `permissionMode` is still a key — Claude Code's — and is former only on codex.
+ */
+const SANDBOX_SINCE = '2026-09-23';
+
+/**
+ * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine took for
+ * the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, written before the key
+ * was Codex's own still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
+ * codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming `sandbox:`. Pure.
+ */
+function codexSandboxNamed<K extends string>(file: string, meta: Partial<Record<K | 'permissionMode' | 'sandbox', string>>, harness: string | undefined): Partial<Record<K | 'permissionMode' | 'sandbox', string>> {
+  const word = meta.permissionMode;
+  if (harness !== 'codex' || word === undefined) return meta;
+  if (meta.sandbox !== undefined) {
+    refuse(`${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: until ${SANDBOX_SINCE} a codex step named its sandbox as \`permissionMode:\`, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`);
+  }
+  const sandbox = sandboxNamed(word);
+  if (!SANDBOXES.codex!.includes(sandbox)) return meta;
+  const { permissionMode: _, ...rest } = meta;
+  return { ...rest, sandbox } as Partial<Record<K | 'permissionMode' | 'sandbox', string>>;
+}
+
+/** The sandbox a codex permission mode named: itself, or `danger-full-access` for `bypassPermissions`, the engine's alias for it. */
+const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
+
+/**
+ * The sandbox a codex file's `permissionMode: <word>` is read as, written before 2026-09-23, or `undefined` for a word that names none,
+ * which the parser refuses. For code outside the package that reads a file's lines the parser did not read — the api's picture of an agent
+ * that does not load — so it reads the former line as the parser would. Pure.
+ */
+export const formerSandbox = (word: string): string | undefined => {
+  const sandbox = sandboxNamed(word);
+  return SANDBOXES.codex!.includes(sandbox) ? sandbox : undefined;
+};
+
+/**
+ * The fence a step asks its harness for: the engine's task calls both `permissionMode`, Claude Code's permission mode and Codex's sandbox,
+ * and a step has at most one of the two (`wordOf`). What the tick files as `config.permissionMode`. Pure.
+ */
+export const modeOf = (step: Pick<Workflow, 'permissionMode' | 'sandbox'>): string | undefined => step.sandbox ?? step.permissionMode;
+
 /** The name a key was written under, for a key read under a former one (`FORMER_KEYS`), by the key it is now. */
 type Spelled = Partial<Record<string, string>>;
 
@@ -668,20 +757,39 @@ function harnessOf(step: string, harness: string | undefined): string | undefine
 
 const VOCABULARY = {
   permissionMode: { lists: PERMISSION_MODES, noun: 'a mode' },
+  sandbox: { lists: SANDBOXES, noun: 'a sandbox' },
   effort: { lists: EFFORTS, noun: 'an effort' },
 } as const;
 
-/** A permission mode or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. */
+/** The two fences, each one harness's: what a step on the other harness is told to write instead. */
+const FENCE_ELSEWHERE = {
+  permissionMode: (word: string) => `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex!.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
+  sandbox: () => `\`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${CLAUDE_MODES.join(', ')} — with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`. Write \`permissionMode:\` instead, or run the step on codex`,
+} as const;
+
+/**
+ * A permission mode, a sandbox or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. A harness with
+ * no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other key.
+ */
 function wordOf(step: string, key: keyof typeof VOCABULARY, word: string | undefined, harness: string | undefined): string | undefined {
   const { lists, noun } = VOCABULARY[key];
   const on = harness ?? DEFAULT_HARNESS;
-  const words = lists[on]!;
-  if (word === undefined || words.includes(word)) return word;
-  const owner = HARNESSES.find((h) => lists[h]!.includes(word));
+  const words = lists[on];
+  if (word === undefined || words?.includes(word)) return word;
+  const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
+  if (!words) return refuse(`${step}: \`${key}: ${word}\` is not a key ${on} takes${where}. ${FENCE_ELSEWHERE[key as keyof typeof FENCE_ELSEWHERE](word)}.`);
+  if (key === 'sandbox' && word === 'bypassPermissions') {
+    return refuse(`${step}: \`sandbox: bypassPermissions\` is Claude Code's word for its widest mode. Codex's own name for the sandbox that fences nothing is \`danger-full-access\`: write \`sandbox: danger-full-access\`. On ${on} it is one of: ${words.join(', ')}.`);
+  }
+  const owner = HARNESSES.find((h) => lists[h]?.includes(word));
+  // The other fence's word: a sandbox written as a mode, on a harness that has modes, or the other way round.
+  const other = key === 'permissionMode' ? 'sandbox' : key === 'sandbox' ? 'permissionMode' : undefined;
+  const across = other && HARNESSES.find((h) => VOCABULARY[other].lists[h]?.includes(word));
   return refuse(
-    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
+    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${where}.`
     + ` On ${on} it is one of: ${words.join(', ')}.`
     + (owner ? ` \`${word}\` is ${owner}'s word, and this step does not run on ${owner}.` : '')
+    + (across ? ` \`${word}\` is ${VOCABULARY[other].noun} ${across} has, written \`${other}: ${word}\` on a step that runs on ${across}.` : '')
     + ' Without the line, the harness uses its own default.',
   );
 }
@@ -694,14 +802,14 @@ const TOOLS_EXAMPLE = '`tools: Read, Grep, Glob, Bash`';
  * Split on commas, as `after:` is — so a comma inside an entry, in a rule's parentheses or in quotes, would reach
  * the harness as the pieces of one; and a space inside one is a list written without its commas, or a rule where
  * a name goes. Refused on codex, which has no tool list: one shell in a sandbox, so a list there narrows nothing
- * the sandbox does not, and the engine leaves the sandbox as `permissionMode` named it whenever the list has Bash.
+ * the sandbox does not, and the engine leaves the sandbox as `sandbox:` named it whenever the list has Bash.
  */
 function toolsOf(step: string, tools: string | undefined, harness: string | undefined): string[] | undefined {
   if (tools === undefined) return undefined;
   const named = `${step}: \`tools: ${tools}\``;
   const written = `A step's tools are the harness's names for them, bare and comma-separated: ${TOOLS_EXAMPLE}.`;
   if (harness === 'codex') {
-    refuse(`${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`permissionMode: read-only\` for a step that must not write.`);
+    refuse(`${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`sandbox: read-only\` for a step that must not write.`);
   }
   if (/\([^)]*,|\[[^\]]*,|"[^"]*,|'[^']*,/.test(tools)) {
     const pieces = tools.split(',').map((s) => `\`${s.trim()}\``).join(', ');
@@ -737,7 +845,7 @@ const RULE_LIST = {
     example: DISALLOW_EXAMPLE,
     written: 'what the session may not have',
     may: 'may not run',
-    sandbox: '`permissionMode: read-only` for a step that must not write',
+    sandbox: '`sandbox: read-only` for a step that must not write',
     absent: 'the step is denied nothing beyond the checkout\'s settings',
     two: 'Two commands are two rules: `Bash(git push), Bash(git reset)`.',
   },
@@ -747,7 +855,7 @@ const RULE_LIST = {
     example: ALLOW_EXAMPLE,
     written: 'what the session may do without being asked',
     may: 'may do',
-    sandbox: '`permissionMode: workspace-write` for a step that writes in its workspace and asks nobody',
+    sandbox: '`sandbox: workspace-write` for a step that writes in its workspace and asks nobody',
     absent: 'the step may do only what its `permissionMode` allows by itself',
     two: 'Two tools are two rules: `Edit(**), Bash(npm test)`.',
   },
@@ -770,7 +878,7 @@ function rulesOf(step: string, key: 'disallowedTools' | 'allowedTools', written:
   const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
   const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
   if (harness === 'codex') {
-    refuse(`${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`);
+    refuse(`${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`);
   }
   if (/\([^)]*,/.test(written)) {
     const pieces = written.split(',').map((x) => `\`${x.trim()}\``).join(', ');
@@ -1422,7 +1530,7 @@ export function parseFolder(files: ReadonlyArray<readonly [name: string, text: s
  * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent
  * file that sets one is refused by name.
  */
-export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
+export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
  * The keys a step takes from its agent: every agent key but the two that describe the agent itself — its `description:` and the `skills:` it
@@ -1471,9 +1579,10 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
-  const { meta: { description, skills: named, ...keys }, spelled } = block === null
+  const { meta: { description, skills: named, ...written }, spelled } = block === null
     ? { meta: {} as Partial<Record<AgentKey, string>>, spelled: {} }
     : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
+  const keys = codexSandboxNamed(file, written, written.harness);
   stepFrom(file, keys, body, read, spelled);
   const skills = skillsOf(file, named, read);
   return { name, ...(description !== undefined && { description }), ...(skills !== undefined && { skills }), keys, body, read: read ?? (() => undefined) };
@@ -1506,6 +1615,7 @@ export function renderAgent(draft: AgentDraft): string {
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
+  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined) refuse(codexModeWritten(file, keys.permissionMode));
   const own: ReadonlyArray<'description' | 'skills'> = ['description', 'skills'];
   const values: Array<[string, string | null | undefined]> = [['description', draft.description], ['skills', draft.skills], ...AGENT_KEYS.filter((key) => !(own as readonly string[]).includes(key)).map((key) => [key, keys[key]] as [string, string | null | undefined])];
   const lines = values.flatMap(([key, value]) => {
@@ -1634,6 +1744,19 @@ export function formerKeysIn(text: string): string[] {
  */
 const formerKeyWritten = (file: string, former: string): string =>
   `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file written before 2026-09-23 may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page open since before then sends the former name: reload it, and save again.`;
+
+/**
+ * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read from a
+ * file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and `writeWorkflow` for a
+ * step whose harness is its agent's. What sends one is a form drawn before the key was Codex's own, or a step moved onto codex that kept its
+ * Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
+ */
+export const codexModeWritten = (file: string, word: string): string =>
+  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until ${SANDBOX_SINCE}, which a file written before may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
+
+/** What `wf start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
+export const codexModeLine = (file: string, word: string): string =>
+  `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox, which a codex step says since ${SANDBOX_SINCE}. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
@@ -1777,7 +1900,8 @@ const DEFAULT_MODE = 'auto';
  * `default` and `acceptEdits`, in folders under `/tmp`, told to write outside its folder, run a command and fetch a page, was denied
  * each call it could not make, carried on and exited on its own. So a step run as a job — every `claude` step without `background: true`,
  * every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one shell, fenced by the sandbox its
- * mode names, and asks nobody in any of them. What is judged is the one way left to ask: a `background: true` step.
+ * `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a harness's own: Codex has no
+ * permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
  *
  * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
@@ -1860,9 +1984,14 @@ export const asRan = (step: Workflow): Workflow =>
  * field under its former name, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
  * a former name, and the next pass that writes the record back writes the new ones, with the former beside them (`withFormerNames`). A
- * field under both names keeps the new one's value. A step with no former name is returned as it is. Pure.
+ * field under both names keeps the new one's value. A step with no former name is returned as it is. A codex step's sandbox, frozen under
+ * `permissionMode` before the key was Codex's own, is read as `sandbox` the same way (`sandboxRead`). Pure.
  */
 export function asNamed(step: Workflow): Workflow {
+  return sandboxRead(renamedKeys(step));
+}
+
+function renamedKeys(step: Workflow): Workflow {
   const fields = Object.keys(step);
   const agent = step.agent;
   const given = agent?.given ? Object.keys(agent.given) : [];
@@ -1884,15 +2013,44 @@ export function asNamed(step: Workflow): Workflow {
 }
 
 /**
+ * A codex step frozen before `sandbox:` read with it (`SANDBOX_SINCE`): its sandbox is the field `permissionMode` — the engine's task field,
+ * which the step carried under that name — and the key `permissionMode` among its agent's `keys` and `given`. Read so, the tick would file
+ * it with no sandbox, and Codex would run it in `workspace-write`: wider than a reviewer written `read-only`, and said nowhere. So the field
+ * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a record written with both — `withFormerNames` — keeps `sandbox`'s.
+ * A step that does not run on codex is returned as it is: its `permissionMode` is Claude Code's. Pure.
+ */
+function sandboxRead(step: Workflow): Workflow {
+  const agent = step.agent;
+  const legacy = step.permissionMode !== undefined || Boolean(agent?.keys.includes('permissionMode')) || agent?.given?.permissionMode !== undefined;
+  if (step.harness !== 'codex' || !legacy) return step;
+  const { permissionMode: word, ...rest } = step;
+  const read: Workflow = { ...rest, ...(rest.sandbox === undefined && word !== undefined ? { sandbox: sandboxNamed(word) } : {}) };
+  if (!agent) return read;
+  const { permissionMode: given, ...others } = agent.given ?? {};
+  return {
+    ...read,
+    agent: {
+      ...agent,
+      keys: [...new Set(agent.keys.map((key) => (key === 'permissionMode' ? 'sandbox' : key)))],
+      ...(agent.given ? { given: { ...others, ...(others.sandbox === undefined && given !== undefined ? { sandbox: sandboxNamed(given) } : {}) } } : {}),
+    },
+  };
+}
+
+/**
  * A step as a record is written: each renamed field under its name now and, with the same value, under its former one (`FORMER_KEYS`). A
  * `wf up` daemon started before the rename runs its old code until it is restarted, and its tick reads a step's rule lists by the former
  * names alone: a record with the new ones only would have it file every step of a run started since with no rule list, and say nothing —
  * a reviewer's `Bash(npm run build)` deny and the supervisor's git denies gone. `asNamed` reads the record back under the new names
- * alone, so no reader of today's code sees the copy. Only the step's own fields are copied: they are all the old tick filed from. Pure.
+ * alone, so no reader of today's code sees the copy. Only the step's own fields are copied: they are all the old tick filed from. A codex
+ * step's `sandbox` is copied to `permissionMode`, the field the old tick filed Codex's sandbox from: without it, a codex reviewer written
+ * `sandbox: read-only` would be filed by an old daemon with no sandbox, and run in Codex's `workspace-write`. Pure.
  */
 export function withFormerNames(step: Workflow): Workflow {
   const fields = step as unknown as Record<string, unknown>;
   const copies = Object.entries(FORMER_KEYS).filter(([, now]) => fields[now] !== undefined).map(([former, now]) => [former, fields[now]]);
+  // A codex step's sandbox, under the field the old tick filed it from: `permissionMode` (`sandboxRead`).
+  if (step.harness === 'codex' && step.sandbox !== undefined) copies.push(['permissionMode', step.sandbox]);
   return copies.length ? { ...step, ...Object.fromEntries(copies) } : step;
 }
 

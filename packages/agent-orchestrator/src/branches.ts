@@ -8,7 +8,7 @@
  * a controller, and `runner.ts` re-exports what it exported of this before. What asks the engine as well — `parentOf`, `decide` — is
  * the controllers' (`views.ts`, `decide.ts`).
  */
-import { execFileSync } from 'node:child_process';
+import { execCounted } from './tally.ts';
 import { isGitRun, resultSteps, type BranchStanding, type GitRun, type ParentRun, type Run, type Shipped } from './run.ts';
 import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
 import { readRun, stepsOf } from './store.ts';
@@ -31,7 +31,7 @@ import { git, gitSays } from './worktree.ts';
  * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
  */
 export function isShipped(run: GitRun, branch: string): Shipped {
-  const within = (commit: string, base: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
+  const within = (commit: string, base: string) => execCounted('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
   // On the base branch already: with commits past the run's base, or none. Exit 1 is git's no — the commit is not within the run's base.
   const landed = (commit: string): Shipped => {
     try {

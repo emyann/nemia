@@ -251,6 +251,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's
   admission gate, worktree base and lease each were).
+- **A pass on a copy of the store acts on the real repositories.** A run record names its steps' worktrees and its repository by
+  absolute path, so a `tick` with `WF_ROOT` on a copy of `runs/*.json` and a fake engine that answered `succeeded` handed off the
+  uncommitted work of a live worktree — this run's own — in a commit `implement: hand off what was left uncommitted`, and ran every
+  `isShipped` git call against the real repositories. To measure or probe a pass, use a fixture store whose runs name scratch
+  repositories (`test/meter-store.test.ts`), or a fake engine whose tasks are all `pending` and nothing settles (learned by the run
+  that measured what a tick costs).
 - **A test of a timer waits for the ticks it counts, never for a length of time.** "start() ticks on a timer" slept 200 ms
   and wanted two ticks at 20 ms; a process the scheduler parks for those 200 ms wakes with the interval and the sleep both
   due, sees one tick, and fails — two full checks in four at a load of 20, and on demand by freezing the test with `SIGSTOP`
@@ -602,8 +608,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`). Pure files — `assess` in `run.ts` among them — read no disk, spawn
     nothing, and import no runtime and no file of the other kinds. Store files are the I/O beneath the controllers, import
-    no runtime, no controller and not the client, and load as a tree: `places.ts` and `workflow-store.ts` at the bottom,
-    `store.ts` on them, `worktree.ts` on `store.ts` and `places.ts`; outside the store, only the client and the controllers
+    no runtime, no controller and not the client, and load as a tree: `places.ts`, `workflow-store.ts` and `tally.ts` (the
+    pass's meter) at the bottom, `store.ts` on them, `worktree.ts` on `store.ts`, `places.ts` and `tally.ts`; outside the store, only the client and the controllers
     beneath the CLI import them. The controllers are `runner.ts`, the package's root, which re-exports by name; `views.ts`,
     `start.ts`, `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts` beneath it, which import one another with no cycle; and
     `cli.ts`, which parses, calls, prints, and reaches the package only through `runner.ts` and `workflow.ts`, as `bin/wf.ts`

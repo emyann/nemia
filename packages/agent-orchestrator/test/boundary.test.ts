@@ -24,10 +24,10 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['check', 'closeout', 'daemon', 'deps', 'feed', 'inbox', 'plan', 'radius', 'retry', 'run', 'timeline', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['check', 'closeout', 'daemon', 'deps', 'feed', 'inbox', 'meter', 'plan', 'radius', 'retry', 'run', 'timeline', 'workflow'].map((f) => `src/${f}.ts`);
 
 /** The I/O beneath the controllers: no runtime, never a controller or the client, and a tree (`STORE_BOTTOM`, `STORE_SHARED`). */
-const STORE = ['places', 'workflow-store', 'store', 'worktree', 'branches', 'artifacts', 'authoring', 'daemon-store', 'feed-store', 'inbox-store'].map((f) => `src/${f}.ts`);
+const STORE = ['places', 'workflow-store', 'store', 'worktree', 'branches', 'artifacts', 'authoring', 'daemon-store', 'feed-store', 'inbox-store', 'tally'].map((f) => `src/${f}.ts`);
 
 /** What uses the runtime, through the client: the root, the controllers it re-exports, and the CLI above them. */
 const CONTROLLER = [...['runner', 'views', 'start', 'tick', 'verbs', 'forget', 'decide', 'cli'].map((f) => `src/${f}.ts`), 'bin/wf.ts'];
@@ -42,7 +42,7 @@ const BENEATH_CLI = CONTROLLER.filter((f) => !CLI.includes(f));
 const CLIENT = 'src/runtime-client.ts';
 
 /** The bottom of the store's tree: they import no store file. */
-const STORE_BOTTOM = ['src/places.ts', 'src/workflow-store.ts'];
+const STORE_BOTTOM = ['src/places.ts', 'src/workflow-store.ts', 'src/tally.ts'];
 
 /**
  * The store files another store file may import, each with the store files it may import itself: the bottom, then the run store on it, then
@@ -52,8 +52,9 @@ const STORE_BOTTOM = ['src/places.ts', 'src/workflow-store.ts'];
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/places.ts': [],
   'src/workflow-store.ts': [],
+  'src/tally.ts': [],
   'src/store.ts': STORE_BOTTOM,
-  'src/worktree.ts': ['src/store.ts', 'src/places.ts'],
+  'src/worktree.ts': ['src/store.ts', 'src/places.ts', 'src/tally.ts'],
 };
 
 /** The package's files the CLI may import. */
@@ -248,8 +249,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/store.ts', 'agent-runtime')), ['src/store.ts is a store file and imports agent-runtime']);
   assert.deepEqual(treeBreaks(adding('src/branches.ts', 'src/runner.ts')), ['src/branches.ts is a store file and imports src/runner.ts, a controller: a cycle']);
   assert.deepEqual(treeBreaks(adding('src/workflow-store.ts', 'src/store.ts')), ['src/workflow-store.ts imports src/store.ts, which the tree does not let it: it is the bottom, and imports no store file']);
-  assert.deepEqual(treeBreaks(adding('src/store.ts', 'src/worktree.ts')), ['src/store.ts imports src/worktree.ts, which the tree does not let it: of the store it imports src/places.ts, src/workflow-store.ts']);
-  assert.deepEqual(treeBreaks(adding('src/artifacts.ts', 'src/branches.ts')), ['src/artifacts.ts imports src/branches.ts, which the tree does not let it: of the store it imports src/places.ts, src/workflow-store.ts, src/store.ts, src/worktree.ts']);
+  assert.deepEqual(treeBreaks(adding('src/store.ts', 'src/worktree.ts')), ['src/store.ts imports src/worktree.ts, which the tree does not let it: of the store it imports src/places.ts, src/workflow-store.ts, src/tally.ts']);
+  assert.deepEqual(treeBreaks(adding('src/artifacts.ts', 'src/branches.ts')), ['src/artifacts.ts imports src/branches.ts, which the tree does not let it: of the store it imports src/places.ts, src/workflow-store.ts, src/tally.ts, src/store.ts, src/worktree.ts']);
   assert.deepEqual(treeBreaks(adding('src/inbox-store.ts', 'src/decide.ts')), ['src/inbox-store.ts is a store file and imports src/decide.ts, a controller: a cycle']);
   assert.deepEqual(treeBreaks(adding('src/store.ts', CLIENT)), ['src/store.ts is a store file and imports src/runtime-client.ts, the client: a cycle']);
   assert.deepEqual(treeBreaks(unimported('src/daemon-store.ts')), ['src/daemon-store.ts is imported by no controller and not by the client: a store file is the controllers\' I/O']);

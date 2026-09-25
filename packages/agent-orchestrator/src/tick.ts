@@ -19,13 +19,15 @@ import { askingTry, assess, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, ownSta
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import { artifactsDir, cancelFile, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
-import { ceilings, lastCeilings, recordCeilings } from './daemon-store.ts';
+import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { gitSays, handOff, workspaceFor } from './worktree.ts';
 import { collectArtifacts } from './artifacts.ts';
 import { refsOf } from './branches.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
 import { startQueued } from './start.ts';
+import { addOverhead, addRuntime, metered, within, type Tallies } from './tally.ts';
+import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
@@ -326,7 +328,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
   let markedHandedOff = false;
   // A pruned run owed no hand-off when its worktrees went (`pruneRefusal`), and has nowhere to hand one off from since.
-  const collected = (run.pruned ? [] : handOffDue(steps, run, phaseOf)).flatMap((name) => {
+  const collected = within('act', () => (run.pruned ? [] : handOffDue(steps, run, phaseOf)).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
     const record = run.steps[name]!;
     let handed: ReturnType<typeof handOff>;
@@ -338,7 +340,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       markedHandedOff = true;
     }
     return collectArtifacts(run, name, signedOff(name));
-  });
+  }));
 
   // Two runs' ending steps never work in one checkout at once (`checkoutHold`): while another run's `workspace: main` task is unsettled
   // there, this run's is not filed, whatever its approval says. Read from the world on this pass, including what the pass has already
@@ -660,7 +662,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   for (const name of ready) {
     if (!mayFile()) break;
     const step = steps.find((s) => s.name === name)!;
-    const place = await workspaceFor(run, steps, step);
+    const place = await within('act', () => workspaceFor(run, steps, step));
     notes.push(...place.notes.map((note) => `${name}: ${note}`));
     // Asked again after the cut, which can take minutes: the worktree stays for `wf rm` to find, and nothing is filed into it.
     if (!mayFile()) break;
@@ -846,6 +848,11 @@ export type Pass = {
   runs: Advanced[]; queue?: QueueStarted;
   /** Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed to decide. */
   feedError?: string;
+  /**
+   * What the pass cost, phase by phase (`PassCost`), as written to the store for `wf up --stats` and the api (`recordPassCost`) — its
+   * `overheadMs` here with that write in it, which the file cannot hold of itself.
+   */
+  cost?: PassCost;
 };
 
 /**
@@ -856,12 +863,26 @@ export type Pass = {
  * counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one queued card
  * is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started. Nothing is carried
  * between passes: the next one counts again.
+ *
+ * Metered as it goes (`tally.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a test
+ * that meters its own — is counted as part of that one and carries no cost of its own.
  */
 export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string } = {}): Promise<Pass> {
+  const io0 = ioOf(e);
+  const { value, ms, tallies } = await metered(() => pass(meteredEngine(e), repo));
+  if (!tallies) return value;
+  const t0 = performance.now();
+  const measured = costOf(tallies, ms, io0, ioOf(e));
+  const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
+  const written = recordPassCost(cost);
+  return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
+}
+
+async function pass(e: Engine, repo: string): Promise<Pass> {
   await e.tick();
   const ran = ceilings();
   // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
-  recordCeilings(ran);
+  within('act', () => recordCeilings(ran));
   const cap = ran.runs;
   const runs = listRuns();
   const done = new Map<string, Advanced>();
@@ -873,7 +894,7 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
     done.set(run.id, advanced);
     if (advanced.inFlight) counted++;
   }
-  const queue = slotFree({ inFlight: counted, cap }) ? startQueued(repo, runs) : undefined;
+  const queue = slotFree({ inFlight: counted, cap }) ? within('act', () => startQueued(repo, runs)) : undefined;
   // Last, and apart: what the pass judged, written where it changed. A feed that cannot be written costs the report, never the pass.
   let feedError: string | undefined;
   try {
@@ -883,6 +904,64 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
   }
   return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}) };
 }
+
+// ─── what the pass cost ─────────────────────────────────────────────────────
+
+/** The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a task is `act`. */
+const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
+  tick: 'runtime', view: 'journals', list: 'journals', feed: 'journals', logs: 'journals', transcript: 'journals',
+  file: 'act', stop: 'act', close: 'act', answer: 'act', say: 'act',
+};
+
+type EngineIo = ReturnType<Engine['io']>;
+
+/** The runtime's running totals, or undefined for an engine that keeps none (a test's fake). */
+const ioOf = (e: Engine): EngineIo | undefined => (typeof e.io === 'function' ? e.io() : undefined);
+
+/** Each harness's observes between two of the runtime's totals. */
+const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined): Record<string, HarnessCost> =>
+  Object.fromEntries(Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
+    const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
+    return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];
+  }));
+
+/**
+ * One call to the engine, counted in its phase — and what the runtime reported of it added there: the bytes it read and the processes it
+ * started, with the time its harnesses' observes took moved to `observe`. A pass observes its harnesses at once, so its observe took the
+ * slowest's time; a view observes the one harness of its task.
+ */
+async function engineCall<T>(e: Engine, verb: string, phase: Phase, call: () => Promise<T>): Promise<T> {
+  const t0 = performance.now();
+  const before = ioOf(e);
+  addOverhead(performance.now() - t0);
+  try {
+    return await within(phase, call);
+  } finally {
+    const t1 = performance.now();
+    const after = ioOf(e);
+    if (before && after) {
+      const seen = Object.values(observedBetween(before, after));
+      const ms = verb === 'tick' ? Math.max(0, ...seen.map((o) => o.ms)) : seen.reduce((n, o) => n + o.ms, 0);
+      addRuntime(phase, { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
+        { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) });
+    }
+    addOverhead(performance.now() - t1);
+  }
+}
+
+/** The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is. */
+const meteredEngine = (e: Engine): Engine => new Proxy(e, {
+  get(target, key, receiver) {
+    const value = Reflect.get(target, key, receiver) as unknown;
+    const phase = typeof key === 'string' ? ENGINE_PHASES[key] : undefined;
+    if (!phase || typeof value !== 'function') return value;
+    return (...args: unknown[]) => engineCall(target, key as string, phase, () => (value as (...a: unknown[]) => Promise<unknown>).apply(target, args));
+  },
+});
+
+/** A pass's cost from its counts and the runtime's totals before and after it. */
+const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined): PassCost =>
+  passCost({ at: new Date().toISOString(), ms, phases: t.kinds, harnesses: observedBetween(before, after), records: t.records, overheadMs: t.overheadMs });
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between

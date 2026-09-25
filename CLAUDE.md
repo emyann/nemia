@@ -547,6 +547,17 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `PushNotificationNotSupportedError` before the transport unless the card says `pushNotifications`, so a test of the
   handler's own refusal calls the transport; and `Client.sendMessage` fills `returnImmediately` from the client's `polling`,
   so a refusal of a send without it is reached only by the handler directly (same run).
+- **A card the A2A SDK's own server serves loses its security schemes in the SDK's own parser.** An agent built on the SDK
+  serves its card as the SDK's objects stringified, security schemes as `{ scheme: { $case, value } }`; `AgentCard.fromJSON`,
+  which reads A2A's proto JSON, empties each such scheme, so the card's requirement names a scheme with nothing in it, and
+  the runtime refused a bearer card as *`token` is not a scheme the card declares*, credentials given or not. `cardOfJson` (`agent-runtime/src/a2a-remote.ts`) keeps that form's schemes as
+  they are, and `test/remote-server.ts` serves both forms (`cardForm`): a remote-agent test of auth runs on each (learned by
+  thin runtime stage 6, part 1).
+- **A settled task's view names its session by the attempt's `nativeId` on a harness that can `find`.** `viewOf` in `facade.ts`
+  reads the record, and `logs` and `stop` are handed that id. For a remote A2A agent the `nativeId` is the Task's context —
+  what an answer's turn continues — not the Task's id, so a `logs` that asked GetTask for it read *no longer has the Task*.
+  A harness whose `nativeId` is not the id its verbs take resolves one to the other in the driver (`bySession`: a context
+  reads as the latest Task sent in it), and a test reads `logs` after the task settles (same run).
 - **A paged read is served from the listing its token names, never from the latest.** The runtime's A2A handler kept one
   snapshot behind its page tokens, and every view, transcript, `say` and tick in one process observes: with more than a
   hundred sessions — `check`, `codex` and `claude-detached` list every session they ever ran — a second listing made while

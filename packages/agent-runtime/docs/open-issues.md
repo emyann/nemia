@@ -822,6 +822,21 @@ changed*), and the runtime's phase is what is left. Skipping a settled task is n
   still open among them, and that a `stop-requested` or a second `file` leaves it settled; and meter that a second pass over
   N settled journals reads only the feed's new bytes.
 
+### 34. A remote Task answered in the moment before the registry holds it is owned by nobody (2026-09-25)
+
+A remote A2A agent's spawn (`src/a2a-remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
+one SendMessage, and writes the Task's id beside the intent when the answer comes back. A crash after the agent made the
+Task and before that write leaves an intent with no Task: the next spawn under the name refuses to send again, in words
+that are no refusal, and the grace window reads the attempt `lost`. Nothing is sent twice, which is the rule the registry
+keeps. But the Task the agent made runs on, and nothing here knows its id to read it or cancel it.
+
+- **Not closable from this side.** GetTask needs the Task's id, and ListTasks on an agent others use lists theirs too, with
+  no field that says which message a Task was made of. The message's id is on the intent, and an agent that deduplicated
+  a SendMessage on its `messageId` would answer a resend with the same Task: then the spawn could send again under the
+  recorded id and adopt what comes back. A2A does not require that, and the SDK's server does not do it.
+- **What bounds it.** The window is one request long, and the attempt is read `lost`, so the task fails as any lost
+  attempt does, and a person or the orchestrator tries again; the orphan's cost is the other party's.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

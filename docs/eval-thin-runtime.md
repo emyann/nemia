@@ -434,3 +434,30 @@ orchestrator's calls to the runtime change.
    is never resumed; and a deadline that passes on a live session stops it and then ends the attempt `deadline`, where the
    sketch went through `stopping`, which is kept for a person's word.
 6. **Remote A2A agents by URL** (and their Agent Card); later, the adapters mounted over HTTP.
+   **Part 1 done, 2026-09-25: the runtime reaches a remote agent** (`src/a2a-remote.ts`). A harness is configured as
+   `{ url }` or `{ card }`, and a task picks it by name. The verbs are A2A's own over the SDK's client: SendMessage,
+   GetTask for each open session, CancelTask. The binding is the card's first that the runtime speaks, JSON-RPC or REST.
+   Auth follows the card, with each secret asked of the engine's `credentials` on every request and never written down.
+   A registry under `<root>/remote/` holds the intent before the send and the Task on its answer, so a restart never
+   sends twice. Each refusal is made at shipped defaults against the SDK's own server over HTTP. The pass is metered: one
+   GetTask per open session, and none once settled. The runtime README's *A remote A2A agent as a harness* describes it,
+   and open issue 34 records the crash window between the answer and the registry.
+
+   Where it departs from the plan:
+   - `say` reaches a Task that asks for input rather than being refused outright, since `answer` refuses an attempt in
+     flight and nothing else could continue it.
+   - A card that cannot be read, or offers no spoken binding, is `unstartable` rather than `lost`, since nothing was
+     sent.
+   - `release` moves a settled session's entry aside, which is what makes a settled task cost a pass nothing.
+   - JSON-RPC is served in the test through the SDK's express handler, beside REST's.
+
+   The rest is filed as three parts:
+   - **Part 2: a workflow step names a remote agent through its `harness:` key.** The orchestrator's `runtime-client.ts`
+     builds the entries and supplies `credentials` from the environment, and `harnessOf` and `KEY_HELP` accept them. The
+     api's builder and listing and the board's harness picker learn the new values. The part also decides how a remote
+     step signs off, since a remote agent may ignore the schema: until then such a task ends `stated: false`, read as
+     unsigned. The question for its plan gate: is the URL written in the key, or declared once under a name?
+   - **Part 3: the gRPC binding.** `@grpc/grpc-js`, `@bufbuild/protobuf`, and the SDK's `client/grpc` and `server/grpc`.
+   - **Part 4: streaming and subscribe.** SendStreamingMessage and SubscribeToTask, relayed to the transcript and the feed,
+     and a restarted runtime resubscribing. It also carries what stage 2 part 5a deferred: the collected files as
+     Artifacts, and one A2A Task per runtime task.

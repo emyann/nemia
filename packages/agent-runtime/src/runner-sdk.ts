@@ -27,13 +27,13 @@
  */
 import { Effect } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { Observed, Sighting, Usage } from './domain.ts';
+import type { SessionState, Sighting, Usage } from './domain.ts';
 import { Runner, RunnerError } from './runner.ts';
 import { renderTranscript } from './runner-claude-transcript.ts';
 import type { HarnessArgs } from './harness-args.ts';
 
 /** What the in-process runner knows about one session it is running. */
-type Live = { sessionId: string; state: Observed; abort: AbortController; toolCalls: number; usage?: Usage };
+type Live = { sessionId: string; state: SessionState; abort: AbortController; toolCalls: number; usage?: Usage };
 
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
@@ -65,7 +65,7 @@ export const sdkRunner = () => {
             const u = m.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } | undefined;
             set({
               sessionId: m.session_id,
-              state: m.is_error ? 'failed' : 'done',
+              state: m.is_error ? 'failed' : 'completed',
               usage: {
                 turns: m.num_turns,
                 toolCalls: live.get(name)?.toolCalls ?? 0,
@@ -83,9 +83,9 @@ export const sdkRunner = () => {
         }
         // The iterator can end without a result message (an abort, a crashed child). Never leave
         // a session `working` — the engine would wait on it until its grace window expired.
-        if (live.get(name)?.state === 'working') set({ state: abort.signal.aborted ? 'stopped' : 'failed' });
+        if (live.get(name)?.state === 'working') set({ state: abort.signal.aborted ? 'canceled' : 'failed' });
       } catch {
-        set({ state: abort.signal.aborted ? 'stopped' : 'failed' });
+        set({ state: abort.signal.aborted ? 'canceled' : 'failed' });
       }
     });
 

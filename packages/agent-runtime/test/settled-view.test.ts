@@ -86,14 +86,14 @@ test('REFUSED: a settled task on a harness that has `find` observes nothing eith
   const runner = {
     async spawn(r: { name: string }) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
     async observe() { counts.observe++; return new Map(sessions); },
-    async find(name: string) { counts.find++; const s = sessions.get(name); return s && s.state !== 'done' ? { sessionId: s.sessionId } : undefined; },
+    async find(name: string) { counts.find++; const s = sessions.get(name); return s && s.state !== 'completed' ? { sessionId: s.sessionId } : undefined; },
     async stop() {},
     async logs(sessionId: string) { return `logs of ${sessionId}`; },
   };
   const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { mine: runner } });
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') });
   await engine.tick();
-  sessions.set(`ae/${id}/1`, { ...sessions.get(`ae/${id}/1`)!, state: 'done' });
+  sessions.set(`ae/${id}/1`, { ...sessions.get(`ae/${id}/1`)!, state: 'completed' });
   await engine.tick();
 
   const before = counts.observe;

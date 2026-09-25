@@ -19,7 +19,7 @@
  * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameFor, type Attempt, type Observed, type Sighting } from './domain.ts';
+import { nameFor, type Attempt, type SessionState, type Sighting } from './domain.ts';
 import type { SpawnRequest } from './runner.ts';
 
 /** The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`. */
@@ -46,20 +46,27 @@ export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
 export const SESSION_METHODS = ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript', 'observeSessions'] as const;
 export type SessionMethod = (typeof SESSION_METHODS)[number];
 
-const STATES: Record<Observed, TaskState> = {
+/**
+ * A session's state is A2A's, by name: each of the runtime's names is the protocol's `TaskState` of the same word. The
+ * table is the whole mapping, both ways; `UNSPECIFIED` has no name, and nothing else is left out.
+ */
+const STATES: Record<SessionState, TaskState> = {
+  submitted: TaskState.TASK_STATE_SUBMITTED,
   working: TaskState.TASK_STATE_WORKING,
-  blocked: TaskState.TASK_STATE_INPUT_REQUIRED,
-  done: TaskState.TASK_STATE_COMPLETED,
+  'input-required': TaskState.TASK_STATE_INPUT_REQUIRED,
+  'auth-required': TaskState.TASK_STATE_AUTH_REQUIRED,
+  completed: TaskState.TASK_STATE_COMPLETED,
   failed: TaskState.TASK_STATE_FAILED,
-  stopped: TaskState.TASK_STATE_CANCELED,
+  canceled: TaskState.TASK_STATE_CANCELED,
+  rejected: TaskState.TASK_STATE_REJECTED,
 };
 
-/** A session's state as A2A's. Blocked is waiting on a person: A2A's `INPUT_REQUIRED`, an interrupted state, not a final one. */
-export const stateOf = (observed: Observed): TaskState => STATES[observed];
+/** A session's state as A2A's `TaskState`: the same word. */
+export const stateOf = (state: SessionState): TaskState => STATES[state];
 
-/** The session's state an A2A state stands for, or `undefined` for one no sighting maps to (`SUBMITTED`, `REJECTED`, …). */
-export const observedOf = (state: TaskState): Observed | undefined =>
-  (Object.keys(STATES) as Observed[]).find((o) => STATES[o] === state);
+/** The runtime's name for an A2A state, or `undefined` for one it has no name for (`UNSPECIFIED`, or one a later A2A adds). */
+export const nameOf = (state: TaskState): SessionState | undefined =>
+  (Object.keys(STATES) as SessionState[]).find((o) => STATES[o] === state);
 
 /** An object with its `undefined` keys left out, as JSON would carry it: metadata must survive a transport that serialises. */
 const clean = (o: Record<string, unknown>): Record<string, unknown> =>
@@ -203,7 +210,7 @@ export const taskOfSighting = (name: string, s: Sighting, state = stateOf(s.stat
 /** What a harness saw of a session, off a Task `taskOfSighting` built — or `undefined` for a Task that carries none. */
 export const sightingOf = (t: Task): Sighting | undefined => {
   const s = t.metadata?.sighting as Sighting | undefined;
-  return s && observedOf(t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED) === s.state ? s : undefined;
+  return s && nameOf(t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED) === s.state ? s : undefined;
 };
 
 /** A spawn the harness took: working, with the message that asked for it, in no context known until the harness lists it. */
@@ -248,17 +255,6 @@ export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiti
 
 // ─── a remote agent's Task, which the runtime did not make ─────────────────
 
-const REMOTE_STATES: ReadonlyMap<TaskState, Observed> = new Map([
-  [TaskState.TASK_STATE_SUBMITTED, 'working'],
-  [TaskState.TASK_STATE_WORKING, 'working'],
-  [TaskState.TASK_STATE_INPUT_REQUIRED, 'blocked'],
-  [TaskState.TASK_STATE_AUTH_REQUIRED, 'blocked'],
-  [TaskState.TASK_STATE_COMPLETED, 'done'],
-  [TaskState.TASK_STATE_FAILED, 'failed'],
-  [TaskState.TASK_STATE_REJECTED, 'failed'],
-  [TaskState.TASK_STATE_CANCELED, 'stopped'],
-]);
-
 /** What a remote Task in an interrupted state waits for, in A2A's word for it. */
 const WAITS: ReadonlyMap<TaskState, string> = new Map([
   [TaskState.TASK_STATE_INPUT_REQUIRED, 'input'],
@@ -267,10 +263,10 @@ const WAITS: ReadonlyMap<TaskState, string> = new Map([
 
 /**
  * What a remote agent's Task says of its session, as a sighting. Its id is the session's, and its context the
- * conversation's (`nativeId`), which a later turn continues. `SUBMITTED` and `WORKING` are at work; `INPUT_REQUIRED` and
- * `AUTH_REQUIRED` are `blocked`, waiting on the caller for what `waitingFor` names; `COMPLETED` is `done`; `FAILED` and
- * `REJECTED` are `failed`; `CANCELED` is `stopped`. A state no version of A2A this runtime knows gives, `UNSPECIFIED`
- * among them, says nothing has ended, and reads as at work: the deadline bounds it.
+ * conversation's (`nativeId`), which a later turn continues. Its state is the Task's, passed through by name (`nameOf`):
+ * the lifecycle reads A2A's words, so there is nothing to translate. `INPUT_REQUIRED` and `AUTH_REQUIRED` wait on the
+ * caller, and `waitingFor` says for what, in A2A's word for it. A state no version of A2A this runtime knows gives,
+ * `UNSPECIFIED` among them, says nothing has ended, and reads as `working`: the deadline bounds it.
  *
  * The closing statement is the data part of the last Artifact that has one, and only on a Task that `COMPLETED`: an
  * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`closedOut`).
@@ -279,11 +275,11 @@ const WAITS: ReadonlyMap<TaskState, string> = new Map([
  */
 export const sightingOfTask = (t: Task, now: number): Sighting => {
   const state = t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED;
-  const observed = REMOTE_STATES.get(state) ?? 'working';
+  const named = nameOf(state) ?? 'working';
   const waiting = WAITS.get(state);
-  const payload = observed === 'done' ? statementOf(t.artifacts) : undefined;
+  const payload = named === 'completed' ? statementOf(t.artifacts) : undefined;
   return {
-    sessionId: t.id, state: observed,
+    sessionId: t.id, state: named,
     ...(t.contextId ? { nativeId: t.contextId } : {}),
     ...(waiting ? { waitingFor: waiting } : {}),
     ...(payload !== undefined ? { closeout: { payload, at: now } } : {}),

@@ -17,9 +17,9 @@ import { Journal } from '../src/journal.ts';
 import { HarnessHandler } from '../src/a2a-handler.ts';
 import {
   closeoutArtifact, closeoutOf, contextRefusal, failedSpawnTask, followUpOf, followUpRefusal, followUpText, messageOf, messageRefusal, nameParts,
-  RUNTIME_EXTENSION, observedOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt, taskOfSighting, wordsOf,
+  RUNTIME_EXTENSION, nameOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt, taskOfSighting, wordsOf,
 } from '../src/a2a-map.ts';
-import type { Attempt, Observed, Sighting } from '../src/domain.ts';
+import { SESSION_STATES, type Attempt, type Ended, type SessionState, type Sighting } from '../src/domain.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */
@@ -27,19 +27,23 @@ const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)
 
 test('each session state is its A2A state, exactly, and back', () => {
   // The table itself, not only its round trip: two states swapped would still round-trip.
-  const expected: Record<Observed, TaskState> = {
+  const expected: Record<SessionState, TaskState> = {
+    submitted: TaskState.TASK_STATE_SUBMITTED,
     working: TaskState.TASK_STATE_WORKING,
-    blocked: TaskState.TASK_STATE_INPUT_REQUIRED,
-    done: TaskState.TASK_STATE_COMPLETED,
+    'input-required': TaskState.TASK_STATE_INPUT_REQUIRED,
+    'auth-required': TaskState.TASK_STATE_AUTH_REQUIRED,
+    completed: TaskState.TASK_STATE_COMPLETED,
     failed: TaskState.TASK_STATE_FAILED,
-    stopped: TaskState.TASK_STATE_CANCELED,
+    canceled: TaskState.TASK_STATE_CANCELED,
+    rejected: TaskState.TASK_STATE_REJECTED,
   };
-  for (const [observed, state] of Object.entries(expected) as Array<[Observed, TaskState]>) {
-    assert.equal(stateOf(observed), state, observed);
-    assert.equal(observedOf(state), observed, observed);
+  assert.deepEqual(Object.keys(expected).sort(), [...SESSION_STATES].sort(), 'every name a sighting speaks, and no other');
+  for (const [name, state] of Object.entries(expected) as Array<[SessionState, TaskState]>) {
+    assert.equal(stateOf(name), state, name);
+    assert.equal(nameOf(state), name, name);
   }
-  for (const state of [TaskState.TASK_STATE_SUBMITTED, TaskState.TASK_STATE_REJECTED, TaskState.TASK_STATE_AUTH_REQUIRED, TaskState.TASK_STATE_UNSPECIFIED]) {
-    assert.equal(observedOf(state), undefined, `${TaskState[state]} is no session's state`);
+  for (const state of [TaskState.TASK_STATE_UNSPECIFIED, 99 as TaskState]) {
+    assert.equal(nameOf(state), undefined, `${TaskState[state] ?? state} is no session's state`);
   }
 });
 
@@ -53,7 +57,7 @@ test('a session name is its task and attempt, and nothing else is', () => {
 
 /** A sighting with every optional field set. */
 const full: Sighting = {
-  sessionId: 's-7', state: 'blocked', busy: true, nativeId: 'native-7',
+  sessionId: 's-7', state: 'input-required', busy: true, nativeId: 'native-7',
   usage: {
     turns: 4, toolCalls: 9, inputTokens: 1200, cacheReadTokens: 900, cacheWriteTokens: 200, uncachedTokens: 100,
     peakContextTokens: 1100, firstContextTokens: 400, firstCacheWriteTokens: 50, compactions: 1, outputTokens: 300,
@@ -73,7 +77,7 @@ test('a sighting rides whole in its Task, and survives a transport that serialis
   assert.deepEqual(closeoutOf(overTheWire(t)), full.closeout!.payload);
   assert.deepEqual(overTheWire(t.metadata), t.metadata, 'nothing in a sighting changes shape as JSON');
   assert.deepEqual(sightingOf({ ...t, metadata: overTheWire(t.metadata) }), full);
-  for (const state of ['working', 'done', 'failed', 'stopped'] as const) {
+  for (const state of SESSION_STATES) {
     const bare = taskOfSighting('ae/t-1/3', { sessionId: 's', state });
     assert.deepEqual(sightingOf(bare), { sessionId: 's', state });
     assert.deepEqual([bare.contextId, bare.artifacts], ['', []], 'no id seen yet is no context, and no closeout no Artifact');
@@ -82,7 +86,7 @@ test('a sighting rides whole in its Task, and survives a transport that serialis
 
 test("attempts that continued one conversation share a context: the harness's id, not the runtime's task", () => {
   // A job resumed keeps its session's id (M12): two attempts, one context; another task's session another.
-  const first = taskOfSighting('ae/t-1/1', { sessionId: 'job-1', state: 'done', nativeId: 'conv-a' });
+  const first = taskOfSighting('ae/t-1/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-a' });
   const again = taskOfSighting('ae/t-1/2', { sessionId: 'job-2', state: 'working', nativeId: 'conv-a' });
   const other = taskOfSighting('ae/t-1/3', { sessionId: 'job-3', state: 'working', nativeId: 'conv-b' });
   assert.deepEqual([first.contextId, again.contextId, other.contextId], ['conv-a', 'conv-a', 'conv-b']);
@@ -199,7 +203,8 @@ test('an attempt the harness no longer lists is answered from the journal', () =
     [{ ended: 'done', reason: 'harness' }, TaskState.TASK_STATE_COMPLETED],
     [{ ended: 'stopped', reason: 'operator' }, TaskState.TASK_STATE_CANCELED],
     [{ ended: 'failed', reason: 'harness' }, TaskState.TASK_STATE_FAILED],
-    [{ ended: 'working', reason: 'lost' }, TaskState.TASK_STATE_FAILED],
+    // A word no end is recorded with now, as a journal from an older runtime may carry one: an end, not a success.
+    [{ ended: 'working' as Ended, reason: 'lost' }, TaskState.TASK_STATE_FAILED],
     [{ ended: 'stopped', reason: 'deadline' }, TaskState.TASK_STATE_CANCELED],
   ];
   for (const [change, state] of cases) {
@@ -254,7 +259,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
     stop: (id) => Effect.suspend(() => {
       asked.push(['stop', id]);
       if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
       return Effect.void;
     }),
     logs: (id) => answer('logs', id, `logs of ${id}`),
@@ -263,7 +268,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
     ...(o.bare ? {} : {
       find: (name: string) => answer('find', name, sessions.get(name) && { sessionId: sessions.get(name)!.sessionId }),
       release: (session: Sighting, task: { worktree?: string | boolean }) =>
-        answer('release', [session, task], session.state === 'done' ? { turns: 2, costUsd: 0.5 } : undefined),
+        answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
       say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
       // Told what is expected, the sessions it names alone.
       observeFor: (expected: readonly ExpectedSession[]) =>
@@ -342,7 +347,7 @@ test('a spawn the seam refuses reaches no driver, and says why in A2A\'s words',
 test("observe through the client is the driver's map, every page of it, from one observe", async () => {
   const d = driven();
   for (let i = 1; i <= 250; i++) {
-    d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'done' : 'working', busy: i % 2 === 0 });
+    d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'completed' : 'working', busy: i % 2 === 0 });
   }
   d.sessions.set('ae/t-001/2', full);
   const seen = await Effect.runPromise(d.runner.observe);
@@ -383,12 +388,12 @@ test('a stop through the client reaches the driver by session id', async () => {
   await Effect.runPromise(d.runner.observe);
   await Effect.runPromise(d.runner.stop('s-1'));
   assert.deepEqual(d.acted().at(-1), ['stop', 's-1']);
-  assert.equal(d.sessions.get(request.name)!.state, 'stopped');
+  assert.equal(d.sessions.get(request.name)!.state, 'canceled');
 });
 
 test('a stop with no listing yet lists first, and stops', async () => {
   const d = driven();
-  d.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'blocked' });
+  d.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'input-required' });
   await Effect.runPromise(d.runner.stop('s-9'));
   assert.deepEqual(d.acted(), [['stop', 's-9']]);
 });
@@ -413,7 +418,7 @@ test('a stop of a session that ended since the listing does nothing, as a driver
   const d = driven();
   await Effect.runPromise(d.runner.spawn(request));
   await Effect.runPromise(d.runner.observe);
-  d.sessions.set(request.name, { sessionId: 's-1', state: 'done' });
+  d.sessions.set(request.name, { sessionId: 's-1', state: 'completed' });
   await Effect.runPromise(d.runner.stop('s-1'));
   assert.deepEqual(d.acted(), [['spawn', request]]);
 });
@@ -457,12 +462,12 @@ test("find, logs and release through the seam answer as the driver does, and the
   assert.deepEqual(await Effect.runPromise(d.runner.find!(request.name)), { sessionId: 's-1' });
   assert.equal(await Effect.runPromise(d.runner.find!('ae/t-9/1')), undefined, 'none found is undefined, as a driver says it');
   assert.equal(await Effect.runPromise(d.runner.logs('s-1')), 'logs of s-1');
-  const done: Sighting = { ...full, state: 'done' };
+  const done: Sighting = { ...full, state: 'completed' };
   assert.deepEqual(await Effect.runPromise(d.runner.release!(done, { worktree: '/w/t-1' })), { turns: 2, costUsd: 0.5 });
-  assert.equal(await Effect.runPromise(d.runner.release!({ sessionId: 's-2', state: 'stopped' }, {})), undefined);
+  assert.equal(await Effect.runPromise(d.runner.release!({ sessionId: 's-2', state: 'canceled' }, {})), undefined);
   assert.deepEqual(d.acted().slice(1), [
     ['find', request.name], ['find', 'ae/t-9/1'], ['logs', 's-1'],
-    ['release', [done, { worktree: '/w/t-1' }]], ['release', [{ sessionId: 's-2', state: 'stopped' }, {}]],
+    ['release', [done, { worktree: '/w/t-1' }]], ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
   ]);
   assert.equal(d.asked.filter(([v]) => v === 'observe').length, 0, 'none of them lists the harness');
 });
@@ -510,7 +515,7 @@ test('say through the seam reaches the driver with the name and the id its harne
   const d = driven();
   await Effect.runPromise(d.runner.spawn(request));
   await Effect.runPromise(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'look again'));
-  d.sessions.set(request.name, { sessionId: 's-1', state: 'blocked', waitingFor: 'permission prompt' });
+  d.sessions.set(request.name, { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
   await Effect.runPromise(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'and again'));
   assert.deepEqual(d.acted().slice(1), [
     ['say', [{ name: request.name, sessionId: 's-1' }, 'look again']],
@@ -525,7 +530,7 @@ test("a driver's words through find, logs, release, say and transcript come back
   const cases: Array<[string, Effect.Effect<unknown, RunnerError>]> = [
     ['find', d.runner.find!(request.name)],
     ['logs', d.runner.logs('s-1')],
-    ['release', d.runner.release!({ sessionId: 's-1', state: 'done' }, {})],
+    ['release', d.runner.release!({ sessionId: 's-1', state: 'completed' }, {})],
     ['say', d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi')],
     ['transcript', d.runner.transcriptOf!(request.name)],
     ['transcript', d.runner.transcript!('s-1')],
@@ -542,7 +547,7 @@ test("a driver's defect through find, logs, release, say and transcript is the s
   const d = driven({ fails: boom });
   d.sessions.set(request.name, { sessionId: 's-1', state: 'working' });
   for (const e of [
-    d.runner.find!(request.name), d.runner.logs('s-1'), d.runner.release!({ sessionId: 's-1', state: 'done' }, {}),
+    d.runner.find!(request.name), d.runner.logs('s-1'), d.runner.release!({ sessionId: 's-1', state: 'completed' }, {}),
     d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'), d.runner.transcriptOf!(request.name), d.runner.transcript!('s-1'),
   ]) {
     await assert.rejects(Effect.runPromise(e as Effect.Effect<unknown, RunnerError>), (x) => x === boom);
@@ -551,7 +556,7 @@ test("a driver's defect through find, logs, release, say and transcript is the s
 
 test('REFUSED: say through the seam to a session that has ended is refused in words, and the driver is not asked', async () => {
   const d = driven();
-  d.sessions.set(request.name, { sessionId: 's-1', state: 'done' });
+  d.sessions.set(request.name, { sessionId: 's-1', state: 'completed' });
   const e = await failure(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'));
   assert.deepEqual({ verb: e.verb, message: e.message }, { verb: 'say', message: 'session `ae/t-1/2` has ended (done): it takes no more words.' });
   const gone = await failure(d.runner.say!({ name: 'ae/t-9/1', sessionId: 's-9' }, 'hi'));
@@ -591,7 +596,7 @@ test('the Effect door takes the same seam: a2aRunner spawns, stops and settles t
 
   await run(requestStop(id));
   await run(tick());
-  assert.equal(sessions.get(`ae/${id}/1`)!.state, 'stopped', 'the stop reached the driver through cancelTask');
+  assert.equal(sessions.get(`ae/${id}/1`)!.state, 'canceled', 'the stop reached the driver through cancelTask');
 
   // Only the seam answers this: a driver reached directly is handed any id, and testOps does nothing with one it lacks.
   const e = await run(Effect.flatMap(Runner, (r) => Effect.flip(r.stop('fake-404'))));

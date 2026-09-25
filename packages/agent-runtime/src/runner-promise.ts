@@ -4,8 +4,15 @@
  * handed to the A2A seam (`a2a-client.ts`) and reached only through it.
  */
 import { Effect } from 'effect';
-import type { Sighting, Usage } from './domain.ts';
+import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type SessionState, type Sighting, type Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
+
+/**
+ * A session as a `PromiseRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five words
+ * sightings spoke before them (`working`, `blocked`, `done`, `failed`, `stopped`), which a runner written then still reports
+ * and `promiseOps` reads as their names (`formerStateOf`: `blocked` is `input-required`). Any other word is refused.
+ */
+export type PromiseSighting = Omit<Sighting, 'state'> & { state: SessionState | PhaseWord };
 
 /** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
 export type PromiseRunner = {
@@ -16,7 +23,7 @@ export type PromiseRunner = {
    * it appears, the attempt `lost` if it never does.
    */
   spawn(r: SpawnRequest): Promise<void>;
-  observe(): Promise<Map<string, Sighting>>;
+  observe(): Promise<Map<string, PromiseSighting>>;
   /**
    * Optional. The session running under `name` — a name the engine chose — found without observing every other, or
    * `undefined` when none runs. Only which session it is: a read that needs its state asks `observe`, and takes
@@ -60,7 +67,7 @@ export const promiseOps = (h: PromiseRunner): RunnerOps => ({
       ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
     }),
   }),
-  observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
+  observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })).pipe(Effect.flatMap(inNames)),
   ...(h.find ? {
     find: (name: string) => wrap(() => h.find!(name), (m) => new RunnerError({ verb: 'find', message: m })),
   } : {}),
@@ -81,6 +88,22 @@ export const promiseOps = (h: PromiseRunner): RunnerOps => ({
       wrap(() => h.say!(session, text), (m) => new RunnerError({ verb: 'say', message: m })),
   } : {}),
 });
+
+/** What a `PromiseRunner` observed, every state in A2A's names — or refused, naming the session and the words it takes. */
+const inNames = (seen: Map<string, PromiseSighting>): Effect.Effect<Map<string, Sighting>, RunnerError> => {
+  const out = new Map<string, Sighting>();
+  for (const [name, s] of seen) {
+    const state = isSessionState(s.state) ? s.state : formerStateOf(s.state);
+    if (!state) {
+      return Effect.fail(new RunnerError({
+        verb: 'observe',
+        message: `the harness reported session \`${name}\` as \`${String(s.state)}\`, which is no session state: report one of A2A's, ${SESSION_STATES.join(', ')} (or a former word, working, blocked, done, failed, stopped).`,
+      }));
+    }
+    out.set(name, { ...s, state });
+  }
+  return Effect.succeed(out);
+};
 
 /** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
 export const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>

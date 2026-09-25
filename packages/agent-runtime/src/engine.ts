@@ -8,7 +8,7 @@
 import { Context, Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { admissionOf, awaitsAdmission, decide, fold, nameFor, needsHuman, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type Sighting, type State, type Usage } from './domain.ts';
+import { admissionOf, atWorkState, awaitsAdmission, decide, fold, nameFor, needsHuman, phaseWordOf, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type SessionState, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner, type ExpectedSession } from './runner.ts';
@@ -24,8 +24,9 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
-/** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
-export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
+/** A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled` are not. */
+export const LIVE: ReadonlySet<SessionState> = new Set(['submitted', 'working', 'input-required', 'auth-required']);
+
 
 /** A move the lifecycle refused in a pass: which task, and the state and event it had no edge for (`Refusal`). */
 export type RefusedMove = { taskId: string } & Refusal;
@@ -325,7 +326,7 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   // a pipe the worker reads when it is next scheduled — under load, after. The session is known a pass later, or the harness's
   // own end brings what it printed.
   if (!seen.nativeId) return observed;
-  return new Map(observed).set(name, { ...seen, state: 'done' });
+  return new Map(observed).set(name, { ...seen, state: 'completed' });
 };
 
 /** A `step` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
@@ -541,7 +542,7 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
   const seen = observed.get(nameFor(state.taskId, last.n));
-  return seen === undefined || seen.state === 'working';
+  return seen === undefined || atWorkState(seen.state);
 };
 
 /**
@@ -682,7 +683,8 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
-  const live = last && last.ended === null ? sighting?.state : undefined;
+  // In the words every view has always printed (`phaseWordOf`): A2A's names stop at the runtime.
+  const live = last && last.ended === null && sighting ? phaseWordOf(sighting.state) : undefined;
   const phase = state.settled
     ? state.settled
     // Held open (R1), signed and waiting for a person's answer or close: A2A's TASK_STATE_INPUT_REQUIRED, and nothing running.

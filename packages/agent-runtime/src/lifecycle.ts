@@ -19,9 +19,13 @@
  *                 the task settles on that end, and on nothing observed.
  *
  * A2A's `rejected` is not a state: a spawn its harness refused is one attempt's end (`unstartable`), and the task settles
- * `failed` from `ending` as on any failed end. `auth-required` is not one either: no harness reports it. A session
- * blocked on a person is a self-edge of `working`, not a state: the journal cannot tell it from working, only a sighting
- * can, and a state is what the journal says.
+ * `failed` from `ending` as on any failed end. A sighting may say `rejected` — a remote agent that refused the work once it
+ * had it — and that is the harness ending the attempt, `SESSION_ENDED`, recorded `failed` as any failure the harness
+ * reports. A sighting's `submitted` — a remote Task accepted and not yet started — is `SESSION_LIVE`, as `working` is:
+ * every edge of it (wait, stop for a person or the deadline, stop before continuing) is right for it, and a new event
+ * would copy them. `auth-required` is not a task's state either: a sighting says it, and it is `SESSION_BLOCKED`, as
+ * `input-required` is. A session blocked on a person is a self-edge of `working`, not a state: the journal cannot tell it
+ * from working, only a sighting can, and a state is what the journal says.
  *
  * **A person's verbs are not edges.** `requestStop`, `answer` and `close` write an entry to the journal, and the next
  * pass reads the state that entry makes: `stopping`, a new turn's `submitted`, `ending`. The edges are what a pass does,
@@ -38,7 +42,7 @@
  * where it was. A final state's snapshot is `status: 'done'` and `can` is false there for every event.
  */
 import { setup, transition as xTransition } from 'xstate';
-import type { Action, EndReason, Observed, Outcome, Sighting } from './domain.ts';
+import { endOf, phaseWordOf, type Action, type Ended, type EndReason, type Outcome, type Sighting } from './domain.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
 export const STATES = ['submitted', 'starting', 'working', 'input-required', 'stopping', 'ending', 'completed', 'failed', 'canceled'] as const;
@@ -79,9 +83,9 @@ export type LifecycleEvent =
   // nothing in flight, and the record says why
   | { type: 'NOTHING_OPEN' }
   | { type: 'AWAITING_INPUT' }
-  | { type: 'CLOSED'; last?: { n: number; ended: Observed | null } }
+  | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
-  | { type: 'ATTEMPT_ENDED'; ended: Observed | null; reason: EndReason | null; attempts: number; turn: number }
+  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number }
   /** A settled task: every state it can be in is final, and takes no event. `decide` never asks (`settledQuiet`). */
   | { type: 'SETTLED'; outcome: Outcome };
 
@@ -104,7 +108,8 @@ type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST'>;
 
 const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
-    case 'SESSION_LIVE': return { do: 'nothing', why: `running (${event.sighting.state})` };
+    // In the words views have always printed (`phaseWordOf`): a remote Task `submitted` runs as `working` does.
+    case 'SESSION_LIVE': return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
     case 'SESSION_BLOCKED': return { do: 'nothing', why: 'blocked — needs a person' };
     case 'UNSEEN_IN_GRACE': return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
     case 'QUEUED': return { do: 'nothing', why: 'queued — waits to be admitted' };
@@ -113,13 +118,23 @@ const said = (event: LifecycleEvent): Action => {
   }
 };
 
-/** The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. */
+/**
+ * The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. Its
+ * word is `endOf` the sighting's state — the journal's `done`, `failed` or `stopped`. No edge takes a session waiting on a
+ * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
+ */
 const harnessEnd = (e: Sessioned): Action => ({
-  do: 'record-end', attempt: e.attempt, sessionId: e.sighting.sessionId, observed: e.sighting.state === 'working' ? 'done' : e.sighting.state,
+  do: 'record-end', attempt: e.attempt, sessionId: e.sighting.sessionId, observed: endedOf(e),
   reason: 'harness', nativeId: e.sighting.nativeId, closeout: e.sighting.closeout?.payload,
   // Whether the statement its task asked for came: a fact for the layer above, which judges it.
   ...(e.asked ? { stated: e.sighting.closeout !== undefined } : {}),
 });
+
+const endedOf = (e: Sessioned): Ended => {
+  const end = endOf(e.sighting.state);
+  if (!end) throw new Error(`the lifecycle recorded the end of a session its harness says is \`${e.sighting.state}\` on ${e.type}: it has not ended`);
+  return end;
+};
 
 /**
  * An attempt cut short with its harness holding no end of its own: the cut is its reason. A person's stop records it

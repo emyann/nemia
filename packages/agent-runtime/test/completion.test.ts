@@ -36,7 +36,7 @@ test('state=done is taken at its word, immediately', async () => {
   const restore = withFakeClaude(row('done', 'idle'));
   try {
     const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
-    assert.equal(seen.get('ae/t-1/1')?.state, 'done');
+    assert.equal(seen.get('ae/t-1/1')?.state, 'completed');
   } finally { restore(); }
 });
 
@@ -229,7 +229,7 @@ test('blocked is never quiescent — a session waiting on a person is not finish
     await Effect.runPromise(ops.observe);
     t += 10 * QUIESCENT_AFTER_MS;
     const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
-    assert.equal(seen?.state, 'blocked');
+    assert.equal(seen?.state, 'input-required');
     assert.equal(seen?.quietMs, undefined, 'never quiet');
   } finally { restore(); }
 });
@@ -325,7 +325,7 @@ test('a blocked, idle session reports what it said too — and stays blocked, fo
   try {
     const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe);
     assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
-    assert.equal(seen.get('ae/t-1/1')?.state, 'blocked');
+    assert.equal(seen.get('ae/t-1/1')?.state, 'input-required');
   } finally { restore(); }
 });
 

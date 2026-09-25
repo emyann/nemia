@@ -10,7 +10,7 @@
  * copies of Effect in one dependency tree break service resolution, and a consumer who never
  * imports Effect can never have two.
  */
-import { Effect, Layer } from 'effect';
+import { Effect, Exit, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
 import { fold, nameFor, type Event, type Input, type Said, type Sighting, type State } from './domain.ts';
@@ -28,6 +28,7 @@ import { codex } from './runner-codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps } from './a2a-client.ts';
+import { ioCounts, type IoCounts } from './io-tally.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
   answer, answerRefusalOf, close, closeRefusalOf, DEFAULT_MAX_CONCURRENT, file, filingOf, refusalOf, requestStop, tick, view, type TaskView,
@@ -122,8 +123,26 @@ export type TaskSpec = {
   id?: string;
 };
 
-/** One pass: how many tasks it read, how many actions it took, and the sessions at work in each pool as it left them. */
-export type TickReport = { tasks: number; actions: number; running: Record<string, number> };
+/**
+ * One pass: how many tasks it read, how many actions it took, and the sessions at work in each pool as it left them — and what the pass
+ * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
+ */
+export type TickReport = { tasks: number; actions: number; running: Record<string, number>; ms: number; observed: Record<string, ObserveCount> };
+
+/**
+ * One harness's observes, counted: how many were made, their wall time in ms, the sessions or run files they listed, and the processes
+ * started while they ran (`claude agents` for Claude Code's background sessions; none for a directory of run files). The harnesses of a
+ * pass observe at once, so their `ms` can add up to more than the pass's, and a process another harness started in the same moment is
+ * counted in both.
+ */
+export type ObserveCount = { calls: number; ms: number; listed: number; spawned: number };
+
+/**
+ * What this engine's reads and spawns have cost since the process started, as running totals: the runtime's own reads and spawns
+ * (`IoCounts`, per process), and each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). A caller
+ * that wants one call's cost takes the difference before and after it.
+ */
+export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
 
 export type Engine = {
   /**
@@ -240,6 +259,8 @@ export type Engine = {
     intervalMs?: number;
     onError?: (e: unknown) => void;
   }): { stop(): void };
+  /** What this engine's reads, spawns and observes have cost so far (`EngineIo`): running totals, read by nothing in the engine. */
+  io(): EngineIo;
   /** Tick on a timer until stopped. Ticks never overlap. */
   start(options?: { intervalMs?: number; onTick?: (r: TickReport) => void; onError?: (e: unknown) => void }): { stop(): void };
 };
@@ -336,7 +357,24 @@ export function createEngine(options: EngineOptions = {}): Engine {
   // Each harness behind its A2A agent, reached through the SDK's client in this process (`a2a-client.ts`). Its agent
   // holds nothing: it answers a task it never started off the harness and this journal, so a restart loses no session.
   const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
-  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, a2aOps(name, ops, events)]));
+  // Every observe of a harness, a pass's and a view's alike, goes through its runner here, and is counted on the way (`ObserveCount`).
+  const observed: Record<string, ObserveCount> = {};
+  const counted = <R extends RunnerOps>(name: string, ops: R): R => ({
+    ...ops,
+    observe: Effect.suspend(() => {
+      const t0 = performance.now();
+      const spawned = ioCounts().spawned;
+      return Effect.onExit(ops.observe, (exit) => Effect.sync(() => {
+        const o = (observed[name] ??= { calls: 0, ms: 0, listed: 0, spawned: 0 });
+        o.calls++;
+        o.ms += performance.now() - t0;
+        o.spawned += ioCounts().spawned - spawned;
+        if (Exit.isSuccess(exit)) o.listed += exit.value.size;
+      }));
+    }),
+  });
+  const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
+  const runners = Object.fromEntries(Object.entries(runnersOf(harnesses, root)).map(([name, ops]) => [name, counted(name, a2aOps(name, ops, events))]));
   const pools = poolsOf(harnesses);
   const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)));
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
@@ -386,7 +424,17 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
       return go(file(task));
     },
-    tick: () => go(tick(max, pools)),
+    tick: async () => {
+      const t0 = performance.now();
+      const before = observedNow();
+      const report = await go(tick(max, pools));
+      const during = Object.fromEntries(Object.entries(observedNow()).flatMap(([name, o]): Array<[string, ObserveCount]> => {
+        const b = before[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0 };
+        return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned }]] : [];
+      }));
+      return { ...report, ms: performance.now() - t0, observed: during };
+    },
+    io: () => ({ ...ioCounts(), observed: observedNow() }),
     view: (taskId) => go(viewOf(taskId)),
     list: () => go(Effect.gen(function* () {
       const observed = yield* (yield* Runner).observe;
@@ -578,4 +626,5 @@ export type { Event, Observed, Outcome, Sighting, EndReason, State, Attempt, Usa
 export { HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
+export type { IoCounts } from './io-tally.ts';
 export type { TaskView } from './engine.ts';

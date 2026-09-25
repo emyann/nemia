@@ -25,6 +25,7 @@ import type { Denial, Observed, Sighting, Usage } from './domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
 import { writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
+import { countSpawn, readText } from './io-tally.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -197,7 +198,7 @@ const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(r
 export const detachedFind = (spec: HarnessSpec, root: string) => (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
   Effect.sync(() => {
     try {
-      const run = JSON.parse(fs.readFileSync(runFileOf(spec, root, name), 'utf8')) as RunFile;
+      const run = JSON.parse(readText(runFileOf(spec, root, name))) as RunFile;
       return run.name === name ? { sessionId: name } : undefined;
     } catch { return undefined; }
   });
@@ -222,7 +223,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       // happened to carry a `name` would otherwise be read as a session.
       if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
       try {
-        const run = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as RunFile;
+        const run = JSON.parse(readText(path.join(dir, f))) as RunFile;
         if (run.name) out.push({ name: run.name, run });
       } catch { /* a half-written file: the next pass will read it */ }
     }
@@ -246,7 +247,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     const f = closeoutFile(name);
     let text: string;
     let at: number;
-    try { text = fs.readFileSync(f, 'utf8'); at = fs.statSync(f).mtimeMs; } catch { return undefined; }
+    try { text = readText(f); at = fs.statSync(f).mtimeMs; } catch { return undefined; }
     let payload: unknown = text;
     try { payload = JSON.parse(text); } catch { /* carried as text */ }
     return { payload, at };
@@ -266,7 +267,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     let known = outputs.get(name);
     if (!known || known.size !== size || known.mtimeMs !== mtimeMs) {
       let text: string;
-      try { text = fs.readFileSync(logFile(name), 'utf8'); } catch { return undefined; }
+      try { text = readText(logFile(name)); } catch { return undefined; }
       known = { size, mtimeMs, read: spec.readOutput(text) };
       outputs.set(name, known);
     }
@@ -390,6 +391,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // the run file it leaves says working with no pid, and the lease calls that dead.
           child.on('error', () => {});
           child.unref();
+          countSpawn();
         },
         // Everything in `try` runs before the worker is launched, or is the launch: whatever threw,
         // no session is running under the name.

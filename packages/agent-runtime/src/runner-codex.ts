@@ -10,6 +10,7 @@ import type { HarnessSpec } from './runner-detached.ts';
 import { codexOutput } from './runner-detached-output.ts';
 import { codexRolloutEvents, codexRolloutFile } from './runner-codex-transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from './runner-mcp.ts';
+import { countSpawn } from './io-tally.ts';
 
 /**
  * The project paths a Codex config trusts.
@@ -33,6 +34,7 @@ export const trustedProjects = (toml: string): Set<string> => {
 /** The repository a directory's commits land in: the parent of its git common dir. */
 const repositoryOf = (cwd: string): string | undefined => {
   try {
+    countSpawn();
     const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     return path.dirname(path.resolve(cwd, common));
   } catch { return undefined; }

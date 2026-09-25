@@ -2,7 +2,10 @@
 description: Reviews a web-app change read-only, the diff beside the screenshots of every page it changed, in both themes.
 card: ui-reviewer.skills.json
 harness: claude
-# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings).
+# Said, as every role's is: a job reads no user settings, and with none named here it ran on the owner's `opus[1m]` before
+# card 4 and on Claude Code's default after it (F24 in docs/spike-2026-09-25-agents-skills.md).
+model: opus
+# Said here, or the session takes Claude Code's default: a job reads no user settings (F24).
 # Every token a session writes it reads again on each later call, so a higher effort is paid for many times over.
 effort: high
 # The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-runtime open issue 26).

@@ -25,7 +25,9 @@
  * brief gained one line under that section, that `git commit` and `git merge --continue` are denied it: the diff was that line, eight times.
  * Then that run merged main in, with the two changes above: the ship's new recipe reached both ui folders, whose ship is dev-build's,
  * each ship's check became its implement's new line, and the shipper's fourth item and the build ships' note say that check runs the
- * e2e no round's check ran. Past the briefs, the ui folders' `succeeded` pins moved to `checking` and `running`, as the dev folders' had.)
+ * e2e no round's check ran. Past the briefs, the ui folders' `succeeded` pins moved to `checking` and `running`, as the dev folders' had.
+ * And when planners and reviewers were given git's other read-only verbs (2026-09-25): every plan and review brief names them, from the
+ * step's own directory, and the diff was that sentence, sixteen times — and nothing past the briefs.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

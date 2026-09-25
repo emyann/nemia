@@ -20,7 +20,8 @@ writes and a command `.claude/settings.json` does not allow is denied without a 
 Bash(npm run build), Bash(npm run e2e)`, the two commands the settings allow for implement's sake, so it
 cannot run those two. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach the
 build and the e2e by other names (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), and
-narrowing those allows is the settings' to do. `implement` is denied `SendMessage`,
+narrowing those allows is the settings' to do. Its git is git's read-only verbs, from its own directory
+(`dev`'s README, *What git a fenced step may run*). `implement` is denied `SendMessage`,
 `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. `review` is handed implement's screenshots
 and pages and nothing else of implement (`input: implement`), reads the diff, and uses the look skill on
 the screenshots and the pages side by side. At this repository's settings review looks through the

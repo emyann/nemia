@@ -59,6 +59,9 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * The four ship bodies moved again when the run began landing an ending's merge on the ending's own check (2026-09-25): the shipper
  * stages the merge and signs off its message, and a build folder's note speaks of the check the run executes. Both ui folders' ships,
  * added on main meanwhile as dev-build's, came in with that body when the run merged main.
+ *
+ * The planners' bodies moved when planners and reviewers were given git's other read-only verbs (2026-09-25): the planner, the reviewer
+ * and the ui reviewer name them, and that `git -C` and a `cd` elsewhere are denied. The reviews were on the list already.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),
@@ -67,6 +70,8 @@ const BODIES_REWORDED: string[] = [
   'packages/agent-orchestrator/workflows/ui/implement',
   'packages/agent-orchestrator/workflows/ui/review',
   'workflows/supervisor/supervise',
+  'workflows/dev-planned/plan',
+  'workflows/dev-planned-build/plan',
 ];
 
 /**

@@ -109,12 +109,12 @@ export function skillEdited(form: SkillForm, was: SkillForm): boolean {
 }
 
 /**
- * What the page says of the switch: what a turn would carry with it on — the body, about four characters a token, loaded every turn and cached
- * as the system prompt is (F14) — or what it carries now, and that the switch is the skill's, so every agent that gives it moves with it.
+ * What the page says of the switch beside what a turn carries now (`costWords`): what the other position would carry — on, the body too,
+ * about four characters a token, loaded every turn and cached as the system prompt is (F14); off, only its name and what it does.
  */
 export function preloadWords(cost: SkillCost): string {
-  if (cost.preload) return `Loaded every turn: about ${cost.body.toLocaleString('en')} tokens of instructions in every turn, cached. Off, a session is only told its name and loads it when it needs it.`;
-  return `Off: a session is told its name and what it does, and loads it when it needs it. On, its instructions are loaded every turn — about ${cost.body.toLocaleString('en')} tokens more a turn, cached.`;
+  if (cost.preload) return 'Off, a session is told only its name and what it does, and loads it when it needs it.';
+  return `On, its instructions are loaded every turn too — about ${cost.body.toLocaleString('en')} tokens more a turn, cached.`;
 }
 
 /** Who a change of the skill — its switch included — reaches: every agent that gives it, by name, from the next run started; or none yet. */

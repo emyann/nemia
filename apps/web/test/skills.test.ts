@@ -86,9 +86,9 @@ test('a form is edited when what it would write differs, not when only its blank
   assert.equal(skillEdited({ ...was, body: 'Write it well.\n' }, was), true);
 });
 
-test("the switch says what a turn carries on and off, at four characters a token, cached", () => {
-  assert.match(preloadWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }), /On, its instructions are loaded every turn — about 1,500 tokens more a turn, cached\.$/);
-  assert.match(preloadWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), /^Loaded every turn: about 1,500 tokens of instructions in every turn, cached\./);
+test("the switch says what the other position would carry: on, the body every turn at four characters a token, cached", () => {
+  assert.equal(preloadWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }), 'On, its instructions are loaded every turn too — about 1,500 tokens more a turn, cached.');
+  assert.equal(preloadWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), 'Off, a session is told only its name and what it does, and loads it when it needs it.');
 });
 
 test('a change is said to reach every agent that gives the skill, by name, or none', () => {

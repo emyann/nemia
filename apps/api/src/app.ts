@@ -28,8 +28,8 @@ export const app = new Hono()
   // The agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put back or removed —
   // three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent` (agents.ts).
   .route('/', agents)
-  // The skills an agent of yours can be given, by place, and one HKB ships copied into your library — a write, guarded as a start is,
-  // through the package's `copySkill` (skills.ts).
+  // The skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made, changed, or one HKB ships
+  // copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and `copySkill` (skills.ts).
   .route('/', skills)
   // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
   .route('/', inbox)

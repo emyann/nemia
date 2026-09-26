@@ -1,4 +1,7 @@
-/** The skills an agent of yours can be given, and a skill HKB ships copied into your library (apps/api/src/skills.ts). */
+/**
+ * The skills an agent of yours can be given, a skill HKB ships copied into your library, one skill on its page, and one of yours written on the
+ * board (apps/api/src/skills.ts).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { AgentSkill } from './agents.ts';
@@ -58,3 +61,54 @@ export async function copySkill(name: string): Promise<SkillAdded> {
   if (res.ok && answer) return answer as SkillAdded;
   throw new SkillRefusal(typeof answer?.error === 'string' ? answer.error : `POST /api/skills/yours answered ${res.status} ${res.statusText}`, res.status);
 }
+
+/**
+ * Mirrors `SkillDraft` in the package: a skill as it is written — its name (its folder), a human title, what it does, its card's tags and
+ * examples, whether it is loaded every turn, and its instructions. Left out, `preload` keeps the line the file has.
+ */
+export type SkillDraft = {
+  name: string;
+  title?: string | null;
+  description?: string | null;
+  tags?: string[] | null;
+  examples?: string[] | null;
+  preload?: boolean;
+  body: string;
+};
+
+/** Mirrors `SkillUser`: an agent that gives a skill, by its place and its name. */
+export type SkillUser = { from: 'yours' | 'repo'; name: string };
+
+/**
+ * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read,
+ * `body` its instructions all the same), the agents of either place that give this very folder, and the `cp -r` that moves it to the other place.
+ */
+export type SkillDetail = { skill: SkillRow; version: string; draft: SkillDraft | null; body: string; users: SkillUser[]; copyHint: string | null };
+
+/** Mirrors `SkillSaved`: a skill written, as its page now reads it. */
+export type SkillSaved = SkillDetail & { written: string[] };
+
+/** One skill, read from disk now: its page's read. Under `skillsQuery`'s key, so a write that reads the list again reads it again too. */
+export const skillQuery = (from: string, name: string) =>
+  queryOptions({
+    queryKey: ['skills', from, name],
+    queryFn: () => get<SkillDetail>(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
+  });
+
+async function written(method: 'POST' | 'PUT', url: string, body: unknown): Promise<SkillSaved> {
+  const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
+  if (res.ok && answer) return answer as SkillSaved;
+  throw new SkillRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${url} answered ${res.status} ${res.statusText}`, res.status);
+}
+
+/** A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader refuses. */
+export const createSkill = (draft: SkillDraft): Promise<SkillSaved> => written('POST', '/api/skills/yours', { skill: draft });
+
+/** A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since. */
+export const saveSkill = (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
+  written('PUT', `/api/skills/yours/${encodeURIComponent(name)}`, { version, skill: draft });
+
+/** A skill of yours loaded every turn, or named for a session to load: its `preload:` line alone, at the version it was read at. */
+export const switchPreload = (name: string, version: string, preload: boolean): Promise<SkillSaved> =>
+  written('PUT', `/api/skills/yours/${encodeURIComponent(name)}`, { version, preload });

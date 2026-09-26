@@ -9,14 +9,18 @@
  * Each skill is listed with its card entry or the package's refusal of it (a SKILL.md with no description can be given to no agent), whether it
  * is loaded every turn (`preload: true`), what it costs a turn (`skillTurnCost`: about, at four characters a token), and the agents of yours
  * that give it.
+ *
+ * And one skill on a page of its own (`skillDetail`), and one of yours written on the board (`writeSkill`): made, changed at the version it was
+ * read at, or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
+ * repository's is read there, and a page says the `cp -r` that moves a skill between the two.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { copySkill, HOME, loadAgents, SkillWriteError, skillsFor, type SkillCopied } from 'agent-orchestrator';
-import { AGENTS_FOLDER, SKILLS_FOLDER, skillEntryOf, skillTurnCost, WorkflowError, type AgentSkill, type SkillCost } from 'agent-orchestrator/workflow';
+import { agentSkillsFound, copySkill, HOME, listAgents, loadAgents, SkillWriteError, skillsFor, skillVersion, writeSkill, type AgentPlace, type SkillChange, type SkillCopied, type SkillWritten } from 'agent-orchestrator';
+import { AGENTS_FOLDER, SKILLS_FOLDER, skillDraftOf, skillEntryOf, skillNameRefusal, skillTurnCost, splitFrontmatter, WorkflowError, type AgentSkill, type SkillCost, type SkillDraft } from 'agent-orchestrator/workflow';
 import { HOME_REPO, repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded } from './guard.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { placesOf } from './workflows.ts';
 
 /** Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its agents), or what HKB ships. */
@@ -143,17 +147,134 @@ export function givenSkills(skills: readonly string[], found: ReturnType<typeof 
 }
 
 const COPY_SHAPE = '`{ "copy": "<the name of a skill HKB ships>" }`';
+const DRAFT_SHAPE = '`{ "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" }`';
+const POST_SHAPE = `${COPY_SHAPE}, or \`{ "skill": ${DRAFT_SHAPE.slice(1, -1)} }\``;
+const PUT_SHAPE = `\`{ "version": "<as GET /api/skills/yours/<name> answers it>", "skill": ${DRAFT_SHAPE.slice(1, -1)} }\`, or \`{ "version": "…", "preload": true or false }\``;
 
-/** The copy, as the guard's refusals word it (guard.ts). */
-const skillGuard = (route: string): Guarded => ({
+/** A write of a skill, as the guard's refusals word it (guard.ts). */
+const skillGuard = (route: string, method: 'POST' | 'PUT'): Guarded => ({
   route,
-  does: 'copies a skill into your library',
+  does: method === 'POST' ? 'writes a skill into your library' : 'changes a skill in your library',
   forAnother: 'write one',
   why: "a skill in your library is what every agent of yours that gives it is told, once a run of a workflow naming that agent starts",
-  reach: "add it on an agent's page on the board",
-  instead: "Add it on an agent's page on the board, or copy its folder into your library by hand",
-  shape: COPY_SHAPE,
+  reach: 'write it on the board',
+  instead: 'Write it on the board, or its folder in your library by hand',
+  shape: method === 'POST' ? POST_SHAPE : PUT_SHAPE,
 });
+
+/** An agent that gives a skill: its place and its name. */
+export type SkillUser = { from: AgentPlace; name: string };
+
+/**
+ * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft` what
+ * its form is filled from (`skillDraftOf`), or null where its SKILL.md does not read — `skill.error` says why, and `body` is its instructions
+ * all the same, so a skill of yours can be mended; `users` the agents, of either place, that give this very folder, as their start would find
+ * it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for what HKB ships.
+ */
+export type SkillDetail = { skill: SkillRow; version: string; draft: SkillDraft | null; body: string; users: SkillUser[]; copyHint: string | null };
+
+/** What a write of a skill answers: the skill as it now reads, and what was written. */
+export type SkillSaved = SkillDetail & { written: string[] };
+
+/**
+ * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then `workflows/skills/`,
+ * as a start of the repository's finds it — or what HKB ships. Null when that place has none.
+ */
+export function skillDirOf(from: SkillSource, name: string, repo: string, home: string = HOME, shipped: string = SHIPPED_SKILLS): string | null {
+  const places = from === 'yours' ? [librarySkills(home)]
+    : from === 'shipped' ? [shipped]
+    : [path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
+  const dir = places.map((place) => path.join(place, name)).find((at) => fs.lstatSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false }));
+  return dir ?? null;
+}
+
+/** The agents of both places that give the skill whose folder is `dir`, each as its own start finds the skill it names. */
+export function skillUsers(dir: string, name: string, repo: string): SkillUser[] {
+  const found = new Map<string, ReturnType<typeof agentSkillsFound>>();
+  const at = path.resolve(dir);
+  return listAgents(repo).flatMap(({ from, dir: agents, name: agent, agent: read }) => {
+    if (read instanceof Error || !read.skills?.includes(name)) return [];
+    if (!found.has(agents)) found.set(agents, agentSkillsFound(agents, repo));
+    const given = found.get(agents)!.at.get(name);
+    return typeof given === 'string' && path.resolve(given) === at ? [{ from, name: agent }] : [];
+  });
+}
+
+const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * The command a person runs to copy the skill folder `dir` into the skills folder `into`, as `into/<name>/`. `cp -r dir into/` makes `into`
+ * itself the copy when `into` is not there yet — a repository with a `.claude/` and no `skills/` would get `skills/SKILL.md` — so it makes
+ * `into` first; and each path is quoted, for a home with a space in it.
+ */
+export const copyCommand = (dir: string, into: string): string => `mkdir -p ${quoted(into)} && cp -r ${quoted(dir)} ${quoted(`${into}/`)}`;
+
+/** The skill `name` of `from` read now, for its page. Null when that place has no such skill. */
+export function skillDetail(from: SkillSource, name: string, repo: string, home: string = HOME, shipped: string = SHIPPED_SKILLS): SkillDetail | null {
+  const dir = skillDirOf(from, name, repo, home, shipped);
+  if (dir === null) return null;
+  const users = skillUsers(dir, name, repo);
+  const skill = skillRow(name, dir, from, users.filter((user) => user.from === 'yours').map((user) => user.name));
+  const file = path.join(dir, 'SKILL.md');
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { /* the row says why */ }
+  let draft: SkillDraft | null = null;
+  try { draft = skillDraftOf(file, name, text); } catch { /* the row says why, and the page is filled from the body */ }
+  let body: string;
+  try { body = splitFrontmatter(file, text).body; } catch { body = text.trim(); }
+  const copyHint = from === 'yours' ? copyCommand(dir, path.join(path.resolve(repo), '.claude', SKILLS_FOLDER))
+    : from === 'repo' ? copyCommand(dir, librarySkills(home))
+    : null;
+  return { skill, version: skillVersion(dir) ?? '', draft, body, users, copyHint };
+}
+
+/** A draft from a body, its shape checked: each value is then judged by the package, which says what is wrong with it in its words. */
+function skillDraftFrom(body: unknown, route: string, shape: string): SkillDraft | Refusal {
+  const wrong = (what: string): Refusal => ({ status: 400, error: `${route}: ${what}. Send ${shape}.` });
+  if (!isObject(body)) return wrong(`\`skill\` is the skill, an object, and this request's was ${JSON.stringify(body)}`);
+  const text = (key: string) => body[key] == null || typeof body[key] === 'string';
+  const list = (key: string) => body[key] == null || (Array.isArray(body[key]) && (body[key] as unknown[]).every((item) => typeof item === 'string'));
+  if (typeof body.name !== 'string') return wrong(`\`name\` is the skill's name, its folder, a string, and this request's was ${JSON.stringify(body.name)}`);
+  for (const key of ['title', 'description']) if (!text(key)) return wrong(`\`${key}\` is a line of text, or null`);
+  for (const key of ['tags', 'examples']) if (!list(key)) return wrong(`\`${key}\` is a list of lines of text, or null`);
+  if (body.preload !== undefined && typeof body.preload !== 'boolean') return wrong('`preload` is true or false');
+  if (typeof body.body !== 'string') return wrong(`\`body\` is the skill's instructions, a string, and this request's was ${JSON.stringify(body.body)}`);
+  const known = ['name', 'title', 'description', 'tags', 'examples', 'preload', 'body'];
+  const unknown = Object.keys(body).filter((key) => !known.includes(key));
+  if (unknown.length) return wrong(`${unknown.map((key) => `\`${key}\``).join(' and ')} ${unknown.length > 1 ? 'are' : 'is'} no key of a skill's`);
+  return {
+    name: body.name,
+    title: body.title as string | null | undefined,
+    description: body.description as string | null | undefined,
+    tags: body.tags as string[] | null | undefined,
+    examples: body.examples as string[] | null | undefined,
+    ...(body.preload !== undefined && { preload: body.preload as boolean }),
+    body: body.body,
+  };
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** A refusal of the package's write, as the api answers it. */
+function writeRefused(err: unknown): Refusal | { status: 500; error: string } {
+  if (err instanceof SkillWriteError) return { status: err.why === 'missing' ? 404 : err.why === 'exists' || err.why === 'stale' ? 409 : 422, error: err.message };
+  return { status: 500, error: messageOf(err) };
+}
+
+/** A skill of yours written into the library, and answered as its page reads it now. */
+function written(change: SkillChange, version: string | null, repo: string): { status: 200 | 201; body: SkillSaved } | Refusal | { status: 500; error: string } {
+  let wrote: SkillWritten;
+  try { wrote = writeSkill(librarySkills(), change, { version }); } catch (err) { return writeRefused(err); }
+  const detail = skillDetail('yours', wrote.name, repo);
+  if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
+  return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
+}
+
+/** The repository's skills are the checkout's: the api writes none of them, and says how a person does. */
+const repoRefusal = (route: string, name: string | null, repo: string): string => {
+  const theirs = path.join(repo, '.claude', SKILLS_FOLDER);
+  return `${route} refuses to write the repository's skills (${theirs}): the board writes only your library, in ${librarySkills()}, and the api writes nothing into a checkout. Write the skill in your library, then copy its folder into the repository by hand — \`${copyCommand(path.join(librarySkills(), name ?? '<name>'), theirs)}\` — where git shows it as a change to commit.`;
+};
 
 export const skills = new Hono()
   // Read from disk on each request, so a skill a person has just written lists as it is now.
@@ -164,28 +285,85 @@ export const skills = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // A skill HKB ships copied into your library, under its name: refused, in the package's words, where the library has the name already.
+  // One skill, on its page: where it is, what it says, what it costs a turn, and the agents that give it.
+  .get('/api/skills/:from/:name', (c) => {
+    const { from, name } = c.req.param();
+    if (from !== 'yours' && from !== 'repo' && from !== 'shipped') return c.json({ error: `GET /api/skills/${from}/${name}: a skill is yours, the repository's or shipped, and this request named ${JSON.stringify(from)}.` }, 400);
+    const wrong = skillNameRefusal(name);
+    if (wrong) return c.json({ error: wrong }, 400);
+    try {
+      const detail = skillDetail(from, name, repoOf());
+      if (detail === null) return c.json({ error: `No skill named ${name} in ${from === 'yours' ? 'your library' : from === 'repo' ? "the repository's skills" : 'the skills HKB ships'}. GET /api/skills lists them.` }, 404);
+      return c.json(detail);
+    } catch (err) {
+      return c.json({ error: messageOf(err) }, 500);
+    }
+  })
+  // A skill of yours made — written on the board, or one HKB ships copied under its name — refused, in the package's words, where the library
+  // has the name already.
   .post('/api/skills/:from', async (c) => {
     const { from } = c.req.param();
     const route = `POST /api/skills/${from}`;
-    const refused = refusedBeforeReading(skillGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(skillGuard(route, 'POST'), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
     const library = librarySkills();
-    if (from === 'repo') {
-      return c.json({ error: `${route} refuses to write the repository's skills (${path.join(repoOf(), '.claude', SKILLS_FOLDER)}): the board writes only your library, in ${library}, and the api writes nothing into a checkout. Copy the skill into your library, then its folder into the repository by hand, where git shows it as a change to commit.` }, 403);
-    }
-    if (from !== 'yours') return c.json({ error: `${route}: the board copies a skill into your library, at /api/skills/yours. This request named ${JSON.stringify(from)}.` }, 400);
+    if (from === 'repo') return c.json({ error: repoRefusal(route, null, repoOf()) }, 403);
+    if (from !== 'yours') return c.json({ error: `${route}: the board writes a skill into your library, at /api/skills/yours. This request named ${JSON.stringify(from)}.` }, 400);
     let body: unknown;
-    try { body = await c.req.json(); } catch { return c.json({ error: `${route} takes a JSON body: ${COPY_SHAPE}.` }, 400); }
-    const name = typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>).copy : undefined;
+    try { body = await c.req.json(); } catch { return c.json({ error: `${route} takes a JSON body: ${POST_SHAPE}.` }, 400); }
+    if (!isObject(body)) return c.json({ error: `${route} takes a JSON object: ${POST_SHAPE}.` }, 400);
+    if (Object.hasOwn(body, 'skill') === Object.hasOwn(body, 'copy')) {
+      return c.json({ error: `${route} takes one of \`copy\` — a skill HKB ships, copied — and \`skill\` — one you wrote — and this request sent ${Object.hasOwn(body, 'skill') ? 'both' : 'neither'}. Send ${POST_SHAPE}.` }, 400);
+    }
+    if (Object.hasOwn(body, 'skill')) {
+      const draft = skillDraftFrom(body.skill, route, POST_SHAPE);
+      if ('status' in draft) return c.json({ error: draft.error }, draft.status);
+      const answer = written(draft, null, repoOf());
+      return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
+    }
+    const name = body.copy;
     if (typeof name !== 'string') return c.json({ error: `${route}: \`copy\` is the name of the skill HKB ships to copy, a string, and this request's was ${JSON.stringify(name)}. Send ${COPY_SHAPE}.` }, 400);
     let copied: SkillCopied;
     try {
       copied = copySkill(SHIPPED_SKILLS, library, name);
     } catch (err) {
-      if (err instanceof SkillWriteError) return c.json({ error: err.message }, err.why === 'missing' ? 404 : err.why === 'exists' ? 409 : 422);
-      return c.json({ error: messageOf(err) }, 500);
+      const answer = writeRefused(err);
+      return c.json({ error: answer.error }, answer.status);
     }
     const agents = yourAgentsSkills(HOME).filter(([, given]) => given.includes(name)).map(([agent]) => agent);
     return c.json({ skill: skillRow(name, copied.dir, 'yours', agents), written: copied.written } satisfies SkillAdded, 201);
+  })
+  // A skill of yours changed at the version it was read at: written whole from its form, or its `preload:` alone, from its switch. Either is a
+  // change of every agent that gives it.
+  .put('/api/skills/:from/:name', async (c) => {
+    const { from, name } = c.req.param();
+    const route = `PUT /api/skills/${from}/${name}`;
+    const refused = refusedBeforeReading(skillGuard(route, 'PUT'), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    if (from === 'repo') return c.json({ error: repoRefusal(route, name, repoOf()) }, 403);
+    if (from !== 'yours') return c.json({ error: `${route}: the board changes a skill of your library, at /api/skills/yours/<name>. This request named ${JSON.stringify(from)}.` }, 400);
+    let body: unknown;
+    try { body = await c.req.json(); } catch { return c.json({ error: `${route} takes a JSON body: ${PUT_SHAPE}.` }, 400); }
+    if (!isObject(body)) return c.json({ error: `${route} takes a JSON object: ${PUT_SHAPE}.` }, 400);
+    const { version } = body;
+    if (typeof version !== 'string' || !version) {
+      return c.json({ error: `${route} takes the \`version\` the skill was read at, as GET /api/skills/yours/${name} answers it, so a change of a skill that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(version)}.` }, 400);
+    }
+    if (Object.hasOwn(body, 'skill') === Object.hasOwn(body, 'preload')) {
+      return c.json({ error: `${route} takes one of \`skill\` — the whole skill, from its form — and \`preload\` — its switch alone — and this request sent ${Object.hasOwn(body, 'skill') ? 'both' : 'neither'}. Send ${PUT_SHAPE}.` }, 400);
+    }
+    let change: SkillChange;
+    if (Object.hasOwn(body, 'skill')) {
+      const draft = skillDraftFrom(body.skill, route, PUT_SHAPE);
+      if ('status' in draft) return c.json({ error: draft.error }, draft.status);
+      if (draft.name !== name) {
+        return c.json({ error: `${route}: the skill is named ${name}, and this request's is ${JSON.stringify(draft.name)}. A skill's name is its folder, and every agent that gives it names it: write a new skill under the new name, and give it in their place.` }, 400);
+      }
+      change = draft;
+    } else {
+      if (typeof body.preload !== 'boolean') return c.json({ error: `${route}: \`preload\` is true or false, and this request's was ${JSON.stringify(body.preload)}. Send ${PUT_SHAPE}.` }, 400);
+      change = { name, preload: body.preload };
+    }
+    const answer = written(change, version, repoOf());
+    return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
   });

@@ -5091,8 +5091,8 @@ holds the findings that the design depends on, measured on Claude Code 2.1.282:
 Built since, by the design's cards: 1a (the machinery) and 1b (the shipped procedures as skills), 4 (jobs without user settings), and 2
 (the card generated from the skills, with the `card:` key and the `.skills.json` files retired), and 3a (an agent of yours composes its
 skills on the board from your library, this repository's and HKB's shipped ones, a shipped one copied into your library first, each
-with what it costs a turn; `systemPrompt` as radios by what the agent does). 3b, writing a skill on the board, and 3c, trying an agent on
-a short brief, follow, in that order.
+with what it costs a turn; `systemPrompt` as radios by what the agent does), and 3b (a skill of your own written on the board, with a
+page of its own that lists who gives it and holds `preload:` as a switch with its cost). 3c, trying an agent on a short brief, follows.
 
 ## Engine-side work
 

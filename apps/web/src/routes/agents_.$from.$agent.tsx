@@ -6,7 +6,7 @@ import { AgentForm } from '../components/AgentForm';
 import { AgentRefused, FromBadge, UsedBy } from '../components/AgentParts';
 import { AsWritten } from '../components/FilePage';
 import { agentQuery, AgentRefusal, keyFormQuery, readAgent, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
-import { formKeyOf, keptAfterCopy, type KeptForm } from '../lib/agents';
+import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
@@ -44,12 +44,13 @@ function AgentPage() {
 
   const save = useMutation({
     mutationFn: (draft: AgentDraft) => saveAgent(agent.name, agent.version, draft),
-    onSuccess: async (saved) => {
-      // Renamed, the page moves first: the old name, read again, is gone.
-      if (saved.agent.name !== agent.name) await navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } });
-      setKept(null);
-      await invalidateAgents(queryClient);
-    },
+    onSuccess: (saved) =>
+      settleSave({
+        rename: saved.agent.name !== agent.name ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } }) : undefined,
+        invalidate: () => invalidateAgents(queryClient),
+        // The form a copy kept stays until the agent reads at the save's version: let go before, it was drawn from the file before the save.
+        release: () => setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('yours', saved.agent.name).queryKey)?.version)),
+      }),
   });
   const remove = useMutation({
     mutationFn: () => removeAgent(agent.name, agent.version),

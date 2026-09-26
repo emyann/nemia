@@ -2309,13 +2309,15 @@ const PLACES = [
   { from: 'shipped', dir: '/hkb/workflows/skills', skills: [] },
 ];
 
-/** An agent's form of yours with the skill list read already, as the picker reads it. */
-function agentFormWith(listing: Record<string, unknown>, readOnly = false): Promise<string> {
-  return import('../src/components/AgentForm.tsx').then(({ AgentForm }) => {
-    const client = new QueryClient();
-    client.setQueryData(['skills'], PLACES);
-    return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(AgentForm, { listing: listing as never, keyForm: undefined, readOnly, saving: false, refusal: null, onSave: () => {} })));
-  });
+/** An agent's form of yours with the skill list read already, as the picker reads it, inside a router: a given skill links to its page. */
+async function agentFormWith(listing: Record<string, unknown>, readOnly = false): Promise<string> {
+  const { AgentForm } = await import('../src/components/AgentForm.tsx');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const client = new QueryClient();
+  client.setQueryData(['skills'], PLACES);
+  const form = createElement(AgentForm, { listing: listing as never, keyForm: undefined, readOnly, saving: false, refusal: null, onSave: () => {} });
+  return renderToStaticMarkup(createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, form)));
 }
 
 const composing = {
@@ -2328,6 +2330,11 @@ test("an agent of yours lists the skills it gives, each with where it is found a
   const html = await agentFormWith(composing);
   assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'ask-first', 'gone'], 'in the order its line gives them');
   assert.deepEqual([...html.matchAll(/data-skill-from="([^"]+)"/g)].map((m) => m[1]), ['yours', 'repo', 'none']);
+  assert.deepEqual(
+    [...html.matchAll(/href="([^"]+)"[^>]*data-skill-link="([^"]+)"|data-skill-link="([^"]+)"[^>]*href="([^"]+)"/g)].map((m) => m[1] ?? m[4]),
+    ['/agents/skills/yours/write-a-note', '/agents/skills/repo/ask-first'],
+    'each found skill links to its page, where it is found; the one found nowhere has no page',
+  );
   const texts = textsOf(html);
   assert.ok(texts.includes('named — about 12 tokens a turn, and about 340 more in a turn that loads it'), texts.join(' | '));
   assert.ok(texts.includes('loaded every turn — about 1,208 tokens (cached)'), 'a preloaded skill costs its body every turn');
@@ -2361,4 +2368,40 @@ test("the repository's agent lists the skills it gives read-only: no Remove, no 
   const html = await agentFormWith({ ...composing, from: 'repo', given: [{ name: 'write-a-note', from: 'repo', entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes.', tags: [] }, error: null, preload: false, cost: { preload: false, listed: 5, body: 7, perTurn: 5 } }], skills: 'write-a-note' }, true);
   assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note']);
   assert.doesNotMatch(html, /aria-label="Remove |Add a skill|data-skill-tool-note/);
+});
+
+const SKILL_DETAIL = {
+  skill: PLACES[0]!.skills[0],
+  version: 'v1',
+  draft: { name: 'write-a-note', title: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'], examples: ['Write the notes'], preload: false, body: 'Write them.\n' },
+  body: 'Write them.\n',
+  users: [{ from: 'yours', name: 'scribe' }],
+  copyHint: "mkdir -p '/repo/.claude/skills' && cp -r '/store/workflows/skills/write-a-note' '/repo/.claude/skills/'",
+};
+
+async function skillForm(props: Record<string, unknown>): Promise<string> {
+  const { SkillForm } = await import('../src/components/SkillForm.tsx');
+  return renderToStaticMarkup(createElement(SkillForm, { saving: false, refusal: null, onSave: () => {}, ...props } as never));
+}
+
+test("a new skill's form takes its name, title, description, tags, examples and instructions, and creates it", async () => {
+  const html = await skillForm({ detail: null });
+  assert.match(html, /aria-label="New skill"/);
+  for (const label of ['Name', 'Title', 'Description', 'Tags', 'Examples', 'Instructions']) assert.match(html, new RegExp(`>${label}</label>`), label);
+  assert.doesNotMatch(html, /readonly=""/i, 'every field is to be typed in');
+  assert.match(html, />Create skill</);
+});
+
+test("a skill of yours is filled from its file, its name set once, and saved; the repository's or HKB's is read, not saved", async () => {
+  const between = (changed: boolean) => createElement('p', { 'data-between': String(changed) });
+  const mine = await skillForm({ detail: SKILL_DETAIL, between });
+  assert.match(mine, /readOnly=""[^>]*value="write-a-note"/, 'the name is its folder, and an agent names it by it');
+  assert.match(mine, /Writes the notes of a change\./);
+  assert.match(mine, />Write them\.\n<\/textarea>/);
+  assert.match(mine, /data-between="false"/, 'the switch is told the form holds nothing unsaved');
+  assert.match(mine, />Save</);
+  const theirs = await skillForm({ detail: { ...SKILL_DETAIL, skill: { ...SKILL_DETAIL.skill, from: 'repo' } }, readOnly: true });
+  assert.doesNotMatch(theirs, />Save<|>Create skill</);
+  assert.equal([...theirs.matchAll(/readOnly=""/g)].length, 6, 'every field read-only');
+  assert.equal([...mine.matchAll(/readOnly=""/g)].length, 1, 'of yours, only the name');
 });

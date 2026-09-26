@@ -118,6 +118,25 @@ export function AgentRefused({ message, users, from }: { message: string; users:
   );
 }
 
+/** A write of a skill refused, in the package's words. */
+export function SkillRefused({ message }: { message: string }) {
+  return (
+    <div role="alert" data-skill-refused className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not written:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
+    </div>
+  );
+}
+
+/** A link to a skill's page, by its place and name: what an agent's skills and the Agents page's skills link a skill with. */
+export function SkillLink({ from, name, className }: { from: SkillSource; name: string; className?: string }) {
+  return (
+    <RouteLink to="/agents/skills/$from/$skill" params={{ from, skill: name }} data-skill-link={name} className={cn('font-mono', LINK, className)}>
+      {name}
+    </RouteLink>
+  );
+}
+
 /** Where a skill an agent is given is found: your library, the repository, what HKB ships — or nowhere, which the package refuses on save. */
 export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
   return (
@@ -137,7 +156,7 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
 }
 
 /**
- * The skills an agent gives, one row each in its order: its name, where it is found, what it is for, and what it costs a turn — or why no
+ * The skills an agent gives, one row each in its order: its name, linked to its page where it is found, where it is found, what it is for, and what it costs a turn — or why no
  * session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove); read-only, nothing.
  */
 export function GivenSkills({ rows, action, none }: { rows: readonly GivenSkill[]; action?: (row: GivenSkill) => ReactNode; none: ReactNode }) {
@@ -148,7 +167,11 @@ export function GivenSkills({ rows, action, none }: { rows: readonly GivenSkill[
         <li key={row.name} data-given-skill={row.name} className="flex items-start gap-3 px-3 py-2">
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200">{row.name}</span>
+              {row.from ? (
+                <SkillLink from={row.from} name={row.name} className="text-xs font-medium text-neutral-800 dark:text-neutral-200" />
+              ) : (
+                <span className="font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200">{row.name}</span>
+              )}
               <SkillSourceBadge from={row.from} />
             </p>
             {row.entry && <p className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.description}</p>}

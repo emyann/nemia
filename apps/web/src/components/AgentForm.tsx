@@ -231,8 +231,8 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
   );
 }
 
-/** A text field: a line, or `area`'s textarea. */
-function Field({ label, hint, value, onChange, readOnly, mono = false, area, placeholder, className }: {
+/** A text field: a line, or `area`'s textarea. The skill's form draws its fields with it too. */
+export function Field({ label, hint, value, onChange, readOnly, mono = false, area, placeholder, className }: {
   label: string;
   hint: string | null | undefined;
   value: string;

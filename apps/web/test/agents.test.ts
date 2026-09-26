@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
+import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, keptAfterSave, settleSave, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -208,4 +208,33 @@ test("REFUSED to keep the draft over a copy: the agent's file or its schema chan
   assert.equal(keptAfterCopy(was, { ...was, source: 'edited elsewhere', version: 'v2' }, 'v1'), null, 'the file changed: the form is read again');
   assert.equal(keptAfterCopy(was, { ...was, schema: { type: 'string' }, version: 'v2' }, 'v1'), null, 'the schema changed: the form is read again');
   assert.equal(keptAfterCopy(was, { ...was, schema: null, version: 'v2' }, 'v1'), null, 'the schema went: the form is read again');
+});
+
+test('a save lets the form a copy kept go only once the agent reads at the save\'s version, and keeps it where that read has not landed', () => {
+  const kept = { key: 'v1', version: 'v2' };
+  assert.equal(keptAfterSave(kept, 'v3'), null, 'read back at the save\'s version: drawn from the file as saved');
+  assert.deepEqual(keptAfterSave(kept, 'v2'), kept, 'still the version the copy moved to — the read failed, or has not landed — the typed form stays');
+  assert.deepEqual(keptAfterSave(kept, undefined), kept, 'nothing read: the form stays');
+  assert.equal(keptAfterSave(null, 'v3'), null);
+  // What the key is meanwhile: the form the person typed in, and after the read the saved version's.
+  assert.equal(formKeyOf('v2', keptAfterSave(kept, 'v2')), 'v1');
+  assert.equal(formKeyOf('v3', keptAfterSave(kept, 'v3')), 'v3');
+});
+
+test('REFUSED to let the kept form go before the reads a save changes are read again: rename, then read, then release', async () => {
+  const said: string[] = [];
+  let read!: () => void;
+  const settled = settleSave({
+    rename: async () => { said.push('rename'); },
+    invalidate: () => new Promise<void>((resolve) => { said.push('invalidate'); read = () => { said.push('read'); resolve(); }; }),
+    release: () => { said.push('release'); },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(said, ['rename', 'invalidate'], 'nothing is let go while the read is out');
+  read();
+  await settled;
+  assert.deepEqual(said, ['rename', 'invalidate', 'read', 'release']);
+  const alone: string[] = [];
+  await settleSave({ invalidate: async () => { alone.push('invalidate'); }, release: () => { alone.push('release'); } });
+  assert.deepEqual(alone, ['invalidate', 'release'], 'not renamed: no move');
 });

@@ -11,11 +11,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { AgentWriteError, agentUsers, agentVersion, cardSkills, HOME, loadAgents, removeAgent, skillsFor, writeAgent, type AgentSchema } from 'agent-orchestrator';
+import { AgentWriteError, agentUsers, agentVersion, cardSkills, HOME, listRuns, loadAgents, removeAgent, skillsFor, start, writeAgent, type AgentSchema } from 'agent-orchestrator';
 import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, formerSandbox, frontmatterKey, isCardFile, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey, type SkillsFound } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { givenSkills, type GivenSkill } from './skills.ts';
+import { judgedNow } from './runs.ts';
+import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
+import { tryNameRefusal, tryOf, writeTryFolder } from './try.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from './workflows.ts';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
@@ -168,6 +170,21 @@ const DRAFT = '"description"?: "<use this when…>", "skills"?: "<skill>, <skill
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
+const TRY_SHAPE = '`{ "brief": "<what the agent is asked to do>" }`';
+
+/** What a try answers with: the run it started, which the board follows on the run's page. */
+export type AgentTried = { id: string };
+
+/** A try, as the guard's refusals word it (guard.ts). */
+const tryGuard = (route: string): Guarded => ({
+  route,
+  does: 'tries an agent',
+  forAnother: 'try one',
+  why: 'a try starts a run of the agent, which spends up to its budget once a tick files it',
+  reach: "try it on the board's agent page",
+  instead: "Try it on the board's agent page",
+  shape: TRY_SHAPE,
+});
 
 /** A write of yours, as the guard's refusals word it (guard.ts). */
 const agentGuard = (route: string, shape: string): Guarded => ({
@@ -341,6 +358,56 @@ export const agents = new Hono()
     if ('status' in given) return c.json({ error: given.error }, given.status);
     const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo: repoOf() }, 200);
     return c.json(answer.body, answer.status);
+  })
+  /**
+   * An agent of yours tried on a short brief (agents card 3c): its try's folder written, or written again when the agent's version has moved
+   * (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it. Refused for the repository's
+   * agents, which a start with no repository does not find; for an empty brief; for an agent that does not read, or gives a skill only the
+   * repository has; and while a try of it still moves, one at a time, so a second press does not spend a second budget.
+   */
+  .post('/api/agents/:from/:name/try', async (c) => {
+    const { from, name } = c.req.param();
+    const route = `POST /api/agents/${from}/${name}/try`;
+    const refused = refusedBeforeReading(tryGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const repo = repoOf();
+    if (from === 'repo') {
+      const theirs = path.join(repo, 'workflows', AGENTS_FOLDER, `${name}.md`);
+      const yours = path.join(HOME, 'workflows', AGENTS_FOLDER);
+      return c.json({ error: `${route}: only an agent of yours can be tried — a try runs with no repository, in a folder of its own, and finds no agent of the repository's. Copy it to yours to try it: \`cp ${theirs} ${yours}/\`.` }, 403);
+    }
+    const where = yoursOnly(route, from, name, repo);
+    if (where) return c.json({ error: where.error }, where.status);
+    const place = placeOf(from, name, route);
+    if ('status' in place) return c.json({ error: place.error }, place.status);
+    const read = await jsonOf(c.req, route, TRY_SHAPE);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const brief = isObject(read.body) ? read.body.brief : undefined;
+    if (typeof brief !== 'string') return c.json({ error: `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(brief)}.` }, 400);
+    if (!brief.trim()) return c.json({ error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.` }, 422);
+    const reserved = tryNameRefusal(name);
+    if (reserved) return c.json({ error: reserved }, 422);
+    try {
+      const agent = listedAgent('yours', place.dir, name, repo);
+      if (!agent) return c.json({ error: `Yours has no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.` }, 404);
+      if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
+      // A try looks at no repository, so a skill the agent finds only in the repository's .claude/skills is not found by its start.
+      const theirs = agent.given.filter((skill) => skill.from === 'repo');
+      if (theirs.length) {
+        const copies = theirs.map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills())}\``).join(', ');
+        return c.json({ error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.` }, 422);
+      }
+      const tries = listRuns().filter((run) => tryOf(run)?.agent === name);
+      const moving = (await judgedNow(tries)).find((run) => run.moving);
+      if (moving) return c.json({ error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.` }, 409);
+      const workflowDir = writeTryFolder(name, agent.version);
+      const run = start({ brief: brief.trim(), repo: '', workflowDir });
+      return c.json({ id: run.id } satisfies AgentTried, 201);
+    } catch (err) {
+      const answer = refusalOf(err);
+      if (answer) return c.json(answer.body, answer.status);
+      return c.json({ error: messageOf(err) }, 500);
+    }
   })
   // An agent of yours removed, against the version it was read at — refused while a step still names it, saying which.
   .delete('/api/agents/:from/:name', async (c) => {

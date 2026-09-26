@@ -10,7 +10,8 @@ import type { Workflow } from 'agent-orchestrator/workflow';
 /**
  * One engine for the process, and the api only reads through it — `list`, `view` and `logs`, never
  * `tick` or `file`.
- * Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything.
+ * Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything. The one write through it is a try's removal
+ * (`DELETE /api/runs/:id`), `wf rm`'s own code, which closes a task that waits for a word nobody will give once the record is gone.
  */
 export const e = engine();
 

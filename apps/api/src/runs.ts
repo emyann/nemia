@@ -1,13 +1,15 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, listRuns, runStartedAt } from 'agent-orchestrator';
+import { type BranchReader, branchReader, forget, listRuns, runStartedAt } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
 import { type Asked, holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { restingMemo, restingRead } from './resting.ts';
+import { refusedBeforeReading, type Guarded } from './guard.ts';
+import { tryOf } from './try.ts';
 import { e, filedTimes, findRun, judgedSteps, noSuchRun, stepNames, type Views, viewsFor, viewsOf, workflowsOf } from './store.ts';
 
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
@@ -22,6 +24,8 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
   workflowDir: string;
+  /** The agent it tried, for a try started from an agent's page (`tryOf`, try.ts); null for every other run. */
+  try: { agent: string } | null;
   createdAt: string;
   /**
    * When the run started (`runStartedAt`): its first task's filing, off the engine's feed — for a run started `--after` runs, or held for a
@@ -90,6 +94,7 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
     work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
+    try: tryOf(run),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
@@ -114,6 +119,28 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
   };
   return { summary, asked };
 }
+
+/** Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try, agents.ts). */
+export async function judgedNow(some: readonly Run[]): Promise<Array<Omit<RunSummary, 'startedAt'>>> {
+  const { views, reader } = await viewsFor(some);
+  const git = branchReader();
+  const out: Array<Omit<RunSummary, 'startedAt'>> = [];
+  for (const run of some) out.push((await summarize(run, views, reader, git)).summary);
+  return out;
+}
+
+const REMOVE_SHAPE = '`{}`';
+
+/** A removal of a try's run, as the guard's refusals word it (guard.ts). */
+const removeGuard = (route: string): Guarded => ({
+  route,
+  does: 'removes a run',
+  forAnother: 'remove one',
+  why: 'a run removed takes its record and every folder it worked in with it, and nothing brings them back',
+  reach: "remove it on the board's run page",
+  instead: "Remove it on the board's run page, or with `wf rm`",
+  shape: REMOVE_SHAPE,
+});
 
 /**
  * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
@@ -186,6 +213,30 @@ export const runs = new Hono()
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
     return c.json(await detail(run));
+  })
+  /**
+   * A try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it. Only a try: any other run is removed
+   * with `wf rm`, which says what it hands off and what it leaves, and a git run's worktrees and branches are a person's to read before they go.
+   * A try still working is refused in the package's words.
+   */
+  .delete('/api/runs/:id', async (c) => {
+    const id = c.req.param('id');
+    const route = `DELETE /api/runs/${id}`;
+    const refused = refusedBeforeReading(removeGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const run = findRun(id);
+    if (!run) return c.json({ error: noSuchRun(id) }, 404);
+    if (!tryOf(run)) {
+      return c.json({ error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.` }, 409);
+    }
+    try {
+      const gone = await forget(e, id);
+      if (gone.kind === 'refused') return c.json({ error: gone.refusal }, 409);
+      return c.json({ id, removed: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: message }, (err as { exitCode?: number }).exitCode === 2 ? 422 : 500);
+    }
   })
   // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.
   .get('/api/runs/:id/decision', async (c) => {

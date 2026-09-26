@@ -16,6 +16,11 @@ const code = (text: string) => <code className="font-mono text-xs break-all">{te
  * the store's hidden `tries/<agent>` team (agents card 3c), and the button is held while one moves, with the reason beside it.
  */
 export function TryAgent({ agent }: { agent: AgentListing }) {
+  if (agent.untried) return <Untried untried={agent.untried} />;
+  return <TryForm agent={agent} />;
+}
+
+function TryForm({ agent }: { agent: AgentListing }) {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState('');
   // The try this page started: shown before the list, read again, has it.
@@ -131,16 +136,26 @@ export function TryRun({ id }: { id: string }) {
   );
 }
 
-/** What a repository agent's page says in place of the Try panel: only yours are tried, and the copy that makes one of yours. */
-export function TryYours({ agent }: { agent: AgentListing }) {
-  const command = `cp ${agent.file} ~/.agent-workflows/workflows/agents/`;
+/**
+ * What an agent's page says in place of the Try panel when it cannot be tried: why, in the api's words (`untried`, which its try's route refuses
+ * with), and the command that copies it to yours when that is the fix — into the store the api reads, which the api names.
+ */
+function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing['untried']>; yours?: boolean }) {
   return (
-    <section aria-label="Try it" data-try-yours className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+    <section aria-label="Try it" data-try-yours={yours ? '' : undefined} data-try-untried className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800">
       <h2 className="text-sm font-semibold">Try it</h2>
-      <p className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-        Only an agent of yours is tried here. Copy it to yours to try it: {code(command)}
-        <CopyButton text={command} />
-      </p>
+      <p className="text-xs text-neutral-600 dark:text-neutral-400">{untried.why}</p>
+      {untried.copy && (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+          {code(untried.copy)}
+          <CopyButton text={untried.copy} />
+        </p>
+      )}
     </section>
   );
+}
+
+/** What a repository agent's page says in place of the Try panel: only yours are tried, and the copy, from the api, that makes one of yours. */
+export function TryYours({ agent }: { agent: AgentListing }) {
+  return <Untried yours untried={agent.untried ?? { why: 'Only an agent of yours can be tried. Copy it to yours to try it.', copy: null }} />;
 }

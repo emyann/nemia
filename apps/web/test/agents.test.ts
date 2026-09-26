@@ -21,6 +21,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   version: 'v1',
   usedBy: [],
   error: null,
+  untried: null,
   ...fields,
 });
 

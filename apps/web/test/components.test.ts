@@ -2279,7 +2279,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
   const { AgentForm } = await import('../src/components/AgentForm.tsx');
   const agent = {
     name: 'scribe', from: 'yours' as const, dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read, Skill' }, body: 'Write.\n',
-    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, cardError: null,
+    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null,
     card: [
       { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'] },
       { id: 'file-it', name: 'File it away', description: 'Files a note where it belongs.', tags: ['file-it'] },
@@ -2322,7 +2322,7 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
 
 const composing = {
   name: 'scribe', from: 'yours', dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read' }, body: 'Write.\n',
-  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, cardError: null, card: null,
+  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null, card: null,
   given: [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.', preload: false, cost: null }],
 };
 
@@ -2464,12 +2464,26 @@ test("a try not filed yet says so in place of its files", async () => {
   assert.doesNotMatch(html, /data-try-files/);
 });
 
-test("the repository's agent is not tried: its page says to copy it to yours, with the copy", async () => {
+test("the repository's agent is not tried: its page says to copy it to yours, with the api's copy into the store it reads", async () => {
   const { TryYours } = await import('../src/components/TryAgent.tsx');
-  const html = renderToStaticMarkup(createElement(TryYours, { agent: { ...composing, from: 'repo', file: '/repo/workflows/agents/critic.md' } as never }));
+  const copy = "mkdir -p '/tmp/e2e-store/workflows/agents' && cp '/repo/workflows/agents/critic.md' '/tmp/e2e-store/workflows/agents/'";
+  const untried = { why: 'Only an agent of yours can be tried — a try runs with no repository. Copy it to yours to try it.', copy };
+  const html = renderToStaticMarkup(createElement(TryYours, { agent: { ...composing, from: 'repo', file: '/repo/workflows/agents/critic.md', untried } as never }));
+  assert.match(html, /data-try-yours/);
   assert.match(html, /Copy it to yours to try it/);
-  assert.match(html, /cp \/repo\/workflows\/agents\/critic\.md ~\/\.agent-workflows\/workflows\/agents\//);
+  assert.ok(textsOf(html).includes(copy), `the copy as the api words it, into its own store: ${textsOf(html).join(' | ')}`);
+  assert.doesNotMatch(html, /~\/\.agent-workflows/, 'no store the api may not read');
   assert.doesNotMatch(html, />Try it<\/button>/);
+});
+
+test("REFUSED: an agent of yours the try's fence does not reach says why in place of the Try it button", async () => {
+  const { TryAgent } = await import('../src/components/TryAgent.tsx');
+  const why = "coder runs on `codex`, and a try is fenced by Claude Code's permission mode — `dontAsk` with `Edit(**)`, in a folder of its own — which codex does not take.";
+  const html = await routedWith(createElement(TryAgent, { agent: { ...composing, name: 'coder', keys: { harness: 'codex' }, untried: { why, copy: null } } as never }), [[['runs'], []]]);
+  assert.ok(textsOf(html).includes(why), textsOf(html).join(' | '));
+  assert.match(html, /data-try-untried/);
+  assert.doesNotMatch(html, /data-try-yours/, 'it is yours: nothing to copy');
+  assert.doesNotMatch(html, />Try it<\/button>|<textarea/, 'no brief and no button');
 });
 
 test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow", async () => {

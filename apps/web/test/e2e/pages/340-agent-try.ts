@@ -7,6 +7,9 @@ import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
+/** A path as a regular expression matches it, character for character. */
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** The brief the page tries `scribe` on, and the file the try leaves in its folder. */
 const TRY = {
   brief: 'Write the notes for a change that renames the --dry flag to --plan.',
@@ -65,8 +68,12 @@ export default {
     // The repository's agent: copy it to yours to try it, with the copy, and no Try button.
     const yours = page.locator('section[data-try-yours]');
     await expectVisible(yours.getByText('Copy it to yours to try it', { exact: false }), "the repository's agent says to copy it to yours to try it");
-    await expectVisible(yours.locator('code', { hasText: /^cp .+\/implementer\.md ~\/\.agent-workflows\/workflows\/agents\/$/ }), 'with the cp that copies it');
+    // Into the store this api reads — the e2e's, in /tmp — as the api words it, never a home the api may not read.
+    const into = path.join(store!, 'workflows', 'agents');
+    const copy = new RegExp(`^mkdir -p '${escaped(into)}' && cp '[^']+/implementer\\.md'( '[^']+')? '${escaped(into)}/'$`);
+    await expectVisible(yours.locator('code', { hasText: copy }), `with the cp that copies it into ${into}`);
     await expectCount(page.getByRole('button', { name: 'Try it' }), 0, "the repository's agent has no Try button");
+    await yours.screenshot({ path: path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`) });
 
     let id: string | undefined;
     try {

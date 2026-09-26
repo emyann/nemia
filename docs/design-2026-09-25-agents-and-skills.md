@@ -150,7 +150,9 @@ out until Codex has a place for them, and the load says so for a codex agent tha
      agent, `budget: 1`, `dontAsk`, `Edit(**)` — again when the agent's version moves, and starts it as an ordinary folder run with no
      repository. The panel shows the latest try's state, what it spent of its dollar, the files it wrote and its run; Runs and the
      Factory tag a try `try` beside its agent, and a try's own page removes it (`DELETE /api/runs/:id`, a try only). A repository agent
-     says to copy it to yours to try it; a repository agent, an empty brief and a second try while one moves are each refused. The
-     e2e's `agent-try` page.
+     says to copy it to yours to try it, with the command the api words into the store it reads; a repository agent, an empty brief and a
+     second try while one moves are each refused. So is an agent the try's fence does not reach — on codex, a remote A2A agent, one that
+     says `remote: true` — before anything is written, since the fence is Claude Code's permission mode: `untriedOf` in `try.ts` says why,
+     the route refuses on it and the listing carries it (`untried`), which the page draws in place of the button. The e2e's `agent-try` page.
 4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
    runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

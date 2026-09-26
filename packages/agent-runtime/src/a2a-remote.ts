@@ -5,12 +5,22 @@
  * A2A's own — SendMessage, GetTask, CancelTask — and the runtime extension's methods are never asked.
  *
  * **The registry** is the driver's, and the record of what it sent: `<root>/remote/<session name>.json`, one file per
- * session, written whole to a temporary file and renamed. The intent — the name, the harness, the message's id, when — is on
- * disk before the message is sent, and the Task's id and context are written as the answer comes back, before `spawn`
- * returns. So a spawn asked again for a name that has a file never sends twice: with a Task recorded, it adopts it; without,
- * whether a Task started is not known, and the spawn fails in words that are no refusal, which the engine's grace window
- * reads `lost`. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A session let
- * go of (`release`) moves to `remote/done/`, where `find` and `logs` still read it and `observe` does not.
+ * session, written whole to a temporary file and renamed. The intent — the name, the harness, the message's id, when, and
+ * the process sending it with the time it gives up (`sending`) — is on disk before the message is sent, and the Task's id
+ * and context are written as the answer comes back. So a spawn asked again for a name that has a file never sends twice:
+ * with a Task recorded, it adopts it; with a send still under way in a process that lives, it leaves it to that process;
+ * otherwise whether a Task started is not known, and the spawn fails in words that are no refusal, which the engine's grace
+ * window reads `lost`. A crash between the agent's answer and that write leaves a Task nothing owns (open issue 34). A
+ * session let go of (`release`) moves to `remote/done/`, where `find` and `logs` still read it and `observe` does not.
+ *
+ * **The send leaves the pass** (open issue 34, stage 6 part 2). A spawn runs inside the runtime's pass, which runs task by
+ * task, so a send it awaited held every other task's pass as long. What can refuse — the card, the auth — is still read in
+ * the pass, and a spawn waits for the answer `SPAWN_WAIT_MS` at most, so an agent that answers at once is recorded before
+ * the spawn returns and its refusal is still a spawn refused. An agent that has not answered by then is left to answer
+ * within `SEND_MS`, in this process: until it does, a pass reads its entry, in any process, as a Task `submitted` while the
+ * sending process lives, and the answer's writes are the same as before — its Task, or its reply ended. A refusal that comes
+ * after the spawn has returned is written as a session ended `rejected`, its words in the entry and on `logs`; a send that
+ * fails on the way, or is not answered within `SEND_MS`, or whose process died, is in doubt as before and never sent twice.
  *
  * **A pass** is one GetTask per open entry — not ListTasks, which on an agent others use lists theirs too. A Task that has
  * ended is written into its entry and read from there, with no call, until the engine lets it go. A GetTask that fails
@@ -26,11 +36,8 @@
  * a redirect is never followed, since a header that carries a key is not dropped on the way to another origin.
  *
  * **Every request is bounded** (`REQUEST_MS`), since a pass waits on every harness's observe and an agent that holds a
- * request would hold the runtime: a GetTask not answered in time reads the session as last seen, a send not answered is
- * in doubt as a send that failed on the way, and a card not read is a spawn refused. The send is bounded as the rest are,
- * since a spawn runs inside the pass too: an agent must answer it within the bound, with a Task as `returnImmediately`
- * asks or with its reply, and one that works before it answers is read in doubt every time, its work lost to the runtime
- * (open issue 34).
+ * request would hold the runtime: a GetTask not answered in time reads the session as last seen, and a card not read is a
+ * spawn refused. The send alone is bounded by `SEND_MS`, since it no longer holds a pass.
  *
  * What the client learns of the card and the binding it chose is kept in memory, a view dropped at the first failure and
  * read again: the registry is the record.
@@ -63,10 +70,23 @@ export type RemoteAgent = { url: string } | { card: Record<string, unknown> };
  * harness was given, on whose origin every request goes, or for an agent given by its card the interface's URL;
  * `undefined` when there is none.
  */
-export type Credentials = (scheme: string, agentUrl: string) => string | undefined;
+export type Credentials = (scheme: string, agentUrl: string, harness: string) => string | undefined;
+
+/**
+ * The words a spawn is refused in when `credentials` gives no secret for `scheme`: what a caller that keeps its secrets
+ * somewhere of its own says to do, say which variable to set. Absent, the refusal says to give `createEngine` a
+ * `credentials` that answers for the scheme.
+ */
+export type MissingCredential = (scheme: string, agentUrl: string, harness: string) => string;
 
 /** How long a request to a remote agent is waited on, the card's included, before it is read as not answered. */
 export const REQUEST_MS = 10_000;
+
+/** How long a send is waited on, off the pass, before it is read as not answered: a Task in doubt, never sent twice. */
+export const SEND_MS = 15 * 60_000;
+
+/** How long a spawn waits, in the pass, for its send's answer before it leaves the send to go on without it. */
+export const SPAWN_WAIT_MS = 1_000;
 
 /** Where the card of an agent given by `address` is read: the address itself when it names a `.json` file, else beneath its path. */
 export const cardUrlOf = (address: string): URL => {
@@ -146,13 +166,13 @@ const originOf = (url: string): string | undefined => (URL.canParse(url) ? new U
 type Auth = { headers: Record<string, string> } | { refusal: string };
 
 /** One scheme's header, or why it cannot be sent. */
-const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () => string | undefined): [string, string] | string => {
+const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () => string | undefined, missing: () => string | undefined): [string, string] | string => {
   const s = scheme?.scheme;
   if (!s) return `\`${name}\` is not a scheme the card declares`;
   const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
     const given = secret();
     return given === undefined || given === ''
-      ? `\`${name}\` needs a secret, and \`credentials\` gave none: give \`createEngine\` a \`credentials\` that answers for \`${name}\``
+      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${missing() ?? `give \`createEngine\` a \`credentials\` that answers for \`${name}\``}`
       : [header, value(given)];
   };
   switch (s.$case) {
@@ -176,14 +196,14 @@ const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () =
 };
 
 /** What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met. */
-const authOf = (card: AgentCard, agentUrl: string, credentials: Credentials | undefined): Auth => {
+const authOf = (card: AgentCard, agentUrl: string, harness: string, credentials: Credentials | undefined, missing?: MissingCredential): Auth => {
   if (!card.securityRequirements.length) return { headers: {} };
   const why: string[] = [];
   for (const requirement of card.securityRequirements) {
     const headers: Record<string, string> = {};
     const unmet: string[] = [];
     for (const name of Object.keys(requirement.schemes)) {
-      const h = headerOf(name, card.securitySchemes[name], () => credentials?.(name, agentUrl));
+      const h = headerOf(name, card.securitySchemes[name], () => credentials?.(name, agentUrl, harness), () => missing?.(name, agentUrl, harness));
       if (typeof h === 'string') unmet.push(h);
       else headers[h[0]] = h[1];
     }
@@ -236,6 +256,23 @@ type Entry = {
   ended?: true;
   /** The agent answered with a Message, not a Task: the whole of the session, in its words. */
   reply?: string;
+  /**
+   * The send is under way in the process `pid`, which gives it up at `until`: while that process lives and the time has not
+   * come, the entry is a Task `submitted`. Gone once the answer, or its failure, is written.
+   */
+  sending?: { pid: number; until: string };
+  /** The agent refused the message after the spawn had returned: its words, the session ended `rejected`. */
+  refused?: string;
+  /** The send failed on the way, or was not answered in time: its words, the Task in doubt. */
+  doubt?: string;
+};
+
+/** What a send came to: the agent's answer, its refusal, a failure on the way, or a stop that cut it. */
+type Answer = { task: Task } | { message: Message } | { refused: string } | { failed: unknown } | { canceled: true };
+
+/** Whether a process lives: one this user cannot signal lives too. */
+const alive = (pid: number): boolean => {
+  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; }
 };
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
@@ -253,11 +290,25 @@ const upgraded = (e: Entry): Entry => {
   return { ...e, seen: { ...seen, state } };
 };
 
+/** The bounds of a send, and the words for a secret not given: each has its shipped default. */
+export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCredential?: MissingCredential };
+
 /**
  * A remote A2A agent's `RunnerOps`, under `harness`, its registry beneath `root`. `credentials` answers for the card's
- * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request.
+ * schemes; absent, only an agent that asks for no authentication is reached. `requestMs` bounds each request but the send,
+ * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer.
  */
-export const remoteOps = (harness: string, agent: RemoteAgent, root: string, credentials?: Credentials, requestMs = REQUEST_MS): RunnerOps => {
+export const remoteOps = (
+  harness: string, agent: RemoteAgent, root: string, credentials?: Credentials, requestMs = REQUEST_MS, o: RemoteOptions = {},
+): RunnerOps => {
+  const sendMs = o.sendMs ?? SEND_MS;
+  const spawnWaitMs = o.spawnWaitMs ?? SPAWN_WAIT_MS;
+  /** The sends this process has under way, by session name, each with what stops it. */
+  const inFlight = new Map<string, AbortController>();
+  /** An entry whose send is under way in a process that lives, and has not reached its bound. */
+  const sendingLive = (e: Entry): boolean =>
+    e.sending !== undefined && e.taskId === undefined && Date.parse(e.sending.until) > Date.now()
+    && (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
   const dir = path.join(root, 'remote');
   const done = path.join(dir, 'done');
   const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
@@ -268,11 +319,11 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
       throw e;
     }
   };
-  const write = (e: Entry) => {
-    fs.mkdirSync(dir, { recursive: true });
-    const tmp = `${fileOf(e.name)}.${process.pid}.${randomUUID()}.tmp`;
+  const write = (e: Entry, under = dir) => {
+    fs.mkdirSync(under, { recursive: true });
+    const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
     fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
-    fs.renameSync(tmp, fileOf(e.name));
+    fs.renameSync(tmp, fileOf(e.name, under));
   };
   /** This harness's open entries: those at the top of the registry, sent through it. */
   const open = (): Entry[] => {
@@ -301,7 +352,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
         if (e?.agent === harness) all.push(e);
       }
     }
-    return all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId)
+    return all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId)
       ?? all.filter((e) => e.contextId === sessionId && e.taskId).sort((a, b) => a.sentAt.localeCompare(b.sentAt)).at(-1);
   };
 
@@ -309,13 +360,16 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
   const address = 'url' in agent ? agent.url : undefined;
   let seam: Promise<{ card: AgentCard; agentUrl: string; client: Client }> | undefined;
 
-  /** A fetch that gives up after `requestMs`, in words that say so. */
+  /** The signals a send is made with: its fetch is bounded by `sendMs`, not `requestMs`. */
+  const sends = new WeakSet<AbortSignal>();
+  /** A fetch that gives up after `requestMs` — a send's after `sendMs` — in words that say so. */
   const bounded = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
-    const bound = AbortSignal.timeout(requestMs);
+    const ms = init.signal && sends.has(init.signal) ? sendMs : requestMs;
+    const bound = AbortSignal.timeout(ms);
     try {
       return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, bound]) : bound });
     } catch (e) {
-      if (bound.aborted) throw new Late(`${input instanceof Request ? input.url : String(input)} did not answer within ${requestMs / 1000} s`);
+      if (bound.aborted) throw new Late(`${input instanceof Request ? input.url : String(input)} did not answer within ${ms / 1000} s`);
       throw e;
     }
   };
@@ -357,7 +411,7 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
       }
       return response;
     }, {
-      headers: async () => { const a = authOf(card, agentUrl, credentials); return 'headers' in a ? a.headers : {}; },
+      headers: async () => { const a = authOf(card, agentUrl, harness, credentials); return 'headers' in a ? a.headers : {}; },
       shouldRetryWithHeaders: async () => undefined,
     });
     // The card handed over already read, with only the interface chosen: the factory takes it as it is.
@@ -386,51 +440,114 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
 
   // ─── the verbs ────────────────────────────────────────────────────────────
 
+  /** The send of `intent`, bounded by `sendMs` and stopped by `stop`: what it came to, never a rejection. */
+  const sendOf = async (r: SpawnRequest, intent: Entry, stop: AbortSignal): Promise<Answer> => {
+    const signal = AbortSignal.any([stop]);
+    sends.add(signal);
+    try {
+      const answer = await ask((c) => c.sendMessage({
+        tenant: '', message: remoteMessageOf(r, intent.messageId), metadata: undefined,
+        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+      }, { signal }));
+      return 'status' in answer ? { task: answer } : { message: answer };
+    } catch (e) {
+      if (stop.aborted) return { canceled: true };
+      // Refused, the agent did nothing with the message.
+      if (sendRefused(e)) return { refused: `${messageOf(e)}${untaken(e) ? '' : ' Nothing was started.'}` };
+      return { failed: e };
+    }
+  };
+
+  /** Why a send's answer is not known, in words: the agent may be at work on it. */
+  const doubtOf = (name: string, e: unknown): string => late(e)
+    ? `the agent did not answer the send of \`${name}\` within ${sendMs / 1000} s`
+    : `the send of \`${name}\` failed on the way (${messageOf(e)})`;
+  const NOT_TWICE = 'whether the agent made a Task of it is not known, and it is not sent twice.';
+
+  /**
+   * Write what the send of `intent` came to. `inPass`, the spawn still waits on it, and a refusal or a doubt is thrown for
+   * the engine to journal; after it has returned, both are written into the entry, which a pass then reads.
+   */
+  const record = (intent: Entry, answer: Answer, inPass: boolean): void => {
+    const { sending: _, ...sent } = intent;
+    // Let go of while it was being sent (an attempt ended on its deadline, or stopped): what comes back is written where
+    // `observe` does not read it, and a Task it made is cancelled, since nothing waits on it.
+    const released = !inPass && !fs.existsSync(fileOf(intent.name));
+    if (released) {
+      const task = 'task' in answer ? answer.task : undefined;
+      if (task) void cancel(task.id).catch(() => undefined);
+      write({ ...sent, ...(task ? { taskId: task.id, contextId: task.contextId } : {}), ended: true }, done);
+      return;
+    }
+    if ('task' in answer) {
+      write({ ...sent, taskId: answer.task.id, contextId: answer.task.contextId });
+      return;
+    }
+    if ('message' in answer) {
+      // Answered with a Message: the agent made no Task, and what it said is the session, ended.
+      const m = answer.message;
+      const text = m.parts.map((p) => (p.content?.$case === 'text' ? p.content.value : p.content?.$case === 'data' ? JSON.stringify(p.content.value) : '')).join('\n');
+      const data = m.parts.find((p) => p.content?.$case === 'data');
+      write({
+        ...sent, taskId: m.messageId, contextId: m.contextId, reply: text, ended: true,
+        seen: {
+          sessionId: m.messageId, state: 'completed', ...(m.contextId ? { nativeId: m.contextId } : {}),
+          ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
+        },
+      });
+      return;
+    }
+    if ('refused' in answer) {
+      if (inPass) {
+        // Refused while the spawn waits: the intent goes, and nothing was started under the name.
+        fs.rmSync(fileOf(intent.name), { force: true });
+        throw new Refusal(answer.refused);
+      }
+      write({ ...sent, taskId: intent.messageId, ended: true, refused: answer.refused, seen: { sessionId: intent.messageId, state: 'rejected' } });
+      return;
+    }
+    if ('canceled' in answer) {
+      // Stopped on its way: nothing to wait on. A Task the agent made of it before the cut is not known here.
+      write({ ...sent, taskId: intent.messageId, ended: true, seen: { sessionId: intent.messageId, state: 'canceled' } });
+      return;
+    }
+    const doubt = doubtOf(intent.name, answer.failed);
+    write({ ...sent, doubt });
+    if (inPass) throw new Error(`${doubt}: ${NOT_TWICE}`, { cause: answer.failed });
+  };
+
   const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> => Effect.tryPromise({
     catch: failure('spawn'),
     try: async () => {
       const recorded = readEntry(fileOf(r.name));
       if (recorded?.taskId) return; // Sent before, and answered: the Task is adopted, and nothing is sent again.
+      if (recorded && sendingLive(recorded)) return; // Being sent by a process that lives: read `submitted` until it answers.
       if (recorded) {
-        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since the agent did not answer within ${requestMs / 1000} s or the runtime stopped first: whether the agent made a Task of it is not known, and it is not sent twice.`);
+        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since ${recorded.doubt ?? 'the process sending it stopped first'}: ${NOT_TWICE}`);
       }
       const { card, agentUrl } = await client();
-      const auth = authOf(card, agentUrl, credentials);
+      const auth = authOf(card, agentUrl, harness, credentials, o.missingCredential);
       if ('refusal' in auth) throw new Refusal(auth.refusal);
-      const intent: Entry = { name: r.name, agent: harness, messageId: randomUUID(), ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}), sentAt: new Date().toISOString() };
+      const sentAt = new Date();
+      const intent: Entry = {
+        name: r.name, agent: harness, messageId: randomUUID(), ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}), sentAt: sentAt.toISOString(),
+        sending: { pid: process.pid, until: new Date(sentAt.getTime() + sendMs).toISOString() },
+      };
       write(intent);
-      let answer: Task | Message;
-      try {
-        answer = await ask((c) => c.sendMessage({
-          tenant: '', message: remoteMessageOf(r, intent.messageId), metadata: undefined,
-          configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-        }));
-      } catch (e) {
-        // Refused, the agent did nothing with the message, and the intent goes: nothing was started under the name.
-        if (sendRefused(e)) {
-          fs.rmSync(fileOf(r.name), { force: true });
-          throw new Refusal(`${messageOf(e)}${untaken(e) ? '' : ' Nothing was started.'}`);
-        }
-        // Not answered in time: the agent may be at work on it, and it is not sent again.
-        if (late(e)) {
-          throw new Error(`the agent did not answer the send of \`${r.name}\` within ${requestMs / 1000} s: whether it made a Task of it is not known, and it is not sent twice. An agent must answer a send within that bound, with a Task as \`returnImmediately\` asks or with its reply; one that works before it answers is read so every time.`, { cause: e });
-        }
-        throw e;
-      }
-      if ('status' in answer) {
-        write({ ...intent, taskId: answer.id, contextId: answer.contextId });
+      const stop = new AbortController();
+      inFlight.set(r.name, stop);
+      const answered = sendOf(r, intent, stop.signal);
+      let timer: NodeJS.Timeout | undefined;
+      const waited = new Promise<'waited'>((resolve) => { timer = setTimeout(() => resolve('waited'), spawnWaitMs); });
+      const first = await Promise.race([answered, waited]);
+      clearTimeout(timer);
+      if (first === 'waited') {
+        // Not answered yet: the pass goes on, and the answer is written when it comes. A root removed meanwhile has no
+        // entry to write, and nothing reads one.
+        void answered.then((a) => { try { record(intent, a, false); } catch { /* the registry is gone */ } finally { inFlight.delete(r.name); } });
         return;
       }
-      // Answered with a Message: the agent made no Task, and what it said is the session, ended.
-      const text = answer.parts.map((p) => (p.content?.$case === 'text' ? p.content.value : p.content?.$case === 'data' ? JSON.stringify(p.content.value) : '')).join('\n');
-      const data = answer.parts.find((p) => p.content?.$case === 'data');
-      write({
-        ...intent, taskId: answer.messageId, contextId: answer.contextId, reply: text, ended: true,
-        seen: {
-          sessionId: answer.messageId, state: 'completed', ...(answer.contextId ? { nativeId: answer.contextId } : {}),
-          ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
-        },
-      });
+      try { record(intent, first, true); } finally { inFlight.delete(r.name); }
     },
   });
 
@@ -451,12 +568,17 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
     return s;
   };
 
+  /** A send under way, as a pass reads it: a Task the agent has, as far as anyone can tell, and has not started. */
+  const submittedOf = (e: Entry): Sighting => ({ sessionId: e.messageId, state: 'submitted', ...(e.contextId ? { nativeId: e.contextId } : {}) });
+
   const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.tryPromise({
     catch: failure('observe'),
     try: async () => {
-      const entries = open().filter((e): e is Entry & { taskId: string } => e.taskId !== undefined);
+      const all = open();
+      const entries = all.filter((e): e is Entry & { taskId: string } => e.taskId !== undefined);
       const seen = await Promise.all(entries.map(async (e) => [e.name, await sightingOf(e)] as const));
-      return new Map(seen.filter((pair): pair is readonly [string, Sighting] => pair[1] !== undefined));
+      const sending = all.filter(sendingLive).map((e) => [e.name, submittedOf(e)] as const);
+      return new Map([...seen, ...sending].filter((pair): pair is readonly [string, Sighting] => pair[1] !== undefined));
     },
   });
 
@@ -470,7 +592,13 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
     catch: failure('stop'),
     try: async () => {
       const e = bySession(sessionId);
-      if (e?.reply !== undefined) return; // A reply is no Task: nothing runs.
+      if (e?.reply !== undefined || e?.refused !== undefined) return; // A reply, or a refusal, is no Task: nothing runs.
+      if (e && e.taskId === undefined) {
+        // Still being sent: cut the send, if this process makes it. One another process makes is its to answer, and a
+        // Task it brings back is cancelled on the next stop.
+        inFlight.get(e.name)?.abort();
+        return;
+      }
       await cancel(e?.taskId ?? sessionId);
     },
   });
@@ -480,6 +608,11 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
     try: async () => {
       const e = bySession(sessionId);
       if (e?.reply !== undefined) return `agent: ${e.reply}`;
+      if (e?.refused !== undefined) return `REJECTED — ${e.refused}`;
+      if (e && e.seen?.state === 'canceled' && e.taskId === e.messageId) return `CANCELED — stopped while it was being sent, before the agent answered`;
+      if (e && e.taskId === undefined) {
+        return sendingLive(e) ? `SUBMITTED — sent at ${e.sentAt}; the agent has not answered yet` : `sent at ${e.sentAt}, and its answer was never recorded${e.doubt ? `: ${e.doubt}` : ''}`;
+      }
       const taskId = e?.taskId ?? sessionId;
       try {
         return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined })));
@@ -503,9 +636,10 @@ export const remoteOps = (harness: string, agent: RemoteAgent, root: string, cre
   const release = (session: Sighting): Effect.Effect<void, RunnerError> => Effect.tryPromise({
     catch: failure('release'),
     try: async () => {
-      const e = open().find((o) => o.taskId === session.sessionId);
+      const e = open().find((o) => o.taskId === session.sessionId || (o.taskId === undefined && o.messageId === session.sessionId));
       if (!e) return;
-      if (!e.ended && e.reply === undefined) await cancel(session.sessionId);
+      if (e.taskId === undefined) inFlight.get(e.name)?.abort(); // Still being sent: cut, and whatever answers is let go of.
+      else if (!e.ended && e.reply === undefined && e.refused === undefined) await cancel(session.sessionId);
       fs.mkdirSync(done, { recursive: true });
       fs.renameSync(fileOf(e.name), fileOf(e.name, done));
     },

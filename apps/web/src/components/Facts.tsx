@@ -23,9 +23,10 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * its workflow leaves unset reads as the value the engine filed the task with, marked `default`: `1 · default`, `no limit ·
  * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
  * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
- * marked `this try`. For a step not filed, what the workflow says, or a dash.
+ * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  */
-export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> => [
+export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> => (isRemote(spec, filed) ? remoteRows(spec, filed) : [
+
   ['harness', code(spec.harness)],
   ['model', modelRow(spec.model, filed)],
   ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
@@ -42,7 +43,26 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
-];
+]);
+
+/** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
+const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
+
+/**
+ * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, the deadline.
+ * No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a `harness's own · default` row there
+ * would say the run chose what nobody here chose. The address is the store's word now; where it no longer declares the agent, says so.
+ */
+function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
+  const address = filed?.remote === undefined || filed.remote === null ? null : filed.remote.address ?? 'no longer in a2a-agents.json';
+  return [
+    ['harness', code(spec.harness ?? (filed?.remote ? `a2a:${filed.remote.name}` : null))],
+    ['agent', filed?.remote?.address ? code(address) : address],
+    ['after', spec.after.length ? code(spec.after.join(', ')) : null],
+    ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
+    ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+  ];
+}
 
 /** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
 export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string => (spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode');

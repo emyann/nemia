@@ -1099,3 +1099,35 @@ test('a pass that could not read the harness does not spawn again an intent a cr
   assert.equal(v.state.attempts[0]!.ended, null);
   assert.equal(v.phase, 'running (working)', 'adopted, and followed as it runs');
 });
+
+test('a task on a harness this engine does not have is never spawned on the fallback, and one in flight is not ended `lost`, its grace long past', async () => {
+  const sessions = new Map<string, Sighting>();
+  const spawns: string[] = [];
+  const told: string[] = [];
+  const ops = testOps({ sessions });
+  // The fallback records what it is handed and told to look for: a task on a remote agent the engine was made without is neither.
+  const claude = {
+    ...ops,
+    spawn: (r: SpawnRequest) => Effect.suspend(() => { spawns.push(r.name); return ops.spawn(r); }),
+    observeFor: (expected: readonly { name: string }[]) => Effect.sync(() => { told.push(...expected.map((e) => e.name)); return { seen: new Map(sessions), unread: new Set<string>() }; }),
+  };
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude }, 'claude')), tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  // Filed by an engine that had `a2a:reviewer`: one ready to start, one spawned twice the grace ago and at work on the agent since.
+  const ready = await run(file({ ...spec, harness: 'a2a:reviewer' }));
+  const away = await run(file({ ...spec, harness: 'a2a:reviewer' }));
+  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  await run(Effect.flatMap(Journal, (j) => Effect.all([
+    j.append(away, { kind: 'starting', at: long, attempt: 1 }),
+    j.append(away, { kind: 'spawned', at: long, attempt: 1 }),
+  ], { discard: true })));
+  await run(tick());
+  await run(tick());
+  assert.deepEqual(spawns, [], 'nothing was spawned on the fallback');
+  assert.deepEqual(told, [], 'nor was the fallback told to look for a session of either');
+  const readyEvents = await run(Effect.flatMap(Journal, (j) => j.read(ready)));
+  const end = readyEvents.find((e) => e.kind === 'ended');
+  assert.ok(end?.kind === 'ended' && end.reason === 'unstartable' && /`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/.test(end.error ?? ''), JSON.stringify(readyEvents));
+  const awayEvents = await run(Effect.flatMap(Journal, (j) => j.read(away)));
+  assert.equal(awayEvents.some((e) => e.kind === 'ended' || e.kind === 'settled'), false, `neither there nor gone, so not ended: ${JSON.stringify(awayEvents)}`);
+});

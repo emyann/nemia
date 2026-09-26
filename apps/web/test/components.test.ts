@@ -1091,10 +1091,10 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const unset: StepSpec = { harness: 'claude', model: null, effort: null, context: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: null, rounds: null };
 
   // Filed as a step that sets none of them is, on a harness the api could not ask: nothing said.
-  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null };
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, remote: null };
   assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default']);
   const given: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, remote: null,
   };
   assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default']);
 
@@ -1127,7 +1127,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
   const set: StepSpec = { ...unset, model: 'opus', effort: 'high', context: 200_000, permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600 };
   const asSet: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, remote: null,
   };
   assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s']);
   // No count of attempts: the runtime makes one per start, and a step that says a count is refused (stage 4a part 2).
@@ -1147,6 +1147,26 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   // Not filed: the workflow's words, or a dash.
   assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—']);
   assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s']);
+});
+
+test('a step on a remote A2A agent says the agent and its address, and no model, effort, context, fence or tools the run never chose', () => {
+  const rowsOf = (spec: StepSpec, filed: StepFiled | null) => Object.fromEntries(
+    [...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
+      .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+  );
+  const spec: StepSpec = { harness: 'a2a:reviewer', model: null, effort: null, context: null, after: ['draft'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null };
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, remote: { name: 'reviewer', address: 'https://agents.example.com/reviewer' } };
+  const rows = rowsOf(spec, bare);
+  assert.deepEqual(Object.keys(rows), ['harness', 'agent', 'after', 'deadline']);
+  assert.deepEqual(rows, { harness: 'a2a:reviewer', agent: 'https://agents.example.com/reviewer', after: 'draft', deadline: 'no limit · default' });
+  // A name the store's file no longer declares, or reads as refused: the name is on the harness row, and the address is said to be gone.
+  assert.equal(rowsOf(spec, { ...bare, remote: { name: 'reviewer', address: null } }).agent, 'no longer in a2a-agents.json');
+  // Not filed yet, the harness alone says it is remote: the same rows, the address not known.
+  assert.deepEqual(Object.keys(rowsOf(spec, null)), ['harness', 'agent', 'after', 'deadline']);
+  assert.equal(rowsOf(spec, null).agent, '—');
+  // A harness of ours keeps its rows, and no agent row.
+  assert.equal('agent' in rowsOf({ ...spec, harness: 'claude' }, { ...bare, remote: null }), false);
+  assert.ok('model' in rowsOf({ ...spec, harness: 'claude' }, { ...bare, remote: null }));
 });
 
 

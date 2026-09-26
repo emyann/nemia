@@ -12,10 +12,11 @@
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied (F16, F17).
  *
  * The step's brief is then its own note alone (`briefBody`): the instructions are in the system prompt. A codex step is handed them in its
- * brief as before, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's (F13).
+ * brief as before, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's (F13), and a
+ * step on a remote A2A agent, which keeps its operator's.
  */
 import path from 'node:path';
-import type { Workflow } from './workflow.ts';
+import { isRemoteHarness, type Workflow } from './workflow.ts';
 
 /** The prompt's file in a step's rendered folder. */
 export const PROMPT_FILE = 'prompt.md';
@@ -34,7 +35,7 @@ export const pluginOf = (agent: string): string => `hkb-${agent}`;
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
-  if (!agent || step.harness === 'codex' || step.resume) return false;
+  if (!agent || step.harness === 'codex' || isRemoteHarness(step.harness) || step.resume) return false;
   return Boolean(agent.instructions || agent.skills?.length || (agent.systemPrompt ?? 'default') !== 'default');
 };
 

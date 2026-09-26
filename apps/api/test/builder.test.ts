@@ -24,7 +24,7 @@ const { listWorkflows, versionOf: versionIn } = await import('../src/workflows.t
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 const { loadWorkflows, writeWorkflow } = await import('agent-orchestrator');
-const { AGENT_KEYS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SANDBOXES, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
+const { AGENT_KEYS, EFFORTS, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, REMOTE_REFUSED_KEYS, renderStep, SANDBOXES, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type KeyForm = import('../src/builder.ts').KeyForm;
 type WorkflowSaved = import('../src/builder.ts').WorkflowSaved;
 type BuildRefused = import('../src/builder.ts').BuildRefused;
@@ -347,6 +347,43 @@ test("a codex step that names its sandbox as `permissionMode:`, as before 2026-0
   const saved = await put('fenced', { steps: [{ ...step, spec: { ...step.spec, sandbox: 'workspace-write' } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), '---\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n');
+});
+
+test('the form offers each remote A2A agent the store declares as a harness, and a step on one is saved as the package reads it', async (t) => {
+  const declared = path.join(root, 'a2a-agents.json');
+  t.after(() => fs.rmSync(declared, { force: true }));
+  write(declared, JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer' } }));
+  const form = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+  assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, [...HARNESSES, 'a2a:reviewer']);
+  // A remote agent takes none of a harness's words, and the form leaves off such a step every key the load refuses there.
+  for (const key of ['effort', 'permissionMode', 'sandbox'] as const) assert.equal(Object.hasOwn(form.keys.find((k) => k.key === key)!.byHarness!, 'a2a:reviewer'), false, key);
+  assert.deepEqual(form.remote, { prefix: 'a2a:', refuses: [...REMOTE_REFUSED_KEYS] });
+  assert.ok(form.remote.refuses.includes('model') && form.remote.refuses.includes('permissionMode') && !form.remote.refuses.includes('after'));
+
+  // A file refused as it stands offers none of its agents, and the form is still drawn.
+  write(declared, '{ "reviewer": ');
+  const broken = await app.request('/api/workflows/keys');
+  assert.equal(broken.status, 200);
+  assert.deepEqual(((await broken.json()) as KeyForm).keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
+  write(declared, JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer' } }));
+
+  // Saved, the step says its harness as the package reads it, and the listing carries the agent's name in it.
+  const dir = path.join(STORE, 'asked');
+  write(path.join(dir, 'ask.md'), '---\nworkspace: folder\n---\nAsk it.\n');
+  const [ask] = await listedSteps('asked') as [ListedStep];
+  const saved = await put('asked', { steps: [{ ...ask, spec: { ...ask.spec, harness: 'a2a:reviewer' } }] });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), '---\nworkspace: folder\nharness: a2a:reviewer\n---\nAsk it.\n');
+  assert.equal((await listedSteps('asked'))[0]!.spec.harness, 'a2a:reviewer');
+
+  // A key a remote step may not set is refused in the package's words, and nothing is written.
+  const before = fs.readFileSync(path.join(dir, 'ask.md'), 'utf8');
+  const [remote] = await listedSteps('asked') as [ListedStep];
+  const refused = await put('asked', { steps: [{ ...remote, spec: { ...remote.spec, model: 'opus' } }] });
+  const said = (await refused.json()) as BuildRefused;
+  assert.equal(refused.status, 422, JSON.stringify(said));
+  assert.match(said.error, /^ask: `model: opus` .*`harness: a2a:reviewer` is a remote A2A agent\. Delete the line/);
+  assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), before);
 });
 
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {

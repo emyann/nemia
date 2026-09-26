@@ -13,9 +13,11 @@
  * the engine should need to learn three functions, not a library.
  */
 import path from 'node:path';
-import { claudeDetached, codex, createEngine, type Engine } from 'agent-runtime';
+import { claudeDetached, codex, createEngine, remoteConfigRefusal, type Credentials, type Engine, type MissingCredential, type RemoteAgent } from 'agent-runtime';
+import { envNameOf, readRemoteAgents, remoteAgentsFile } from './a2a-agents.ts';
 import { CHECK } from './check.ts';
 import { HOME } from './store.ts';
+import { REMOTE_PREFIX, remoteNameOf } from './workflow.ts';
 
 export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
@@ -48,8 +50,73 @@ export const HARNESSES = {
  * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
  * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted. The runtime keeps no
  * ceiling of its own since thin runtime stage 4c part 2, and refuses a `maxConcurrent` handed to it.
+ *
+ * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
+ * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
+ * `wf ls`, `wf up`, `wf rm`, the api — works on as before. It is `wf start` that refuses a step naming what was left out, in the file's words.
+ * A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at work
+ * on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  */
 export const engine = (): Engine => {
-  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: HARNESSES });
+  const read = readRemote();
+  const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
+  for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
+  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential });
   return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+};
+
+/** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
+const LEFT_OUT = 'It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held, and one not yet started is refused its start.';
+
+/**
+ * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in
+ * the file's words and naming the file; and, when the file as a whole is refused (`readRemoteAgents`) or cannot be read, why, with no agent.
+ * Read afresh on each call; it throws nothing, so a bad file stops only a step that names one of its agents (`undeclaredRefusal` in start.ts).
+ */
+export type RemoteRead = { agents: ReadonlyMap<string, RemoteAgent>; refused: ReadonlyMap<string, string>; unread?: string };
+
+export function readRemote(): RemoteRead {
+  const file = remoteAgentsFile(HOME);
+  let entries: ReturnType<typeof readRemoteAgents>;
+  try {
+    entries = readRemoteAgents(file);
+  } catch (err) {
+    return { agents: new Map(), refused: new Map(), unread: (err as Error).message };
+  }
+  const agents = new Map<string, RemoteAgent>();
+  const refused = new Map<string, string>();
+  for (const [name, agent] of entries) {
+    const why = remoteConfigRefusal(`${REMOTE_PREFIX}${name}`, agent);
+    if (why) refused.set(name, `${file}: \`${name}\`: ${why}`);
+    else agents.set(name, agent as RemoteAgent);
+  }
+  return { agents, refused };
+}
+
+/** Every refusal a read of the file came to: the file's own, or each entry's. */
+export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.unread] : [...read.refused.values()]);
+
+/**
+ * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step and
+ * reads a run's address off. An entry the runtime refuses is not among them; a file refused as it stands is refused, exit code 2, in its words.
+ */
+export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
+  const read = readRemote();
+  if (read.unread) throw Object.assign(new Error(read.unread), { exitCode: 2 });
+  return read.agents;
+}
+
+/**
+ * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request, so a
+ * variable set for a running `wf up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local harness.
+ */
+export const credentials: Credentials = (scheme, _agentUrl, harness) => {
+  const name = remoteNameOf(harness);
+  return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
+};
+
+/** What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it. */
+export const missingCredential: MissingCredential = (scheme, _agentUrl, harness) => {
+  const name = remoteNameOf(harness) ?? harness;
+  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of \`wf up\` (and of the api, which reads a run through the same engine), and restart it; then \`wf retry\` the step. The secret is read from there on every request, and never written to disk.`;
 };

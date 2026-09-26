@@ -85,6 +85,11 @@ export type StepFiled = {
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
+  /**
+   * The remote A2A agent a step on `harness: a2a:<name>` was sent to: its name, and its address as the store's `a2a-agents.json` gives it
+   * now — origin and path, never a query string, which can carry a key — or null where the file no longer declares it. Null on a harness of ours.
+   */
+  remote: { name: string; address: string | null } | null;
 };
 
 /** Mirrors `RunDetail` in apps/api/src/detail.ts. */

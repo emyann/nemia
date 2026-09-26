@@ -63,7 +63,8 @@ export { AgentWriteError, agentPlaces, agentSkillsFound, copySkill, findAgent, l
 export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten, SkillChange, SkillCopied, SkillWritten, WorkflowWritten } from './authoring.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
 export type { InboxDropped, InboxQueued } from './inbox-store.ts';
-export { HARNESSES, engine } from './runtime-client.ts';
+export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { A2A_AGENTS_FILE, envNameOf } from './a2a-agents.ts';
 export { closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, endWords, exitVerdicts, harnessBlocked, parentOf, phaseOfView, readFilings, saidCount, spendReader, viewedOnce, waitingOf, wordOfView } from './views.ts';
 export type { CheckReport } from './views.ts';
 export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';

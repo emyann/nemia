@@ -95,7 +95,7 @@ const firstTry = (step: { taskId: string | null; status: string; attempts: objec
 }];
 
 /** The engine's record of a task `filed` journals: a codex task with nothing else said — which Codex runs in `workspace-write`. */
-const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null };
+const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, remote: null, tools: null, deadlineSeconds: null };
 
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) =>
@@ -1218,7 +1218,7 @@ test('a step says what it runs with: the workflow\'s effort, context window and 
   // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
   // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
   assert.deepEqual(implement.filed, {
-    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null,
+    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, remote: null, tools: ['Read', 'Grep'], deadlineSeconds: null,
   });
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);

@@ -483,6 +483,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A fake engine's closeout is flat, as a harness writes it.** `parseCloseout` moves the fields beside `outcome` — a schema's
   `title`, `gist` — under `output`; a test that hands the fake an `output` already nested reads the step as `unsigned`, and the next
   step is never filed. Give the fake `{ ...SIGNED, title, gist }` (learned by the run that added `workspace: folder`).
+- **A closeout written by hand is judged against the agent's schema.** The e2e's `agent-try` page stands in for the tick and the harness,
+  and its first closeout — `outcome`, `summary`, `artifacts` — read `unsigned · done`, the run `failed`: `scribe`'s schema requires
+  `notes`. A fixture that signs off a step whose agent has an `output:` carries every field that schema requires, flat beside `outcome`.
+  And `forget` (`wf rm`, the api's `DELETE /api/runs/:id` of a try) refuses a run not yet filed and leaves the engine's journals, so a page
+  that writes `engine/tasks/<id>-*.jsonl` removes it itself (learned by agents card 3c).
 - **A background session in a folder nobody has opened blocks for ever in any mode that can ask; a job never does.**
   A `workspace: folder` step works in a directory the run just made: no settings file, nothing trusted. The first
   call outside it — reading the artifacts directory beside it, say — raises an ordinary permission prompt in a

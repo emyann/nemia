@@ -143,6 +143,14 @@ out until Codex has a place for them, and the load says so for a codex agent tha
      `preload:` as a switch that says what it costs a turn (characters / 4, cached) and that it changes every agent that gives it. A save
      is against the version read, so an edit moves every composing agent's version; a name that is no folder-safe id, a clash with a
      skill already there and a frontmatter the card reader refuses are each refused. The api writes no checkout: a skill of yours says the
-     `cp -r` that gives it to the repository's agents, and a repository's is read there, not written. The e2e's `write-skill` page. **3c, try an agent** on a short brief, after 3b.
+     `cp -r` that gives it to the repository's agents, and a repository's is read there, not written. The e2e's `write-skill` page.
+   **3c, try an agent.** Built 2026-09-25: an agent of yours has *Try it* on its page, a short brief and one line saying a try is a
+     rehearsal fenced to its own folder, not the agent's own permissions (`POST /api/agents/yours/:name/try {brief}`, behind the write
+     guard, `apps/api/src/try.ts`). The api writes the store's hidden one-step team `tries/<agent>/try.md` — `workspace: folder`, the
+     agent, `budget: 1`, `dontAsk`, `Edit(**)` — again when the agent's version moves, and starts it as an ordinary folder run with no
+     repository. The panel shows the latest try's state, what it spent of its dollar, the files it wrote and its run; Runs and the
+     Factory tag a try `try` beside its agent, and a try's own page removes it (`DELETE /api/runs/:id`, a try only). A repository agent
+     says to copy it to yours to try it; a repository agent, an empty brief and a second try while one moves are each refused. The
+     e2e's `agent-try` page.
 4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
    runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

@@ -219,12 +219,12 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.match(mine.version, /^[0-9a-f]{16}$/);
     assert.deepEqual(mine.users, [{ from: 'repo', name: 'theirs' }, { from: 'yours', name: 'clerk' }, { from: 'yours', name: 'scribe' }]);
     assert.deepEqual(mine.skill.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
-    assert.equal(mine.copyHint, `cp -r ${path.join(LIBRARY, 'mine')} ${THEIRS}/`);
+    assert.equal(mine.copyHint, `mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'mine')}' '${THEIRS}/'`);
     // `shared` is in both places: the repository's agent finds its own first, and an agent of yours finds yours.
     assert.deepEqual((await detail('yours', 'shared')).users, [{ from: 'yours', name: 'scribe' }]);
     const theirs = await detail('repo', 'shared');
     assert.deepEqual(theirs.users, [{ from: 'repo', name: 'theirs' }]);
-    assert.equal(theirs.copyHint, `cp -r ${path.join(THEIRS, 'shared')} ${LIBRARY}/`);
+    assert.equal(theirs.copyHint, `mkdir -p '${LIBRARY}' && cp -r '${path.join(THEIRS, 'shared')}' '${LIBRARY}/'`);
     const broken = await detail('repo', 'scratch');
     assert.equal(broken.draft, null);
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
@@ -300,10 +300,28 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', color: 'red' } }), 400, /`color` is no key of a skill's/);
 });
 
+test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet", async () => {
+  const { copyCommand } = await import('../src/skills.ts');
+  // A checkout with a `.claude/` and no `skills/` in it yet, under a folder whose name has a space and a quote.
+  const checkout = path.join(scratch("hkb-api-skills-copy-"), "Jo's work", 'repo');
+  fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
+  const into = path.join(checkout, '.claude', 'skills');
+  const run = () => execFileSync('sh', ['-c', copyCommand(path.join(LIBRARY, 'mine'), into)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  run();
+  assert.deepEqual(fs.readdirSync(into), ['mine'], 'the folder is copied under its name, not spilled into skills/');
+  assert.equal(fs.readFileSync(path.join(into, 'mine', 'SKILL.md'), 'utf8'), fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'));
+  run();
+  assert.deepEqual(fs.readdirSync(path.join(into, 'mine')), ['SKILL.md'], 'copied again, it lands on the same folder, not inside it');
+});
+
 test("REFUSED at shipped defaults: a write of the repository's skills, and a skill write guarded as every write of the board is", async () => {
   const theirs = snapshotOf(THEIRS);
-  await refused(send('/api/skills/repo', { skill: NOTES }), 403, /^POST \/api\/skills\/repo refuses to write the repository's skills .* `cp -r /);
-  await refused(put('/api/skills/repo/review', { version: 'x', preload: true }), 403, new RegExp(`^PUT /api/skills/repo/review refuses to write the repository's skills .*\`cp -r ${path.join(LIBRARY, 'review')} ${THEIRS}/\``));
+  await refused(send('/api/skills/repo', { skill: NOTES }), 403, /^POST \/api\/skills\/repo refuses to write the repository's skills .* `mkdir -p '.*' && cp -r '.*\/<name>' '/);
+  const hint = `\`mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'review')}' '${THEIRS}/'\``;
+  const res = await put('/api/skills/repo/review', { version: 'x', preload: true });
+  assert.equal(res.status, 403);
+  const { error } = (await res.json()) as { error: string };
+  assert.ok(error.startsWith("PUT /api/skills/repo/review refuses to write the repository's skills ") && error.includes(hint), error);
   await refused(put('/api/skills/shipped/review', { version: 'x', preload: true }), 400, /the board changes a skill of your library/);
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
   const { version } = await detail('yours', 'mine');

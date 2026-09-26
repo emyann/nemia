@@ -200,6 +200,15 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
   });
 }
 
+const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * The command a person runs to copy the skill folder `dir` into the skills folder `into`, as `into/<name>/`. `cp -r dir into/` makes `into`
+ * itself the copy when `into` is not there yet — a repository with a `.claude/` and no `skills/` would get `skills/SKILL.md` — so it makes
+ * `into` first; and each path is quoted, for a home with a space in it.
+ */
+export const copyCommand = (dir: string, into: string): string => `mkdir -p ${quoted(into)} && cp -r ${quoted(dir)} ${quoted(`${into}/`)}`;
+
 /** The skill `name` of `from` read now, for its page. Null when that place has no such skill. */
 export function skillDetail(from: SkillSource, name: string, repo: string, home: string = HOME, shipped: string = SHIPPED_SKILLS): SkillDetail | null {
   const dir = skillDirOf(from, name, repo, home, shipped);
@@ -213,8 +222,8 @@ export function skillDetail(from: SkillSource, name: string, repo: string, home:
   try { draft = skillDraftOf(file, name, text); } catch { /* the row says why, and the page is filled from the body */ }
   let body: string;
   try { body = splitFrontmatter(file, text).body; } catch { body = text.trim(); }
-  const copyHint = from === 'yours' ? `cp -r ${dir} ${path.join(path.resolve(repo), '.claude', SKILLS_FOLDER)}/`
-    : from === 'repo' ? `cp -r ${dir} ${librarySkills(home)}/`
+  const copyHint = from === 'yours' ? copyCommand(dir, path.join(path.resolve(repo), '.claude', SKILLS_FOLDER))
+    : from === 'repo' ? copyCommand(dir, librarySkills(home))
     : null;
   return { skill, version: skillVersion(dir) ?? '', draft, body, users, copyHint };
 }
@@ -264,7 +273,7 @@ function written(change: SkillChange, version: string | null, repo: string): { s
 /** The repository's skills are the checkout's: the api writes none of them, and says how a person does. */
 const repoRefusal = (route: string, name: string | null, repo: string): string => {
   const theirs = path.join(repo, '.claude', SKILLS_FOLDER);
-  return `${route} refuses to write the repository's skills (${theirs}): the board writes only your library, in ${librarySkills()}, and the api writes nothing into a checkout. Write the skill in your library, then copy its folder into the repository by hand — \`cp -r ${path.join(librarySkills(), name ?? '<name>')} ${theirs}/\` — where git shows it as a change to commit.`;
+  return `${route} refuses to write the repository's skills (${theirs}): the board writes only your library, in ${librarySkills()}, and the api writes nothing into a checkout. Write the skill in your library, then copy its folder into the repository by hand — \`${copyCommand(path.join(librarySkills(), name ?? '<name>'), theirs)}\` — where git shows it as a change to commit.`;
 };
 
 export const skills = new Hono()

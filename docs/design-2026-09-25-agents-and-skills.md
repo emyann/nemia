@@ -137,7 +137,12 @@ out until Codex has a place for them, and the load says so for a codex agent tha
      read is listed with its reason and nothing to press. Tools that leave out `Skill` are said with a one-press fix. The api lists the
      groups (`GET /api/skills`) and copies a shipped skill (`POST /api/skills/yours {copy}`, `copySkill` in `authoring.ts`). A
      repository agent's page shows the same rows, read-only. The e2e's `skills` page.
-   **3b, write a skill** in your library (a page of its own, `preload:` as a switch with its cost), after 3a. **3c, try an agent** on a
-     short brief, after 3b.
+   **3b, write a skill.** Built 2026-09-25: *New skill* on the Agents page writes `skills/<name>/SKILL.md` in your library (name,
+     title, description, tags, examples, instructions; `POST /api/skills/yours {skill}`, `writeSkill` in `authoring.ts`), and each skill
+     has a page of its own (`/agents/skills/<from>/<name>`, `GET /api/skills/:from/:name`) listing the agents that give it, with
+     `preload:` as a switch that says what it costs a turn (characters / 4, cached) and that it changes every agent that gives it. A save
+     is against the version read, so an edit moves every composing agent's version; a name that is no folder-safe id, a clash with a
+     skill already there and a frontmatter the card reader refuses are each refused. The api writes no checkout: a skill of yours says the
+     `cp -r` that gives it to the repository's agents, and a repository's is read there, not written. The e2e's `write-skill` page. **3c, try an agent** on a short brief, after 3b.
 4. **Jobs without user settings**, if open question 1 is decided that way. Built: every job runs `--setting-sources project,local` in the
    runtime's spawn; what the shipped steps had taken from the user's settings is said on them, and in the repository's settings (F24).

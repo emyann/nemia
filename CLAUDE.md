@@ -211,6 +211,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **`browser_take_screenshot` resolves a relative `filename` against the workspace, not `--output-dir`.** With `@playwright/mcp` 0.0.80 a
   relative name failed as a path under the worktree, and would have written there had the folder existed. Give it an absolute path under
   `/tmp/playwright-mcp`, in a folder made first (learned by the same run; the `look` skill still says relative).
+- **The web's node tests load `src/` as Node does, so a directory import fails them and a route link needs a router.** `lib/agentWrites.ts`
+  imports `./api`, a folder, which vite resolves and Node refuses (`ERR_UNSUPPORTED_DIR_IMPORT`): a helper a test reads goes in a module
+  with file imports only (`settleSave` in `lib/agents.ts`). A component that draws a `routeLink` throws *reading 'protocolAllowlist'* under
+  `renderToStaticMarkup` without a router: wrap it in `RouterContextProvider` over `createRouter({ routeTree: createRootRoute(), history:
+  createMemoryHistory() })` (`components.test.ts`). And that markup spells React's props, `readOnly=""`, not `readonly` (learned by agents
+  card 3b).
 - **An encoded `..` never reaches a Hono route in a test.** `app.request` parses its URL, and a URL resolves `%2E%2E` as `..`
   before the router sees it: the answer is the router's 404, not the route's refusal. Send `..%2F…` — a slash encoded — to reach
   a name refusal (learned by the run that added a card's page).

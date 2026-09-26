@@ -32,9 +32,15 @@ fs.mkdirSync(path.join(repo, '.claude', 'skills', 'theirs'), { recursive: true }
 fs.writeFileSync(path.join(repo, '.claude', 'skills', 'theirs', 'SKILL.md'), '---\nname: theirs\ndescription: The repository\'s own.\n---\nDo it their way.\n');
 // Agents whose names a try's folder cannot take.
 for (const name of ['agents', 'skills']) fs.writeFileSync(path.join(YOURS, `${name}.md`), `---\ndescription: Use this as ${name}.\n---\nDo it.\n`);
-// The repository's own agent.
+// Agents of yours a try's fence does not reach: one on codex, a remote A2A agent, and one bridged to claude.ai.
+fs.writeFileSync(path.join(YOURS, 'coder.md'), '---\ndescription: Use this to code.\nharness: codex\n---\nCode it.\n');
+fs.writeFileSync(path.join(YOURS, 'faraway.md'), '---\ndescription: Use this far away.\nharness: a2a:faraway\n---\nDo it there.\n');
+fs.writeFileSync(path.join(YOURS, 'bridged.md'), '---\ndescription: Use this from a phone.\nremote: true\n---\nDo it.\n');
+// The repository's own agents, one with a result schema beside it.
 fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'critic.md'), '---\ndescription: Use this to criticise.\n---\nCriticise it.\n');
+fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'grader.md'), '---\ndescription: Use this to grade.\noutput: grader.schema.json\n---\nGrade it.\n');
+fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'grader.schema.json'), JSON.stringify({ type: 'object', properties: { grade: { type: 'string' } } }));
 // And a run that is no try, to hold the two apart.
 const other = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(other, { recursive: true });
@@ -218,9 +224,34 @@ test("a removal is guarded as every write is", async () => {
   }
 });
 
-test("a repository agent is refused: copy it to yours to try it", async () => {
+test("a repository agent is refused: copy it to yours — the store this api reads — to try it, its schema with it", async () => {
   const error = await refused(tryIt('critic', { brief: 'Criticise it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
-  assert.ok(error.includes(`cp ${path.join(repo, 'workflows', 'agents', 'critic.md')} ${YOURS}/`), 'with the copy to make');
+  assert.ok(error.includes(`mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`), `with the copy to make: ${error}`);
+  const graded = await refused(tryIt('grader', { brief: 'Grade it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
+  const theirs = path.join(repo, 'workflows', 'agents');
+  assert.ok(graded.includes(`cp '${path.join(theirs, 'grader.md')}' '${path.join(theirs, 'grader.schema.json')}' '${YOURS}/'`), `the schema its output names copied too: ${graded}`);
+});
+
+test("an agent a try's fence does not reach is refused before anything is written: codex, a remote agent, and one bridged to claude.ai", async () => {
+  assert.equal(fs.existsSync(path.join(TRIES, 'coder')), false);
+  const codex = await refused(tryIt('coder', { brief: 'Code it.' }), 422, /runs on `codex`, and a try is fenced by Claude Code's permission mode/);
+  assert.match(codex, /Only an agent on Claude Code is tried here/);
+  await refused(tryIt('faraway', { brief: 'Do it there.' }), 422, /is a remote agent \(`harness: a2a:faraway`\)/);
+  await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`.*a try runs as a job/);
+  for (const name of ['coder', 'faraway', 'bridged']) assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
+});
+
+test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {
+  const agents = (await (await app.request('/api/agents')).json()) as Array<{ from: string; name: string; untried: { why: string; copy: string | null } | null }>;
+  const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
+  assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
+  assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);
+  assert.equal(of('yours', 'coder').untried!.copy, null);
+  assert.match(of('yours', 'faraway').untried!.why, /remote agent/);
+  assert.match(of('yours', 'bridged').untried!.why, /remote: true/);
+  assert.match(of('yours', 'agents').untried!.why, /cannot be tried from the board/);
+  assert.ok(of('repo', 'grader').untried!.copy!.includes('grader.schema.json'), JSON.stringify(of('repo', 'grader')));
+  assert.equal(of('repo', 'critic').untried!.copy, `mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`);
 });
 
 test('an empty brief is refused, and a brief that is no string', async () => {

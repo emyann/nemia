@@ -17,7 +17,7 @@ import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { judgedNow } from './runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
-import { tryNameRefusal, tryOf, writeTryFolder } from './try.ts';
+import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from './workflows.ts';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
@@ -59,6 +59,11 @@ export type AgentListing = {
   version: string;
   usedBy: AgentUser[];
   error: string | null;
+  /**
+   * Why it cannot be tried from the board, and the command that copies it to yours when that is the fix, in the store the api reads
+   * (`untriedOf`, which the try's route refuses on); null when nothing does. The page draws it in place of the Try it button.
+   */
+  untried: Untried | null;
 };
 
 // The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, skills and system prompt) are no step's, so the form
@@ -86,6 +91,11 @@ export function listAgents(repo: string, home: string = HOME): AgentListing[] {
 
 /** One agent as the listing has it, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. */
 export function listedAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string = HOME): AgentListing | null {
+  const read = readAgent(from, dir, name, repo, home);
+  return read && { ...read, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
+}
+
+function readAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
   const found = skillsOfPlace(dir, repo, home);
   const version = agentVersion(dir, name, found);
   if (version === null) return null;
@@ -138,7 +148,7 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string, rep
   return {
     name, from, dir, file, description: agent.description ?? null, keys: agent.keys, body: agent.body, schema: sidecarOf(agent.keys.output),
     card, cardError, skills: agent.skills?.join(', ') ?? null, given: givenSkills(agent.skills ?? [], found, repo, home), systemPrompt: agent.systemPrompt ?? null,
-    source, version, usedBy, error: null,
+    source, version, usedBy, error: null, untried: null,
   };
 }
 
@@ -152,7 +162,7 @@ function skillsLineOf(source: string): string | null {
 }
 
 const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing =>
-  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, cardError: null, skills: null, given: [], systemPrompt: null, source: '', version, usedBy, error: null });
+  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, cardError: null, skills: null, given: [], systemPrompt: null, source: '', version, usedBy, error: null, untried: null });
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
@@ -372,9 +382,11 @@ export const agents = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const repo = repoOf();
     if (from === 'repo') {
-      const theirs = path.join(repo, 'workflows', AGENTS_FOLDER, `${name}.md`);
-      const yours = path.join(HOME, 'workflows', AGENTS_FOLDER);
-      return c.json({ error: `${route}: only an agent of yours can be tried — a try runs with no repository, in a folder of its own, and finds no agent of the repository's. Copy it to yours to try it: \`cp ${theirs} ${yours}/\`.` }, 403);
+      // The command that copies it, its schema beside it, into the store this api reads — read off its file when it has one.
+      const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
+      const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo) : null;
+      const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null });
+      return c.json({ error: `${route}: ${untried!.why} \`${untried!.copy}\`` }, 403);
     }
     const where = yoursOnly(route, from, name, repo);
     if (where) return c.json({ error: where.error }, where.status);
@@ -385,12 +397,12 @@ export const agents = new Hono()
     const brief = isObject(read.body) ? read.body.brief : undefined;
     if (typeof brief !== 'string') return c.json({ error: `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(brief)}.` }, 400);
     if (!brief.trim()) return c.json({ error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.` }, 422);
-    const reserved = tryNameRefusal(name);
-    if (reserved) return c.json({ error: reserved }, 422);
     try {
       const agent = listedAgent('yours', place.dir, name, repo);
       if (!agent) return c.json({ error: `Yours has no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.` }, 404);
       if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
+      // Its name, its harness and `remote:`, refused before anything is written: the loader would refuse the try's own step, on a file the api wrote.
+      if (agent.untried) return c.json({ error: agent.untried.why }, 422);
       // A try looks at no repository, so a skill the agent finds only in the repository's .claude/skills is not found by its start.
       const theirs = agent.given.filter((skill) => skill.from === 'repo');
       if (theirs.length) {

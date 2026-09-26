@@ -2279,7 +2279,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
   const { AgentForm } = await import('../src/components/AgentForm.tsx');
   const agent = {
     name: 'scribe', from: 'yours' as const, dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read, Skill' }, body: 'Write.\n',
-    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, cardError: null,
+    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null,
     card: [
       { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'] },
       { id: 'file-it', name: 'File it away', description: 'Files a note where it belongs.', tags: ['file-it'] },
@@ -2322,7 +2322,7 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
 
 const composing = {
   name: 'scribe', from: 'yours', dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read' }, body: 'Write.\n',
-  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, cardError: null, card: null,
+  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null, card: null,
   given: [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.', preload: false, cost: null }],
 };
 
@@ -2404,4 +2404,95 @@ test("a skill of yours is filled from its file, its name set once, and saved; th
   assert.doesNotMatch(theirs, />Save<|>Create skill</);
   assert.equal([...theirs.matchAll(/readOnly=""/g)].length, 6, 'every field read-only');
   assert.equal([...mine.matchAll(/readOnly=""/g)].length, 1, 'of yours, only the name');
+});
+
+/** A page's piece inside a router, with the queries it reads already answered: a route link needs the router. */
+async function routedWith(element: ReturnType<typeof createElement>, data: Array<[readonly unknown[], unknown]> = []): Promise<string> {
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const client = new QueryClient();
+  for (const [key, value] of data) client.setQueryData(key, value);
+  return renderToStaticMarkup(createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, element)));
+}
+
+const tried = (id: string, fields: Record<string, unknown> = {}) => ({ id, try: { agent: 'scribe' }, createdAt: at, moving: false, ...fields });
+
+/** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
+function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
+  const run = runWith(null);
+  return {
+    ...run, id: 'r-t', repo: null, place: 'folder', status: 'succeeded', try: { agent: 'scribe' }, holding: null, cancelledAt: null,
+    steps: [{
+      ...run.steps[0]!, name: 'try', status: 'done', taskId: 't-t', filesError: null,
+      files: [{ path: 'note.md', name: 'note.md', url: '/api/runs/r-t/steps/try/files/note.md', kind: 'text', size: 120 }],
+      spent: { said: '$0.12', usd: 0.12, measured: 1, unmeasured: 0 },
+      budget: { usd: 1, said: '$1', of: '$0.12 of $1', over: false },
+    }],
+    ...fields,
+  } as never;
+}
+
+test("an agent of yours is tried from its page: the fence said in one line, and Try it held until there is a brief", async () => {
+  const { TryAgent } = await import('../src/components/TryAgent.tsx');
+  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [[['runs'], []]]);
+  const texts = textsOf(html);
+  assert.ok(texts.includes("A rehearsal fenced to its own folder, not the agent's own permissions: dontAsk, allowed Edit(**) in its folder, $1 to spend."), texts.join(' | '));
+  assert.match(html, /<button type="submit" disabled=""[^>]*>Try it<\/button>/, 'no brief, no try');
+  assert.match(html, /data-try-held[^>]*>Write a brief to try it on\./);
+  assert.doesNotMatch(html, /data-try=/, 'an agent never tried shows no try');
+});
+
+test("REFUSED: a second try while one moves — the button is held, and the latest try is drawn: its state, its spend of the dollar, its files and its run", async () => {
+  const { TryAgent } = await import('../src/components/TryAgent.tsx');
+  const runs = [tried('r-old', { createdAt: '2026-09-01T00:00:00.000Z' }), tried('r-t', { moving: true, createdAt: '2026-09-25T00:00:00.000Z' }), { ...tried('r-x'), try: null }];
+  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [[['runs'], runs], [['runs', 'r-t'], tryDetail({ status: 'running' })]]);
+  assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
+  assert.match(html, /<button type="submit" disabled=""/);
+  assert.match(html, /data-try="r-t"/, 'the newest try of this agent, not the older one');
+  assert.match(html, /href="\/runs\/r-t"[^>]*data-try-run="r-t"|data-try-run="r-t"[^>]*href="\/runs\/r-t"/, 'linked to its run');
+  assert.match(html, /data-try-status[^>]*>running</);
+  assert.match(html, /data-try-spent[\s\S]*\$0\.12 of \$1/, 'what it spent of its budget');
+  assert.match(html, /data-try-files[\s\S]*note\.md/);
+});
+
+test("a try not filed yet says so in place of its files", async () => {
+  const { TryRun } = await import('../src/components/TryAgent.tsx');
+  const unfiled = tryDetail();
+  (unfiled.steps[0] as { taskId: string | null }).taskId = null;
+  const html = await routedWith(createElement(TryRun, { id: 'r-t' }), [[['runs', 'r-t'], unfiled]]);
+  assert.match(html, /Not filed yet/);
+  assert.doesNotMatch(html, /data-try-files/);
+});
+
+test("the repository's agent is not tried: its page says to copy it to yours, with the api's copy into the store it reads", async () => {
+  const { TryYours } = await import('../src/components/TryAgent.tsx');
+  const copy = "mkdir -p '/tmp/e2e-store/workflows/agents' && cp '/repo/workflows/agents/critic.md' '/tmp/e2e-store/workflows/agents/'";
+  const untried = { why: 'Only an agent of yours can be tried — a try runs with no repository. Copy it to yours to try it.', copy };
+  const html = renderToStaticMarkup(createElement(TryYours, { agent: { ...composing, from: 'repo', file: '/repo/workflows/agents/critic.md', untried } as never }));
+  assert.match(html, /data-try-yours/);
+  assert.match(html, /Copy it to yours to try it/);
+  assert.ok(textsOf(html).includes(copy), `the copy as the api words it, into its own store: ${textsOf(html).join(' | ')}`);
+  assert.doesNotMatch(html, /~\/\.agent-workflows/, 'no store the api may not read');
+  assert.doesNotMatch(html, />Try it<\/button>/);
+});
+
+test("REFUSED: an agent of yours the try's fence does not reach says why in place of the Try it button", async () => {
+  const { TryAgent } = await import('../src/components/TryAgent.tsx');
+  const why = "coder runs on `codex`, and a try is fenced by Claude Code's permission mode — `dontAsk` with `Edit(**)`, in a folder of its own — which codex does not take.";
+  const html = await routedWith(createElement(TryAgent, { agent: { ...composing, name: 'coder', keys: { harness: 'codex' }, untried: { why, copy: null } } as never }), [[['runs'], []]]);
+  assert.ok(textsOf(html).includes(why), textsOf(html).join(' | '));
+  assert.match(html, /data-try-untried/);
+  assert.doesNotMatch(html, /data-try-yours/, 'it is yours: nothing to copy');
+  assert.doesNotMatch(html, />Try it<\/button>|<textarea/, 'no brief and no button');
+});
+
+test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow", async () => {
+  const { StartedFrom } = await import('../src/components/TryTag.tsx');
+  const html = await routedWith(createElement(StartedFrom, { run: { workflowDir: '/store/tries/scribe', try: { agent: 'scribe' } } }));
+  assert.match(html, /data-try-tag="scribe"[^>]*>try</);
+  assert.match(html, /href="\/agents\/yours\/scribe"/);
+  assert.doesNotMatch(html, /data-workflow=/, 'its folder is on no page');
+  const other = await routedWith(createElement(StartedFrom, { run: { workflowDir: '/store/workflows/notes', try: null } }));
+  assert.match(other, /data-workflow="notes"/);
+  assert.doesNotMatch(other, /data-try-tag/);
 });

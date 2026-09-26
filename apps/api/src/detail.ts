@@ -8,6 +8,7 @@ import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDec
 import { checksOf, type StepCheck } from './logs.ts';
 import { bare, e, filedTimes, judgedSteps, stepNames, type TaskView, type Views, viewsFor, workflowsOf, workFolderOf } from './store.ts';
 import { attemptsIn, closeoutIn, type StepAttempts, type StepCloseout, type StepTry, triesOf, unreadableIn } from './tries.ts';
+import { tryOf } from './try.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
 /**
@@ -139,6 +140,8 @@ export type RunDetail = {
    */
   work: string | null;
   workflowDir: string;
+  /** The agent it tried, for a try started from an agent's page (`tryOf`, try.ts); null for every other run. */
+  try: { agent: string } | null;
   baseRef: string | null;
   branch: string | null;
   isolate: boolean | null;
@@ -460,6 +463,7 @@ export async function detail(run: Run): Promise<RunDetail> {
     place: placeOf(run),
     work: isGitRun(run) ? null : run.workspace,
     workflowDir: run.workflowDir,
+    try: tryOf(run),
     baseRef: run.baseRef ?? null,
     branch: run.branch ?? null,
     isolate: run.isolate ?? null,

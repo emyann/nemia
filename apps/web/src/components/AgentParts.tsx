@@ -99,11 +99,14 @@ export function AgentLink({ from, name, className }: { from: AgentListing['from'
   );
 }
 
-/** A write of an agent refused: the package's words, and the nodes that still name it when that is why, each linked. */
-export function AgentRefused({ message, users, from }: { message: string; users: readonly string[]; from: AgentListing['from'] }) {
+/**
+ * A write of an agent refused: the package's words, and the nodes that still name it when that is why, each linked. `verb` is what did not
+ * happen: a try refused is not started.
+ */
+export function AgentRefused({ message, users, from, verb = 'Not written' }: { message: string; users: readonly string[]; from: AgentListing['from']; verb?: string }) {
   return (
     <div role="alert" data-agent-refused className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not written:</p>
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">{verb}:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
       {users.length > 0 && (
         <p className="flex flex-wrap gap-x-2 text-xs text-red-800 dark:text-red-300">

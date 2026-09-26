@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { AgentForm } from '../components/AgentForm';
 import { AgentRefused, FromBadge, UsedBy } from '../components/AgentParts';
 import { AsWritten } from '../components/FilePage';
+import { TryAgent, TryYours } from '../components/TryAgent';
 import { agentQuery, AgentRefusal, keyFormQuery, readAgent, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
@@ -30,7 +31,8 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
 
 /**
  * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, when it is the repository's, which
- * the board does not write. Save puts it back against the version it was read at, and Remove takes it away while no node names it.
+ * the board does not write. Save puts it back against the version it was read at, and Remove takes it away while no node names it. Under it,
+ * the Try panel, for an agent of yours.
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();
@@ -132,6 +134,9 @@ function AgentPage() {
           {form}
         </AsWritten>
       )}
+
+      {/* Only an agent of yours is tried: a try runs with no repository, where a repository's agent is not read. */}
+      {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
   );
 }

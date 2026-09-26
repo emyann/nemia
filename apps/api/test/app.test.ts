@@ -122,7 +122,7 @@ test('runs are read from the workflow store and summarized, with what each step 
 
   const res = await app.request('/api/runs');
   assert.deepEqual(await res.json(), [{
-    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
+    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Do the thing', workflowDir: '/code/app/workflows', try: null, createdAt: '2026-09-12T00:00:00.000Z',
     // Started, and none of its filings on the feed (there is none here): when it was created.
     startedAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
@@ -183,7 +183,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   const run = await res.json();
   const [implement, review] = run.steps;
   assert.deepEqual({ ...run, steps: undefined }, {
-    id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', place: 'git', work: null, workflowDir, baseRef: 'def456',
+    id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', place: 'git', work: null, workflowDir, try: null, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', startedAt: '2026-09-12T02:00:00.000Z', cancelledAt: null, pruned: null, after: [], waiting: null, heldUntil: [], holding: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
     status: 'failed', moving: false, cost: null, read: null, waitingOnYou: ['implement'], onYou: ['implement'],

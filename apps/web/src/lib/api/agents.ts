@@ -55,6 +55,12 @@ export type AgentListing = {
   version: string;
   usedBy: AgentUser[];
   error: string | null;
+  /**
+   * Why it cannot be tried from the board — the repository's, a name a try's folder cannot take, a harness the try's Claude Code fence does not
+   * reach, `remote: true` — and the command that copies it to yours when that is the fix, in the store the api reads; null when nothing does.
+   * Mirrors `Untried` in apps/api/src/try.ts, whose words the try's route refuses with.
+   */
+  untried: { why: string; copy: string | null } | null;
 };
 
 /** Every agent of the repository's and of yours, read from disk on each request. */
@@ -124,3 +130,12 @@ export const saveAgent = (name: string, version: string, draft: AgentDraft): Pro
 /** Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which. */
 export const removeAgent = (name: string, version: string): Promise<{ removed: string[] }> =>
   agentWrite('DELETE', `/api/agents/yours/${encodeURIComponent(name)}`, { version });
+
+/** Mirrors `AgentTried` in apps/api/src/agents.ts: the run a try started, which its page follows. */
+export type AgentTried = { id: string };
+
+/**
+ * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
+ * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
+ */
+export const tryAgent = (name: string, brief: string): Promise<AgentTried> => agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, { brief });

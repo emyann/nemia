@@ -200,7 +200,7 @@ export function skillUsers(dir: string, name: string, repo: string): SkillUser[]
   });
 }
 
-const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
+export const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
 
 /**
  * The command a person runs to copy the skill folder `dir` into the skills folder `into`, as `into/<name>/`. `cp -r dir into/` makes `into`

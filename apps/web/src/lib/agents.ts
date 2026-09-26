@@ -203,3 +203,21 @@ export async function settleSave({ rename, invalidate, release }: { rename?: () 
   await invalidate();
   release();
 }
+
+/** What a try is, said on the agent's Try panel in one line: the fence is the try's, whatever the agent's own keys say. */
+export const TRY_FENCE = "A rehearsal fenced to its own folder, not the agent's own permissions";
+
+/** How a try runs, beside the fence: the keys its step says. */
+export const TRY_TERMS = 'dontAsk, allowed Edit(**) in its folder, $1 to spend';
+
+/** The latest try of an agent among the runs, by when it was made; undefined when it has none. */
+export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(runs: readonly T[], agent: string): T | undefined {
+  return runs.filter((run) => run.try?.agent === agent).reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined);
+}
+
+/** Why the Try button is not pressable, or null: an empty brief, or a try of the agent still moving — the api refuses both. */
+export function tryHeld(brief: string, latest: { moving: boolean; id: string } | undefined): string | null {
+  if (latest?.moving) return `A try is still running (${latest.id}): one at a time.`;
+  if (!brief.trim()) return 'Write a brief to try it on.';
+  return null;
+}

@@ -12,7 +12,8 @@ import { RunGone } from '../components/RunGone';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
-import { WorkflowLink } from '../components/WorkflowLink';
+import { StartedFrom } from '../components/TryTag';
+import { RemoveRun } from '../components/RemoveRun';
 import { runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
@@ -137,7 +138,8 @@ function Run({ run }: { run: RunDetail }) {
               <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
             </p>
           )}
-          <WorkflowLink dir={run.workflowDir} />
+          <StartedFrom run={run} />
+          {run.try && <RemoveRun id={run.id} />}
         </div>
       </header>
 

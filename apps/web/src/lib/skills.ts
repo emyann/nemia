@@ -123,3 +123,13 @@ export function reachWords(users: readonly SkillUser[]): string {
   const names = users.map((user) => (user.from === 'repo' ? `${user.name} (this repository)` : user.name));
   return `A change, this switch included, changes every agent that gives it, from its next run: ${names.join(', ')}.`;
 }
+
+/**
+ * The skill the page's form is drawn from, given the one it was drawn from and the one read now. A form with nothing unsaved follows the
+ * read; one holding unsaved words keeps what it was drawn from, so a read that finds the file changed — a focus refetch, or the read after a
+ * stale refusal — does not remount it and throw the words away. The page then says the file moved (`drawn.version !== now.version`). Another
+ * skill read on the same page (its params changed) is never held.
+ */
+export function drawnSkill(drawn: SkillDetail, now: SkillDetail, changed: boolean): SkillDetail {
+  return drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir ? now : drawn;
+}

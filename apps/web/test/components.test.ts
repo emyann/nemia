@@ -2376,7 +2376,7 @@ const SKILL_DETAIL = {
   draft: { name: 'write-a-note', title: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'], examples: ['Write the notes'], preload: false, body: 'Write them.\n' },
   body: 'Write them.\n',
   users: [{ from: 'yours', name: 'scribe' }],
-  copyHint: 'cp -r /store/workflows/skills/write-a-note /repo/.claude/skills/',
+  copyHint: "mkdir -p '/repo/.claude/skills' && cp -r '/store/workflows/skills/write-a-note' '/repo/.claude/skills/'",
 };
 
 async function skillForm(props: Record<string, unknown>): Promise<string> {

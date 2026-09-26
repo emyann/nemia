@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GivenSkill, SkillDetail, SkillPlace, SkillRow } from '../src/lib/api.ts';
-import { costWords, draftOfForm, EMPTY_SKILL_FORM, givenRows, offerOf, PLACE_LABELS, preloadWords, reachWords, skillEdited, skillFormOf } from '../src/lib/skills.ts';
+import { costWords, draftOfForm, drawnSkill, EMPTY_SKILL_FORM, givenRows, offerOf, PLACE_LABELS, preloadWords, reachWords, skillEdited, skillFormOf } from '../src/lib/skills.ts';
 
 const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
   name: 'write-a-note',
@@ -97,4 +97,15 @@ test('a change is said to reach every agent that gives the skill, by name, or no
     reachWords([{ from: 'yours', name: 'coder' }, { from: 'repo', name: 'reviewer' }]),
     'A change, this switch included, changes every agent that gives it, from its next run: coder, reviewer (this repository).',
   );
+});
+
+test('the form follows the file read again while it holds nothing unsaved, and holds what it was drawn from while it does', () => {
+  const was = detail();
+  const now = detail({ version: 'v2', body: 'Changed by hand.\n' });
+  assert.equal(drawnSkill(was, now, false), now, 'nothing unsaved: the form is drawn again from the file');
+  assert.equal(drawnSkill(was, now, true), was, 'unsaved words: the form keeps them, and the page says the file moved');
+  const same = detail();
+  assert.equal(drawnSkill(was, same, true), same, 'the same version read again is the read, unsaved words or not');
+  const other = detail({ skill: row({ name: 'other', dir: '/store/workflows/skills/other' }), version: 'v9' });
+  assert.equal(drawnSkill(was, other, true), other, 'another skill is never held for this one');
 });

@@ -1,11 +1,12 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { AgentLink, SkillRefused, SkillSourceBadge } from '../components/AgentParts';
 import { SkillForm } from '../components/SkillForm';
-import { saveSkill, skillQuery, switchPreload, type SkillDetail, type SkillDraft } from '../lib/api';
-import { costWords, preloadWords, reachWords } from '../lib/skills';
+import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '../lib/api';
+import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
@@ -33,16 +34,35 @@ function SkillPage() {
   const { data: detail } = useSuspenseQuery(skillQuery(from, name));
   const queryClient = useQueryClient();
   const mine = detail.skill.from === 'yours';
+  // The skill the form is drawn from: the read, until the file moves under unsaved words (`drawnSkill`). A write carries its version back.
+  const [changed, setChanged] = useState(false);
+  const [drawn, setDrawn] = useState(detail);
+  const shown = drawnSkill(drawn, detail, changed);
+  if (shown !== drawn) setDrawn(shown);
+  const moved = shown.version !== detail.version;
 
+  // A write of this page is read back at once, as the form's own: its words are what was written, and would otherwise read as unsaved.
+  const wroteIt = async ({ written: _, ...now }: SkillSaved) => {
+    queryClient.setQueryData(skillQuery(from, name).queryKey, now);
+    setDrawn(now);
+    await invalidateSkills(queryClient);
+  };
+  // Refused as stale, the skill is read again: a form with unsaved words keeps them and says the file moved; one without shows the file now.
+  const readAgainIfStale = (err: Error) => (err instanceof SkillRefusal && err.status === 409 ? invalidateSkills(queryClient) : undefined);
   const save = useMutation({
-    mutationFn: (draft: SkillDraft) => saveSkill(detail.skill.name, detail.version, draft),
-    onSuccess: () => invalidateSkills(queryClient),
+    mutationFn: ({ draft, version }: { draft: SkillDraft; version: string }) => saveSkill(name, version, draft),
+    onSuccess: wroteIt,
+    onError: readAgainIfStale,
   });
   const toggle = useMutation({
-    mutationFn: (on: boolean) => switchPreload(detail.skill.name, detail.version, on),
-    onSuccess: () => invalidateSkills(queryClient),
+    mutationFn: ({ on, version }: { on: boolean; version: string }) => switchPreload(name, version, on),
+    onSuccess: wroteIt,
+    onError: readAgainIfStale,
   });
   const error = save.error ?? toggle.error;
+  // A stale refusal the page has since read past, with nothing unsaved to keep, says so beside the package's "read it again".
+  const refusedAt = save.error ? save.variables?.version : toggle.variables?.version;
+  const readPast = error instanceof SkillRefusal && error.status === 409 && !moved && refusedAt !== detail.version;
   const { skill } = detail;
 
   return (
@@ -74,29 +94,66 @@ function SkillPage() {
 
       <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">{skill.dir}/SKILL.md</p>
       <SkillForm
-        // A new version is a new form: what was saved or switched, as it now reads.
-        key={detail.version}
-        detail={detail}
+        // A new version is a new form: what was saved or switched, as it now reads — but not while the file moved under unsaved words.
+        key={shown.version}
+        detail={shown}
         readOnly={!mine}
         saving={save.isPending || toggle.isPending}
-        refusal={error && <SkillRefused message={error.message} />}
+        onChanged={setChanged}
+        refusal={
+          (error || moved) && (
+            <>
+              {error && <SkillRefused message={error.message} />}
+              {moved ? (
+                <Moved
+                  file={`skills/${skill.name}/SKILL.md`}
+                  onReadAgain={() => {
+                    save.reset();
+                    toggle.reset();
+                    setDrawn(detail);
+                  }}
+                />
+              ) : (
+                readPast && <p data-skill-read-again className="text-xs text-neutral-600 dark:text-neutral-400">It has been read again since: the page shows it as it now reads.</p>
+              )}
+            </>
+          )
+        }
         onSave={(draft) => {
           toggle.reset();
-          save.mutate(draft);
+          save.mutate({ draft, version: shown.version });
         }}
         between={(changed) => (
           <Preload
-            detail={detail}
+            detail={shown}
             pending={toggle.isPending || save.isPending}
             changed={changed}
             onSwitch={(on) => {
               save.reset();
-              toggle.mutate(on);
+              toggle.mutate({ on, version: shown.version });
             }}
           />
         )}
       />
     </article>
+  );
+}
+
+/**
+ * The file changed since the form was drawn — by hand, or from another page — while it holds unsaved words. A save of the form would be
+ * refused, so nothing is written over the change; reading it again draws the form from the file as it now reads, and drops the words.
+ */
+function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void }) {
+  return (
+    <div data-skill-moved className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40">
+      <p className="min-w-0 flex-1 text-sm text-amber-900 dark:text-amber-200">
+        {file} has changed since this form was drawn, so a save of it would write over that change and is refused. What you typed stays here
+        until you read it again, which draws the form from the file as it now reads and drops it: copy out what you want to keep first.
+      </p>
+      <Button variant="outline" onPress={onReadAgain}>
+        Read it again
+      </Button>
+    </div>
   );
 }
 

@@ -16,6 +16,8 @@ const SKILL = {
   examples: ['Summarise this branch'],
   body: '# Write a summary\n\nSay what changed, and why, in three lines.\n',
   edited: 'Writes the short summary of a change, for a reader in a hurry.',
+  stale: 'Typed while the file changed under the form.',
+  byHand: 'Added by hand while the page was open.',
 };
 
 const wrote = (page: Page, method: 'POST' | 'PUT', pathname: string) =>
@@ -26,7 +28,8 @@ export default {
   // the package's words, and nothing is written. Then `scribe` is made to name a skill nobody has yet, and from the Agents page New skill
   // writes it: its folder in your library, its SKILL.md as the package renders it. Its page says `scribe` gives it and what it costs a turn,
   // and the switch — pressed by its label — loads it every turn, which says it changes every agent that gives it, and moves `scribe`'s
-  // version; an edit of its description saved moves it again. The Agents page lists it under your library. The skill and `scribe`'s file are
+  // version; an edit of its description saved moves it again. In a page of its own, a save under a hand edit of the file is refused as stale:
+  // the page keeps the typed words, says the file moved, and Read it again shows the file. The Agents page lists it under your library. The skill and `scribe`'s file are
   // both taken back, so the next visit, in either theme, reads the store as seeded.
   name: 'write-skill',
   route: '/agents',
@@ -150,6 +153,46 @@ export default {
       await expectVisible(edit.getByRole('button', { name: 'Save', disabled: true }), 'saved, Save waits again');
       await expectVisible(page.getByRole('switch', { name: /Load it every turn/, checked: true, disabled: false }), 'and the switch is free again');
       if ((await versionOfScribe()) === preloaded) throw new Refused(`the edit moves the version of ${seeded.name}, which gives it`);
+
+      // Stale, in a page of its own whose one refusal is the point: the file changed by hand under unsaved words. The save is refused, the
+      // page reads the skill again, keeps the words and says the file moved; Read it again draws the form from the file and drops them.
+      const stale = await page.context().newPage();
+      try {
+        const { problems } = watch(stale);
+        await stale.goto(new URL(`/agents/skills/yours/${SKILL.name}`, page.url()).href, { waitUntil: 'load' });
+        await idle(stale);
+        const form = stale.locator(`form[data-skill-form="${SKILL.name}"]`);
+        const description = form.getByRole('textbox', { name: 'Description', exact: true });
+        await expectVisible(description, 'the skill form, in a page of its own');
+        await description.fill(SKILL.stale);
+        const byHand = `${fs.readFileSync(skillFile, 'utf8')}${SKILL.byHand}\n`;
+        fs.writeFileSync(skillFile, byHand);
+        const [answered] = await Promise.all([wrote(stale, 'PUT', `/api/skills/yours/${SKILL.name}`), form.getByRole('button', { name: 'Save' }).click()]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error?.includes('Read it again before changing it')) {
+          throw new Refused(`a save of a skill whose file changed since it was read is refused — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        if (fs.readFileSync(skillFile, 'utf8') !== byHand) throw new Refused('nothing is written on a stale refusal — the hand edit stands');
+        const moved = form.locator('[data-skill-moved]');
+        await expectVisible(moved, 'read again, the page says the file changed since the form was drawn');
+        await expectVisible(moved.getByText('What you typed stays here until you read it again'), 'and that the unsaved words stay until it is read again');
+        if ((await description.inputValue()) !== SKILL.stale) throw new Refused(`the unsaved words stay after the read — the description reads ${JSON.stringify(await description.inputValue())}`);
+        await settled(stale);
+        await stale.screenshot({ path: path.join(OUT, `write-skill-moved-${await themeOf(stale)}.png`), fullPage: true });
+        await moved.getByRole('button', { name: 'Read it again' }).click();
+        await expectCount(form.locator('[data-skill-moved]'), 0, 'read again, the notice goes');
+        const instructions = await form.getByRole('textbox', { name: 'Instructions', exact: true }).inputValue();
+        if (!instructions.includes(SKILL.byHand)) throw new Refused(`read again, the form shows the file as it now reads — its instructions read ${JSON.stringify(instructions)}`);
+        if ((await description.inputValue()) !== SKILL.edited) throw new Refused(`read again, the typed words are dropped — the description reads ${JSON.stringify(await description.inputValue())}`);
+        await idle(stale);
+        const expected = `request answered 409: PUT ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the stale page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await stale.close();
+      }
+      await idle(page);
 
       // Listed on the Agents page, under your library.
       await page.getByRole('link', { name: '← Agents' }).click();

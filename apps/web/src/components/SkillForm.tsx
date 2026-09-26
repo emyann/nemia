@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import type { SkillDetail, SkillDraft } from '../lib/api';
 import { draftOfForm, EMPTY_SKILL_FORM, skillEdited, skillFormOf, type SkillForm as Form } from '../lib/skills';
@@ -8,19 +8,21 @@ import { Field } from './AgentForm';
  * A skill's form: its name — its folder, set once — a title, what it does, its card's tags and examples, and its instructions, the body of
  * its SKILL.md. Nothing is judged here that the package judges on save; a refusal of the last save is shown above the fields in the package's
  * words. `readOnly` draws a skill the board does not write: the repository's, or one HKB ships. `between` draws what sits between the card and
- * the instructions — the page's switch — told whether the form holds unsaved words.
+ * the instructions — the page's switch — told whether the form holds unsaved words, and `onChanged` tells the page the same.
  */
-export function SkillForm({ detail, readOnly = false, saving, refusal, onSave, between }: {
+export function SkillForm({ detail, readOnly = false, saving, refusal, onSave, between, onChanged }: {
   detail: SkillDetail | null;
   readOnly?: boolean;
   saving: boolean;
   refusal: ReactNode;
   onSave: (draft: SkillDraft) => void;
   between?: (changed: boolean) => ReactNode;
+  onChanged?: (changed: boolean) => void;
 }) {
   const was = detail ? skillFormOf(detail) : EMPTY_SKILL_FORM;
   const [form, setForm] = useState<Form>(was);
   const changed = skillEdited(form, was);
+  useEffect(() => onChanged?.(changed), [changed, onChanged]);
   const set = (key: keyof Form) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   return (

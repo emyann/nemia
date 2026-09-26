@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, keptAfterSave, settleSave, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
+import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, keptAfterSave, latestTryOf, settleSave, tryHeld, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -237,4 +237,20 @@ test('REFUSED to let the kept form go before the reads a save changes are read a
   const alone: string[] = [];
   await settleSave({ invalidate: async () => { alone.push('invalidate'); }, release: () => { alone.push('release'); } });
   assert.deepEqual(alone, ['invalidate', 'release'], 'not renamed: no move');
+});
+
+test("an agent's latest try is the newest run that tried it, whatever the list's order; an agent never tried has none", () => {
+  const run = (id: string, agent: string | null, createdAt: string) => ({ id, try: agent ? { agent } : null, createdAt });
+  const runs = [run('new', 'scribe', '2026-09-25T10:00:00.000Z'), run('other', 'critic', '2026-09-25T11:00:00.000Z'), run('plain', null, '2026-09-25T12:00:00.000Z'), run('old', 'scribe', '2026-09-24T10:00:00.000Z')];
+  assert.equal(latestTryOf(runs, 'scribe')?.id, 'new');
+  assert.equal(latestTryOf([...runs].reverse(), 'scribe')?.id, 'new', 'not the first or the last listed');
+  assert.equal(latestTryOf(runs, 'reader'), undefined);
+});
+
+test("REFUSED: Try it is held on an empty brief and while a try moves, as the api refuses both, and not otherwise", () => {
+  assert.equal(tryHeld('  \n', undefined), 'Write a brief to try it on.');
+  assert.equal(tryHeld('Write a note', { id: 'r-1', moving: true }), 'A try is still running (r-1): one at a time.');
+  assert.equal(tryHeld('', { id: 'r-1', moving: true }), 'A try is still running (r-1): one at a time.', 'the running try said first: a brief will not free it');
+  assert.equal(tryHeld('Write a note', { id: 'r-1', moving: false }), null);
+  assert.equal(tryHeld('Write a note', undefined), null);
 });

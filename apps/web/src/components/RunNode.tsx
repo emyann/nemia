@@ -6,6 +6,7 @@ import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunDetail, type RunSummary } from '@/lib/api';
+import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
@@ -106,9 +107,14 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               {run.id}
             </span>
             {/* A folder run has no repository: its steps work in folders the run made (`workspace: folder`). */}
-            <span className="shrink-0" title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made')}>
-              {run.repo ? repoName(run.repo) : 'folders'}
-            </span>
+            {/* A try of an agent, started from its page, is a folder run of the store's own: tagged, since its folder is on no page. */}
+            {run.try ? (
+              <TryTag agent={run.try.agent} />
+            ) : (
+              <span className="shrink-0" title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made')}>
+                {run.repo ? repoName(run.repo) : 'folders'}
+              </span>
+            )}
           </p>
           {/* On whom a run started `--after` waits, in `wf ls`'s word — amber when one never ships without you — and what to do, on hover. */}
           {run.waiting && (

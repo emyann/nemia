@@ -19,6 +19,8 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
+  /** The agent it tried, for a try started from an agent's page; null for every other run. */
+  try: { agent: string } | null;
   createdAt: string;
   /**
    * When the run started: the first filing of any of its tasks, off the engine's feed — for a run started `--after` runs, or held for a run
@@ -66,3 +68,15 @@ export const runsQuery = queryOptions({
   queryFn: () => get<RunSummary[]>('/api/runs'),
   refetchInterval: () => pace(5_000),
 });
+
+/**
+ * Remove a try's run, as `wf rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still in flight;
+ * rejects with its refusal in full — the package's words, which say to cancel it first — or the api's own about the request.
+ */
+export async function removeRun(id: string): Promise<{ id: string; removed: true }> {
+  const route = `/api/runs/${encodeURIComponent(id)}`;
+  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const body = (await res.json().catch(() => undefined)) as { removed?: unknown; error?: unknown } | undefined;
+  if (res.ok && body?.removed === true) return { id, removed: true };
+  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
+}

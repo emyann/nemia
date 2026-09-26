@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { StatusChip } from '../components/StatusChip';
-import { WorkflowLink } from '../components/WorkflowLink';
+import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
 import { inFlight, inFlightFirst, onYouOf, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
@@ -133,7 +133,7 @@ function RunRow({ run }: { run: RunSummary }) {
             {run.cost.said}
           </span>
         )}
-        <WorkflowLink dir={run.workflowDir} />
+        <StartedFrom run={run} />
       </div>
     </li>
   );

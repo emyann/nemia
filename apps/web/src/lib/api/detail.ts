@@ -102,6 +102,8 @@ export type RunDetail = {
   /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run, whose work is on its branch. */
   work: string | null;
   workflowDir: string;
+  /** The agent it tried, for a try started from an agent's page; null for every other run. */
+  try: { agent: string } | null;
   baseRef: string | null;
   branch: string | null;
   isolate: boolean | null;

@@ -134,7 +134,7 @@ fs.writeFileSync(
     ['t-b', filedB],
     ['t-i', filedI],
   ]
-    .map(([taskId, at]) => `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`)
+    .map(([taskId, at]) => `${JSON.stringify({ taskId, event: { ...filed(), at } })}\n`)
     .join(''),
 );
 

@@ -56,9 +56,12 @@ function branchOff(branch: string) {
 const at = '2026-09-25T09:00:00.000Z';
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 const journal = (taskId: string) => path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
-/** A line on the engine's feed, as every append to a journal writes one: what takes a run out of the memo. */
-const fed = (taskId: string, kind: string) =>
-  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event: { kind, at } })}\n`);
+/** A line on the engine's feed, as every append to a journal writes one: what takes a run out of the memo. Its task settled again. */
+const fed = (taskId: string) =>
+  fs.appendFileSync(
+    path.join(root, 'engine', 'feed.jsonl'),
+    `${JSON.stringify({ taskId, event: { kind: 'settled', at, outcome: 'succeeded' } })}\n`,
+  );
 
 const started = () => [
   { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
@@ -195,7 +198,7 @@ test("a line on the engine's feed for a task of the run is judged afresh: its jo
   await list();
   assert.ok(resting.runs.has('r-fed'));
   blocked('r-fed-implement');
-  fed('r-fed-implement', 'settled');
+  fed('r-fed-implement');
   assert.equal((await unverified(() => listed('r-fed')))?.status, 'failed');
 });
 
@@ -208,7 +211,7 @@ test("a journal changed with no line on the feed is not seen: the feed is what t
   assert.equal((await unverified(() => listed('r-unfed')))?.status, 'succeeded', 'from memory');
   const res = await app.request('/api/runs');
   assert.equal(res.status, 500, 'and the check says the memo answered wrong');
-  fed('r-unfed-implement', 'settled');
+  fed('r-unfed-implement');
   assert.equal((await listed('r-unfed'))?.status, 'failed');
 });
 
@@ -281,7 +284,7 @@ test('two requests at once: one that read the feed before the other read on past
 
   const first = await restingRead(resting, false); // the first request reads the feed, then the run's journal, judged succeeded
   blocked('r-raced-implement');
-  fed('r-raced-implement', 'settled'); // a line of its task, before the first request keeps what it judged
+  fed('r-raced-implement'); // a line of its task, before the first request keeps what it judged
   await restingRead(resting, false); // the second reads the feed on past the line: the run is not kept, so nothing is taken out
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(!resting.runs.has('r-raced'), 'kept nothing: the line is past where the first request read, and no request will read it again');

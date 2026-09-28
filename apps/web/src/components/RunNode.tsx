@@ -16,6 +16,7 @@ import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
+import { CardLift } from './LiftHold';
 import { StepRail, StepTiles } from './StepRail';
 
 /**
@@ -211,7 +212,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               </span>
             )}
           </span>
-          <span className="flex gap-1">
+          <span className="flex items-center gap-1">
             {decide && (
               <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>
             )}
@@ -221,6 +222,8 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             {run.holding && !cancelled && (
               <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">held</Badge>
             )}
+            {/* The hold lifted here, as `wf hold --off` lifts it: beside its chip, in the row the card already has. */}
+            {run.holding && !cancelled && <CardLift id={run.id} />}
             {cancelled && <Badge variant="outline">cancelled</Badge>}
           </span>
         </div>

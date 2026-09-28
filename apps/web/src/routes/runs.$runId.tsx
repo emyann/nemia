@@ -14,6 +14,7 @@ import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
 import { StartedFrom } from '../components/TryTag';
 import { RemoveRun } from '../components/RemoveRun';
+import { LiftHold } from '../components/LiftHold';
 import { runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
@@ -389,6 +390,7 @@ function HeldUntil({ run }: { run: RunDetail }) {
           ))}
         </ul>
       )}
+      <LiftHold id={run.id} />
     </section>
   );
 }

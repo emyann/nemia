@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
 import { phaseOfView } from 'agent-orchestrator';
+import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { e, taskOfStep, type TaskView, workFolderOf } from './store.ts';
@@ -129,6 +130,14 @@ export const steps = new Hono()
     const refused = refusedName(name);
     if (refused) return c.json({ error: refused }, 400);
     const file = readArtifactFile(found.run, step, name);
+    // Gone, not missing: `wf prune --artifacts` removed the run's files, and its record, closeouts and branches are what is left.
+    const pruned = found.run.pruned?.artifacts;
+    if (!file && pruned) {
+      return c.json({
+        error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
+        pruned: pruned.at,
+      }, 410);
+    }
     if (!file) {
       return c.json({
         error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,

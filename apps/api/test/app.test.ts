@@ -1406,6 +1406,53 @@ test("a step's file is served by name, with its type and no caching — and a na
   assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404);
 });
 
+test("once `wf prune --artifacts` removed a run's files, each file a closeout named there reads pruned, the route answers 410 saying so — not a 404 that reads as missing — and the run's page and its decision read as before", async () => {
+  const { dir, named } = seedFiles();
+  const marker = path.join(root, 'runs', 'r-52.pruned');
+  const files = { at: '2026-09-28T09:00:00.000Z', bytes: 3 * 1024 * 1024 };
+  fs.writeFileSync(marker, JSON.stringify({ at: files.at, worktrees: [], artifacts: files }));
+  fs.rmSync(path.join(root, 'runs', 'r-52', 'artifacts'), { recursive: true });
+  try {
+    const res = await app.request('/api/runs/r-52');
+    assert.equal(res.status, 200);
+    const page = await res.json();
+    assert.deepEqual(page.pruned, { at: files.at, worktrees: [], artifacts: files });
+    const said = `its files were removed at ${files.at} (wf prune --artifacts)`;
+    const [shoot] = page.steps;
+    assert.deepEqual(shoot.closeout.artifacts, [
+      // Every file named in the directory went with it, one beneath it and one the route would refuse by name included.
+      ...[0, 1, 2, 3].map((i) => ({ path: named[i], pruned: said })),
+      // Beside the directory is not in it: the path alone, as before.
+      { path: named[4] },
+      ...[5, 6, 7, 8].map((i) => ({ path: named[i], pruned: said })),
+      { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
+    ]);
+    assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
+
+    const base = '/api/runs/r-52/steps/shoot/artifacts';
+    for (const name of ['shot.png', 'gone.png']) {
+      const gone = await app.request(`${base}/${name}`);
+      assert.equal(gone.status, 410, name);
+      const body = await gone.json();
+      assert.equal(body.error, `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`wf decide r-52\` reads them.`);
+      assert.equal(body.pruned, files.at);
+    }
+    // A name that is a path is refused as before; the prune answers only for a name the route would serve.
+    assert.equal((await app.request(`${base}/sub%2Fdeep.png`)).status, 400);
+
+    const decision = await app.request('/api/runs/r-52/decision');
+    assert.equal(decision.status, 200, await decision.clone().text());
+  } finally {
+    fs.rmSync(marker, { force: true });
+  }
+  // Its files back, unpruned: a file the directory lacks is missing again, a 404, and says so.
+  seedFiles();
+  const missing = await app.request('/api/runs/r-52/steps/shoot/artifacts/gone.png');
+  assert.equal(missing.status, 404);
+  assert.match((await missing.json()).error, /has no file 'gone\.png' in its files directory/);
+  assert.ok(fs.existsSync(path.join(dir, 'shot.png')));
+});
+
 // ─── where the time went ────────────────────────────────────────────────────
 
 test("the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words", async (t) => {

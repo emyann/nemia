@@ -152,9 +152,10 @@ export type RunDetail = {
   /**
    * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record and
    * files are kept, so the rest of the page reads as before; what it no longer offers is anything that would work in a worktree. Null for a
-   * run never pruned.
+   * run never pruned. `artifacts` is when `wf prune --artifacts` removed its files directory too, and what that freed: each file a closeout
+   * named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
    */
-  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }> } | null;
+  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
@@ -470,7 +471,11 @@ export async function detail(run: Run): Promise<RunDetail> {
     createdAt: run.createdAt,
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
-    pruned: run.pruned ? { at: run.pruned.at, worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })) } : null,
+    pruned: run.pruned ? {
+      at: run.pruned.at,
+      worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
+      artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
+    } : null,
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,

@@ -276,7 +276,7 @@ export function writeAgent(
     if (why) throw new AgentWriteError(why, kind, users);
   };
   if (Object.hasOwn(rest, 'card'))
-    refuse('`card` is not written with an agent since agents card 2: its card is generated from its skills. Send the agent without it.');
+    refuse('`card` is not written with an agent: its card is generated from its skills. Send the agent without it.');
   refuse(agentPlaceRefusal(at, anywhere));
   const name = draft?.name;
   refuse(agentNameRefusal(name));

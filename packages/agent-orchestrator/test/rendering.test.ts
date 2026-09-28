@@ -355,7 +355,10 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
 
 test('a `skills:` line naming a card file, as it did until 2026-09-25, is refused where it is read and where it is written: the card file is retired', () => {
   const legacy = refusal(() => parseAgent('builder', '---\nskills: builder.skills.json\n---\nx\n', () => '[]'));
-  assert.match(legacy, /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired: since agents card 2/);
+  assert.match(
+    legacy,
+    /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired: an agent's card is generated/,
+  );
   const dir = team('---\nskills: builder.skills.json\n---\nYou build.\n', { 'workflows/agents/builder.skills.json': '[]' });
   assert.match(
     refusal(() => loadWorkflows(dir)),
@@ -363,7 +366,7 @@ test('a `skills:` line naming a card file, as it did until 2026-09-25, is refuse
   );
   const written = refusal(() => renderAgent({ name: 'builder', skills: 'builder.skills.json', keys: {}, body: 'x\n' }));
   assert.match(written, /^agents\/builder\.md: `skills: builder\.skills\.json` names a card file, which is retired/);
-  assert.match(written, /A page open since before then sends it: reload it, and save again\.$/);
+  assert.match(written, /A page that sends it is stale: reload it, and save again\.$/);
   assert.match(
     refusal(() => renderAgent({ name: 'builder', card: 'builder.skills.json', keys: {}, body: 'x\n' } as never)),
     /^agents\/builder\.md: `card: builder\.skills\.json` names a card file, which is retired/,

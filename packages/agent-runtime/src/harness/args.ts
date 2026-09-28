@@ -182,7 +182,7 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
   const former = Object.keys(FORMER_ARGS).find((key) => at(spec, key) || at(filed, key));
   if (former) {
-    return `\`${former}\` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as \`config: { claude: { ${FORMER_ARGS[former]}: true } }\`, or leave it out.`;
+    return `\`${former}\` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as \`config: { claude: { ${FORMER_ARGS[former]}: true } }\`, or leave it out.`;
   }
   const loose = HARNESS_ARGS.find((key) => Object.hasOwn(spec, key) && (spec as Record<string, unknown>)[key] !== undefined);
   if (loose) return `\`${loose}\` is the harness's configuration: file it under \`config\`, as \`config: { ${loose}: … }\`.`;

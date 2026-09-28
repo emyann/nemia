@@ -185,7 +185,7 @@ test('a codex agent that names its sandbox as `permissionMode:`, as before 2026-
         version: fenced.version,
       }),
       422,
-      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, .* Send `sandbox: danger-full-access` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/,
+      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is the former name of `sandbox:` there, .* Send `sandbox: danger-full-access` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/,
     );
     const put = await send('PUT', '/api/agents/yours/fenced', {
       name: 'fenced',
@@ -538,7 +538,7 @@ test('an agent with a leftover `card:` line is listed with the refusal saying wh
     const old = (await listed()).find((a) => a.name === 'old')!;
     assert.match(
       old.error ?? '',
-      /^agents\/old\.md: `card` names a card file, which is retired: since agents card 2 an agent's card is generated from its `skills:`/,
+      /^agents\/old\.md: `card` names a card file, which is retired: an agent's card is generated from its `skills:`/,
     );
     assert.equal(old.card, null, 'nothing generated for an agent that does not read');
     const put = await send('PUT', '/api/agents/yours/old', {

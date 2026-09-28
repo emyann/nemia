@@ -160,7 +160,7 @@ export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | unde
   claudeRefuses(task) ??
   (task.config?.budgetUsd === undefined
     ? undefined
-    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
+    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
 
 /**
  * What Claude Code cannot be asked for as the engine runs it by default, in the mode the task chose. A job (`claude -p`, the
@@ -174,7 +174,7 @@ export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | un
   if (task.config?.background) {
     return task.config?.budgetUsd === undefined
       ? undefined
-      : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
+      : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
   }
   return bridgeAsked(task)
     ? '`claude.remoteControl` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge. Give `config.background: true` as well, or leave `claude.remoteControl` off.'

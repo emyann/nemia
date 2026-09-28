@@ -190,14 +190,14 @@ export function lockfileParting(
 
 /**
  * What a step is told of its `node_modules`, under `## Where to look` — only when the run did more than
- * link it: a tree of its own that `npm ci` took a minute to install, or one it could not make.
+ * link it: a tree of its own that `npm ci` installed, or one it could not make.
  */
 export function depsLines(deps: Provisioned | undefined): string[] {
   if (deps?.tree === 'own') {
     return [
       "Its `node_modules` is its own: this branch's `package-lock.json` asks for packages the main checkout has not",
-      'installed, so the run installed them with `npm ci` when it cut this worktree — about a minute before you',
-      "started. `npm install` here changes this tree and nobody else's.",
+      'installed, so the run installed them with `npm ci` when it cut this worktree, before you started. `npm install`',
+      "here changes this tree and nobody else's.",
     ];
   }
   if (deps?.tree === 'failed') {

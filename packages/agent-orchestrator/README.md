@@ -1356,7 +1356,7 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
-- **`wf plan` refuses `--input`.** A card's inputs are not a thing yet; start that card by hand with its files.
+- **`wf plan` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 

@@ -1235,7 +1235,8 @@ test('`wf retry --model haiku` on a Claude Code step in `auto` is refused and wr
       ),
       `at shipped defaults a step that names no mode is filed in \`auto\`, and Claude Code runs haiku in \`default\` there: ${said}`,
     );
-    assert.match(said, /F21/);
+    assert.match(said, /a job denies every call `default` would ask about/);
+    assert.doesNotMatch(said, /F21|measured/, "a finding's number and a version are nothing a person can act on");
     assert.match(said, new RegExp(`wf retry ${run.id} implement --model sonnet`));
   }
   assert.deepEqual(asksOf(run.id), [], 'nothing written');
@@ -4530,7 +4531,7 @@ test('REFUSED at `wf start`, before a run is written: an --input that is not the
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   await assert.rejects(
     main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]),
-    refusedWith(/^wf plan does not take --input: a card's inputs are not a thing yet\./),
+    refusedWith(/^wf plan does not take --input: a card has no input files of its own\./),
   );
   assert.equal(runsWritten(), before, 'nor by the CLI');
 });

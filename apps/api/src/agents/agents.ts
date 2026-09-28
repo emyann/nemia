@@ -315,7 +315,7 @@ function draftWords(route: string, shape: string): Words {
     if (RETIRED.some((retired) => retired === key)) {
       const sent = RETIRED.filter((retired) => valueAt(body, [retired]) !== undefined);
       return wrong(
-        `${sent.map((retired) => `\`${retired}\``).join(' and ')} named the card file beside the agent, which is retired: since agents card 2 its card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page open since before then sends it: reload it, and save again`,
+        `${sent.map((retired) => `\`${retired}\``).join(' and ')} named the card file beside the agent, which is retired: an agent's card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page that sends it is stale: reload it, and save again`,
       );
     }
     if (key === 'description') return wrong('`description` is a line of text, or null');

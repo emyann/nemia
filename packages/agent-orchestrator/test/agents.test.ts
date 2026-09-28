@@ -476,9 +476,8 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
     }),
   );
   assert.ok(
-    said.startsWith(
-      'review: `permissionMode: workspace-write` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23',
-    ) && said.includes('Send `sandbox: workspace-write` instead'),
+    said.startsWith('review: `permissionMode: workspace-write` on a step that runs on codex is the former name of `sandbox:` there') &&
+      said.includes('Send `sandbox: workspace-write` instead'),
     said,
   );
   const kept = refusal(() =>
@@ -616,7 +615,7 @@ test('REFUSED at shipped defaults: a SKILL.md whose card entry cannot be read of
 
 test('REFUSED at shipped defaults: a leftover `card:` line, or a `skills:` naming a card file, saying what replaced it', () => {
   const card = refusal(() => agent('reviewer', '---\ndescription: Reviews\ncard: reviewer.skills.json\n---\nReview it.\n'));
-  assert.ok(card.startsWith('agents/reviewer.md: `card` names a card file, which is retired: since agents card 2'), card);
+  assert.ok(card.startsWith("agents/reviewer.md: `card` names a card file, which is retired: an agent's card is generated"), card);
   assert.ok(card.includes("generated from its `skills:`, an entry for each skill made from its SKILL.md's frontmatter"), card);
   assert.ok(card.includes('Delete the line'), card);
   assert.ok(

@@ -1,6 +1,6 @@
 /**
  * A remote A2A agent for the tests: the SDK's own server, over HTTP on a port the system picks, so the runtime's remote
- * harness (`src/a2a-remote.ts`) is proven against the protocol as another party speaks it, and not against our own
+ * harness (`src/a2a/remote.ts`) is proven against the protocol as another party speaks it, and not against our own
  * handler. Not a test file: `remote-agent.test.ts` starts one per test and closes it.
  *
  * The request handler is the SDK's `DefaultRequestHandler` over its `InMemoryTaskStore`; the executor is scripted: each

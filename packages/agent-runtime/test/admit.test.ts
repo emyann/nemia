@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createEngine, type Event, type FeedEntry, type PromiseJournal, type PromiseRunner, type Sighting } from '../src/facade.ts';
-import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from '../src/domain.ts';
+import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from '../src/core/domain.ts';
 
 const T0 = new Date('2026-09-25T09:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();

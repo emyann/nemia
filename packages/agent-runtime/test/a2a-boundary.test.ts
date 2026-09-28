@@ -1,7 +1,7 @@
 /**
- * The A2A SDK stays inside the seam: only `src/a2a-*.ts` import `@a2a-js/sdk`, by any entry, and neither of the runtime's
- * entries hands a consumer an SDK name or value. A consumer of the runtime learns no protocol, and a change of SDK is a
- * change to the seam's files alone.
+ * The A2A SDK stays inside the seam: only the files of `src/a2a/`, its face `index.ts` left out, import `@a2a-js/sdk`,
+ * by any entry, and neither of the runtime's entries hands a consumer an SDK name or value. A consumer of the runtime
+ * learns no protocol, and a change of SDK is a change to the seam's files alone.
  *
  * Each rule is made to refuse planted source first: a scan that read nothing, or matched nothing, passes too.
  */
@@ -31,7 +31,7 @@ function specifiersIn(text: string): string[] {
 }
 
 /** The seam's files, by their path in the package. */
-const inSeam = (file: string) => /^src\/a2a-[a-z0-9-]+\.ts$/.test(file);
+const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
 
 /** Where `file` reaches the SDK from outside the seam: each breach, worded with what to do instead. */
 function sdkBreaches(file: string, text: string): string[] {
@@ -40,7 +40,7 @@ function sdkBreaches(file: string, text: string): string[] {
     .filter((spec) => spec === SDK || spec.startsWith(`${SDK}/`))
     .map(
       (spec) =>
-        `${file} imports ${spec}: only src/a2a-*.ts speak A2A — reach a harness through RunnerOps, and put what needs the SDK in the seam`,
+        `${file} imports ${spec}: only src/a2a/ speaks A2A, its face left out — reach a harness through RunnerOps, and put what needs the SDK in the seam`,
     );
 }
 
@@ -48,22 +48,22 @@ function sdkBreaches(file: string, text: string): string[] {
 const sourceFiles = () =>
   ['src', 'bin'].flatMap((dir) =>
     fs
-      .readdirSync(path.join(PKG, dir))
-      .filter((f) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(f))
-      .map((f) => `${dir}/${f}`),
+      .readdirSync(path.join(PKG, dir), { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(f) && !f.endsWith('.test.ts'))
+      .map((f) => `${dir}/${f.split(path.sep).join('/')}`),
   );
 
 test('the scan reads the seam and the rest of the package — or it would pass by reading nothing', () => {
   const files = sourceFiles();
-  assert.deepEqual(files.filter(inSeam), ['src/a2a-client.ts', 'src/a2a-handler.ts', 'src/a2a-map.ts', 'src/a2a-remote.ts']);
-  assert.ok(files.includes('src/facade.ts') && files.includes('src/engine.ts') && files.includes('bin/ae.ts'));
+  assert.deepEqual(files.filter(inSeam), ['src/a2a/client.ts', 'src/a2a/handler.ts', 'src/a2a/map.ts', 'src/a2a/remote.ts']);
+  assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   assert.ok(
     files.filter(inSeam).every((f) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK))),
     'and every seam file imports the SDK, so the pattern matches an import of it',
   );
 });
 
-test('only src/a2a-*.ts import @a2a-js/sdk, by any entry', () => {
+test('only src/a2a/ imports @a2a-js/sdk, by any entry', () => {
   assert.deepEqual(
     sourceFiles().flatMap((f) => sdkBreaches(f, fs.readFileSync(path.join(PKG, f), 'utf8'))),
     [],
@@ -71,22 +71,24 @@ test('only src/a2a-*.ts import @a2a-js/sdk, by any entry', () => {
 });
 
 test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type, a re-export, a dynamic import', () => {
-  const why = 'only src/a2a-*.ts speak A2A — reach a harness through RunnerOps, and put what needs the SDK in the seam';
+  const why = 'only src/a2a/ speaks A2A, its face left out — reach a harness through RunnerOps, and put what needs the SDK in the seam';
   const planted: Array<[string, string, string]> = [
-    ['src/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
+    ['src/core/engine/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
     ['src/facade.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
-    ['src/runner.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
+    ['src/harness/seam.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
     ['src/index.ts', "export { TaskNotFoundError } from '@a2a-js/sdk/errors';", '@a2a-js/sdk/errors'],
     ['bin/ae.ts', "const sdk = await import('@a2a-js/sdk');", '@a2a-js/sdk'],
     ['src/a2a.ts', "import { Role } from '@a2a-js/sdk';", '@a2a-js/sdk'],
-    ['src/a2a-map.test.ts', "import { Role } from '@a2a-js/sdk';", '@a2a-js/sdk'],
+    ['src/a2a/map.test.ts', "import { Role } from '@a2a-js/sdk';", '@a2a-js/sdk'],
+    ['src/a2a/index.ts', "export { Role } from '@a2a-js/sdk';", '@a2a-js/sdk'],
+    ['src/a2a-client.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
   ];
   for (const [file, line, spec] of planted) {
     assert.deepEqual(sdkBreaches(file, `// the seam\n${line}\n`), [`${file} imports ${spec}: ${why}`], `${file}: ${line}`);
   }
-  assert.deepEqual(sdkBreaches('src/a2a-client.ts', "import { Client } from '@a2a-js/sdk/client';"), [], 'not refused: the seam itself');
+  assert.deepEqual(sdkBreaches('src/a2a/client.ts', "import { Client } from '@a2a-js/sdk/client';"), [], 'not refused: the seam itself');
   assert.deepEqual(
-    sdkBreaches('src/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"),
+    sdkBreaches('src/core/engine/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"),
     [],
     'not refused: prose that names the SDK',
   );
@@ -109,7 +111,7 @@ const sdkExports = async () => {
 function exportBreaches(entry: string, exported: Record<string, unknown>, sdk: { names: Set<string>; values: Set<unknown> }): string[] {
   return Object.entries(exported).flatMap(([name, value]) =>
     sdk.names.has(name) || sdk.values.has(value)
-      ? [`${entry} exports ${name}, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a-*.ts`]
+      ? [`${entry} exports ${name}, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/`]
       : [],
   );
 }
@@ -128,9 +130,9 @@ test('REFUSED: an entry that exports an SDK name, or an SDK value renamed', asyn
   const { Client } = await import(`${SDK}/client`);
   const effect = { ...(await import('agent-runtime/effect')) };
   assert.deepEqual(exportBreaches('agent-runtime/effect', { ...effect, TaskState }, sdk), [
-    "agent-runtime/effect exports TaskState, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a-*.ts",
+    "agent-runtime/effect exports TaskState, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
   ]);
   assert.deepEqual(exportBreaches('agent-runtime', { A2AClient: Client }, sdk), [
-    "agent-runtime exports A2AClient, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a-*.ts",
+    "agent-runtime exports A2AClient, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
   ]);
 });

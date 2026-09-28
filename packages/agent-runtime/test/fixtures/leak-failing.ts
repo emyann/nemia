@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { detachedOps, type HarnessSpec } from '../../src/runner-detached.ts';
+import { detachedOps, type HarnessSpec } from '../../src/harness/detached/detached.ts';
 import { scratch } from '../scratch.ts';
 
 const started = async (file: string) => {

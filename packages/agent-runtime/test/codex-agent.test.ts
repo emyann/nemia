@@ -29,14 +29,14 @@ import path from 'node:path';
 import { TaskState, type Task } from '@a2a-js/sdk';
 import type { Client } from '@a2a-js/sdk/client';
 import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
-import { clientOf } from '../src/a2a-client.ts';
-import { cardOf } from '../src/a2a-handler.ts';
-import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a-map.ts';
+import { clientOf } from '../src/a2a/client.ts';
+import { cardOf } from '../src/a2a/handler.ts';
+import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { createEngine, nameFor } from '../src/facade.ts';
-import { Journal } from '../src/journal.ts';
-import { codex } from '../src/runner-codex.ts';
-import { detachedOps } from '../src/runner-detached.ts';
-import type { SpawnRequest } from '../src/runner.ts';
+import { Journal } from '../src/core/engine/journal.ts';
+import { codex } from '../src/harness/codex/codex.ts';
+import { detachedOps } from '../src/harness/detached/detached.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 
 /** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */
@@ -157,7 +157,7 @@ const until = async (ok: () => boolean | Promise<boolean>, what: string, ms = 15
 };
 
 /** The codex agent over a store at `root`, as the engine's seam builds it, with no journal behind it unless given one. */
-const agent = (root: string, events: (taskId: string) => Promise<readonly import('../src/domain.ts').Event[]> = async () => []) =>
+const agent = (root: string, events: (taskId: string) => Promise<readonly import('../src/core/domain.ts').Event[]> = async () => []) =>
   clientOf('codex', detachedOps(codex, root), events);
 const send = (client: Client, r: SpawnRequest) =>
   client.sendMessage({

@@ -41,6 +41,7 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['stopped · done', 'cancelled'],
     ['waiting', 'waiting'],
     ['pending', 'waiting'],
+    ['unreadable', 'unreadable'],
     ['unknown', 'unknown'],
   ];
   for (const [status, state] of cases) assert.equal(stepState(status, false, false), state, status);
@@ -62,6 +63,7 @@ test('only verified and unverified are work done; a refused check, a failed sess
     'checking',
     'running (working)',
     'waiting',
+    'unreadable',
     'unknown',
   ];
   for (const status of notDone) assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
@@ -154,6 +156,7 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
     'failed',
     'stopped',
     'waiting',
+    'unreadable',
     'unknown',
   ];
   for (const status of notGates) assert.equal(isGate(stepState(status, false, false), false), false, status);
@@ -220,6 +223,7 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
     ['denied', 'denied'],
     ['failed', 'failed'],
     ['stopped', 'cancelled'],
+    ['unreadable', 'unreadable'],
     ['unknown', 'unknown'],
   ];
   for (const [status, state] of unmoved) assert.equal(stepState(status, false, true), state, status);

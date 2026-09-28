@@ -29,6 +29,7 @@ export type StepState =
   | 'waiting'
   | 'held'
   | 'cancelled'
+  | 'unreadable'
   | 'unknown';
 
 /**
@@ -82,6 +83,7 @@ function wordState(status: string, runCancelled: boolean): StepState {
   // A task held open whose turn signed, waiting for a person's word with nothing running: the run reads it as it signed. Its word beside
   // it says which — `input-required · BLOCKED` — and `wf ls` gives it that word or its own; alone it is a session that ended, as above.
   if (word === 'input-required') return 'unverified';
+  if (word === 'unreadable') return 'unreadable';
   if (word === 'unknown') return 'unknown';
   // `waiting on a-1x2y (cancelled), b-3z4w`: a root of a run started `--after` runs that have not shipped. Not filed, as `waiting` is.
   if (word === 'waiting' || word.startsWith('waiting on ') || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
@@ -132,6 +134,8 @@ export const stateMeaning: Record<StepState, string> = {
   waiting: 'waiting: not filed yet',
   held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
+  unreadable:
+    "unreadable: its task's journal holds an entry no runtime wrote, so the run is not judged and the tick does not advance it until the journal reads again — the run says which entry",
   unknown: 'unknown: the engine has no record of its task',
 };
 
@@ -161,5 +165,6 @@ export const stateClass: Record<StepState, string> = {
   // Nobody is asked, as with `waiting`, and not grey: a person's word stops it, not the order of the steps.
   held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
+  unreadable: 'border border-dashed border-red-400 text-red-800 dark:border-red-700 dark:text-red-300',
   unknown: 'border border-dashed border-neutral-300 text-neutral-500 dark:border-neutral-700',
 };

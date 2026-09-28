@@ -2,9 +2,10 @@
  * The comment guards: a comment is a JSDoc contract, or a lint directive with its reason (CLAUDE.md, "Code reads by itself").
  *
  * `lint/comments.ts` is the oxlint plugin; `.oxlintrc.json` switches the guards on in one override block per package, off while its
- * `excludeFiles` names the package, and one block that is on also covers `lint/**`, the plugin itself. These tests run the repository's oxlint on fixtures with the repository's own block, so a guard the
- * block names that runs nothing — misspelled, set to `off`, or aimed at other files — fails here. The last part is what a lint rule
- * cannot see across files: a name a comment quotes in backticks is one the code has, in each file a block that is on covers.
+ * `"excludeFiles"` names the package, and one block that is on also covers `lint/**`, the plugin itself. These tests run the
+ * repository's oxlint on fixtures with the repository's own block, so a guard the block names that runs nothing — misspelled, set to
+ * `off`, or aimed at other files — fails here. The last part is what a lint rule cannot see across files: a name a comment quotes in
+ * backticks is one the code has, in each file a block that is on covers.
  *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
@@ -37,7 +38,7 @@ function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'u
 /** The override blocks that carry the comment guards, in the order the config lists them. */
 const guardBlocks = (config: Config): Block[] => config.overrides.filter((block) => 'comments/no-code-comments' in block.rules);
 
-/** Whether a block's guards run: no `excludeFiles` takes its package back out. */
+/** Whether a block's guards run: no `"excludeFiles"` takes its package back out. */
 const isOn = (block: Block): boolean => block.excludeFiles === undefined;
 
 /** The package a block covers, from its first `files` glob. */
@@ -90,7 +91,7 @@ function lint(fixtures: Record<string, string>): Diagnostic[] {
   return report.diagnostics.map((d) => ({ file: d.filename, line: d.labels[0].span.line, rule: ruleOf(d.code) }));
 }
 
-/** The 1-based line of `text` that holds `needle`, which must be on exactly one line. */
+/** The 1-based line of `text` that holds the needle it is given, which must be on exactly one line. */
 function lineOf(text: string, needle: string): number {
   const lines = text.split('\n').flatMap((line, i) => (line.includes(needle) ? [i + 1] : []));
   assert.equal(lines.length, 1, `${needle} is on ${lines.length} lines of the fixture`);
@@ -329,7 +330,7 @@ test('there is one guard block per workspace package, each covering its package,
   }
 });
 
-/** `.oxlintrc.json`'s text with `pkg`'s guards switched on: its block's `excludeFiles` line deleted, as its cleanup card does. */
+/** `.oxlintrc.json`'s text with `pkg`'s guards switched on: its block's `"excludeFiles"` line deleted, as its cleanup card does. */
 function switchedOn(text: string, pkg: string): string {
   const lines = text.split('\n');
   const at = lines.findIndex((line) => line.trim() === `"excludeFiles": ["${pkg}/**"],`);
@@ -416,7 +417,10 @@ function namesOf(source: ts.SourceFile, into: Set<string>): Set<string> {
 }
 
 let known: Set<string> | undefined;
-/** Every name the repository's code has, from each source file under packages/, apps/ and lint/ but this one, whose fixtures quote stale names. */
+/**
+ * Every name the repository's code has, from each source file under packages/, apps/ and lint/ but this one, whose fixtures quote stale
+ * names.
+ */
 const knownNames = (): Set<string> =>
   (known ??= sourceFiles()
     .filter((file) => file !== SELF)

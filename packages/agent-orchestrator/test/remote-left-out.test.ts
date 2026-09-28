@@ -1,11 +1,15 @@
 /**
  * A remote step filed, and then its agent left out of the engine: `a2a-agents.json` refused as it stands, its entry refused, or the entry
  * removed, and `wf tick` run with the engine `main` makes itself, as a restarted `wf up` would. One step is at work on the agent (its Task
- * waits on a question), one is filed and queued behind it. Neither may be handed to Claude Code, the engine's first harness, which the
- * runtime fell back to for a harness it did not have: the queued one was spawned as a `claude -p` job in the step's workspace, and the
- * one at work looked for in Claude Code's listing and, past the grace, ended `lost`. The one at work is held, neither there nor gone,
- * and followed again once the file is fixed; the queued one is refused its start in words that say why. A fake `claude` and `codex`
- * first on PATH write down every call, so nothing real is asked and any call is seen.
+ * waits on a question), one is filed and queued behind it. Neither may be handed to Claude Code, the engine's first harness: a runtime
+ * that falls back to it for a harness it does not have spawns the queued one as a `claude -p` job in the step's workspace, and looks for
+ * the one at work in Claude Code's listing and, past the grace, ends it `lost`. The one at work is held, neither there nor gone, and
+ * followed again once the file is fixed; the queued one is refused its start in words that say why. A fake `claude` and `codex` first on
+ * PATH write down every call, so nothing real is asked and any call is seen.
+ *
+ * `WF_ROOT` is set before the import, since the module reads it as it loads. Each case leaves its step held at work on the agent, so by
+ * the second a pool of two sessions, the default, is full and the queued step is never admitted to be refused: the test sets
+ * `WF_MAX_CONCURRENT` itself, since a check the run executes inherits the daemon's ceiling.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,12 +19,9 @@ import { a2aServer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-remote-left-out-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-// Each case leaves its step held at work on the agent, so by the second a pool of two sessions (the default) is full and the queued
-// step is never admitted to be refused. A check the run executes inherits the daemon's ceiling (50 on the owner's machine), which hid it.
 process.env.WF_MAX_CONCURRENT = '10';
 const BIN = scratch('wf-remote-left-out-bin-');
 const CALLS = path.join(BIN, 'calls.log');
@@ -132,10 +133,13 @@ for (const [what, text] of [
       assert.match(String(refused[0].error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
       assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
 
-      // Fixed, the step at work is followed again where it is: on the agent, waiting on its question.
       fs.writeFileSync(FILE, good);
       await said(['tick']);
-      assert.equal(ended(away).length, 0, `followed again, not ended: ${JSON.stringify(journal(away))}`);
+      assert.equal(
+        ended(away).length,
+        0,
+        `once the file is fixed, the step at work is followed again on the agent, not ended: ${JSON.stringify(journal(away))}`,
+      );
       assert.ok(journal(away).every((e) => e.kind !== 'ended' || e.observed !== 'lost'));
     } finally {
       fs.rmSync(FILE, { force: true });

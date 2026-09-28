@@ -2,6 +2,8 @@
  * `wf decide`'s screen, end to end: a real repository, a run started for real, and a board settled by
  * hand. What the branch touched, the lesson line and the check-affecting files in full sit between the
  * verdicts and the closeouts; what each step consumed sits beside its check; the commands are unchanged.
+ *
+ * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +17,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-decide-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const {
   AGENT_FACING,
@@ -70,8 +71,10 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
 
 /**
  * A board a test settles by hand. A settled attempt carries the usage it is given, as the engine records it. The n-th task filed is filed
- * 10n minutes after midnight on 2026-09-13, its attempt started 5 s and spawned 12 s after that, and ended 5 minutes after filing once it
- * settled; each view and the feed carry its filing. `fed` counts the reads of the feed.
+ * 10n minutes after the board's midnight, its attempt started 5 s and spawned 12 s after that, and ended 5 minutes after filing once it
+ * settled; each view and the feed carry its filing. `fed` counts the reads of the feed, and `viewed` how many times each task was viewed:
+ * every view is a harness observe. While `carries.on`, a view carries what no screen reads, as the engine's does: the task's admission
+ * (`queued`, `admitted`, and the view's `admission` while it waits) and the `claude.remoteControl` it was filed with.
  */
 const board = () => {
   type Filed = { id: string; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
@@ -79,12 +82,7 @@ const board = () => {
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
-  /** How many times each task was viewed: every view is a harness observe. */
   const viewed = new Map<string, number>();
-  /**
-   * Whether a view carries what no screen reads — the task's admission (`queued`, `admitted`, and the view's `admission` while it waits) and
-   * the `claude.remoteControl` it was filed with — as the engine's does.
-   */
   const carries = { on: true };
   const fed = { reads: 0 };
   const e = {
@@ -143,7 +141,9 @@ const board = () => {
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const USAGE = { turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 };
 
-/** `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check. */
+/**
+ * `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check.
+ */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
@@ -153,7 +153,8 @@ const folder = (implementKeys = '') => {
 
 /**
  * A run waiting on you: implement verified, with usage; review unverified, with none. Its branch weakened
- * a test, added to a source file, wrote a lesson in CLAUDE.md and added a binary file.
+ * a test, added to a source file, wrote a lesson in CLAUDE.md and added a binary file. Its steps worked on
+ * a branch of their own, as a run with worktrees does, and the record says where.
  */
 const awaiting = async (implementKeys = '') => {
   const repo = aRepo();
@@ -175,7 +176,6 @@ const awaiting = async (implementKeys = '') => {
   await advance(e, readRun(run.id));
   settle(`${run.id}-review`, 'succeeded', SIGNED);
 
-  // The steps worked on a branch of their own, as a run with worktrees does: the record says where.
   const record = readRun(run.id);
   for (const s of Object.values(record.steps)) s.branch = branch;
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
@@ -231,8 +231,11 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   viewed.clear();
   fed.reads = 0;
   const lines = await screen(t, e, run.id);
-  // Each task viewed once for the whole screen, usage included: every view is a harness observe (plan §4b).
-  assert.deepEqual(Object.fromEntries(viewed), { [`${run.id}-implement`]: 1, [`${run.id}-implement-check`]: 1, [`${run.id}-review`]: 1 });
+  assert.deepEqual(
+    Object.fromEntries(viewed),
+    { [`${run.id}-implement`]: 1, [`${run.id}-implement-check`]: 1, [`${run.id}-review`]: 1 },
+    'each task viewed once for the whole screen, usage included: every view is a harness observe',
+  );
 
   const verdict = indexOf(lines, /^  UNVERIFIED: review/);
   const touched = indexOf(lines, `  touched  ${branch}`);
@@ -244,50 +247,62 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   ]);
   const lesson = indexOf(lines, '  lesson  CLAUDE.md +2 −0');
   const inFull = indexOf(lines, /^  ── in full: the check-affecting files — what a change could edit to make its check pass/);
-  // The weakened assertion, whole — and the source change, which decides nothing about the check, not.
-  assert.ok(lines.includes('  -assert.equal(add(1, 1), 2);') && lines.includes('  +assert.ok(true);'), lines.join('\n'));
-  assert.ok(!lines.some((l) => l.includes('export const sub')));
+  assert.ok(
+    lines.includes('  -assert.equal(add(1, 1), 2);') && lines.includes('  +assert.ok(true);'),
+    `the weakened assertion, whole:\n${lines.join('\n')}`,
+  );
+  assert.ok(!lines.some((l) => l.includes('export const sub')), 'the source change decides nothing about the check: it is not in full');
   const implement = indexOf(lines, '  implement');
   assert.ok(verdict < touched && touched < lesson && lesson < inFull && inFull < implement, 'in that order, before the closeouts');
 
-  // What each step consumed, beside its check — and a step with no usage says so.
   const check = indexOf(lines, /^    check  npm test  →/);
-  assert.deepEqual(lines.slice(check + 1, check + 3), [
-    '    used  29 turns · 93 tool calls · 6.35M in · 112k out',
-    '    cost  not measured',
-  ]);
+  assert.deepEqual(
+    lines.slice(check + 1, check + 3),
+    ['    used  29 turns · 93 tool calls · 6.35M in · 112k out', '    cost  not measured'],
+    'what each step consumed, beside its check',
+  );
   const review = indexOf(lines, '  review');
-  assert.deepEqual(lines.slice(review + 1, review + 3), ['    used  not measured', '    cost  not measured']);
+  assert.deepEqual(
+    lines.slice(review + 1, review + 3),
+    ['    used  not measured', '    cost  not measured'],
+    'a step with no usage says so',
+  );
   assert.ok(!lines.some((l) => /^\s+cost .*\d/.test(l)), 'cost never prints a number no runner measured');
 
-  // Where the time went, after what each step used: its session and its check, each filed, spawned and ended, queued and ran — off the
-  // engine's attempts and each task's filing time on its view. Not off the feed, which holds every task the engine ever filed, read whole
-  // for one run's screen until 2026-09-25.
-  assert.equal(fed.reads, 0, 'the feed is not read for one run');
-  assert.deepEqual(lines.slice(check + 3, check + 5), [
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
-    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-  ]);
+  assert.equal(
+    fed.reads,
+    0,
+    "the feed, which holds every task the engine ever filed, is not read for one run: the times come off the engine's attempts and each task's filing time on its view",
+  );
+  assert.deepEqual(
+    lines.slice(check + 3, check + 5),
+    [
+      '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+      '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    ],
+    'where the time went, after what each step used: its session and its check, each filed, spawned and ended, queued and ran',
+  );
   assert.deepEqual(lines.slice(review + 3, review + 4), [
     '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
   ]);
-  // And the run's, after every step and before the branches: one round, so the run's line alone.
   const total = indexOf(lines, '  timeline  run  queued 36s  ran 14m24s  wall 25m00s');
-  assert.ok(review < total && total < indexOf(lines, new RegExp(`^  ${branch}`)), 'after the steps, before the branches');
+  assert.ok(
+    review < total && total < indexOf(lines, new RegExp(`^  ${branch}`)),
+    "the run's timeline, after the steps, before the branches: one round, so the run's line alone",
+  );
 
-  // The commands stay as they are, and none is run.
-  assert.deepEqual(lines.slice(-2), [
-    `  ship it   git -C ${repo} merge --no-ff ${branch}`,
-    `  drop it   git -C ${repo} branch -D ${branch}`,
-  ]);
-  assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
+  assert.deepEqual(
+    lines.slice(-2),
+    [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
+    'the commands stay as they are',
+  );
+  assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main', 'none of the commands is run');
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
 test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
-  // Momentum is the orchestrator's (`momentumOf`), read off the run's record: no filing carries a `priority` since thin runtime stage 4c.
   assert.deepEqual(
     ids.map((id) => ['priority' in filed(id)!, filed(id)?.config?.claude?.remoteControl]),
     [
@@ -295,7 +310,7 @@ test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or 
       [false, undefined],
       [false, undefined],
     ],
-    'filed with them',
+    "filed with their Remote Control, and none with a priority: momentum is the orchestrator's (momentumOf), read off the run's record",
   );
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();
@@ -315,8 +330,10 @@ test('--sensitive with a glob that matches nothing prints the heading, and none'
   const heading = indexOf(lines, /^  ── in full: the files --sensitive names \(nothing\/\*\*\)/);
   assert.equal(lines[heading + 1], '  none');
   assert.ok(!lines.includes('  +assert.ok(true);'), 'the default list is replaced, not added to');
-  // The flag chooses what is read whole, not what is true: the radius still names the check file.
-  assert.ok(lines.includes('    check-affecting  packages/x/test/add.test.ts'));
+  assert.ok(
+    lines.includes('    check-affecting  packages/x/test/add.test.ts'),
+    'the flag chooses what is read whole, not what is true: the radius still names the check file',
+  );
 });
 
 test('`wf decide` refuses a flag it does not take, and --sensitive without globs or twice — before a run is read', async () => {
@@ -330,16 +347,18 @@ test('`wf decide` refuses a flag it does not take, and --sensitive without globs
   ] as const) {
     await assert.rejects(main(['decide', 'no-such-run', ...flags]), refused(pattern), flags.join(' '));
   }
-  // A flag before the run is refused too — not the general help, which exits 0 and says nothing of the order.
   for (const argv of [['--sensitive', 'src/**', 'no-such-run'], ['--sensitive']]) {
     await assert.rejects(
       main(['decide', ...argv]),
       refused(/^wf decide takes the run first: wf decide <runId> \[--sensitive <globs>\]/),
-      argv.join(' '),
+      `${argv.join(' ')}: a flag before the run is refused, not answered with the general help, which exits 0 and says nothing of the order`,
     );
   }
-  // The flag it takes gets as far as reading the run, which is not there.
-  await assert.rejects(main(['decide', 'no-such-run', '--sensitive', 'src/**']), (err: Error) => !/sensitive/.test(err.message));
+  await assert.rejects(
+    main(['decide', 'no-such-run', '--sensitive', 'src/**']),
+    (err: Error) => !/sensitive/.test(err.message),
+    'the flag it takes gets as far as reading the run, which is not there',
+  );
 });
 
 test('`wf decide --help` prints the lists the screen uses, from the one place they are written', async (t) => {
@@ -417,14 +436,14 @@ test('what a step consumed is summed over its attempts — one that never starte
         ],
       },
     },
-    // A session lost before its runner measured anything: nobody counted, so nothing is summed.
     t2: { state: { attempts: [{ reason: 'lost', endedAt: '2026-09-13T00:00:00Z', usage: null }] } },
   };
   const run = { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, respond: {} } } as unknown as Run;
-  assert.deepEqual(consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run), {
-    implement: { turns: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 },
-    review: undefined,
-  });
+  assert.deepEqual(
+    consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run),
+    { implement: { turns: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 }, review: undefined },
+    'review, whose session was lost before its runner measured anything, sums nothing: nobody counted',
+  );
 });
 
 test('`wf decide` on a try a person answered: its line says so, and under it what the try before needed and your answer, read off the ask; a blocked step is told the wf retry --message that answers it', async (t) => {
@@ -515,11 +534,16 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
   assert.match(listed[1], /^   implement      verified ✓  \$3\.01 +\S/);
   assert.match(listed[2], /^   review         unverified · done  \$0\.50 +\S/);
 
-  // The run the other screen tests read measured no cost: no dollar on either screen, and the run's cost says not measured.
   const unmeasured = await awaiting();
-  assert.ok(!(await ls(unmeasured.run.id)).some((l) => l.includes('$')));
+  assert.ok(
+    !(await ls(unmeasured.run.id)).some((l) => l.includes('$')),
+    'the run the other screen tests read measured no cost: no dollar on `wf ls`',
+  );
   const bare = await screen(t, unmeasured.e, unmeasured.run.id);
-  assert.ok(bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')), bare.join('\n'));
+  assert.ok(
+    bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')),
+    `nor on \`wf decide\`, where the run's cost says not measured:\n${bare.join('\n')}`,
+  );
 });
 
 test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both', async (t) => {
@@ -542,7 +566,6 @@ test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     const run = start({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false });
     const { e, settle } = board();
     await advance(e, readRun(run.id));
-    // No closeout either way: the one session failed, the other ended without it.
     settle(`${run.id}-implement`, phase, undefined, { costUsd: 3.4 });
     const lines = await screen(t, e, run.id);
     const said = indexOf(lines, banner(run.id));
@@ -550,7 +573,7 @@ test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
       lines,
       '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran',
     );
-    assert.ok(said < over, `${own}: why it stopped, then why nothing more is filed`);
+    assert.ok(said < over, `${own}, with no closeout: why it stopped, then why nothing more is filed`);
     indexOf(
       lines,
       `    implement: over budget (${own}), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session)`,
@@ -564,11 +587,11 @@ test("UNSIGNED after the run's own nudge: `wf decide` and `wf ls` say the run nu
   const run = start({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
-  // As the engine records a session that ended without calling StructuredOutput: failed, its last attempt `unsigned`.
   settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
   assert.deepEqual(
     (await advance(e, readRun(run.id))).notes.filter((n) => n.startsWith('implement:')),
     ['implement: try 2 — a nudge to sign off, once a round'],
+    'a session that ended without calling StructuredOutput, as the engine records it: failed, its last attempt unsigned',
   );
   settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
   await advance(e, readRun(run.id));
@@ -596,16 +619,18 @@ test("the branch's standing against the base is a fact on every screen — on it
   const { run, repo, branch, e } = await awaiting();
   assert.ok((await screen(t, e, run.id)).includes(`  branch    ${branch} is ahead of main by 1 commit`));
 
-  // Merged by hand, as a person ships a run with no ending step: the run reads shipped, and there is nothing left to decide.
   git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
-  assert.deepEqual(await screen(t, e, run.id), [`${run.id}  add sub`, '', `  shipped — ${branch} is already on main`]);
+  assert.deepEqual(
+    await screen(t, e, run.id),
+    [`${run.id}  add sub`, '', `  shipped — ${branch} is already on main`],
+    'merged by hand, as a person ships a run with no ending step: the run reads shipped, and there is nothing left to decide',
+  );
 
-  // And once the branch is deleted after the merge, git still says where it went, by the tip the run's own tick recorded.
   const { run: other, repo: otherRepo, branch: otherBranch, e: otherEngine } = await awaiting();
   git(otherRepo, 'branch', '-D', otherBranch);
   assert.ok(
     (await screen(t, otherEngine, other.id)).includes(`  branch    ${otherBranch} is gone: git no longer has it`),
-    'no tip was recorded for it',
+    'a branch deleted with no tip recorded for it is gone',
   );
 });
 
@@ -617,7 +642,6 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
     path.join(dir, 'ship.md'),
     "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
   );
-  // Worktrees, as a folder with an ending is started: `--no-worktree` is refused for one, since such a run has no branch to merge.
   const run = start({ brief: 'add sub', repo, workflowDir: dir });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
@@ -645,18 +669,19 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   ]);
   assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
 
-  // And `wf ls` says the same, in one line, where it says who the run waits on.
   const said = await listed(t, e, run.id);
   indexOf(
     said,
     `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — wf approve ${run.id} ship`,
   );
-  assert.ok(!said.some((l) => l.includes('waiting on you')), 'the ending is not said twice');
+  assert.ok(
+    !said.some((l) => l.includes('waiting on you')),
+    '`wf ls` says it in one line, where it says who the run waits on: the ending is not said twice',
+  );
   indexOf(said, /^   ship {11}awaiting approval/);
 });
 
 test('a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its git commands', async (t) => {
-  // `wf start --gate review` on a chain: review is a terminal gated step, so a person's word ends the run, but nothing merges its branch.
   const repo = aRepo();
   const run = start({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });
   const { e, settle } = board();
@@ -672,7 +697,6 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
   settle(`${run.id}-review`, 'succeeded', SIGNED);
   const branch = readRun(run.id).steps.review.branch!;
 
-  // At the gate: the word is asked for, and the step's own instructions are not read back as what happens next.
   const held = await screen(t, e, run.id);
   indexOf(held, '  to decide  review has signed off and waits for your word:');
   indexOf(held, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
@@ -680,13 +704,13 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
   assert.ok(!held.some((l) => /ship it   git/.test(l)), 'the branch is not offered while the gate holds');
   indexOf(await listed(t, e, run.id), `   → to decide: review has signed off at its gate — wf approve ${run.id} review`);
 
-  // Approved: the run is over, and the branch nobody has merged is still a person's — with the commands, since no step of this folder merges.
   approveByHand(run.id, 'review', 1);
   const after = await screen(t, e, run.id);
-  assert.deepEqual(after.slice(-2), [
-    `  ship it   git -C ${repo} merge --no-ff ${branch}`,
-    `  drop it   git -C ${repo} branch -D ${branch}`,
-  ]);
+  assert.deepEqual(
+    after.slice(-2),
+    [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
+    "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
+  );
   indexOf(await listed(t, e, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — wf decide ${run.id}`);
 });
 
@@ -724,17 +748,21 @@ test("a run whose one step works in the checkout is not shown the base branch's 
     needs: 'Merge add-sub, or hold it?',
   });
   await advance(e, readRun(run.id));
-  // The step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's.
-  assert.equal(readRun(run.id).steps.supervise?.branch, 'main');
+  assert.equal(
+    readRun(run.id).steps.supervise?.branch,
+    'main',
+    "the step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's",
+  );
 
-  // And main moves on while the run watches: another run's merge, which touches a test and CLAUDE.md.
   write(repo, 'packages/x/test/add.test.ts', "import assert from 'node:assert';\nassert.ok(true);\n");
   write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
-  // That diff is there to be read: what is refused is reading it AS this run's work.
   const moved = touchedBy(gitRun(readRun(run.id)), 'main');
-  assert.ok(!('error' in moved) && moved.changes.length === 2, JSON.stringify(moved));
+  assert.ok(
+    !('error' in moved) && moved.changes.length === 2,
+    `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
+  );
 
   const lines = await screen(t, e, run.id);
   assert.ok(!lines.some((l) => l.startsWith('  touched ')), `no branch to read:\n${lines.join('\n')}`);
@@ -743,13 +771,10 @@ test("a run whose one step works in the checkout is not shown the base branch's 
     !lines.some((l) => /in full: the check-affecting files/.test(l)),
     'nor every check-affecting file merged since, above the question',
   );
-  // What the person came for is what they get.
   const said = indexOf(lines, '    add-sub is ready to merge.');
-  assert.ok(indexOf(lines, '    needs: Merge add-sub, or hold it?') > said);
+  assert.ok(indexOf(lines, '    needs: Merge add-sub, or hold it?') > said, 'what the person came for: the summary, then the question');
   indexOf(lines, `    to answer it:  wf retry ${run.id} supervise --message "<answer>"`);
 
-  // A run that worked on the base branch ITSELF (--no-worktree) is unchanged, on the same fallback: its implement failed, so the
-  // terminal step has no branch and the screen reads every branch a step worked on — which is main, where that run's work really is.
   const direct = start({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
   fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
   git(repo, 'commit', '-q', '-am', 'the work, on the base branch itself');
@@ -758,7 +783,11 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   const worked = await screen(t, e, direct.id);
   assert.equal(readRun(direct.id).steps.review?.branch, undefined, 'the terminal step has no branch: the fallback is what answers');
   const where = indexOf(worked, '  touched  main');
-  assert.match(worked[where + 1], /^ {4}packages\/x\s+1 file\s+\+1 −0$/, worked.slice(where, where + 3).join('\n'));
+  assert.match(
+    worked[where + 1],
+    /^ {4}packages\/x\s+1 file\s+\+1 −0$/,
+    `a run that worked on main itself (--no-worktree) reads every branch a step worked on, main, where its work is:\n${worked.slice(where, where + 3).join('\n')}`,
+  );
 });
 
 test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
@@ -784,9 +813,6 @@ test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges,
 });
 
 test('`wf ls` views each task once, and runs added in a repository it already reads add no git process', async (t) => {
-  // Before, each run cost two `merge-base --is-ancestor` per result branch and a run another waited on was viewed again: 406 git
-  // processes and 418 journals for 200 finished runs (2026-09-25). The store holds the other tests' runs too, some in repositories
-  // of their own, so what is counted is what three more runs in one repository add.
   const { e, viewed, settle, run } = await awaiting();
   const repo = run.repo!;
   const ls = async () => {
@@ -798,7 +824,6 @@ test('`wf ls` views each task once, and runs added in a repository it already re
       log.mock.restore();
     }
   };
-  // A run of one step, finished in a worktree on a branch of its own, and the next waits on it: `wf ls` reads its task for both.
   const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(oneStep, 'work.md'), 'work it\n');
   const first = start({ brief: 'first', repo, workflowDir: oneStep, isolate: true }).id;
@@ -814,10 +839,14 @@ test('`wf ls` views each task once, and runs added in a repository it already re
     fs.writeFileSync(path.join(ROOT, 'runs', `${more.id}.json`), JSON.stringify(record, null, 2));
   }
   const after = await ls();
-  assert.ok(viewed.has(`${first}-work`), 'the run waited on was read');
+  assert.ok(viewed.has(`${first}-work`), 'the run of one step, finished in a worktree and waited on by the next, was read');
   assert.ok(
     [...viewed.values()].every((n) => n === 1),
     `every task viewed once: ${JSON.stringify(Object.fromEntries(viewed))}`,
   );
-  assert.equal(after, before, 'three more runs, each with a result branch, in a repository already read');
+  assert.equal(
+    after,
+    before,
+    "three more runs, each with a result branch, in a repository already read, add no git process: the store holds the other tests' runs too, so what is counted is what they add",
+  );
 });

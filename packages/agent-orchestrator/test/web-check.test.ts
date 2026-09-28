@@ -8,8 +8,8 @@
  * same way in the repository's own checkout in the middle of the merge the shipper staged, where no `WF_BASE_REF` is set and what
  * counts is what the merge brings. A condition that cannot say what was touched fails with words, never reads as "nothing touched".
  *
- * The e2e runs in the second place alone (changed 2026-09-25): a round's check is the slow part of every round, and the e2e was 3-4 of
- * its six minutes and seldom changed a review's verdict. The line tells the two apart by `WF_BASE_REF`, which the run sets on the check
+ * The e2e runs in the second place alone: a round's check is the slow part of every round, the e2e is most of it, and it seldom changes
+ * a review's verdict. The line tells the two apart by `WF_BASE_REF`, which the run sets on the check
  * of every step in a worktree and never on ship's, so anything that runs the line without the run's environment runs the whole of it.
  *
  * `npm` is a stand-in on PATH that prints what it was asked, so the test reads which scripts ran.
@@ -50,10 +50,10 @@ const BUILD_FOLDERS = FOLDERS.filter((f) => /build|ui/.test(f));
 const AT_MERGE =
   'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
 const BUILD_LINE = `npm test && npm run typecheck && npm run lint && npm run build && ${AT_MERGE}`;
-/** A line as it was before 2026-09-25, with the e2e in every round: what each REFUSED case below must catch. */
+/** A line with the e2e in every round in place of `AT_MERGE`: what each REFUSED case below must catch. */
 const everyRound = (line: string) => line.replace(AT_MERGE, 'npm run e2e');
 
-// A stand-in `npm`: prints `npm <args>`, and fails the one script NPM_FAILS names.
+/** The folder of a stand-in `npm`, first on PATH: it prints `npm <args>`, and fails the one script `NPM_FAILS` names. */
 const BIN = path.join(ROOT, 'bin');
 fs.mkdirSync(BIN);
 fs.writeFileSync(path.join(BIN, 'npm'), '#!/bin/sh\necho "npm $*"\n[ "$*" = "${NPM_FAILS:-}" ] && exit 1\nexit 0\n', { mode: 0o755 });
@@ -81,7 +81,10 @@ const write = (repo: string, file: string) => {
   fs.writeFileSync(path.join(repo, file), `${file}\n`);
 };
 
-/** A repository on main, and a branch `work` off it whose one commit writes `files`. Returns the repo and main's commit the branch left from. */
+/**
+ * A repository on main, and a branch `work` off it whose one commit writes `files`. Returns the repo and main's commit the branch left
+ * from.
+ */
 function branched(files: string[]): { repo: string; base: string } {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
@@ -113,7 +116,10 @@ function asCheck(repo: string, command: string, baseRef: string, extra: Record<s
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-/** Ship's check as the run executes it: through `CHECK`, in the repository's checkout, with the environment the tick hands an ending — no `WF_BASE_REF`. */
+/**
+ * Ship's check as the run executes it: through `CHECK`, in the repository's checkout, with the environment the tick hands an ending — no
+ * `WF_BASE_REF`.
+ */
 function asShipCheck(repo: string, command: string, extra: Record<string, string> = {}): Ran {
   const brief = checkBrief(command, { WF_RUN: 'r-1', WF_STEP: 'ship', WF_WORKSPACE: repo, WF_STDERR: '', WF_ARTIFACTS: ROOT });
   const { cmd, args } = CHECK.command({ brief });
@@ -137,15 +143,18 @@ test('dev and dev-planned judge implement by the same line: the suite and the ty
   assert.ok(DEV.startsWith('npm test && npm run typecheck && '), DEV);
   assert.ok(DEV.includes('git -c core.quotePath=false diff --no-renames --name-only "$range"'), DEV);
   assert.ok(DEV.includes('range="$WF_BASE_REF...HEAD"') && DEV.includes('range=HEAD...MERGE_HEAD'), DEV);
-  // The folders a person picks for the build keep it whatever was touched: they asked for it.
-  assert.deepEqual(BUILD_FOLDERS, [
-    'workflows/dev-build',
-    'workflows/dev-planned-build',
-    'workflows/ui',
-    'packages/agent-orchestrator/workflows/ui',
-  ]);
-  for (const folder of BUILD_FOLDERS) assert.equal(checkOf(folder), BUILD_LINE, folder);
-  // Every line runs the e2e in one place, behind the one condition.
+  assert.deepEqual(
+    BUILD_FOLDERS,
+    ['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui'],
+    'the folders a person picks for the build',
+  );
+  for (const folder of BUILD_FOLDERS) {
+    assert.equal(
+      checkOf(folder),
+      BUILD_LINE,
+      `${folder}: a build folder keeps the build whatever was touched, since a person asked for it`,
+    );
+  }
   for (const folder of FOLDERS) {
     const line = checkOf(folder);
     assert.equal(line.split(AT_MERGE).length, 2, `${folder}: the e2e is held for the merged tree, once\n${line}`);
@@ -185,8 +194,11 @@ test('REFUSED as a check: a line with the e2e in every round, as each folder had
     assert.equal(r.status, 0, `${folder}\n${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, E2E, `${folder}: the old line ran the e2e in a round\n${r.stdout}`);
   }
-  // The build folders' old line, word for word.
-  assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run lint && npm run build && npm run e2e');
+  assert.equal(
+    everyRound(BUILD_LINE),
+    'npm test && npm run typecheck && npm run lint && npm run build && npm run e2e',
+    "the build folders' line with the e2e in every round, word for word",
+  );
 });
 
 test("REFUSED as ship's check: an e2e that fails fails the line on the merged tree; in a round, where it does not run, it cannot", () => {
@@ -240,8 +252,6 @@ test('as a check: a branch that touches only the packages, the docs or the workf
 });
 
 test('as a check: a file moved out of the web app, or one whose name is not ASCII, counts as touching it', () => {
-  // A rename is listed by its new path alone under git's default rename detection, and a non-ASCII path is quoted: either would read
-  // as a change to the packages only.
   const { repo } = branched(['apps/web/src/lib/shared.ts']);
   git(repo, 'checkout', '-q', '-b', 'moved');
   fs.mkdirSync(path.join(repo, 'packages', 'shared'), { recursive: true });
@@ -250,12 +260,16 @@ test('as a check: a file moved out of the web app, or one whose name is not ASCI
   const moved = git(repo, 'rev-parse', 'work');
   const r = asCheck(repo, DEV, moved);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-  assert.match(r.stdout, BUILT, `a move out of apps/web/ builds\n${r.stdout}`);
+  assert.match(
+    r.stdout,
+    BUILT,
+    `a move out of apps/web/ builds, though git's default rename detection lists it by its new path alone\n${r.stdout}`,
+  );
 
   const named = branched(['apps/web/src/routes/café.tsx']);
   const n = asCheck(named.repo, DEV, named.base);
   assert.equal(n.status, 0, `${n.stdout}\n${n.stderr}`);
-  assert.match(n.stdout, BUILT, `a non-ASCII path under apps/web/ builds\n${n.stdout}`);
+  assert.match(n.stdout, BUILT, `a non-ASCII path under apps/web/ builds, though git quotes it by default\n${n.stdout}`);
 });
 
 test('REFUSED as a check: a build that fails fails the check — the condition swallows nothing', () => {
@@ -302,11 +316,14 @@ test("as ship's check, mid-merge with no WF_BASE_REF: a merge that brings the we
 });
 
 test("as ship's check, mid-merge: what counts is what the merge brings, not what the base branch did meanwhile", () => {
-  // Main touched the web app after the branch left it; the branch did not. The merge brings no web change, and nothing is built.
   const repo = midMerge(['packages/agent-orchestrator/src/run.ts'], ['apps/web/src/main.tsx']);
   const r = asShipCheck(repo, DEV);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-  assert.doesNotMatch(r.stdout, BUILT);
+  assert.doesNotMatch(
+    r.stdout,
+    BUILT,
+    'main touched the web app after the branch left it and the branch did not: the merge brings no web change, and nothing is built',
+  );
   assert.ok(r.stdout.includes(SKIPPED), r.stdout);
 });
 
@@ -330,7 +347,6 @@ test('ui ends in a gated ship, like the build folders, and the check the run exe
       folder,
     );
 
-    // The line the shipper is told the run executes on its merge, taken off its brief as the shipper reads it.
     const run: Run = {
       id: 'r-1',
       repo: '/repo',
@@ -350,7 +366,11 @@ test('ui ends in a gated ship, like the build folders, and the check the run exe
     };
     const brief = composeBrief(ship, run, workflow, undefined, '/wf/runs/r-1/artifacts/ship');
     const named = /Once you sign off, the run executes `([^\n]*)` in this checkout, on the merge you left staged/.exec(brief)?.[1];
-    assert.equal(named, checkOf(folder), `${folder}: the ship is told implement's check\n\n${brief}`);
+    assert.equal(
+      named,
+      checkOf(folder),
+      `${folder}: the ship's brief names implement's check as the line the run executes on its merge\n\n${brief}`,
+    );
 
     const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-runtime/src/engine.ts']);
     const r = asShipCheck(repo, named);

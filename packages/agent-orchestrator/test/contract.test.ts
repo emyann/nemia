@@ -6,9 +6,9 @@
  * the package's CLI, not an import, and prose that names a file in src/ is not a route to it.
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
- * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy of
- * the one in packages/agent-runtime/test/contract.test.ts, not an import of it: a package's test reaches into no other package's files, which
- * is the rule it keeps.
+ * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy
+ * of the one in packages/agent-runtime/test/contract.test.ts, not an import of it: a package's test reaches into no other package's
+ * files, which is the rule it keeps.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

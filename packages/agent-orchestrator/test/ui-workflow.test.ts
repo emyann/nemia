@@ -1,13 +1,13 @@
 /**
  * `workflows/ui/`, the workflow for a change a person will see, held to its shape — so an edit that drops
  * the build check, the screenshots, the look, the loop or the ship fails the suite rather than a run. The e2e is the
- * implementer's own run, for the screenshots, and the check's on the merged tree only (since 2026-09-25), which the gated ship
- * runs, as the dev folders' does (since 2026-09-25 too).
+ * implementer's own run, for the screenshots, and the check's on the merged tree only, which the gated ship
+ * runs, as the dev folders' does.
  *
  *   implement ⇄ review → ship   (review: the diff, and implement's screenshots and the pages beside it)
  *
- * Looking is the look skill (`.claude/skills/look/SKILL.md`), which both steps use. It was a step of its own, with a
- * respond to answer both reviewers, until the reviewer ran on Claude and the loop gave the edge back (plan §4 U2).
+ * Looking is the look skill (`.claude/skills/look/SKILL.md`), which both steps use; the loop answers the review, so no step of its own
+ * looks or responds. The shipper blocks on long work in the foreground: a job cannot end its turn to wait for a suite.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +24,10 @@ import { toldIn } from './told.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
-/** The build folders' and ui's implement check: the build every round, and the e2e only where the run set no `WF_BASE_REF` — the merged tree. */
+/**
+ * The build folders' and ui's implement check: the build every round, and the e2e only where the run set no `WF_BASE_REF` — the merged
+ * tree.
+ */
 const BUILD =
   'npm test && npm run typecheck && npm run lint && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
 /** `dev`'s implement check, as its folder writes it: the suite and the types, then the build and the e2e on what git says was touched. */
@@ -40,8 +43,8 @@ const told = (step: (typeof ui)[number]) => said(toldIn(path.join(WORKFLOWS, 'ui
 /**
  * The skills a step's body tells it to use and it could not reach: one named by a file the repository does not have, and one named
  * only as `the <name> skill` on a step with no Skill tool, which the body is all it is told. A `tools:` line without `Skill` gives a
- * session no Skill tool — measured with Claude Code 2.1.270, whose session still lists the repository's skills beside it — so
- * such a step must be told the skill's file, which Read opens.
+ * session no Skill tool, though the session still lists the repository's skills beside it, so such a step must be told the skill's
+ * file, which Read opens.
  */
 function unreachableSkills(step: { body: string; tools?: string[] }): string[] {
   const text = said(step.body);
@@ -76,15 +79,20 @@ test("the ui workflow loads as two steps, the loop between them and the ship aft
     terminalSteps(ui).map((s) => s.name),
     ['ship'],
   );
-  // A chain: review works in implement's workspace, so each round it reads the change as it stands.
-  assert.deepEqual(workspacePlan(ui, steps.review), { kind: 'inherit', from: 'implement' });
+  assert.deepEqual(
+    workspacePlan(ui, steps.review),
+    { kind: 'inherit', from: 'implement' },
+    "a chain: review works in implement's workspace, so each round it reads the change as it stands",
+  );
 });
 
 test('look and respond are gone: both steps use the look skill, which the repository carries, and the loop answers the review', () => {
   for (const gone of ['look.md', 'look.schema.json', 'respond.md'])
     assert.equal(fs.existsSync(path.join(WORKFLOWS, 'ui', gone)), false, `${gone} is gone`);
-  // Since agents card 1b both are told so by their agents' skills, `look-at-a-page` and `read-a-screenshot`.
-  assert.ok(told(steps.implement).includes('Before you sign off, use the look skill on every page you changed'), told(steps.implement));
+  assert.ok(
+    told(steps.implement).includes('Before you sign off, use the look skill on every page you changed'),
+    `both steps are told so by their agents' skills, look-at-a-page and read-a-screenshot\n\n${told(steps.implement)}`,
+  );
   assert.ok(told(steps.review).includes('Read the diff.'), told(steps.review));
   assert.ok(
     told(steps.review).includes("use the look skill on implement's screenshots and on the pages, side by side"),
@@ -92,21 +100,29 @@ test('look and respond are gone: both steps use the look skill, which the reposi
   );
   assert.ok(!said(steps.review.body).includes('Read the diff.'), 'and the review is the skill, not the body');
 
-  // The skill the two briefs name is there, under that name, and the one browser tool it forbids is refused by the settings too.
   const skill = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md'), 'utf8');
-  assert.match(skill, /^---\nname: look\ndescription: \S/);
-  assert.match(skill, /never `browser_run_code_unsafe`/i);
+  assert.match(skill, /^---\nname: look\ndescription: \S/, 'the skill the two briefs name is there, under that name');
+  assert.match(skill, /never `browser_run_code_unsafe`/i, 'the skill forbids one browser tool');
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
-  assert.ok(settings.permissions.deny.includes('mcp__playwright__browser_run_code_unsafe'), 'denied by name');
+  assert.ok(
+    settings.permissions.deny.includes('mcp__playwright__browser_run_code_unsafe'),
+    'the one browser tool the skill forbids is denied by the settings too, by name',
+  );
 });
 
 test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
-  // review has the Skill tool, and its skill `read-a-screenshot` names the file too. The guard is exercised on a copy without the tool.
-  assert.equal(steps.review?.tools?.includes('Skill'), true);
+  assert.equal(
+    steps.review?.tools?.includes('Skill'),
+    true,
+    'review has the Skill tool, and its skill read-a-screenshot names the file too: the guard is exercised on a copy without the tool',
+  );
   const fenced = { ...steps.review, tools: steps.review.tools.filter((t) => t !== 'Skill') };
-  // The ship looks at nothing: it merges, and runs the check.
   for (const step of ui.filter((s) => s.name !== 'ship')) {
-    assert.match(told(step), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
+    assert.match(
+      told(step),
+      /`\.claude\/skills\/look\/SKILL\.md`/,
+      `${step.name} is told the skill's file; the ship looks at nothing, it merges`,
+    );
     assert.deepEqual(unreachableSkills({ ...step, body: told(step) }), [], step.name);
   }
 
@@ -121,8 +137,11 @@ test('REFUSED: a step told to use the look skill that could not reach it — no 
     ),
     'a renamed skill',
   );
-  // The rule is the Skill tool's: a step that has it loads the skill by name.
-  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(file, 'the skill') }), []);
+  assert.deepEqual(
+    unreachableSkills({ ...review, body: review.body.replaceAll(file, 'the skill') }),
+    [],
+    "the rule is the Skill tool's: a step that has it loads the skill by name",
+  );
 });
 
 test('implement is checked by the build, and in a browser only on the merged tree; review, which writes nothing, declares no check', () => {
@@ -170,18 +189,20 @@ test('review writes nothing by machinery: on Claude, tools that read and Bash, i
 
 /** What the settings allow for implement's check, and write into the workspace: a reviewer is denied both by name. */
 const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
-/** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
+/** What an unattended session has and no step needs, as measured of what a worker gets. */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
 test("every dev* folder, and ui, ends in `ship`: gated, in the repository's checkout, with implement's denies and that folder's check, which the run executes on the merge — and its prose stages the merge and signs off the message, and neither runs the check nor commits", () => {
   const CHECKS: Record<string, string> = {
-    // The suite and the types, then the build when git says the work touched the web app, and the e2e on the merged tree alone
-    // (web-check.test.ts runs both).
+    /**
+     * The suite and the types, then the build when git says the work touched the web app, and the e2e on the merged tree alone
+     * (web-check.test.ts runs both).
+     */
     dev: DEV_CHECK,
     'dev-planned': DEV_CHECK,
     'dev-build': BUILD,
     'dev-planned-build': BUILD,
-    // ui's is the build folders' line, and so its ship is theirs, note and all; the package's copy is shipped too.
+    /** ui's is the build folders' line, and so its ship is theirs, note and all; the package's copy is shipped too. */
     ui: BUILD,
     [path.relative(path.join(REPO, 'workflows'), path.join(WORKFLOWS, 'ui'))]: BUILD,
   };
@@ -206,10 +227,16 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       },
       folder,
     );
-    // Its check is implement's, the same line: what the work was judged by is what the merged tree is judged by.
-    assert.equal(own, byName.implement.check, `${folder}: ship's check is implement's`);
-    // And the message the run commits the merge with is the step's closeout, one required string.
-    assert.equal(ship.output?.file, 'shipper.schema.json', folder);
+    assert.equal(
+      own,
+      byName.implement.check,
+      `${folder}: ship's check is implement's, the same line: what the work was judged by is what the merged tree is judged by`,
+    );
+    assert.equal(
+      ship.output?.file,
+      'shipper.schema.json',
+      `${folder}: the message the run commits the merge with is the step's closeout, one required string`,
+    );
     const schema = closeoutSchemaOf(ship, loadWorkflows(dir)) as { required: string[]; properties: Record<string, { type: string }> };
     assert.ok(schema.required.includes('message'), `${folder}: a sign-off gives its message`);
     assert.equal(schema.properties.message.type, 'string');
@@ -221,13 +248,10 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       `${folder} ends there`,
     );
 
-    // The prose is the recipe, one for every folder (the shipper's): stage the merge, write the message, leave the rest to the run.
-    // Told by the shipper's body and its two skills, `trial-merge-a-branch` and `say-why-it-aborted`, given whole (since agents card 1b).
     const body = said(toldIn(dir, ship));
     for (const sentence of [
       "Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
       'git merge --no-ff --no-commit <branch>…',
-      // The merge is committed with a message the shipper writes, not git's `Merge branch '…'`: what shipped, and the evidence for it.
       "Write the commit message — never git's default.",
       "the run's own title — the first line under *What was asked for* — trimmed to about 72 characters.",
       '"Merge branch …" is what this message replaces.',
@@ -238,13 +262,19 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       "Leave the merge staged, and sign off `done`, the message whole as your closeout's `message`.",
       "Do not run the check, do not commit, and do not abort a merge that is clean: the run does each, on the check's exit",
       '`git merge --abort` if a merge is staged, then sign off `blocked` saying what happened.',
-      // A job cannot end its turn to wait for a suite: the lesson the owner gave with the plan's approval.
       '`[structured-output-enforce]`',
       'timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"',
       'Do not push, and do not delete the branch',
     ])
-      assert.ok(body.includes(sentence), `${folder}: ${sentence}\n\n${body}`);
-    assert.ok(!body.includes('`git commit --no-edit`'), `${folder}: the recipe never commits git's default message\n\n${body}`);
+      assert.ok(
+        body.includes(sentence),
+        `${folder}: the recipe, one for every folder, told whole by the shipper's body and its skills trial-merge-a-branch and ` +
+          `say-why-it-aborted, says: ${sentence}\n\n${body}`,
+      );
+    assert.ok(
+      !body.includes('`git commit --no-edit`'),
+      `${folder}: the recipe never commits git's default message, but one the shipper writes: what shipped, and the evidence for it\n\n${body}`,
+    );
     const run: Run = {
       id: 'r-1',
       repo: '/repo',
@@ -263,28 +293,38 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       ),
     };
     const brief = composeBrief(ship, run, loadWorkflows(dir), undefined, '/wf/runs/r-1/artifacts/ship');
-    // The title the recipe's subject is taken from is the brief's, under its heading — the brief's first line where the step has no note of
-    // its own, since the shipper's instructions are in its system prompt (`briefBody`).
-    assert.match(brief, /(^|\n)## What was asked for\n\nShip it/, `${folder}\n\n${brief}`);
-    // The brief says the run executes the folder's check on the merge and commits it — once — and never hands the step a check to run.
-    assert.equal(brief.split(landingContract(check)).length, 2, `${folder}\n\n${brief}`);
-    assert.ok(!brief.includes("This workflow's check, which its work was judged by:"), `${folder}\n\n${brief}`);
+    assert.match(
+      brief,
+      /(^|\n)## What was asked for\n\nShip it/,
+      `${folder}: the recipe's subject is the brief's title, under its heading, the brief's first line where the step has no note of its ` +
+        `own, since the shipper's instructions are in its system prompt (briefBody)\n\n${brief}`,
+    );
+    assert.equal(
+      brief.split(landingContract(check)).length,
+      2,
+      `${folder}: the brief says, once, that the run executes the folder's check on the merge and commits it\n\n${brief}`,
+    );
+    assert.ok(
+      !brief.includes("This workflow's check, which its work was judged by:"),
+      `${folder}: and never hands the step a check to run\n\n${brief}`,
+    );
     assert.ok(!brief.includes('## Finishing'), `${folder}: no contract to run a check before signing off\n\n${brief}`);
   }
 
-  // One ending, written once: every dev* folder's ship.md is the same wiring and the shipper. A build folder's adds a note after it, the
-  // team's reason to run its build and e2e on the merged tree, which the shipper — one recipe for every folder — does not give.
   const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
-  assert.equal(shipIn('dev-planned'), shipIn('dev'), 'dev-planned');
+  assert.equal(shipIn('dev-planned'), shipIn('dev'), "dev-planned: one ending, written once: every dev* folder's ship.md is the same");
   assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'), 'dev-planned-build');
   assert.equal(shipIn('ui'), shipIn('dev-build'), 'ui');
   assert.equal(fs.readFileSync(path.join(WORKFLOWS, 'ui', 'ship.md'), 'utf8'), shipIn('ui'), "the package's ui");
-  // The same wiring, its check its own folder's (and a comment on what that line does mid-merge), then its note.
   const wiring = (folder: string) =>
     shipIn(folder)
       .replace(/^check: .+$/m, 'check:')
       .replace(/^# (Mid-merge, |and runs the e2e |With no WF_BASE_REF there, ).+\n/gm, '');
-  assert.ok(wiring('dev-build').startsWith(wiring('dev')), 'dev-build is the same wiring, then its note');
+  assert.ok(
+    wiring('dev-build').startsWith(wiring('dev')),
+    "dev-build is the same wiring but for its check line and the comment on what it does mid-merge, then its note: the team's reason " +
+      'to run its build and e2e on the merged tree, which the shipper, one recipe for every folder, does not give',
+  );
   const WHY = [
     "`npm run build` regenerates the web app's route tree",
     '`npm run e2e` visits every page in both themes',
@@ -297,12 +337,14 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
 });
 
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
-  // The deny is what keeps review from them: the settings allow both, so in dontAsk nothing else would.
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as {
     permissions: { allow: string[] };
   };
   for (const rule of REVIEW_DENIED)
-    assert.ok(settings.permissions.allow.includes(rule), `${rule} is allowed by the settings, word for word`);
+    assert.ok(
+      settings.permissions.allow.includes(rule),
+      `${rule} is allowed by the settings, word for word, so in dontAsk only the deny keeps review from it`,
+    );
 
   const folders = [
     WORKFLOWS,
@@ -408,15 +450,17 @@ test('REFUSED: a review finding that names neither a file nor a page — nor hal
     { where: { page: '/workflows', theme: 'light' } },
   ]) {
     assert.equal(validate(closeout(refused)), false, JSON.stringify(refused));
-    // Refused for the finding, and for nothing else of the closeout.
     assert.ok(
       validate.errors!.every((e) => e.instancePath.startsWith('/findings/0')),
-      JSON.stringify(validate.errors),
+      `refused for the finding, and for nothing else of the closeout: ${JSON.stringify(validate.errors)}`,
     );
   }
 });
 
-/** The files of two workflow folders that differ — missing from either, or not the same bytes — READMEs aside, which describe where each lives. */
+/**
+ * The files of two workflow folders that differ — missing from either, or not the same bytes — READMEs aside, which describe where each
+ * lives.
+ */
 function differences(ours: string, theirs: string): string[] {
   const files = (dir: string) => fs.readdirSync(dir).filter((f) => f !== 'README.md');
   const all = [...new Set([...files(ours), ...files(theirs)])].sort();
@@ -445,25 +489,26 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
   assert.deepEqual(differences(repository, shipped), []);
   assert.ok(fs.existsSync(path.join(repository, 'README.md')), 'the repository copy says what it is');
 
-  // And the agents its steps name, beside it: the package's agents/ holds ui's two and the shipper, with their schemas,
-  // each the repository's byte for byte.
   const agents = path.join(WORKFLOWS, 'agents');
   const theirs = path.join(REPO, 'workflows', 'agents');
-  assert.deepEqual(fs.readdirSync(agents).sort(), [
-    'implement.schema.json',
-    'shipper.md',
-    'shipper.schema.json',
-    'ui-implementer.md',
-    'ui-reviewer.md',
-  ]);
+  assert.deepEqual(
+    fs.readdirSync(agents).sort(),
+    ['implement.schema.json', 'shipper.md', 'shipper.schema.json', 'ui-implementer.md', 'ui-reviewer.md'],
+    "the package's agents/ holds the agents ui's steps name, its two and the shipper, with their schemas",
+  );
   for (const file of fs.readdirSync(agents))
-    assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
+    assert.ok(
+      fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))),
+      `agents/${file} is the repository's byte for byte`,
+    );
 
-  // And the skills those three agents give, beside agents/ as in the repository: every one of them and nothing else, each folder the
-  // repository's file for file.
   const skills = path.join(WORKFLOWS, 'skills');
   const given = loadWorkflows(path.join(WORKFLOWS, 'ui')).flatMap((s) => s.agent?.skills ?? []);
-  assert.deepEqual(fs.readdirSync(skills).sort(), [...new Set(given)].sort());
+  assert.deepEqual(
+    fs.readdirSync(skills).sort(),
+    [...new Set(given)].sort(),
+    "the package's skills/, beside agents/ as in the repository, holds every skill the three agents give and nothing else",
+  );
   assert.deepEqual(fs.readdirSync(skills).sort(), [
     'implement-a-web-change',
     'look-at-a-page',
@@ -473,7 +518,11 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
     'trial-merge-a-branch',
   ]);
   for (const skill of fs.readdirSync(skills))
-    assert.deepEqual(differences(path.join(skills, skill), path.join(REPO, 'workflows', 'skills', skill)), [], `skills/${skill}`);
+    assert.deepEqual(
+      differences(path.join(skills, skill), path.join(REPO, 'workflows', 'skills', skill)),
+      [],
+      `skills/${skill} is the repository's file for file`,
+    );
 });
 
 test("review is handed implement's screenshots and pages, and not its summary, beside the loop's contract", () => {

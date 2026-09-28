@@ -8,7 +8,13 @@
  * non-Chromium browser, a profile kept on disk and shared between steps, and output files written into the
  * workspace — `.playwright-mcp/` by default, where the run would commit them.
  *
- * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money.
+ * The server is spawned as Claude Code spawns the entry, in the session's cwd, speaking JSON-RPC on stdio; listing its tools launches no
+ * browser, so that test costs nothing and needs no install.
+ *
+ * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
+ * the engine's built-in harnesses, `claude` first, asked for a background session, with no `mcp` on the task, so the only servers it can
+ * have are the ones the checkout's `.mcp.json` names. A settled session stays in the harness's registry, so the test stops and removes
+ * its own after, as far as `claude` lets it.
  *
  *   AE_LIVE=1 node --test test/mcp-config.test.ts
  */
@@ -175,15 +181,12 @@ test('an interactive session in the checkout is given the same server, and it is
 });
 
 test('the ui implement step is told it has the browser', () => {
-  // By its agent's skill `look-at-a-page`, since agents card 1b.
   const dir = path.join(REPO, 'packages', 'agent-orchestrator', 'workflows', 'ui');
   const implement = loadWorkflows(dir).find((s) => s.name === 'implement')!;
-  assert.match(toldIn(dir, implement), /`browser_\*` tools/);
+  assert.match(toldIn(dir, implement), /`browser_\*` tools/, "by its agent's skill look-at-a-page");
 });
 
 test('the server starts as configured, from the repository root, and offers browser_navigate', async () => {
-  // What Claude Code does with the entry: spawn it in the session's cwd and speak JSON-RPC on stdio.
-  // Listing tools launches no browser, so this costs nothing and needs no install.
   const { command, args } = shipped().mcpServers.playwright;
   const child = spawn(command, args, { cwd: REPO, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
@@ -227,8 +230,6 @@ test('the server starts as configured, from the repository root, and offers brow
   }
 });
 
-// ─── live ───────────────────────────────────────────────────────────────────
-
 const live = process.env.AE_LIVE === '1';
 
 const BRIEF = [
@@ -255,8 +256,6 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    // Shipped defaults: the engine's built-in harnesses, `claude` first, asked for a background session. No `mcp` on the task, so the
-    // only servers it can have are the ones the checkout's .mcp.json names.
     const engine: Engine = createEngine({ root: scratch('wf-live-mcp-') });
     const id = await engine.file({
       brief: BRIEF,
@@ -284,14 +283,11 @@ test(
         "no tool from any of the operator's servers",
       );
     } finally {
-      // Settled sessions stay in the harness's registry (engine open issue 3); leave nothing running behind.
       const short = view?.sessionId?.split('-')[0];
       for (const verb of short ? ['stop', 'rm'] : []) {
         try {
           execFileSync('claude', [verb, short!], { stdio: 'ignore', timeout: 30_000 });
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     }
   },

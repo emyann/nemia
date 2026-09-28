@@ -25,7 +25,10 @@ import {
 } from '../src/inbox.ts';
 import { fromNote } from '../src/run.ts';
 
-/** A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as workflow.test.ts's). */
+/**
+ * A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as
+ * workflow.test.ts's).
+ */
 function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>): string | null {
   if (JSON.stringify(Object.keys(meanings)) !== JSON.stringify(keys))
     return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order`;
@@ -78,18 +81,25 @@ test('an inbox card is its file: the name without .md, `workflow:` and `repo:` f
     workflow: '../workflows/mine',
     body: 'x',
   });
-  // Saved on Windows, with a comment and a blank line in the frontmatter; and a frontmatter of only a comment, over a body that opens with a rule.
-  assert.deepEqual(read('﻿---\r\n# what runs it\r\nworkflow: dev\r\n\r\n---\r\nCache the views.\r\n'), {
-    name: 'cache-the-views-k2q9',
-    file: 'cache-the-views-k2q9.md',
-    workflow: 'dev',
-    body: 'Cache the views.',
-  });
-  assert.deepEqual(read('---\n# no keys\n---\n---\ntitle: a brief that opens with a rule\n---\nx\n'), {
-    name: 'cache-the-views-k2q9',
-    file: 'cache-the-views-k2q9.md',
-    body: '---\ntitle: a brief that opens with a rule\n---\nx',
-  });
+  assert.deepEqual(
+    read('﻿---\r\n# what runs it\r\nworkflow: dev\r\n\r\n---\r\nCache the views.\r\n'),
+    {
+      name: 'cache-the-views-k2q9',
+      file: 'cache-the-views-k2q9.md',
+      workflow: 'dev',
+      body: 'Cache the views.',
+    },
+    'saved on Windows, with a comment and a blank line in the frontmatter',
+  );
+  assert.deepEqual(
+    read('---\n# no keys\n---\n---\ntitle: a brief that opens with a rule\n---\nx\n'),
+    {
+      name: 'cache-the-views-k2q9',
+      file: 'cache-the-views-k2q9.md',
+      body: '---\ntitle: a brief that opens with a rule\n---\nx',
+    },
+    'a frontmatter of only a comment, over a body that opens with a rule',
+  );
 });
 
 test('REFUSED by name at shipped defaults: a key an inbox card does not have — `after:` with where it is said instead — `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not absolute or names no directory, an empty body, and a frontmatter that never closes', () => {
@@ -167,14 +177,15 @@ test("`gate:` names the step a card's run waits at for a person, carried by the 
   );
   assert.deepEqual(inboxLines([listed]), ['cache-the-views-k2q9  Cache the views.  workflow: dev-planned  gate: plan']);
 
-  // Queued, and taken back: the gate stays. Filed from a file whose frontmatter is a card's: the gate is kept.
   assert.equal(
     queuedText(card, '2026-09-16T10:00:00.000Z', isDirectory),
     '---\nworkflow: dev-planned\nqueued: 2026-09-16T10:00:00.000Z\ngate: plan\n---\nCache the views.\n',
+    'queued, and taken back: the gate stays',
   );
   assert.equal(
     ideaCard('./idea.md', '---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n', {}, isDirectory).text,
     '---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n',
+    "filed from a file whose frontmatter is a card's: the gate is kept",
   );
 
   assert.throws(
@@ -260,10 +271,10 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     },
   ] satisfies InboxListing[]);
   assert.deepEqual(inboxListing([], runs, isDirectory), []);
-  // A record naming a card no longer there lists nothing: that card was started, and removed.
   assert.deepEqual(
     inboxListing([files[3]], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' } }], isDirectory).map((l) => l.startedAs),
     [[]],
+    'a record naming a card no longer there lists nothing: that card was started, and removed',
   );
 });
 
@@ -348,17 +359,24 @@ test("`ideaCard`: a note is the body; a file whose frontmatter is an inbox card'
     text: 'Cache the views.\nBetween passes.\n',
     body: 'Cache the views.\nBetween passes.',
   });
-  // Not a card's frontmatter, so the text is the body whole — kept from being read as frontmatter by a comment before it; and a rule that never closes.
   const brief = '---\ntitle: the flag\nworkflow: dev\n---\nParse it.';
   const kept = ideaCard('./brief.md', `${brief}\n`, {}, isDirectory);
-  assert.deepEqual(kept, { text: `---\n# the idea below opens with a rule of its own\n---\n${brief}\n`, body: brief });
+  assert.deepEqual(
+    kept,
+    { text: `---\n# the idea below opens with a rule of its own\n---\n${brief}\n`, body: brief },
+    "not a card's frontmatter, so the text is the body whole, kept from being read as frontmatter by a comment before it",
+  );
   assert.equal(
     parseInboxCard('brief-ab12.md', kept.text, isDirectory).body,
     brief,
     'the card it writes reads back as the text it was given',
   );
   assert.equal(ideaCard('./brief.md', brief, { workflow: 'dev' }, isDirectory).text, `---\nworkflow: dev\n---\n${brief}\n`);
-  assert.equal(ideaCard('the idea', '---\nA note that opens with a rule.\n', {}, isDirectory).body, '---\nA note that opens with a rule.');
+  assert.equal(
+    ideaCard('the idea', '---\nA note that opens with a rule.\n', {}, isDirectory).body,
+    '---\nA note that opens with a rule.',
+    'a rule that never closes is the body',
+  );
 });
 
 test("`ideaCard` writes a file's own `workflow:` that is a path absolute against the file's folder — as a plan card's is read from its plan folder — and leaves a name a name, an absolute path as it is, and a flag's over it", () => {
@@ -395,12 +413,12 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with nothing in the id
     () => ideaCard('./empty.md', '---\nworkflow: dev\n---\n', {}, isDirectory),
     refusedWith(/^\.\/empty\.md: the body is empty\./),
   );
-  // Not a card yet, so the refusal names no card's path: file the idea, then give the wait at start.
   assert.throws(
     () => ideaCard('./ideas/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', {}, isDirectory),
     refusedWith(
       /^\.\/ideas\/d\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>\/<name>\.md --after <runId>\.$/,
     ),
+    "not a card yet, so the refusal names no card's path: file the idea, then give the wait at start",
   );
   assert.throws(
     () => ideaCard('./d.md', '---\nworkflow: dev\nrepo: /home/me/code/app\nrepo: /home/me/code/app\n---\nx\n', {}, isDirectory),
@@ -476,8 +494,6 @@ test('a card with no workflow is refused naming the workflows the repository has
   assert.equal(fromNote({ from: { inbox: 'cache-the-views-k2q9' } }), 'from inbox card cache-the-views-k2q9');
   assert.equal(fromNote({}), undefined);
 });
-
-// ─── cards that start themselves ────────────────────────────────────────────
 
 test('a queued card is a card with `queued:`, the ISO time it was queued — REFUSED by name at shipped defaults: a `queued:` that is not a time, one on a card with no `workflow:`, and a `queued:` carried into `wf inbox add` by a file', () => {
   assert.deepEqual(read('---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views.\n'), {
@@ -636,7 +652,6 @@ test("`inboxListing` gives each queued card its place in the order — by when i
     'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12',
     'f-parked   Parked  workflow: dev',
   ]);
-  // A card that names its repository is not told of another.
   const named = inboxListing(
     [{ file: 'g-named.md', text: `---\nworkflow: nope\nrepo: ${app}\nqueued: 2026-09-16T09:00:00.000Z\n---\nNamed\n` }],
     [],
@@ -658,6 +673,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   assert.equal(
     inboxLines(named)[0],
     `g-named  Named  workflow: nope  repo: ${app}  queued 1 of 1 — not started at 2026-09-16T10:06:00.000Z: g-named.md: no workflow folder. Edit the card, or take it back and queue it again, and the tick tries it again`,
+    'a card that names its repository is not told of another',
   );
 });
 
@@ -709,16 +725,16 @@ test('a queued card whose `repo:` names no directory any more keeps its place in
   );
   assert.equal(nextQueued(listing, '/home/me/code/app')?.name, 'gone-a1b2', 'the tick tries it, and the start says why');
 
-  // Once refused as it stands, passed over, and `wf inbox` says so beside why it does not read — without saying that twice.
   const refused = inboxListing(
     files,
     [],
     isDirectory,
     new Map([['gone-a1b2', { at: '2026-09-16T10:00:00.000Z', text: gone, repo: '/home/me/code/gone', why, refused: true }]]),
   );
-  assert.equal(nextQueued(refused, '/home/me/code/app')?.name, 'behind-c3d4');
+  assert.equal(nextQueued(refused, '/home/me/code/app')?.name, 'behind-c3d4', 'once refused as it stands, passed over');
   assert.equal(
     inboxLines(refused).at(-1),
     `gone-a1b2    ${why}  queued 1 of 2 — not started at 2026-09-16T10:00:00.000Z Edit the card, or take it back and queue it again, and the tick tries it again`,
+    'wf inbox says so beside why it does not read, without saying that twice',
   );
 });

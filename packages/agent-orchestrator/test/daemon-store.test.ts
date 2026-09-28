@@ -6,7 +6,9 @@
  * A store of its own, since the verbs read every run under `WF_ROOT`. The engine is a fake whose tick is all a pass over an empty store asks
  * of it, so a test counts the passes and reads the file between them. A holder that is alive is a real process of the test's — a sleeper —
  * written with its own start from `/proc`, as `wf up` writes its own; one that is gone is a child that has exited; and a pid reused after
- * a crash is the sleeper under a start that is not its own.
+ * a crash is the sleeper under a start that is not its own. `WF_ROOT` is read as the module loads, so it is set before the import;
+ * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in
+ * tick.ts).
  */
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,9 +19,7 @@ import type { Engine, RefusedMove, TickReport } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-daemon-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../src/runner.ts');
@@ -121,8 +121,6 @@ const clear = () => fs.rmSync(FILE, { force: true });
 test('a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout', async (t) => {
   assert.equal(daemonFile(), FILE);
   clear();
-  // One pass that awaits — as an npm ci in each of several worktrees does — until it has seen two beats of its own daemon, under a bound of
-  // seconds: counted, not timed. Without the beat's timer no beat comes and the bound fails it.
   const beats: string[] = [];
   const kinds = new Set<string>();
   const e = engineOf(() => {
@@ -132,7 +130,10 @@ test('a pass that runs long is heard from: the beat is written while the pass aw
     e.passes++;
     const until = Date.now() + 10_000;
     while (beats.length < 2) {
-      assert.ok(Date.now() < until, 'two beats within 10s of a pass in flight');
+      assert.ok(
+        Date.now() < until,
+        "two beats within 10s of one pass that awaits them, as an npm ci does: counted, not timed; without the beat's timer none comes",
+      );
       const f = read();
       assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
       if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
@@ -183,10 +184,13 @@ test('REFUSED at shipped defaults: `wf up` with an interval daemon.json cannot h
     assert.equal(e.passes, 0, arg);
     assert.equal(fs.existsSync(FILE), false, `${arg}: the store not taken`);
   }
-  // And a store held by a live daemon is not freed by one: the refusal is the interval's, the file untouched.
   const text = holdBy(LIVE);
   await assert.rejects(main(['up', '-5'], engineOf()), refusedWith(/^wf up takes its pass interval/));
-  assert.equal(fs.readFileSync(FILE, 'utf8'), text);
+  assert.equal(
+    fs.readFileSync(FILE, 'utf8'),
+    text,
+    "a store held by a live daemon is not freed by a bad interval: the refusal is the interval's, the file untouched",
+  );
   clear();
 });
 
@@ -249,11 +253,14 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
     assert.equal(e.passes, 0, 'neither ticked');
     assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
   }
-  // `wf ls` says who ticks, last.
   holdBy(LIVE);
   const { printed } = await typed(t, ['ls'], engineOf());
   assert.equal(printed[0], 'no runs');
-  assert.match(printed.at(-1)!, new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — last pass \\d+s ago \\(`));
+  assert.match(
+    printed.at(-1)!,
+    new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — last pass \\d+s ago \\(`),
+    '`wf ls` says who ticks, last',
+  );
 });
 
 test('a holder stale, gone or stopped is taken over by `wf up` — and not refused to a `wf tick`, which writes nothing', async (t) => {
@@ -346,7 +353,6 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
 
 test("`wf up` stopped by a signal lets the store go on the way out, with the signal's exit code", async () => {
   clear();
-  // A real process, since a signal stops it; its engine a fake, so no harness is asked anything.
   const cli = new URL('../src/cli.ts', import.meta.url).href;
   const child = spawn(
     process.execPath,
@@ -362,14 +368,13 @@ test("`wf up` stopped by a signal lets the store go on the way out, with the sig
   );
   const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
   try {
-    // Wait for a pass it wrote down, under a bound.
     const until = Date.now() + 20_000;
     while (!(fs.existsSync(FILE) && read().pid === child.pid && read().passedAt)) {
       assert.ok(Date.now() < until, 'the daemon wrote a pass within 20s');
       await new Promise((r) => setTimeout(r, 25));
     }
     child.kill('SIGTERM');
-    assert.equal(await exited, 143);
+    assert.equal(await exited, 143, 'a real process, since a signal stops it; its engine a fake, so no harness is asked anything');
     const file = read();
     assert.equal(file.pid, child.pid);
     assert.ok(file.stoppedAt, 'stoppedAt written as it stopped');
@@ -380,7 +385,6 @@ test("`wf up` stopped by a signal lets the store go on the way out, with the sig
 });
 
 test("REFUSED NOT: a pid alive but another process's — reused after a kill -9 — holds nothing, and is never named as one to kill", async (t) => {
-  // The sleeper under a start that is not its own: a live pid, a fresh pass, and not the process that wrote the file.
   assert.equal(typeof procStartOf(LIVE), 'number', 'this test needs /proc');
   const text = holdBy(LIVE, { procStart: procStartOf(LIVE)! + 1 });
   const kill = new RegExp(`kill ${LIVE}\\b`);
@@ -388,6 +392,7 @@ test("REFUSED NOT: a pid alive but another process's — reused after a kill -9 
   assert.equal(
     ls.printed.at(-1),
     `wf up: none ticking — the wf up of pid ${LIVE} is gone, that pid another process's now; its ${ls.printed.at(-1)!.split('; its ')[1]}`,
+    'the sleeper under a start that is not its own: a live pid, a fresh pass, and not the process that wrote the file',
   );
   const tick = engineOf(() => {});
   const byHand = await typed(t, ['tick'], tick);
@@ -418,13 +423,16 @@ test("REFUSED NOT: a pid alive but another process's — reused after a kill -9 
 });
 
 test('REFUSED at shipped defaults, unconfirmed: a live pid whose start cannot be compared holds the store — and its pid is not handed over bare', async () => {
-  // A file with no process start, as one written where there is no /proc reads everywhere: the pid is alive, so it holds.
   const text = holdBy(LIVE, { procStart: undefined });
   const e = engineOf();
   const unconfirmed = new RegExp(
     `its pid, once checked: ${LIVE} could not be confirmed here as the process that wrote daemon\\.json \\(the file names no process start\\), .* if ps -p ${LIVE} -o lstart=,args= shows a wf up started at \\S+, kill ${LIVE}`,
   );
-  await assert.rejects(main(['up'], e), refusedWith(new RegExp(`^wf up: ${ROOT} is held by the wf up of pid ${LIVE}, `), unconfirmed));
+  await assert.rejects(
+    main(['up'], e),
+    refusedWith(new RegExp(`^wf up: ${ROOT} is held by the wf up of pid ${LIVE}, `), unconfirmed),
+    'a file with no process start, as one written where there is no /proc reads everywhere: the pid is alive, so it holds',
+  );
   await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^wf tick: ${ROOT} is held by the wf up of pid ${LIVE}, `), unconfirmed));
   await assert.rejects(main(['up'], e), (err: Error) => !new RegExp(`kill ${LIVE} —`).test(err.message));
   assert.equal(e.passes, 0);
@@ -519,7 +527,6 @@ test('`wf up` says a move the runtime refused once while it lasts, and again onc
   clear();
   const stuck: RefusedMove = { taskId: 't-stuck', state: 'working', event: 'SESSION_LIVE' };
   const other: RefusedMove = { taskId: 't-other', state: 'ending', event: 'CLOSED' };
-  // What each pass's report says was refused: pass 5 has cleared it, pass 6 has it back.
   const byPass = [[stuck], [stuck], [stuck, other], [stuck, other], [], [stuck], [stuck]];
   const e = engineOf();
   e.tick = async () => {
@@ -536,7 +543,7 @@ test('`wf up` says a move the runtime refused once while it lasts, and again onc
   assert.deepEqual(
     said.map((l) => l.slice(10)),
     [words(stuck), words(other), words(stuck)],
-    printed.join('\n'),
+    `each pass's report says what was refused, pass 5 has cleared it, and pass 6 has it back:\n${printed.join('\n')}`,
   );
   assert.ok(
     said.every((l) => /^\d\d:\d\d:\d\d  t-/.test(l)),
@@ -620,8 +627,11 @@ test('a cost reads back as written, and REFUSED: half a file, another shape, a p
     parsePassCost(JSON.stringify({ ...COST, harnesses: { claude: { calls: 1, ms: 1, listed: 'all', spawned: 0 } } })),
     undefined,
   );
-  // A key a newer meter writes is kept, as the file is read whole.
-  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, later: 1 })), { ...COST, later: 1 });
+  assert.deepEqual(
+    parsePassCost(JSON.stringify({ ...COST, later: 1 })),
+    { ...COST, later: 1 },
+    'a key a newer meter writes is kept, as the file is read whole',
+  );
   assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, rested: 3 })), { ...COST, rested: 3 }, 'the runs answered from memory');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and REFUSED, a count of them that is not one');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: -1 })), undefined);

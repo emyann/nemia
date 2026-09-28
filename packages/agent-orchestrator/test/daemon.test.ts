@@ -49,30 +49,42 @@ test('each standing, from the file and the clock: none, unreadable, ticking, sta
   assert.equal(judged(undefined, live).kind, 'none');
   assert.equal(kindOf(holder()), 'ticking');
   assert.equal(kindOf(holder({ passedAt: null, startedAt: ago(1) })), 'ticking', 'started a minute ago and no pass yet is still ticking');
-  // Alive but quiet: stalled on the far side of the threshold, ticking on the near one — deleting the stale comparison fails the first.
-  assert.equal(kindOf(holder({ passedAt: ago(16) })), 'stalled');
-  assert.equal(kindOf(holder({ passedAt: ago(14) })), 'ticking');
+  assert.equal(
+    kindOf(holder({ passedAt: ago(16) })),
+    'stalled',
+    'alive but quiet: stalled on the far side of the threshold, which fails without the stale comparison',
+  );
+  assert.equal(kindOf(holder({ passedAt: ago(14) })), 'ticking', 'and ticking on the near one');
   assert.equal(
     kindOf(holder({ passedAt: null, startedAt: ago(16) })),
     'stalled',
     'a start with no pass for sixteen minutes is stalled too',
   );
-  // Measured from the holder's own interval, not the reader's.
-  assert.equal(kindOf(holder({ every: 600_000, startedAt: ago(300), passedAt: ago(90) })), 'ticking');
+  assert.equal(
+    kindOf(holder({ every: 600_000, startedAt: ago(300), passedAt: ago(90) })),
+    'ticking',
+    "measured from the holder's own interval, not the reader's",
+  );
   assert.equal(kindOf(holder({ every: 600_000, startedAt: ago(300), passedAt: ago(101) })), 'stalled');
-  // A pass that runs long is heard from by its beat: forty minutes since a pass, beating now, is ticking — deleting the beat from `last` fails
-  // this — and a beat as silent as the pass is stalled all the same.
-  assert.equal(kindOf(holder({ passedAt: ago(40), beatAt: ago(0.05) })), 'ticking');
-  assert.equal(kindOf(holder({ passedAt: ago(40), beatAt: ago(16) })), 'stalled');
+  assert.equal(
+    kindOf(holder({ passedAt: ago(40), beatAt: ago(0.05) })),
+    'ticking',
+    'a pass that runs long is heard from by its beat: forty minutes since a pass, beating now, is ticking, which fails without the beat in `last`',
+  );
+  assert.equal(kindOf(holder({ passedAt: ago(40), beatAt: ago(16) })), 'stalled', 'a beat as silent as the pass is stalled all the same');
   assert.equal(kindOf(holder({ passedAt: ago(0.05), beatAt: ago(16) })), 'ticking', 'the latest of pass and beat');
-  // Dead but fresh: gone at once — deleting the liveness check fails this.
-  assert.equal(kindOf(holder({ passedAt: ago(0) }), dead), 'gone');
-  // A stop said frees the store even while its pid answers: reused by another process, it holds nothing.
-  assert.equal(kindOf(holder({ stoppedAt: ago(0.01) })), 'stopped');
-  // A pid alive but another process's — reused after a kill -9 — is gone, however fresh the file: deleting the identity check fails this.
-  assert.equal(kindOf(holder({ passedAt: ago(0) }), as('other')), 'gone');
-  // A live pid that cannot be compared holds, as a live pid did before: two writers are the worse mistake.
-  assert.equal(kindOf(holder(), as('unknown')), 'ticking');
+  assert.equal(kindOf(holder({ passedAt: ago(0) }), dead), 'gone', 'dead but fresh: gone at once, which fails without the liveness check');
+  assert.equal(
+    kindOf(holder({ stoppedAt: ago(0.01) })),
+    'stopped',
+    'a stop said frees the store even while its pid answers: reused by another process, it holds nothing',
+  );
+  assert.equal(
+    kindOf(holder({ passedAt: ago(0) }), as('other')),
+    'gone',
+    "a pid alive but another process's, reused after a kill -9, is gone however fresh the file, which fails without the identity check",
+  );
+  assert.equal(kindOf(holder(), as('unknown')), 'ticking', 'a live pid that cannot be compared holds: two writers are the worse mistake');
   assert.equal(kindOf(holder({ passedAt: ago(16) }), as('unknown')), 'stalled');
 });
 
@@ -129,14 +141,12 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
     /^wf tick: \/store is held by the wf up of pid 4242, started \S+ in \/home\/me\/repo, every 4000ms — no pass completed yet, started 30s ago \(\S+\), which runs this same pass within its interval: a pass by hand beside it would be a second writer\. /,
   );
   assert.match(tick, /kill 4242 — that pid is the node process that ticks, not an npm exec wrapper .* and tick by hand then\.$/);
-  // A pid that could not be confirmed as the daemon is never handed over as a pid to kill as it stands: it is named, said unconfirmed, and
-  // how to check it comes before the kill.
   for (const [file, why] of [
     [holder({ procStart: 99 }), 'no /proc/4242/stat to compare its start with'],
     [holder(), 'the file names no process start'],
   ] as const) {
     const refusal = holdRefusal(held(file, as('unknown')), 'up', '/store', NOW);
-    assert.doesNotMatch(refusal, /kill 4242 —/);
+    assert.doesNotMatch(refusal, /kill 4242 —/, 'a pid not confirmed as the daemon is never handed over as a pid to kill as it stands');
     assert.ok(
       refusal.includes(
         `stop it with its pid, once checked: 4242 could not be confirmed here as the process that wrote daemon.json (${why}), `,
@@ -146,6 +156,7 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
     assert.match(
       refusal,
       /a pid is reused once its process ends — if ps -p 4242 -o lstart=,args= shows a wf up started at 2026-09-22T11:00:00\.000Z, kill 4242; /,
+      'it is named, said unconfirmed, and how to check it comes before the kill',
     );
   }
 });
@@ -184,10 +195,10 @@ test("wf ls's line: whether a daemon ticks the store, and when its last pass was
     line(holder({ passedAt: ago(20) })),
     'wf up: stalled, pid 4242, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (2026-09-22T11:40:00.000Z); the next wf up takes the store over, and kill 4242 stops it',
   );
-  // A pass under way: its beat more than two intervals past its last pass is said, so a pass that runs long, or never ends, reads as one.
   assert.equal(
     line(holder({ passedAt: ago(40), beatAt: ago(0.05) })),
     'wf up: ticking, pid 4242, every 4000ms — last pass 40m00s ago (2026-09-22T11:20:00.000Z), a pass under way since — alive 3s ago (2026-09-22T11:59:57.000Z)',
+    'a beat more than two intervals past the last pass is said, so a pass that runs long, or never ends, reads as one under way',
   );
   assert.equal(
     line(holder({ passedAt: ago(0.05), beatAt: ago(0.02) })),
@@ -230,7 +241,6 @@ test('REFUSED: an interval the file cannot hold — negative, zero, fractional, 
     [String(MAX_EVERY_MS), MAX_EVERY_MS],
   ] as const) {
     assert.deepEqual(everyOf(arg), { every }, arg);
-    // Every interval taken is one the file reads back: the guard and the parser agree.
-    assert.equal(parseDaemonFile(text(holder({ every })))?.every, every);
+    assert.equal(parseDaemonFile(text(holder({ every })))?.every, every, 'every interval taken is one the file reads back');
   }
 });

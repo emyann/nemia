@@ -1,8 +1,8 @@
 /**
- * The branch reader (`branchReader` in branches.ts): git's word on a run's result branches — on the base or not (`isShipped`), there or gone,
- * how far ahead — answered from one `for-each-ref` of a repository's branches, where `oneByOne` asks git a process for each question. It
- * must say what `oneByOne` says of every shape a branch can be in, whichever order the branches are asked in, and ask git once for a
- * repository where `oneByOne` asks it twice for each branch.
+ * The branch reader (`branchReader` in branches.ts): git's word on a run's result branches — on the base or not (`isShipped`), there or
+ * gone, how far ahead — answered from one `for-each-ref` of a repository's branches, where `oneByOne` asks git a process for each
+ * question. It must say what `oneByOne` says of every shape a branch can be in, whichever order the branches are asked in, and ask git
+ * once for a repository where `oneByOne` asks it twice for each branch.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,7 +48,12 @@ const aRun = (repo: string, fields: Partial<GitRun>): GitRun => ({
   ...fields,
 });
 
-/** Every shape a result branch can be in against its run's base, on two base branches, and bases git cannot read. */
+/**
+ * Every shape a result branch can be in against its run's base, on two base branches, and bases git cannot read: `moved-back` was cut at
+ * b1 and moved back to b0, which b1 has, so it is on the base with nothing past the run's base; `on-release` is merged into the second
+ * base branch alone; and the last two runs name a commit the repository does not have and a base branch it does not have, which git
+ * refuses, so the reader asks one by one.
+ */
 const shapes = () => {
   const repo = aRepo();
   const b0 = git(repo, 'rev-parse', 'main');
@@ -64,9 +69,7 @@ const shapes = () => {
   const goneUnmerged = commitOn(repo, 'gone-unmerged', b0, 'gone, never merged');
   git(repo, 'branch', '-D', 'gone-unmerged');
   const b1 = git(repo, 'rev-parse', 'main');
-  // Cut at b1 and then moved back to b0, which b1 has: on the base, with nothing past the run's base.
   git(repo, 'branch', 'moved-back', b0);
-  // A second base branch, and a branch merged into it alone.
   git(repo, 'branch', 'release', b0);
   commitOn(repo, 'on-release', b0, 'for release');
   git(repo, 'checkout', '-q', 'release');
@@ -78,7 +81,6 @@ const shapes = () => {
     aRun(repo, { baseRef: b0, tips }),
     aRun(repo, { baseRef: b1, tips }),
     aRun(repo, { baseRef: b0, branch: 'release', tips }),
-    // A commit the repository does not have, and a base branch it does not have: git refuses both, and the reader asks one by one.
     aRun(repo, { baseRef: 'f'.repeat(40), tips }),
     aRun(repo, { baseRef: b0, branch: 'no-such-base', tips }),
   ];
@@ -91,12 +93,12 @@ const answers = (git: BranchReader, runs: readonly GitRun[], branches: readonly 
 test('the reader says what git says one question at a time, of every shape a branch can be in, in either order, primed or not', () => {
   const { repo, runs, all } = shapes();
   const expected = answers(oneByOne, runs, all);
-  // The fixture has each answer: a yes with work, a yes with none, a no, gone, and ahead.
   const said = new Set(expected.flatMap((a) => a.shipped.map(String)));
-  assert.deepEqual([...said].sort(), ['false', 'true', 'unchanged']);
+  assert.deepEqual([...said].sort(), ['false', 'true', 'unchanged'], 'the fixture has each answer: a yes with work, a yes with none, a no');
   assert.ok(
     expected.some((a) => a.standings.some((s) => s.where === 'gone')) &&
       expected.some((a) => a.standings.some((s) => s.where === 'ahead' && s.commits === 1)),
+    'and a branch gone, and one ahead',
   );
   assert.deepEqual(
     runs.map((run) => all.map((b) => isShipped(run, b))),
@@ -117,8 +119,7 @@ test('the reader says what git says one question at a time, of every shape a bra
     answers(oneByOne, [...runs].reverse(), backwards),
     'in the opposite order',
   );
-  // And the heads a memo keys the answers by are git's.
-  assert.deepEqual(Object.fromEntries(primed.heads(repo)), headsOf(repo));
+  assert.deepEqual(Object.fromEntries(primed.heads(repo)), headsOf(repo), "the heads a memo keys the answers by are git's");
   assert.deepEqual(Object.fromEntries(branchReader().heads(repo)), headsOf(repo));
   assert.deepEqual(Object.fromEntries(oneByOne.heads(repo)), headsOf(repo));
   assert.ok(Object.keys(headsOf(repo)).includes('ahead'));
@@ -169,8 +170,11 @@ test('a base git cannot read costs the reader one more listing, not a process fo
     value,
     all.map((run, k) => branchStandings(run, [`wf/r-${Math.min(k, 9)}`], oneByOne)),
   );
-  // The listing git refused, the commits it can read, the listing again without the one it cannot, and that run's own question.
-  assert.equal(tallies!.kinds.git.spawned, 4);
+  assert.equal(
+    tallies!.kinds.git.spawned,
+    4,
+    "the listing git refused, the commits it can read, the listing again without the one it cannot, and that run's own question",
+  );
 });
 
 test('a primed reader lists a repository on the first question about it, and one nothing is asked about costs no process', async () => {
@@ -204,7 +208,10 @@ test('a base branch the repository does not have costs two more listings, and th
     runs.map((run) => branchStandings(run, ['wf/r-0'], oneByOne)),
   );
   assert.deepEqual(value.heads, headsOf(repo));
-  // The listing git refused, the branches alone, the listing again without the base it cannot read, and that run's own questions.
   const own = await metered(async () => branchStandings(runs[1], ['wf/r-0'], oneByOne));
-  assert.equal(tallies!.kinds.git.spawned, 3 + own.tallies!.kinds.git.spawned);
+  assert.equal(
+    tallies!.kinds.git.spawned,
+    3 + own.tallies!.kinds.git.spawned,
+    "the listing git refused, the branches alone, the listing again without the base it cannot read, and that run's own questions",
+  );
 });

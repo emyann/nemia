@@ -1,7 +1,7 @@
 /**
  * The git `.claude/settings.json` allows every session in this checkout, and so the whole of the git a `dontAsk` planner or reviewer
- * may run: git's read-only verbs, and nothing that writes, runs a program or moves a ref (the owner, 2026-09-25;
- * `workflows/dev/README.md`, *What git a fenced step may run*).
+ * may run: git's read-only verbs, and nothing that writes, runs a program or moves a ref (`workflows/dev/README.md`, *What git a fenced
+ * step may run*).
  *
  * An allow rule matches by prefix, so the fence is the list itself: a `Bash(git …)` allow that is not on `READS` fails, and `READS` is held
  * against the verbs that write, run a program or reach past the step's own directory, so the list cannot grow one either.
@@ -14,7 +14,10 @@ import path from 'node:path';
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const SETTINGS = path.join(REPO, '.claude', 'settings.json');
 
-/** Every git allow the settings may hold, word for word. `git merge-tree --write-tree` writes tree objects into the object store and moves no ref, index or file. */
+/**
+ * Every git allow the settings may hold, word for word. `git merge-tree --write-tree` writes tree objects into the object store and
+ * moves no ref, index or file.
+ */
 const READS = [
   'Bash(git diff:*)',
   'Bash(git log:*)',
@@ -94,12 +97,15 @@ test('every git allow in the shipped settings is a read on the named list, and t
   const { allow } = shipped();
   assert.deepEqual(refusals(allow), []);
   assert.deepEqual(refusals(READS), [], 'the list itself holds no verb that writes, runs a program or moves a ref');
-  // The reads the steps' recorded denials asked for are there, word for word: whether the branch still merges, and where.
-  for (const rule of ['Bash(git merge-tree:*)', 'Bash(git merge-base:*)', 'Bash(git ls-tree:*)']) assert.ok(allow.includes(rule), rule);
-  // And the deny list is the one it was: a push, and a branch deleted by force.
+  for (const rule of ['Bash(git merge-tree:*)', 'Bash(git merge-base:*)', 'Bash(git ls-tree:*)'])
+    assert.ok(
+      allow.includes(rule),
+      `${rule}: a read the steps' recorded denials asked for, word for word: whether the branch still merges, and where`,
+    );
   assert.deepEqual(
     shipped().deny.filter((r) => r.startsWith('Bash(git')),
     ['Bash(git push)', 'Bash(git push:*)', 'Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)'],
+    'the deny list: a push, and a branch deleted by force',
   );
 });
 
@@ -121,15 +127,21 @@ test('REFUSED: a git allow for -C, grep, fetch, a verb that writes, a bare git, 
     assert.equal(said.length, 1, `${rule} is refused: ${said.join('; ')}`);
     assert.ok(said[0].startsWith(`${rule}: `), said[0]);
   }
-  // Refused for what it is, not only for being off the list: put on the list, a rule that writes is refused all the same.
   READS.push('Bash(git -C:*)', 'Bash(git commit:*)');
   try {
-    assert.match(refusalOf('Bash(git -C:*)')!, /option before the verb/);
+    assert.match(
+      refusalOf('Bash(git -C:*)')!,
+      /option before the verb/,
+      'refused for what it is, not only for being off the list: put on the list, a rule that writes is refused all the same',
+    );
     assert.match(refusalOf('Bash(git commit:*)')!, /writes/);
   } finally {
     READS.splice(-2);
   }
-  // A read off the list is refused too: the list is named, not inferred.
-  assert.match(refusalOf('Bash(git cat-file:*)')!, /not on the named list/);
+  assert.match(
+    refusalOf('Bash(git cat-file:*)')!,
+    /not on the named list/,
+    'a read off the list is refused too: the list is named, not inferred',
+  );
   assert.equal(refusalOf('Bash(npm test)'), undefined, 'not a git rule');
 });

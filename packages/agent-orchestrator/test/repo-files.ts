@@ -18,10 +18,13 @@ export const files = (): string[] =>
     .split('\0')
     .filter(Boolean);
 
-/** Text, not an image: a NUL in its first bytes is a binary file, which says no name a person reads. */
+/**
+ * Text, not an image: a NUL in its first bytes is a binary file, which says no name a person reads. Undefined for a path that is no file,
+ * deleted or not yet staged, or a link.
+ */
 export const textOf = (file: string): string | undefined => {
   const at = path.join(REPO, file);
-  if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) return undefined; // deleted, not yet staged; or a link
+  if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) return undefined;
   const bytes = fs.readFileSync(at);
   return bytes.subarray(0, 8000).includes(0) ? undefined : bytes.toString('utf8');
 };

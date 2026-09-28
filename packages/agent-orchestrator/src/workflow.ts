@@ -721,7 +721,7 @@ function stepFrom(
 
 /**
  * Refused: a Claude Code step that runs in `auto` — named, or the mode it is filed with when it names none — on a model that drops it
- * (`autoDropped`, F21). The refusal names the modes that keep what the step is for.
+ * (`autoDropped`). The refusal names the modes that keep what the step is for.
  */
 function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined): void {
   const dropped = autoDropped(harness, model, permissionMode);
@@ -733,10 +733,10 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
 
 /**
  * Why a Claude Code session filed in `permissionMode` — the mode a step names, or `undefined` for none — would not run in it on `model`, as
- * the words after what names the model: `names no \`permissionMode:\`, … (F21, …)`. `undefined` when it would: on codex, which has
- * sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says `default` from its
- * first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording for the load's
- * refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
+ * the words after what names the model: `names no \`permissionMode:\`, …, and Claude Code drops \`auto\` …`. `undefined` when it would:
+ * on codex, which has sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says
+ * `default` from its first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording
+ * for the load's refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
  */
 export function autoDropped(
   harness: string | undefined,
@@ -1766,7 +1766,7 @@ const ENTRY_LISTS: readonly EntryKey[] = ['tags', 'examples'];
 
 /**
  * The card entry of one composed skill: its `AgentSkill`, read off its SKILL.md's frontmatter (`text`). `id` is the skill's folder, `name` its
- * `title:` — a key Claude Code ignores (F7), for the card alone — or else its frontmatter `name`, or else the id, as Claude Code names a
+ * `title:` — a key Claude Code ignores, for the card alone — or else its frontmatter `name`, or else the id, as Claude Code names a
  * skill; `description` is the frontmatter's, which the A2A protocol and Claude Code's listing both need, so a skill with none is refused;
  * `tags` are the frontmatter's, or the id when it gives none (the protocol marks them REQUIRED, and a skill written for Claude Code alone
  * has none); `examples` only when given. Pure: `file` is what a refusal calls the SKILL.md.
@@ -2232,9 +2232,9 @@ const isOwnKey = (key: string): key is AgentOwnKey => (AGENT_OWN_KEYS as readonl
 
 /**
  * What becomes of Claude Code's own system prompt for an agent's steps (`systemPrompt:`): `default` keeps it and appends the agent's
- * instructions after it (`--append-system-prompt-file`, F1); `no-coding` keeps it less its coding instructions, through an output style
- * that says `keep-coding-instructions: false`, and appends them the same (F16, F17); `own` replaces it with them (`--system-prompt-file`,
- * F15). Absent is `default`. Claude Code's alone: codex is handed its instructions in the brief.
+ * instructions after it (`--append-system-prompt-file`); `no-coding` keeps it less its coding instructions, through an output style
+ * that says `keep-coding-instructions: false`, and appends them the same; `own` replaces it with them (`--system-prompt-file`).
+ * Absent is `default`. Claude Code's alone: codex is handed its instructions in the brief.
  */
 export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
 export type SystemPrompt = (typeof SYSTEM_PROMPTS)[number];
@@ -2253,7 +2253,7 @@ export function skillNameRefusal(name: unknown): string | undefined {
  * What a skill costs an agent's sessions, in tokens, estimated at four characters a token (the page says "about"): `listed`, its name and
  * description, which Claude Code lists to every session of an agent that gives it; `body`, its SKILL.md's body, which a session reads when
  * it loads the skill — or, for a skill that says `preload: true`, which the run appends to the system prompt, so it is carried on every turn
- * (cached; F14). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
+ * (cached). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
  * SKILL.md that does not read costs what its text would.
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
@@ -2284,7 +2284,7 @@ export function skillTurnCost(id: string, text: string): SkillCost {
 export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
 
 /**
- * The models Claude Code runs in `default` when asked for `auto` (F21, Claude Code 2.1.282): the
+ * The models Claude Code runs in `default` when asked for `auto` (Claude Code 2.1.282): the
  * session starts in `auto`, says `default` from its first turn, and a job denies every call `default` would ask about. Each name as written
  * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not listed is let through: the list is what is known to fail.
  */
@@ -2449,7 +2449,7 @@ function systemPromptOf(file: string, written: string | undefined): SystemPrompt
  * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`), and
  * again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or `harness:`
  * can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a system prompt other than `default`
- * are refused: a session continued keeps the system prompt it was started with, and the plugins with it (F13).
+ * are refused: a session continued keeps the system prompt it was started with, and the plugins with it.
  */
 function composedRefusal(
   named: string,

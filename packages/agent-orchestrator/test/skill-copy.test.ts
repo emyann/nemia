@@ -3,7 +3,7 @@
  * And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
  * The copy is held byte for byte against the shipped folder, and each refusal is made to refuse at shipped defaults, asserted on its
- * message, its kind, and with the library as it was.
+ * message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,6 @@ import { preloads, skillsFor } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-copy-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { copySkill, SkillWriteError } = await import('../src/runner.ts');
 
@@ -160,12 +159,11 @@ test('a skill costs a turn its listing, and its body too when it is preloaded', 
     tokensAbout('---\ndescription: never closed\n'),
     'a frontmatter that never closes is costed as its text',
   );
-  // Every shipped skill is read the same way the render reads it (`preloads`).
   for (const name of fs.readdirSync(SHIPPED)) {
     assert.equal(
       skillTurnCost(name, fs.readFileSync(path.join(SHIPPED, name, 'SKILL.md'), 'utf8')).preload,
       preloads(path.join(SHIPPED, name)),
-      name,
+      `${name}: every shipped skill is read the same way the render reads it`,
     );
   }
 });

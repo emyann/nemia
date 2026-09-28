@@ -1,8 +1,8 @@
 /**
  * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed and dropped through the verbs, as a person types them.
  *
- * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card is
- * filed under, and the run records a listing reads.
+ * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card
+ * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,6 @@ const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, readRun, start, startFromInbox } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
@@ -131,7 +130,6 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
     '--repo written absolute',
   );
 
-  // A file: its card's keys are read, the flag written over its own, and a workflow given as a path is kept absolute.
   const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
   fs.writeFileSync(given, `---\nworkflow: ui\nrepo: /nowhere/at/all\n---\nShow the flag on the settings page.\n`);
   await printedBy(t, 'inbox', 'add', given, '--repo', repo);
@@ -139,11 +137,11 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   assert.equal(
     fs.readFileSync(path.join(INBOX, third), 'utf8'),
     `---\nworkflow: ui\nrepo: ${repo}\n---\nShow the flag on the settings page.\n`,
+    "a file's card keys are read, and --repo written over its own",
   );
   assert.equal(fs.readFileSync(given, 'utf8').includes('/nowhere/at/all'), true, 'the file given is left as it was');
   const byPath = addToInbox({ text: 'Store the flag', workflow: path.join(repo, 'workflows', 'dev') });
-  assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'));
-  // --workflow given as a path from here: written absolute, so the inbox reads the same folder.
+  assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'), 'a workflow given as a path is kept absolute');
   const relative = path.relative(process.cwd(), path.join(repo, 'workflows', 'ui'));
   assert.match(relative, /\//, 'a path, not a name');
   await printedBy(t, 'inbox', 'add', 'Store the flag by path', '--workflow', relative);
@@ -151,10 +149,10 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   assert.equal(
     fs.readFileSync(path.join(INBOX, fourth), 'utf8'),
     `---\nworkflow: ${path.join(repo, 'workflows', 'ui')}\n---\nStore the flag by path\n`,
+    '--workflow given as a path from here is written absolute, so the inbox reads the same folder',
   );
   fs.rmSync(path.join(INBOX, fourth));
 
-  // Listed: a card a record names as started, a card that does not read, a file that is not a card; a hidden file and a README are not.
   writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
   writeRecord('an-unrelated-run-yy88');
   fs.writeFileSync(path.join(INBOX, 'broken-a1b2.md'), '---\nharness: codex\n---\nx\n');
@@ -172,6 +170,7 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
       [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
       [byPath.card.name, [], true],
     ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    'listed: a card a record names as started, a card that does not read, a file that is not a card; a hidden file and a README are not',
   );
   const lines = await printedBy(t, 'inbox');
   assert.ok(
@@ -280,7 +279,6 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
 
   const { card, file } = addToInbox({ text: 'Stay where you are' });
   const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], NO_ENGINE);
-  // A file the way out of the folder would reach: a run's record.
   writeRecord('r-outside');
   for (const name of ['../runs/r-outside.json', '../runs/r-outside', 'sub/card', '..']) {
     await assert.rejects(
@@ -311,8 +309,6 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
 });
 
-// ─── starting a card ────────────────────────────────────────────────────────
-
 test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `wf decide` names the card under the run's line; a plan's card started so stays where it is", async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev', 'ui');
@@ -334,16 +330,18 @@ test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `
   assert.deepEqual(readInbox(), []);
   const decided = await printedBy(t, 'decide', id);
   assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
-  // A run typed at wf start carries no `from`, and its decide screen names no card.
   const typed = start({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') });
-  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'), false);
-  assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/);
+  assert.equal(
+    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
+    false,
+    'a run typed at wf start carries no from',
+  );
+  assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
 
-  // A plan's card: started by wf start, and never removed.
   const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
   const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
-  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined]);
+  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined], "a plan's card is started by wf start, with no from");
   assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
 });
 
@@ -355,7 +353,6 @@ test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the car
   const before = runsWritten();
   const starting = (...argv: string[]) => main(['start', ...argv], NO_ENGINE);
 
-  // A name with no card, typed without its .md: refused, where it used to start a run asked to do its own path.
   await assert.rejects(
     starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
     refusedWith(
@@ -363,18 +360,20 @@ test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the car
         `^no card cache-the-views in the inbox\\. Its cards are: ${escaped([card.name, other.card.name].sort().join(', '))}\\. Start one of those`,
       ),
     ),
+    'a name with no card, typed without its .md, is refused, never started as a run asked to do its own path',
   );
-  // A file in the inbox that is not a card, and one in a folder inside it: refused, not read as a brief.
   fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
   await assert.rejects(
     starting(path.join(INBOX, 'notes.txt'), '--workflows', 'dev', '--repo', repo),
     refusedWith(/^no card notes\.txt in the inbox\./),
+    'a file in the inbox that is not a card is refused, not read as a brief',
   );
   fs.mkdirSync(path.join(INBOX, 'drafts'));
   fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
   await assert.rejects(
     starting(path.join(INBOX, 'drafts', 'idea.md'), '--workflows', 'dev', '--repo', repo),
     refusedWith(/^`drafts\/idea` is not a card's name: a name stays in the inbox, with no slash/),
+    'and so is one in a folder inside it',
   );
   assert.equal(runsWritten(), before, 'no run written');
 
@@ -392,7 +391,6 @@ test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the car
 test("`wf inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox", async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev');
-  // The trap: a workflow of the same name in the store, which `../workflows/dev` names when read from the inbox.
   const theStores = path.join(ROOT, 'workflows', 'dev');
   fs.mkdirSync(theStores, { recursive: true });
   fs.writeFileSync(path.join(theStores, 'implement.md'), "the store's own\n");
@@ -407,7 +405,11 @@ test("`wf inbox add <file>` writes a path in the file's own `workflow:` absolute
       `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`,
     );
     const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
-    assert.equal(run.workflowDir, path.join(repo, 'workflows', 'dev'));
+    assert.equal(
+      run.workflowDir,
+      path.join(repo, 'workflows', 'dev'),
+      "the workflow the file meant, not the store's of the same name, which ../workflows/dev names when read from the inbox",
+    );
     assert.equal(fs.readFileSync(idea, 'utf8').includes('workflow: ../workflows/dev'), true, 'the file given is left as it was');
   } finally {
     fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
@@ -443,7 +445,6 @@ test("a start says what the card does not, over what it does: --workflows over `
   );
   assert.match(run.id, /^show-the-flag-on-the-setting-[a-z0-9]{4}$/, 'the id from the brief it was started with');
 
-  // No repo: on the card and none given: the caller's — `wf start`'s `.` — and its workflow: found there, by name.
   const bare = addToInbox({ text: 'Store the flag', workflow: 'ui' });
   const cwd = process.cwd();
   process.chdir(other);
@@ -453,17 +454,24 @@ test("a start says what the card does not, over what it does: --workflows over `
   } finally {
     process.chdir(cwd);
   }
-  assert.deepEqual([here.repo, here.workflowDir], [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')]);
+  assert.deepEqual(
+    [here.repo, here.workflowDir],
+    [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')],
+    "no repo: on the card and none given: the caller's, wf start's `.`, and its workflow: found there, by name",
+  );
   const given = addToInbox({ text: 'Document the flag' });
   const byBoard = startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo });
   assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
 
-  // A brief from a file, and what the card waits on, said at start.
   const brief = path.join(mine, 'work.md');
   fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
   const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
   const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0]);
-  assert.deepEqual([child.brief, child.after, child.from], ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }]);
+  assert.deepEqual(
+    [child.brief, child.after, child.from],
+    ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }],
+    'a brief from a file, and what the card waits on, said at start',
+  );
 });
 
 test('REFUSED by name at shipped defaults, before a run is written and with the card left in the inbox: a card not there — naming those there are — a name that would leave the inbox, no workflow from the card or the flag, a workflow that does not load, a card that does not read, an empty --brief, --brief on anything but an inbox card, and an --after start() refuses', async () => {

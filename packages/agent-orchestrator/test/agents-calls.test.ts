@@ -2,11 +2,13 @@
  * What a pass asks Claude Code's registry, at shipped defaults: the client's `engine()` and `tick()`, over runs started from a workflow
  * folder, so `advance` reads every step in flight as the daemon does. A fake `claude` first on PATH counts each `claude agents` call: a job
  * (`-p`) reads its brief and runs until the test ends it, and a background session (`--bg`) is written into the registry `agents` prints,
- * working and busy, as 2.1.280 lists one.
+ * working and busy, as Claude Code's registry lists one.
  *
- * `claude agents` took about 0.2-0.4 s of each pass, twice: the runtime's observe asked it on every pass, and `advance` viewed each step in
- * flight, which observed again (2026-09-25). A pass now asks it only for a session expected that is no job, once, and `advance` reads the
- * views the runtime's pass reported (`reportedEngine`).
+ * A `claude agents` call costs about 0.2-0.4 s. A pass asks it only for a session expected that is no job, once, and `advance` reads the
+ * views the runtime's pass reported (`reportedEngine`) rather than viewing each step in flight, which would observe again.
+ *
+ * `WF_ROOT` is set before the import, since the module reads it as it loads, with the shipped ceilings and every run the memo answers
+ * judged in full; `CLAUDE_CONFIG_DIR`, where Claude Code keeps its sessions and transcripts, is a folder of the test's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,12 +18,10 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-agents-calls-');
-// WF_ROOT is read as the module loads, so it is set before the import; the shipped ceilings, and every run the memo answers judged in full.
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-// Where Claude Code keeps its sessions and transcripts: a folder of the test's, never the machine's.
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
 const { engine, readRun, start, tick } = await import('../src/runner.ts');
 const { freshRestMemo } = await import('../src/tick.ts');
@@ -150,11 +150,10 @@ test('a pass with one background session in flight asks `claude agents` once, be
 
 test('a background session left running across a restart is observed on the first pass of a fresh engine, and read at work', async () => {
   const bg = taskOf(bgRun.id);
-  // A restarted daemon: a new engine over the same store, whose pass remembers nothing — no memo, no session it spawned.
   e = engine();
   memo = freshRestMemo();
   const { calls, done } = await counted();
-  assert.equal(calls, 1, 'the journal names the session, and the registry is asked for it');
+  assert.equal(calls, 1, 'a fresh engine remembers no session it spawned: the journal names the session, and the registry is asked for it');
   assert.equal((await e.view(bg)).phase, 'running (working)', 'at work, as the registry lists it — not lost');
   assert.equal(advanced(done, bgRun.id)?.status, 'running');
   assert.equal((await e.view(taskOf(jobRun.id))).phase, 'running (working)', 'and the job, off its run file');

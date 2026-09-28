@@ -5,14 +5,14 @@
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *
  * - `prompt.md`, the agent's instructions, then a line naming each skill it is given, then the whole text of each skill that asks to be
- *   told whole (`preload: true`): appended to Claude Code's own system prompt, which is kept (`--append-system-prompt-file`, F1), or put in
- *   its place for `systemPrompt: own` (`--system-prompt-file`, F15);
- * - `hkb-<agent>/`, a plugin of the step's own (`--plugin-dir`, F4, F5): its `skills/<name>/`, each copied whole from where the load found it,
+ *   told whole (`preload: true`): appended to Claude Code's own system prompt, which is kept (`--append-system-prompt-file`), or put in
+ *   its place for `systemPrompt: own` (`--system-prompt-file`);
+ * - `hkb-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
  *   so a session loads them as `hkb-<agent>:<name>`; and, for `systemPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
- *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied (F16, F17).
+ *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
  *
  * The step's brief is then its own note alone (`briefBody`): the instructions are in the system prompt. A codex step is handed them in its
- * brief, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's (F13), and a
+ * brief, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's, and a
  * step on a remote A2A agent, which keeps its operator's.
  */
 import path from 'node:path';
@@ -24,7 +24,7 @@ export const PROMPT_FILE = 'prompt.md';
 /** The output style `systemPrompt: no-coding` chooses, in the step's plugin. */
 export const NO_CODING_STYLE = 'no-coding';
 
-/** The plugin an agent's skills are served from, and so their namespace: `hkb-<agent>` (F4). */
+/** The plugin an agent's skills are served from, and so their namespace: `hkb-<agent>`. */
 export const pluginOf = (agent: string): string => `hkb-${agent}`;
 
 /**
@@ -76,7 +76,7 @@ export type RenderedSkill = { name: string; whole?: string };
 /**
  * The text of `prompt.md`: the agent's instructions, then each skill it is given by its namespaced name, the session to load it with the
  * Skill tool when the instructions say it is needed, then each skill told whole, under a heading of its name. Claude Code lists a plugin's
- * skills to the session by name and description all the same (F4); naming them here says they are this agent's.
+ * skills to the session by name and description all the same; naming them here says they are this agent's.
  */
 export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
   const agent = step.agent!;
@@ -96,7 +96,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
   );
 }
 
-/** The output style `systemPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks` (F17). */
+/** The output style `systemPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`. */
 export const noCodingStyle = (agent: string): string =>
   [
     '---',
@@ -109,7 +109,7 @@ export const noCodingStyle = (agent: string): string =>
     '',
   ].join('\n');
 
-/** The manifest of a step's plugin, naming its namespace on purpose (F4). */
+/** The manifest of a step's plugin, naming its namespace on purpose. */
 export const pluginManifest = (agent: string): string =>
   JSON.stringify(
     { name: pluginOf(agent), version: '0.0.0', description: `The skills of the ${agent} agent, for one step of one run.` },

@@ -96,8 +96,8 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
  * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is known
- * only once it ends, a job's (`claude -p`) with its result and a background session's with its attempt (agent-runtime's open issue 17), and one killed first, or on a model its harness could not price,
- * has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`): `$4.20`, and `≥$4.20` where an ended
+ * only once it ends, a job's (`claude -p`) with its result and a background session's with its attempt, and one killed first, or on a
+ * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`): `$4.20`, and `≥$4.20` where an ended
  * attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was measured: a cost nobody measured is not $0.
  */
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
@@ -145,8 +145,8 @@ export type RunHolding = {
  * `needs` is the closeout's, for a step whose current try signed off blocked: its question. Null for any other step.
  *
  * `blockedByHarness` is whether the harness marked the step's session blocked while it gave no closeout — the engine's
- * `needs-human` — which is no question of the step's: measured on "Could not refresh your login because another Claude Code
- * process is refreshing it". What the session said last is on the run's detail alone (`lastLine`): reading it observes the
+ * `needs-human` — which is no question of the step's, as when a session stops on "Could not refresh your login because another Claude
+ * Code process is refreshing it". What the session said last is on the run's detail alone (`lastLine`): reading it observes the
  * harness again, and the list is read on every poll of the Factory for one observation.
  *
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
@@ -187,8 +187,7 @@ export async function waitsIn(run: Run, reader: typeof e, git: BranchReader = br
  * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to resolve.
  *
  * The package decides it (`neverShips` in run.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when it may
- * never ship without a person, why — so any reason it carries counts, one the package adds after `missing`, `cancelledAt` and `gone`
- * included, rather than a copy of the three it has today. Exporting `neverShips` would make this an import.
+ * never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
 const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
@@ -255,11 +254,19 @@ type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
   waitingOnYou: string[];
-  /** `waitingOnYou` in `wf ls`'s words (`onYouWords`): `approve plan` for a step at its gate. */
+  /** `waitingOnYou` in `wf ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   onYou: string[];
   /** What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while there is nothing. */
   toDecide: RunToDecide | null;
   status: RunStatus;
+  /**
+   * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file —
+   * a check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
+   * once those ship (`runReady`), which never happens on its own for one that never ships: the gate is the tick's, and `assess` does not
+   * know it. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands. A held run's due is what it
+   * files once its hold lifts, for a hold that lifts on its own; a hold that lifts only by a person's hand leaves nothing due. A record the
+   * tick cannot read — no frozen workflow, its folder gone — has nothing filed for it, whatever its bare steps would make ready: the tick fails on it.
+   */
   moving: boolean;
   /** The runs its roots wait on (`waitingOf`). */
   waiting: RunWaiting | null;
@@ -297,15 +304,13 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  *
  * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing left
  * to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule (the
- * dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh api asks git again.
+ * dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh api asks git again. It spares
+ * the store's long tail — finished runs whose branches are already on the base — two `git` calls a branch on every poll of the list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
  * a run whose branch had nothing on it past its base reads `on` too (`isShipped`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and git is asked afresh. What is left is a person committing to a
  * finished run's branch by hand, which nothing on the board is told of either: `wf decide` reads git every time, and so does a fresh api.
- *
- * What it is for is the store's long tail. Of the author's 69 runs with a result branch on 2026-09-17, 66 were already on main — two `git`
- * calls each, on every poll of the list — and after the first poll they are three.
  */
 const onTheBase = new Map<string, string>();
 
@@ -328,11 +333,12 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  * by hand stops being one to decide with nobody telling the run. A record whose branches cannot be read is no branch: git said nothing, and
  * only a gate says there is something to decide.
  *
- * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it.
+ * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it. A
+ * folder run has no branch, and stands nowhere.
  *
  * `git` is the request's reader (`branchReader`: one listing of a repository's branches for every run of it). `asked`, where given, is told
- * what git was asked of — the branches it did not find on the base, and whether git answered — which is what the list's memo of runs at
- * rest watches (`resting.ts`).
+ * what git was asked of — the branches it did not find on the base, which only their tips can move, a branch on the base staying there as
+ * `onTheBase` has it; and whether git answered — which is what the list's memo of runs at rest watches (`resting.ts`).
  */
 export function standingsOf(
   run: Run,
@@ -341,7 +347,6 @@ export function standingsOf(
   git: BranchReader = branchReader(),
   asked?: Asked,
 ): BranchStanding[] {
-  // A folder run has no branch to stand anywhere.
   if (!isGitRun(run)) return [];
   const filed = workFiled(run, steps);
   const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
@@ -349,7 +354,6 @@ export function standingsOf(
   try {
     const read = branchStandings(run, branches, git);
     for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
-    // A branch on the base stays there, as `onTheBase` has it: only the others' tips can move the answer.
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     return read;
   } catch {
@@ -371,20 +375,35 @@ export type Asked = { branches: string[]; failed: boolean };
  *
  * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`readAsks`): without them a
  * step a person asked to try again, or a loop out of rounds a person sent round once more, reads as waiting on them, and the
- * run as not moving, for as long as the tick takes to file what they asked for. A step the page shows and the tick does not judge — one a pre-freeze record has and its folder
- * lost — is worded as a `bare` step, and has no say in the run's status. Everything is read off the views the request already has: calling `list` would
- * read every task again, and word only the steps the tick judges. The api test holds these words to `list`'s.
+ * run as not moving, for as long as the tick takes to file what they asked for. Unreadable ask files are notes the tick prints and does
+ * not honour; neither does the board. A step the page shows and the tick does not judge — one a record names that has no frozen workflow
+ * and whose folder lacks it — is worded as a `bare` step, and has no say in the run's status. Everything is read off the views the request
+ * already has: calling `list` would read every task again, and word only the steps the tick judges. The api test holds these words to
+ * `list`'s.
+ *
+ * The rest is read as `list` and the tick read it. A check's verdict comes off the engine's record of each check (`exitVerdicts`), not the
+ * log `wf ls` reads: the check prints the code it exits with, so the two agree, and a `logs` call per refused check would observe every
+ * harness again on every poll of the list. `assess` is given it, as the tick is: without it `assess` cannot tell a check that refused,
+ * which `retries:` tries again, from one that did not finish, which waits on a person, and the status and `listing`'s words would disagree.
+ * What people said with their asks (`readAnswers`): without it a try a person answered reads as one they did not. How many times a person
+ * said something to each step's current try (`wf say`, `saidCount`), which the note says. The harness's word (`harnessBlocked`): a
+ * person's try of a step whose session the harness blocked is due, the session stopped first; without it that try is in `listing`'s note
+ * and neither `asked` nor `moving`. And what each task's sessions cost (`spendReader`), off views that hold every try's task: a step whose
+ * tries have cost its cap says `over budget $4.25 of $3`, waits on you, is not tried nor its loop sent round on the run's word, and so does
+ * not move.
  *
  * Given the runs its roots wait on, read once (`waitsIn`): a root of a run waiting on runs says `waiting on <run>`, as `list` words it, and
  * the run moves while each may still ship — the tick files the roots when they do — and not once one never will without a person.
  *
- * Given the runs a person holds it until, read once (`holdsIn`): what `wf ls` says of the hold, and `listing` offers nothing on a held run,
+ * Given the runs a person holds it until, read once (`holdsIn`), none for a run nobody holds: what `wf ls` says of the hold, and `listing`
+ * offers nothing on a held run,
  * so no step of it waits on you. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it once every
  * run it names has shipped, and files then what is due — as a run waiting on runs does, and not once it lifts only by a person's hand.
  *
- * And given where the run's result branches stand, asked of git for the runs where the answer can decide anything (`standingsOf`), which is
- * why the status is read first: without them only a gate says a run is one nobody has decided, and a finished run whose branch nobody merged
- * would say there is nothing to decide.
+ * And given where the run's result branches stand, asked of git for the runs where the answer can decide anything (`standingsOf`), once
+ * the run's status is known: `listing` reads what is left to decide off them, on the same inputs as `assess`, so the words and the
+ * judgement are the package's single reading. Left out, no branch is read: only a gate says a run is one nobody has decided, and a
+ * finished run whose branch nobody merged says there is nothing to decide.
  */
 export function judge(
   run: Run,
@@ -392,36 +411,20 @@ export function judge(
   folder: readonly Workflow[] | null,
   views: Views,
   waits: readonly Wait[],
-  /** The runs it is held until (`holdsIn`): none for a run nobody holds. */
   holds: readonly Wait[],
-  /** Where each result branch stands, asked once the run's status is known (`standingsOf`); left out, no branch is read, and a to-decide branch says nothing. */
   readStandings: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[] = () => [],
 ): Judged {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = closeoutAsked(views);
-  // Off the engine's record of each check, not the log `wf ls` reads (`readVerdict`): the check prints the code it exits with,
-  // so the two agree, and a `logs` call per refused check would observe every harness again, on every poll of the list.
   const verdicts = exitVerdicts(views, run);
-  // Unreadable ask files are `notes` the tick prints and does not honour; neither does the board.
   const { asks, rounds } = readAsks(run.id);
-  // And what people said with them, as `list` reads it: without it a try a person answered reads as one they did not.
   const answers = readAnswers(run.id);
-  // And how many times a person said something to each step's current try (`wf say`), as `list` counts it: the note says so.
-  // And what each task's sessions cost, as `list` reads it (`spendReader`), off views that hold every try's task: a step whose tries have
-  // cost its cap says `over budget $4.25 of $3`, waits on you, and is filed nothing more — without it, it read as one with no cap.
   const spendOf = spendReader(views);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
-  // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
-  // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
-  // And the harness's word, as the tick has it (`harnessBlocked`): a person's try of a step whose session the harness blocked is due, the
-  // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
-  // And the cost, as the tick has it: a step over its budget is not tried, nor its loop sent round, on the run's word, so it does not move.
   const judgedOf = (on: Run) =>
     assess(steps, on, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   const { status, ready, check, retry, round } = judgedOf(run);
-  // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
-  // inputs as `assess`, so the words and the judgement are the package's single reading.
   const standings = readStandings(status, steps);
   const said = listing(
     shown,
@@ -441,26 +444,17 @@ export function judge(
   );
   const waiting = waitingOf(run, said.waiting);
   const holding = holdingOf(run, holds);
-  // What the tick files once the hold lifts, for a hold that lifts on its own: the run as it stands without it. A held run has nothing due.
   const { hold: _, ...unheld } = run;
   const due = holding && !holding.onYou ? judgedOf(unheld) : { ready, check, retry, round };
-  // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
-  // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => said.waitingOnYou.includes(name));
   return {
     words: new Map(said.steps.map((s) => [s.name, s.status])),
     notes: new Map(said.steps.map((s) => [s.name, s.note ?? null])),
     waitingOnYou,
-    // In the page's order, as `waitingOnYou` is: the words `wf ls` prints after `→ waiting on you:`.
     onYou: onYouWords({ steps: said.steps, waitingOnYou }),
     toDecide: toDecideOf(run, said.toDecide, steps),
     status,
-    // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
-    // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
-    // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
-    // Roots `assess` makes ready on a run waiting on runs are filed once those ship (`runReady`), which never happens on its own for a
-    // run that never ships: the gate is the tick's, and `assess` does not know it. A held run's due is what it files once the hold lifts (`due`).
     moving:
       inFlight(run, phase).length > 0 ||
       (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
@@ -476,7 +470,8 @@ export function judge(
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
- * on you, what `wf ls` asks of you, in its words (`onYouWords`).
+ * on you, what `wf ls` asks of you, in its words (`onYouWords`). A wait is read only for a step the harness blocked, nothing else having
+ * one for a person to answer: the harness's own word for it, and the name `claude agents` lists that session under (`nameFor`).
  */
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
@@ -484,8 +479,6 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
   const status = judged.words.get(name)!;
   const atGate = status === 'awaiting approval' && judged.waitingOnYou.includes(name);
   const blockedByHarness = view?.phase === 'needs-human' && said === undefined;
-  // The harness's own word for what it waits on, where there is one, and the name `claude agents` lists that session under
-  // (`nameFor`, the engine's). Only for a step the harness blocked: nothing else has a wait for a person to answer.
   const word = blockedByHarness ? view?.waitingFor : undefined;
   const attempt = view?.state.attempts.at(-1)?.n;
   const calls = view ? deniedOf(views)(run.steps[name].taskId!) : [];

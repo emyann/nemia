@@ -128,7 +128,7 @@ const LABELS: Record<string, string> = {
 };
 /**
  * The windows the board shows, in this order: the plan's own. Claude Code's answer holds many more keys, most null and some named for no one
- * (`nimbus_quill`, at 0% and no reset, on the owner's plan), so a key it does not know is not shown.
+ * (`nimbus_quill`, at 0% with no reset), so a key it does not know is not shown.
  */
 const ORDER = Object.keys(LABELS);
 
@@ -172,7 +172,8 @@ const subscriptionOf = (usage: Record<string, unknown>): string | null =>
 
 /**
  * What an answer says: the plan's windows and its subscription, no plan, a plan the usage service gave nothing for, or why it cannot be read.
- * Pure, and judged at `now` for the windows' resets.
+ * Pure, and judged at `now` for the windows' resets. A plan whose `rate_limits` are null is `unanswered`, as the Agent SDK's type for this
+ * answer says: "or null when unavailable".
  */
 export function answerOf(
   response: unknown,
@@ -191,7 +192,6 @@ export function answerOf(
   const usage = response.response;
   if (usage.rate_limits_available === false) return { kind: 'no-plan' };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
-  // The Agent SDK's type for this answer says as much: "or null when unavailable".
   if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
   if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
   const windows = windowsOf(usage.rate_limits, now);
@@ -314,6 +314,12 @@ export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEn
 const END_MS = 2_000;
 
 /**
+ * The handler for an error on an asked process's stdin, which it ignores: a process that ends before it reads its request closes the pipe
+ * under the write, and how it ended is read off its exit.
+ */
+const ignoreClosedPipe = (): void => {};
+
+/**
  * Ask Claude Code for the plan's usage: start `claude` (USAGE_ARGS) in the system's temporary directory, write one `get_usage` request with
  * an id of its own, and read its stdout for the control_response with that id. Then close its stdin, on which it ends of its own; killed
  * if it has not in `END_MS`. Never rejects: every way it can go is an `Asked`.
@@ -347,8 +353,7 @@ export function askUsage({
     child.on('error', (e: NodeJS.ErrnoException) =>
       settle(e.code === 'ENOENT' ? { kind: 'no-claude' } : { kind: 'failed', code: null, signal: null, said: e.message }),
     );
-    // A process that ends before it reads its request closes the pipe under the write.
-    child.stdin.on('error', () => {});
+    child.stdin.on('error', ignoreClosedPipe);
     child.stderr.on('data', (d: Buffer) => {
       err = (err + d.toString()).slice(-4_000);
     });
@@ -404,7 +409,9 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
 
 /**
  * The quota as this request should say it: from what is held while it is younger than its keep — the keep, or an `unanswered` outcome's
- * wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that.
+ * wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that. An answer that
+ * came in the wait is this request's, however short the keep. A reading with windows begins the backoff again; each `unanswered` one in a
+ * row lengthens it (`backoffOf`); another failure between two `unanswered` answers neither ends it nor adds to it.
  */
 export async function readQuota({
   waitMs = QUOTA_WAIT_MS,
@@ -426,7 +433,6 @@ export async function readQuota({
       .then((asked) => {
         const at = Math.max(started, now());
         const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
-        // A good reading begins the backoff again; another failure between two `unanswered` answers neither ends it nor adds to it.
         if (read === 'windows') unanswered = 0;
         if (read === 'unanswered') unanswered += 1;
         held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
@@ -443,7 +449,6 @@ export async function readQuota({
       }),
     ]);
     clearTimeout(wait);
-    // An answer that came in the wait is this request's, however short the keep.
     if (inFlight !== null || held === null || held.at < started) return quotaOf(null, good, now(), keepMs);
   }
   return quotaOf(held, good, now(), keepMs);

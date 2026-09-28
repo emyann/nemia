@@ -10,7 +10,7 @@
  * to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE /api/inbox/:name/queue`), each of which writes
  * the store's inbox; and a workflow of yours built on the board — made (`POST /api/workflows/yours`), or put back from its steps and
  * the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts — each of which writes the store's `workflows/`, and removes a
- * step's file the folder no longer has; and an agent of yours made (`POST /api/agents/yours`), put back or renamed
+ * step's file the folder has dropped; and an agent of yours made (`POST /api/agents/yours`), put back or renamed
  * (`PUT /api/agents/yours/:name`) or removed (`DELETE /api/agents/yours/:name`), agents.ts — each of which writes the store's
  * `workflows/agents/`, what every step naming the agent is told; and a skill of yours made — written on the board, or one HKB ships copied
  * into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:` alone (`PUT /api/skills/yours/:name`), skills.ts, each of

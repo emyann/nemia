@@ -309,23 +309,41 @@ async function atRest(run: Run, judged: Judged, reader: typeof e): Promise<boole
 /** The list's memo of runs at rest, for as long as the api runs. */
 export const resting = restingMemo<Omit<RunSummary, 'startedAt'>>();
 
+/**
+ * The runs' routes: the list, one run in full, what `wf decide` shows of it, and the three writes the board makes on a run.
+ *
+ * - `GET /api/runs` — every run's summary (`RunSummary`), in the store's order. One request costs, however many runs there are, one
+ *   harness observation (one `claude agents --json`, one scan of the detached runs' files), a read of every task journal in the engine's
+ *   store, and each run's record and workflow folder. The records are read before the engine: `wf` files a step's task before it writes
+ *   the id on the run, so every id read is in the listing that follows; the other way round, a task filed between the two reads would show
+ *   as `unknown` until the next poll. A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and
+ *   its tasks as they were listed. The feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each
+ *   run started. A run at rest is answered from the list's memo (`resting.ts`) while nothing it was judged on has moved, so a poll reads
+ *   the journals of the runs still moving and of none other; the rest are read through the request's own engine and git (`viewsFor`,
+ *   `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
+ * - `GET /api/runs/:id` — a run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does
+ *   not, in the words the list says it with (`RunSummary.unreadable`).
+ * - `GET /api/runs/:id/decision` — what `wf decide` shows a person (`decisionOf`); a 404 for no such run. Not on the page's poll, since it
+ *   runs `git diff`.
+ * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it.
+ *   Guarded as a write (`removeGuard`). Only a try: any other run is a 409 naming `wf rm`, which says what it hands off and what it leaves,
+ *   and a git run's worktrees and branches are a person's to read before they go. A try still working is a 409 in the package's words; a
+ *   thrown refusal of the package's (`exitCode` 2) is a 422.
+ * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`): its file removed, and the run goes
+ *   on at the next tick, what its steps asked while it was held asked again. Guarded as a write (`liftGuard`). Refused in the package's
+ *   words, a 409: a run nobody holds — a pruned one among them, since no verb holds one — and a hold put again as it was lifted; any other
+ *   failure is a 502. No feed line: the tick is the feed's one writer, and the board reads the run again itself.
+ * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts`
+ *   and `unmerged` its `--unmerged` (`PRUNE_BODY`): its worktrees removed, and its files with `artifacts`; its record and every branch
+ *   kept. Guarded as a write (`pruneGuard`). The page asks twice before it sends this, so there is no dry run here. The package decides
+ *   everything and words it, and the api maps its answer to a status: refused (a folder run, a run not over, a finished run nobody merged
+ *   without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one pruned already) are each a 409 in `wf
+ *   prune`'s words alone, as `DELETE …` sends `forget`'s, the page saying `Not pruned` above them itself (`Refusal`); a thrown refusal of
+ *   the package's (`exitCode` 2) is a 422, and any other failure a 502. No feed line: the marker the prune writes moves the run's
+ *   `restStamps`, and the board reads the run again itself.
+ */
 export const runs = new Hono()
   .get('/api/runs', async (c) => {
-    // What one request costs, however many runs there are: one harness observation (one
-    // `claude agents --json`, one scan of the detached runs' files), a read of every task journal in
-    // the engine's store, and each run's record and workflow folder. It was a `view` — so an
-    // observation — per filed step of every run: dozens of `claude agents` calls a poll.
-    //
-    // The records before the engine: `wf` files a step's task before it writes the id on the run, so
-    // every id read here is in the listing that follows. The other way round, a task filed between
-    // the two reads would show as `unknown` until the next poll.
-    //
-    // A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed.
-    //
-    // And the feed's filing times, once, read on from where the last read stopped (`filedTimes`): when each run started.
-    //
-    // A run at rest is answered from the list's memo (`resting.ts`) while nothing it was judged on has moved, so a poll reads the journals of
-    // the runs still moving and of none other; the rest are read through the request's own engine and git (`viewsFor`, `branchReader`).
     const read = await restingRead(resting);
     const runs = listRuns();
     read.only(runs.map((run) => run.id));
@@ -368,10 +386,6 @@ export const runs = new Hono()
     });
     return c.json(summaries);
   })
-  /**
-   * A run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the
-   * list says it with (`RunSummary.unreadable`).
-   */
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);
@@ -380,11 +394,6 @@ export const runs = new Hono()
     if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
     return c.json(full);
   })
-  /**
-   * A try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it. Only a try: any other run is removed
-   * with `wf rm`, which says what it hands off and what it leaves, and a git run's worktrees and branches are a person's to read before they go.
-   * A try still working is refused in the package's words.
-   */
   .delete('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const route = `DELETE /api/runs/${id}`;
@@ -414,11 +423,6 @@ export const runs = new Hono()
       return c.json({ error: message }, (err as { exitCode?: number }).exitCode === 2 ? 422 : 500);
     }
   })
-  /**
-   * A person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`): its file removed, and the run goes on at the next tick, what its steps
-   * asked while it was held asked again. Refused in the package's words, a 409: a run nobody holds — a pruned one among them, since no verb
-   * holds one — and a hold put again as it was lifted. No feed line: the tick is the feed's one writer, and the board reads the run again itself.
-   */
   .delete('/api/runs/:id/hold', async (c) => {
     const id = c.req.param('id');
     const route = `DELETE /api/runs/${id}/hold`;
@@ -439,14 +443,6 @@ export const runs = new Hono()
       return c.json({ error: `${route}: the hold was not lifted — ${message}. Lift it with \`wf hold ${id} --off\`.` }, 502);
     }
   })
-  /**
-   * A finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts` and `unmerged` its `--unmerged`:
-   * its worktrees removed, and its files with `artifacts`; its record and every branch kept. The page asks twice before it sends this, so
-   * there is no dry run here. The package decides everything and words it, and the api maps its answer to a status: refused (a folder run,
-   * a run not over, a finished run nobody merged without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one
-   * pruned already) are each a 409 in `wf prune`'s words; a thrown refusal of the package's (`exitCode` 2) is a 422. No feed line: the marker the prune writes moves
-   * the run's `restStamps`, and the board reads the run again itself.
-   */
   .post('/api/runs/:id/prune', async (c) => {
     const id = c.req.param('id');
     const route = `POST /api/runs/${id}/prune`;
@@ -463,7 +459,6 @@ export const runs = new Hono()
     try {
       const { artifacts = false, unmerged = false } = read.body;
       const p = await prune(e, id, { artifacts, unmerged, yes: true });
-      // The package's words alone, as `DELETE …` sends `forget`'s: the page says `Not pruned` above them itself (`Refusal`).
       if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
       if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
       return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
@@ -473,7 +468,6 @@ export const runs = new Hono()
       return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
     }
   })
-  // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.
   .get('/api/runs/:id/decision', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);

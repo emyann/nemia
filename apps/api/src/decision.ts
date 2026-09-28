@@ -34,8 +34,8 @@ export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
 /**
  * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
  * — with the fact in the package's words (`branchWord`) and how much it changed, as `wf decide` prints beside the branch (`diffStat`, git's
- * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it no
- * longer has, or one with nothing on it past the run's base.
+ * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it does
+ * not have, or one with nothing on it past the run's base.
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
@@ -133,6 +133,10 @@ export function diffFiles(diff: string): DiffFile[] {
   return files.map((lines) => ({ path: diffPath(lines), lines: lines.slice(0, DIFF_LINES), cut: Math.max(0, lines.length - DIFF_LINES) }));
 }
 
+/**
+ * The path one file's diff is about, off its header lines: `from → to` for a rename, else the `+++` side, else the `---` side. A binary
+ * file or a mode change has neither: its `diff --git a/<path> b/<path>` line, whose two halves are the same path, names it.
+ */
 function diffPath(lines: readonly string[]): string {
   const hunk = lines.findIndex((line) => line.startsWith('@@'));
   const head = hunk < 0 ? lines : lines.slice(0, hunk);
@@ -150,7 +154,6 @@ function diffPath(lines: readonly string[]): string {
     const named = after(prefix);
     if (named && named !== '/dev/null') return named.startsWith(side) ? named.slice(side.length) : named;
   }
-  // No `---`/`+++` for a binary file or a mode change: `diff --git a/<path> b/<path>`, whose two halves are the same path.
   const both = (head[0] ?? '').slice('diff --git '.length);
   const half = (both.length - 1) / 2;
   return Number.isInteger(half) && both.slice(2, half) === both.slice(half + 3) ? both.slice(2, half) : both;
@@ -198,7 +201,8 @@ type AtGate = { step: string; back: string[] };
 /**
  * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each
  * step waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch —
- * which has nothing to merge, nor a branch to delete. A folder run has none of those: forget it, and nothing about git.
+ * which has nothing to merge, nor a branch to delete. A folder run has none of those: its work stays where it is until a person is done with
+ * it, and forgetting it is the one command `wf decide` prints (cli.ts, `!git`), and nothing about git.
  *
  * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
  * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
@@ -235,8 +239,6 @@ function commandsOf(
       ];
     }),
   ];
-  // A folder run has no branch to ship or drop: its work stays where it is until a person is done with it, and forgetting it is the one
-  // command `wf decide` prints (cli.ts, `!git`).
   if (!isGitRun(run))
     return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
   if (d.direct) {
@@ -268,6 +270,20 @@ function commandsOf(
  *
  * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read. Then a
  * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered.
+ *
+ * The run is judged without the branch standings, which this answer does not carry: a run still running is answered `running` without
+ * one `git` being run for it, and what there is to decide is on the run's own detail, off its own read. `decision` is given the harness's
+ * word, as `wf decide` reads it — a person's try of a session the harness blocked is waited on too — and what each task's sessions cost
+ * (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
+ *
+ * For a run still running with a step waiting on you, the branches read are the result steps' (`resultSteps`), as `decision` reads them
+ * once it is not: the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose
+ * work it acts on. A folder run has no repository to ask, so none of git is read for it: what its steps made is in their artifacts.
+ * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main` and whose own line
+ * says so instead. A pruned run is offered no once-more, whose verbs each refuse it (`prunedRefusal`): the package's lines say so
+ * themselves, for `wf decide` and for this. A step waiting at its gate on you — not one a person has sent back already, which waits on
+ * nobody — is offered with the steps its send-back names (`sendBackTo`), which is what `wf decide` prints under the step; the word is
+ * `listing`'s, as `needsOf` reads it for the verb.
  */
 export async function decisionOf(run: Run): Promise<RunDecision> {
   const waits = await waitsIn(run, e);
@@ -279,8 +295,6 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const views = await viewsOf(run);
-  // Judged without the branch standings, which this answer does not carry: a run still running is answered `running` below without one
-  // `git` being run for it, and what there is to decide is on the run's own detail, off its own read.
   const judged = judge(run, names, folder, views, waits, holds);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
@@ -291,8 +305,6 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
   const asked = closeoutAsked(views);
   const verdicts = exitVerdicts(views, run);
   const { asks, rounds } = readAsks(run.id);
-  // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too. And what each
-  // task's sessions cost (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
   const { spendOf } = judged;
   const d = decision(
     steps,
@@ -310,8 +322,6 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
-  // Still running with a step waiting on you: the result steps' branches, as `decision` reads them once it is not (`resultSteps`) —
-  // the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose work it acts on.
   const results = [
     ...new Set(
       resultSteps(steps)
@@ -320,7 +330,6 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
     ),
   ];
   const result = d.kind === 'awaiting' ? d.branches : results;
-  // None of it for a folder run, which has no repository to ask: what its steps made is in their artifacts.
   const git = isGitRun(run) ? run : undefined;
   const touched: Touched[] = !git
     ? []
@@ -329,8 +338,6 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
         Object.values(git.steps).map((s) => s.branch),
         git.isolate ? git.branch : undefined,
       ).map((branch) => ({ branch, radius: touchedBy(git, branch) }));
-  // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run — none for a run
-  // that worked on its base branch itself, whose standing would read `main is on main` and whose own line says so instead.
   const standings: Standing[] = git?.isolate
     ? branchStandings(git, results).map((s) => ({
         ...s,
@@ -341,10 +348,7 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  // None for a pruned run, whose verbs each refuse it (`prunedRefusal`): the package's lines say so themselves, for `wf decide` and for this.
   const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
-  // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — with the steps its send-back
-  // names (`sendBackTo`), which is what `wf decide` prints under the step. The word is `listing`'s, as `needsOf` reads it for the verb.
   const gates: AtGate[] = steps
     .filter((step) => judged.words.get(step.name) === 'awaiting approval' && judged.waitingOnYou.includes(step.name))
     .map((step) => ({ step: step.name, back: sendBackTo(step, run) }));

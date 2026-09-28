@@ -95,8 +95,8 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
  * tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they have cost
  * the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says `over budget` or
  * `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a background session
- * (`background: true`, `claude --bg`) keeps none and is not stopped (agent-runtime's issue 17), so such a step — the package refuses a
- * budget beside it, but a run frozen before may have both — can finish past it with nothing waiting on a raise.
+ * (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget beside it, but a
+ * frozen record may carry both — can finish past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
@@ -109,8 +109,8 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
  * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
- * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
- * says which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
+ * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone does not
+ * say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
@@ -154,13 +154,13 @@ export type StepSpec = {
   /**
    * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
    * ends the run, whose gate holds before it is filed and whose approval is what files it. Null for every other step, which works in a
-   * worktree. What tells such a gate from §6's on the board, where the two read the same off the record: unfiled and awaiting approval.
+   * worktree. What tells such a gate from any other on the board, where the two read the same off the record: unfiled and awaiting approval.
    */
   workspace: string | null;
   resume: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`; on a run frozen before 2026-09-23, its `permissionMode`, read so): null on Claude Code. */
+  /** Codex's sandbox (`sandbox:`, or on a run frozen under the former key its `permissionMode`, read so): null on Claude Code. */
   sandbox: string | null;
   /** The only tools the session may have: null for the harness's own set, empty for none. */
   tools: string[] | null;
@@ -197,7 +197,7 @@ export type StepFiled = {
   /**
    * The remote A2A agent the try was sent to, for a step that says `harness: a2a:<name>` (`remoteOf`): its name, and its address as the
    * store's `a2a-agents.json` gives it now — origin and path, never a query or a secret, which is never in the file — or null where the file
-   * no longer declares it or cannot be read. Null for a local harness, whose mode is `runsIn`.
+   * does not declare it or cannot be read. Null for a local harness, whose mode is `runsIn`.
    */
   remote: { name: string; address: string | null } | null;
   tools: string[] | null;
@@ -229,7 +229,7 @@ export type RunDetail = {
   cancelledAt: string | null;
   /**
    * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record and
-   * files are kept, so the rest of the page reads as before; what it no longer offers is anything that would work in a worktree. Null for a
+   * files are kept, so the rest of the page reads as before; what it does not offer is anything that would work in a worktree. Null for a
    * run never pruned. `artifacts` is when `wf prune --artifacts` removed its files directory too, and what that freed: each file a closeout
    * named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
    */
@@ -268,17 +268,17 @@ export type RunDetail = {
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
   gates: string[];
-  /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
+  /** Set when the workflow folder cannot be read, or lacks steps the run started with. */
   warning: string | null;
   /**
    * The steps as a graph, from the workflow the run is judged by (`judgedSteps`), for every client to draw the same:
    * `runGraph`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
    */
   graph: RunGraph;
-  /** The recorded steps in the order the run started with them, then — on a record from before runs froze their workflow — any the folder has gained. */
+  /** The recorded steps in the order the run started with them, then — on a record with no frozen workflow — any the folder has gained. */
   steps: Array<{
     name: string;
-    /** From the workflow the run froze at `wf start`; for a record from before runs froze one, the folder. */
+    /** From the workflow the run froze at `wf start`; for a record that froze none, the folder. */
     spec: StepSpec | null;
     /** What the engine filed its current try with; null for a step not filed, or a task the engine has no record of. */
     filed: StepFiled | null;
@@ -304,7 +304,10 @@ export type RunDetail = {
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
     denied: StepNeeds['denied'];
-    /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
+    /**
+     * Its gate, awaiting approval or approved (`StepGate`); null for a step with none. Judged by the workflow the run is: a step it does
+     * not have is gated only where the run was started with its gate.
+     */
     gate: StepGate | null;
     /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */
     accepted: StepAcceptance | null;
@@ -326,7 +329,10 @@ export type RunDetail = {
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
     attempts: StepAttempts;
-    /** What its current try consumed, in `wf decide`'s words; null for a step not filed, which consumed nothing. */
+    /**
+     * What its current try consumed, in `wf decide`'s words, its peak against the `context:` its sessions ran under as the run judges the
+     * step; null for a step not filed, which consumed nothing.
+     */
     used: StepUsed | null;
     /** What every try of it has cost together, each session once, as `wf ls` puts it beside the step's word (`stepSpend`); null until a cost was measured. */
     spent: Spent | null;
@@ -376,8 +382,9 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
 
 /**
  * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off the
- * views the request already read, with no observation of its own. `steps` are the workflow the run is judged by: a step it does not have has
- * no `budget:`.
+ * views the request already read, which hold every try's task, with no observation of its own. `steps` are the workflow the run is judged
+ * by: a step it does not have has no `budget:`. No raise on a run called off, pruned or held: a raise is asked with a try or a round, which
+ * the verb refuses while a hold stands (`heldRefusal`).
  */
 function costOf(
   run: Run,
@@ -398,7 +405,6 @@ function costOf(
           over: Boolean(overBudget(step, run, spendOf)),
         }
       : null;
-  // None on a held run, as on one pruned: the raise is asked with a try or a round, which the verb refuses while the hold stands (`heldRefusal`).
   return { spent, budget, raise: step && !run.cancelledAt && !run.pruned && !run.hold ? raiseOf(run, step, steps, views, spendOf) : null };
 }
 
@@ -482,7 +488,8 @@ const lastSaid = new Map<string, { cursor: string; line: string | null }>();
 
 /**
  * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
- * none or its conversation cannot be read.
+ * none or its conversation cannot be read. What it said, not what it was told: a brief, a `wf say` and every tool result come back as
+ * `user` events (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
  *
  * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
  * is on no record, and the engine asks the registry for it (one `claude agents` call). Read on a run's detail, as a refused check's output
@@ -502,8 +509,6 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
     got = await read();
   }
   if (!got) return null;
-  // What the session said, not what it was told: a brief, a `wf say` and every tool result come back as `user` events
-  // (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
   const last = got.events
     .filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim())
     .at(-1);
@@ -545,23 +550,24 @@ const specOf = (step: Workflow): StepSpec => ({
 
 /**
  * Where what a page shows of a step's workflow is read from: the workflow the run froze at `wf start`, which the tick
- * files from and `judgedSteps` judges by; the folder only for a record from before runs froze one. Null when neither reads.
+ * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
  */
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
 /**
  * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
  * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
+ *
+ * The run's tasks, every try's, are read over one look at the harnesses (`viewsFor`), as the list reads them, the record first — never a
+ * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own.
+ * One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
+ * run's own detail reads. What its tries consumed and cost, and its timeline, come off the same views and the feed's filing times
+ * (`filedTimes`), with no observation of their own; the timeline's rounds are of the loops of the steps the run is judged by.
  */
 export async function detail(run: Run): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  // The run's tasks, every try's, over one look at the harnesses (`viewsFor`), as the list reads them, rather than a `view` — an
-  // observation, ~0.3 s here — for each task of each try, one after another, on a page polled every five seconds: a loop's later rounds
-  // made that seconds a poll. Until 2026-09-25 it was every task in the store (1,850 journals on the live store), for one run's handful.
-  // The record is read first, as the list reads it. One more observation for each refused check's output (`checksOf`) and each blocked
-  // session's last line (`lastLineOf`), which only a run's own detail reads.
   const { views, reader: seen, unreadable } = await viewsFor([run]);
   const read = await judgedUnlessUnreadable(run, unreadable, async () =>
     judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
@@ -573,10 +579,7 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
-  // Off the views already read: no observation of its own.
   const used = consumption(views, run);
-  // Off the same views — every try's task — and the feed's filing times: no observation either.
-  // And the steps the run is judged by, whose loops its rounds are of.
   const filed = await filedTimes();
   const clock = timeline(run, views, filed, steps);
   return {
@@ -620,14 +623,12 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    // The steps `judge` words: the judged workflow, then a root for each one the page shows beside it.
     graph: runGraph(steps, names),
     steps: await Promise.all(
       names.map(async (name) => {
         const step = source?.find((s) => s.name === name);
         const taskId = run.steps[name]?.taskId ?? null;
-        // The `context:` its sessions ran under, as the run judges the step: where its peak reached it.
-        const cap = steps.find((s) => s.name === name)?.context;
+        const judgedContext = steps.find((s) => s.name === name)?.context;
         const needs = needsOf(run, name, views, judged);
         const current = {
           status: judged.words.get(name)!,
@@ -649,17 +650,15 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
           note: judged.notes.get(name) ?? null,
           ...needs,
           lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
-          // Judged by the workflow the run is: a step it does not have is gated only where the run was started with its gate.
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
           asked: askedOf(judged.asked.get(name)),
           ...current,
-          used: taskId ? usedOf(used[name], cap) : null,
-          // Off the same views, which hold every try's task: no observation.
+          used: taskId ? usedOf(used[name], judgedContext) : null,
           ...costOf(run, name, steps, views, judged.spendOf),
           tries: triesOf(run, name, steps, views, current, judged.answers),
-          timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, cap) : null })),
+          timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
         };
       }),
     ),
@@ -670,12 +669,14 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
   };
 }
 
-/** What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. */
+/**
+ * What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. The
+ * harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`), which the engine carries unread.
+ */
 function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
   const { deadlineSeconds } = view.state;
-  // The harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`); the engine carries them unread.
   const { model, effort, contextTokens, permissionMode, tools } = view.state.config ?? {};
   return {
     model: model ?? null,
@@ -704,7 +705,7 @@ function askedModelOf(record: StepRecord | undefined): string | null {
 /**
  * The remote A2A agent a task was filed on (`StepFiled.remote`), or null for a local harness. Its address is read from the store's
  * `a2a-agents.json` on each request (`remoteAgents`), as the base URL given or, for an agent given by its card, the card's first interface:
- * origin and path alone, so a query string that carries a key is never shown. A file that no longer declares the name, whose entry for it is
+ * origin and path alone, so a query string that carries a key is never shown. A file that does not declare the name, whose entry for it is
  * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `wf up` says what is wrong with the file.
  */
 function remoteOf(harness: string | undefined): StepFiled['remote'] {

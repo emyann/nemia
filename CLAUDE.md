@@ -570,6 +570,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   it`, and the board drew the run as moving: `listing` and the api read what is due off `assess`, not off the tick. A new marker beside
   `.cancelled` goes into `assess` (and `listing`'s `waitingOnYou`), and its test asserts `wf ls` and the api say nothing is coming (learned
   by the run that added `wf prune`).
+- **A seeded finished step whose worktree is on disk owes a hand-off until its record says `handedOff`.** `handOffOwed` reads a step
+  with a workspace that exists and no `handedOff` equal to its task as work still to hand on, so `wf prune` and the api's prune refuse
+  the run and a pass would commit in that worktree. A fixture that gives a finished run a worktree writes `handedOff: <taskId>` on the
+  step (UNMERGED in `apps/web/test/e2e/seed.ts`). And a pruned mark's title is `prunedWords`, which opens `pruned at <ISO> — `: a test
+  of the words anchors past that (learned by the run that put Prune on the board).
 - **`wf decide` of a shipped run prints no step's closeout.** It returns on `shipped — … is already on main`, so a test that wants a step's
   artifact lines (`!! not kept`, `!! missing`) reads a run still awaiting a decision; one on a merged run finds none and fails, or passes an
   absence for nothing (learned by the run that added `wf prune --artifacts`).

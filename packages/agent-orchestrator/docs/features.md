@@ -2136,7 +2136,8 @@ Where it departs from the plan:
 Left for later:
 
 - ~~**`--artifacts`**~~: shipped, below (*a finished run's files — `wf prune --artifacts`*).
-- **The board has no prune button**, and the Runs list and the Factory say nothing of a pruned run; only its page does.
+- ~~**The board has no prune button**, and the Runs list and the Factory say nothing of a pruned run~~: shipped, below (*pruning a
+  finished run from the board*).
 - **A cancelled run whose branch is not merged prunes without `--unmerged`**: nothing of it could be tried again anyway, but its branch is
   still the one place its work is.
 
@@ -2168,7 +2169,35 @@ What was built:
 
 Left for later:
 
-- **The whole directory or none**: nothing keeps one screenshot and prunes the rest. And the board still has no prune button.
+- **The whole directory or none**: nothing keeps one screenshot and prunes the rest.
+
+## Shipped: pruning a finished run from the board
+
+What was built:
+
+- **`POST /api/runs/:id/prune`**, behind the api's write guard, calls the package's `prune` with `yes`, `artifacts` and `unmerged` as
+  the body says, and answers 200 with `wf prune`'s lines, 409 with its refusal in its words (a run not over, one already pruned, one
+  nobody merged without `unmerged`), 404 for a run not in the store. Each refusal is proven in `apps/api/test/prune.test.ts`, the store
+  unchanged after it; the e2e makes none, since its watch counts every 4xx.
+- **What is on disk**: a run's detail carries `onDisk: {worktrees, files}`, so the page offers only what a prune would find and no button
+  that could only be answered *nothing to prune*.
+- **The run's page** has a Prune button in its header for a finished git run with something on disk. Its popover offers what to give
+  back: its worktrees; its worktrees and its files; and, for a run nobody merged, the same though nobody merged it (`--unmerged`), which
+  says in red that its branch becomes the only copy of its work and that no branch is ever deleted. For such a run the first two are shown
+  unavailable, with why. The prune is asked twice, the second time in words that name what goes, the warning again (`pruneOffer`,
+  `pruneQuestion` in `apps/web/src/lib/prune.ts`).
+- **The marks**: a `pruned` word on the run's row on Runs and a `pruned` badge on its Factory card, each with `wf ls`'s words as its title.
+- **The e2e's `prune` page** prunes the seeded unmerged run through its page, checks the store and the kept branch, reads both marks, and
+  takes it all back.
+
+Where it departs from the plan:
+
+- **A failed run is offered the third choice too.** The api's decision says `git` only of a run that succeeded, but `pruneRefusal` asks
+  `--unmerged` of any finished run neither shipped nor called off, so the board reads that off the status (`nobodyMerged`).
+
+Left for later:
+
+- **A cancelled run whose branch is not merged** is offered no warning, as the package asks no `--unmerged` of it (above).
 ## Shipped: a landed ending keeps no pictures of the merged tree
 
 Measured read-only on the owner's store on 2026-09-28: `runs/` was 3.81 GB, almost all of it the e2e's PNGs (18,176 files, 3.73 GB) under

@@ -10,6 +10,7 @@ import {
   lastCeilings,
   lastPassCost,
   listRuns,
+  maxRuns,
   parentOf,
   type ParentRun,
   type PassCost,
@@ -19,7 +20,7 @@ import {
   spendReader,
   stepsOf,
 } from 'agent-orchestrator';
-import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
+import { admissionOrder, assess, gated, heldRuns, type Run, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { everyView, judgedUnlessUnreadable, seenBy } from '../store.ts';
 
@@ -59,7 +60,7 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
 export async function ceilingsOf(): Promise<Ceilings> {
   const last = lastCeilings() ?? null;
   const pass = lastPassCost() ?? null;
-  const cap = last?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
+  const cap = last?.runs ?? maxRuns();
   if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
   const runs = listRuns();
   const { views, unreadable } = await everyView();

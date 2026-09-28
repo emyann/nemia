@@ -10,7 +10,6 @@ import path from 'node:path';
 import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check/check.ts';
 import { depsLines, inside, type Provisioned } from './workspace/workspace.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
-import { Invalid } from './refusal/refusal.ts';
 
 export { durationWord };
 import {
@@ -1151,20 +1150,6 @@ export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean
  * engine admits its tasks, so a run admitted on a pass counts for the next one on the same pass. `cap` 0 is no cap.
  */
 export type RunSlot = { inFlight: number; cap: number };
-
-/**
- * `WF_MAX_RUNS` as a cap: a whole count, 0 — or unset, or empty — for none. Refused by name, exit 2, when it is anything
- * else: read as no cap, a mistyped value would lift the cap it was set to hold.
- */
-export function runCapOf(value: string | undefined): number {
-  if (value === undefined || !value.trim()) return 0;
-  if (!/^\d+$/.test(value.trim())) {
-    throw new Invalid({
-      message: `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`,
-    });
-  }
-  return Number(value.trim());
-}
 
 /**
  * What a run asks of the cap on a pass. Pure.

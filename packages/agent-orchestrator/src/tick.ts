@@ -29,7 +29,6 @@ import {
   heldRuns,
   isGitRun,
   runAdmitted,
-  runCapOf,
   slotNeed,
   slotWord,
   hasStarted,
@@ -109,6 +108,7 @@ import {
   stepsOf,
 } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon/daemon.store.ts';
+import { maxRuns, verifiesRest } from './config/config.store.ts';
 import { feedFile, recordFeed } from './feed/feed.store.ts';
 import { abortMerge, checkoutParts, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
@@ -1255,14 +1255,14 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
  * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and throws
- * where the two differ — the tests' (`WF_VERIFY_REST=1`), never the daemon's, since it spends all that the memo saves.
+ * where the two differ — the tests' (`WF_VERIFY_REST=1`, `verifiesRest`), never the daemon's, since it spends all that the memo saves.
  */
 export async function tick(
   e: Engine,
   {
     repo = process.cwd(),
     memo = restMemo(e),
-    verifyRest = process.env.WF_VERIFY_REST === '1',
+    verifyRest = verifiesRest(),
   }: {
     repo?: string;
     memo?: RestMemo;
@@ -1596,10 +1596,10 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
  * does not read is left out, as nothing of it could be filed; a run a task of which does not read is counted in flight (`UNJUDGED`).
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
- * any pass has written it, the caller's own (`WF_MAX_RUNS`, refused by name when it is not a count).
+ * any pass has written it, the caller's own (`WF_MAX_RUNS`, `maxRuns`, refused by name when it is not a count).
  */
 export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Promise<Map<string, RunSlot>> {
-  const cap = lastCeilings()?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
+  const cap = lastCeilings()?.runs ?? maxRuns();
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map();
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {

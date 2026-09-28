@@ -4,11 +4,10 @@
  *
  * Beneath the controllers, as `retry.ts` is beneath `run.ts`: this file imports neither the engine nor a controller, `runner.ts` re-exports
  * what the package exports of it, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this file loads, which is when
- * the package loads.
+ * the package loads, and a `WF_ROOT` that is not an absolute path is refused then (`wfRoot`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { Result, Schema, SchemaIssue } from 'effect';
 import {
   spentAcceptances,
@@ -36,6 +35,7 @@ import {
 } from './rendering.ts';
 import { inputsRoot } from './record/places.store.ts';
 import { Invalid } from './refusal/refusal.ts';
+import { wfRoot } from './config/config.store.ts';
 import { countRecord, readText, within } from './meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -203,7 +203,7 @@ const jsonOr = (text: string): unknown => {
   }
 };
 
-export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
+export const HOME = wfRoot();
 
 export const runsDir = () => path.join(HOME, 'runs');
 export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);

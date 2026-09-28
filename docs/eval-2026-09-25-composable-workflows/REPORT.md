@@ -22,6 +22,8 @@ The four scenarios:
 Where things stand today, in three facts:
 - **Composition is `agent:` only.** So the dev family is a 2×2 matrix of whole folders: 20 step files, 400 lines, about 210 of them distinct.
 - **The ship is prose.** It is the one step that changes the base branch, its recipe is `shipper.md`, and `check:` is refused on `workspace: main`.
+
+  *Noted 2026-09-28, the line above kept as written:* no longer so. Since 2026-09-25 a gated `workspace: main` step may carry `check:`, and the four `dev*` folders' `ship.md` carry implement's line (`cb4141e`). The shipper stages the merge and signs off its message, and the run executes the check on the merged tree, then commits on exit 0 or aborts on anything else (`landingDue`; features.md, *Shipped: the run checks the ending's merge and lands it*). The session is denied `git commit` and `git merge --continue`. This overtakes the ship's half of card 5, its first machine check, and card 20's local merge done by code. What stays of card 5 is services as data and `does:`, and what stays of card 20 is retiring `shipper.md`, whose recipe still stages the merge and writes its message.
 - **"Do not open a pull request" is a sentence.** It is `implementer.md:31`, told to an agent running `permissionMode: auto` (`implementer.md:13`). What actually holds it is the `git push` deny in `.claude/settings.json:7-8`.
 
 ## 2. The three shapes

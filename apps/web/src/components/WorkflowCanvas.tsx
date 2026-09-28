@@ -128,9 +128,9 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
  * rather than zooming, and nothing about it is kept. A block clicked opens its step's page.
  */
 export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
-  const { steps, graph } = workflow;
   const navigate = useNavigate();
   const drawn = useMemo(() => {
+    const { steps, graph } = workflow;
     let at;
     try {
       at = layout(

@@ -14,7 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Markdown } from '@/components/Markdown';
 import { Shimmer } from './shimmer';
 
@@ -76,19 +76,21 @@ export const Reasoning = memo(
     const duration = durationProp ?? durationState;
 
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
-    const [startTime, setStartTime] = useState<number | null>(null);
+    // When the streaming started: read by the effect alone, never drawn.
+    const startTime = useRef<number | null>(null);
 
     // Track duration when streaming starts and ends
     useEffect(() => {
       if (isStreaming) {
-        if (startTime === null) {
-          setStartTime(Date.now());
-        }
-      } else if (startTime !== null) {
-        setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
-        setStartTime(null);
+        if (startTime.current === null) startTime.current = Date.now();
+        return;
       }
-    }, [isStreaming, startTime]);
+      if (startTime.current === null) return;
+      const took = Math.ceil((Date.now() - startTime.current) / MS_IN_S);
+      startTime.current = null;
+      // A clock read as the streaming ends: how long it took is known then and not in a render.
+      setDuration(took);
+    }, [isStreaming]);
 
     // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {

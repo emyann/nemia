@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
@@ -57,11 +57,9 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
   // What the card said when a person answered its gate: through the state the answer was given in and the one it moved the run to (the
   // step approved, or the try asked), until the run moves on from that — the tick filing it — or back, the answer taken back.
   const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
+  // Moved on as the render that sees the new state runs, as React has a state kept from the last render adjusted, not in an effect after it.
   const [taken, setTaken] = useState<Taken | null>(null);
-  useEffect(() => {
-    if (!taken || stamp === taken.stamp || stamp === taken.next) return;
-    setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
-  }, [stamp, taken]);
+  if (taken && stamp !== taken.stamp && stamp !== taken.next) setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
   // How long it has been at work, from its first filing — or, before that, how long it has waited (`runClock`).
   const clock = runClock(run, now, finished);

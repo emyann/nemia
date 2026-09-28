@@ -5,6 +5,7 @@ import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
 import { inFlight, inFlightFirst, onYouOf, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
+import { useNow } from '../lib/useNow';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -18,6 +19,8 @@ export const Route = createFileRoute('/runs/')({
 
 function Runs() {
   const { data: runs } = useSuspenseQuery(runsQuery);
+  // Each row's title says how long its run has been at work, read against one clock for the page, not in the render.
+  const now = useNow(60_000);
 
   if (!runs.length) {
     return (
@@ -45,11 +48,13 @@ function Runs() {
 
   return (
     <article className="space-y-8">
-      {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} />}
+      {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} now={now} />}
       {deciding.length > 0 && (
-        <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} />
+        <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} now={now} />
       )}
-      {finished.length > 0 && <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} />}
+      {finished.length > 0 && (
+        <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} now={now} />
+      )}
     </article>
   );
 }
@@ -59,7 +64,7 @@ function Runs() {
  * three: a run whose check refused while a sibling's session still works is in flight, and waits on you, and a run at its ending's gate
  * waits on you for the decision itself.
  */
-function RunGroup({ group, title, about, runs }: { group: string; title: string; about: string; runs: RunSummary[] }) {
+function RunGroup({ group, title, about, runs, now }: { group: string; title: string; about: string; runs: RunSummary[]; now: number }) {
   const waiting = runs.filter(waitsOnYou).length;
   return (
     <section aria-label={title} data-group={group} className="space-y-1">
@@ -75,14 +80,14 @@ function RunGroup({ group, title, about, runs }: { group: string; title: string;
       </h2>
       <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
         {runs.map((run) => (
-          <RunRow key={run.id} run={run} />
+          <RunRow key={run.id} run={run} now={now} />
         ))}
       </ul>
     </section>
   );
 }
 
-function RunRow({ run }: { run: RunSummary }) {
+function RunRow({ run, now }: { run: RunSummary; now: number }) {
   const title = titleOf(run);
   const decide = toDecideOf(run);
 
@@ -140,7 +145,7 @@ function RunRow({ run }: { run: RunSummary }) {
       </Link>
       <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
         {/* When it was created, which orders the list; when it started, and how long it waited before, on hover, in the card's words. */}
-        <time className="text-xs text-neutral-500" dateTime={run.createdAt} title={runClock(run, Date.now(), !inFlight(run)).title}>
+        <time className="text-xs text-neutral-500" dateTime={run.createdAt} title={runClock(run, now, !inFlight(run)).title}>
           {new Date(run.createdAt).toLocaleString()}
         </time>
         {/* What it has cost, as `wf ls` puts it on the run's line, once a cost was measured. */}

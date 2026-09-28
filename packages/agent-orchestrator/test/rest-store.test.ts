@@ -232,8 +232,9 @@ test('a pass that answers the finished runs from memory carries no refused move:
 const rested = async (): Promise<number> => (await verified()).cost!.rested ?? 0;
 /** What the last pass answered of one run. */
 const answered = async (id: string) => (await verified()).runs.find((a) => a.run.id === id)!;
-/** A finished run worked in place, from the store built above, not yet touched by a test. */
+/** The ids of the runs a test has taken with `aResting`, each taken once. */
 const touched = new Set<string>();
+/** A finished run worked in place, from the store built above, not yet touched by a test; `isolate` picks one in a worktree instead. */
 const aResting = (isolate = false): GitRun => {
   const run = listRuns().find(
     (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && MEMO.runs.has(r.id),

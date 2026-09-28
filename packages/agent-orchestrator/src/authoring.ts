@@ -276,7 +276,8 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     // that failed part-way through those files, which is why they are written in here too.
     for (const { sidecar, was } of before) {
       if (!written.includes(sidecar.file)) continue;
-      was === undefined ? fs.rmSync(path.join(at, sidecar.file), { force: true }) : fs.writeFileSync(path.join(at, sidecar.file), was);
+      if (was === undefined) fs.rmSync(path.join(at, sidecar.file), { force: true });
+      else fs.writeFileSync(path.join(at, sidecar.file), was);
     }
     throw err;
   }

@@ -92,8 +92,11 @@ export const confusion = (
     if (p === undefined) continue;
     const t = truth(row);
     if (p === 'unsure') unsure++;
-    else if (p === 'yes') t ? yesYes++ : yesNo++;
-    else t ? noYes++ : noNo++;
+    else if (p === 'yes') {
+      if (t) yesYes++;
+      else yesNo++;
+    } else if (t) noYes++;
+    else noNo++;
   }
   const decided = yesYes + yesNo + noYes + noNo;
   return {

@@ -242,7 +242,8 @@ export const recorded = (options: { readonly model: string; readonly record: str
         const n = nextN(facts);
         const deadline = new Date(Date.now() + asker.holdMs).toISOString();
         const won = yield* onRecord(() => claim(record, { ...common(k, n), deadline, pid: process.pid, host }));
-        (won ? mine.push({ k, n }) : theirs.push(k));
+        if (won) mine.push({ k, n });
+        else theirs.push(k);
       }
 
       let usage: Usage | undefined;

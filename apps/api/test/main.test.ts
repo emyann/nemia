@@ -38,7 +38,7 @@ function startApi(port: string) {
         const m = pattern.exec(output);
         if (m) { clearInterval(timer); resolve(m); }
       }, 20);
-      void ended.then(() => { clearInterval(timer); const m = pattern.exec(output); m ? resolve(m) : reject(new Error(`exited without ${pattern}:\n${output}`)); });
+      void ended.then(() => { clearInterval(timer); const m = pattern.exec(output); if (m) resolve(m); else reject(new Error(`exited without ${pattern}:\n${output}`)); });
     });
   return { child, ended, said, output: () => output };
 }

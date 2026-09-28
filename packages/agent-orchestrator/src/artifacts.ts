@@ -4,7 +4,7 @@
  * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`).
  *
  * Beneath the controllers, beside `store.ts` and `worktree.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports
- * what it exported of this before. The closeout itself is read off the engine's record, so `closeoutOf` is `views.ts`'s.
+ * `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is `views.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,11 +15,8 @@ import { artifactsDir, checkStderr, lstatOf } from './store.ts';
 import { gitSays } from './worktree.ts';
 
 /**
- * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`).
- *
- * The whole point of declaring them. The first real run lost the reviewer's entire output because
- * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
- * and empty. A declared file the run does not have is now a mismatch somebody can see.
+ * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`): a declared file written and never handed over is a
+ * mismatch a person can see, where the merge alone would be clean and empty.
  *
  * A path from the workspace root is read where the tick collected it (`collectArtifacts`), and the workspace says why when it is not
  * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
@@ -50,9 +47,9 @@ export function missingArtifacts(run: Run, stepName: string, closeout: Closeout 
  * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
  * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, or a
  * directory. A file in the workspace whose copy something a step made in `dir` refuses (`copyBlocked`) is `not collected`, even when it is
- * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, as it was before collection —
- * so a run from before it, whose worktree is still there and whose steps are past hand-off, reads as it did — and one on no branch either,
- * a file git ignores that its step has not handed off yet, is `not collected`. With nothing in the workspace, the branch answers too.
+ * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, so a step handed off without
+ * its files collected still has what its branch holds, and one on no branch either, a file git ignores that its step has not handed off
+ * yet, is `not collected`. With nothing in the workspace, the branch answers too.
  */
 function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
   const rel = path.normalize(file);
@@ -94,10 +91,11 @@ function inWorkspace(
  * steps after it and `wf decide` read them from one place (`missingArtifacts`, `artifactFiles`).
  *
  * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
- * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and time is left as
- * it is. Nothing is copied, and `wf decide` says why, for a path that climbs out of the workspace (never read), a link that leads out of it
- * (not followed), a directory, and a file that is not there. Nothing is written through a link in the files directory, which a step may
- * have made. It never throws, as a hand-off does not. The pass's note names what was copied.
+ * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and, within a
+ * millisecond, its time is left as it is, since a copy's time reads back a hair off its source's. Nothing is copied, and `wf decide` says
+ * why, for a path that climbs out of the workspace (never read), a link that leads out of it (not followed), a directory, a file that is
+ * not there, and a copy that fails. Nothing is written through a link in the files directory, which a step may have made. It never
+ * throws, as a hand-off does not. The pass's note names what was copied.
  */
 export function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
   const workspace = run.steps[stepName]?.workspace;
@@ -115,22 +113,20 @@ export function collectArtifacts(run: Run, stepName: string, closeout: Closeout 
       fs.mkdirSync(path.dirname(to), { recursive: true });
       const from = fs.statSync(at.real);
       const there = lstatOf(to);
-      // Within a millisecond: the time a copy is given goes through a `Date` and a float of seconds, and reads back a hair off the source's.
       if (there && there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1) continue;
       fs.copyFileSync(at.real, to);
       fs.utimesSync(to, from.atime, from.mtime);
       copied.push(rel);
-    } catch {
-      /* not collected, and `wf decide` says so */
-    }
+    } catch {}
   }
   return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
 }
 
 /**
  * Whether a copy of `rel` into `dir` would go through something a step may have made there: `dir`, or a directory on the way to the copy,
- * that is there and is not a plain directory — a link, a file — or something in the copy's place that is not a regular file. Looks, and
- * makes nothing: what `collectArtifacts` refuses to write through, and what `missingArtifacts` names as the copy refused.
+ * that is there and is not a plain directory — a link, a file — or something in the copy's place that is not a regular file. A directory
+ * on the way that is not there yet blocks nothing, since it is made plain. Looks, and makes nothing: what `collectArtifacts` refuses to
+ * write through, and what `missingArtifacts` names as the copy refused.
  */
 function copyBlocked(dir: string, rel: string): boolean {
   let at = dir;
@@ -143,7 +139,6 @@ function copyBlocked(dir: string, rel: string): boolean {
   ]) {
     at = path.join(at, part);
     const st = lstatOf(at);
-    // Nothing there yet: made as a plain directory, and nothing below it can be in the way.
     if (!st) return false;
     if (!st.isDirectory()) return true;
   }
@@ -193,12 +188,13 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
  * the pass that writes `{ commit }`. The ship's check runs the e2e on the merge staged in the repository's checkout, with its files
  * directory as `WF_ARTIFACTS`, after the ship's gate — so no person and no step reads those pictures before it, and after a pass nothing
  * shows them but `wf decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
- * implement step's (measured on the owner's store on 2026-09-28: 202 of 252 differ byte for byte), and about 45 MB a run. A check that did
- * not pass is never landed as a commit, so its pictures, the failed page's among them, stay for whoever reads why.
+ * implement step's, which are kept. A check that did not pass is never landed as a commit, so its pictures, the failed page's among them,
+ * stay for whoever reads why.
  *
  * Only a regular `.png` directly in the directory that the ending's closeout does not name, and never through a link. In its place a note,
  * `e2e-pictures.txt`, says what was removed and where what the check said is kept — written before anything is removed, and left as it is
- * on a later pass, so a pass that dies halfway leaves the whole list and the next one removes the rest. Nothing to remove writes nothing.
+ * on a later pass, so a pass that dies halfway, or a picture that cannot be removed, leaves the whole list and the next pass that lands
+ * removes the rest. Nothing to remove writes nothing.
  */
 export function dropLandedPictures(
   run: Pick<Run, 'id'>,
@@ -231,9 +227,7 @@ export function dropLandedPictures(
       fs.rmSync(path.join(dir, picture.name));
       removed.push(picture.name);
       freed += picture.bytes;
-    } catch {
-      /* still there: the next pass that lands tries again */
-    }
+    } catch {}
   }
   return { removed, bytes: freed };
 }

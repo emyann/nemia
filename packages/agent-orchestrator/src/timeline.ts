@@ -142,10 +142,13 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * Where a run's time went, per try and per check of every step, off the engine's views of their tasks and the run's `tries`. Pure.
  *
  * `views` must hold every task of every try — the tries behind the current one too, and each try's check; a task it does not hold reads as
- * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in views.ts); without it every
- * queue time is `not known`. A step not filed has no try on the clock.
+ * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in views.ts) or each view's
+ * `State.filedAt` (`decide`); a task without one has its queue time `not known`. A step not filed has no try on the clock.
  *
  * `steps` are the workflow the run is judged by — the one it froze, by default — whose loops its rounds are of. Without them no round is totalled.
+ * A round counts the steps its loop files again (`loopSpan`), and a step before the loop or after it is in no round. The rounds go by loop,
+ * in the workflow's order, then by round: the rounds of two loops are not the same rounds. A session a recheck's try shares is counted
+ * once, on the try that ran it.
  */
 export function timeline(
   run: Run,
@@ -153,8 +156,6 @@ export function timeline(
   filed: ReadonlyMap<string, string> = new Map(),
   steps: readonly Workflow[] = run.workflow ?? [],
 ): Timeline {
-  // The loop a step's rounds are of: each step a round of it files again (`loopSpan`), by its looping step. A step in no span is in no round:
-  // one before the loop was filed once, and one after it once the loop was done, and counting either in round 1 made round 1 the whole run.
   const loops = steps.filter((s) => s.loop);
   const loopOf = new Map(loops.flatMap((looping) => loopSpan(steps, looping).map((name) => [name, looping.name] as const)));
   const byStep: Record<string, TimelineTry[]> = {};
@@ -170,7 +171,6 @@ export function timeline(
       ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
     ];
     byStep[name] = tries.map((t, i): TimelineTry => {
-      // A recheck replaced only the check: the try after it has the same task, whose session is counted once, on the try that ran it.
       const first = tries.findIndex((u) => u.taskId === t.taskId);
       const session = first === i ? spanOf(t.taskId, views.get(t.taskId), filed.get(t.taskId)) : null;
       const check = t.check ? spanOf(t.check, views.get(t.check), filed.get(t.check)) : null;
@@ -179,7 +179,6 @@ export function timeline(
       return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...(used ? { used } : {}) };
     });
   }
-  // By loop, in the workflow's order, then by round: the rounds of two loops are not the same rounds.
   const rounds = loops.flatMap((looping) => {
     const of = counted.filter((c) => c.loop === looping.name);
     return [...new Set(of.map((c) => c.round))]
@@ -218,7 +217,7 @@ function slotWaitOf(run: Run, filed: ReadonlyMap<string, string>): SlotWait | nu
 
 /**
  * When the run could first be at work: the earliest filing of any task of any try of any step — a session's or a check's — off the
- * engine's feed (`readFilings`). Null while nothing of the run is filed, and for a run whose tasks are not on the feed. Pure.
+ * filing times it is handed (`filed`). Null while nothing of the run is filed, and for a run none of whose tasks has one. Pure.
  *
  * Not the record's `createdAt`: a run started `--after` runs, or held for a run slot, is created long before anything of it is filed. And
  * not when its parents shipped, which nothing writes down: the tick files the roots on the pass that reads them shipped.
@@ -234,7 +233,7 @@ export function firstFiledAt(run: Run, filed: ReadonlyMap<string, string>): stri
 
 /**
  * When a run started, as a person is told it: its first filing (`firstFiledAt`); for a run that has started and whose filings the feed does
- * not have — a store from before the feed — its `createdAt`, the best there is; null while nothing of it is filed. Pure.
+ * not have, its `createdAt`, the best there is; null while nothing of it is filed. Pure.
  */
 export const runStartedAt = (run: Run, filed: ReadonlyMap<string, string>): string | null =>
   firstFiledAt(run, filed) ?? (hasStarted(run) ? run.createdAt : null);
@@ -309,7 +308,11 @@ function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | u
   return { taskId, at, filedAt: filedAt ?? null, spawnedAt, endedAt, attempts: attempts.length, queuedMs, ranMs, queued, ran };
 }
 
-/** Several tasks' time together (`TimelineTotal`) — the run's with its wait for a run slot, when the cap held it, counted as queued. */
+/**
+ * Several tasks' time together (`TimelineTotal`) — the run's with its wait for a run slot, when the cap held it, counted as queued. Each
+ * time in words is the sum of the times known, then what it leaves out, and `—` rather than a sum of none, which would read as nothing
+ * spent.
+ */
 function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[], slot: SlotWait | null = null): TimelineTotal {
   const inFlight = spans.filter((s) => s.at === 'queued' || s.at === 'starting' || s.at === 'running');
   const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), slot?.ms ?? 0);
@@ -328,7 +331,6 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
     !lasts.length
       ? null
       : between([...(firsts as string[])].sort()[0], lasts.sort().at(-1)!);
-  // A sum over the times that are known, then what it leaves out — and never a sum of none, which would read as nothing spent.
   const said = (known: number, ms: number, pending: [number, string], unknown: number): string =>
     [
       known ? durationWord(ms) : '',
@@ -383,7 +385,6 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const rows = tries.flatMap((t): Array<[string, string]> => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
     const used = usedLines(t.used)[0].replace(/^used\s+/, '');
-    // What the session cost, beside what it used, where the engine measured it.
     const cost = t.used?.costUsd !== undefined ? `  cost ${dollars(t.used.costUsd)}` : '';
     return [
       [label, t.session ? `${words(t.session)}  used ${used}${cost}` : `its session is try ${t.sessionOf}'s, checked again`],

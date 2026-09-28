@@ -28,6 +28,11 @@ export type RunSummary = {
    */
   startedAt: string | null;
   cancelledAt: string | null;
+  /**
+   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what it
+   * kept — for the mark beside its status; null on a run never pruned.
+   */
+  pruned: { said: string } | null;
   /** The runs this one waits on (`wf start --after`), as its record froze them: the edges from their cards to its card on the Factory. */
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
@@ -91,4 +96,26 @@ export async function liftHold(id: string): Promise<{ id: string; lifted: true }
   const body = (await res.json().catch(() => undefined)) as { lifted?: unknown; error?: unknown } | undefined;
   if (res.ok && body?.lifted === true) return { id, lifted: true };
   throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
+}
+
+/** What a prune gives back beyond the run's worktrees, as `wf prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody merged. */
+export type PruneHow = { artifacts: boolean; unmerged: boolean };
+
+/** What the api answers a prune with: `wf prune`'s lines, and how many places it could not remove (`left`), which those lines name. */
+export type Pruned = { id: string; pruned: true; lines: string[]; left: number };
+
+/**
+ * Prune a finished run, as `wf prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged only with
+ * `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already pruned, or
+ * one nobody merged — or its own about the request.
+ */
+export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
+  const route = `/api/runs/${encodeURIComponent(id)}/prune`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
+  const body = (await res.json().catch(() => undefined)) as { pruned?: unknown; lines?: unknown; left?: unknown; error?: unknown } | undefined;
+  if (res.ok && body?.pruned === true) {
+    const lines = Array.isArray(body.lines) ? body.lines.filter((line): line is string => typeof line === 'string') : [];
+    return { id, pruned: true, lines, left: Array.isArray(body.left) ? body.left.length : 0 };
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
 }

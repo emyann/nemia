@@ -329,8 +329,8 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
   );
 }
 
-const RADIO = 'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
-const DOT = 'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
+export const RADIO = 'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
+export const DOT = 'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
 
 /**
  * `systemPrompt:`, as a choice of what the agent does: Claude Code's instructions whole, less their coding section, or none — which drops

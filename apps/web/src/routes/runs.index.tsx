@@ -89,6 +89,12 @@ function RunRow({ run }: { run: RunSummary }) {
           {/* A folder run has no repository to name: where a git run's row says one, it says what it works in. */}
           <span title={run.repo ?? 'Its steps work in folders the run made'}>{run.repo ?? 'folders'}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
+          {/* That `wf prune` gave back its worktrees, and its files when asked: what it removed and kept, on hover. */}
+          {run.pruned && (
+            <span data-pruned title={run.pruned.said}>
+              pruned
+            </span>
+          )}
           {/* As `wf ls` prints `→ waiting on you:` — the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve. */}
           {waitsOnYou(run) && (onYouOf(run).length > 0 || run.waiting?.advice) && (
             <span data-waiting-on-you className="font-medium text-amber-600">

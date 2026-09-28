@@ -1,7 +1,7 @@
 /**
- * The shipped skills (`workflows/skills/`, agents card 1b of docs/design-2026-09-25-agents-and-skills.md): each the procedure one entry of
- * an agent's card describes, moved out of the agent's body into a SKILL.md of its own. The agent's body keeps its role and its limits and
- * names its skills; the card says what the agent can do, and the skills are how.
+ * The shipped skills (`workflows/skills/`): each the procedure one entry of an agent's card describes, in a SKILL.md of its own rather
+ * than in the agent's body. The agent's body keeps its role and its limits and names its skills; the card says what the agent can do, and
+ * the skills are how.
  *
  * A SKILL.md whose frontmatter is not YAML is dropped by Claude Code with nothing said — the session is simply not given it — so each is
  * parsed here as YAML, and a description whose quoting breaks it fails the suite rather than a run.
@@ -51,15 +51,16 @@ test('every shipped SKILL.md reads as YAML, its name its folder and its descript
       assert.equal(keys.name, name, `${file}: named as its folder`);
       assert.equal(typeof keys.description, 'string', `${file}: a description`);
       assert.match(keys.description as string, /^\S[^\n]*\S$/, `${file}: one line`);
-      // The run reads `preload` with its own line reader (`preloads`), and reads it as YAML does.
-      assert.equal(preloads(path.join(skills, name)), keys.preload === true, `${file}: preload`);
+      assert.equal(
+        preloads(path.join(skills, name)),
+        keys.preload === true,
+        `${file}: preload, read by the run's own line reader as YAML reads it`,
+      );
       read++;
     }
   }
   assert.equal(read, 20, "the repository's fourteen and the package's six");
 
-  // The quoting that breaks a description, each on a shipped file: a colon and a space in plain text, a quote inside quotes, a quote
-  // never closed, a backquote first. Each is YAML no parser reads, and Claude Code drops the skill.
   const file = path.join(REPO, 'workflows', 'skills', 'review-a-change', 'SKILL.md');
   const text = fs.readFileSync(file, 'utf8');
   const line = /^description: .*$/m;
@@ -73,7 +74,7 @@ test('every shipped SKILL.md reads as YAML, its name its folder and its descript
     assert.throws(
       () => frontmatterOf(file, text.replace(line, broken)),
       (e: Error) => e instanceof yaml.YAMLException,
-      broken,
+      `${broken}: quoting that breaks a description is YAML no parser reads, and Claude Code drops the skill`,
     );
   assert.deepEqual(
     Object.keys(frontmatterOf(file, text.replace(line, 'description: Reads the diff, as a second engineer would'))).includes('description'),

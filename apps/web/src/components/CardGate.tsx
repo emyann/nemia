@@ -12,8 +12,8 @@ import { SECONDARY, useApprove } from './Gate';
  */
 export type Taken = { said: string; stamp: string; next?: string };
 
-const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
-const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
+export const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
+export const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
 
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in a row (`gateCardLine`), cut short where the names are

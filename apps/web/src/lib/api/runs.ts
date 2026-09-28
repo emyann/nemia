@@ -80,3 +80,15 @@ export async function removeRun(id: string): Promise<{ id: string; removed: true
   if (res.ok && body?.removed === true) return { id, removed: true };
   throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
 }
+
+/**
+ * Lift a person's hold on a run, as `wf hold <run> --off` lifts it: the hold's file removed, and the run goes on at the next tick. Rejects
+ * with the api's refusal in full — the package's words for a run nobody holds — or its own about the request.
+ */
+export async function liftHold(id: string): Promise<{ id: string; lifted: true }> {
+  const route = `/api/runs/${encodeURIComponent(id)}/hold`;
+  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const body = (await res.json().catch(() => undefined)) as { lifted?: unknown; error?: unknown } | undefined;
+  if (res.ok && body?.lifted === true) return { id, lifted: true };
+  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
+}

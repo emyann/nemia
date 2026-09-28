@@ -2284,7 +2284,24 @@ Where it departs from the plan:
 - **The e2e holds GATED until HELD, not until the diamond's running run.** `holdRefusal` refuses a hold across repositories, and those
   two runs are on different ones.
 
-Left for later: **lifting a hold from the board**, which needs a route on the api.
+Left for later: **lifting a hold from the board**, which needs a route on the api. Built since: see *Shipped: a hold lifted from the board*.
+
+## Shipped: a hold lifted from the board
+
+- **`DELETE /api/runs/:id/hold`** (`apps/api/src/runs.ts`) lifts a run's hold with the package's own `unhold`, the code `wf hold <run>
+  --off` runs, behind the same guard as every other write (a name that is not this machine and another site's page are refused 403, a
+  body not sent as JSON 415). It refuses what `wf hold --off` refuses, in its words: a run nobody holds, a pruned one among them, is 409;
+  a run not in the store, or one removed with its hold file left behind, is 404. A hold written by hand on a pruned run is lifted, since
+  the board says it; the run stays pruned. Each refusal is proven in `apps/api/test/hold.test.ts`, the files unchanged after it.
+- **Lift, asked twice, wherever the board says a run is held.** The Factory's card has `Lift…` in its footer beside the `held` chip,
+  which opens a popover whose second press lifts; the run's page has `Lift…` in its Held section, which asks in place. Once lifted, the
+  board reads the run's record and the list again (each `exact`), so the hold, its edge and the button go, and the gate the hold kept
+  back is offered again. The lift writes no feed line: the tick is the feed's one writer, and says the run moved once it files.
+- **The e2e's `lift` page** holds GATED until HELD, lifts it from the card and then from the run's page, checks the hold file is gone
+  each time and that the card still fits its cell with the button, and takes back whatever hold it left.
+
+Where it departs from the plan: the card's `Lift…` is in its footer, not in the row where the gate would be, so a held card is no
+taller than its cell (`CELL_HEIGHT`).
 
 ## Shipped: two small items from the plan's queue
 

@@ -1,7 +1,7 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, forget, listRuns, runStartedAt } from 'agent-orchestrator';
+import { type BranchReader, branchReader, forget, listRuns, runStartedAt, unhold } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
@@ -142,6 +142,17 @@ const removeGuard = (route: string): Guarded => ({
   shape: REMOVE_SHAPE,
 });
 
+/** A person's hold lifted, as the guard's refusals word it (guard.ts). */
+const liftGuard = (route: string): Guarded => ({
+  route,
+  does: "lifts a run's hold",
+  forAnother: 'lift one',
+  why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
+  reach: "lift it on the board's run page",
+  instead: "Lift it on the board's run page, or with `wf hold <run> --off`",
+  shape: '`{}`',
+});
+
 /**
  * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
  * status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged by
@@ -236,6 +247,26 @@ export const runs = new Hono()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return c.json({ error: message }, (err as { exitCode?: number }).exitCode === 2 ? 422 : 500);
+    }
+  })
+  /**
+   * A person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`): its file removed, and the run goes on at the next tick, what its steps
+   * asked while it was held asked again. Refused in the package's words, a 409: a run nobody holds — a pruned one among them, since no verb
+   * holds one — and a hold put again as it was lifted. No feed line: the tick is the feed's one writer, and the board reads the run again itself.
+   */
+  .delete('/api/runs/:id/hold', async (c) => {
+    const id = c.req.param('id');
+    const route = `DELETE /api/runs/${id}/hold`;
+    const refused = refusedBeforeReading(liftGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+    try {
+      const { hold } = unhold(id);
+      return c.json({ id, lifted: true, hold });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if ((err as { exitCode?: number }).exitCode === 2) return c.json({ error: message }, 409);
+      return c.json({ error: `${route}: the hold was not lifted — ${message}. Lift it with \`wf hold ${id} --off\`.` }, 502);
     }
   })
   // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.

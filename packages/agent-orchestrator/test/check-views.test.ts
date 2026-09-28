@@ -36,7 +36,8 @@ const file = (id: string, held = false) =>
     harness: 'check',
     brief: checkBrief(
       held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
-      { WF_RUN: 'r', WF_STEP: id },
+      // No stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+      { WF_RUN: 'r', WF_STEP: id, WF_WORKSPACE: '', WF_STDERR: '', WF_ARTIFACTS: '' },
     ),
   });
 

@@ -117,6 +117,7 @@ import {
   type InputFile,
   type RetryBriefing,
   type RoundAsk,
+  type GitRun,
   type Run,
   type Said,
   type StepRecord,
@@ -156,7 +157,7 @@ import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workfl
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
 const STEPS = [step('implement'), step('review', ['implement'])];
 
-const run = (steps: Record<string, string | null>, rest: Partial<Run> = {}): Run => ({
+const run = (steps: Record<string, string | null>, rest: Partial<GitRun> = {}): GitRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',
@@ -553,7 +554,7 @@ test('a late try of a step in the checkout is told the base branch by name, neve
     },
   );
   // Try 4, and a new session — a nudge whose last try left none to continue — so the whole brief is composed, `## Where to look` and all.
-  const briefing: RetryBriefing = { try: 4, by: 'person', mode: 'nudge', resumed: false, status: 'blocked', message: 'Merge it.' };
+  const briefing: RetryBriefing = { try: 4, by: 'ask', mode: 'nudge', resumed: false, status: 'blocked', message: 'Merge it.' };
   const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES, undefined, briefing);
   assert.match(
     brief,
@@ -877,7 +878,7 @@ test('a run id is readable, and step ids share its prefix', async () => {
 // ─── the decider ────────────────────────────────────────────────────────────
 
 /** A run whose two steps are done and whose result sits on a branch. */
-const finished = (extra: Partial<Run> = {}) =>
+const finished = (extra: Partial<GitRun> = {}) =>
   run(
     { implement: 't1', review: 't2' },
     {
@@ -1215,7 +1216,7 @@ const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
 /** `implement` filed and settled as the phases say; its check filed under `checkId`, if given. */
-const withCheck = (checkId: string | null, extra: Partial<Run> = {}) =>
+const withCheck = (checkId: string | null, extra: Partial<GitRun> = {}) =>
   run(
     {},
     {
@@ -1659,7 +1660,7 @@ test('a check stopped before it printed its exit code reads unfinished, never a 
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
 const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
-const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<Run> = {}) =>
+const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<GitRun> = {}) =>
   run(
     {},
     {
@@ -2913,7 +2914,7 @@ const answered: Closeout = {
 };
 
 /** The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it — and ship unfiled. */
-const inRound = (n: number, extra: Partial<Run> = {}): Run => {
+const inRound = (n: number, extra: Partial<GitRun> = {}): Run => {
   const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
@@ -3044,7 +3045,7 @@ test("a person's `wf round` takes an exhausted loop once more, once: an ask for 
 /** Why a person judged a loop's findings later work rather than this run's: the whole reason what waits on the loop was filed. */
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
 /** Try `t` of review, accepted as it stands at a known time. */
-const acceptedTry = (t: number, message: string = ENOUGH): Partial<Run> => ({
+const acceptedTry = (t: number, message: string = ENOUGH): Partial<GitRun> => ({
   acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }],
 });
 
@@ -3080,13 +3081,13 @@ test("a person's `wf accept` ends a loop out of rounds on their word: what waits
   assert.deepEqual(roundLines(LOOP, r, d), [], '`wf decide` offers the round no more');
 
   // What it is all for: a gated ending goes to its gate and is approved or not as ever, rather than never being filed at all.
-  const GATED = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2]!, gate: true }];
+  const GATED: Workflow[] = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2]!, gate: true }];
   const filed: Run = { ...r, steps: { ...r.steps, ship: { taskId: 's1' } } };
   const saidShip = (name: string) => (name === 'ship' ? signedDone() : said(name));
   assert.deepEqual(assess(GATED, r, ALL_SUCCEEDED, said, asked).ready, ['ship']);
   assert.equal(stepStatus(GATED[2]!, filed, ALL_SUCCEEDED, saidShip, asked, GATED), 'awaiting approval');
   // And a gate on the looping step itself, which a round un-holds: a person's word ends the loop, so that gate holds now too.
-  const GATED_LOOP = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]!];
+  const GATED_LOOP: Workflow[] = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]!];
   assert.equal(stepStatus(GATED_LOOP[1]!, r, ALL_SUCCEEDED, said, asked, GATED_LOOP), 'awaiting approval');
   assert.equal(
     stepStatus(GATED_LOOP[1]!, inRound(3), ALL_SUCCEEDED, said, asked, GATED_LOOP),
@@ -3105,7 +3106,8 @@ test("a person's `wf accept` ends a loop out of rounds on their word: what waits
 
 test('REFUSED: `wf accept` takes a loop out of rounds with `again` still true, and nothing else — each refusal naming the way on instead', () => {
   const said = saidIn(3, true);
-  const why = (a: ReturnType<typeof acceptAsk>): string => {
+  // `wf accept`'s answer, and `wf round`'s at the end: each a refusal, or what it would write.
+  const why = (a: ReturnType<typeof acceptAsk> | ReturnType<typeof roundAsk>): string => {
     if (!('refusal' in a)) assert.fail(`accepted, and should not have: ${JSON.stringify(a)}`);
     return a.refusal;
   };
@@ -3236,7 +3238,7 @@ test("a round moves every step of the loop behind it: the target continued under
     },
     test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', then: 'round' }] },
     review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', then: 'round' }] },
-  });
+  } satisfies Run['steps']);
   assert.equal(r.steps.implement!.tries, undefined, 'the record it was given is not written into');
   assert.deepEqual(
     [roundOf(next, 'review'), stepTaskId(next, 'test', 2), checkTaskId(next, 'implement')],
@@ -3661,7 +3663,7 @@ const shippedOnly = (...ids: string[]) => {
 };
 
 /** Another run's record, as a parent's. */
-const record = (id: string, rest: Partial<Run> = {}): Run => run({ implement: 'x' }, { id, ...rest });
+const record = (id: string, rest: Partial<GitRun> = {}): Run => run({ implement: 'x' }, { id, ...rest });
 
 test('a record from before there was an `after` reads as ready, and so does a run started without one — and no parent is read for either', () => {
   const legacy = run({ implement: null, review: null });
@@ -3737,7 +3739,7 @@ test('`waitsOf` says why a parent may never ship — no such run, cancelled, a r
 
 test("a pass records the tips of a finished run's result branches — succeeded or failed, never running or cancelled, never --no-worktree — writes nothing when none moved, and keeps a tip once its branch is gone", () => {
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
-  const branched = (rest: Partial<Run> = {}): Run => {
+  const branched = (rest: Partial<GitRun> = {}): Run => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
     for (const name of ['a', 'b', 'c']) r.steps[name]!.branch = `wf/r-1/${name}`;
     return r;
@@ -4176,7 +4178,7 @@ test('a run given inputs names them once, under what was asked for, on every bri
   for (const [why, given] of [
     ['no inputs on the record', r],
     ['an empty list', { ...r, inputs: [] }],
-  ] as const) {
+  ] satisfies [string, Run][]) {
     assert.equal(brief(step('implement'), given, STEPS), plain, why);
   }
   // `undefined` would not skip `brief`'s default directory: composed with none at all.
@@ -6566,7 +6568,7 @@ test("REFUSED at shipped defaults: a person's ask no pass has spent — one the 
 
 test('REFUSED at shipped defaults: a run another run waits on and has not started names the runs it would strand, and how to free it; a child that started, was called off, or waits on another run strands nothing', () => {
   const parent = run({ implement: 't1', review: 't2' });
-  const child = (id: string, rest: Partial<Run> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
+  const child = (id: string, rest: Partial<GitRun> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
   assert.equal(
     forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
     'c-1 and c-2 wait on it and have not started: forgotten, each would read waiting on r-1 (no such run) for ever. Let them start first, on the pass after wf decide says r-1 has shipped, or call them off: wf cancel c-1, wf cancel c-2.',
@@ -6864,7 +6866,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
 /** `plan → implement → review`, as dev-planned is, with the steps it is given in place of its own. */
 const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
 /** Plan signed off done, implement and review not filed; gated at plan by `--gate plan` unless told otherwise. */
-const atPlan = (extra: Partial<Run> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
+const atPlan = (extra: Partial<GitRun> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
 const PLAN_DONE = phases({ t1: 'succeeded' });
 const approval = (step: string, n: number, message?: string) => ({
   step,
@@ -6901,13 +6903,13 @@ test('`holdsOpen`: a step keeps its task open while a word from a person is what
       () => undefined,
     );
   const plan = step('plan');
-  const at = (extra: Partial<Run> = {}) => run({ plan: 't1', implement: null }, extra);
+  const at = (extra: Partial<GitRun> = {}) => run({ plan: 't1', implement: null }, extra);
   assert.equal(holds(plan, at(), 'succeeded', said('blocked')), true, 'signed off blocked');
   assert.equal(holds(plan, at({ gates: ['plan'] }), 'succeeded', signedDone()), true, 'at its gate');
   const checked = { ...plan, check: 'npm test' };
   const checking = at({ gates: ['plan'], steps: { plan: { taskId: 't1', check: { taskId: 'c1' } }, implement: { taskId: null } } });
   assert.equal(
-    holds(checked, checking, 'succeeded', signedDone(), 'running (working)'),
+    holds(checked, checking, 'succeeded', signedDone(), 'running'),
     true,
     'gated, its check running: the gate is where it goes next',
   );
@@ -6915,7 +6917,7 @@ test('`holdsOpen`: a step keeps its task open while a word from a person is what
   assert.equal(holds(plan, at(), 'succeeded', signedDone()), false, 'ungated, signed off done');
   assert.equal(holds(plan, at({ gates: ['plan'], approvals: [approval('plan', 1)] }), 'succeeded', signedDone()), false, 'approved');
   assert.equal(
-    holds(checked, { ...checking, gates: undefined }, 'succeeded', signedDone(), 'running (working)'),
+    holds(checked, { ...checking, gates: undefined }, 'succeeded', signedDone(), 'running'),
     false,
     'ungated, its check running',
   );
@@ -6967,7 +6969,7 @@ test('REFUSED by the gate at shipped defaults, pass after pass: a gated step tha
 
 test('a gated step with `check:` is verified first, then held: checking while its check is due or running, `failed (check)` when it refuses — no gate on unverified work — and awaiting approval once it passes', () => {
   const gated: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
-  const at = (checkId: string | null, extra: Partial<Run> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
+  const at = (checkId: string | null, extra: Partial<GitRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
   const due = assess(gated, at(null), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual([due.check, due.ready], [['implement'], []], 'its check is filed first');
   assert.equal(stepStatus(gated[0]!, at('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), 'checking');
@@ -7033,7 +7035,7 @@ test('`wf ls` at a gate: the step reads `awaiting approval`, with the two comman
 });
 
 test('`wf decide` at a gate: the run is awaiting you, its outcome blocked, the step named under `awaitingApproval` — and a gated run is not shipped while it waits, merged or not, so a run `--after` it is not ready; approved, it ships as any run', () => {
-  const gatedAtReview = (extra: Partial<Run> = {}) => finished({ gates: ['review'], ...extra });
+  const gatedAtReview = (extra: Partial<GitRun> = {}) => finished({ gates: ['review'], ...extra });
   const d = decision(STEPS, gatedAtReview(), DONE, nothingShipped, signedDone, asked);
   assert.equal(d.kind, 'awaiting');
   // Review declares no check, so it is unverified on its own word as well: the gate is said beside how it ended, never in its place.
@@ -7502,7 +7504,7 @@ const SHIP: Workflow = {
 };
 const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
 /** implement and review done on the run's branch, ship never filed. */
-const atEnd = (extra: Partial<Run> = {}) =>
+const atEnd = (extra: Partial<GitRun> = {}) =>
   run(
     {},
     {
@@ -7675,7 +7677,7 @@ test("a run at its ending step's gate is not shipped while its result is off the
   assert.equal(decision(ENDS, atEnd(), DONE, () => 'unchanged' as const, signedDone, asked).kind, 'shipped');
 
   // Any other gate is a person's word git cannot give: a gated step that has run and signed off, its branch merged, is still awaiting it.
-  const accepted = [step('implement'), { ...step('review', ['implement']), gate: true }];
+  const accepted: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
   const signed = run(
     { implement: 't1', review: 't2' },
     {
@@ -7834,7 +7836,7 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
   }
 
   // A gate on a last step that has run and merges nothing is acceptance of what it did, not a merge: git's standing does not answer it.
-  const accepted = [step('implement'), { ...step('review', ['implement']), gate: true }];
+  const accepted: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
   const signed = run(
     { implement: 't1', review: 't2' },
     {
@@ -8572,7 +8574,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
     ),
     composeBrief(write, folder({ write: 't1', review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/write', undefined, {
       try: 2,
-      by: 'person',
+      by: 'ask',
       mode: 'fresh',
       resumed: false,
       status: 'blocked',
@@ -8628,7 +8630,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
       undefined,
       '/store/runs/n-1/artifacts/write',
       undefined,
-      { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' },
+      { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'blocked' },
     ),
     composeBrief(
       loopTarget,
@@ -8652,7 +8654,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
     undefined,
     '/store/runs/n-1/artifacts/a',
     undefined,
-    { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' },
+    { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'blocked' },
   );
   assert.match(
     side,
@@ -8701,7 +8703,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
 const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'main', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
-const atLanding = (rest: Partial<Run> = {}, ship: Partial<StepRecord> = {}): Run => ({
+const atLanding = (rest: Partial<GitRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
   steps: {
     implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
@@ -8921,7 +8923,7 @@ test('ownStatus reads an ending that lands on its check off the landing: checkin
       LANDER,
       r,
       phases({ 't-ship': 'succeeded', 't-ship-check': check }),
-      () => ({ ...SIGNOFF, outcome: 'done' }) as Closeout,
+      signedDone,
       () => false,
       LANDING_STEPS,
       () => undefined,
@@ -8959,7 +8961,7 @@ test('landedWords says what the run did with the merge: the commit, or why none'
 test("REFUSED: wf rm of a run whose ending's merge is staged and not landed, with nothing of it running", () => {
   const r = atLanding();
   const ph = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded' });
-  const closeoutOf = () => ({ ...SIGNOFF, outcome: 'done', output: { message: 'Add a flag' } }) as Closeout;
+  const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
   const forget = (at: Run, merging: MergeState['merging']) =>
     forgetRefusal(
       LANDING_STEPS,

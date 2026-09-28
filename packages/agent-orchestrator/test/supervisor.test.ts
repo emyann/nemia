@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
+import type { Engine, TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { terminalSteps } from '../src/workflow.ts';
 import { loadWorkflows, workflowDescription } from '../src/workflow-store.ts';
@@ -75,7 +75,7 @@ const folderOf = (steps: Record<string, string>): string => {
  * (`native-<id>`). A settled task carries the closeout it is given.
  */
 const board = () => {
-  type Filed = { id: string; brief: string; closeoutSchema?: object } & Record<string, unknown>;
+  type Filed = TaskSpec & { id: string };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; costUsd?: number }>();
   const filings: string[] = [];
   const stopped: string[] = [];
@@ -393,11 +393,12 @@ test("REFUSED at `wf start`, with nothing written: `slot: none` on a step of a w
   const repo = aRepo();
   const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   const before = runs();
-  for (const steps of [
+  const shapes: Record<string, string>[] = [
     { supervise: 'slot: none', implement: 'harness: claude' },
     { implement: 'harness: claude', supervise: 'after: implement\nslot: none' },
     { supervise: 'slot: none', review: 'after: supervise' },
-  ]) {
+  ];
+  for (const steps of shapes) {
     assert.throws(
       () => start({ brief: 'watch it', repo, workflowDir: folderOf(steps) }),
       (err: Error & { exitCode?: number }) =>

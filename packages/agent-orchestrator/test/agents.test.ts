@@ -497,6 +497,7 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\nagent: implementer\n---\nBuild it.\n' });
   const run = start({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false });
   fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
+  assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;
   assert.equal(build!.model, 'opus');
   assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');

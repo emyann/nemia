@@ -98,7 +98,14 @@ const file = (id: string, harness: string) =>
     harness,
     brief:
       harness === 'check'
-        ? checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, { WF_RUN: 'r', WF_STEP: id })
+        ? // No stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+          checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, {
+            WF_RUN: 'r',
+            WF_STEP: id,
+            WF_WORKSPACE: '',
+            WF_STDERR: '',
+            WF_ARTIFACTS: '',
+          })
         : id,
   });
 

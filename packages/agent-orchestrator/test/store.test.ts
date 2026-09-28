@@ -11,12 +11,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskView } from 'agent-runtime';
-import type { Run, TaskPhase } from '../src/run.ts';
+import {
+  createEngine,
+  nameFor,
+  type Engine,
+  type PromiseJournal,
+  type PromiseRunner,
+  type Sighting,
+  type TaskSpec,
+  type TaskView,
+} from 'agent-runtime';
+import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import type { RetryHow } from '../src/retry.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
 import { scratch } from './scratch.ts';
-import { SIGNOFF } from '../src/run.ts';
+import { isGitRun, SIGNOFF } from '../src/run.ts';
 import { momentumOf, toAdmit } from '../src/admission.ts';
 
 const ROOT = scratch('wf-store-');
@@ -293,7 +302,7 @@ const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { c
  * own (`native-<id>`), and a settled task carries the exit code it is given, as a detached one does.
  */
 const board = () => {
-  type Filed = { id: string; brief: string; harness?: string; cwd: string; closeoutSchema?: object } & Record<string, unknown>;
+  type Filed = TaskSpec & { id: string };
   const tasks = new Map<
     string,
     { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string | string[]; usage?: object }
@@ -343,15 +352,14 @@ const board = () => {
               ? []
               : reasons.map((reason, i) =>
                   i < reasons.length - 1
-                    ? { n: i + 1, ...endOf(reason), nativeId: `native-${id}`, exitCode: null, usage: null }
+                    ? { n: i + 1, ...endOf(reason!), nativeId: `native-${id}`, exitCode: null, usage: null }
                     : {
                         n: i + 1,
-                        ended: null,
                         nativeId: `native-${id}`,
                         closeout: t.closeout,
                         exitCode: t.exitCode ?? null,
                         usage: settled && t.usage ? t.usage : null,
-                        ...(reason ? endOf(reason) : {}),
+                        ...(reason ? endOf(reason) : { ended: null }),
                         ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
                         ...(settled && !reason && stated.has(id) ? { ended: 'done', reason: 'harness', stated: stated.get(id) } : {}),
                       },
@@ -399,8 +407,14 @@ const folder = (implementKeys = '') => {
   return dir;
 };
 
+/** A run this file started on a repository: a git run, whose repository and base branch are on its record. */
+const gitRunOf = (run: Run): GitRun => {
+  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+  return run;
+};
+
 /** `wf start`, for real, over a fresh repository, the steps working in the checkout itself. */
-const started = (dir: string) => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false });
+const started = (dir: string) => gitRunOf(start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false }));
 
 test('no `check:` → the run never files a check task, from the first pass to the last', async () => {
   const run = started(folder());
@@ -2750,7 +2764,9 @@ test('a run frozen before stage 4a part 2 with a step of `maxAttempts: 2` still 
   const record = JSON.parse(fs.readFileSync(file, 'utf8'));
   record.workflow = record.workflow.map((s: { name: string }) => (s.name === 'implement' ? { ...s, maxAttempts: 2 } : s));
   fs.writeFileSync(file, JSON.stringify(record));
-  assert.equal(readRun(run.id).workflow!.find((s) => s.name === 'implement')!.maxAttempts, 2, 'the key is on the frozen step');
+  // No step has the key since stage 4a part 2, so it is read off the frozen step as a key the type does not know.
+  const frozen: Record<string, unknown> = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+  assert.equal(frozen.maxAttempts, 2, 'the key is on the frozen step');
 
   const b = board();
   assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['implement']);
@@ -2946,7 +2962,7 @@ const aParent = async (
     brief = 'the parent',
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
-  const run = start({ brief, repo, workflowDir: workflowDir ?? oneStep() });
+  const run = gitRunOf(start({ brief, repo, workflowDir: workflowDir ?? oneStep() }));
   await advance(b.e, readRun(run.id));
   const wt = readRun(run.id).steps.implement!.workspace!;
   if (work) {

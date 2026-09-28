@@ -557,6 +557,39 @@ test('`wf tick` says every move its one pass refused', async (t) => {
   );
 });
 
+test('`wf up` says a task the runtime left out once while it lasts, and again once it clears and comes back; `wf tick` says each its pass left out', async (t) => {
+  clear();
+  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.turns` is not a number";
+  const feed = 'the feed (/store/feed.jsonl), entry 3 read from cursor 148 is no event this runtime writes';
+  const byPass = [[bad], [bad, feed], [bad], [], [bad]];
+  const e = engineOf();
+  e.tick = async () => {
+    e.passes++;
+    if (e.passes > byPass.length) throw STOP;
+    return pass({ tasks: 2, unreadable: byPass[e.passes - 1]! });
+  };
+  const errors: string[] = [];
+  t.mock.method(console, 'error', (...args: unknown[]) => {
+    errors.push(args.map(String).join(' '));
+  });
+  const { threw } = await typed(t, ['up', '1'], e);
+  assert.equal(threw, STOP);
+  const said = errors.filter((l) => l.includes('left out: '));
+  assert.deepEqual(
+    said.map((l) => l.slice(10)),
+    [`left out: ${bad}`, `left out: ${feed}`, `left out: ${bad}`],
+    errors.join('\n'),
+  );
+  assert.ok(
+    said.every((l) => /^\d\d:\d\d:\d\d  left out: /.test(l)),
+    'stamped as the daemon stamps every line',
+  );
+  errors.length = 0;
+  e.tick = async () => pass({ tasks: 2, unreadable: [bad, feed] });
+  assert.equal((await typed(t, ['tick'], e)).threw, undefined);
+  assert.deepEqual(errors, [`left out: ${bad}`, `left out: ${feed}`]);
+});
+
 /** A pass's cost as the meter writes one: every phase, and two harnesses observed. */
 const COST = passCost({
   at: '2026-09-25T10:00:00.000Z',

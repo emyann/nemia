@@ -1301,6 +1301,11 @@ export type Pass = {
    * what it sees changes or the machine gains the edge. Absent when there were none. `wf up` says each once while it lasts (`refusalLines`).
    */
   refused?: RefusedMove[];
+  /**
+   * Why the runtime left a task out of this pass, or skipped a feed entry, as it said it (`TickReport.unreadable`): a journal holding an
+   * entry no runtime wrote, on every pass while it lasts. Absent when there were none. `wf up` says each once while it lasts.
+   */
+  unreadable?: string[];
 };
 
 /**
@@ -1408,11 +1413,13 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
   }
   // An engine's report from before the runtime reported refusals — a test's fake — carries none.
   const refused = report.refused ?? [];
+  const unreadable = report.unreadable ?? [];
   return {
     runs: runs.map((run) => done.get(run.id)!),
     ...(queue ? { queue } : {}),
     ...(feedError ? { feedError } : {}),
     ...(refused.length ? { refused } : {}),
+    ...(unreadable.length ? { unreadable } : {}),
   };
 }
 

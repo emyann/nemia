@@ -67,6 +67,19 @@ const refusalOf = (name: string, off = false): string => {
   return assert.fail(`queueInInbox took ${name}${off ? ' --off' : ''}, which the api refused`);
 };
 
+/** A record of a run started from `card`, as `wf start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
+const startedFrom = (id: string, card: string): string =>
+  JSON.stringify({
+    id,
+    place: { kind: 'folder' },
+    workspace: path.join(root, 'runs', id),
+    brief: 'Started from its card',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    steps: {},
+    createdAt: '2026-09-16T09:00:00.000Z',
+    from: { inbox: card },
+  });
+
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
 // ─── the inbox's queue ──────────────────────────────────────────────────────
@@ -212,10 +225,7 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   queueInInbox(queued.name);
   const started = addToInbox({ text: 'Started, its removal failed', workflow: 'dev' }).card;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', 'started-run-k2q9.json'),
-    JSON.stringify({ id: 'started-run-k2q9', from: { inbox: started.name } }),
-  );
+  fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
   fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
   const before = inboxAsIs();
 

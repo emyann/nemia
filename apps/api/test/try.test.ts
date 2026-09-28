@@ -136,7 +136,7 @@ function ended(id: string): void {
   const cwd = path.join(run.workspace, 'try');
   fs.mkdirSync(cwd, { recursive: true });
   signedOff(`t-${id}`, cwd);
-  run.steps = { try: { taskId: `t-${id}`, workspace: cwd, branch: null } };
+  run.steps = { try: { taskId: `t-${id}`, workspace: cwd } };
   fs.writeFileSync(file, JSON.stringify(run));
 }
 

@@ -34,6 +34,19 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
+/** A record of a run started from `card`, as `wf start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
+const startedFrom = (id: string, card: string): string =>
+  JSON.stringify({
+    id,
+    place: { kind: 'folder' },
+    workspace: path.join(root, 'runs', id),
+    brief: 'Started from its card',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    steps: {},
+    createdAt: '2026-09-16T09:00:00.000Z',
+    from: { inbox: card },
+  });
+
 /** The repository's `dev`, yours `mine`, and `both`, which each has. */
 const dev = path.join(repo, 'workflows', 'dev');
 write(path.join(dev, 'implement.md'), 'Implement it.\n');
@@ -161,7 +174,7 @@ test('GET /api/inbox lists an entry that does not read as a card with its refusa
   write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
   write(path.join(inbox, 'notes.txt'), 'not a card\n');
   const { card } = addToInbox({ text: 'Started, and its removal failed' });
-  write(path.join(root, 'runs', 'started-run-k2q9.json'), JSON.stringify({ id: 'started-run-k2q9', from: { inbox: card.name } }));
+  write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
 
   const entries = await listed();
   const broken = entries.find((e) => e.name === 'broken')!;
@@ -595,7 +608,7 @@ test("REFUSED at shipped defaults: a `card` that is not there is a 404 carrying 
 test("REFUSED at shipped defaults: a card started already is a 409, a blank brief, a card that does not read and a run it cannot wait on are 422s — each the package's sentence, and nothing is written or removed", async () => {
   clear();
   const { card: started } = addToInbox({ text: 'Started once' });
-  write(path.join(root, 'runs', 'started-once-k2q9.json'), JSON.stringify({ id: 'started-once-k2q9', from: { inbox: started.name } }));
+  write(path.join(root, 'runs', 'started-once-k2q9.json'), startedFrom('started-once-k2q9', started.name));
   const { card } = addToInbox({ text: 'Not started' });
   write(path.join(inbox, 'broken.md'), '---\nafer: dev\n---\nMisspelt.\n');
   const before = runFiles();

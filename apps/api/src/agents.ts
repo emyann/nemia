@@ -70,7 +70,7 @@ export type AgentListing = {
   body: string;
   schema: AgentSchema | null;
   /**
-   * What its card says it can do, generated (`cardSkills`, since agents card 2): an A2A skill for each skill its `skills:` gives, read off the
+   * What its card says it can do, generated (`cardSkills`): an A2A skill for each skill its `skills:` gives, read off the
    * skill's SKILL.md, or one made from its description when it gives none. Nobody writes it: the board shows it, read-only. Null when there is
    * none — a file that does not read (`error` says why), or a card the package refuses (`cardError`).
    */
@@ -97,8 +97,10 @@ export type AgentListing = {
   untried: Untried | null;
 };
 
-// The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, skills and system prompt) are no step's, so the form
-// shows them apart (`RoleKey`).
+/**
+ * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, skills and system prompt) are no step's, so the form
+ * shows them apart (`RoleKey`).
+ */
 const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -127,6 +129,13 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string, rep
   return read && { ...read, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
 }
 
+/**
+ * One agent of `dir` as the listing has it, before whether it can be tried, or null when `dir` has no file of that name. A file that is a
+ * link is answered with the package's refusal only: read here it would be whatever it points at, outside the folder. A file that does not
+ * read is answered with its lines as written, so what is wrong can be put right in the form: a key under a former name too, as the parser
+ * reads it, which the form's save then writes under the name it has; and a codex agent's sandbox under the former key `permissionMode:` is
+ * its `sandbox`, as the parser reads it (`formerSandbox`).
+ */
 function readAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
   const found = skillsOfPlace(dir, repo, home);
   const version = agentVersion(dir, name, found);
@@ -137,7 +146,6 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     return { from, workflow, step };
   });
   const agent = loadAgents(dir).get(name);
-  // A link is refused by the package's reader, and read here it would be whatever it points at, outside the folder: only the refusal.
   const linked = (at: string) => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
   if (linked(file))
     return {
@@ -159,8 +167,6 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     }
   };
   if (agent === undefined || agent instanceof Error) {
-    // Not read: its lines as written, so what is wrong can be put right in the form — a key under its former name too, as the parser reads it,
-    // which the form's save then writes under the name it has now.
     const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
     const keys = Object.fromEntries(
       ROLE_KEYS.flatMap((key) => {
@@ -168,7 +174,6 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
         return value === undefined ? [] : [[key, value]];
       }),
     ) as Partial<Record<RoleKey, string>>;
-    // A codex agent's sandbox, written as `permissionMode:` before 2026-09-23, is its `sandbox` — as the parser reads it (`formerSandbox`).
     const former =
       keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined
         ? formerSandbox(keys.permissionMode)
@@ -225,8 +230,8 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
 }
 
 /**
- * A `skills:` line as written, for a file that does not read — none where it names a card file, the card's line before 2026-09-25, which the
- * package refuses since agents card 2: the form's save then writes the agent without it, which is the fix its refusal names.
+ * A `skills:` line as written, for a file that does not read — none where it names a card file, a former line the package refuses: the
+ * form's save then writes the agent without it, which is the fix its refusal names.
  */
 function skillsLineOf(source: string): string | null {
   const line = frontmatterKey(source, 'skills');
@@ -277,8 +282,9 @@ const TRY_SHAPE = '`{ "brief": "<what the agent is asked to do>" }`';
 const AgentName = Schema.String.check(Schema.makeFilter((name: string) => agentNameRefusal(name) === undefined));
 
 /**
- * A page drawn before agents card 2 sends the card file it edited — `card` and `cardText`, or `skillsText` from before 2026-09-25. Taken as
- * nothing, the edit would be lost unsaid; the card is generated from the agent's skills now, so each is refused, saying so. An own null too.
+ * The former keys a page may still send for the card file beside the agent it edited: `card` and `cardText`, or the older `skillsText`.
+ * Taken as nothing, the edit would be lost unsaid; the card is generated from the agent's skills, so each is refused, saying so, a null
+ * among them too.
  */
 const RETIRED = ['card', 'cardText', 'skillsText'] as const;
 
@@ -386,10 +392,13 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
   };
 }
 
-/** A package refusal as the api answers it: an agent not there is 404; stale, taken or still named is 409; anything else it judged, 422. */
+/**
+ * A package refusal as the api answers it: an agent not there is 404; stale, taken or still named is 409; anything else it judged, 422 —
+ * `renderAgent`'s and the parser's refusals among them, which are a `WorkflowError` (a key, a value, a line break). Null for an error that
+ * is not a refusal.
+ */
 function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 } | null {
   if (!(err instanceof AgentWriteError)) {
-    // renderAgent's and the parser's refusals are WorkflowErrors: a key, a value, a line break.
     if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2)
       return { body: { error: err.message, users: [] }, status: 422 };
     return null;
@@ -412,8 +421,32 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
   return { dir: agentPlaces(repoOf()).find((p) => p.from === from)!.dir };
 }
 
+/**
+ * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
+ * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
+ * 403 for the repository's); the package's refusals have `refusalOf`'s statuses.
+ *
+ * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is
+ *   now.
+ * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
+ * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`). Not a valid card and it says so:
+ *   A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and nothing here serves an agent over A2A — so
+ *   `servedOverA2A` is false beside it, in the answer, rather than left for a reader to work out. Its skills are generated (`cardSkills`);
+ *   an agent with no `description:`, or a skill that cannot be read, has no card, and the package's refusal says which (422).
+ * - `POST /api/agents/:from` — a new agent of yours: `writeAgent` with no version, so a name already taken is refused. 201.
+ * - `PUT /api/agents/:from/:name` — an agent of yours put back, and renamed when the body names it otherwise, against the `version` it was
+ *   read at, so a save of an agent changed since is refused rather than written over what changed.
+ * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
+ *   agent's version has moved (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
+ *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
+ *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
+ *   an agent that does not read, or whose name, harness or `remote:` the loader would refuse on the try's own step (422, before anything is
+ *   written); an agent that gives a skill only the repository's .claude/skills has, which a start that looks at no repository does not find
+ *   (422); and, while a try of it still moves, another (409): one at a time, so a second press does not spend a second budget.
+ * - `DELETE /api/agents/:from/:name` — an agent of yours removed, against the `version` it was read at — refused while a step still names
+ *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
+ */
 export const agents = new Hono()
-  // Read from disk on each request, so an agent a person has just edited lists as it is now.
   .get('/api/agents', (c) => {
     try {
       return c.json(listAgents(repoOf()));
@@ -421,7 +454,6 @@ export const agents = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // One agent, for its page: the name refused in the package's words before a file is read, so none reaches outside the folder.
   .get('/api/agents/:from/:name', (c) => {
     const { from, name } = c.req.param();
     const place = placeOf(from, name, `GET /api/agents/${from}/${name}`);
@@ -440,12 +472,6 @@ export const agents = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  /**
-   * One agent in the shape of an A2A Agent Card. Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is
-   * a transport and a URL, and nothing here serves an agent over A2A — so `servedOverA2A` is false beside it, in the answer, rather than
-   * left for a reader to work out. Its skills are generated (`cardSkills`); an agent with no `description:`, or a skill that cannot be read,
-   * has no card, and the package's refusal says which.
-   */
   .get('/api/agents/:from/:name/card', (c) => {
     const { from, name } = c.req.param();
     const route = `GET /api/agents/${from}/${name}/card`;
@@ -473,7 +499,6 @@ export const agents = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // A new agent of yours: `writeAgent` with no version, so a name already taken is refused.
   .post('/api/agents/:from', async (c) => {
     const { from } = c.req.param();
     const route = `POST /api/agents/${from}`;
@@ -494,7 +519,6 @@ export const agents = new Hono()
     const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo: repoOf() }, 201);
     return c.json(answer.body, answer.status);
   })
-  // An agent of yours put back — and renamed, when the body names it otherwise — against the version it was read at.
   .put('/api/agents/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `PUT /api/agents/${from}/${name}`;
@@ -521,12 +545,6 @@ export const agents = new Hono()
     const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo: repoOf() }, 200);
     return c.json(answer.body, answer.status);
   })
-  /**
-   * An agent of yours tried on a short brief (agents card 3c): its try's folder written, or written again when the agent's version has moved
-   * (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it. Refused for the repository's
-   * agents, which a start with no repository does not find; for an empty brief; for an agent that does not read, or gives a skill only the
-   * repository has; and while a try of it still moves, one at a time, so a second press does not spend a second budget.
-   */
   .post('/api/agents/:from/:name/try', async (c) => {
     const { from, name } = c.req.param();
     const route = `POST /api/agents/${from}/${name}/try`;
@@ -539,7 +557,6 @@ export const agents = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const repo = repoOf();
     if (from === 'repo') {
-      // The command that copies it, its schema beside it, into the store this api reads — read off its file when it has one.
       const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
       const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo) : null;
       const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null });
@@ -575,9 +592,7 @@ export const agents = new Hono()
           404,
         );
       if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
-      // Its name, its harness and `remote:`, refused before anything is written: the loader would refuse the try's own step, on a file the api wrote.
       if (agent.untried) return c.json({ error: agent.untried.why }, 422);
-      // A try looks at no repository, so a skill the agent finds only in the repository's .claude/skills is not found by its start.
       const theirs = agent.given.filter((skill) => skill.from === 'repo');
       if (theirs.length) {
         const copies = theirs
@@ -608,7 +623,6 @@ export const agents = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // An agent of yours removed, against the version it was read at — refused while a step still names it, saying which.
   .delete('/api/agents/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `DELETE /api/agents/${from}/${name}`;
@@ -633,7 +647,6 @@ export const agents = new Hono()
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const { version } = read.body;
     try {
-      // The repository the board serves is read too, for a step its workflows are given this agent by; another is not known here.
       return c.json(removeAgent(place.dir, name, { version, repo: repoOf() }));
     } catch (err) {
       const answer = refusalOf(err);

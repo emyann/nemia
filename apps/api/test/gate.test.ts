@@ -5,6 +5,7 @@
  * `wf retry --message` is.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
+ * `WF_ROOT` is set before the api loads: agent-orchestrator locates its store as its modules load.
  */
 import { stops } from './harness.ts';
 import type { DecideCommand, Decidable } from '../src/decision.ts';
@@ -18,7 +19,6 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-gate-${label}-`);
 
-// agent-orchestrator locates its store as its modules load: set first.
 const root = tmp('root');
 process.env.WF_ROOT = root;
 
@@ -159,17 +159,16 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
       { name: 'implement', status: 'waiting', approve: null, gate: null },
       { name: 'review', status: 'waiting', approve: null, gate: null },
       { name: 'tokens', status: 'unverified · done', approve: null, gate: null },
-      // Gated, and not signed off: nothing to approve yet.
       { name: 'sketch', status: 'waiting', approve: null, gate: { awaiting: false, approval: null } },
     ],
+    'sketch is gated and not signed off: nothing to approve yet',
   );
   assert.equal(run.steps[0].closeout?.summary, PLAN.summary, "the closeout a person approves is the step's own");
   assert.deepEqual(run.waitingOnYou, ['plan']);
   assert.deepEqual(run.onYou, ['approve plan']);
 
-  // As `wf ls` has it: the words after `→ waiting on you:` are the package's.
   const words = await list(engine(), readRun(R));
-  assert.deepEqual(run.onYou, onYouWords(words));
+  assert.deepEqual(run.onYou, onYouWords(words), "as `wf ls` has it: the words after `→ waiting on you:` are the package's");
   const listed = await summary();
   assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
   assert.deepEqual(listed.onYou, ['approve plan']);
@@ -189,20 +188,25 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
     'the list carries the need, and no gate: the Factory needs no more',
   );
 
-  // The decision offers the gate's two commands, as `wf decide` prints them under the step: nothing else is offered on a run with no branch to
-  // ship — which read `None yet: the run is still moving` on the board.
-  assert.deepEqual(await commandsOf(), [
-    {
-      label: 'approve',
-      command: `wf approve ${R} plan`,
-      said: `plan waits at its gate — with words: wf approve ${R} plan --message "<words>"`,
-    },
-    { label: 'send back', command: `wf retry ${R} plan --message "<objection>"`, said: null },
-  ]);
+  assert.deepEqual(
+    await commandsOf(),
+    [
+      {
+        label: 'approve',
+        command: `wf approve ${R} plan`,
+        said: `plan waits at its gate — with words: wf approve ${R} plan --message "<words>"`,
+      },
+      { label: 'send back', command: `wf retry ${R} plan --message "<objection>"`, said: null },
+    ],
+    "the decision offers the gate's two commands, as `wf decide` prints them under the step, and nothing else on a run with no branch to ship",
+  );
 
-  // A run called off waits on nobody: no need, though its step still reads as it stands.
   const cancelled = await summary(CANCELLED);
-  assert.deepEqual([cancelled.waitingOnYou, cancelled.onYou, cancelled.steps[0].approve], [[], [], null]);
+  assert.deepEqual(
+    [cancelled.waitingOnYou, cancelled.onYou, cancelled.steps[0].approve],
+    [[], [], null],
+    'a run called off waits on nobody: no need, though its step still reads as it stands',
+  );
 });
 
 test('REFUSED at shipped defaults: an approval another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {
@@ -261,9 +265,8 @@ test("REFUSED: a body that is not an approval (400), a run or a step that does n
     const res = await approveOver('plan', { message });
     assert.equal(res.status, 422, JSON.stringify(message));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, approvalWordsRefusal(message, `wf approve ${R} plan`));
-    // The package's own sentence, and the one `approve()` refuses with.
-    assert.equal(error, await approveRefuses('plan', message));
+    assert.equal(error, approvalWordsRefusal(message, `wf approve ${R} plan`), "the package's own sentence");
+    assert.equal(error, await approveRefuses('plan', message), 'the one `approve()` refuses with');
     assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
   }
   nothingWritten('a body that is not an approval');
@@ -318,10 +321,13 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
   assert.equal(plan.approve, null);
   assert.deepEqual([run.waitingOnYou, run.onYou], [[], []]);
-  // As `wf ls` has it until the tick files what waits: the plan on its own word, and nobody waited on.
   const words = await list(engine(), readRun(R));
-  assert.equal(plan.status, words.steps.find((s) => s.name === 'plan')?.status);
-  assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou);
+  assert.equal(
+    plan.status,
+    words.steps.find((s) => s.name === 'plan')?.status,
+    'as `wf ls` has it until the tick files what waits: the plan on its own word',
+  );
+  assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `wf ls` has it');
 
   const again = await approveOver('plan', { message: 'Ship the first reading.' });
   assert.equal(again.status, 409);
@@ -370,11 +376,17 @@ test("REFUSED at shipped defaults: sending a step back from its gate without wor
   assert.deepEqual(await back.json(), { try: 2, file: askFile(id, 'plan', 2), stopFirst: false });
   const plan = (await detail(id)).steps[0];
   assert.deepEqual(plan.asked, { try: 2, mode: 'nudge', model: null, message: 'Store the flag before you parse it.', stopFirst: false });
-  // Still at its gate until the tick files the try, and no longer waiting on you: what is asked of you, you asked.
-  assert.deepEqual([plan.status, plan.gate, plan.approve], ['awaiting approval', { awaiting: true, approval: null }, null]);
-  assert.deepEqual((await detail(id)).onYou, []);
-  // The send-back is due, so the run moves and waits on nobody: nothing to decide, as `wf decide` says, and so no gate offered.
-  assert.deepEqual(await (await app.request(`/api/runs/${id}/decision`)).json(), { running: true });
+  assert.deepEqual(
+    [plan.status, plan.gate, plan.approve],
+    ['awaiting approval', { awaiting: true, approval: null }, null],
+    'still at its gate until the tick files the try',
+  );
+  assert.deepEqual((await detail(id)).onYou, [], 'not waiting on you: what is asked of you, you asked');
+  assert.deepEqual(
+    await (await app.request(`/api/runs/${id}/decision`)).json(),
+    { running: true },
+    'the send-back is due, so the run moves and waits on nobody: nothing to decide, as `wf decide` says, and so no gate offered',
+  );
 
   const res = await approveOver('plan', { message: 'Ship it.' }, BOARD, id);
   assert.equal(res.status, 409);

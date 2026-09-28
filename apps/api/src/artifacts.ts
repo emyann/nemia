@@ -19,7 +19,10 @@ export type StepArtifact =
   | { path: string; name: string; url: string; kind: ArtifactKind; size: number }
   | { path: string; pruned: string; prunedAt: string };
 
-/** By extension: the type a file is served with, and what the board does with it. */
+/**
+ * By extension: the type a file is served with, and what the board does with it. Text a step wrote is shown as text. An HTML or a script
+ * file among it is an agent's text too: as `text/plain`, a tab shows it rather than running it on the board's origin.
+ */
 const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
   '.png': { type: 'image/png', kind: 'image' },
   '.jpg': { type: 'image/jpeg', kind: 'image' },
@@ -30,8 +33,6 @@ const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
   '.svg': { type: 'image/svg+xml', kind: 'image' },
   '.json': { type: 'application/json; charset=utf-8', kind: 'text' },
   '.pdf': { type: 'application/pdf', kind: 'other' },
-  // Text a step wrote is shown as text. An HTML or a script file among it is an agent's text too: as `text/plain`, a tab
-  // shows it rather than running it on the board's origin.
   ...Object.fromEntries(
     ['.txt', '.md', '.log', '.csv', '.tsv', '.yaml', '.yml', '.xml', '.html', '.diff', '.patch', '.ts', '.tsx', '.js', '.css', '.sh'].map(
       (ext) => [ext, { type: 'text/plain; charset=utf-8', kind: 'text' as const }],
@@ -58,12 +59,14 @@ function fileIn(dir: string, name: string): fs.Stats | undefined {
   return stat?.isFile() ? stat : undefined;
 }
 
-/** A path a closeout named, as the board shows it (`StepArtifact`). */
+/**
+ * A path a closeout named, as the board shows it (`StepArtifact`). Once the step's artifacts directory is pruned, a file anywhere under it
+ * is pruned with it, one in a directory beneath it included.
+ */
 export function artifactOf(run: Pick<Run, 'id' | 'pruned'>, step: string, file: string): StepArtifact {
   const dir = artifactsDir(run, step);
   const files = run.pruned?.artifacts;
   if (artifactPlace(file, dir) !== 'files') return { path: file };
-  // A file anywhere under the directory went with it, one in a directory beneath it included.
   if (files && !fs.existsSync(dir)) return { path: file, pruned: filesPrunedWords(files), prunedAt: files.at };
   if (path.dirname(path.resolve(file)) !== path.resolve(dir)) return { path: file };
   const name = path.basename(file);

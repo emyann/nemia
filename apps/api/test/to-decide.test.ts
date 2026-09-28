@@ -6,7 +6,8 @@
  * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `diffStat`), and the branches are read off a real repository.
  * Every `git` the api runs is noted, so a test can say which runs one is asked about: the list is polled every five seconds.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
+ * At shipped defaults: the api's own engine over a store this file seeds, `WF_ROOT` set before the orchestrator is imported, as it locates
+ * its store as its modules load, and the harness's fake `claude` (test/harness.ts) first on PATH.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -19,11 +20,10 @@ import type { RunDecision } from '../src/decision.ts';
 import type { RunDetail } from '../src/detail.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-to-decide-');
 process.env.WF_ROOT = root;
 
-// A `git` in front of the real one that notes each call and runs it, as decision.test.ts has: what says which runs the api asks git about.
+/** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 const bin = scratch('hkb-api-to-decide-bin-');
 const gitCalls = path.join(bin, 'git-calls');
@@ -169,30 +169,38 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
     ],
   );
   assert.deepEqual([detail.waitingOnYou, detail.onYou], [['ship'], ['approve ship']]);
-  // And the key the board tells this gate from §6's by: the step runs in the repository's own checkout, and the work does not.
   assert.deepEqual(
     detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
     [
       ['implement', null],
       ['ship', 'main'],
     ],
+    "the key the board tells an ending's gate from another gate by: the ending runs in the repository's own checkout, and the work does not",
   );
-  // The ending has not run, so what there is to decide is what it would do, in the folder's own first line — and the command that runs it.
-  assert.deepEqual(detail.toDecide, {
-    kind: 'approve',
-    step: 'ship',
-    says: SHIPS,
-    // What the card answers it with: a send-back goes to the work, which ship waits on (`sendBackTo`), and the result is on its way to main.
-    back: ['implement'],
-    onto: 'main',
-    said: `${SHIPS} — wf approve ${id} ship`,
-    command: `wf approve ${id} ship`,
-  });
-  // The whole of `wf ls`'s line ends with the command the board offers, so the two cannot drift apart.
-  assert.ok(detail.toDecide.said.endsWith(detail.toDecide.command), detail.toDecide.said);
+  assert.deepEqual(
+    detail.toDecide,
+    {
+      kind: 'approve',
+      step: 'ship',
+      says: SHIPS,
+      /** What the card answers it with: a send-back goes to the work ship waits on (`sendBackTo`), and the result is on its way to main. */
+      back: ['implement'],
+      onto: 'main',
+      said: `${SHIPS} — wf approve ${id} ship`,
+      command: `wf approve ${id} ship`,
+    },
+    "the ending has not run: what there is to decide is what it would do, in the folder's own first line, and the command that runs it",
+  );
+  assert.ok(
+    detail.toDecide.said.endsWith(detail.toDecide.command),
+    `the whole of wf ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.toDecide.said}`,
+  );
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
-  // A gate says a run is one to decide on its own: the branch is the ending step's to merge, and nothing asks git about it.
-  assert.equal(gitCount(), before, 'no git call for a run whose folder has an ending step');
+  assert.equal(
+    gitCount(),
+    before,
+    "no git call for a run whose folder has an ending step: a gate says it is one to decide, and the branch is the ending step's to merge",
+  );
 });
 
 test("the decision of a run at its ending's gate offers the approval and the send-back, and never `git merge` by hand: its ending is what merges", async () => {
@@ -205,11 +213,10 @@ test("the decision of a run at its ending's gate offers the approval and the sen
     commands.map((c) => c.command),
     [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`],
   );
-  // The result it would act on is the work's branch, not the ending step's own — which has none, working in the repository's checkout
-  // (`resultSteps`). Read for the facts under the run, whatever the list is spared.
   assert.deepEqual(
     standings.map((b) => [b.branch, b.where]),
     [['wf/r-ending/implement', 'ahead']],
+    "the result it would act on is the work's branch, not the ending step's own, which has none, working in the repository's checkout (resultSteps); read for the facts under the run, whatever the list is spared",
   );
 });
 
@@ -221,7 +228,6 @@ test('whether the result still merges onto the base, as the base is now: clean, 
     [{ clean: true, said: 'merges cleanly onto main' }],
   );
 
-  // main moves under the branch: the same file, written otherwise. The branch is as it was; what it would find is not.
   const tip = git(repo, 'rev-parse', 'HEAD').trim();
   write(path.join(repo, 'src/a.ts'), 'export const a = 2;\n');
   git(repo, 'add', '-A');
@@ -239,20 +245,25 @@ test('whether the result still merges onto the base, as the base is now: clean, 
     assert.deepEqual(
       conflicted.standings.map((s) => s.merge),
       [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }],
+      'main moved under the branch, writing the same file otherwise: the branch is as it was, what it would find is not',
     );
-    // A trial in git's object store alone: the checkout, its index and main are as they were.
-    assert.equal(git(repo, 'status', '--porcelain'), '');
-    assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
+    assert.equal(
+      git(repo, 'status', '--porcelain'),
+      '',
+      "a trial in git's object store alone: the checkout and its index are as they were",
+    );
+    assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main', 'and main is still checked out');
   } finally {
     git(repo, 'reset', '-q', '--hard', tip);
   }
-  // And a branch git no longer has is not called clean, nor conflicted: git's own word for why it cannot say.
   const gone = mergesOnto(repo, 'main', 'wf/no-such-run/implement');
-  assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
+  assert.ok(
+    'error' in gone && /no-such-run/.test(gone.error),
+    `a branch git no longer has is called neither clean nor conflicted, but carries git's own word for why it cannot say: ${JSON.stringify(gone)}`,
+  );
 });
 
 test("an ending that waits on several steps offers a send-back to each, and one that waits on nothing offers only the approval — the gate's commands are never empty", async () => {
-  // A fan-in ending: `ship` after implement and docs, which the loader allows — nothing waits on it, and nothing ends beside it.
   const fan = 'r-fan';
   const wide = [
     { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
@@ -282,10 +293,9 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   assert.deepEqual(
     wideGate.commands.map((c) => c.command),
     [`wf approve ${fan} ship`, `wf retry ${fan} implement --message "<objection>"`, `wf retry ${fan} docs --message "<objection>"`],
+    'a fan-in ending, which the loader allows: ship after implement and docs, nothing waiting on it and nothing ending beside it',
   );
 
-  // And an ending that waits on nothing: a workflow of one step in the checkout, which the loader allows too. There is no work to send
-  // back, so the approval is the only command — and it is there.
   const alone = 'r-alone';
   writeRun({
     id: alone,
@@ -298,12 +308,13 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   assert.deepEqual(
     lone.commands.map((c) => [c.label, c.command]),
     [['approve', `wf approve ${alone} ship`]],
+    'an ending that waits on nothing, a workflow of one step in the checkout, which the loader allows too: no work to send back, so the approval is the only command, and it is there',
   );
-  // Neither is handed `git merge` by hand: the ending step is what merges.
   for (const { commands } of [wideGate, lone]) {
     assert.deepEqual(
       commands.filter((c) => c.label === 'ship it' || c.label === 'drop it'),
       [],
+      'neither is handed git merge by hand: the ending step is what merges',
     );
   }
 });
@@ -333,7 +344,6 @@ test('an ending that ran on its approval and stopped on the base branch offers b
   ];
   branchOff(repo, `wf/${id}/implement`, 'src/stopped.ts', 'export const stopped = 1;\n');
   signedOff(`${id}-implement`, repo);
-  // Review handed on: `again: false`, flat beside the outcome as a harness writes it.
   write(
     path.join(root, 'engine', 'tasks', `${id}-review.jsonl`),
     jsonl([
@@ -347,6 +357,7 @@ test('an ending that ran on its approval and stopped on the base branch offers b
         sessionId: `ae/${id}-review/1`,
         observed: 'done',
         reason: 'harness',
+        /** Review handed on: `again: false`, flat beside the outcome as a harness writes it. */
         closeout: { outcome: 'done', summary: 'Holds.', needs: null, artifacts: [], again: false },
       },
       { kind: 'settled', at, outcome: 'succeeded' },
@@ -409,22 +420,25 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   });
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
 
-  // The facts under the result, as `wf decide` prints them: where the branch stands, and how much it changed.
   const { standings, commands } = await decidableOf(id);
-  assert.deepEqual(standings, [
-    {
-      branch,
-      where: 'ahead',
-      commits: 1,
-      said: `${branch} is ahead of main by 1 commit`,
-      stat: '1 file changed, 1 insertion(+)',
-      merge: { clean: true, said: 'merges cleanly onto main' },
-    },
-  ]);
-  // And the commands a person runs by hand, which this folder leaves to them.
+  assert.deepEqual(
+    standings,
+    [
+      {
+        branch,
+        where: 'ahead',
+        commits: 1,
+        said: `${branch} is ahead of main by 1 commit`,
+        stat: '1 file changed, 1 insertion(+)',
+        merge: { clean: true, said: 'merges cleanly onto main' },
+      },
+    ],
+    'the facts under the result, as wf decide prints them: where the branch stands, and how much it changed',
+  );
   assert.deepEqual(
     commands.map((c) => c.label),
     ['ship it', 'drop it'],
+    'the commands a person runs by hand, which this folder leaves to them',
   );
 });
 
@@ -436,14 +450,17 @@ test('level-triggered: a branch merged by hand stops being one to decide on the 
     assert.equal((await detailOf(id)).toDecide, null, 'the branch is on the base: nothing left to decide');
     assert.equal((await listedOf(id)).toDecide, null);
     assert.equal(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8'), record, "and nothing is written on the run's record");
-    // And `wf decide`'s own answer, which reads the same way.
-    assert.deepEqual(await decisionOf(id), { nothing: `shipped — wf/${id}/implement is already on main` });
+    assert.deepEqual(
+      await decisionOf(id),
+      { nothing: `shipped — wf/${id}/implement is already on main` },
+      "wf decide's own answer reads the same way",
+    );
   } finally {
     git(repo, 'reset', '-q', '--hard', base);
   }
 });
 
-test('an approved ending that has run leaves nothing to decide: the folder answered for its own branch', async () => {
+test('an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `wf approve` writes one', async () => {
   const id = 'r-shipped';
   const branch = `wf/${id}/implement`;
   branchOff(repo, branch, 'src/c.ts', 'export const c = 3;\n');
@@ -456,7 +473,6 @@ test('an approved ending that has run leaves nothing to decide: the folder answe
     workflow: ENDING,
     steps: { implement: { taskId: `${id}-implement`, branch }, ship: { taskId: `${id}-ship`, workspace: repo } },
   });
-  // The approval as `wf approve` writes one, with no words: a `message` it does not hold, which the package refuses read as null.
   write(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at }));
   git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
 
@@ -471,7 +487,6 @@ test('an approved ending that has run leaves nothing to decide: the folder answe
 });
 
 test("a branch already on the base is asked about once: the list's later polls run no `git` for it, and a branch ahead is asked every time", async () => {
-  // A run whose ending merged nothing — a folder with no ending step — whose branch a person merged before the board first read it.
   const id = 'r-memo';
   const branch = `wf/${id}/implement`;
   branchOff(repo, branch, 'src/memo.ts', 'export const memo = 1;\n');
@@ -480,7 +495,11 @@ test("a branch already on the base is asked about once: the list's later polls r
   git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
 
   const first = gitCount();
-  assert.equal((await listedOf(id)).toDecide, null, 'on the base: nothing to decide');
+  assert.equal(
+    (await listedOf(id)).toDecide,
+    null,
+    'on the base, merged by a person before the board first read it, in a folder with no ending step: nothing to decide',
+  );
   const asked = gitCount() - first;
   assert.ok(asked > 0, `the first read asks git about it — it ran ${asked} calls`);
 
@@ -488,8 +507,6 @@ test("a branch already on the base is asked about once: the list's later polls r
   assert.equal((await listedOf(id)).toDecide, null, 'and it still says nothing to decide');
   assert.equal(gitCount(), again, 'with no git call at all: a branch on the base does not come off it');
 
-  // And it is remembered against the work the run had filed: a try of a finished step can commit to that branch, so the next read asks git
-  // again. A run whose branch had nothing on it past its base reads `on` too, and this is the way that one grows.
   const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
     steps: Record<string, { taskId: string; tries?: unknown[] }>;
   };
@@ -498,9 +515,11 @@ test("a branch already on the base is asked about once: the list's later polls r
   write(path.join(root, 'runs', `${id}.json`), JSON.stringify(tried, null, 2));
   const retried = gitCount();
   assert.equal((await listedOf(id)).toDecide, null, 'still on the base, as git says');
-  assert.ok(gitCount() > retried, 'and git was asked again: the work was filed again, so the branch may have grown');
+  assert.ok(
+    gitCount() > retried,
+    'and git was asked again: the answer is kept against the work the run filed, and a try of a finished step commits to the branch, the way one with nothing past its base, which reads as on the base too, grows',
+  );
 
-  // The answer that holds a person up is asked every time, however often the list is polled.
   const ahead = 'wf/r-memo-ahead/implement';
   branchOff(repo, ahead, 'src/ahead.ts', 'export const ahead = 2;\n');
   signedOff('r-memo-ahead-implement', repo);
@@ -514,7 +533,10 @@ test("a branch already on the base is asked about once: the list's later polls r
   for (const poll of [1, 2]) {
     const before = gitCount();
     assert.equal((await listedOf('r-memo-ahead')).toDecide?.kind, 'git', `poll ${poll} says the branch is there to decide`);
-    assert.ok(gitCount() > before, `poll ${poll} asks git: a branch ahead of the base is one a person may merge at any moment`);
+    assert.ok(
+      gitCount() > before,
+      `poll ${poll} asks git, however often the list is polled: a branch ahead of the base is one a person may merge at any moment`,
+    );
   }
 });
 
@@ -540,11 +562,10 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   assert.deepEqual([off.status, off.toDecide], ['cancelled', null]);
   assert.equal(gitCount(), before, 'a run still going, and one called off, are not at their result: git is asked nothing');
 
-  // The count counts: the run whose branch is read does run git through the same PATH.
   const ahead = 'wf/r-ahead/implement';
   branchOff(repo, ahead, 'src/e.ts', 'export const e = 5;\n');
   signedOff('r-ahead-implement', repo);
   writeRun({ id: 'r-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-ahead-implement', branch: ahead } } });
   assert.equal((await detailOf('r-ahead')).toDecide?.kind, 'git');
-  assert.ok(gitCount() > before, 'a finished run whose branch may be ahead is read out of git');
+  assert.ok(gitCount() > before, 'a finished run whose branch may be ahead is read out of git, through the same PATH: the count counts');
 });

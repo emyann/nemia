@@ -1,7 +1,7 @@
 /**
  * A repository's workflows, for the board: listed, drawn, and started.
  *
- * W in docs/plan-hold-the-bar.md. A workflow is a folder of steps. A repository carries its own checked in, one folder
+ * A workflow is a folder of steps. A repository carries its own checked in, one folder
  * each under `<repo>/workflows/`, and a person keeps their own under `workflows/` in the store the runs are in —
  * `~/.agent-workflows/workflows/`, or under `WF_ROOT` when that is set. Each folder is read with the package's loader,
  * so one `wf start` would refuse is listed with the loader's refusal, never hidden.
@@ -12,7 +12,7 @@
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
- * the page itself has on the board..
+ * the page itself has on the board.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -76,7 +76,10 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`, read from `permissionMode:` in a file written before 2026-09-23): null on Claude Code, and where a codex step names none. */
+  /**
+   * Codex's sandbox (`sandbox:`, or the former key `permissionMode:` a codex file may still carry): null on Claude Code, and where a codex
+   * step names none.
+   */
   sandbox: string | null;
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallowedTools:`): empty where the step denies nothing. */
@@ -123,8 +126,8 @@ export type WorkflowListing = {
    */
   folderTeam: boolean;
   /**
-   * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder no longer
-   * holds that, rather than written over what changed.
+   * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder holds
+   * something else, rather than written over what changed.
    */
   version: string;
   error: string | null;
@@ -240,7 +243,7 @@ const listedStep = (step: Workflow): ListedStep => ({
  * changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its file, where the load
  * finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill folder its `skills:` gives:
  * what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as the step's, and an agent edited
- * since is a step the board no longer shows as it is.
+ * after the listing is a step the board does not show as it is.
  */
 export function versionOf(dir: string, places: Places): string {
   let names: string[];
@@ -485,8 +488,31 @@ function cardRefusalStatus(card: string): 404 | 409 | 422 {
   return 422;
 }
 
+/**
+ * The workflows' routes, and the board's first write.
+ *
+ * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
+ *   it is now. 500 for a folder that could not be listed.
+ * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
+ *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
+ *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
+ *   the loader's refusal, word for word, with which the folder is listed and has no step to show; 404 for a step the folder does not have.
+ *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
+ *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
+ *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
+ * - `GET /api/repository` — the repository a start runs in: what the start form lists the runs of, for a run to wait on.
+ * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder>
+ *   --repo <repo> --after <runId>`, or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
+ *   Guarded (guard.ts); the body is refused as `startWords` and `startOf` say. 201 with the run's `Location` once its record is written.
+ *   Without a card, `wf start`'s refusal is 422, word for word: a folder that does not read as a workflow, a step named for another's check
+ *   or try, a `.worktreeinclude` it cannot use, a repository git cannot read, or a run this one cannot wait on (`afterRefusal`). With a
+ *   card, the api's repository is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
+ *   `folderOf` found. `startFromInbox`'s refusals have `cardRefusalStatus`, anything else 422. A run started when the card could not be
+ *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
+ *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
+ *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
+ */
 export const workflows = new Hono()
-  // Read from disk on each request, so a folder a person has just edited lists as it is now.
   .get('/api/workflows', (c) => {
     try {
       return c.json(listWorkflows(repoOf()));
@@ -494,8 +520,6 @@ export const workflows = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // One step of one folder, for its page: found among the folders the sources have and the steps the loader read, never joined from what
-  // was sent — so no name in the path reaches a file outside the folder — or why not, in the words a start would use.
   .get('/api/workflows/:from/:name/:step', (c) => {
     const { from, name, step } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
@@ -513,7 +537,6 @@ export const workflows = new Hono()
       try {
         steps = loadWorkflows(folder.dir, placesOf(repoOf()));
       } catch (err) {
-        // The loader's refusal, word for word: the folder is listed with it, and has no step to show.
         return c.json({ error: messageOf(err) }, 422);
       }
       const found = steps.find((s) => s.name === step);
@@ -524,9 +547,6 @@ export const workflows = new Hono()
         );
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      // The step's resolved agent carries its keys and words, not what its card says it can do: that is generated from the agent's skills,
-      // found where the load found them (`cardSkills`). `agentSkills` are the card's A2A skills, one for each Claude Code skill its `skills:`
-      // gives a session, or one made from its description; null for a card the package refuses, whose words the agent's page shows.
       const places = placesOf(repoOf());
       const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
       let agentSkills: AgentSkill[] | null = null;
@@ -551,10 +571,7 @@ export const workflows = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // The repository a start runs in: what the start form lists the runs of, for a run to wait on.
   .get('/api/repository', (c) => c.json({ repo: repoOf() }))
-  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo> --after <runId>`,
-  // or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
   .post('/api/runs', async (c) => {
     const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
@@ -565,7 +582,6 @@ export const workflows = new Hono()
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     if (asked.card !== undefined) {
       try {
-        // The api's repository is the caller's, as `.` is `wf start`'s: the card's `repo:` is over it. The folder is the one `folderOf` found.
         const started = startFromInbox({
           name: asked.card,
           callerRepo: repo,
@@ -574,9 +590,6 @@ export const workflows = new Hono()
           ...(asked.after ? { after: asked.after } : {}),
         });
         c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
-        // Started all the same when the card could not be removed: the run is written, and the card lists as started until it is dropped.
-        // And a card whose `repo:` the run looked at none of — a folder team's — carries it, as `wf start` prints it and a tick's line
-        // says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
         return c.json(
           {
             id: started.run.id,
@@ -597,8 +610,6 @@ export const workflows = new Hono()
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);
     } catch (err) {
-      // `wf start`'s refusal, word for word: a folder that does not read as a workflow, a step named for another's check
-      // or try, a `.worktreeinclude` it cannot use, a repository git cannot read, or a run this one cannot wait on (`afterRefusal`).
       return c.json({ error: messageOf(err) }, 422);
     }
   });

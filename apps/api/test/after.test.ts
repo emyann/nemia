@@ -1,7 +1,15 @@
 /**
  * A run that waits on a run (`wf start --after`), as the board reads it: `after` as the record froze it, and `waiting` — the runs its
  * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `wf ls` and `wf decide` say. Off a
- * real repository, where a parent ships by its branch being merged, and in a scratch store.
+ * real repository, where a parent ships by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
+ * imported, as it locates its store when it loads.
+ *
+ * The runs: `a-shipped`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
+ * still working, its branch not merged; `c-cancelled`, called off before anything of it was filed; `x-gone`, signed off on a branch deleted
+ * unmerged before any tick recorded its tip. Their children, none filed: `d-waits`, `e-cancelled-parent`, `f-no-such-parent`,
+ * `g-parents-shipped`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. On the engine's feed,
+ * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they ship;
+ * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them.
  */
 import { observations } from './harness.ts';
 import { test } from 'node:test';
@@ -14,7 +22,6 @@ import type { RunDecision } from '../src/decision.ts';
 import type { RunDetail } from '../src/detail.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
 const root = scratch('hkb-api-after-');
 process.env.WF_ROOT = root;
 
@@ -74,6 +81,10 @@ const working = (taskId: string) => journal(taskId, [filed(), { kind: 'starting'
 /** One step, frozen on the record as `wf start` freezes it: its branch is the run's result. */
 const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
+/**
+ * Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `wf cancel` does, in a file of its own
+ * beside the record.
+ */
 function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}): void {
   const { cancelledAt, ...rest } = fields;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -94,38 +105,29 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
       ...rest,
     }),
   );
-  // Cancelled as `wf cancel` marks a run: a file of its own, beside the record.
   if (cancelledAt) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
 }
 
 const cancelledAt = '2026-09-14T00:20:00.000Z';
 
-// The diamond's top, shipped: its step signed off, and its result branch merged into main.
 branch('wf/a-shipped/implement', true);
 signedOff('t-a');
 writeRun('a-shipped', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-shipped/implement' } } });
-// Started after it, and still working, its branch not merged.
 branch('wf/b-running/implement', false);
 working('t-b');
 writeRun('b-running', { after: ['a-shipped'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
-// Called off before anything of it was filed.
 writeRun('c-cancelled', { cancelledAt });
-// Signed off on a branch somebody deleted unmerged, before any tick recorded its tip.
 signedOff('t-x');
 writeRun('x-gone', { steps: { implement: { taskId: 't-x', workspace: repo, branch: 'wf/x-gone/implement' } } });
 
-// The children, none filed yet.
 writeRun('d-waits', { after: ['a-shipped', 'b-running'] });
 writeRun('e-cancelled-parent', { after: ['c-cancelled'] });
 writeRun('f-no-such-parent', { after: ['no-such-run'] });
 writeRun('g-parents-shipped', { after: ['a-shipped'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
-// A child that started: its parents are never read again.
 working('t-i');
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
 
-// The feed, as the engine appends to it: b-running and i-started were filed an hour and more after they were created, as a run started
-// `--after` runs is, once they ship. a-shipped's and x-gone's filings are not on it, as in a store from before the feed.
 const filedB = '2026-09-14T01:10:00.000Z';
 const filedI = '2026-09-14T01:40:30.000Z';
 fs.writeFileSync(
@@ -159,13 +161,16 @@ test("the list carries each run's `after` as the record froze it, and `waiting` 
   const runs = await listedRuns();
   const d = runs.get('d-waits')!;
   assert.deepEqual(d.after, ['a-shipped', 'b-running']);
-  // a-shipped has shipped, so it is not waited on; b-running has not.
-  assert.deepEqual(d.waiting, {
-    runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
-    word: 'waiting on b-running',
-    advice: 'nothing of d-waits is filed until wf decide says b-running has shipped onto main; nothing to decide yet',
-    onYou: false,
-  });
+  assert.deepEqual(
+    d.waiting,
+    {
+      runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
+      word: 'waiting on b-running',
+      advice: 'nothing of d-waits is filed until wf decide says b-running has shipped onto main; nothing to decide yet',
+      onYou: false,
+    },
+    'a-shipped has shipped, so only b-running is waited on',
+  );
   assert.deepEqual(
     d.steps.map((s) => [s.name, s.status]),
     [['implement', 'waiting on b-running']],
@@ -185,11 +190,17 @@ test("the list carries each run's `after` as the record froze it, and `waiting` 
   ]);
   assert.equal(runs.get('h-gone-parent')!.waiting?.word, 'waiting on x-gone (wf/x-gone/implement gone)');
 
-  // Every parent shipped: nothing to wait on, and the next tick files the roots. Started: its parents are not read, whatever they say.
-  assert.deepEqual([runs.get('g-parents-shipped')!.after, runs.get('g-parents-shipped')!.waiting], [['a-shipped'], null]);
-  assert.deepEqual([runs.get('i-started')!.after, runs.get('i-started')!.waiting], [['b-running'], null]);
-  // Started without `--after`.
-  assert.deepEqual([runs.get('a-shipped')!.after, runs.get('a-shipped')!.waiting], [[], null]);
+  assert.deepEqual(
+    [runs.get('g-parents-shipped')!.after, runs.get('g-parents-shipped')!.waiting],
+    [['a-shipped'], null],
+    'every parent shipped: nothing to wait on, and the next tick files the roots',
+  );
+  assert.deepEqual(
+    [runs.get('i-started')!.after, runs.get('i-started')!.waiting],
+    [['b-running'], null],
+    'started: its parents are not read, whatever they say',
+  );
+  assert.deepEqual([runs.get('a-shipped')!.after, runs.get('a-shipped')!.waiting], [[], null], 'started without --after');
 });
 
 test("the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`", async () => {
@@ -217,9 +228,11 @@ test("the list's words and waits are `list`'s, run by run — and `advice` is `w
     if (cli.waiting.length) {
       assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
       assert.equal(api.waiting?.advice, waitAdvice(readRun(id), cli.waiting), id);
-      // Whether a person has to act, held to the package's own words rather than a copy of its rule: `waitAdvice` says "nothing of <run> is
-      // filed until …" exactly while every run waited on may still ship, and what is yours to resolve otherwise.
-      assert.equal(api.waiting?.onYou, !waitAdvice(readRun(id), cli.waiting).startsWith(`nothing of ${id} is filed until `), id);
+      assert.equal(
+        api.waiting?.onYou,
+        !waitAdvice(readRun(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+        `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still ship`,
+      );
     }
   }
 });
@@ -236,8 +249,12 @@ test('a run waiting on runs moves — the tick files its roots once they ship �
     'f-no-such-parent': false,
     'h-gone-parent': false,
   });
-  // Where `assess` puts them, which knows no gate: nothing is final, so running. Nobody is waited on in the steps' words: no step is filed.
-  for (const id of Object.keys(moving)) assert.deepEqual([runs.get(id)!.status, runs.get(id)!.waitingOnYou], ['running', []], id);
+  for (const id of Object.keys(moving))
+    assert.deepEqual(
+      [runs.get(id)!.status, runs.get(id)!.waitingOnYou],
+      ['running', []],
+      `${id}: running, as assess, which knows no gate, puts a run nothing of which is final; nobody waited on, as no step is filed`,
+    );
 });
 
 test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
@@ -265,10 +282,13 @@ test("a run started when its first task was filed, off the engine's feed, not wh
   const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
   assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-shipped for an hour: that hour is not time at work');
   assert.deepEqual(started('i-started'), [at, filedI]);
-  // Started, and its filing not on the feed: when it was created, the only time there is.
-  assert.deepEqual(started('a-shipped'), [at, at]);
-  // Waiting on runs, whether they may still ship or never will, or with its parents shipped and the tick yet to file it: not started.
-  for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled']) assert.equal(runs.get(id)!.startedAt, null, id);
+  assert.deepEqual(started('a-shipped'), [at, at], 'started, and its filing not on the feed: when it was created, the only time there is');
+  for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled'])
+    assert.equal(
+      runs.get(id)!.startedAt,
+      null,
+      `${id}: waiting on runs that may still ship or never will, or its parents shipped and the tick yet to file it: not started`,
+    );
   for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
     const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
     assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
@@ -276,12 +296,13 @@ test("a run started when its first task was filed, off the engine's feed, not wh
 });
 
 test('reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them', async () => {
-  // a-shipped's branch is on main, so `parentOf` reads its tasks to ask its `wf decide` — off the views the request already read.
-  // The tasks in flight here are Codex's: the list and the detail look at the harnesses of the runs' own tasks (`viewsFor`), and ask Claude
-  // Code's registry nothing. Before, each read every harness once, `claude agents` included.
   const before = observations();
   await listedRuns();
-  assert.equal(observations() - before, 0, 'the list');
+  assert.equal(
+    observations() - before,
+    0,
+    "the list: a-shipped's tasks, read to ask its wf decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
+  );
   const again = observations();
   assert.equal((await app.request('/api/runs/d-waits')).status, 200);
   assert.equal(observations() - again, 0, 'the detail');
@@ -301,6 +322,9 @@ test('the decision of a run waiting on runs is `waiting`, and nothing else: what
     assert.equal(body.waiting.word, waitWord(waiting), id);
     assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);
   }
-  // Every parent shipped, and not yet filed: it runs, and there is nothing to decide yet.
-  assert.deepEqual(await (await app.request('/api/runs/g-parents-shipped/decision')).json(), { running: true });
+  assert.deepEqual(
+    await (await app.request('/api/runs/g-parents-shipped/decision')).json(),
+    { running: true },
+    'every parent shipped, and not yet filed: it runs, and there is nothing to decide yet',
+  );
 });

@@ -4,6 +4,8 @@
  * At shipped defaults: a store of the file's own, whose feed is written by the package's own writer (`recordFeed`), as the tick writes
  * it. What the stream sends is held to what the feed says: each line, named by what it is about, its id the cursor just after it. The
  * watchers it holds are counted as the process counts them (`FSEventWrap`), so a stream whose reader went and left one behind fails here.
+ * `WF_ROOT` is set before the orchestrator is imported, as it locates its store as it loads. A socket is served by the adaptor's server,
+ * which, given no `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -14,7 +16,6 @@ import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store as it loads: WF_ROOT is set first.
 const root = scratch('hkb-api-feed-');
 process.env.WF_ROOT = root;
 
@@ -24,11 +25,13 @@ type FeedWords = import('agent-orchestrator').FeedWords;
 
 const STREAM = '/api/feed/stream';
 
-/** A store whose feed is gone, and a writer that has read none of it — the tick's memo, started afresh. */
+/**
+ * A store whose feed is gone, and a writer that has read none of it — the tick's memo, started afresh. Returns one pass, as the tick hands
+ * the feed what it judged: every run in the store, by id.
+ */
 const emptyFeed = () => {
   fs.rmSync(feedFile(), { force: true });
   const memo = freshFeedMemo();
-  /** One pass, as the tick hands the feed what it judged: every run in the store, by id. */
   return (runs: Record<string, FeedWords>) => recordFeed(new Map(Object.entries(runs)), { memo });
 };
 const planAt = (word: string, note?: string): FeedWords => ({
@@ -146,8 +149,12 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
     lines.map((l) => [l.step ? 'step' : 'run', JSON.stringify(l)]),
   );
   assert.equal(all[2].id, String(end()));
-  // Each id is where a read takes up after that line, and no other.
-  for (const [i, b] of all.entries()) assert.deepEqual(readFeed(Number(b.id)).lines, lines.slice(i + 1));
+  for (const [i, b] of all.entries())
+    assert.deepEqual(
+      readFeed(Number(b.id)).lines,
+      lines.slice(i + 1),
+      `event ${i}: its id is where a read takes up after that line, and no other`,
+    );
 
   const again = await open('?after=0', { 'Last-Event-ID': all[0].id! });
   const resumed = await readUntil(again.reader, again.text, (s) => s.length >= 2);
@@ -176,7 +183,7 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
   assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
 });
 
-test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID', async () => {
+test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID — and one it gave is taken', async () => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
   const size = end();
@@ -209,7 +216,6 @@ test('REFUSED: a cursor the feed never gave is a 400 that names it and says what
       where,
     );
   }
-  // A cursor the feed did give is taken.
   const taken = await open(`?after=${size}`);
   await taken.reader.cancel();
 });
@@ -224,10 +230,13 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
 
   const first = fs.readFileSync(feedFile(), 'utf8').split('\n')[0];
   fs.writeFileSync(feedFile(), `${first}\n`);
-  // Resolves only once the api closes the stream; a stream that went on trying would reach the bound.
   const said = await readUntil(reader, text, () => false);
   const last = said.at(-1)!;
-  assert.equal(last.event, 'unreadable');
+  assert.equal(
+    last.event,
+    'unreadable',
+    'the read resolves only once the api closes the stream: one that went on trying would reach the bound',
+  );
   const { error, retrying } = JSON.parse(last.data!);
   assert.equal(retrying, false);
   assert.match(error, /is past the end of the feed/);
@@ -250,18 +259,15 @@ test('a read that fails for a beat is said once, `retrying`, and cleared by the 
       const { error, retrying } = JSON.parse(failed[0].data!);
       assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
       assert.match(error, /EACCES/);
-      // More than two of the watch's beats (1 s): each fails again, and none is said again. An absence, so a bound of time is all
-      // there is; a slow machine makes it prove less, never fail.
       await new Promise((r) => setTimeout(r, 2_500));
     } finally {
       fs.chmodSync(feedFile(), 0o644);
     }
-    // Nothing written: the next read that works clears it all the same.
     const cleared = await readUntil(reader, text, (s) => s.length >= 2);
     assert.deepEqual(
       cleared.map((b) => b.event),
       ['unreadable', 'readable'],
-      'said once, then cleared — with no line between',
+      "said once over more than two of the watch's one-second beats, each failing again, then cleared by the next read that works, with no line written between; an absence, so a bound of time is all there is, and a slow machine makes it prove less, never fail",
     );
 
     const [line] = pass({ 'r-1': planAt('succeeded') });
@@ -276,15 +282,13 @@ test('a read that fails for a beat is said once, `retrying`, and cleared by the 
 test('a stream whose reader goes leaves no watcher behind: each open stream holds one, and a cancelled one gives it back', async () => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
-  // Nothing else in this process watches: the streams of the tests before this one are gone with their readers.
   await until(
     () => watchers() === 0,
-    () => `${watchers()} watchers left behind by the tests before this one`,
+    () => `${watchers()} watchers left behind by the tests before this one, whose streams are gone with their readers`,
   );
   const streams = await Promise.all([open(), open(), open()]);
-  // One event each: each stream's watch has started.
   for (const s of streams) await readUntil(s.reader, s.text, (said) => said.length >= 1);
-  assert.equal(watchers(), 3, 'one watcher a stream');
+  assert.equal(watchers(), 3, "one watcher a stream, each stream's watch started once it sent an event");
   await streams[0].reader.cancel();
   await until(
     () => watchers() === 2,
@@ -300,7 +304,6 @@ test('a stream whose reader goes leaves no watcher behind: each open stream hold
 test('a client that closes its socket stops the watch too — the path `main.ts` serves, where nothing is being written when it goes', async () => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
-  // Given no `createServer`, the adaptor makes a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {

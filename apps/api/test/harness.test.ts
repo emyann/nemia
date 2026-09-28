@@ -58,13 +58,14 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   assert.deepEqual(JSON.parse(listed), JSON.parse(fs.readFileSync(registry, 'utf8')));
   fs.writeFileSync(registry, '[]');
 
-  // A task filed on the engine's Claude harness, and read: through the package's engine, and through the api's own.
   const e = engine();
   await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('hkb-api-cwd-'), harness: 'claude' });
   let before = observations();
-  // A list observes every harness; a view of a task with no attempt in flight reads its record alone since `find` (E7).
   await e.list();
-  assert.ok(observations() > before, "the package's engine observed the harness's `claude`");
+  assert.ok(
+    observations() > before,
+    "the package's engine, listing a task filed on its Claude harness, observed the harness's `claude`: a list observes every harness, where a view of a task with no attempt in flight reads its record alone",
+  );
   before = observations();
   await (await import('../src/store.ts')).e.list();
   assert.ok(observations() > before, "and so did the api's");

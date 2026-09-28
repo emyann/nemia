@@ -2,10 +2,15 @@
  * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` — `wf say`'s
  * own — and the `said` on the step's detail, read back off the engine's journal.
  *
- * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH, listing the sessions this file says
- * are running, each with a pid, so the registry of the sessions on this machine is never asked; and a real Unix socket standing in for a
- * session's inbox, registered where Claude Code registers one (`<CLAUDE_CONFIG_DIR>/sessions/<pid>.json`). So words the api takes are on that
- * socket, as given, and on the task's journal; words it refuses are on neither.
+ * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH,
+ * listing the sessions this file says are running, each with a pid, so the registry of the sessions on this machine is never asked; and a
+ * real Unix socket standing in for a session's inbox, registered where Claude Code registers one
+ * (`<CLAUDE_CONFIG_DIR>/sessions/<pid>.json`). So words the api takes are on that socket, as given, and on the task's journal; words it
+ * refuses are on neither.
+ *
+ * The tasks it seeds: `t-implement`, at work, its inbox listening; `t-deaf`, at work, its registration naming an inbox that is not there;
+ * `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work with its inbox listening: only the run's mark
+ * refuses it.
  */
 import { registry } from './harness.ts';
 import { test } from 'node:test';
@@ -21,9 +26,10 @@ import type { RunSummary } from '../src/runs.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-say-${label}-`);
 
-// agent-orchestrator locates its store, and the Claude runner where sessions register, as their modules load: both are set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = tmp('root');
 process.env.WF_ROOT = root;
+/** Where sessions register, set in `CLAUDE_CONFIG_DIR` before the api loads: the Claude runner reads it as its module loads. */
 const config = tmp('claude');
 process.env.CLAUDE_CONFIG_DIR = config;
 
@@ -66,8 +72,8 @@ const inbox = async () => {
   return { path: socket, lines };
 };
 
-/** A Claude Code task whose session the harness lists at work, with a pid, and registered as Claude Code registers one, its inbox at `socket`. */
 let pid = 424_200;
+/** A Claude Code task whose session the harness lists at work, with a pid, and registered as Claude Code registers one, its inbox at `socket`. */
 const runningSession = (taskId: string, socket: string): string => {
   const sessionId = randomUUID();
   journal(taskId, started);
@@ -85,7 +91,6 @@ const runningSession = (taskId: string, socket: string): string => {
 const box = await inbox();
 const R = 'r-say';
 const C = 'r-say-cancelled';
-// implement: at work, its inbox listening. deaf: at work, its registration naming an inbox that is not there. settled: ran once and signed off.
 const implementSession = runningSession('t-implement', box.path);
 runningSession('t-deaf', path.join(tmp('gone'), 'in.sock'));
 journal('t-settled', [
@@ -101,7 +106,6 @@ journal('t-settled', [
   },
   { kind: 'settled', at: at(9), outcome: 'succeeded' },
 ]);
-// The cancelled run's step is at work, and its inbox listens: only the run's mark refuses it.
 runningSession('t-cancelled', box.path);
 
 const record = (id: string, steps: Record<string, { taskId: string | null }>) =>

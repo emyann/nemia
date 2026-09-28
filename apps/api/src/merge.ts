@@ -12,6 +12,10 @@ import { execFileSync } from 'node:child_process';
  */
 export type MergeWord = { clean: true } | { clean: false; conflicts: string[] } | { error: string };
 
+/**
+ * Whether `branch` merges onto `onto` in `repo` (`MergeWord`). Git's exit 1 is its answer that the merge conflicts, the tree it wrote on
+ * the first line of its output and then each conflicted file once; any other failure is an `error`, in git's first line.
+ */
 export function mergesOnto(repo: string, onto: string, branch: string): MergeWord {
   try {
     execFileSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', onto, branch], {
@@ -23,7 +27,6 @@ export function mergesOnto(repo: string, onto: string, branch: string): MergeWor
     return { clean: true };
   } catch (err) {
     const { status, stdout, stderr, message } = err as { status?: number | null; stdout?: string; stderr?: string; message: string };
-    // Exit 1 is git's answer that the merge conflicts: the tree it wrote on the first line, then each conflicted file once.
     if (status === 1 && stdout) return { clean: false, conflicts: stdout.split('\n').slice(1).filter(Boolean) };
     return { error: (stderr || message).trim().split('\n')[0] || `git merge-tree exited ${status}` };
   }

@@ -16,7 +16,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-resting-');
 process.env.WF_ROOT = root;
 
@@ -275,19 +275,22 @@ test("runs waiting on the same run read its journals once between them, off the 
   );
 });
 
-test('two requests at once: one that read the feed before the other read on past a line of its run keeps nothing', async () => {
+test('two requests at once: the first reads the feed and judges the run succeeded, a line of its task lands, the second reads on past the line while the run is not yet kept, and the first then keeps nothing', async () => {
   aFinishedRun('r-raced');
   const answer = await listed('r-raced');
   assert.ok(answer && resting.runs.has('r-raced'));
-  resting.runs.delete('r-raced'); // not yet kept, as on the request that first judges it
+  resting.runs.delete('r-raced');
   const { startedAt: _, ...judged } = answer;
 
-  const first = await restingRead(resting, false); // the first request reads the feed, then the run's journal, judged succeeded
+  const first = await restingRead(resting, false);
   blocked('r-raced-implement');
-  fed('r-raced-implement'); // a line of its task, before the first request keeps what it judged
-  await restingRead(resting, false); // the second reads the feed on past the line: the run is not kept, so nothing is taken out
+  fed('r-raced-implement');
+  await restingRead(resting, false);
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
-  assert.ok(!resting.runs.has('r-raced'), 'kept nothing: the line is past where the first request read, and no request will read it again');
+  assert.ok(
+    !resting.runs.has('r-raced'),
+    'kept nothing: the first request read the feed before the line; the second read on past it while the run was not kept, so took nothing out; and no request will read the line again',
+  );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
   const alone = await restingRead(resting, false);

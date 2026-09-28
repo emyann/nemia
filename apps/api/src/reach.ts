@@ -1,20 +1,19 @@
 /**
- * What each step of each workflow gets: the fence its file declares, beside what of the repository's capabilities reaches it — the second half of
- * B1 (docs/plan-hold-the-bar.md §6 item 14). Pure over what the api read of the checkout (`capabilitiesOf`) and the workflows the package's loader
- * read, as the Workflows page reads them (`listWorkflows`); nothing here starts, asks or writes anything.
+ * What each step of each workflow gets: the fence its file declares, beside what of the repository's capabilities reaches it. Pure over
+ * what the api read of the checkout (`capabilitiesOf`) and the workflows the package's loader read, as the Workflows page reads them
+ * (`listWorkflows`); nothing here starts, asks or writes anything.
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
- * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
- * enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's read-only commands, which
- * ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what the settings allow of what asks.
- * What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that says `background: true`), which asks
- * nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
- * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions, read 2026-09-14, and for ask
- * rules 2026-09-16): deny, then ask, then allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask
- * rule every allow it matches, which asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included,
- * and `:*` at the end is a trailing ` *`, which also matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny,
- * removes the tool. A Codex step reads no `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the
- * page claims nothing else for it.
+ * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the
+ * settings enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's
+ * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
+ * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
+ * says `background: true`), which asks nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
+ * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions): deny, then ask, then
+ * allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask rule every allow it matches, which
+ * asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included, and `:*` at the end is a trailing ` *`, which also
+ * matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny, removes the tool. A Codex step reads no
+ * `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the page claims nothing else for it.
  */
 import { HARNESSES } from 'agent-orchestrator';
 import {
@@ -32,8 +31,9 @@ import { listWorkflows, type WorkflowListing, type WorkflowSource, type Workflow
 const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
 
 /**
- * The modes a job was measured in, each denying what would ask and carrying on (agent-runtime's open issue 28, M1, Claude Code 2.1.280) —
- * none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job in it.
+ * The modes a job was measured in on Claude Code 2.1.280, each denying what would ask and carrying on (agent-runtime's docs/open-issues.md,
+ * "Claude Code as a job") — none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job
+ * in it.
  */
 const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
 
@@ -236,6 +236,20 @@ export function reachOf(
   return workflows.filter((w) => w.error === null).flatMap((w) => w.steps.map(({ name, spec }) => stepReach(capabilities, w, name, spec)));
 }
 
+/**
+ * What one step gets (`StepReach`). A step on a harness that is not Claude Code reads no settings, and nothing of them is claimed for it.
+ * On Claude Code:
+ *
+ * - A deny naming a tool whole — `Bash`, or `Bash(*)` — removes it from the session. One naming one tool of a family the set names as
+ *   one — `CronCreate` of `Cron*` — leaves the family, and names the tool as taken.
+ * - Whether it has a tool is known for a set its `tools:` names; for the measured set, a tool the measurement did not name is not ruled
+ *   out.
+ * - Deny, then ask, then allow: an allow stands only where no deny, and no ask rule, matches the whole of it. The narrower ask rules that
+ *   still make part of an allow ask leave out any a deny covers, since the deny comes first and that part never asks.
+ * - Each read-only command asks for no rule, unless a Bash deny covers all of it, or an ask rule does — which makes it ask, and on a step
+ *   that denies what asks (in `dontAsk`, or a job) denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole
+ *   makes every command ask. `git`'s read-only forms are not listed, so only a rule of every `git` command is known to take them.
+ */
 function stepReach(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflow: WorkflowListing,
@@ -290,7 +304,6 @@ function stepReach(
   const ask = asked.map((a) => a.rule);
   const inferred: readonly string[] = MEASURED_TOOLS.inferred.map((t) => t.name);
   const offered: readonly string[] = spec.tools ?? [...MEASURED_TOOLS.tools, ...inferred];
-  // A deny naming a tool whole — `Bash`, or `Bash(*)` — removes it from the session.
   const wholly = (tool: string) => denied.find((d) => ruleOf(d.rule)?.tool === tool && ruleOf(d.rule)?.scope === null);
   const removed: RemovedTool[] = [];
   const names = offered.filter((name) => {
@@ -298,14 +311,12 @@ function stepReach(
     if (by) removed.push({ name, rule: by.rule, source: by.source, of: null });
     return !by;
   });
-  // A rule naming one tool of a family the set names as one — `CronCreate` of `Cron*`: the family stays, and the tool is named as taken.
   for (const d of denied) {
     const r = ruleOf(d.rule);
     if (!r || r.scope !== null || offered.includes(r.tool) || removed.some((x) => x.name === r.tool)) continue;
     const family = names.find((name) => name.endsWith('*') && r.tool.startsWith(name.slice(0, -1)));
     if (family) removed.push({ name: r.tool, rule: d.rule, source: d.source, of: family });
   }
-  // Whether it has a tool: known for a set its `tools:` names; for the measured set, a tool the measurement did not name is not ruled out.
   const has = (tool: string) =>
     !spec.tools || names.includes(tool) || names.some((name) => name.endsWith('*') && tool.startsWith(name.slice(0, -1)));
 
@@ -319,7 +330,6 @@ function stepReach(
           : `Its tools have no \`Skill\`, so it cannot load a skill — its session still lists the repository's skills (measured, ${MEASURED_TOOLS.harness} ${MEASURED_TOOLS.version}).`,
       };
 
-  // Deny, then ask, then allow: an allow stands only where no deny, and no ask rule, matches the whole of it.
   const allowed: AllowedFor = { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, askDenier, why: null };
   for (const { rule } of capabilities.allowed) {
     const by = takenBackBy(rule, denied);
@@ -330,7 +340,6 @@ function stepReach(
     else if (tool !== undefined && !has(tool)) allowed.unused.push(rule);
     else allowed.rules.push(rule);
   }
-  // The narrower ask rules that still make part of an allow ask — less any a deny covers, since the deny comes first and that part never asks.
   const narrowerAsks = (rule: string) => narrowerDenies(rule, asked).filter((ask) => !takenBackBy(ask, denied));
   allowed.exceptions = allowed.rules
     .map((rule) => ({ rule, except: narrowerDenies(rule, denied), asks: narrowerAsks(rule) }))
@@ -348,9 +357,6 @@ function stepReach(
       : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
   }
 
-  // What asks for no rule: each read-only command, unless a Bash deny covers all of it, or an ask rule does — which makes it ask, and on a step
-  // that denies what asks (in dontAsk, or a job) denies it. A deny naming Bash whole has taken the tool, and an ask rule naming it whole makes every command ask. `git`'s read-only forms are
-  // not listed, so only a rule of every `git` command is known to take them.
   const covering = (rules: readonly DeniedRule[], command: string) =>
     rules.find((d) => {
       const r = ruleOf(d.rule);

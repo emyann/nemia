@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
 const root = scratch('hkb-api-remote-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
@@ -68,27 +68,31 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   assert.equal(ask.filed?.runsIn, null, "no mode: the agent runs under its own party's fence");
   assert.equal(text.includes('s3cret'), false, 'the query string, which can carry a key, is on no answer');
 
-  // An agent given by its card is addressed by the card's first interface.
   write(
     path.join(root, 'a2a-agents.json'),
     JSON.stringify({ reviewer: { card: { supportedInterfaces: [{ url: 'https://a2a.example.org/rpc', protocolBinding: 'JSONRPC' }] } } }),
   );
-  assert.deepEqual(((await (await app.request('/api/runs/r-remote')).json()) as RunDetail).steps[0].filed?.remote, {
-    name: 'reviewer',
-    address: 'https://a2a.example.org/rpc',
-  });
+  assert.deepEqual(
+    ((await (await app.request('/api/runs/r-remote')).json()) as RunDetail).steps[0].filed?.remote,
+    { name: 'reviewer', address: 'https://a2a.example.org/rpc' },
+    "an agent given by its card is addressed by the card's first interface",
+  );
 
-  // Taken out of the file since, or the file refused as it stands: the name, which is on the task, and no address.
   completed('t-gone', 'a2a:critic');
   oneStep('r-gone', 'a2a:critic', 't-gone');
-  assert.deepEqual(((await (await app.request('/api/runs/r-gone')).json()) as RunDetail).steps[0].filed?.remote, {
-    name: 'critic',
-    address: null,
-  });
+  assert.deepEqual(
+    ((await (await app.request('/api/runs/r-gone')).json()) as RunDetail).steps[0].filed?.remote,
+    { name: 'critic', address: null },
+    'a name taken out of the file: the name, which is on the task, and no address',
+  );
   write(path.join(root, 'a2a-agents.json'), '{ "reviewer": ');
   const refused = await app.request('/api/runs/r-remote');
   assert.equal(refused.status, 200, 'the page is still drawn');
-  assert.deepEqual(((await refused.json()) as RunDetail).steps[0].filed?.remote, { name: 'reviewer', address: null });
+  assert.deepEqual(
+    ((await refused.json()) as RunDetail).steps[0].filed?.remote,
+    { name: 'reviewer', address: null },
+    'the file refused as it stands: the name, which is on the task, and no address',
+  );
   fs.rmSync(path.join(root, 'a2a-agents.json'));
 });
 
@@ -130,9 +134,9 @@ test('a remote step whose Task waits on its caller is answered with wf say, and 
     words: 'waiting for an input',
     advice: 'read its question with wf logs r-asks ask, and answer it with wf say r-asks ask "<your answer>"',
   });
-  // The same wait on a harness of ours is answered where it runs.
   assert.deepEqual(
     needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice,
     'answer it in Claude Code: claude agents, session ae/t-asks/1',
+    'the same wait on a harness of ours is answered where it runs',
   );
 });

@@ -1,7 +1,8 @@
 /**
  * The board's agents (agents.ts): listed from both places with the nodes that name them, one read, and one of yours made, put back,
  * renamed and removed — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
- * refuse, asserted on its words, with the folder as it was.
+ * refuse, asserted on its words, with the folder as it was. The repository holds the shipped agents and skills and `dev`, whose steps name
+ * them; yours holds the same, `dev` beside them.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -11,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
 const root = scratch('hkb-api-agents-');
 process.env.WF_ROOT = root;
 const repo = scratch('hkb-api-agents-repo-');
@@ -26,7 +27,6 @@ const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const STORE = path.join(root, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
 
-// The repository's: the shipped agents and `dev`, whose steps name them. Yours: the same agents, and `dev` beside them.
 fs.cpSync(path.join(SHIPPED, 'agents'), path.join(repo, 'workflows', 'agents'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, 'skills'), path.join(repo, 'workflows', 'skills'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, 'dev'), path.join(repo, 'workflows', 'dev'), { recursive: true });
@@ -438,11 +438,14 @@ test('an agent is listed with what it says it can do: its card, generated from i
     tags: ['code', 'review'],
     examples: ['Use this when a change is written and nobody has read it yet.'],
   });
-  // An agent given no skills says one thing it can do: its own description, as one entry.
   fs.writeFileSync(path.join(AGENTS, 'mute.md'), '---\ndescription: Says nothing.\n---\nDo it.\n');
   try {
     const mute = (await listed()).find((a) => a.name === 'mute')!;
-    assert.deepEqual(mute.card, [{ id: 'mute', name: 'mute', description: 'Says nothing.', tags: ['mute'] }]);
+    assert.deepEqual(
+      mute.card,
+      [{ id: 'mute', name: 'mute', description: 'Says nothing.', tags: ['mute'] }],
+      'an agent given no skills says one thing it can do: its own description, as one entry',
+    );
     assert.equal(mute.cardError, null);
   } finally {
     fs.rmSync(path.join(AGENTS, 'mute.md'));
@@ -487,7 +490,6 @@ test("a skill in the repository's .claude/skills is on the card of an agent of y
       /changed since it was read/,
     );
 
-    // At the version just listed, a save and a removal go through: the writer reads the version with the skills the listing found it with.
     const put = await send('PUT', '/api/agents/yours/courier', {
       name: 'courier',
       description: 'Carries notes on.',
@@ -496,13 +498,17 @@ test("a skill in the repository's .claude/skills is on the card of an agent of y
       body: 'Carry it.',
       version: edited.version,
     });
-    assert.equal(put.status, 200, await put.clone().text());
+    assert.equal(
+      put.status,
+      200,
+      `at the version just listed a save goes through: the writer reads the version with the skills the listing found it with. ${await put.clone().text()}`,
+    );
     const saved = (await put.json()) as { agent: { version: string } };
     const relisted = (await listed()).find((a) => a.name === 'courier')!;
     assert.equal(relisted.description, 'Carries notes on.');
     assert.equal(saved.agent.version, relisted.version);
     const gone = await send('DELETE', '/api/agents/yours/courier', { version: relisted.version });
-    assert.equal(gone.status, 200, await gone.clone().text());
+    assert.equal(gone.status, 200, `and so does a removal. ${await gone.clone().text()}`);
     assert.equal(fs.existsSync(path.join(AGENTS, 'courier.md')), false);
 
     fs.writeFileSync(
@@ -597,15 +603,14 @@ test('an agent is written and listed with the skills it is given and its system 
       ['review-a-change', 'write-a-note'],
       'the card is the skills it gives',
     );
-    // Neither is a role key: a step has no skills and no system prompt of its own.
-    assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false);
-    assert.equal(Object.hasOwn(saved.agent.keys, 'systemPrompt'), false);
+    assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false, 'not a role key: a step has no skills of its own');
+    assert.equal(Object.hasOwn(saved.agent.keys, 'systemPrompt'), false, 'not a role key: a step has no system prompt of its own');
   } finally {
     await send('DELETE', '/api/agents/yours/scribe', { version: saved.agent.version });
   }
 });
 
-test('REFUSED at shipped defaults: skills or a system prompt not written as text, and ones the package will not read', async () => {
+test("REFUSED at shipped defaults: skills or a system prompt not written as text, ones the package will not read, and skills the agent's tools could not load", async () => {
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: ['a'] }), 400, /`skills` is the skills the agent is given, by name/);
   await refused(
     send('POST', '/api/agents/yours', { ...scribe, systemPrompt: 1 }),
@@ -614,7 +619,6 @@ test('REFUSED at shipped defaults: skills or a system prompt not written as text
   );
   await refused(send('POST', '/api/agents/yours', { ...scribe, systemPrompt: 'terse' }), 422, /systemPrompt/);
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'Not A Name' }), 422, /Not A Name/);
-  // At shipped defaults the scribe's tools are `Read, Write`: skills it could not load are refused (F11).
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'write-a-note' }), 422, /no `Skill`/);
   await refused(
     send('POST', '/api/agents/yours', { ...scribe, keys: { ...scribe.keys, harness: 'codex' }, skills: 'write-a-note' }),
@@ -631,16 +635,11 @@ test('an agent is answered as an A2A Agent Card, with what it leaves out said be
   assert.equal(answer.servedOverA2A, false);
   assert.match(answer.why, /Nothing here serves reviewer over A2A/);
   assert.match(answer.why, /`supportedInterfaces` REQUIRED/);
-  // A2A's required fields, but the interfaces nothing here has: the card is the card, and the sentence about it is not in it.
-  assert.deepEqual(Object.keys(answer.card).sort(), [
-    'capabilities',
-    'defaultInputModes',
-    'defaultOutputModes',
-    'description',
-    'name',
-    'skills',
-    'version',
-  ]);
+  assert.deepEqual(
+    Object.keys(answer.card).sort(),
+    ['capabilities', 'defaultInputModes', 'defaultOutputModes', 'description', 'name', 'skills', 'version'],
+    "A2A's required fields but the interfaces nothing here has: the card is the card, and the sentence about it is not in it",
+  );
   assert.deepEqual(answer.card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
   const listing = (await listed()).find((a) => a.from === 'repo' && a.name === 'reviewer')!;
   assert.equal(answer.card.version, listing.version, 'the version is the one a save is held to');
@@ -690,11 +689,14 @@ test("an agent of yours a step of the repository's workflows is given — the re
       409,
       /of the repository .* renaming it to giver would/,
     );
-    // The repository's own lender is what its workflows are given now, so yours may go.
     fs.mkdirSync(path.dirname(own), { recursive: true });
     fs.writeFileSync(own, "---\ndescription: The repository's own.\n---\nDo it.\n");
     const res = await send('DELETE', '/api/agents/yours/lender', { version: lender.version });
-    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(
+      res.status,
+      200,
+      `the repository's own lender is what its workflows are given, so yours may go. ${await res.clone().text()}`,
+    );
     assert.ok(!fs.existsSync(path.join(AGENTS, 'lender.md')));
   } finally {
     fs.rmSync(path.join(AGENTS, 'lender.md'), { force: true });

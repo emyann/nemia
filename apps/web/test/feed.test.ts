@@ -79,6 +79,7 @@ function followed() {
     /** `ms` pass: each timer due by then runs. */
     pass: (ms: number) => {
       clock += ms;
+      // oxlint-disable-next-line unicorn/no-useless-spread -- a snapshot: a timer that runs may set another, which waits for the next pass
       for (const [id, t] of [...timers]) {
         if (t.at > clock) continue;
         timers.delete(id);

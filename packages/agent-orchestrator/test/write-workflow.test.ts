@@ -243,7 +243,7 @@ test('the files of the steps the folder no longer has go before a byte of the ne
   // them came before the write.
   const wrote = order.indexOf('wrote REVIEW.md');
   assert.ok(wrote >= 0, order.join(', '));
-  assert.deepEqual([...order.slice(0, wrote)].sort(), ['removed review.md', 'removed ship.md'], 'both removals come before the write');
+  assert.deepEqual(order.slice(0, wrote).sort(), ['removed review.md', 'removed ship.md'], 'both removals come before the write');
   assert.deepEqual(order.slice(wrote), ['wrote REVIEW.md'], 'and nothing is removed after it — implement.md is left as it is');
 });
 

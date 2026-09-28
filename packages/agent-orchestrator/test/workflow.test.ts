@@ -222,7 +222,7 @@ test('the shipped workflow is implement ⇄ review: two steps, and the review lo
   assert.deepEqual(steps.map((s) => s.name), ['implement', 'review'], 'respond is gone: implement answers the review in its own session, through the loop');
   const review = steps.find((s) => s.name === 'review')!;
   assert.deepEqual([review.loop, review.rounds], ['implement', 3]);
-  assert.equal((review.output?.schema.properties.again as { type: string }).type, 'boolean');
+  assert.equal((review.output!.schema.properties.again as { type: string }).type, 'boolean');
   assert.deepEqual(review.output?.schema.required, ['findings', 'again']);
   assert.deepEqual(loopSpan(steps, review), ['implement', 'review']);
 });

@@ -1435,7 +1435,7 @@ test("a step at its gate is a human gate on the canvas, and its node says what i
   assert.ok(footer, html);
   // What approving does, in a line that names the step as `wf ls` does: a step that ran hands on; an ending not filed runs.
   assert.equal(footer[2], '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>');
-  const spec = { ...(atGate().steps[0]!.spec ?? {}), workspace: 'main' } as RunDetail['steps'][number]['spec'];
+  const spec = { ...atGate().steps[0]!.spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } as RunDetail['steps'][number]['attempts'] }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/);
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no attempt yet`');
@@ -2224,7 +2224,6 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
 
 const { HandedOn } = await import('../src/components/Closeout.tsx');
 const { Gate } = await import('../src/components/Gate.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
 
 /** A plan's closeout as the api gives it, its fields in the order its schema declares them: files long enough to fold, risks not. */
 const planCloseout: StepCloseout = {

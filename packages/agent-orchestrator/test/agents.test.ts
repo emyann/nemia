@@ -204,9 +204,9 @@ test("a schema the agent's output: names is read beside the agent, and one the s
   const steps = loadWorkflows(path.join(dir, 'dev'));
   const check = steps.find((s) => s.name === 'check')!;
   assert.equal(check.output?.file, 'review.schema.json');
-  assert.deepEqual(Object.keys((check.output?.schema as { properties: object }).properties), ['verdict']);
+  assert.deepEqual(Object.keys((check.output!.schema as { properties: object }).properties), ['verdict']);
   const judge = steps.find((s) => s.name === 'judge')!;
-  assert.deepEqual(Object.keys((judge.output?.schema as { properties: object }).properties), ['ok']);
+  assert.deepEqual(Object.keys((judge.output!.schema as { properties: object }).properties), ['ok']);
 });
 
 test('REFUSED at shipped defaults: a broken agent, only when a step names it, naming agents/<file> — a linked one too', () => {

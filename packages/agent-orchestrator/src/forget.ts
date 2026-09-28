@@ -222,7 +222,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const hold = heldWorktree(w, { clean: status !== undefined && !changes.length, onBranch });
     // git could not read its status: taken as holding what nobody can see, and refused.
     const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
-    return { path: w.path, ...(hold ?? {}), ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
+    return { path: w.path, ...hold, ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
   });
   // A run once pruned is not asked its merge again for its worktrees; for its files it is (`pruneRefusal`).
   const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts, files: Boolean(files) }, { unmerged, artifacts });

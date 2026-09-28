@@ -462,7 +462,7 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   }
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {
     if (typeof h === 'object' && h !== null && Object.hasOwn(h, 'pool')) {
-      return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`admission.ts\`). ${ADMIT_INSTEAD}`;
+      return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`src/cap/cap.ts\`). ${ADMIT_INSTEAD}`;
     }
     const remote = typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, h) : undefined;
     if (remote) return remote;

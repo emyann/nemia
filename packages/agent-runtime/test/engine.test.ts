@@ -349,7 +349,7 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
  *
  * The pass keeps no ceiling, no pools and no order: which task starts, and when, is the layer above's (`queued` and `admit`;
  * the orchestrator's `toAdmit`). The ceiling, its pools, what a slot is held by and which task a free one goes to are
- * `agent-orchestrator/test/admission.test.ts`'s and `pool.test.ts`'s.
+ * `agent-orchestrator/src/cap/cap.test.ts`'s and `pool.test.ts`'s.
  */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
   b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));

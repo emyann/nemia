@@ -945,9 +945,9 @@ review of stage 3, and says how under its heading. 19 to 22, 24 and 25 each have
 
 **Where it is now** (2026-09-25). The runtime keeps no ceiling since thin runtime stage 4c part 2, so it counts no slot:
 `tick()` reports `running`, the sessions at work per harness, and a `blocked` one is not among them. The rule moved to
-agent-orchestrator in part 1: `holdsSlot` in its `src/admission.ts` counts a session at work, one starting and one
+agent-orchestrator in part 1: `holdsSlot` in its `src/cap/cap.ts` counts a session at work, one starting and one
 admitted and not yet started, and not one blocked on a person (`needs-human`) or held for an answer. Its
-`test/admission.test.ts` makes each case happen, a blocked session working again counted again included.
+`src/cap/cap.test.ts` makes each case happen, a blocked session working again counted again included.
 
 **What is left, unchanged and now the orchestrator's.** It is reasoning, not a measurement: a session on a permission
 prompt makes no API calls, so it costs nothing against the subscription's rate limit, but no blocked session's API
@@ -959,7 +959,7 @@ stopped for it, and nothing more is admitted while the count is at or past the c
 
 **Where it is now** (2026-09-25). The runtime counts no pools since stage 4c part 2: `pool` is gone from `HarnessSpec` and
 `PromiseRunner`, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
-naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/admission.ts`: `claude` and
+naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/cap/cap.ts`: `claude` and
 `claude-detached` one pool, since they are one subscription; `codex` and `check` each their own; a harness no line names
 its own. Its `test/pool.test.ts` proves it at shipped defaults, with fake `claude` and `codex`.
 
@@ -978,8 +978,8 @@ task it is given and admits a queued one on its word.
 
 **Where it is now** (2026-09-25). The runtime chooses no order since stage 4c part 2: a pass walks the board in the order
 the store lists it and starts every task not queued, and `State` carries `filedAt` for the layer above to read. The rule
-moved to agent-orchestrator in part 1: `toAdmit` in its `src/admission.ts` admits momentum first, then the earlier filing,
-then the lower id, and its `test/admission.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
+moved to agent-orchestrator in part 1: `toAdmit` in its `src/cap/cap.ts` admits momentum first, then the earlier filing,
+then the lower id, and its `src/cap/cap.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
 
 **What is left, now the orchestrator's.** The time is the filer's clock: `file()` stamps `new Date()` in the process that
 files, so two processes with skewed clocks filing onto one board are ordered by their clocks — one machine, one clock,
@@ -991,7 +991,7 @@ a newer run's first step. A time that does not parse orders its task last, never
 **Where it is now** (2026-09-25). `priority` is retired: a runtime that keeps no ceiling has no slot for it to choose.
 Both doors refuse it at any value, `0` and `undefined` as an own key included (exit 2, naming `queued: true` and `admit`),
 and a journal that carries one from before is folded unread; `ae ls` prints no priority. The run's momentum it carried
-until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read off the run records by the filing rules
+until stage 4c is agent-orchestrator's `momentumOf` (`src/cap/cap.ts`), read off the run records by the filing rules
 (`stepMomentum`, `MOMENTUM` in `src/run.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
 and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
 run's first step waiting for as long as it lasts.

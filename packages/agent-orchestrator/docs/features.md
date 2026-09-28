@@ -2395,7 +2395,7 @@ and a card marked to start on its own is started by the tick when a run slot is 
 
 What was built, the cap:
 
-- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in daemon-store.ts), unset or 0 for no cap, today's behaviour. Anything but a
+- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in daemon.store.ts), unset or 0 for no cap, today's behaviour. Anything but a
   whole count is refused by name, exit 2 (`runCapOf`), by `wf up`, `wf tick` and `wf ls`: read as no cap, a typo would lift the cap.
 - **A pure admission gate beside `runReady`.** `slotNeed` says what a run asks of the cap: in flight — a step's or a check's task filed and
   not settled, or a started run nobody called off that the pass files something of — and whether it wants a slot: nothing filed, not called
@@ -4158,7 +4158,7 @@ the git words are not renamed. No change to `packages/agent-runtime`: a task's `
 
 - **The word** (`workflow.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
 - **The run** (`run.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
-  caller says what a folder run gets. `places.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
+  caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`start.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
   refused — on a brief or an inbox card (`startFromInbox`, found by review); the cwd default, a card's own `repo:` (the board writes one on
@@ -4291,7 +4291,7 @@ cannot be edited from the board. And the comment above `UNASKING`/`DEFAULT_MODE`
 
 The slice named "a folder's lifetime — kept, cleaned, or none at all" was laid out at a plan gate on 22 September, and the owner
 chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exactly as long as its record, until `wf rm`
-(`removeKeyed` in `forget.ts`, `workRoot` in `places.ts`). Nothing was built but a test.
+(`removeKeyed` in `forget.ts`, `workRoot` in `places.store.ts`). Nothing was built but a test.
 
 - **Measured** (home store, 2026-09-22): two folder runs, both of the shipped `note` team. The finished one has one folder, not
   two, since review continues write's session and so its folder (`workspacePlan`'s `inherit`): `note.md`, 2,741 bytes, the same
@@ -4681,7 +4681,7 @@ Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`max
 - **Departures from the plan.** The owner replaced the plan's `tick({ admission })` callback with the report's views and `e.admit`, so
   admission running inside the runtime's pass, and its throw, are gone. The word is per turn (a held-open task waits for one before each
   later turn). `momentumOf` takes each run with its workflow's steps, since a pure file reads no folder. `POOLS` lives in
-  `admission.ts` and is not re-exported from `runtime-client.ts`, which only wraps the runtime.
+  `cap.ts` and is not re-exported from `runtime-client.ts`, which only wraps the runtime.
 
 **What it leaves.** The runtime's ceiling, pools and `priority` still held for `ae` and anything built without the client; part 2
 retired them (*Shipped: the runtime's ceiling, pools and priority retired*, below). `advance` still views each task in flight on its own, so a pass that advances claude runs makes more than one

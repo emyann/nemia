@@ -554,7 +554,7 @@ test('a task not queued starts, and `decide` is handed nothing to hold it back w
   assert.deepEqual(
     decide(fold(TASK, [filed()]), seen(), now()),
     { do: 'start', attempt: 1, resumeFrom: undefined },
-    "it starts whatever else runs: how many run at once is the layer above's (`agent-orchestrator/test/admission.test.ts`)",
+    "it starts whatever else runs: how many run at once is the layer above's (`agent-orchestrator/src/cap/cap.test.ts`)",
   );
   assert.deepEqual(Object.keys(now()).sort(), ['at', 'graceMs'], 'the clock and the grace window, and no count');
 });

@@ -791,7 +791,7 @@ test('createEngine refuses a harness that names a `pool`, a spec or a Promise ru
             `^createEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\\. Take \`pool\` off it`,
           ),
         );
-        assert.match(e.message, /the orchestrator's `POOLS` in `admission\.ts`/);
+        assert.match(e.message, /the orchestrator's `POOLS` in `src\/cap\/cap\.ts`/);
         return true;
       },
     );

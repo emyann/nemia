@@ -10,15 +10,15 @@ import {
   STALE_FLOOR_MS,
   daemonLine,
   everyOf,
-  daemonStanding,
+  daemonStanding as standingOf,
   holdRefusal,
   holderAgainst,
-  parseDaemonFile,
   staleAfterMs,
   takeoverLine,
   type DaemonFile,
   type Identity,
 } from '../src/daemon.ts';
+import { parseDaemonFile } from '../src/daemon-store.ts';
 
 const NOW = Date.parse('2026-09-22T12:00:00.000Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -34,7 +34,10 @@ const text = (file: DaemonFile | Record<string, unknown>) => JSON.stringify(file
 const as = (identity: Identity) => ({ now: NOW, identify: () => identity });
 const live = as('same');
 const dead = as('gone');
-const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => daemonStanding(text(file), how).kind;
+/** The pure judgement of the file's text as `daemon-store.ts` reads it: undefined for no file, else the text and what it holds. */
+const judged = (text: string | undefined, how: { now: number; identify: () => Identity }) =>
+  standingOf(text === undefined ? undefined : { text, file: parseDaemonFile(text) }, how);
+const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => judged(text(file), how).kind;
 
 test("stale is ten of the holder's own intervals, never under fifteen minutes — the floor decides at the shipped 4000 ms", () => {
   assert.equal(STALE_FLOOR_MS, 15 * 60_000);
@@ -43,7 +46,7 @@ test("stale is ten of the holder's own intervals, never under fifteen minutes �
 });
 
 test('each standing, from the file and the clock: none, unreadable, ticking, stalled, gone and stopped', () => {
-  assert.equal(daemonStanding(undefined, live).kind, 'none');
+  assert.equal(judged(undefined, live).kind, 'none');
   assert.equal(kindOf(holder()), 'ticking');
   assert.equal(kindOf(holder({ passedAt: null, startedAt: ago(1) })), 'ticking', 'started a minute ago and no pass yet is still ticking');
   // Alive but quiet: stalled on the far side of the threshold, ticking on the near one — deleting the stale comparison fails the first.
@@ -74,7 +77,7 @@ test('each standing, from the file and the clock: none, unreadable, ticking, sta
 });
 
 test('a file that does not read as a holder is unreadable, and holds nothing — a pid that would signal a process group included', () => {
-  for (const bad of ['', '{', 'null', '[]', '"x"']) assert.equal(daemonStanding(bad, live).kind, 'unreadable', JSON.stringify(bad));
+  for (const bad of ['', '{', 'null', '[]', '"x"']) assert.equal(judged(bad, live).kind, 'unreadable', JSON.stringify(bad));
   const { pid: _pid, ...noPid } = holder();
   for (const file of [
     noPid,
@@ -94,25 +97,25 @@ test('a file that does not read as a holder is unreadable, and holds nothing —
     { ...holder(), procStart: '12' },
   ]) {
     assert.equal(parseDaemonFile(text(file)), undefined, text(file));
-    assert.equal(holderAgainst(daemonStanding(text(file), live), 1), undefined);
+    assert.equal(holderAgainst(judged(text(file), live), 1), undefined);
   }
   assert.deepEqual(parseDaemonFile(text({ ...holder(), passedAt: undefined })), { ...holder(), passedAt: null });
   assert.deepEqual(parseDaemonFile(text(holder({ procStart: 1627402 }))), holder({ procStart: 1627402 }));
 });
 
 test('only a daemon ticking that is not the reader holds the store against it', () => {
-  const ticking = daemonStanding(text(holder()), live);
+  const ticking = judged(text(holder()), live);
   assert.deepEqual(holderAgainst(ticking, 1)?.file, holder());
   assert.equal(holderAgainst(ticking, 4242), undefined, 'its own file holds nothing against itself');
   for (const file of [holder({ passedAt: ago(16) }), holder({ stoppedAt: ago(1) })])
-    assert.equal(holderAgainst(daemonStanding(text(file), live), 1), undefined);
-  assert.equal(holderAgainst(daemonStanding(text(holder()), dead), 1), undefined);
-  assert.equal(holderAgainst(daemonStanding(text(holder()), as('other')), 1), undefined, 'a reused pid holds nothing');
-  assert.equal(holderAgainst(daemonStanding(text(holder()), as('unknown')), 1)?.file.pid, 4242, 'a pid not compared holds');
+    assert.equal(holderAgainst(judged(text(file), live), 1), undefined);
+  assert.equal(holderAgainst(judged(text(holder()), dead), 1), undefined);
+  assert.equal(holderAgainst(judged(text(holder()), as('other')), 1), undefined, 'a reused pid holds nothing');
+  assert.equal(holderAgainst(judged(text(holder()), as('unknown')), 1)?.file.pid, 4242, 'a pid not compared holds');
 });
 
 test('the refusals name the pid, where and since when it ticks, its last pass, and how to stop it — the node process, not the npm wrapper', () => {
-  const held = (file: DaemonFile, how = live) => holderAgainst(daemonStanding(text(file), how), 1)!;
+  const held = (file: DaemonFile, how = live) => holderAgainst(judged(text(file), how), 1)!;
   const up = holdRefusal(held(holder()), 'up', '/store', NOW);
   assert.match(
     up,
@@ -148,7 +151,7 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
 });
 
 test('what wf up says of the store it took: a holder gone, stalled or unreadable is named, and a clean stop or an empty store is not', () => {
-  const standing = (file: DaemonFile, how = live) => daemonStanding(text(file), how);
+  const standing = (file: DaemonFile, how = live) => judged(text(file), how);
   assert.equal(
     takeoverLine(standing(holder({ passedAt: ago(125) }), dead), '/store', NOW),
     'took /store over from pid 4242, whose process is gone — its last pass 2h05m ago (2026-09-22T09:55:00.000Z)',
@@ -157,7 +160,7 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
     takeoverLine(standing(holder({ passedAt: ago(16) })), '/store', NOW)!,
     /^took \/store over from pid 4242, alive but silent for 16m00s, over the 15m00s that is stale at every 4000ms — it stops at its next pass/,
   );
-  assert.equal(takeoverLine(daemonStanding('{', live), '/store', NOW), 'took /store over from a daemon.json that did not read as a holder');
+  assert.equal(takeoverLine(judged('{', live), '/store', NOW), 'took /store over from a daemon.json that did not read as a holder');
   assert.equal(
     takeoverLine(standing(holder(), as('other')), '/store', NOW),
     "took /store over from pid 4242, whose process is gone — that pid is another process's now, started after the wf up that wrote daemon.json — its last pass 3s ago (2026-09-22T11:59:57.000Z)",
@@ -166,14 +169,14 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
   assert.doesNotMatch(unsure, /kill 4242 —/);
   assert.match(unsure, /to stop it now, its pid, once checked: 4242 could not be confirmed here/);
   assert.equal(takeoverLine(standing(holder({ stoppedAt: ago(1) })), '/store', NOW), undefined);
-  assert.equal(takeoverLine(daemonStanding(undefined, live), '/store', NOW), undefined);
+  assert.equal(takeoverLine(judged(undefined, live), '/store', NOW), undefined);
 });
 
 test("wf ls's line: whether a daemon ticks the store, and when its last pass was", () => {
-  const line = (file: DaemonFile | undefined, how = live) => daemonLine(daemonStanding(file && text(file), how), NOW);
+  const line = (file: DaemonFile | undefined, how = live) => daemonLine(judged(file && text(file), how), NOW);
   assert.equal(line(undefined), 'wf up: none has held this store — nothing ticks it; start one with wf up');
   assert.equal(
-    daemonLine(daemonStanding('nope', live), NOW),
+    daemonLine(judged('nope', live), NOW),
     'wf up: none known — daemon.json does not read as a holder, so nothing is known to tick this store; wf up takes it over',
   );
   assert.equal(line(holder()), 'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)');

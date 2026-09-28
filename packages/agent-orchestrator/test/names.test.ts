@@ -1,17 +1,16 @@
 /**
  * The packages' former names are said only where the words are history.
  *
- * `packages/agent-runtime` and `packages/agent-orchestrator` had other names until 2026-09-23. A live file that still says them —
- * an import, a path, a sentence telling the next person where to look — points at nothing, and the next two changes are written in
- * the new words. So every file the repository holds is read, tracked or not yet added (git's own list, ignored files left out), and a
- * former name is refused anywhere but:
+ * `packages/agent-runtime` and `packages/agent-orchestrator` have former names. A live file that still says them — an import, a path,
+ * a sentence telling the next person where to look — points at nothing. So every file the repository holds is read, tracked or not yet
+ * added (git's own list, ignored files left out), and a former name is refused anywhere but:
  *
  * - a file on `HISTORY`: dated writing that keeps the words it was written with, with a line at its top that says so — a `.md` file
  *   there that names a former package carries, in its first `NOTE_WITHIN` lines, one line with both `MARK` and `NOTE`, or the suite
  *   fails;
  * - a store's path, `~/.agent-workflows` or `~/.agent-engine`: the stores kept their names, since a new default would orphan every
  *   record on disk (each package's README says so);
- * - a line that says `renamed on 2026-09-23`: an alias kept on purpose, or the history the README gives.
+ * - a line that says `MARK`: an alias kept on purpose, or the history the README gives.
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
@@ -20,19 +19,23 @@ import assert from 'node:assert/strict';
 import { files, textOf } from './repo-files.ts';
 
 const MARK = 'renamed on 2026-09-23';
-const FORMER = ['agent-engine', 'agent-workflows']; // renamed on 2026-09-23
+/** The packages' former names, spelled in parts so that this line is not one that names them. */
+const FORMER = ['engine', 'workflows'].map((name) => `agent-${name}`);
 
 /** A former name as a word of its own; one right after a `.` is a store's directory, and is not the package. */
 const NAME = new RegExp(`(?<![.\\w])(?:${FORMER.join('|')})(?!\\w)`, 'g');
 
-/** Dated history, by path from the repository's root: a file, a folder (`/` at its end), or a file pattern (`*`). */
+/**
+ * Dated history, by path from the repository's root: a file, a folder (`/` at its end), or a file pattern (`*`). The fixture
+ * `resolved-before.json` is never regenerated: what the loader read every shipped folder as before agents, keys and all
+ * (agents-before-after.test.ts).
+ */
 const HISTORY = [
   'docs/eval-2026-09-12/',
   'docs/pivot-2026-09-18.md',
   'docs/pivot-2026-09-18/',
   'docs/plan-hold-the-bar.md',
   'docs/night-*.md',
-  // Never regenerated: what the loader read every shipped folder as before agents, keys and all (agents-before-after.test.ts).
   'packages/agent-orchestrator/test/fixtures/resolved-before.json',
 ];
 
@@ -52,7 +55,7 @@ const NOTE_WITHIN = 5;
 
 /**
  * Only a `.md` file on history is asked for a note: a JSON fixture is read by a test, and a line added to it would change what the test
- * reads. (The Jev experiment's cards, the briefs as they were sent, were the one exception until they left the tree on 2026-09-25.)
+ * reads.
  */
 const asksForNote = (file: string): boolean => file.endsWith('.md') && inHistory(file);
 

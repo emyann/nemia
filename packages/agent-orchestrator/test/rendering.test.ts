@@ -1,8 +1,8 @@
 /**
- * An agent rendered for Claude Code (`rendering.ts`, card 1 of `docs/design-2026-09-25-agents-and-skills.md`): the skills it gives by name,
- * found in the workflow's own root, the repository's `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's
- * system prompt; what `wf start` writes under `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped
- * defaults. The runs are folder teams, so no git is asked.
+ * An agent rendered for Claude Code (`rendering.ts`): the skills it gives by name, found in the workflow's own root, the repository's
+ * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's system prompt; what `wf start` writes under
+ * `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The runs are folder teams, so
+ * no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -173,9 +173,12 @@ test('REFUSED at shipped defaults: a codex agent with skills or a system prompt,
     refusal(() => loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
     /^build: `agent: builder`: `systemPrompt: own` shapes Claude Code's system prompt/,
   );
-  // A codex agent that says only `default`, or nothing, is what it was: its instructions in the brief.
   const [codex] = loadWorkflows(team('---\nharness: codex\nsystemPrompt: default\n---\nYou build.\n', {}));
-  assert.equal(rendersAgent(codex), false);
+  assert.equal(
+    rendersAgent(codex),
+    false,
+    'a codex agent that says only `default`, or nothing, is not rendered: its instructions are in the brief',
+  );
   assert.match(briefBody(codex), /^You build\./);
 });
 
@@ -189,7 +192,6 @@ test('REFUSED at shipped defaults: skills or a system prompt on a step that cont
     refusal(() => loadWorkflows(dir)),
     /^build: `agent: builder`: `systemPrompt: no-coding` shapes the system prompt of a session the step starts, and `resume: plan` continues plan's/,
   );
-  // Instructions alone are told in the brief of a step that resumes, as before 2026-09-25.
   const told = loadWorkflows(
     team(
       '---\n---\nYou build.\n',
@@ -197,7 +199,7 @@ test('REFUSED at shipped defaults: skills or a system prompt on a step that cont
       '---\nagent: builder\nafter: plan\nresume: plan\n---\nAnd go on.\n',
     ),
   ).find((s) => s.name === 'build')!;
-  assert.equal(rendersAgent(told), false);
+  assert.equal(rendersAgent(told), false, 'instructions alone are told in the brief of a step that resumes');
   assert.match(briefBody(told), /^You build\.[\s\S]*And go on\./);
 });
 
@@ -214,11 +216,10 @@ test("REFUSED at shipped defaults: `auto` on a model Claude Code drops it on (F2
       /^build: `model: .*` says `permissionMode: auto`, and Claude Code drops `auto`/,
     );
   }
-  // Kept: a mode the model keeps, a model that keeps auto, a codex step, and no model at all.
-  assert.equal(loadWorkflows(team('---\nmodel: haiku\npermissionMode: dontAsk\n---\nx\n', {})).length, 1);
-  assert.equal(loadWorkflows(team('---\nmodel: sonnet\n---\nx\n', {})).length, 1);
-  assert.equal(loadWorkflows(team('---\nharness: codex\nmodel: haiku\n---\nx\n', {})).length, 1);
-  assert.equal(loadWorkflows(team('---\n---\nx\n', {})).length, 1);
+  assert.equal(loadWorkflows(team('---\nmodel: haiku\npermissionMode: dontAsk\n---\nx\n', {})).length, 1, 'kept: a mode the model keeps');
+  assert.equal(loadWorkflows(team('---\nmodel: sonnet\n---\nx\n', {})).length, 1, 'kept: a model that keeps auto');
+  assert.equal(loadWorkflows(team('---\nharness: codex\nmodel: haiku\n---\nx\n', {})).length, 1, 'kept: a codex step');
+  assert.equal(loadWorkflows(team('---\n---\nx\n', {})).length, 1, 'kept: no model at all');
   assert.deepEqual(
     [...AUTO_UNSUPPORTED],
     ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
@@ -260,12 +261,18 @@ test("a name is looked for in the workflow's own root, then the repository's .cl
     path.join(home, 'workflows', 'skills', 'write-a-note'),
     'with no repository, the store',
   );
-  // The workflow's own root first: a store workflow's is the store, so its own come first there.
   const own = team('---\nskills: write-a-note\n---\nYou build.\n', { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') });
-  assert.equal(skillsFor(own, places).at.get('write-a-note'), path.join(path.dirname(own), 'skills', 'write-a-note'));
+  assert.equal(
+    skillsFor(own, places).at.get('write-a-note'),
+    path.join(path.dirname(own), 'skills', 'write-a-note'),
+    "the workflow's own root first: a store workflow's is the store, so its own come first there",
+  );
 });
 
-// As Claude Code's `/agents` wizard writes a project subagent (2.1.282): its name, a description with an example, its tools, its model, its colour.
+/**
+ * A project subagent as Claude Code's /agents wizard writes one: its name, a description with an example, its tools, its model, its
+ * colour.
+ */
 const WIZARD =
   '---\nname: code-reviewer\ndescription: Use this agent when a change needs a second look. Example: after a feature is written.\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\ncolor: blue\n---\nYou are a careful code reviewer.\n';
 
@@ -307,10 +314,10 @@ test("REFUSED at shipped defaults: Claude Code's own subagent keys a run would d
     refusal(() => parseAgent('code-reviewer', WIZARD.replace('model: sonnet', 'model: inherit'))),
     /^agents\/code-reviewer\.md: `model: inherit` is Claude Code's word for a subagent that runs on the model of the conversation that called it/,
   );
-  // A key that is no one's is still refused as before.
   assert.match(
     refusal(() => parseAgent('code-reviewer', '---\ncolour: blue\n---\n')),
     /`colour` is not a key an agent has/,
+    "a key that is no one's is refused",
   );
 });
 
@@ -339,8 +346,11 @@ test("REFUSED at shipped defaults: a name in both of one repository's places, wo
     refusal(() => loadWorkflows(dir, { repo })),
     /builder is an agent in both .* one repository's two places for agents, and nothing says which runs/,
   );
-  // Read with no repository, the same folder finds its own and is not refused: the clash is one repository's.
-  assert.equal(loadWorkflows(dir).length, 1);
+  assert.equal(
+    loadWorkflows(dir).length,
+    1,
+    "read with no repository, the same folder finds its own and is not refused: the clash is one repository's",
+  );
 });
 
 test('a `skills:` line naming a card file, as it did until 2026-09-25, is refused where it is read and where it is written: the card file is retired', () => {
@@ -407,11 +417,15 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     pluginDir: [`${dir}/hkb-builder`],
     settings: JSON.stringify({ outputStyle: 'hkb-builder:no-coding' }),
   });
-  // Nothing to render: an agent with no instructions, no skills and the default prompt, and a step with no agent.
-  assert.equal(flags('---\nmodel: opus\n---\n'), undefined);
+  assert.equal(
+    flags('---\nmodel: opus\n---\n'),
+    undefined,
+    'nothing to render: an agent with no instructions, no skills and the default prompt',
+  );
   assert.equal(
     renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': 'Just a step.\n' }), 'workflows', 'team'))[0], dir),
     undefined,
+    'nothing to render: a step with no agent',
   );
 });
 
@@ -423,8 +437,6 @@ test('a rendered step is briefed with its own note alone, and one whose folder i
   assert.match(briefBody(before), /^You build\.\n[\s\S]*The step's own note\./);
   assert.equal(renderedFlags(before, '/x'), undefined);
 });
-
-// ─── wf start and the tick ──────────────────────────────────────────────────
 
 /** A folder team in the store's own workflows, beside the store's agents and skills. */
 function storeTeam(name: string, steps: Record<string, string>): string {
@@ -444,7 +456,6 @@ fs.writeFileSync(
 fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'coder.md'), '---\nharness: codex\n---\nYou write code.\n');
 fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), SKILL('write-a-note'));
 fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'template.md'), '# Title\n');
-// The repository's, for a folder team started from it: the directory it is started in is the repository its `.claude/` is read from.
 fs.mkdirSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
 fs.writeFileSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), SKILL('mind-the-tone', 'preload: true\n'));
 
@@ -474,9 +485,12 @@ test("wf start renders each Claude Code step's agent under runs/<id>/agents/<ste
   assert.equal(fs.readFileSync(path.join(at, 'hkb-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
   assert.equal(fs.existsSync(agentFilesDir(run, 'code')), false, 'a codex step is not rendered');
 
-  // An edit after the start reaches no run already started: the folder is the run's.
   fs.appendFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), 'Edited later.\n');
-  assert.doesNotMatch(fs.readFileSync(path.join(at, 'hkb-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'), /Edited later/);
+  assert.doesNotMatch(
+    fs.readFileSync(path.join(at, 'hkb-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
+    /Edited later/,
+    "an edit after the start reaches no run already started: the folder is the run's",
+  );
 
   const { e, filed } = board();
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['write']);
@@ -509,15 +523,15 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25 — the
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined);
   assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
-  // With no plugin there is nothing to load, so each skill is told whole, read again where a start of the run's folder finds it: the store's.
-  // A folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for.
   assert.match(
     write.brief,
     /Write about tides\.\n\nNo skill is loaded with the Skill tool for this step[^\n]*\n\n## Skill `write-a-note`\n\nHow to write a note\./,
+    "with no plugin there is nothing to load, so each skill is told whole, read again where a start of the run's folder finds it: the store's",
   );
   assert.match(
     write.brief,
     /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills\. Sign off blocked if you need it\.\n\n## What was asked for/,
+    'a folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for',
   );
 });
 
@@ -546,11 +560,11 @@ test('REFUSED at shipped defaults: wf start of a team whose agent gives a skill 
   const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
   const runs = path.join(ROOT, 'runs');
   const before = fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [];
-  // Started from a directory whose `.claude/` has no mind-the-tone: the store has write-a-note alone.
   const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
   assert.throws(
     () => start({ brief: 'x', repo: elsewhere, workflowDir: dir }),
     (e: Error) => /gives the skill `mind-the-tone`, and no skills folder has it/.test(e.message),
+    'started from a directory whose .claude/ has no mind-the-tone, and the store has write-a-note alone',
   );
   assert.deepEqual(fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [], before);
 });

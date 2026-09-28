@@ -2,7 +2,8 @@
  * A step on a remote A2A agent (`harness: a2a:<name>`), up to the engine: the store's `a2a-agents.json` and each way it is refused, the
  * variable a secret is read from and the refusal that names it, the keys a remote step may not set, each refused at load from the step and
  * from its agent, `wf start`'s refusal of a name the file does not declare, and what the tick files — no harness arguments, no schema, no
- * hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s.
+ * hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s. `WF_ROOT` is set
+ * before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,6 @@ import { envNameOf, readRemoteAgents } from '../src/a2a-agents.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { advance, readRun, remoteAgents, retry, start } = await import('../src/runner.ts');
 const { credentials, missingCredential, readRemote } = await import('../src/runtime-client.ts');
@@ -43,8 +43,6 @@ function loadRefusal(fn: () => unknown): string {
   }
   return assert.fail('it was not refused');
 }
-
-// ─── the file ───────────────────────────────────────────────────────────────
 
 test('a store with no a2a-agents.json declares no agent, and the file maps each name to its entry in its order', () => {
   assert.equal(readRemoteAgents(path.join(ROOT, 'nowhere.json')).size, 0);
@@ -91,11 +89,13 @@ test("two names whose secrets' variables can meet are refused: a card the other 
     refused,
     /`acme` and `acme-internal` are both declared, and their secrets' variables can meet: `WF_A2A_ACME_INTERNAL_TOKEN` is acme-internal's secret for a scheme its card calls `token`, and acme's for one its card calls `internal-token`/,
   );
-  // Which is so: the refusal is about a real collision, not a style.
-  assert.equal(envNameOf('acme', 'internal-token'), envNameOf('acme-internal', 'token'));
-  // Names that share a beginning without a dash meet nowhere, and are both declared.
+  assert.equal(
+    envNameOf('acme', 'internal-token'),
+    envNameOf('acme-internal', 'token'),
+    'the refusal is about a real collision, not a style',
+  );
   fs.writeFileSync(file, JSON.stringify({ acme: { url: 'https://acme.example' }, acmecorp: { url: 'https://corp.example' } }));
-  assert.equal(readRemoteAgents(file).size, 2);
+  assert.equal(readRemoteAgents(file).size, 2, 'names that share a beginning without a dash meet nowhere, and are both declared');
 });
 
 test("an entry the runtime would refuse is left out of remoteAgents() and said by readRemote(), naming the file and the entry, in the runtime's words", () => {
@@ -110,20 +110,18 @@ test("an entry the runtime would refuse is left out of remoteAgents() and said b
     declare({ reviewer: { url: 'https://a.example/reviewer' } });
     assert.deepEqual([...remoteAgents().keys()], ['reviewer']);
     assert.equal(readRemote().refused.size, 0);
-    // A file refused as it stands is refused by remoteAgents(), and said by readRemote() with no agent.
     declare('{ reviewer: ');
     assert.match(
       refusal(() => remoteAgents()),
       /a2a-agents\.json: is not JSON/,
+      'a file refused as it stands is refused by remoteAgents()',
     );
-    assert.match(readRemote().unread!, /a2a-agents\.json: is not JSON/);
-    assert.equal(readRemote().agents.size, 0);
+    assert.match(readRemote().unread!, /a2a-agents\.json: is not JSON/, 'and said by readRemote()');
+    assert.equal(readRemote().agents.size, 0, 'with no agent');
   } finally {
     fs.rmSync(FILE, { force: true });
   }
 });
-
-// ─── the secret ─────────────────────────────────────────────────────────────
 
 test('a secret is read from WF_A2A_<NAME>_<SCHEME>, upper case with a dash made an underscore, and never for a local harness', () => {
   assert.equal(envNameOf('reviewer', 'bearer'), 'WF_A2A_REVIEWER_BEARER');
@@ -148,8 +146,6 @@ test('a secret not given is refused naming the variable to set, where to set it,
   );
   assert.match(said, /restart it; then `wf retry` the step/);
 });
-
-// ─── at load ────────────────────────────────────────────────────────────────
 
 test('harness: a2a:<name> is a harness a step can run on, and a name of another shape is refused', () => {
   assert.equal(parseWorkflow('ask', '---\nharness: a2a:reviewer\n---\nReview it.\n').harness, 'a2a:reviewer');
@@ -202,17 +198,16 @@ test('each key that tells a harness of ours how to run is refused on a remote st
     loadRefusal(() => parseWorkflow('ask', '---\nharness: a2a:reviewer\nworkspace: main\n---\nx\n')),
     /^ask: `workspace: main` runs the step in the repository's own checkout/,
   );
-  // What the board's form leaves off a remote step is what the load refuses there, key for key, in the package's order.
   assert.deepEqual(
     REMOTE_REFUSED_KEYS,
     STEP_KEYS.filter((key) => key in LOCAL_ONLY || key === 'loop'),
+    "what the board's form leaves off a remote step is what the load refuses there, key for key, in the package's order",
   );
-  // What a remote step may say: where it sits, its gate, its tries, its deadline, what it reads.
   const ok = parseWorkflow(
     'ask',
     '---\nharness: a2a:reviewer\nafter: plan\ninput: plan\ngate: true\nretries: 1\ndeadlineSeconds: 600\n---\nReview the plan.\n',
   );
-  assert.equal(ok.harness, 'a2a:reviewer');
+  assert.equal(ok.harness, 'a2a:reviewer', 'a remote step may say where it sits, its gate, its tries, its deadline, what it reads');
 });
 
 const agentsOf = (files: Record<string, string>): Agents =>
@@ -228,7 +223,6 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
     ),
   );
   assert.match(refused, /^ask: `model: opus` .*Delete the line — from the step, or from the agent it names/);
-  // And an agent that itself names the remote harness.
   assert.match(
     loadRefusal(() =>
       parseWorkflow(
@@ -239,6 +233,7 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
       ),
     ),
     /`tools: Read` fences a session on this machine/,
+    'and from an agent that itself names the remote harness',
   );
   const skilled = loadRefusal(() =>
     parseWorkflow(
@@ -262,14 +257,13 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
     ),
   );
   assert.match(prompted, /`systemPrompt: default` shapes Claude Code's system prompt, and `harness: a2a:reviewer` is a remote A2A agent/);
-  // An agent of instructions alone is sent them in the brief.
   const told = parseWorkflow(
     'ask',
     '---\nagent: critic\nharness: a2a:reviewer\n---\nThe plan.\n',
     undefined,
     agentsOf({ critic: '---\ndescription: Criticises\n---\nCriticise.\n' }),
   );
-  assert.equal(told.harness, 'a2a:reviewer');
+  assert.equal(told.harness, 'a2a:reviewer', 'an agent of instructions alone is sent them in the brief');
 });
 
 test("a loop's target on a remote agent is refused; a step inside the loop may be one", () => {
@@ -303,8 +297,6 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
   );
   assert.equal(inside.find((s) => s.name === 'ask')!.harness, 'a2a:second-opinion');
 });
-
-// ─── wf start and the tick ──────────────────────────────────────────────────
 
 type Filed = { id: string; brief: string; cwd: string; harness?: string } & Record<string, unknown>;
 type Engine = Parameters<typeof advance>[0];
@@ -383,17 +375,17 @@ test('wf start refuses a step whose remote agent a2a-agents.json does not declar
       refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })),
       /and .*a2a-agents\.json declares `critic`\. Add it there/,
     );
-    // An entry the runtime refuses is refused for the step that names it, in the file's words; a file refused as it stands, for any.
     declare({ reviewer: { url: 'ftp://a.example' }, critic: { url: 'https://a.example/critic' } });
     const entry = refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir }));
     assert.ok(
       entry.startsWith(`ask: \`harness: a2a:reviewer\` names a remote A2A agent whose entry is refused. ${FILE}: \`reviewer\`: `),
-      entry,
+      `an entry the runtime refuses is refused for the step that names it, in the file's words: ${entry}`,
     );
     declare('[]');
     assert.match(
       refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })),
       /^ask: `harness: a2a:reviewer` names a remote A2A agent, and the file that declares them is refused\. .*a2a-agents\.json: is a list/,
+      'a file refused as it stands is refused for any step',
     );
     const after = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
     assert.equal(after, before, 'no run was written');
@@ -417,11 +409,10 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
     const draft = tasks.get(`${run.id}-draft`)!.spec;
     assert.ok('config' in draft && 'closeoutSchema' in draft, 'a local step is filed as it always was');
 
-    // Signed off, the draft lets the remote step be filed.
     settle(`${run.id}-draft`, 'succeeded', { outcome: 'done', summary: 'drafted', artifacts: [], needs: null });
     await advance(e, readRun(run.id));
     const ask = tasks.get(`${run.id}-ask`)?.spec;
-    assert.ok(ask, `the remote step was filed: ${[...tasks.keys()].join(', ')}`);
+    assert.ok(ask, `signed off, the draft lets the remote step be filed: ${[...tasks.keys()].join(', ')}`);
     assert.equal(ask.harness, 'a2a:reviewer');
     for (const key of ['config', 'closeoutSchema', 'holdOpen', 'resumeFrom'])
       assert.equal(key in ask, false, `${key} is not on a remote filing at all`);
@@ -457,9 +448,8 @@ test('wf retry refuses --model and --budget on a remote step, in the words its l
     await assert.rejects(retry(e, run.id, 'ask', { mode: 'nudge', budget: 5 }), (err: Error) =>
       err.message.startsWith('`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none'),
     );
-    // Without them, the same try is asked for.
     const asked = await retry(e, run.id, 'ask', { mode: 'fresh' });
-    assert.equal(asked.ask.try, 2);
+    assert.equal(asked.ask.try, 2, 'without them, the same try is asked for');
   } finally {
     fs.rmSync(FILE, { force: true });
   }

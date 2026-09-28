@@ -1,12 +1,12 @@
 /**
  * What an agent says it can do, printed in the A2A protocol's terms (`agentCard`): a card-shaped description, and **not** an Agent Card.
  *
- * The required fields below are written out as a literal from the protocol's own definition — `specification/a2a.proto` in a2aproject/A2A,
- * protocol 1.0, read at the source on 2026-09-19 — so the omission this slice makes on purpose is pinned rather than assumed. A later slice
- * that serves a card over A2A deletes the omission deliberately, and this test is where it says so.
+ * The required fields below are written out as a literal from the protocol's own definition — specification/a2a.proto in a2aproject/A2A,
+ * protocol 1.0 — so the omission made on purpose is pinned rather than assumed. A change that serves a card over A2A deletes the omission
+ * deliberately, and this test is where it says so.
  *
- * Since agents card 2 the card's skills are generated (`cardSkills`): an entry for each skill the agent's `skills:` gives, read off its
- * SKILL.md's frontmatter, or one made from the agent's own description when it gives none. Nothing is written by hand.
+ * The card's skills are generated (`cardSkills`): an entry for each skill the agent's `skills:` gives, read off its SKILL.md's
+ * frontmatter, or one made from the agent's own description when it gives none. Nothing is written by hand.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,7 +46,12 @@ const UNFILLED = [
 const SCRIBE =
   '---\ndescription: Use this when a change needs its notes written.\nskills: write-a-note, file-it, just-an-id\ntools: Read, Edit, Skill\n---\nWrite the notes.\n';
 
-/** A workflows folder holding the scribe and three skills, each giving its card entry in another way. */
+/**
+ * A workflows folder holding the scribe and three skills, each giving its card entry in another way: `write-a-note` has every key the
+ * card reads, and one it does not (`preload`), in each of the forms a value may take; `file-it` has a frontmatter `name` and no title, so
+ * the name is the entry's name, no tags, so the id is its tag, and no examples, so none are said; `just-an-id` has neither, and Claude
+ * Code names such a skill by its folder, as the card does.
+ */
 function composed(scribe = SCRIBE): { root: string; found: ReturnType<typeof skillsFor>; agent: Agent } {
   const root = path.join(scratch('wf-agent-card-'), 'workflows');
   const skill = (id: string, text: string) => {
@@ -55,7 +60,6 @@ function composed(scribe = SCRIBE): { root: string; found: ReturnType<typeof ski
   };
   fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
   fs.writeFileSync(path.join(root, 'agents', 'scribe.md'), scribe);
-  // Every key the card reads, and one it does not (`preload`), in each of the forms a value may take.
   skill(
     'write-a-note',
     [
@@ -71,12 +75,10 @@ function composed(scribe = SCRIBE): { root: string; found: ReturnType<typeof ski
       '',
     ].join('\n'),
   );
-  // A frontmatter `name` and no title: the name is the entry's name. No tags: the id is its tag. No examples: none are said.
   skill(
     'file-it',
     '---\nname: File it away\ndescription: File a finished note where the team reads it. # not part of it\n---\nHow to file.\n',
   );
-  // Neither: Claude Code names such a skill by its folder, and so does the card.
   skill('just-an-id', '---\ndescription: Say nothing but the id.\n---\n');
   const agent = parseAgent('scribe', scribe, () => undefined);
   return { root, found: skillsFor(path.join(root, '_')), agent };
@@ -131,8 +133,11 @@ test('a card carries every field A2A marks REQUIRED but the interfaces, which no
     if (key === 'supportedInterfaces') continue;
     assert.ok(Object.hasOwn(card, key), `a card gives ${key}, which the protocol marks REQUIRED`);
   }
-  // The one omission, on purpose: `supported_interfaces` is the list of URLs a client would call, and there is none to give.
-  assert.equal(Object.hasOwn(card, 'supportedInterfaces'), false, 'no interface is offered for an agent nothing serves');
+  assert.equal(
+    Object.hasOwn(card, 'supportedInterfaces'),
+    false,
+    "the one omission, on purpose: the protocol's supported interfaces are the URLs a client calls, and an agent nothing serves has none",
+  );
   for (const key of UNFILLED) assert.equal(Object.hasOwn(card, key), false, `${key} is left out rather than filled with a placeholder`);
   assert.deepEqual(
     Object.keys(card).filter((k) => !REQUIRED.includes(k)),
@@ -146,12 +151,18 @@ test('a card says what the agent is, how it is versioned, and what it takes and 
   const { found, agent } = composed();
   const card = agentCard(agent, 'abc123', cardSkills(agent, found));
   assert.equal(card.name, 'scribe');
-  // A2A's own example is semver; ours is the content digest a save carries, which changes when the agent's files change.
-  assert.equal(card.version, 'abc123');
+  assert.equal(
+    card.version,
+    'abc123',
+    "A2A's own example is semver; ours is the content digest a save carries, which changes when the agent's files change",
+  );
   assert.deepEqual(card.defaultInputModes, ['text/plain'], 'a step is handed a composed brief, and nothing else');
   assert.deepEqual(card.defaultOutputModes, ['application/json'], 'every closeout is a JSON object');
-  // A2A capabilities are protocol features, never what an agent may reach: none of the three exists here.
-  assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
+  assert.deepEqual(
+    card.capabilities,
+    { streaming: false, pushNotifications: false, extendedAgentCard: false },
+    'A2A capabilities are protocol features, never what an agent may reach: none of the three exists here',
+  );
   assert.equal(JSON.parse(JSON.stringify(card)).skills[0].id, 'write-a-note', 'and the whole of it is JSON');
 });
 

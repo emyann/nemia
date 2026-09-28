@@ -3,12 +3,12 @@
  *
  * `workflow.ts` refuses a permission mode, a sandbox or an effort its step's harness does not take, at load, before a run
  * exists. It cannot ask the engine — it is pure, and imports no runtime (`docs/architecture.md`) — so it keeps a
- * copy, and this holds the copy to the lists the runtime exports: the source. The first copies differed for months,
- * unnoticed: the engine took `manual` on Claude Code and `bypassPermissions` on codex, and the parser refused both.
+ * copy, and this holds the copy to the lists the runtime exports: the source. A copy that drifts refuses a word the
+ * engine takes, `manual` on Claude Code or `bypassPermissions` on codex, and nothing else notices.
  *
- * Since 2026-09-23 a codex step names its sandbox as `sandbox:`, and the engine's task still calls it `permissionMode`: the tick hands
- * one to the other (`modeOf`). The engine's `bypassPermissions` on codex is its alias for `danger-full-access`, which a step writes under
- * Codex's own name: the parser reads it only on a line from before (`permissionMode: bypassPermissions` on codex), as `danger-full-access`.
+ * A codex step names its sandbox as `sandbox:`, and the engine's task calls it `permissionMode`: the tick hands one to the other
+ * (`modeOf`). The engine's `bypassPermissions` on codex is its alias for `danger-full-access`, which a step writes under Codex's own name:
+ * the parser reads it only on a former line (`permissionMode: bypassPermissions` on codex), as `danger-full-access`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,7 +39,10 @@ const ENGINE: { permissionMode: Lists; sandbox: Lists; effort: Lists } = {
   effort: { claude: CLAUDE_EFFORTS, codex: CODEX_EFFORTS, 'claude-detached': CLAUDE_EFFORTS },
 };
 
-/** Every way the parser's lists differ from the engine's, one line each — `[]` when a word is refused at load exactly when the engine would refuse it. */
+/**
+ * Every way the parser's lists differ from the engine's, one line each — `[]` when a word is refused at load exactly when the engine
+ * would refuse it.
+ */
 function drift(parser: { permissionMode: Lists; sandbox: Lists; effort: Lists }): string[] {
   const lines: string[] = [];
   for (const key of ['permissionMode', 'sandbox', 'effort'] as const) {
@@ -63,8 +66,12 @@ test('the lists are exported by the runtime, and are there to compare', () => {
 test("the parser's permission modes, sandboxes and efforts are the engine's, harness by harness", () => {
   assert.deepEqual(drift({ permissionMode: PERMISSION_MODES, sandbox: SANDBOXES, effort: EFFORTS }), []);
   assert.deepEqual([...HARNESSES].sort(), Object.keys(ENGINE.effort).sort(), 'the harnesses a step may name');
-  // Each harness has one fence, under one key: a permission mode or a sandbox, never both and never neither.
-  for (const h of HARNESSES) assert.equal(Object.hasOwn(PERMISSION_MODES, h) !== Object.hasOwn(SANDBOXES, h), true, h);
+  for (const h of HARNESSES)
+    assert.equal(
+      Object.hasOwn(PERMISSION_MODES, h) !== Object.hasOwn(SANDBOXES, h),
+      true,
+      `${h} has one fence, under one key: a permission mode or a sandbox, never both and never neither`,
+    );
 });
 
 test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word added, a harness forgotten', () => {
@@ -86,27 +93,37 @@ test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word ad
   assert.deepEqual(drift({ ...lists, effort: forgotten }), [
     `effort on codex: the engine takes ${CODEX_EFFORTS.join(', ')}, and the parser refuses it at load`,
   ]);
-  // The sandboxes back under `permissionMode`, as they were until 2026-09-23: two keys' lists, each wrong.
-  assert.deepEqual(drift({ ...lists, permissionMode: { ...PERMISSION_MODES, codex: SANDBOXES.codex }, sandbox: {} }), [
-    'permissionMode on codex: the parser takes read-only, workspace-write, danger-full-access, and the engine refuses it when the step is filed',
-    'sandbox on codex: the engine takes read-only, workspace-write, danger-full-access, and the parser refuses it at load',
-  ]);
-  // The first copies, as they shipped.
+  assert.deepEqual(
+    drift({ ...lists, permissionMode: { ...PERMISSION_MODES, codex: SANDBOXES.codex }, sandbox: {} }),
+    [
+      'permissionMode on codex: the parser takes read-only, workspace-write, danger-full-access, and the engine refuses it when the step is filed',
+      'sandbox on codex: the engine takes read-only, workspace-write, danger-full-access, and the parser refuses it at load',
+    ],
+    "the sandboxes back under permissionMode, the former key: two keys' lists, each wrong",
+  );
   const shipped = ['default', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions', 'plan'];
-  assert.deepEqual(drift({ ...lists, permissionMode: { claude: shipped, 'claude-detached': shipped } }), [
-    'permissionMode on claude: the engine takes manual, and the parser refuses it at load',
-    'permissionMode on claude-detached: the engine takes manual, and the parser refuses it at load',
-  ]);
+  assert.deepEqual(
+    drift({ ...lists, permissionMode: { claude: shipped, 'claude-detached': shipped } }),
+    [
+      'permissionMode on claude: the engine takes manual, and the parser refuses it at load',
+      'permissionMode on claude-detached: the engine takes manual, and the parser refuses it at load',
+    ],
+    'the first copies, as they shipped, without manual',
+  );
 });
 
 test("the parser's context windows are the engine's, harness by harness — and codex has none on either side", () => {
-  // `claude` is the engine's `claude`, a job or a background session, whose range is `CLAUDE_CONTEXT_TOKENS` either way; a spec declares its own.
   const engine: Record<string, unknown> = {
     claude: CLAUDE_CONTEXT_TOKENS,
     'claude-detached': claudeDetached.contextTokens,
     codex: codex.contextTokens,
   };
-  for (const h of HARNESSES) assert.deepEqual(CONTEXT_WINDOWS[h], engine[h], h);
+  for (const h of HARNESSES)
+    assert.deepEqual(
+      CONTEXT_WINDOWS[h],
+      engine[h],
+      `${h}: claude, a job or a background session, has CLAUDE_CONTEXT_TOKENS either way; each other harness's spec declares its own`,
+    );
   assert.deepEqual(
     CLAUDE_CONTEXT_TOKENS,
     { least: 100_000, most: 1_000_000 },
@@ -119,14 +136,17 @@ test("every word the parser takes, the engine's own refusal takes too — asked 
     ['codex', codex.refuses!],
     ['claude-detached', claudeDetached.refuses!],
   ] as const) {
-    // The engine's task names either fence `permissionMode`: what the tick files a step's sandbox as (`modeOf`).
     for (const permissionMode of [...(PERMISSION_MODES[h] ?? []), ...(SANDBOXES[h] ?? [])])
-      assert.equal(refuses({ brief: 'b', cwd: '/w', config: { permissionMode } }), undefined, `${h} ${permissionMode}`);
+      assert.equal(
+        refuses({ brief: 'b', cwd: '/w', config: { permissionMode } }),
+        undefined,
+        `${h} ${permissionMode}: the engine's task names either fence permissionMode, as the tick files a step's sandbox (modeOf)`,
+      );
     for (const effort of EFFORTS[h]) assert.equal(refuses({ brief: 'b', cwd: '/w', config: { effort } }), undefined, `${h} ${effort}`);
   }
-  // `claude` is the engine's `claude`, whose refusal is Claude Code's lists in either mode — the same `claudeDetached.refuses` is.
-  assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached']);
-  assert.deepEqual(EFFORTS.claude, EFFORTS['claude-detached']);
+  const same = "claude's refusal is Claude Code's lists in either mode, the same claudeDetached.refuses is";
+  assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached'], same);
+  assert.deepEqual(EFFORTS.claude, EFFORTS['claude-detached'], same);
 });
 
 test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and the one it was written as before 2026-09-23 the same", () => {
@@ -145,14 +165,17 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
     assert.equal(sandboxOf(`---\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`), sandbox, `the former line, ${sandbox}`);
   }
   assert.equal(sandboxOf('---\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
-  // Filed from `permissionMode` alone, as the tick did before `modeOf`, the reviewer runs in Codex's default, which writes.
   const { args } = codex.command({
     name: 'review',
     brief: 'b',
     cwd: scratch('wf-vocabulary-codex-'),
     config: { permissionMode: parseWorkflow('review', '---\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
   });
-  assert.equal(args[args.indexOf('-s') + 1], 'workspace-write');
+  assert.equal(
+    args[args.indexOf('-s') + 1],
+    'workspace-write',
+    "filed from permissionMode alone, without modeOf, the reviewer runs in Codex's default, which writes",
+  );
 });
 
 test("REFUSED at load in the engine's words: a `budget:` on a codex step, which `codex exec` has no spend cap to keep", async () => {
@@ -165,10 +188,17 @@ test("REFUSED at load in the engine's words: a `budget:` on a codex step, which 
     () => parseWorkflow('review', '---\nharness: codex\nbudget: 5\n---\nreview it\n'),
     (e: Error) => e.message.startsWith(`review: \`budget: 5\` ${reason}.`),
   );
-  // The harnesses a budget is taken on: `claude`, run as a job, and `claude-detached`, whose `claude -p` each ends a session at the cap.
-  assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/w', config: { budgetUsd: 5 } }), undefined);
+  assert.equal(
+    claudeDetached.refuses!({ brief: 'b', cwd: '/w', config: { budgetUsd: 5 } }),
+    undefined,
+    'claude-detached takes a budget: each claude -p it runs ends a session at the cap',
+  );
   for (const harness of ['claude', 'claude-detached'])
-    assert.equal(parseWorkflow('x', `---\nharness: ${harness}\nbudget: 5\n---\ndo it\n`).budget, 5, harness);
+    assert.equal(
+      parseWorkflow('x', `---\nharness: ${harness}\nbudget: 5\n---\ndo it\n`).budget,
+      5,
+      `${harness} takes a budget: claude run as a job, and claude-detached`,
+    );
 });
 
 test("REFUSED at load in the engine's words: a `budget:` beside `background: true`, which a `claude --bg` session has no spend cap to keep — and a job's is taken", async () => {
@@ -193,19 +223,21 @@ test("REFUSED at load in the engine's words: a `budget:` beside `background: tru
       ),
     reason,
   );
-  // A job keeps one, on both doors.
-  assert.equal(await refusal({}), undefined);
-  assert.equal(parseWorkflow('watch', '---\nbudget: 5\n---\nwatch it\n').budget, 5);
+  assert.equal(await refusal({}), undefined, "a job keeps its budget at the engine's door");
+  assert.equal(parseWorkflow('watch', '---\nbudget: 5\n---\nwatch it\n').budget, 5, "and at the parser's");
 });
 
 test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
   const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
   const { renderedFlags } = await import('../src/rendering.ts');
-  // What the tick files for an agent with instructions and `systemPrompt: no-coding`: every flag `renderedFlags` gives but `systemPromptFile`.
   const scribe = parseAgent('scribe', '---\nsystemPrompt: no-coding\n---\nYou write.\n');
   const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
   const claude = renderedFlags(step, '/runs/r/agents/write');
-  assert.deepEqual(Object.keys(claude ?? {}).sort(), ['appendSystemPromptFile', 'pluginDir', 'settings']);
+  assert.deepEqual(
+    Object.keys(claude ?? {}).sort(),
+    ['appendSystemPromptFile', 'pluginDir', 'settings'],
+    'what the tick files for an agent with instructions and systemPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
+  );
   const dir = scratch('wf-vocabulary-');
   fs.writeFileSync(
     path.join(dir, 'claude'),

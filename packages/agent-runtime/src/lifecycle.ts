@@ -1,6 +1,6 @@
 /**
  * A task's lifecycle, as a statechart: which states a task can be in, and for each event that can be observed in a state, the
- * one state it moves to and the one action that moves it (thin runtime stage 5, `docs/eval-thin-runtime.md` §5).
+ * one state it moves to and the one action that moves it.
  *
  * **A transition function, never an interpreter.** Nothing here runs: no actor is created, no action executes, no timer is
  * set. `transition` asks XState's pure `transition(machine, snapshot, event)` what an edge does, from a state `lifecycleOf`
@@ -14,7 +14,7 @@
  *
  *   - `starting`  an attempt's intent is journalled and no spawn is. The crash window: the name is derivable from the
  *                 intent, so a session found under it is adopted (a self-edge) rather than spawned a second time.
- *   - `stopping`  a person asked it to stop. Outranks every other reading but a settled one, as the stop always has.
+ *   - `stopping`  a person asked it to stop. Outranks every other reading but a settled one.
  *   - `ending`    no attempt runs and the current turn's end is on the record, or a person closed a task held open:
  *                 the task settles on that end, and on nothing observed.
  *
@@ -32,12 +32,12 @@
  * and a pass never writes a person's word, so `stopping` is entered by no edge (the reachability test counts it a root).
  *
  * **An event with no edge is refused, not guessed at.** `transition` answers `{ refused }`, `decide` turns it into
- * `nothing` with the refusal on it, the engine's pass reports it (`TickReport.refused`) and `wf up` logs it. Before
- * stage 5 `decide`'s branches were total by construction; a missing edge now stalls a task out loud.
+ * `nothing` with the refusal on it, the engine's pass reports it (`TickReport.refused`) and `wf up` logs it: a missing
+ * edge stalls a task out loud.
  *
- * Measured of XState 5.33.2 before it was used this way (2026-09-25): `machine.resolveState({ value })` builds a snapshot
- * of any state; `snapshot.can(event)` evaluates guards against the event's payload; `transition(machine, snapshot, event)`
- * returns `[next, actions]`, each action `{ type, params }` and none executed; on an event with no edge it returns the same
+ * What XState does, as this file uses it: `machine.resolveState({ value })` builds a snapshot of any state;
+ * `snapshot.can(event)` evaluates guards against the event's payload; `transition(machine, snapshot, event)` returns
+ * `[next, actions]`, each action `{ type, params }` and none executed; on an event with no edge it returns the same
  * snapshot and no action, and throws nothing — which is why `can` is asked first, since a self-edge also leaves the state
  * where it was. A final state's snapshot is `status: 'done'` and `can` is false there for every event.
  */
@@ -71,14 +71,23 @@ type Seen = {
 /**
  * What a pass observed about a task, recomputed from the journal and the sightings on every pass (`observe` in
  * `domain.ts`). Each names a fact, never an action: the edge says what the fact means in the state it meets.
+ *
+ * - Nothing in flight, the turn not started: `READY`, `QUEUED`, `PREVIOUS_LIVE`, `NO_SESSION_TO_CONTINUE`.
+ * - An attempt in flight, and what its harness says of the name: `SESSION_LIVE`, `SESSION_BLOCKED`, `SESSION_QUIET`,
+ *   `SESSION_ENDED`, `SESSION_STOPPED`, `UNSPAWNED`, `UNSEEN_IN_GRACE`, `LOST`, `UNREAD` and `DEADLINE_PASSED`.
+ *   `UNREAD` is one in flight — spawned, or only intended — whose harness could not be read this pass (`Now.unread`):
+ *   neither seen nor gone; `overdue` on it says it is past its deadline.
+ * - `SPAWN_REFUSED`, the engine's own: the harness refused the spawn, and nothing started. Never observed, since only the
+ *   spawn call knows.
+ * - Nothing in flight, and the record says why: `NOTHING_OPEN`, `AWAITING_INPUT`, `CLOSED`, `DEADLINE_SPENT`,
+ *   `ATTEMPT_ENDED`.
+ * - `SETTLED`: a settled task. Every state it can be in is final, and takes no event; `decide` never asks (`settledQuiet`).
  */
 export type LifecycleEvent =
-  // nothing in flight, the turn not started
   | { type: 'READY'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'QUEUED' }
   | { type: 'PREVIOUS_LIVE'; sessionId: string }
   | { type: 'NO_SESSION_TO_CONTINUE'; turn: number }
-  // an attempt in flight, and what its harness says of the name
   | ({ type: 'SESSION_LIVE' } & Seen)
   | ({ type: 'SESSION_BLOCKED' } & Seen)
   | ({ type: 'SESSION_QUIET' } & Seen)
@@ -87,18 +96,14 @@ export type LifecycleEvent =
   | { type: 'UNSPAWNED'; attempt: number; name: string }
   | { type: 'UNSEEN_IN_GRACE'; attempt: number }
   | { type: 'LOST'; attempt: number }
-  /** In flight — spawned, or only intended — and its harness could not be read this pass (`Now.unread`): neither seen nor gone. `overdue`: past its deadline. */
   | { type: 'UNREAD'; attempt: number; overdue: boolean }
   | { type: 'DEADLINE_PASSED'; attempt: number; sighting?: Sighting; live: boolean }
-  /** The engine's own: the harness refused the spawn, and nothing started. Never observed, since only the spawn call knows. */
   | { type: 'SPAWN_REFUSED'; attempt: number; error: string }
-  // nothing in flight, and the record says why
   | { type: 'NOTHING_OPEN' }
   | { type: 'AWAITING_INPUT' }
   | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
   | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number }
-  /** A settled task: every state it can be in is final, and takes no event. `decide` never asks (`settledQuiet`). */
   | { type: 'SETTLED'; outcome: Outcome };
 
 export type EventType = LifecycleEvent['type'];
@@ -111,16 +116,17 @@ export type Moved = { to: LifecycleState; action: Action } | { refused: Refusal 
 /** One pass's move: from a state, on an event, to the next state and the one action that takes it there. */
 export type Move = (from: LifecycleState, event: LifecycleEvent) => Moved;
 
-// ─── what an edge does ──────────────────────────────────────────────────────
-// Each edge names one action, and these give its words: the `Action` `decide` returns, from the event's payload alone.
-
 type Ev<T extends EventType> = Extract<LifecycleEvent, { type: T }>;
 type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
 type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 
+/**
+ * The `nothing` an edge that waits gives, in words from the event's payload alone. Each edge names one action, and this and
+ * the helpers below give its words: the `Action` `decide` returns. A live session runs in the words views print
+ * (`phaseWordOf`), so a remote Task `submitted` runs as `working` does.
+ */
 const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
-    // In the words views have always printed (`phaseWordOf`): a remote Task `submitted` runs as `working` does.
     case 'SESSION_LIVE':
       return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
     case 'SESSION_BLOCKED':
@@ -142,6 +148,7 @@ const said = (event: LifecycleEvent): Action => {
  * The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. Its
  * word is `endOf` the sighting's state — the journal's `done`, `failed` or `stopped`. No edge takes a session waiting on a
  * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
+ * `stated`, where the task asked for a closing statement: whether it came, a fact for the layer above, which judges it.
  */
 const harnessEnd = (e: Sessioned): Action => ({
   do: 'record-end',
@@ -151,7 +158,6 @@ const harnessEnd = (e: Sessioned): Action => ({
   reason: 'harness',
   nativeId: e.sighting.nativeId,
   closeout: e.sighting.closeout?.payload,
-  // Whether the statement its task asked for came: a fact for the layer above, which judges it.
   ...(e.asked ? { stated: e.sighting.closeout !== undefined } : {}),
 });
 
@@ -178,15 +184,20 @@ const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sig
   closeout: sighting?.closeout?.payload,
 });
 
+/**
+ * The note a turn with no successful attempt settles `failed` with: how many attempts it had — a journal an older runtime
+ * wrote may hold several of one turn, and the note counts them all — and, for an end that runtime's engine judged
+ * `unsigned`, that the last ended without the closing statement it was asked for.
+ */
 const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
-  // A journal from before stage 4a part 2 may hold several attempts of a turn: the note counts them all.
   const none = `${e.attempts} attempt(s)${e.turn ? ` of turn ${e.turn}` : ''}, none succeeded`;
-  // An end the engine judged `unsigned`, in a journal from before stage 4a: settled with the note it always had.
   return e.reason === 'unsigned' ? `${none}: the last ended without the closing statement it was asked for` : none;
 };
 
-// The actions, named for the `Action` each gives. Their bodies are empty and never run: XState is asked what an edge
-// does, never to do it, and the engine applies the `Action` (`step` in `engine.ts`).
+/**
+ * The actions, named for the `Action` each gives. Their bodies are empty and never run: XState is asked what an edge does,
+ * never to do it, and the engine applies the `Action` (`step` in `engine.ts`).
+ */
 const ACTIONS = { nothing: () => {}, start: () => {}, spawn: () => {}, 'record-end': () => {}, stop: () => {}, settle: () => {} };
 
 /** An edge's action, whose params are the `Action` it gives. Typed loosely here; `transition` hands back only `params`. */
@@ -213,7 +224,7 @@ const inFlight = {
   SESSION_BLOCKED: { actions: nothing },
   SESSION_QUIET: harness,
   SESSION_ENDED: harness,
-  // Stopped under it, by its harness or a person at the harness's side: an end that never holds, since only `done` does.
+  /** Stopped under it, by its harness or a person at the harness's side: an end that never holds, since only `done` does. */
   SESSION_STOPPED: { target: 'ending', actions: act('record-end', harnessEnd) },
   DEADLINE_PASSED: deadline,
 };
@@ -244,12 +255,14 @@ const CONFIG = {
           })),
         },
         QUEUED: { actions: nothing },
-        // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
-        // would share one conversation.
+        /**
+         * A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
+         * would share one conversation.
+         */
         PREVIOUS_LIVE: {
           actions: act('stop', (e: Ev<'PREVIOUS_LIVE'>) => ({ do: 'stop', sessionId: e.sessionId, why: 'to continue it' })),
         },
-        // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
+        /** A later turn is an answer to a session, and one that never heard the question has nothing to answer. */
         NO_SESSION_TO_CONTINUE: {
           target: 'failed',
           actions: settle(
@@ -271,10 +284,12 @@ const CONFIG = {
           target: 'working',
           actions: act('spawn', (e: Ev<'UNSPAWNED'>) => ({ do: 'spawn', attempt: e.attempt, name: e.name })),
         },
-        // Its harness could not be read, so a session the crash left under the name is not ruled out: spawned by a pass that
-        // reads it, never twice. The deadline is read before this, and ends it.
+        /**
+         * Its harness could not be read, so a session the crash left under the name is not ruled out: spawned by a pass that
+         * reads it, never twice. The deadline is read before this, and ends it.
+         */
         UNREAD: { actions: nothing },
-        // Nothing started: the attempt ends `failed`, `unstartable`, in the harness's words.
+        /** Nothing started: the attempt ends `failed`, `unstartable`, in the harness's words. */
         SPAWN_REFUSED: {
           target: 'ending',
           actions: act('record-end', (e: Ev<'SPAWN_REFUSED'>) => ({
@@ -292,9 +307,9 @@ const CONFIG = {
     working: {
       on: {
         ...inFlight,
-        // Not registered yet, a race measured in seconds, or gone: the grace window tells the two apart.
+        /** Not registered yet, a race measured in seconds, or gone: the grace window tells the two apart. */
         UNSEEN_IN_GRACE: { actions: nothing },
-        // Its harness could not be read: nothing is known, so nothing is done. The deadline is read before this, and ends it.
+        /** Its harness could not be read: nothing is known, so nothing is done. The deadline is read before this, and ends it. */
         UNREAD: { actions: nothing },
         LOST: {
           target: 'ending',
@@ -326,8 +341,10 @@ const CONFIG = {
         UNSPAWNED: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
         UNSEEN_IN_GRACE: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
         LOST: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
-        // Its harness could not be read: the stop waits for a read that says what runs, and once the deadline has passed
-        // it is cut as a lost one is, so a person's stop is bounded by a harness that is never read again.
+        /**
+         * Its harness could not be read: the stop waits for a read that says what runs, and once the deadline has passed
+         * it is cut as a lost one is, so a person's stop is bounded by a harness that is never read again.
+         */
         UNREAD: [{ guard: 'overdue', actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) }, { actions: nothing }],
         NOTHING_OPEN: { target: 'canceled', actions: settle('stopped', () => 'operator') },
       },
@@ -349,7 +366,7 @@ const CONFIG = {
           target: 'failed',
           actions: settle('failed', (e: Ev<'DEADLINE_SPENT'>) => `deadline exceeded after ${e.seconds}s`),
         },
-        // One attempt per start: trying again — lost, unstartable or failed — is the layer above's, a new filing.
+        /** One attempt per start: trying again — lost, unstartable or failed — is the layer above's, a new filing. */
         ATTEMPT_ENDED: [
           { guard: 'endedDone', target: 'completed', actions: settle('succeeded') },
           { guard: 'endedStopped', target: 'canceled', actions: settle('stopped', () => 'session stopped') },
@@ -374,13 +391,20 @@ const GUARDS = {
 
 type Config = { id: string; initial: string; states: Record<string, { type?: 'final'; on?: Record<string, unknown> }> };
 
+/**
+ * The machine a configuration makes. The configuration is checked by the tests (every edge, every state), not by XState's
+ * types, which cannot follow a union of events through a table built from helpers.
+ */
 const machineOf = (config: Config) =>
-  // The configuration is checked by the tests (every edge, every state), not by XState's types, which cannot follow a
-  // union of events through a table built from helpers.
   setup({ types: { events: {} as LifecycleEvent }, guards: GUARDS, actions: ACTIONS }).createMachine(config as any);
 
 export const MACHINE = machineOf(CONFIG);
 
+/**
+ * A machine's move: `can` is asked first, since XState stays where it was on an event with no edge, and the event is
+ * refused. Every edge names one action (`test/lifecycle.test.ts`): anything else is the table's mistake, not the task's, and
+ * is thrown.
+ */
 const moveOn =
   (machine: ReturnType<typeof machineOf>): Move =>
   (from, event) => {
@@ -388,7 +412,6 @@ const moveOn =
     if (!snapshot.can(event)) return { refused: { state: from, event: event.type } };
     const [next, actions] = xTransition(machine, snapshot, event);
     const params = actions.map((a) => a.params as Action | undefined);
-    // Every edge names one action (`test/lifecycle.test.ts`): anything else is the table's mistake, not the task's.
     if (params.length !== 1 || !params[0])
       throw new Error(`the lifecycle's edge from ${from} on ${event.type} gave ${params.length} actions, not one`);
     return { to: next.value as LifecycleState, action: params[0] };
@@ -414,14 +437,16 @@ export const withoutEdge = (from: LifecycleState, event: EventType): Move => mov
 /** One edge of the machine, as its table says it: where it leaves from, on what, under which guard, to where, doing what. */
 export type Edge = { from: LifecycleState; event: EventType; guard?: string; to: LifecycleState; action: string };
 
-/** Every edge of a machine, read off XState's own nodes, so the list is the machine and not a copy of it. */
+/**
+ * Every edge of a machine, read off XState's own nodes, so the list is the machine and not a copy of it. A guard named in
+ * the table is kept as its name; one given as an object, by its type.
+ */
 export const edgesOf = (machine = MACHINE): Edge[] =>
   Object.entries(machine.root.states).flatMap(([from, node]) =>
     [...node.transitions.entries()].flatMap(([event, defs]) =>
       defs.map((d) => ({
         from: from as LifecycleState,
         event: event as EventType,
-        // A guard named in the table is kept as its name; one given as an object, by its type.
         ...(d.guard ? { guard: typeof d.guard === 'string' ? d.guard : (d.guard as { type: string }).type } : {}),
         to: (d.target?.[0]?.key ?? from) as LifecycleState,
         action: d.actions.map((a) => (a as { type: string }).type).join(' '),
@@ -438,10 +463,10 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
 
 /**
  * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,
- * and `test/lifecycle.test.ts` fails when the two differ.
+ * and `test/lifecycle.test.ts` fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
+ * drawn under its own name, by an id without one.
  */
 export const diagram = (machine = MACHINE): string => {
-  // Mermaid takes no `-` in a state's id: `input-required` is drawn under its own name, by an id without one.
   const id = (s: string) => s.replace(/-/g, '_');
   return [
     'stateDiagram-v2',

@@ -5,12 +5,11 @@
  * fold is a pure function of an append-only journal. So a pass that has folded one needs to fold it again only once
  * something is appended — and every append reaches the board's feed (`JournalOps.feed`). The memo keeps a cursor into
  * that feed and, for each settled task, the little a pass still does with it: let the harness go of its finished sessions
- * (`releaseFinished`), which reads the observation and so is asked on every pass. Until 2026-09-25 every pass folded every
- * journal, twice, and with ~200 runs in the store that was about 30 MB read a pass.
+ * (`releaseFinished`), which reads the observation and so is asked on every pass.
  *
  * A cache of a pure function, never a source of truth: it lives as long as the engine that made it (`createEngine`), is
  * never written down, and a fresh engine starts with none and folds everything. A pass without one — the Effect door's,
- * with layers of its own — folds everything as before.
+ * with layers of its own — folds every task.
  */
 import { Context, Layer, Schema } from 'effect';
 import { isDeepStrictEqual } from 'node:util';

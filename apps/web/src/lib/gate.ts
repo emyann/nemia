@@ -3,7 +3,7 @@
  *
  * The facts are the api's, off the package: which step waits at its gate (`toDecide`, a step's `approve`), where a send-back goes
  * (`sendBackTo`, carried as `back`), the base branch (`onto`, `branch`), each step's tries, closeout and check, and the run's decision. The
- * sentences joining them are the board's: `wf ls` prints the command, and a person asked what approving does had to know the package.
+ * sentences joining them are the board's, so a person reads what approving does without knowing the package: `wf ls` prints the command.
  */
 import type { Decidable, RunDetail, RunSummary, StepAsked } from './api';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
@@ -20,9 +20,10 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
 
 /**
  * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its gate
- * on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits. A to-decide gate whose `back` names the step itself holds after the step ran,
- * as §6's does (`sendBackTo` gives the step once it has a task); one whose `back` does not is an ending, not filed until approved. A list
- * from an api without `back` reads the step alone as where a send-back goes, which the package would refuse for an ending, in its words.
+ * on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits. A
+ * to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one whose
+ * `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back goes,
+ * which the package would refuse for an ending, in its words.
  */
 export function gateOfSummary(
   run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunSummary['holding'] },
@@ -139,7 +140,8 @@ export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; st
  * run's decision when it has been read, what the result touched and whether each branch still merges onto the base.
  *
  * A looping step's word is read off its closeout's output, the keys `wf`'s loop reads (`again`) and the reviewer's `findings`; a closeout
- * without them says it signed off, and how. A step not run says so.
+ * without them says it signed off, and how. A step not run says so. A looping step a person ended out of rounds (`wf accept`) is said
+ * accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true`.
  */
 export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
@@ -151,8 +153,6 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
     const closeout = looping.closeout;
     const output = closeout?.output ?? {};
     const findings = Array.isArray(output.findings) ? output.findings.length : null;
-    // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the loop is over on their word. Say that,
-    // with their words, where "asks another round" would send whoever approves the ending looking for a round nobody will file.
     const accepted = looping.accepted
       ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}`
       : null;

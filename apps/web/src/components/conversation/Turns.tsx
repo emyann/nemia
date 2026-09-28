@@ -140,7 +140,9 @@ export function ToolCallView({ call, running, defaultOpen = false }: { call: Too
 
 /**
  * Calls with nothing said between them, as one line — "Ran 3 commands, read 3 files" — that opens to them. Every call in it
- * waits on the same thing: in the tail of a live session, each without a result is running, as a batch of parallel calls is.
+ * waits on the same thing: in the tail of a live session, each without a result is running, as a batch of parallel calls is. Its calls are
+ * drawn only while it is open, and spaced inside the panel: a closed panel is hidden, not taken out (`ToolContent`). A thought in it is
+ * followed by a call, so it is never the one being had now.
  */
 export function ToolRun({
   turn,
@@ -165,12 +167,10 @@ export function ToolRun({
             )}
             <ChevronDownIcon className="size-4 shrink-0 transition-transform group-data-expanded/tools:rotate-180" />
           </CollapsibleTrigger>
-          {/* Its calls drawn only while it is open, and spaced inside the panel: a closed panel is hidden, not taken out (`ToolContent`). */}
           <CollapsibleContent>
             {isExpanded && (
               <div className="mt-2 space-y-2 border-l pl-4">
                 {turn.turns.map((inner) => (
-                  // A thought in a fold is followed by a call, so it is never the one being had now.
                   <TurnView key={inner.key} turn={inner} live={live} last={false} tail={tail} />
                 ))}
               </div>

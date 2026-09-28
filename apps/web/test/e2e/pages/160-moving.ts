@@ -4,6 +4,10 @@ import { NEIGHBOUR } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
+  /**
+   * A run with a step at work: its graph has a node per step, a dot travels the running edge, and the legend's running sample, and nothing
+   * else moves. Once a person asks for reduced motion, with the page open, nothing travels and the running edge is still drawn running.
+   */
   name: 'moving',
   route: `/runs/${NEIGHBOUR.id}`,
   expect: async (page) => {
@@ -16,7 +20,6 @@ export default {
     );
     const edge = (id: string) => graph.locator(`.react-flow__edge[data-id="${id}"]`);
     const running = edge(NEIGHBOUR.running);
-    // Counted, not seen: a straight edge's path has no height, which Playwright takes for hidden.
     await expectCount(
       running.locator('.react-flow__edge-path[data-state="running"]'),
       1,
@@ -32,13 +35,12 @@ export default {
     const legend = graph.locator('.react-flow__panel[aria-label="Legend"]');
     await expectCount(legend.locator('animateMotion'), 1, "the legend's running sample moves as the running edge does");
 
-    // A person who asks for reduced motion, with the page open: nothing travels, and the running edge is still drawn running.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expectCount(graph.locator('animateMotion'), 0, 'with reduced motion asked for, no dot travels — on an edge or in the legend');
     await expectCount(
       running.locator('.react-flow__edge-path[data-state="running"][marker-end]'),
       1,
-      'the running edge keeps its colour and its arrow',
+      'with reduced motion asked for, the running edge is still drawn running: it keeps its colour and its arrow',
     );
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await expectCount(running.locator('animateMotion'), 1, 'the dot travels again once the person no longer asks, without a reload');

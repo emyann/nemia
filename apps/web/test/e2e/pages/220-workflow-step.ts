@@ -6,8 +6,10 @@ import type { PageSpec } from '../visit.ts';
 import { store } from '../world.ts';
 
 export default {
-  // A step's page, from its block on the Workflows page: what it is told, rendered, then every key a step may set — set or not — with
-  // its value as the loader reads it and what it means, and Source: the file as written. It writes nothing: the checkout's folder is as it was.
+  /**
+   * A step's page, from its block on the Workflows page: what it is told, rendered, then every key a step may set — set or not — with its
+   * value as the loader reads it and what it means, and Source: the file as written. It writes nothing: the checkout's folder is as it was.
+   */
   name: 'workflow-step',
   route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
   expect: async (page) => {

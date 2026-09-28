@@ -4,6 +4,12 @@ import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
+  /**
+   * The run page of the seeded run: its header and step graph, the gate that asks and the check that refused, the calls its harness
+   * denied, the Decide section read out of the run's real repository, what each session used and the mode it runs in, the timeline off
+   * the engine's attempts and the filings on its feed, and the step inspector's Details, Activity and Output tabs. It ends with tokens'
+   * Output open for the photograph, its image served as a PNG never cached and opened full-size in a tab of its own.
+   */
   name: 'run',
   route: `/runs/${FAKE.id}`,
   expect: async (page) => {
@@ -24,7 +30,6 @@ export default {
       graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'),
       `${FAKE.blocked} is drawn as a human gate`,
     );
-    // What it waits for, as its closeout gave it: on its node, and in the banner at the top of the page.
     await expectVisible(
       graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-need="asks"]`, { hasText: `asks: ${SESSION.closeout.needs}` }),
       `${FAKE.blocked}'s node says what it asks (${SESSION.closeout.needs})`,
@@ -48,7 +53,6 @@ export default {
       0,
       `no dot travels the run's edges: nothing moves into ${FAKE.refused}, whose check refused`,
     );
-    // What the harness denied its job: how many on its node, read whole, with which on hover, and each call on its section.
     const denied = graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-denied][title="${FAKE.denied.words}"]`, {
       hasText: FAKE.denied.node,
     });
@@ -62,10 +66,9 @@ export default {
     );
     await expectCount(page.locator('[data-fact="denied"]'), 1, 'and no other section has a denied row');
 
-    // What `wf decide` shows, between the banner and the canvas, read out of the run's real repository.
     await expectVisible(
       page.locator(`article > header + section[aria-label="Decide"] + section[aria-label="The run's steps as a graph"]`),
-      'the Decide section sits between the header and the canvas',
+      'the Decide section, what wf decide shows, sits between the header and the canvas',
     );
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(
@@ -91,7 +94,6 @@ export default {
       decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }),
       `the lesson chip says what the run wrote (${FAKE.lesson})`,
     );
-    // Each check-affecting file folded, until a person opens it: then a coloured diff, cut where the api cut it.
     await expectCount(decide.locator('details[open]'), 0, 'every check-affecting diff is folded until opened');
     const capped = decide.locator(`details[data-diff="${FAKE.capped}"]`);
     await capped.locator('summary').click();
@@ -109,7 +111,6 @@ export default {
       decide.locator('section[aria-label="Used"] dd', { hasText: 'not measured' }),
       'the run total says not measured, since not every step was',
     );
-    // The commands as lines to copy, and nothing that runs one.
     await expectVisible(
       decide.locator('[data-command="ship it"] code', { hasText: `merge --no-ff ${FAKE.branch}` }),
       'ship it: the merge, as a line',
@@ -132,7 +133,6 @@ export default {
       0,
       'no button among the commands but one that copies',
     );
-    // Before them, the answers: a box for the step that asks, and Try again for the step whose check refused, its check again an option.
     const answers = decide.locator('section[aria-label="Answer"]');
     const answer = answers.locator(`[data-offer="answer"][data-step="${FAKE.blocked}"]`);
     await expectVisible(
@@ -150,22 +150,19 @@ export default {
       "every other button in the Decide section is an answer's",
     );
 
-    // What a step consumed, in its section and in the inspector's Details, in `wf decide`'s words.
     const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
     await expectVisible(
       tokens.locator('dd', { hasText: FAKE.used }),
-      `${FAKE.unverified}'s section says what its session used (${FAKE.used})`,
+      `${FAKE.unverified}'s section says what its session used in wf decide's words (${FAKE.used})`,
     );
-    // The mode each session runs in, filed with none: its harness's choice, marked default — never "the harness's own".
     await expectVisible(
       tokens.locator('[data-mark="default"]', { hasText: 'workspace-write · default' }),
-      `${FAKE.unverified}'s spec says the sandbox its Codex session runs in (workspace-write · default)`,
+      `${FAKE.unverified}'s spec says the sandbox its Codex session runs in, filed with none: its harness's choice, marked default (workspace-write · default)`,
     );
-    // A codex step's fence under Codex's name, read off a record frozen when it was written `permissionMode: read-only`.
     const review = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: 'review', exact: true }) });
     await expectVisible(
       review.locator('[data-fact="sandbox"] dd', { hasText: /^read-only$/ }),
-      "review's spec says its sandbox, read-only, from a record frozen before the key was named so",
+      "review's spec says its sandbox under Codex's name, read-only, read off a record that says permissionMode: read-only",
     );
     await expectCount(review.locator('[data-fact="permission mode"]'), 0, 'and no permission mode, which codex has not');
     const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
@@ -174,17 +171,18 @@ export default {
       `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`,
     );
 
-    // Where the run's time went: a row per try's session and per check, each queued filed → spawned and ran spawned → ended, off the
-    // engine's attempts and the filings on its feed.
     const timeline = page.locator('section[aria-label="Timeline"]');
     const exactly = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
     for (const [step, [queued, ran]] of Object.entries(FAKE.timeline.sessions)) {
       const row = timeline.locator(`tr[data-step="${step}"][data-task="session"][data-at="ended"]`);
       await expectVisible(
         row.locator('[data-cell="queued"]', { hasText: exactly(queued) }),
-        `the timeline says ${step} queued ${queued} for a slot`,
+        `the timeline says ${step} queued ${queued} for a slot, filed → spawned`,
       );
-      await expectVisible(row.locator('[data-cell="ran"]', { hasText: exactly(ran) }), `the timeline says ${step} ran ${ran}`);
+      await expectVisible(
+        row.locator('[data-cell="ran"]', { hasText: exactly(ran) }),
+        `the timeline says ${step} ran ${ran}, spawned → ended`,
+      );
     }
     const [checkQueued, checkRan] = FAKE.timeline.check;
     const checkRow = timeline.locator(`tr[data-step="${FAKE.refused}"][data-task="check"][data-at="ended"]`);
@@ -216,7 +214,6 @@ export default {
     await expectCount(timeline.locator('tr[data-total^="round-"]'), 0, "one round: the run's total alone");
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
-    // Signed off, it opens on its Output; what it used is under Details.
     await expectVisible(
       inspected.getByRole('tab', { name: 'Output', selected: true }),
       `${FAKE.unverified}'s inspector opens on Output: it has signed off`,
@@ -226,15 +223,13 @@ export default {
 
     await graph.locator('.react-flow__node[data-id="review"]').click();
     await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
-    // The canvas narrows for the inspector and fits itself again; judged once it has.
     await settled(page);
     await expectInside(
       graph.locator('.react-flow__node'),
       graph.locator('.react-flow'),
-      'every step is on the canvas beside the open inspector',
+      'every step is on the canvas beside the open inspector, once the canvas, narrowed for it, has fitted itself again',
     );
 
-    // implement's Activity: the tail of its session's conversation, folded as its page folds it, and the way to that page.
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
     const inspector = page.locator(`aside[aria-label="Step ${SESSION.step}"]`);
     await inspector.getByRole('tab', { name: 'Activity' }).click();
@@ -249,14 +244,11 @@ export default {
     );
     await settled(page);
 
-    // tokens' Output: the image it named drawn inline, opening full-size in a new tab; its text file a link; a path on its
-    // branch as it gave it. Left open for the photograph.
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
     const output = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
     await output.getByRole('tab', { name: 'Output' }).click();
     const palette = output.locator(`img[alt="${FAKE.artifacts.image}"]`);
     await expectDrawn(palette, `${FAKE.unverified}'s Output tab draws the image it named inline (${FAKE.artifacts.image})`);
-    // `has` is queried inside each link, so from the page: `palette` starts at the inspector, which no link is around.
     const full = output.locator('a[target="_blank"]', { has: page.locator(`img[alt="${FAKE.artifacts.image}"]`) });
     await expectCount(full, 1, `${FAKE.artifacts.image} is inside a link that opens it in a new tab`);
     await expectVisible(
@@ -271,19 +263,20 @@ export default {
       page.locator(`article > section [aria-label="Artifacts"] img[alt="${FAKE.artifacts.image}"]`),
       `${FAKE.unverified}'s section on the run's page draws the image too`,
     );
-    // As the api serves it, through the proxy the page reads it by: a PNG, never cached.
     const served = await page.request.get(new URL((await full.getAttribute('href')) ?? '', page.url()).href);
     const headers = served.headers();
     if (served.status() !== 200 || headers['content-type'] !== 'image/png' || headers['cache-control'] !== 'no-store') {
       throw new Refused(
-        `the api serves ${FAKE.artifacts.image} as a PNG, never cached — it answered ${served.status()}, ${headers['content-type']}, cache-control ${headers['cache-control']}`,
+        `the api serves ${FAKE.artifacts.image}, through the proxy the page reads it by, as a PNG, never cached — it answered ${served.status()}, ${headers['content-type']}, cache-control ${headers['cache-control']}`,
       );
     }
-    // Opened full-size: a tab of its own, which draws it under the api's sandboxing policy.
     const [tab] = await Promise.all([page.context().waitForEvent('page'), full.click()]);
     try {
       await tab.waitForLoadState();
-      await expectDrawn(tab.locator('img'), `${FAKE.artifacts.image} opens full-size in a tab of its own`);
+      await expectDrawn(
+        tab.locator('img'),
+        `${FAKE.artifacts.image} opens full-size in a tab of its own, drawn under the api's sandboxing policy`,
+      );
     } finally {
       await tab.close();
     }

@@ -299,8 +299,8 @@ export const LOOPING = {
 } as const;
 
 /**
- * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — Q1's round-2
- * implement on 2026-09-14, stopped by the login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
+ * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — stopped by the
+ * harness's login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
  * run is running and moves, and in the package's words nobody is waiting on you: the step asked nothing. On the floor by default,
  * in the cell after NEIGHBOUR's. The board names the harness, what it says it waits for (`waitingFor`, on the registry row) and what
  * the session said last (`line`), and continues the session as `wf retry` does: the `held` page presses Continue, and takes its ask back.
@@ -311,7 +311,7 @@ export const HELD = {
   steps: ['implement', 'review'],
   blocked: 'implement',
   sessionId: '9c3e1d2a-7b4f-4e8a-b6d5-1f0a2c3b4d5e',
-  /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 wrote it that day. */
+  /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 writes it. */
   line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
   /** What `claude agents --json` says that session waits for (`waitingFor`), and the board's words for it and for answering it. */
   waitingFor: 'permission prompt',
@@ -460,8 +460,8 @@ export const SHIPPED = {
 
 /**
  * A ninth run whose folder says nothing about what happens when the work is done: one step, signed off, its branch two commits ahead of
- * main and nobody has merged it. The second kind of thing to decide — the pain §8 was registered as: with nothing asking for a merge, the
- * run seemed to vanish. Its card stays on the floor, marked, and `wf decide` is the command in the line.
+ * main and nobody has merged it: the second kind of thing to decide, a run nothing asks to merge. Its card stays on the floor, marked, and
+ * `wf decide` is the command in the line.
  */
 export const UNMERGED = {
   id: 'nobody-merged-it-e2e14',
@@ -526,6 +526,12 @@ export const FOLDER = {
  * Write FOLDER into the store at `root`: its workflow folder, its record with `place` and none of a git run's fields, a journal per
  * step, and the files the steps left — in `write`'s folder, and the note collected beside the record as the run collects a named file.
  * Times are minutes before `now`.
+ *
+ * Every step works under the run's own directory in the store, and `review` continues `write`'s folder, as a chain does. The brief says no
+ * git word of its own: the folder page sweeps everything the page draws, so a git word found there can only have come from the board. Each
+ * step is filed as the run files a folder step, in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it ran
+ * in rather than the engine's default. Its journal puts the mode beside the task's fields rather than under `config`, a shape the runtime
+ * reads in today's (`upgrade` in agent-runtime's journal.ts): the folder page's `dontAsk` proves such a journal reaches the board.
  */
 export function seedFolder(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -541,7 +547,6 @@ export function seedFolder(root: string, now = Date.now()): void {
     `---\nharness: claude\nafter: write\nworkspace: folder\npermissionMode: dontAsk\n---\nRead the note, and say whether it holds up.\n`,
   );
 
-  // Every step of a folder team works under the run's own directory in the store; `review` continues `write`'s folder, as a chain does.
   const work = path.join(root, 'runs', id, 'work');
   const wrote = path.join(work, 'write');
   write(
@@ -549,7 +554,6 @@ export function seedFolder(root: string, now = Date.now()): void {
     `# Why the tides come twice a day\n\nThe moon pulls the water nearest it, and leaves the water\nfarthest from it behind. Two bulges, one turn: two tides.\n`,
   );
   write(path.join(wrote, FOLDER.outline), 'moon pulls · earth turns · two bulges\n');
-  // The run collects a file its closeout named into the step's files, beside the record.
   write(path.join(root, 'runs', id, 'artifacts', 'write', FOLDER.note), fs.readFileSync(path.join(wrote, FOLDER.note)));
 
   write(
@@ -559,8 +563,6 @@ export function seedFolder(root: string, now = Date.now()): void {
         id,
         place: { kind: 'folder' },
         workspace: work,
-        // The brief says no git word of its own — the folder page sweeps everything the page draws, so a word found there can only
-        // have come from the board.
         brief: `${FOLDER.title}\n\nA run seeded by npm run e2e: a team that works in folders it makes for its steps.`,
         workflowDir,
         workflow: [
@@ -590,10 +592,6 @@ export function seedFolder(root: string, now = Date.now()): void {
     ),
   );
 
-  // Filed as the run files a folder step: in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it
-  // ran in rather than the engine's default. Written as the engine wrote a filing before 2026-09-23, the mode beside the task's fields
-  // rather than under `config`: the runtime reads it in today's shape (`upgrade` in agent-runtime's journal.ts), and the folder page's
-  // `dontAsk` is what proves an old journal reaches the board. Leave it in the old shape.
   const signedOff = (step: string, brief: string, began: number, ended: number, closeout: object): void =>
     write(
       path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
@@ -625,8 +623,10 @@ export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAM
 /**
  * Write DIAMOND into the checkout at `repo` — made a git repository here, its files the base on `main` — and the store at `root`. `top`'s
  * and `shipped`'s result branches are merged into main with `--no-ff`, one after the other, and their steps signed off: each one's own
- * `wf decide` says shipped. `running`'s branch has its work and is not merged, and its session has not ended. `cancelled` is marked as
- * `wf cancel` marks a run, in a file beside its record. Times are minutes before `now`.
+ * `wf decide` says shipped. `running`'s branch has its work and is not merged, and its session has started and not ended, as NEIGHBOUR's
+ * draft: the engine reads it running. Its record was created a minute before its step was filed, as a run started `--after` one is filed on
+ * the pass after its parent ships: that minute is its wait, and its card does not count it. `cancelled` is marked as `wf cancel` marks a
+ * run, in a file beside its record. Times are minutes before `now`.
  */
 export function seedDiamond(repo: string, root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -645,7 +645,6 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   git('commit', '-q', '-m', 'base');
   const base = git('rev-parse', 'HEAD').trim();
   const branchOf = (id: string) => `wf/${id}/implement`;
-  /** A result branch off main with the run's work on it, merged back when it shipped. */
   const work = (id: string, merge: boolean) => {
     git('checkout', '-q', '-b', branchOf(id));
     write(path.join(repo, 'src', `${id}.ts`), `export const done = '${id}';\n`);
@@ -715,8 +714,6 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   work(shipped.id, true);
   signedOff(shipped, 2.4, 2.3);
   record(shipped, 2.4, { taskId: task(shipped), workspace: repo, branch: branchOf(shipped.id) });
-  // Its session started and has not ended, as NEIGHBOUR's draft: the engine reads it running. Created a minute before its step was filed,
-  // as a run started `--after` one is filed on the pass after its parent ships: that minute is its wait, and its card does not count it.
   work(running.id, false);
   write(
     path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`),
@@ -732,7 +729,10 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
 /** Where in the store the sessions `claude agents --all --json` lists are kept, for the fake `claude` run.ts puts on the api's PATH. */
 export const REGISTRY = 'claude-agents.json';
 
-/** HELD's `implement`, as its session said it before the harness stopped it: the prompt, words, a call and its result, and the harness's line. */
+/**
+ * HELD's `implement`, as its session said it before the harness stopped it: the prompt, words, a call and its result, and the harness's
+ * line, an assistant message the harness made up (`isApiErrorMessage`): no model wrote it.
+ */
 function heldConversation(ago: (minutes: number) => string): object[] {
   const line = {
     sessionId: HELD.sessionId,
@@ -756,7 +756,6 @@ function heldConversation(ago: (minutes: number) => string): object[] {
     said('assistant', 'held-assistant-1', 2.7, [{ type: 'text', text: 'Reading the tests first.' }]),
     said('assistant', 'held-assistant-2', 2.6, [{ type: 'tool_use', id: 'toolu_held_test', name: 'Bash', input: { command: 'npm test' } }]),
     said('user', 'held-user-2', 2.5, [{ type: 'tool_result', tool_use_id: 'toolu_held_test', content: '# tests 33\n# pass 33\n# fail 0' }]),
-    // The harness's own line, as an assistant message it made up: no model wrote it.
     said('assistant', 'held-assistant-3', 2.4, [{ type: 'text', text: HELD.line }], { isApiErrorMessage: true, error: 'server_error' }),
   ];
 }
@@ -770,7 +769,7 @@ const STEPS = [
   {
     file: 'review.md',
     text: '---\nharness: codex\nafter: implement\nsandbox: read-only\n---\nReview the change.\n',
-    // Frozen as a run started before 2026-09-23 wrote it, when a codex step's sandbox was its `permissionMode`: read as its `sandbox`.
+    /** Frozen with a codex step's sandbox as its `permissionMode`, which is read as its `sandbox`. */
     frozen: { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'codex', permissionMode: 'read-only' },
   },
   {
@@ -939,7 +938,7 @@ export const AGENTS = {
   made: {
     name: 'notary',
     description: 'Use this when a decision needs writing down.',
-    // Not haiku: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused (F21).
+    /** Not haiku: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused. */
     model: 'sonnet',
     edited: 'opus',
     /**
@@ -1224,12 +1223,14 @@ export const write = (file: string, text: string | Buffer): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A PNG, `width` by `height`, each pixel the colour `colour` gives it: encoded here, since the e2e installs nothing to draw one. */
+/**
+ * A PNG, `width` by `height`, each pixel the colour `colour` gives it: encoded here, since the e2e installs nothing to draw one. 8 bits a
+ * channel, RGB, each row with no filter, and the one compression, filter method and interlace a PNG has.
+ */
 export function png(width: number, height: number, colour: (x: number, y: number) => readonly [number, number, number]): Buffer {
   const stride = width * 3 + 1;
   const rows = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y++) {
-    // Each row starts with its filter, none.
     for (let x = 0; x < width; x++) rows.set(colour(x, y), y * stride + 1 + x * 3);
   }
   const chunk = (type: string, data: Buffer): Buffer => {
@@ -1243,7 +1244,6 @@ export function png(width: number, height: number, colour: (x: number, y: number
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
-  // 8 bits a channel, RGB, and the one compression, filter and interlace a PNG has.
   header.set([8, 2, 0, 0, 0], 8);
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
@@ -1328,8 +1328,14 @@ function seedRepo(repo: string, branch: string): string {
  *
  * Real commits, because what the board says about each is read out of git on every request: where the branch stands against the base, and
  * git's own diff stat of it. ENDING's two commits are three files, fourteen insertions and one deletion against the base — `stat` — with
- * `CLAUDE.md` among them, so its radius has a lesson line too. SHIPPED's branch is merged into main with `--no-ff`, as its ending step
- * would have merged it, which is what makes the run read as shipped with nothing left to decide.
+ * `CLAUDE.md` among them, so its radius has a lesson line too: eight lines of source, then five of docs and CLAUDE.md's line rewritten.
+ * SHIPPED's branch is merged into main with `--no-ff`, as its ending step would have merged it, which is what makes the run read as shipped
+ * with nothing left to decide.
+ *
+ * ENDING and SHIPPED are started from one folder: implement, review, then the ending in the repository's own checkout. SHIPPED's ship
+ * was approved with no words, as `wf approve` writes an approval, filed in the checkout, and merged; then pruned, as `wf prune --artifacts`
+ * marks a run: its record and branch kept, the worktree and its files gone. UNMERGED's folder says nothing about shipping, so git is what
+ * ends it: one step, signed off, and a branch nobody took.
  */
 function seedDecisions(root: string, repo: string, base: string, now: number): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -1343,7 +1349,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
-  /** A commit of `files` on `branch`, cut from the base the first time. */
   const commit = (branch: string, message: string, files: ReadonlyArray<readonly [string, string]>, cut = false) => {
     git('checkout', '-q', ...(cut ? ['-b', branch, base] : [branch]));
     for (const [file, text] of files) write(path.join(repo, file), text);
@@ -1352,7 +1357,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     git('checkout', '-q', 'main');
   };
 
-  // ENDING's branch: eight lines of source, then five of docs and a line of CLAUDE.md rewritten — `ENDING.stat` against the base.
   commit(
     ENDING.branch,
     'Cap the runs in flight',
@@ -1394,7 +1398,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     true,
   );
 
-  /** A task that ran once and signed off with `closeout`, from `began` to `ended` minutes ago. */
   const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object): void =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -1408,7 +1411,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     );
   const done = (summary: string, artifacts: string[] = []) => ({ outcome: 'done', summary, needs: null, artifacts });
 
-  // The folder both runs of it were started from: implement ⇄ nothing, review, then the ending in the repository's own checkout.
   const shipDir = path.join(root, 'workflow-ship');
   write(path.join(shipDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
   write(path.join(shipDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview the change.\n');
@@ -1420,7 +1422,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'main', gate: true },
   ];
 
-  /** One of the two runs of that folder: its steps' records, and the brief a person reads. */
   const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object) =>
     write(
       path.join(root, 'runs', `${id}.json`),
@@ -1443,7 +1444,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
       ),
     );
 
-  // ENDING: implement and review signed off on the run's branch; ship has never been filed, and waits at its gate.
   const lane = path.join(root, 'worktrees', ENDING.id, 'implement');
   const files = path.join(root, 'runs', ENDING.id, 'artifacts', 'review');
   write(path.join(files, ENDING.artifact), `# ${ENDING.review.heading}\n\n${ENDING.review.items.map((item) => `- ${item}`).join('\n')}\n`);
@@ -1478,7 +1478,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     },
   );
 
-  // SHIPPED: the same, with ship approved — the approval as `wf approve` writes one, with no words — filed in the checkout, and merged.
   const shippedLane = path.join(root, 'worktrees', SHIPPED.id, 'implement');
   signedOff(`${SHIPPED.id}-implement`, shippedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
   signedOff(
@@ -1491,7 +1490,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   );
   signedOff(`${SHIPPED.id}-ship`, repo, shipBody, 0.3, 0.2, done(SHIPPED.merged));
   write(path.join(root, 'runs', `${SHIPPED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
-  // And pruned after it shipped, as `wf prune --artifacts` marks a run: its record and branch kept, the worktree and its files gone.
   const prunedAt = ago(0.1);
   write(
     path.join(root, 'runs', `${SHIPPED.id}.pruned`),
@@ -1518,7 +1516,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     },
   );
 
-  // UNMERGED: one step, signed off, and a branch nobody took — the folder says nothing about shipping, so git is what ends it.
   const aloneDir = path.join(root, 'workflow-alone');
   write(path.join(aloneDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
   const aloneLane = path.join(root, 'worktrees', UNMERGED.id, 'implement');
@@ -1537,7 +1534,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
         workflowDir: aloneDir,
         workflow: [{ name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' }],
         createdAt: ago(0.7),
-        // Handed off, as the tick writes it once the step signed off: the `prune` page cuts its worktree, and a hand-off owed would hold the prune.
+        /** Handed off, as the tick writes it once the step signed off: the `prune` page cuts its worktree, and a hand-off owed would hold the prune. */
         steps: {
           implement: {
             taskId: `${UNMERGED.id}-implement`,
@@ -1553,7 +1550,6 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   );
 }
 
-/** Events as the engine journals them: a line of JSON each. */
 /** SAYING's session so far, as Claude Code 2.1.270 writes it: the prompt, words, and a Read with no result yet. */
 function draftConversation(ago: (minutes: number) => string): object[] {
   const line = {
@@ -1581,12 +1577,13 @@ function draftConversation(ago: (minutes: number) => string): object[] {
   ];
 }
 
+/** Events as the engine journals them: a line of JSON each. */
 export const lines = (events: object[]): string => events.map((event) => `${JSON.stringify(event)}\n`).join('');
 
 /**
  * The engine's feed, as its journal keeps one beside the tasks: every event of every task's journal in the store, in the order they
- * happened. The seed writes each journal by hand, and the api reads when a task was filed off the feed alone (`readFilings`), so this is
- * written last, over them all.
+ * happened, sorted stably so a journal's events that share an instant keep their order. The seed writes each journal by hand, and the api
+ * reads when a task was filed off the feed alone (`readFilings`), so this is written last, over them all.
  */
 export function seedFeed(root: string): void {
   const tasks = path.join(root, 'engine', 'tasks');
@@ -1600,12 +1597,41 @@ export function seedFeed(root: string): void {
         .filter(Boolean)
         .map((line) => ({ taskId: file.slice(0, -'.jsonl'.length), event: JSON.parse(line) as { at: string } })),
     );
-  // Stable, so a journal's events that share an instant keep their order.
   entries.sort((a, b) => a.event.at.localeCompare(b.event.at));
   write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
 }
 
-/** Write the fake run into `root`, which becomes the api's WF_ROOT. Times are minutes before `now`. */
+/**
+ * Write the fake run into `root`, which becomes the api's WF_ROOT, with NEIGHBOUR, LOOPING, HELD, GATED, COSTLY, and last the three runs
+ * whose result is a decision (`seedDecisions`), newest, whose cards take the cells after every other run's. Times are minutes before
+ * `now`. A task's end records the session's own id (`nativeId`) for a harness that has one, which the engine reads a transcript by.
+ *
+ * FAKE's repository is named as the other runs' is, so the Factory's card reads the same. tokens runs beside implement, so it has a
+ * worktree of its own, which theme, its only follower, works in. implement signed off blocked, its conversation on disk (SESSION);
+ * review's task has no journal at all, which is what makes it `unknown`. tokens' files are in its files directory beside the run's
+ * record, named by absolute path in its closeout as a step is told to name them, with a path on its branch beside them. theme's check is
+ * filed on the check harness: its process exited 1, the engine wrote the code down with the attempt's end, and the harness's worker left a
+ * run file and the output with the exit code printed last, its stderr in a file of its own beside the run records.
+ *
+ * NEIGHBOUR's plan signed off with no check, draft's session started after it and has not ended, and sketch failed. draft is registered
+ * as Claude Code registers a session, its inbox the socket run.ts listens on, its conversation so far on disk, and listed with its pid
+ * (REGISTRY).
+ *
+ * LOOPING's review loops back to implement, on round 3: each step's place holds its round-3 task and a try behind it for each round
+ * before, a task the engine ran once, moved there with `then: 'round'` as the run moves it when it files a round. review's `rounds` is
+ * what the parser sets for a loop that does not say. A declared field is a field of the closeout, beside the four every closeout has:
+ * implement answers the findings it was handed, as a loop's target owes from round 2, and each review asks for another round.
+ *
+ * HELD's implement was spawned and never ended, `claude agents` lists its session blocked (REGISTRY), and its conversation ends on the
+ * harness's line; review waits on it, not filed. GATED's plan signed off at the gate the run was started with, filed as the run started
+ * and signed off a few seconds later, sooner than the minute FAKE's steps take from filing to spawn; implement waits on it, not filed.
+ *
+ * COSTLY's tokens is over its own budget, and review's loop is held on implement's. Each session's attempt carries what the engine read of
+ * it — its cost, and the time its harness counted waiting on the model and running tools — except review's, on Codex, which prices
+ * nothing: it reports its input's reads from the cache and writes none, so its usage has the classes and no peak. From round 2,
+ * implement gives its answers to the findings it was handed. palette signed off blocked, having spent more than its cap to get there: a
+ * question for a person, and a budget to raise with the answer.
+ */
 export function seed(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FAKE;
@@ -1614,11 +1640,9 @@ export function seed(root: string, now = Date.now()): void {
 
   const workspace = path.join(root, 'worktrees', id, 'implement');
   const branch = `wf/${id}/implement`;
-  // tokens runs beside implement, so it has a worktree of its own; theme is its only follower, and works in it.
   const lane = path.join(root, 'worktrees', id, 'tokens');
   const laneBranch = FAKE.branch;
   const check = `${id}-theme-check`;
-  // Named as the other runs' repository is, so the Factory's card reads the same.
   const repo = path.join(root, 'hkb-v2');
   const baseRef = seedRepo(repo, laneBranch);
   write(
@@ -1637,7 +1661,7 @@ export function seed(root: string, now = Date.now()): void {
         createdAt: ago(42),
         steps: {
           implement: { taskId: `${id}-implement`, workspace, branch },
-          // review is implement's only follower, so it works in implement's workspace, on its branch.
+          /** implement's only follower, so it works in implement's workspace, on its branch. */
           review: { taskId: `${id}-review`, workspace, branch },
           respond: { taskId: null },
           tokens: { taskId: `${id}-tokens`, workspace: lane, branch: laneBranch },
@@ -1649,11 +1673,6 @@ export function seed(root: string, now = Date.now()): void {
     ),
   );
 
-  /**
-   * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
-   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one;
-   * `denials`, the calls its harness denied the job.
-   */
   const signedOff = (
     task: string,
     harness: string,
@@ -1688,12 +1707,8 @@ export function seed(root: string, now = Date.now()): void {
       ]),
     );
 
-  // implement signed off blocked, and its session's conversation is on disk (SESSION). review's task has no journal at all,
-  // which is what makes it `unknown`.
   signedOff(`${id}-implement`, 'claude', workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
-  // tokens' files, where the run keeps a step's: in its files directory beside the run's record. Named by absolute path in its
-  // closeout, as a step is told to name them, with a path on its branch beside them.
   const files = path.join(root, 'runs', id, 'artifacts', FAKE.unverified);
   write(path.join(files, FAKE.artifacts.image), palette());
   write(path.join(files, FAKE.artifacts.text), 'sky blue emerald amber orange red neutral violet teal rose\n');
@@ -1722,8 +1737,6 @@ export function seed(root: string, now = Date.now()): void {
     FAKE.denied.denials,
   );
 
-  // theme's check, as the run files one on the check harness: its process exited 1, and the engine wrote the
-  // code down with the end of the attempt.
   write(
     path.join(root, 'engine', 'tasks', `${check}.jsonl`),
     lines([
@@ -1734,8 +1747,6 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'settled', at: ago(7), outcome: 'failed' },
     ]),
   );
-  // Its session as the check harness's worker leaves it: a run file, and the output with the exit code the run
-  // printed last. Its stderr goes to a file of its own, beside the run records.
   const session = `ae/${check}/1`;
   const base = path.join(root, 'engine', 'runs', 'check', session.replace(/[^a-zA-Z0-9]+/g, '_'));
   write(`${base}.json`, JSON.stringify({ name: session, state: 'done', pid: 0, heartbeatAt: ago(7), logFile: `${base}.log`, exitCode: 1 }));
@@ -1777,7 +1788,6 @@ export function seed(root: string, now = Date.now()): void {
       2,
     ),
   );
-  // plan signed off with no check; draft's session started after it and has not ended; sketch's failed.
   signedOff(`${NEIGHBOUR.id}-plan`, 'claude', '/code/hkb-v2', 'Plan it.', 5, 3, {
     outcome: 'done',
     summary: 'Planned it.',
@@ -1792,8 +1802,6 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'spawned', at: ago(2.5), attempt: 1 },
     ]),
   );
-  // draft's session at work (SAYING): registered as Claude Code registers one, its inbox the socket run.ts listens on, and its conversation so
-  // far on disk. `claude agents` lists it, with its pid, below (REGISTRY).
   write(
     path.join(root, 'claude', 'sessions', `${SAYING.pid}.json`),
     JSON.stringify({
@@ -1816,8 +1824,6 @@ export function seed(root: string, now = Date.now()): void {
     ]),
   );
 
-  // LOOPING: review loops back to implement, on round 3. Each step's place holds its round-3 task, and a try behind it for
-  // each round before, moved there with `then: 'round'` as the run moves it when it files a round.
   const loopDir = path.join(root, 'workflow-loop');
   const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
   write(path.join(loopDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
@@ -1843,7 +1849,6 @@ export function seed(root: string, now = Date.now()): void {
         workflowDir: loopDir,
         workflow: [
           { name: 'implement', after: [], body: 'Implement it.', harness: 'claude' },
-          // `rounds` as the parser sets it for a loop that does not say.
           {
             name: 'review',
             after: ['implement'],
@@ -1871,8 +1876,6 @@ export function seed(root: string, now = Date.now()): void {
       2,
     ),
   );
-  // A declared field is a field of the closeout, beside the four every closeout has: implement answers the findings it
-  // was handed, as a loop's target owes from round 2, and review asks for another round.
   signedOff(roundTask('implement', 3), 'claude', loopWorkspace, 'Implement it.', 3.9, 2.5, {
     outcome: 'done',
     summary: 'Answered the second review.',
@@ -1893,8 +1896,6 @@ export function seed(root: string, now = Date.now()): void {
     artifacts: [],
     again: true,
   });
-  // The rounds before, each step's try in each a task the engine ran once: implement's second answered the first review, and
-  // each review asked for another round.
   const ranOnce = (task: string, harness: string, brief: string, began: number, ended: number, closeout: object): void =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -1927,8 +1928,6 @@ export function seed(root: string, now = Date.now()): void {
     said(second.review, { again: true }),
   );
 
-  // HELD: implement's attempt was spawned and never ended, and `claude agents` lists its session blocked (REGISTRY); its conversation
-  // ends on the harness's line. review waits on it, not filed.
   const heldDir = path.join(root, 'workflow-held');
   write(path.join(heldDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
   write(path.join(heldDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview it.\n');
@@ -1989,7 +1988,6 @@ export function seed(root: string, now = Date.now()): void {
   );
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
 
-  // GATED: plan signed off at its gate, the gate the run was started with; implement waits on it, not filed.
   const gateDir = path.join(root, 'workflow-gate');
   const planSchema = {
     type: 'object',
@@ -2039,7 +2037,6 @@ export function seed(root: string, now = Date.now()): void {
       2,
     ),
   );
-  // Filed as the run started, and signed off a few seconds later: `signedOff` spawns a minute after filing, which this run is younger than.
   write(
     path.join(root, 'engine', 'tasks', `${gatedPlan}.jsonl`),
     lines([
@@ -2065,8 +2062,6 @@ export function seed(root: string, now = Date.now()): void {
     ]),
   );
 
-  // COSTLY: tokens over its own budget, and review's loop held on implement's. Each session's attempt carries what the engine read of it —
-  // its cost, and the time its harness counted waiting on the model and running tools — except review's, on Codex, which prices nothing.
   const costDir = path.join(root, 'workflow-cost');
   write(path.join(costDir, 'implement.md'), '---\nharness: claude\nbudget: 2\n---\nImplement it.\n');
   write(
@@ -2134,10 +2129,6 @@ export function seed(root: string, now = Date.now()): void {
       2,
     ),
   );
-  /**
-   * A session that ran once — filed, spawned and ended `at` minutes ago — and signed off with `closeout`, with the usage the engine read: a
-   * continuation of the session `resumeFrom`, where one is given.
-   */
   const priced = (
     task: string,
     harness: string,
@@ -2158,7 +2149,6 @@ export function seed(root: string, now = Date.now()): void {
         { kind: 'settled', at: ago(at[2]), outcome: 'succeeded' },
       ]),
     );
-  /** A check that ran to its end and exited 1, from `at[0]` to `at[1]` minutes ago: on the engine's record, and in the log its worker leaves. */
   const refused = (task: string, cwd: string, at: readonly [number, number]): void => {
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -2177,7 +2167,6 @@ export function seed(root: string, now = Date.now()): void {
     write(path.join(root, 'checks', `${task}.stderr`), 'npm error Lifecycle script `test` failed with error:\nnpm error code 1\n');
   };
   const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
-  // Codex reports its input's reads from the cache, and writes none: its classes, and no peak.
   const unpriced = {
     toolCalls: 12,
     inputTokens: 210_000,
@@ -2210,7 +2199,6 @@ export function seed(root: string, now = Date.now()): void {
     done('Two findings.', { again: true }),
     unpriced,
   );
-  // From round 2, a loop's target owes its answers to the findings it was handed: implement gives them, and signs off done.
   priced(
     cost('implement-2'),
     'claude',
@@ -2289,7 +2277,6 @@ export function seed(root: string, now = Date.now()): void {
     `ae/${cost('tokens')}/1`,
   );
   refused(cost('tokens-try2-check'), tokensLane, [1.0, 0.95]);
-  // palette signed off blocked, having spent more than its cap to get there: a question for a person, and a budget to raise with the answer.
   priced(
     cost('palette'),
     'claude',
@@ -2319,7 +2306,5 @@ export function seed(root: string, now = Date.now()): void {
     },
   );
 
-  // The three runs whose result is a decision, in FAKE's repository: at an ending's gate, shipped by an approved ending, and a branch
-  // nobody took. Last, and newest: their cards take the cells after every other run's.
   seedDecisions(root, repo, baseRef, now);
 }

@@ -11,6 +11,7 @@ export type StateFlowEdge = Edge<StateEdgeData, 'state'>;
  * colour, with a dot travelling its path (`Travelling`). An `after` edge is React Flow's bezier between the nodes' sides. A
  * loop's edge back curves beneath the row from under its looping step (`loopPath`), dashed, with the round it is on beside
  * it, and moves as a running edge does while its round is due. Its arrow is the `markerEnd` `stepEdges` gives it, in its colour.
+ * Its label is drawn after the dot, so the dot passes under the round and not over its words.
  */
 export function StateEdge({
   sourceX,
@@ -32,7 +33,6 @@ export function StateEdge({
     <>
       <BaseEdge path={path} markerEnd={markerEnd} data-state={state} style={{ stroke, ...edgeLine(state, loop) }} />
       {state === 'running' && <Travelling path={path} colour={stroke} />}
-      {/* After the dot, so the dot passes under the round and not over its words. */}
       <EdgeText x={labelX} y={labelY} label={label} labelStyle={{ fontSize: 10 }} labelBgPadding={[4, 2]} labelBgBorderRadius={3} />
     </>
   );

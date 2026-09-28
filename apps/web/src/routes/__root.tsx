@@ -27,23 +27,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: Root,
 });
 
+/**
+ * The frame of every page: the sidebar, a header naming the section, and the page, in a centred column unless a matched route's
+ * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself. It follows the workflow feed once for
+ * the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends every
+ * React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
+ */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
   const section = NAV.find((item) => item.active(path))?.label;
   const router = useRouter();
-  // The workflow feed, followed once for the whole page: what moves on it is read again at once, and the polls slow while it is open.
   const feed = useFeed();
 
   return (
-    // React Aria's links navigate through this. Enter on a link makes the browser click it on keydown, and React Aria does not prevent that
-    // click: with no provider the browser follows it, and the whole page loads again. With one, React Aria takes the click and calls the
-    // router. A mouse click goes the same way, since `routeLink` leaves TanStack's own click handler off.
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <SidebarProvider>
         <AppSidebar path={path} />
         <SidebarInset className="min-w-0">
-          {/* `h-12`: the Factory takes the height below it. */}
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3" data-feed={feed}>
             <SidebarTrigger />
             {section && <span className="text-sm font-medium">{section}</span>}
@@ -66,9 +67,9 @@ function Root() {
 /** A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's `to` and its preloading. */
 const NavLink = routeLink(SidebarMenuButton);
 
+/** The menu, with `path`'s place in it marked; on a narrow screen it is a sheet over the page, and a pick closes it. */
 function AppSidebar({ path }: { path: string }) {
   const { isMobile, setOpenMobile } = useSidebar();
-  // On a narrow screen the menu is a sheet over the page: a pick closes it, or it covers what was picked.
   const picked = () => {
     if (isMobile) setOpenMobile(false);
   };

@@ -6,9 +6,11 @@ import type { PageSpec } from '../visit.ts';
 import { store } from '../world.ts';
 
 export default {
-  // A card's page: its body rendered — a heading, a list, a table, a code block, a line of raw HTML shown as text, a link that opens in a
-  // new tab and a `javascript:` one that is only its words — then its keys, each with what it means as the api says it, and Source: the
-  // file as written, frontmatter included. It writes nothing: the inbox is as it was.
+  /**
+   * A card's page: its body rendered — a heading, a list, a table, a code block, a line of raw HTML shown as text, a link that opens in a
+   * new tab and a `javascript:` one that is only its words — then its keys, each with what it means as the api says it, and Source: the
+   * file as written, frontmatter included. It writes nothing: the inbox is as it was.
+   */
   name: 'card',
   route: `/inbox/${CARDS.rich.name}`,
   expect: async (page) => {

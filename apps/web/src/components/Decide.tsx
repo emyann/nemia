@@ -72,7 +72,9 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
 /**
  * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and the
  * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
- * here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first.
+ * here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET line says why
+ * each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. A folder run
+ * has no branch and nothing to merge, so nothing is said of one: where its work is instead, as `wf decide` says.
  */
 export function DecideSection({
   runId,
@@ -86,13 +88,11 @@ export function DecideSection({
   run?: Pick<RunDetail, 'place' | 'work'> | null;
 }) {
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
-  // A folder run has no branch and nothing to merge, so nothing about one: where its work is instead. (`wf decide` says the same.)
   const inFolders = run?.place === 'folder';
   return (
     <DecideFrame runId={runId}>
       {offers}
 
-      {/* Why each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. */}
       {overBudget && (
         <p
           data-over-budget
@@ -198,20 +198,21 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
 /**
  * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Try again` for a
  * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
- * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
+ * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`; a step waiting on you again later starts afresh.
+ *
+ * As `wf decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step gets a new
+ * session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries no message
+ * (`messageRefusal` refuses one) and the box is closed while it is chosen. An answer goes as it was typed, as `--message` takes it; something
+ * to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still holds.
  */
 export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
   const [message, setMessage] = useState('');
-  // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
-  // A denied step, a new session first, as `wf decide` offers it: the one it had was denied, and carries on the same permissions.
   const [mode, setMode] = useState<RetryMode>(
     offer.kind === 'try-again' && offer.unfinished ? 'recheck' : offer.kind === 'denied' ? 'fresh' : 'nudge',
   );
   const field = useId();
-  // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
   const rechecking = mode === 'recheck';
   const ask = useAsk(runId, offer.step, () => setMessage(''));
-  // Once the api says the try is asked, its words show rather than this row's; a step waiting on you again later starts afresh.
   const { reset } = ask;
   useEffect(() => {
     if (offer.kind === 'asked') reset();
@@ -252,8 +253,6 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          // An answer goes as it was typed, as `--message` takes it. Something to tell a try is optional: none, when nothing was written,
-          // and none with a recheck, whatever the closed box still holds.
           const said = !rechecking && (offer.kind === 'answer' || message.trim()) ? { message } : {};
           ask.mutate({ mode, ...said });
         }}
@@ -315,7 +314,11 @@ const AMOUNT =
  * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer, which
  * the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second ask
  * carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its check
- * again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box closed.
+ * again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box closed: it
+ * files no session, so it takes no budget and carries no message, which `messageRefusal` refuses on one.
+ *
+ * The amount goes as typed: one the package refuses is refused in its words, and an empty box sends none, which it refuses too. An answer
+ * goes as it was typed, as `--message` takes it; something to tell a try is optional, and none is sent when nothing was written.
  */
 export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'raise' }> }) {
   const [amount, setAmount] = useState(() => String(raiseTo(offer.above)));
@@ -326,7 +329,6 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   const rounded = useRound(runId);
   const ask = offer.by === 'retry' ? tried : rounded;
   const asks = offer.by === 'retry' && offer.own === 'blocked';
-  // A recheck files no session: it takes no budget, and `messageRefusal` refuses a message on one.
   const rechecking = offer.by === 'retry' && mode === 'recheck';
   const command = `wf ${offer.by} ${runId} ${offer.step} --budget <amount>${asks ? ' --message "<answer>"' : ''}`;
 
@@ -374,12 +376,10 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         onSubmit={(event) => {
           event.preventDefault();
           if (offer.by === 'round') {
-            // As typed: an amount the package refuses is refused in its words, beside the box — and an empty box sends none, which it refuses too.
             rounded.mutate({ step: offer.step, ...(amount.trim() === '' ? {} : { budget: Number(amount) }) });
           } else if (rechecking) {
             tried.mutate({ mode: 'recheck' });
           } else {
-            // An answer goes as it was typed, as `--message` takes it; something to tell a try is optional, and none when nothing was written.
             const said = asks || message.trim() ? { message } : {};
             tried.mutate({ mode, ...(amount.trim() === '' ? {} : { budget: Number(amount) }), ...said });
           }
@@ -457,7 +457,8 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
  * Continue a session the harness blocked, from the banner beside what it said last, as `wf retry` continues it: a nudge — with something to
  * tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session, then filing the
  * try, which continues it told what happened. The api's refusal shows beside the button, verbatim. Once the api has the ask, what the tick
- * does with it (`askedSaid`), until the run is read again and the banner says it in `wf ls`'s words.
+ * does with it (`askedSaid`), until the run is read again and the banner says it in `wf ls`'s words. Nothing written is a nudge with no
+ * message, as `wf retry` sends one; something written goes as it was typed, as `--message` takes it.
  */
 export function Continue({ runId, step }: { runId: string; step: string }) {
   const [message, setMessage] = useState('');
@@ -477,7 +478,6 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          // Nothing written is a nudge with no message, as `wf retry` sends one; something written goes as it was typed, as `--message` takes it.
           ask.mutate({ mode: 'nudge', ...(message.trim() ? { message } : {}) });
         }}
       >
@@ -506,21 +506,23 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
   );
 }
 
-/** An ask for a step's next try through the api (`askTry`), and the run read again once the api has it. */
+/**
+ * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`), never
+ * its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on would
+ * fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads, which
+ * answers a gate from the board.
+ *
+ * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
+ * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it.
+ */
 export function useAsk(runId: string, step: string, onAsked: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    // `step` in the ask names another step to try instead, for an ending step's gate, where the send-back goes to the work and not to the
-    // step at the gate (`sendBackTo` in agent-orchestrator); it is not part of the request the api takes.
     mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) =>
       askTry(runId, to ?? step, how),
     onSuccess: () => {
       onAsked();
-      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody. The run's own record alone
-      // (`exact`), never its decisions: those are keyed by the state of the run they were read for (`decisionStamp`), and a refetch of the
-      // key the page is on would fill it with the answer for the state after this write — which is what the next key is for.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      // And the list the Factory's card reads, which answers a gate from the board.
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
     },
   });
@@ -541,14 +543,15 @@ function useAccept(runId: string, step: string) {
   });
 }
 
-/** An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it. */
+/**
+ * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it: its record alone
+ * (`exact`), as for a try, since a decision is keyed by the state it was read for.
+ */
 function useRound(runId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
     onSuccess: () => {
-      // The run as the api has it now: the looping step's note says the round is asked, and the loop waits on nobody. Its record alone, as
-      // for a try: a decision is keyed by the state it was read for.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
@@ -744,11 +747,13 @@ const LINE_CLASS: Record<DiffLine, string> = {
   context: '',
 };
 
-/** One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. */
+/**
+ * One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. Its summary is a
+ * flex row, which draws no marker of its own: a chevron says it opens, and turns when it has.
+ */
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
     <details data-diff={file.path} className="group rounded border border-neutral-200 dark:border-neutral-800">
-      {/* A flex summary draws no marker of its own: the chevron says it opens, and turns when it has. */}
       <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900">
         <ChevronRight aria-hidden className="size-3.5 shrink-0 text-neutral-500 transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
@@ -832,7 +837,7 @@ function CommandLine({ command: c }: { command: DecideCommand }) {
 
 /**
  * `wf accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the button
- * waits for it — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls the package's `accept()`.
+ * waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls the package's `accept()`.
  * What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api has it, what the tick does with it,
  * until the run is read again and the loop is offered no more.
  */
@@ -852,11 +857,9 @@ export function AcceptCommand({ runId, step, command }: { runId: string; step: s
       ) : (
         <form
           aria-label={`Accept ${step} as it stands`}
-          // Under the command, past its label (w-16 and the row's gap-2).
           className="space-y-2 pl-18"
           onSubmit={(event) => {
             event.preventDefault();
-            // As typed, as `--message` takes it: words that are only whitespace are the package's to refuse, in its words.
             accept.mutate({ message });
           }}
         >

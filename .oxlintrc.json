@@ -112,7 +112,6 @@
     },
     {
       "files": ["apps/web/**"],
-      "excludeFiles": ["apps/web/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

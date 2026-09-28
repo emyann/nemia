@@ -7,7 +7,8 @@ import { Continue } from './Decide';
 /**
  * What a person has to decide about the run's result, above the banner and the page, as `wf ls` prints `→ to decide:` above
  * `→ waiting on you`: the ending step's gate, in the folder's own words, with the command that approves it — linked to that step's
- * section, where Approve and Send back are — or the result branch nobody has merged. Nothing while there is nothing to decide.
+ * section, where Approve and Send back are, by a hash the browser scrolls to and no navigation — or the result branch nobody has merged.
+ * Nothing while there is nothing to decide.
  */
 export function ToDecideBanner({ run }: { run: RunDetail }) {
   const decide = toDecideOf(run);
@@ -20,7 +21,6 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
     >
       <strong>To decide:</strong>{' '}
       {decide.kind === 'approve' ? (
-        // To the ending step's section, where its gate is: a hash the browser scrolls to, and no navigation.
         <a href={`#${stepAnchor(decide.step)}`} data-approve={decide.step} className="underline underline-offset-2">
           {decide.said}
         </a>
@@ -40,12 +40,15 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
  * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate, `approve plan`,
  * linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner says (`onYouOf`),
  * which is above this one and names it: `wf ls` does not ask for the same step twice. A run whose whole `waiting on you` was that step has
- * no banner here at all.
+ * no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation. A step at its gate is said in the
+ * line alone: its approval is no question to list under it.
+ *
+ * A question is answered from the Decide section; a session the harness blocked, here. Under such a session, what a person does about the
+ * wait, in the package's words (`answerIn`): the harness answers it, and this board does not — Continue only asks the tick for another try.
+ * Once that try is asked, the next tick stops the session, so that advice goes, and the step's note says what was asked instead.
  */
 export function NeedsBanner({ run }: { run: RunDetail }) {
-  // A step at its gate is said in the line, as `wf ls` says it (`approve plan`): its approval is no question to list under it.
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
-  // Each step waited on with `wf ls`'s words for it, the ending step's own gate left to the banner above.
   const said = onYouOf(run);
   const asks = run.waitingOnYou.map((step, i) => ({ step, said: run.onYou[i] ?? step })).filter((one) => said.includes(one.said));
   if (!asks.length && !needs.length) return null;
@@ -65,7 +68,6 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
                 {said === step ? (
                   said
                 ) : (
-                  // To the step's section on this page, where Approve is: a hash the browser scrolls to, and no navigation.
                   <a href={`#${stepAnchor(step)}`} data-approve={step} className="underline underline-offset-2">
                     {said}
                   </a>
@@ -80,7 +82,6 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
       {needs.length > 0 && (
         <ul className="space-y-2">
           {needs.map((need) => {
-            // A question is answered from the Decide section; a session the harness blocked, here.
             const offer = need.kind === 'harness' ? offers.find((o) => o.step === need.step) : undefined;
             return (
               <li key={need.step} data-need={need.kind} data-step={need.step} className="space-y-1.5">
@@ -88,9 +89,6 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
                   <strong>{need.step}</strong> {need.kind === 'harness' ? 'is ' : ''}
                   {needText(need)}
                 </p>
-                {/* What a person does about the wait the line above says, in the package's words: the harness answers it, and this board
-                    does not — Continue below only asks the tick for another try (`answerIn`). Once that try is asked, the next tick stops
-                    this session, so the advice to answer a prompt in it goes, and the note below says what was asked instead. */}
                 {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
                   <p data-advice className="break-words text-xs">
                     {need.waitingFor.advice}

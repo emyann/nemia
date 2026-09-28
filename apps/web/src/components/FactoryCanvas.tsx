@@ -65,11 +65,12 @@ import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
 import { afterEdges } from './stepGraph';
 
-/** Where the cards were left in this browser: the arrangement saved at today's cell width, or else the one saved at the old, widened. */
+/** Where the cards were left in this browser: the arrangement saved at the cell width, or else the one saved at the narrower width, widened (`widenLayout`). */
 const savedLayout = (): Map<string, Point> | null => readFactoryLayout() ?? widenLayout(readNarrowFactoryLayout());
 
-// Declared once: a new object per render makes React Flow warn and mount every node afresh.
+/** The floor's node types for React Flow, one object for the module's life. */
 const nodeTypes = { run: RunNode };
+/** The floor's edge types for React Flow, one object for the module's life. */
 const edgeTypes = { state: StateEdge };
 
 /** The room left round the cards when the floor is fitted, beyond what the floor's own panels take (`fitClear`). */
@@ -77,9 +78,9 @@ const FIT_GAP = 16;
 
 /**
  * How the floor is fitted: every card in view, and none under a panel drawn over the floor — the buttons at its top, the zoom controls,
- * the legend and the minimap at its bottom. A padding in proportion to the floor was not enough: with a floor of three rows, the fit put
- * the bottom row's footer under the legend, which wraps to two lines, and its Approve could not be pressed. So the panels are measured
- * where they are drawn, at each fit, and the fit keeps that much clear above and below: the legend's height moves with the floor's width.
+ * the legend and the minimap at its bottom. Takes the floor's frame, or null; measures the panels in it where they are drawn, at each
+ * call, since the legend's height moves with the floor's width; and returns React Flow's fit options, at zoom 1 at most, keeping clear
+ * above and below as much as the panels take, plus `FIT_GAP`. A panel hidden on a narrow floor is drawn nowhere and takes no room.
  */
 function fitClear(frame: HTMLElement | null) {
   let top = 0;
@@ -88,7 +89,6 @@ function fitClear(frame: HTMLElement | null) {
     const box = frame.getBoundingClientRect();
     for (const panel of frame.querySelectorAll('.react-flow__panel')) {
       const at = panel.getBoundingClientRect();
-      // A panel hidden on a narrow floor is drawn nowhere, and takes no room.
       if (!at.height) continue;
       if (panel.classList.contains('top')) top = Math.max(top, at.bottom - box.top);
       if (panel.classList.contains('bottom')) bottom = Math.max(bottom, box.bottom - at.top);
@@ -104,9 +104,8 @@ const REVEAL_MIN_ZOOM = 0.4;
 const HANDFUL = 5;
 
 /**
- * The minimap in the cards' terms — to decide, waiting on you, still going, or finished.
- * To decide first, then waiting on you, then finished: a run whose result nobody has decided, and one stopped at a step that needs a
- * person, are both over, and both still want finding.
+ * A card's colour on the minimap, in the cards' terms: to decide, else waiting on you, else finished, else still going. A run whose
+ * result nobody has decided, and one stopped at a step that needs a person, are both over, and both still want finding.
  */
 const minimapFill = (node: RunFlowNode) =>
   toDecideOf(node.data.run)
@@ -135,7 +134,7 @@ const minimapFill = (node: RunFlowNode) =>
  * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`) —
  * and, when no wf up ticks the store, that nothing does and how to start one (`DaemonLine`), since a run waiting its turn and a run nobody moves
  * look alike on the floor. The cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed
- * carries no card's events yet: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
+ * carries no card's events: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   return (
@@ -159,6 +158,35 @@ const readsOf = (results: UseQueryResult<RunDetail>[]): Read[] =>
 const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
 
+/**
+ * The factory's floor and its header, for `FactoryCanvas`: the runs shown (`floorRuns`), each a card placed by `placeRuns`.
+ *
+ * - A refetch that moves a status moves no card: what lays the cards out is kept by its content (`useContent`).
+ * - Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`): each tile's attempt and cost,
+ *   and what the inspector shows. A closed card reads the list, and so does an open card's flowchart.
+ * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening
+ *   or closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless
+ *   an opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a
+ *   card off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
+ * - On mount it forgets the steps' arrangement saved in this browser (`forgetFactorySteps`).
+ * - A card opened is brought into view once the floor is laid out for it, and the run inspected is kept in view when the inspector
+ *   narrows the floor: panned to its middle, if any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM`
+ *   at most. Its box is the cells it takes (`openSpan`) less the gap beside the last, which React Flow may not have measured yet.
+ * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
+ *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane,
+ *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header.
+ * - Reset layout lays the cards on the grid again with every run closed and the saved arrangement forgotten; Collapse all closes every
+ *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
+ * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
+ *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
+ *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
+ * - The floor fills the screen under the root's header. The queue lane sits at its left, off while a step's inspector is open. The
+ *   floor's hint shows only where the floor is wide enough beside its buttons, and the legend wraps short of the minimap when there is
+ *   one; arrowheads take their edges' colour in both themes.
+ * - A click on a card, or Enter on the card itself, opens or closes it; a click or Enter on a link or a button in it does only what
+ *   that does. A press on a step's tile opens its inspector, which closes on a click on the floor, and when the run's read no longer
+ *   has that step.
+ */
 function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const { fitView, setViewport } = useReactFlow<RunFlowNode>();
   const store = useStoreApi<RunFlowNode>();
@@ -167,27 +195,18 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const flying = useMemo(() => new Set(runs.filter(inFlight).map((run) => run.id)), [runs]);
   const shown = useMemo(() => floorRuns(runs, showFinished), [runs, showFinished]);
   const known = useMemo(() => new Set(runs.map((run) => run.id)), [runs]);
-  // The list is new on every refetch; what lays the cards out is kept by its content, so a refetch that moves a status moves no card.
   const ids = useContent(shown.map((run) => run.id));
-  // Each card's runs it waits on: what lays the cards joined by an edge out layered.
   const afterEntries = useContent(shown.map((run): [string, string[]] => [run.id, run.after]));
   const after = useMemo(() => new Map(afterEntries), [afterEntries]);
 
-  // The runs whose cards are open, in the order they were opened; kept in this browser.
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
   const openSet = useMemo(() => new Set(open), [open]);
-  // The step whose inspector is open.
   const [selected, setSelected] = useState<{ runId: string; step: string } | null>(null);
 
-  // Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`): each tile's attempt and cost, and
-  // what the inspector shows. A closed card reads the list, and so does an open card's flowchart.
   const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
-  // Combined, the reads keep their identity until one of them changes (react-query shares what is equal).
   const reads = useQueries({ queries: opened.map((id) => runQuery(id)), combine: readsOf });
   const details = useMemo(() => new Map(opened.map((id, i) => [id, reads[i] ?? NOT_READ])), [opened, reads]);
 
-  // The cells each open card takes, from its tiles' size — which reads the steps' names and the graph, not their words — the run opened
-  // last first: the order `placeRuns` claims cells in.
   const spanEntries = useContent(
     [...opened].reverse().map((id): [string, Span] => {
       const run = shown.find((one) => one.id === id)!;
@@ -206,33 +225,22 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   );
   const spans = useMemo(() => new Map(spanEntries), [spanEntries]);
 
-  // Where each card is and how big React Flow measured it, changed only through `onNodesChange`, a run joining or leaving the floor or
-  // opening or closing, and a reset. What a card shows is read below. The cards left open on the last visit claim their cells first,
-  // and the ones saved around them stay where they were left unless one is under an open card.
   const [placed, setPlaced] = useState<PlacedCard[]>(() => {
     const at = placeRuns(ids, new Map(), savedLayout(), spans, after, new Set());
     return ids.map((id) => nodeOf(id, at.get(id)!));
   });
-  // Which runs and open cards `placed` was last laid out for: whatever reads the cards' positions waits for it.
   const [placedFor, setPlacedFor] = useState<{ ids: string[]; spans: ReadonlyMap<string, Span> } | null>(null);
 
-  // The open cards the floor was last laid out with — at first, the ones left open on the last visit: a card not among them opens when it
-  // is drawn open, and is the only thing that moves a card aside (`unfoldingNow`). A card dropped moves nothing but itself.
   const drawn = useRef(new Set(opened));
 
-  // Set when a card has moved — dragged, or moved aside by a card opening — and cleared once the arrangement is saved.
   const moved = useRef(false);
 
-  // Runs that started, finished, were asked for, opened or closed since: every card where it belongs.
   useEffect(() => {
     const { unfolding, drawn: now } = unfoldingNow(drawn.current, spans);
     drawn.current = now;
-    // React Flow's nodes are state a drag and its measurements write too: a run joining or leaving the floor, or a card opening or
-    // closing, is merged into them after the commit, with the arrangement saved in this browser.
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
       const onFloor = new Map(current.map((node) => [node.id, node.position]));
-      // Cards on the floor stay put, unless a card opening now covers them; one coming back yields its old cell.
       const at = placeRuns(ids, onFloor, savedLayout(), spans, after, unfolding);
       const next = ids.map((id) => {
         const node = have.get(id);
@@ -240,7 +248,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
         if (!node) return nodeOf(id, point);
         return node.position.x === point.x && node.position.y === point.y ? node : { ...node, position: point };
       });
-      // A card an open card moved aside is kept where it went, so the next visit lays out the same floor.
       if (next.some((node) => have.has(node.id) && node !== have.get(node.id))) moved.current = true;
       return next.length === current.length && next.every((node, i) => node === current[i]) ? current : next;
     });
@@ -250,21 +257,17 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
-    // A card off the floor now keeps where it was left; a run the store no longer lists does not.
     saveFactoryLayout(keepLayout(savedLayout(), new Map(placed.map((node) => [node.id, node.position])), known));
   }, [placed, known]);
 
   useEffect(() => {
-    // A run the store no longer lists is not kept open.
     const kept = open.filter((id) => known.has(id));
     if (kept.length) saveFactoryOpen(kept);
     else forgetFactoryOpen();
   }, [open, known]);
 
-  // Where a person dragged the steps of the graph that used to unfold beside a card: nothing reads it since the steps went onto the card.
   useEffect(() => forgetFactorySteps(), []);
 
-  // What the observers and the reveal read, as of the last commit.
   const frame = useRef<HTMLDivElement>(null);
   const latest = useRef({ open, placed, spans, inspecting: selected?.runId ?? null });
   useLayoutEffect(() => {
@@ -272,17 +275,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   });
 
   const onNodesChange = useCallback((changes: NodeChange<RunFlowNode>[]) => {
-    // A card dropped where a person dragged it stays there, over whatever it landed on, and the arrangement is kept. It moves alone:
-    // the cards joined to it by `after` stay, and their edges stretch.
     if (changes.some((change) => change.type === 'position' && !change.dragging)) moved.current = true;
     const kept = changes.filter(placing);
     setPlaced((current) => applyNodeChanges(kept, current));
   }, []);
 
-  // A click opens or closes a run. The run just opened is brought into view once the floor is laid out for it.
   const revealing = useRef<string | null>(null);
   const toggle = useCallback((runId: string) => {
-    // Opened by a click, it moves aside the cards under it.
     if (!latest.current.open.includes(runId)) drawn.current.delete(runId);
     setOpen((current) => toggleOpen(current, runId));
     setSelected((current) => (current?.runId === runId ? null : current));
@@ -317,14 +316,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     });
   }, [placed, shown, flying, openSet, details, selected, toggle, inspect]);
 
-  // Between the cards: from each run a card waits on, into it.
   const edges = useMemo((): Edge[] => afterEdges(shown), [shown]);
 
-  /**
-   * An open card brought into view, if any of it is off the floor's screen: panned to its middle, and zoomed out only as far as it must be.
-   * Its box is the cells it takes (`openSpan`), less the gap beside the last: the card as it will be drawn, which React Flow may not have
-   * measured yet.
-   */
   const reveal = useCallback(
     (runId: string) => {
       const { placed, spans } = latest.current;
@@ -357,13 +350,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     const runId = revealing.current;
     if (!runId || placedFor?.ids !== ids || placedFor.spans !== spans) return;
     revealing.current = null;
-    // Closed again, or not on the floor: nothing to show.
     if (openSet.has(runId) && spans.has(runId)) reveal(runId);
   }, [placedFor, ids, spans, openSet, reveal]);
 
-  // Fitted once per ask, and not before the cards asked for are on the floor, or it fits the floor
-  // they are about to join. Asked once from the start: the first fit is this one, not React Flow's own, so it keeps clear of the
-  // panels too (`fitClear`) — React Flow waits for the cards to be measured — and it is not animated from nowhere.
   const [fits, setFits] = useState(1);
   const fitted = useRef(0);
   useEffect(() => {
@@ -374,7 +363,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
   }, [fits, placed, ids, fitView]);
 
-  // The floor narrows when a step's inspector opens beside it: the run inspected is kept in view.
   const onFloor = shown.length > 0;
   useEffect(() => {
     const el = frame.current;
@@ -391,8 +379,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 
   const close = useCallback(() => setSelected(null), []);
 
-  // Laid out on the grid again with every run closed and the saved arrangement forgotten, so the next visit agrees. The open
-  // runs are forgotten by the effect that keeps them, its one writer.
   const resetLayout = () => {
     forgetFactoryLayout();
     setOpen([]);
@@ -401,7 +387,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setPlaced((current) => current.map((node) => ({ ...node, position: at.get(node.id) ?? node.position })));
     setFits((n) => n + 1);
   };
-  // Every card closed. The cards they moved aside stay where they went.
   const collapseAll = () => {
     setOpen([]);
     setSelected(null);
@@ -412,16 +397,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   };
   const finished = runs.length - flying.size;
-  // Said beside the counts: a run stopped at a step that needs a person, or waiting on a run that never ships without one. Nothing of it
-  // moves, so it is counted finished too, but it stays on the floor whatever "Show finished" says (`floorRuns`): each has its card.
   const waiting = runs.filter(waitsOnYou).length;
-  // And the runs nobody has decided, which are finished too and stay on the floor: counted as `wf ls` says them, before who else
-  // the run waits on. A run at its ending's gate is in both counts — the decision is what it waits on you for.
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
-  // Polled every 5 s whether or not the feed is followed: a card queued, dropped or edited is on no event of it.
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queue.data) : [];
-  // The lane beside the floor comes or goes with the first card queued or the last one started: the floor is fitted again to its new width.
   const laned = queued.length > 0;
   const wasLaned = useRef(laned);
   useEffect(() => {
@@ -429,9 +408,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     wasLaned.current = laned;
     setFits((n) => n + 1);
   }, [laned]);
-  // The quota over the floor, read in the route's loader so the floor is fitted beside it once. Should it come, go, or change what it says —
-  // a sentence in place of the numbers, which may wrap the header to another line, or the dimmed last reading under it — the floor is fitted
-  // again to its new height.
   const quota = useQuery(quotaQuery);
   const quotaShown = quota.error ? 'error' : `${quota.data?.state ?? 'none'}${quota.data?.last ? ' with the last reading' : ''}`;
   const wasQuota = useRef(quotaShown);
@@ -440,8 +416,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     wasQuota.current = quotaShown;
     setFits((n) => n + 1);
   }, [quotaShown]);
-  // Whether a wf up ticks the store, read in the route's loader too: the line comes when nothing ticks and goes when one does, and changes
-  // its words with how, which may wrap it — the floor is fitted again to the header's new height.
   const daemon = useQuery(daemonQuery);
   const daemonShown = daemon.error ? 'error' : daemon.data && !daemon.data.ticking ? daemon.data.kind : 'nothing';
   const wasDaemon = useRef(daemonShown);
@@ -455,12 +429,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     return sum + columns * rows;
   }, 0);
 
-  // A step the folder has lost since it was clicked is off the floor, and its panel goes with it.
   const inspectedRun = selected ? (details.get(selected.runId)?.detail ?? null) : null;
   const inspected = inspectedRun?.steps.find((step) => step.name === selected?.step);
 
   return (
-    // The height left under the root's `h-12` header, so the floor fills the screen and no more.
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -474,7 +446,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
           <DaemonLine daemon={daemon.data} error={daemon.error} />
           <QuotaLine quota={quota.data} error={quota.error} />
         </div>
-        {/* The aria switch is a label of its own, round its input, so its words are a label beside it that names that input. */}
         <div className="flex items-center gap-2 text-sm">
           <Switch id={finishedSwitch} isSelected={showFinished} onChange={toggleFinished} />
           <label htmlFor={finishedSwitch} className="cursor-pointer">
@@ -484,7 +455,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {/* Off while a step's inspector is open beside the floor, which the two together would leave too narrow to read: the header still counts the queue. */}
         {laned && !(inspectedRun && inspected) && <QueueLane cards={queued} />}
         {shown.length ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
@@ -496,14 +466,12 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                 edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
                 onNodeClick={(event, node) => {
-                  // The title's link, the chevron, a tile and the gate's buttons do what they do, and no more.
                   if ((event.target as Element).closest('a, button')) return;
                   toggle(node.id);
                 }}
                 onPaneClick={close}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter') return;
-                  // On a card itself: Enter on the title's link, the chevron or a tile is theirs.
                   const target = event.target as HTMLElement;
                   if (!target.classList.contains('react-flow__node')) return;
                   const node = nodes.find((candidate) => candidate.id === target.dataset.id);
@@ -516,11 +484,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                 selectionKeyCode={null}
                 multiSelectionKeyCode={null}
                 colorMode="system"
-                // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
                 defaultMarkerColor={null}
                 minZoom={0.2}
               >
-                {/* Only where the floor is wide enough for it beside the buttons: a step's inspector narrows it. */}
                 <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">
                   Click a run to open its steps · drag a card, and it moves alone · kept in this browser
                 </Panel>
@@ -537,7 +503,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                 </Panel>
                 <Background variant={BackgroundVariant.Dots} gap={16} />
                 <Controls showInteractive={false} showFitView={false} />
-                {/* Wrapped short of the minimap, when there is one. */}
                 <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
                 {cells > HANDFUL && <MiniMap<RunFlowNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
               </ReactFlow>
@@ -564,11 +529,11 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count is the
  * cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is not; the
  * difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, with its breakdown on hover (`passTitle`), once a pass has
- * written it. Nothing until the cap is read; why, when it cannot be.
+ * written it, its time of day said as today's or another day's against a clock read each minute (`useNow`). Nothing until the cap is
+ * read; why, when it or the queue cannot be.
  */
 function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
   const { data, error } = useQuery(ceilingsQuery);
-  // The pass's time of day is said as today's or another day's: read against a clock that moves.
   const now = new Date(useNow(60_000));
   if (error || queueError) {
     return (

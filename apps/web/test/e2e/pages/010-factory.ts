@@ -79,6 +79,12 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
 const IN_FLIGHT_BY_CAP = 3;
 
 export default {
+  /**
+   * The Factory: the queue's ghosts at the floor's left edge and the run slots over it; the runs in flight, to decide and waiting on you
+   * as cards on the floor, the finished ones once asked for; the diamond drawn as a graph of cards, whose picture is the floor as a person
+   * first finds it; each card dragged alone and kept where it was put down; a card opened on its steps, a press on a tile opening the step's
+   * inspector; and the loop's arrow back.
+   */
   name: 'factory',
   route: '/',
   expect: async (page) => {
@@ -86,9 +92,6 @@ export default {
     const floor = page.locator('.react-flow');
     await expectVisible(floor, 'the Factory canvas');
 
-    // The queue, at the floor's left edge: a ghost per queued card, in the order the tick starts them, each saying its place, first line,
-    // workflow and repository, and linked to its card's page — the refused one marked with why — and none of them a node on the floor. Over
-    // the floor, the run slots taken of the cap the daemon's last pass ran with, and how many are queued.
     const lane = page.locator('aside[aria-label="Queued cards"]');
     const ghosts = lane.locator('a[data-ghost]');
     await expectCount(ghosts, QUEUED.length, `a ghost per queued card (${QUEUED.map((c) => c.name).join(', ')})`);
@@ -131,7 +134,6 @@ export default {
       [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued · ${PASS.line}`],
       `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight — and what the daemon's last pass took`,
     );
-    // What the last pass cost, whole, on hover: the pass's totals, each phase in the package's order, the harness observed, and what measuring took.
     const pass = page.locator('[data-cap] [data-pass]');
     await expectTexts(pass, [`· ${PASS.line}`], 'the pass is said beside the cap');
     const passTitle = (await pass.getAttribute('title')) ?? '';
@@ -159,26 +161,20 @@ export default {
     }
     const { card, pills, tiles, pill, tile } = onTheFloor(page);
     const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
-    // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
     await expectVisible(
       beside,
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
     await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
-    // A run whose session the harness blocked is in flight too: its card names the harness and what it waits for, which the list carries.
-    // What the session said last is on the run's page, which reads it: the list reads no conversation.
     await expectVisible(
       page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, {
         hasText: new RegExp(`^${HELD.blocked} is blocked by the harness: ${HELD.wait}$`),
       }),
-      `the card of a run whose session the harness blocked says so, and what the harness waits for — not needs-human alone (${HELD.id})`,
+      `the card of a run whose session the harness blocked says so, and what the harness waits for — not needs-human alone, and not what the session said last, which only the run's page reads (${HELD.id})`,
     );
     await settled(page);
-    // As a person first finds it: every card on the fitted floor can be read and pressed, none under the legend or the buttons.
     await expectClearOfPanels(page, 'on first load');
 
-    // The diamond, drawn as a graph of cards: an edge from each run a card waits on into it, parents left of children, and the two
-    // sides level about the middle. Its top and its shipped side are finished, and on the floor all the same: a run in flight waits on each.
     const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
     for (const run of [top, shipped, running, bottom])
       await expectVisible(cardOf(page, run.id), `the diamond's card ${run.id} is on the floor by default`);
@@ -188,11 +184,8 @@ export default {
         `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it`,
       );
     }
-    // The run called off moves no more and waits on nobody: off the floor. The run waiting on it will wait for ever without a person, so
-    // it waits on you, and its card stays on the floor though nothing of it moves.
     await expectCount(cardOf(page, cancelled.id), 0, `${cancelled.id} is not on the floor by default: called off, it waits on nobody`);
     await expectVisible(cardOf(page, orphan.id), `${orphan.id} is on the floor by default: it waits on a run called off, so on a person`);
-    // Counted, not seen: an edge whose ends are level is a path with no height, which Playwright takes for hidden.
     for (const [from, to, state] of [
       [top, shipped, 'done'],
       [top, running, 'done'],
@@ -211,17 +204,15 @@ export default {
       'the four edges of the diamond, and no other edge between cards',
     );
     await expectDiamond(page, 'on the default floor');
-    // What each card waits on, in `wf ls`'s word: the bottom on the side still running alone, and not on you.
     await expectVisible(
       cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
-      `the bottom's card says ${DIAMOND.words.bottom}: the side that shipped is waited on no more`,
+      `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that shipped is waited on no more`,
     );
     await expectCount(
       cardOf(page, bottom.id).getByText('waiting on you', { exact: true }),
       0,
       'and does not wait on you: the side it waits on may still ship',
     );
-    // Its steps, at rest, a rail of pills that waits: each pill inside the card, what it waits on whole on hover.
     await expectVisible(
       cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-step][data-state="waiting"]'),
       "the bottom card's rail draws its step waiting",
@@ -233,13 +224,10 @@ export default {
     );
     for (const run of [top, shipped, running])
       await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
-    // How long each has been at work, counted from when it started: the running side waited a minute on the top, created and nothing of
-    // it filed, and that minute is on hover, not in its time at work. The bottom and the orphan have not started: they say they wait.
     await expectVisible(
       cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s since it started$/ }),
       `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
     );
-    // Counted from the instant the api says it started, its first filing, and not from its creation a minute before.
     const times = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
       createdAt: string;
       startedAt: string | null;
@@ -265,13 +253,9 @@ export default {
       1,
       "the Factory's legend draws the edge between two cards",
     );
-    // Photographed as a person first finds it: the page's own photograph is taken at the end, after a graph unfolded over the diamond.
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-diamond-${await themeOf(page)}.png`), fullPage: true });
 
-    // Each card moves alone, as in a modeller: a card dragged moves that card, and nothing else on the floor — not the cards that wait on
-    // it, which the edges put to its right, nor the ones it waits on. The edges between them stretch, and pull nothing. The diamond's top,
-    // dragged up and to the right, leaves both sides and the bottom where they are.
     const everyOther = (...ids: string[]) =>
       page.locator(`.react-flow__node[data-id]${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
     await expectMovedAlone(
@@ -280,7 +264,6 @@ export default {
       `${top.id} dragged moves alone — ${shipped.id}, ${running.id} and ${bottom.id}, which wait on it, stay, and so does every other card`,
       everyOther(top.id),
     );
-    // A side leaves the bottom, which waits on it, the top, which it waits on, and the other side.
     await expectMovedAlone(
       cardOf(page, running.id),
       () => dragBy(page, cardOf(page, running.id).locator('time'), { x: 60, y: 30 }, `the card of ${running.id}`),
@@ -296,7 +279,6 @@ export default {
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-cards-dragged-${await themeOf(page)}.png`), fullPage: true });
-    // Kept in this browser: the next visit finds the side where it was put down, and the bottom where it was before either drag.
     const [putDown, leftBe] = [await placeOf(cardOf(page, running.id)), await placeOf(cardOf(page, bottom.id))];
     await nextVisit(page, async (again) => {
       await expectVisible(cardOf(again, running.id), `${running.id} is on the floor on the next visit`);
@@ -308,32 +290,22 @@ export default {
         throw new Refused(`the next visit finds ${bottom.id} where no drag moved it, ${said(leftBe)} — it is at ${said(stayed)}`);
     });
 
-    // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight. Its followers read `waiting`, and
-    // will for ever — but the blocked step asks a person something, so the run waits on you, and its card stays on the floor until answered.
     await expectVisible(card, `a run with a step signed off blocked waits on a person: its card is on the floor by default (${FAKE.id})`);
-    // So does the loop out of rounds: it waits on a person, and nothing of it moves.
     await expectVisible(
       cardOf(page, LOOPING.id),
       `a loop out of rounds waits on a person: its card is on the floor by default (${LOOPING.id})`,
     );
-    // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. To decide: ENDING and UNMERGED. Waiting on you: FAKE,
-    // LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off.
     await expectVisible(
       page.getByText('4 in flight · 12 finished · 2 to decide · 6 waiting on you'),
-      'the Factory counts the runs in flight, the finished, those nobody has decided, and those waiting on you',
+      "the Factory counts the runs in flight (NEIGHBOUR, HELD, the diamond's running side and its bottom), the finished, those nobody has decided (ENDING and UNMERGED), and those waiting on you (FAKE, LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off)",
     );
-    // A run at a gate in its middle: nothing of it moves until a person approves its step, and the api reads it failed, with nothing to
-    // decide about its result — its card stays on the floor all the same, since it waits on a person.
     await expectVisible(
       cardOf(page, GATED.id),
-      `a run held at its plan's gate waits on a person: its card is on the floor by default (${GATED.id})`,
+      `a run held at its plan's gate waits on a person, though the api reads it failed with nothing to decide: its card is on the floor by default (${GATED.id})`,
     );
 
-    // A run nobody has decided is finished too — and its card is on the floor all the same, until it is decided: at its ending's gate,
-    // in the folder's own words with the command that approves it; or with a branch nobody merged, which git ends.
     const ending = cardOf(page, ENDING.id);
     await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
-    // What approving does and where a send-back goes, in a row; the line whole, and the folder's own words for the ending, on hover.
     await expectVisible(
       ending.locator(
         `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}"]`,
@@ -361,7 +333,6 @@ export default {
     );
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
     await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
-    // Decided: its ending merged the branch, so there is nothing to decide and its card is off the floor with the finished.
     await expectCount(
       cardOf(page, SHIPPED.id),
       0,
@@ -373,7 +344,6 @@ export default {
     await showFinished(page);
     await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
     await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
-    // Pruned with its files (`wf prune --artifacts`): the card says so in its footer, and what went and what stayed on hover.
     await expectVisible(cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
     const prunedSaid = await cardOf(page, SHIPPED.id).locator('[data-pruned]').getAttribute('title');
     if (
@@ -386,18 +356,14 @@ export default {
       );
     }
     await expectCount(page.locator('[data-pruned]'), 1, 'and no other card says pruned: SHIPPED is the one run pruned');
-    // A run with no repository says `folders` where a git run's card says its repository's name, and where its steps worked on hover. Not a
-    // row of its own: a card drawn taller than its cell reaches over the card beneath it on every layout (`expectClearOfEachOther`), and the
-    // path is on the run's page, copyable, for a person who wants to open it.
     const inFolders = cardOf(page, FOLDER.id).getByText('folders', { exact: true });
     await expectVisible(inFolders, `a folder run's card says folders, and names no repository (${FOLDER.id})`);
     const where = await inFolders.getAttribute('title');
     if (!new RegExp(String.raw`^Its steps work in folders under .+[\\/]runs[\\/]${FOLDER.id}[\\/]work$`).test(where ?? '')) {
       throw new Refused(
-        `the card says where its steps work, on hover, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
+        `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
       );
     }
-    // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
     await expectVisible(
       cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, amber`,
@@ -418,17 +384,15 @@ export default {
     );
     await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
     await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
-    // What a run cost, beside its age, once its harness priced a session of it — and nothing for a run nobody priced, which is not $0.
     await expectVisible(
       cardOf(page, COSTLY.id).locator('[data-cost]', { hasText: `· ${COSTLY.cost}` }),
       `the card of a run whose sessions were priced says what it cost beside its age (${COSTLY.cost})`,
     );
-    await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost: none of its sessions was priced");
-    // A run at its gate: its card says what is asked of you, in wf ls's words, and its step's chip is amber.
+    await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost, not $0: none of its sessions was priced");
     const gated = cardOf(page, GATED.id);
     await expectVisible(
       gated.locator(`[data-gate-line="${GATED.gated}"]`, { hasText: `approve what ${GATED.gated} handed on, or send it back` }),
-      `the card of a run at its gate says what approving ${GATED.gated} does (${GATED.id})`,
+      `the card of a run at its gate says what approving ${GATED.gated} does, in wf ls's words (${GATED.id})`,
     );
     await expectVisible(gated.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card');
     await expectVisible(
@@ -446,7 +410,6 @@ export default {
       pill(FAKE.refused).and(page.locator('[data-state="failed-check"][title*="failed ✗ check (exit 1)"]')),
       `the card's rail shows ${FAKE.refused}'s refused check as a red pill, the check's exit on hover`,
     );
-    // At rest, the card draws its steps as a rail: a pill a step, an arrow for each `after` between them, and no tile.
     await expectCount(pills, FAKE.steps.length, `a pill per step on the card at rest (${FAKE.steps.join(', ')})`);
     await expectCount(
       card.locator('ul[aria-label="Steps"]').locator('..').locator('[data-arrow]'),
@@ -454,7 +417,6 @@ export default {
       "an arrow between the pills for each `after` between the run's steps",
     );
     await expectCount(tiles, 0, 'and no tile: the card is closed');
-    // A run with a session at work: a dot travels the rail's arrow into it, on the card at rest.
     const railArrow = (edge: string) =>
       beside
         .locator('ul[aria-label="Steps"]')
@@ -469,27 +431,23 @@ export default {
     await expectCount(railMoving.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running} on the card at rest`);
     await expectCount(railArrow(NEIGHBOUR.still).locator('animateMotion'), 0, `and none travels ${NEIGHBOUR.still}, which waits`);
 
-    // Laid out again, oldest first: the fake run's card in the first cell, and the other run's in the cell beside it.
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     await expectInside(card, floor, 'the card is on the floor');
     await expectCount(tiles, 0, 'a closed card draws no tile');
-    // And no card reaches over another: the grid puts the one beneath a cell's height below, so a card drawn taller than its cell —
-    // a rail and a line of what one of its steps asks is the tall card here — would be over it on every layout.
     await expectClearOfEachOther(page);
-    // The fake run's card at rest, alone: what the closeout shows of a card with its rail.
     await photographCard(page, card, path.join(OUT, `factory-card-at-rest-${await themeOf(page)}.png`));
-    // Photographed with the whole floor in view: every run there is, cards only, as the grid lays them out. No other picture has this one,
-    // and the tall cards are finished runs, off the floor until they are asked for.
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-laid-out-${await themeOf(page)}.png`), fullPage: true });
 
-    // A click on the card, away from its title's link, opens it on its steps: the card grows to its right, a tile a step, over the cell the
-    // other run's card is in, which moves aside. The rail stays, beside the tiles, and nothing else is drawn on the floor for the run.
     const nodes = await page.locator('.react-flow__node').count();
     await card.locator('time').click();
-    await expectCount(tiles, FAKE.steps.length, `the card opens into a tile per step (${FAKE.steps.join(', ')})`);
+    await expectCount(
+      tiles,
+      FAKE.steps.length,
+      `a click on the card away from its title's link opens it into a tile per step (${FAKE.steps.join(', ')})`,
+    );
     await expectCount(page.locator('.react-flow__node'), nodes, 'on the card itself: no node is added to the floor for a step');
     await expectVisible(
       card.getByText(FAKE.touched, { exact: true }),
@@ -513,7 +471,6 @@ export default {
       tile(FAKE.unverified).locator('[data-state="unverified"]', { hasText: 'unverified · done' }),
       `${FAKE.unverified}, signed off with no check, is marked unverified, not done`,
     );
-    // Its latest attempt, once the run's detail is read: the steps filed say how their try ended, the ones never filed say so.
     await expectVisible(
       tile('respond').getByText('not filed yet', { exact: true }),
       'respond, never filed, says so on its tile once the run is read',
@@ -532,7 +489,6 @@ export default {
     );
     await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
     await expectApart(beside, card, 'the card beside it moves out from under the open card');
-    // The card opens over some of the diamond's cards and not others: they move aside together, and still read as a diamond.
     await expectDiamond(page, 'with the fake run open over the diamond');
     for (const one of DIAMOND_RUNS) await expectApart(cardOf(page, one.id), card, `${one.id} moves out from under the open card`);
     await expectClearOfEachOther(page);
@@ -540,24 +496,19 @@ export default {
     await expectInside(card, floor, 'the open card, its tiles and all, is brought onto the screen');
     await photographCard(page, card, path.join(OUT, `factory-card-open-${await themeOf(page)}.png`));
 
-    // Remembered in this browser: the next visit finds the run open.
     await nextVisit(page, async (again) => {
-      // Finished runs are shown by asking, on every visit; which runs are open is what this browser kept.
       await showFinished(again);
-      await expectCount(onTheFloor(again).tiles, FAKE.steps.length, 'the run is still open on the next visit');
+      await expectCount(onTheFloor(again).tiles, FAKE.steps.length, 'the run is still open on the next visit: this browser kept it open');
       await settled(again);
       await expectClearOfEachOther(again);
     });
 
-    // Collapse all folds it away, and the chevron opens it again.
     await page.getByRole('button', { name: 'Collapse all' }).click();
     await expectCount(tiles, 0, 'Collapse all folds the tiles away');
     await expectCount(pills, FAKE.steps.length, 'and leaves the rail');
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(tiles, FAKE.steps.length, "the card's chevron opens it again");
 
-    // Dragged, the open card moves with its tiles, and no other card. Dropped on the other run's card, it stays where it landed, and so does
-    // the card under it: a drop moves nothing aside, and two cards a person stacked stay stacked.
     await settled(page);
     const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
     if (!from || !onto || !grip) throw new Refused('the cards to drag and drop onto — one of them is not on the page');
@@ -575,8 +526,7 @@ export default {
     );
     await expectCount(tiles, FAKE.steps.length, 'a drop is not a click: the run is still open');
     await settled(page);
-    await expectVisible(beside, 'the card the open run was dropped on is still on the floor, under it');
-    // A drag that starts on a tile moves no card: the tile is a button, to press.
+    await expectVisible(beside, 'the card the open run was dropped on is still on the floor, under it: a drop moves nothing aside');
     const put = await placeOf(card);
     await dragBy(page, tile(FAKE.unverified), { x: 120, y: 80 }, `the tile of ${FAKE.unverified}`);
     await settled(page);
@@ -584,24 +534,23 @@ export default {
     if (!samePlace(still, put))
       throw new Refused(`a drag started on a tile leaves its card where it is, ${said(put)} — it is at ${said(still)}`);
     await expectCount(tiles, FAKE.steps.length, 'and does not close the card');
-    // Photographed with the whole floor in view: an open card a person has dragged over another.
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-dragged-${await themeOf(page)}.png`), fullPage: true });
 
-    // Reset layout closes every run as it lays the floor out again, here and on the next visit.
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await expectCount(tiles, 0, 'Reset layout closes the card');
     await expectVisible(card.getByRole('button', { name: 'Show steps' }), "after a reset the card's chevron shows the steps");
     await nextVisit(page, async (again) => {
       const next = onTheFloor(again);
       await showFinished(again);
-      // The chevron reads the open runs this browser kept as the page mounts, before any step is read.
-      await expectVisible(next.card.getByRole('button', { name: 'Show steps' }), 'the next visit after a reset finds the run closed');
+      await expectVisible(
+        next.card.getByRole('button', { name: 'Show steps' }),
+        'the next visit after a reset finds the run closed: the chevron reads what this browser kept as the page mounts',
+      );
       await expectCount(next.tiles, 0, 'the next visit after a reset draws no tile');
     });
 
-    // Open again; a press on a tile opens its step's inspector beside the floor, the run's title above the step's name, and leaves the card open.
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(tiles, FAKE.steps.length, 'the chevron opens the run again after a reset');
     await expectApart(beside, card, 'the card beside it moves aside again');
@@ -612,7 +561,6 @@ export default {
     await expectCount(tiles, FAKE.steps.length, 'a press on a tile does not close its card');
     await expectCount(card.locator('[data-tile][aria-pressed="true"]'), 1, 'and one tile reads pressed');
     await expectCount(tile('review').and(page.locator('[aria-pressed="true"]')), 1, "review's, the step inspected");
-    // Beside the inspector, the queue's lane gives the floor its width back; the header still counts the queue.
     await expectCount(
       page.locator('aside[aria-label="Queued cards"]'),
       0,
@@ -624,13 +572,10 @@ export default {
       'and the header still counts the queue',
     );
     await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
-    // The floor narrows for the inspector and brings the run back into view; judged once it has.
     await settled(page);
-    await expectInside(card, floor, 'the open card is on the floor beside the open inspector');
+    await expectInside(card, floor, 'the floor narrowed for the open inspector brings the open card back onto it');
 
-    // The step whose check refused: its Details say what the check ran, what it exited with, and how its output ended.
     await tile(FAKE.refused).click();
-    // Signed off, it opens on its Output; its check is under Details.
     await page.locator(`aside[aria-label="Step ${FAKE.refused}"]`).getByRole('tab', { name: 'Details' }).click();
     const check = page.locator(`aside[aria-label="Step ${FAKE.refused}"] section[aria-label="Check"]`);
     await expectVisible(
@@ -641,12 +586,10 @@ export default {
     await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
     await settled(page);
     await expectInside(card, floor, `the open card is on the floor beside ${FAKE.refused}'s inspector`);
-    // Closed, the queue's lane is back beside the floor.
     await page.getByRole('button', { name: "Close the step's panel" }).click();
     await expectCount(page.locator(`aside[aria-label="Step ${FAKE.refused}"]`), 0, "the step's panel closes");
     await expectCount(ghosts, QUEUED.length, "and the queue's lane is back beside the floor");
 
-    // The run beside it opened too: a dot travels the one arrow into a step at work, and nothing between the cards moves.
     await beside.locator('time').click();
     const besideOpen = beside.locator(`section[aria-label="The run's steps"]`);
     const moving = besideOpen.locator(`[data-arrow="step:${NEIGHBOUR.running.replace('->', '->step:')}"]`);
@@ -668,7 +611,6 @@ export default {
       1,
       "the Factory's legend shows the running edge moving as it moves",
     );
-    // Another card opened, over whichever of the diamond's cards it reaches: still a diamond, and the run called off still left of the run waiting on it.
     await expectDiamond(page, 'with the run beside it open too');
     await expectLeftOf(
       cardOf(page, DIAMOND.cancelled.id),
@@ -676,8 +618,6 @@ export default {
       `${DIAMOND.cancelled.id} is still left of ${DIAMOND.orphan.id}`,
     );
 
-    // The loop out of rounds: at rest, its rail's arrow back says no round, which the pill's hover does; opened, the arrow back between its
-    // tiles says the round the loop is on, as the run's page labels its edge.
     const looping = cardOf(page, LOOPING.id);
     const back = `[data-arrow="loop:step:${LOOPING.exhausted}->step:${LOOPING.target}"]`;
     await expectCount(
@@ -685,7 +625,7 @@ export default {
       1,
       `${LOOPING.id}'s rail draws the arrow back from ${LOOPING.exhausted} into ${LOOPING.target}`,
     );
-    await expectCount(looping.locator('[data-round]'), 0, 'and says no round on the card at rest');
+    await expectCount(looping.locator('[data-round]'), 0, "and says no round on the card at rest: the pill's hover does");
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
     await looping.locator('time').click();
@@ -694,7 +634,7 @@ export default {
     await expectTexts(
       loopOpen.locator(`${back} [data-round]`),
       [LOOPING.round],
-      `the arrow back between its tiles says the loop is on ${LOOPING.round}`,
+      `the arrow back between its tiles says the loop is on ${LOOPING.round}, as the run's page labels its edge`,
     );
     await settled(page);
     await photographCard(page, looping, path.join(OUT, `factory-loop-open-${await themeOf(page)}.png`));

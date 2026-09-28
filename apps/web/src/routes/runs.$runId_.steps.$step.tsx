@@ -12,7 +12,10 @@ import { isGate, stepState } from '@/lib/status';
 import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
 import { useStepTranscript } from '@/lib/useStepTranscript';
 
-// `$runId_`: at /runs/$runId/steps/$step, and not drawn inside the run's page, which has no outlet for it.
+/**
+ * The page of a step's session, at /runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page, which has no outlet
+ * for it.
+ */
 export const Route = createFileRoute('/runs/$runId_/steps/$step')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
   staticData: { fullBleed: true },
@@ -31,12 +34,13 @@ type Step = RunDetail['steps'][number];
 
 /**
  * One step's session, as a conversation: the whole of it, full height, followed while its task is live — with what a person said to it laid
- * in, and a box below to say something more while it runs.
+ * in, and a box below to say something more while it runs. A run removed while the page is open is said to be gone, and its session is
+ * neither followed nor offered words. The session is keyed by run and step, so one step's conversation never stands in for another's
+ * while that one is read.
  */
 function SessionPage() {
   const { runId, step: name } = Route.useParams();
   const { data: run, error } = useSuspenseQuery(runQuery(runId));
-  // Removed while the page was open: the session is not followed, nor offered words, for a run that is not there.
   if (runGone(error)) {
     return (
       <div className="space-y-3 p-4">
@@ -58,19 +62,21 @@ function SessionPage() {
       </div>
     );
   }
-  // Keyed by run and step, so one step's conversation never stands in for another's while that one is read.
   return <Session key={`${run.id}/${step.name}`} run={run} step={step} />;
 }
 
+/**
+ * The session of `step` in `run`: its header, its conversation, and the box to say more. The transcript is told whether the step waits on a
+ * person's word — its session over, nothing of it running — and never whether the run is held: a hold (`wf hold`) answers nothing, and the
+ * session runs or rests as it did. What this page said that the run, as last read, does not have yet is kept with the task it was said to,
+ * so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what was said, where they reached it
+ * (`heardIn`).
+ */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  // Whether the step waits on a person's word — its session over, nothing of it running — never `held`: a hold on the run (`wf hold`)
-  // answers nothing, and the session runs or rests as it did.
   const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled, false), cancelled));
-  // What this page said that the run, as last read, does not have yet — kept with the task it was said to, so a later try starts afresh.
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
-  // Words the session's transcript shows reaching it are drawn once, as what was said, where they reached it (`heardIn`).
   const turns = useMemo(() => {
     const heard = heardIn(following.events, said);
     return withSaid(foldTranscript(heard.events), heard.said);

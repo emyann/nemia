@@ -26,14 +26,18 @@ async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: s
 }
 
 export default {
+  /**
+   * The runs list: the runs in flight, as the Factory counts them, then those nobody has decided, then the finished, each group under a
+   * heading with its count and each newest first — an order the api's id order is not, and where the first finished row is newer than the
+   * last in flight. Each row says, in `wf ls`'s words, what there is to decide and what waits on you, and shows its chips, its cost, its
+   * workflow beside its link and whether it was pruned. The menu's places are reached with Enter in the page, to the Inbox and back.
+   */
   name: 'runs',
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
-    // The runs in flight on top, then the rest, each newest first; in flight as the Factory counts them, which the api's id order is not.
     const rows = page.locator('li[data-in-flight]');
     await expectCount(rows, 16, 'the runs list has a row for each of the sixteen runs the Factory counts');
-    // Under a heading each, which says where the runs in flight end: the first finished row is newer than the last in flight.
     const flying = page.locator('section[data-group="in-flight"]');
     const deciding = page.locator('section[data-group="to-decide"]');
     const finished = page.locator('section[data-group="finished"]');
@@ -55,7 +59,6 @@ export default {
     );
     await expectBeneath(finished, flying, 'the finished runs are listed beneath the runs in flight');
 
-    // Between the two, the runs nobody has decided: a group of its own, newest first, with its count and how many wait on you.
     await expectCount(deciding.locator('li[data-in-flight="false"]'), 2, 'the two runs nobody has decided are under To decide');
     await expectVisible(
       deciding.getByRole('heading', {
@@ -65,12 +68,11 @@ export default {
     );
     await expectBeneath(deciding, flying, 'the runs to decide are listed beneath the runs in flight');
     await expectBeneath(finished, deciding, 'and the finished beneath those');
-    // Each row says what there is to decide, in `wf ls`'s words: the ending's gate with the command that approves it, and the branch nobody took.
     await expectVisible(
       deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-to-decide="approve"]`, {
         hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}`,
       }),
-      `the row of a run at its ending's gate says what it would do and the command that approves it`,
+      `the row of a run at its ending's gate says, in wf ls's words, what it would do and the command that approves it`,
     );
     await expectCount(
       deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-waiting-on-you]`),
@@ -87,7 +89,6 @@ export default {
       `the run whose ending merged it is among the finished (${SHIPPED.id})`,
     );
     await expectCount(finished.locator('[data-to-decide]'), 0, 'and no finished row has anything to decide');
-    // Beside where a row says `cancelled`, the row of a run pruned says so, and what went and what stayed on hover.
     await expectVisible(
       finished.locator(`li a[href="/runs/${SHIPPED.id}"] [data-pruned]`, { hasText: /^pruned$/ }),
       `the row of the run pruned with its files says pruned (${SHIPPED.id})`,
@@ -101,7 +102,6 @@ export default {
         at: li.querySelector('time')?.getAttribute('datetime') ?? '',
       })),
     );
-    // The three groups in their order, and each newest first: in flight, then what nobody has decided, then the rest.
     const GROUPS = ['in-flight', 'to-decide', 'finished'];
     const ordered = [...listed].sort(
       (a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id),
@@ -123,32 +123,29 @@ export default {
       row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }),
       `the row shows ${FAKE.refused}'s refused check as a red chip`,
     );
-    // Beside the run's link, not inside it: a link inside a link is not HTML.
     await expectVisible(
       page
         .locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) })
         .locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
       `the row names the workflow the run was started from (${FAKE.workflow}), linked to the Workflows page`,
     );
-    await expectCount(row.locator('a'), 0, "the run's link has no link inside it");
+    await expectCount(row.locator('a'), 0, "the run's link has no link inside it: a link inside a link is not HTML");
     await expectVisible(
       page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-state="waiting"]`, { hasText: DIAMOND.words.bottom }),
       `the row of a run waiting on a run says so on its root, as wf ls does (${DIAMOND.words.bottom}), a waiting chip`,
     );
-    // A run waiting on a run called off waits on you, as the Factory counts it: the row says so, in wf ls's words.
     const orphanRow = page.locator(`li a[href="/runs/${DIAMOND.orphan.id}"]`);
     await expectVisible(
       orphanRow.locator('[data-waiting-on-you]', {
         hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${DIAMOND.orphan.id}`,
       }),
-      `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, and what is yours to resolve`,
+      `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, as the Factory counts it, and what is yours to resolve, in wf ls's words`,
     );
     await expectCount(
       page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-waiting-on-you]`),
       0,
       `${DIAMOND.bottom.id}, waiting on a run that may still ship, does not wait on you`,
     );
-    // What a run cost, beside when it started, once a session of it was priced; a step over its budget, an amber chip with the amounts.
     const costly = page.locator('li', { has: page.locator(`a[href="/runs/${COSTLY.id}"]`) });
     await expectVisible(
       costly.locator('[data-cost]', { hasText: COSTLY.cost }),
@@ -164,11 +161,10 @@ export default {
       0,
       "the fake run's row says no cost: none of its sessions was priced",
     );
-    // A run at its gate: what is asked of you, as wf ls says it, and counted among the runs waiting on you above.
     const gatedRow = page.locator(`li a[href="/runs/${GATED.id}"]`);
     await expectVisible(
       gatedRow.locator('[data-waiting-on-you]', { hasText: new RegExp(`^waiting on you: approve ${GATED.gated}$`) }),
-      `the row of a run at its gate says waiting on you: approve ${GATED.gated}`,
+      `the row of a run at its gate says, as wf ls does, waiting on you: approve ${GATED.gated}`,
     );
     await expectVisible(
       gatedRow.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }),
@@ -184,13 +180,12 @@ export default {
       `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
     );
 
-    // From the keyboard, to the Inbox and back: each place reached in the page, and the runs list drawn again for its photograph.
     await enterOnPlace(page, 'Inbox', '/inbox');
     await expectVisible(
       page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
       'reached with Enter, the Inbox is lit in the menu',
     );
     await enterOnPlace(page, 'Runs', '/runs');
-    await expectCount(rows, 16, 'back on Runs with Enter, the list has its sixteen rows again');
+    await expectCount(rows, 16, 'back on Runs with Enter, the list has its sixteen rows again, drawn for its photograph');
   },
 } satisfies PageSpec;

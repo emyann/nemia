@@ -9,9 +9,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // A run held at a gate in its middle, on the default floor: nothing of it moves, the api reads it failed with nothing to decide about its
-  // result, and it waits on a person all the same — so its card stays, says what it asks, and takes the answer. Before, the card left the
-  // floor the moment its plan reached its gate. The approval is written, then taken back, so every page after reads the store as seeded.
+  /**
+   * A run held at a gate in its middle, on the default floor: nothing of it moves, the api reads it failed with nothing to decide about its
+   * result, and it waits on a person all the same — so its card stays, says what it asks, and takes the answer. The card links to what is
+   * being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's inspector, on Output, with the
+   * plan's approach in it, and the page goes back to the floor. The card is approved where it is, a press a person can make clear of the
+   * legend, then the popover's. The approval is written, then taken back, so every page after reads the store as seeded.
+   */
   name: 'factory-mid-gate',
   route: '/',
   expect: async (page) => {
@@ -20,7 +24,6 @@ export default {
     const approved = (r: Response) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`;
     await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off');
-    // The floor as the grid lays it out, whatever the page before left open.
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     await expectClearOfEachOther(page);
@@ -43,10 +46,8 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), fullPage: true });
 
-    // The card links to what is being approved, in its answer row, which grows it no taller: pressed, the run's page opens on plan's
-    // inspector, on Output, with the plan's approach in it. Then back to the floor, as the page began.
     const read = card.locator(`a[data-read="${gated}"]`, { hasText: /^Read the plan$/ });
-    await expectVisible(read, `the card's gate offers Read the plan`);
+    await expectVisible(read, `the card's gate offers Read the plan, in its answer row`);
     await expectClearOfEachOther(page);
     await read.click();
     await page.waitForURL((url) => url.pathname === `/runs/${id}` && url.searchParams.get('step') === gated, { timeout: WAIT_MS });
@@ -57,14 +58,15 @@ export default {
     );
     await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), "with the plan's approach in it");
     await settled(page);
-    // Under the banners and Decide, below the first screen: the page is brought to it, and stays there once Decide has read its decision.
-    await expectOnScreen(inspector, `the page is scrolled to ${gated}'s inspector`);
+    await expectOnScreen(
+      inspector,
+      `the page is scrolled to ${gated}'s inspector, below the first screen under the banners and Decide, and stays there once Decide has read its decision`,
+    );
     await page.screenshot({ path: path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`) });
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');
 
-    // Approved on the card, where it is: a press a person can make, clear of the legend, then the popover's.
     try {
       await card.locator('[data-answer="Approve"]').click();
       const approval = page.getByRole('dialog', { name: `Approve ${gated}` });

@@ -13,8 +13,11 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
 - `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium; only `npm run e2e` runs them). A web test that needs
   no browser sits in `test/`.
+- `components/ui` and `components/ai-elements` are registry code adapted to React Aria by hand: adding one again overwrites its edits
+  (the sidebar's `ul` menu, `showCloseButton={false}`, shiki's fine-grained build) and brings back comments the guards refuse.
 - The shadcn skill's CLI runs from `apps/web` (where `components.json` is). Its rules know radix and base; on aria the reference is what
   `npx shadcn@latest add <component> --view <file>` prints, and `add` installs no `react-aria-components`.
+- `@/` is declared once, in `tsconfig.json`'s `paths`; Vite reads it from there (`resolve.tsconfigPaths` in `vite.config.ts`).
 - `browser_take_screenshot` resolves a relative `filename` against the workspace: give it an absolute path under `/tmp/playwright-mcp`.
 
 ## Writing an e2e page
@@ -48,6 +51,10 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - Drag with `page.mouse` (down, `move(…, { steps: 12 })`, up), never `dragTo`: React Flow moves a node from the second pointer move, and a
   handle has `pointer-events: none` until a drag starts (`drawEdge` in `canvas.ts`). In the browser tools, synthesize mouse events a few
   milliseconds apart from `browser_evaluate`.
+- React Flow's `nodeTypes` and `edgeTypes` are module constants, and each `ReactFlow` has an `id` of its own, which scopes its marker
+  ids; `defaultMarkerColor={null}` lets the stylesheet colour a marker.
+- Chromium writes a console error, `Failed to load resource`, for every 4xx: a page expecting one refusal allows that line too.
+- Playwright reports neither `requestfinished` nor `requestfailed` for a request a navigation leaves behind (`track` in `checks.ts`).
 - `hasText` reads `textContent`, which puts no space between elements: put `{' '}` between a label and what follows it.
 - A React Aria switch, checkbox or radio is clicked through its `<label>` (`showFinished` in `canvas.ts`); a sheet is closed with its Close
   button, not Escape.
@@ -60,10 +67,12 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 
 ## React and Query
 
-- The React Compiler compiles `src` at build (`@rolldown/plugin-babel` after the router's plugin, in `vite.config.ts`); the node tests
-  load `src` uncompiled, so only the build and the e2e test the compiled app. A function it skips is logged at build as
-  `React Compiler skipped <file>:<line>: <why>`: read the build's output. A memo lists what its body reads, and an array rebuilt on every
-  refetch goes through `useContent`.
+- The React Compiler compiles `src` at build (`@rolldown/plugin-babel` after the router's plugin, which splits the routes it must see,
+  and before `react()`, in `vite.config.ts`); the node tests load `src` uncompiled, so only the build and the e2e test the compiled app.
+  A function it skips is logged at build as `React Compiler skipped <file>:<line>: <why>`: read the build's output. A memo lists what its
+  body reads, and an array rebuilt on every refetch goes through `useContent`.
+- The compiler skips a function with an optional call inside a `try`: write `.then(ok, fail)` (`CodeBlockCopyButton`). It skips an arrow
+  written as a parameter's default: declare it at module level (`asIs` in `StepForm.tsx`).
 - A link to a route is `routeLink` (`components/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - React Aria's `DisclosurePanel` keeps and lays out what it holds while closed: draw a fold's content only while open.
@@ -86,6 +95,7 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 
 ## Node tests of `src`
 
+- `assert.deepEqual(x, [])` from `node:assert/strict` narrows `x` to `never[]` after it: assert on its length, or compare a copy.
 - No directory import in a module a test reads (`./api` is a folder Node refuses): a helper a test reads uses file imports only.
 - A component that draws a `routeLink` renders under `RouterContextProvider` over a memory-history router (`components.test.ts`); the
   markup spells React's props (`readOnly=""`).

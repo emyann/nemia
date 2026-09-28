@@ -64,10 +64,9 @@ test('a folder as a draft is as it is listed, unsaved nowhere, and puts back as 
   assert.equal(unsaved(draft, folder), false);
   assert.deepEqual(unsavedSteps(draft, folder), []);
   assert.deepEqual(toPut(draft), folder.steps);
-  // A copy: the draft changes, and the listing does not.
   setKey(draft, 'implement', 'model', 'opus');
   draft[0].spec.after.push('x');
-  assert.deepEqual(folder.steps[0].spec.after, []);
+  assert.deepEqual(folder.steps[0].spec.after, [], 'the draft is a copy: it changes, and the listing does not');
 });
 
 test('an edge drawn from A to B writes `after: A` on B; drawn from the loop handle, `loop: B` on A with the default rounds; a second time, or to itself, nothing', () => {
@@ -145,8 +144,11 @@ test('a key set is set as given, a loop brings its rounds and takes them away, a
   assert.equal(specOf(looped, 'implement').rounds, DEFAULT_ROUNDS);
   assert.equal(specOf(setKey(draft, 'review', 'loop', null), 'review').rounds, null);
   assert.deepEqual(unsavedSteps(setBody(draft, 'review', 'Review it twice.'), folder), ['review']);
-  // Set back to what it was listed as, it is not a change.
-  assert.equal(unsaved(setKey(setKey(draft, 'implement', 'model', 'opus'), 'implement', 'model', null), folder), false);
+  assert.equal(
+    unsaved(setKey(setKey(draft, 'implement', 'model', 'opus'), 'implement', 'model', null), folder),
+    false,
+    'set back to what it was listed as, it is not a change',
+  );
 });
 
 test('a schema pasted names its file in `output:`, is a change until saved, and taken back leaves `output:` as it is', () => {
@@ -193,7 +195,6 @@ test('what is typed into a list or a number field, as the listing has it', () =>
   assert.equal(numberOf(' 900 '), 900);
   assert.equal(numberOf('2.50'), 2.5);
   assert.equal(numberOf('-1'), -1, 'the package refuses it on save, in its words');
-  // A context window, as a person writes it and as the package reads it — `200k`, `150000`, `1M` — and back in the package's one form.
   for (const [typed, tokens] of [
     ['200k', 200_000],
     [' 150000 ', 150_000],
@@ -201,9 +202,13 @@ test('what is typed into a list or a number field, as the listing has it', () =>
     ['1M', 1_000_000],
     ['50k', 50_000],
   ] as const)
-    assert.equal(tokensOf(typed), tokens, typed);
+    assert.equal(tokensOf(typed), tokens, `${typed}: a context window as a person writes it and as the package reads it`);
   for (const typed of ['', 'lots', '200 k', '1.5M', '200,000', '0', '-1']) assert.equal(tokensOf(typed), null, typed);
-  assert.deepEqual([contextText(150_000), contextText(1_000_000), contextText(123_456)], ['150k', '1000k', '123456']);
+  assert.deepEqual(
+    [contextText(150_000), contextText(1_000_000), contextText(123_456)],
+    ['150k', '1000k', '123456'],
+    "a context window written back in the package's one form",
+  );
 });
 
 test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {
@@ -254,9 +259,12 @@ test("a step with an agent: a key changed is its own, one unset is its agent's a
   const lower = setKey(draft, 'build', 'effort', 'low');
   assert.deepEqual(lower[0].own, { keys: ['check', 'effort'], body: 'Mind the cache.' });
   assert.deepEqual(unsavedSteps(lower, attached), ['build']);
-  // Unset, the check is left to the agent — which sets none — and the effort changed back to the agent's is the agent's again.
   const back = setKey(setKey(lower, 'build', 'check', null), 'build', 'effort', null);
-  assert.deepEqual(back[0].own!.keys, []);
+  assert.deepEqual(
+    back[0].own!.keys,
+    [],
+    "unset, the check is left to the agent, which sets none, and the effort changed back to the agent's is the agent's again",
+  );
 
   const noted = setBody(draft, 'build', 'Mind the index.');
   assert.deepEqual(
@@ -361,6 +369,9 @@ test('a step on a remote A2A agent has none of the keys the package refuses ther
   );
   assert.equal(takes(form, tools, 'a2a:gone'), false, 'a name the store no longer declares is still remote');
   assert.deepEqual([takes(form, model, 'claude'), takes(form, tools, 'claude')], [true, true], 'a harness of ours keeps them');
-  // An api from before remote agents sends no `remote`: nothing is hidden for it. Cast on purpose: the type says every api sends one.
-  assert.equal(takes({ keys: form.keys } as unknown as Pick<KeyForm, 'keys' | 'remote'>, tools, 'a2a:reviewer'), true);
+  assert.equal(
+    takes({ keys: form.keys } as unknown as Pick<KeyForm, 'keys' | 'remote'>, tools, 'a2a:reviewer'),
+    true,
+    'an api that sends no `remote`, which the type does not allow, has nothing hidden for it',
+  );
 });

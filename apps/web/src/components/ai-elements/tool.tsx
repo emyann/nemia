@@ -1,3 +1,8 @@
+/**
+ * A tool call in a transcript, folded to one line: `Tool` on the aria base's `Collapsible`, `ToolHeader` with the call's name, what it was
+ * about and how it went, and `ToolContent` with its input (`ToolInput`) and its result (`ToolOutput`). A call's state is in a transcript's
+ * words (`ToolState`): running while its session may still answer it, and no result once it cannot.
+ */
 'use client';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,16 +14,6 @@ import { useContext } from 'react';
 import { DisclosureStateContext } from 'react-aria-components';
 import { CodeBlock, type CodeLanguage } from './code-block';
 
-// From AI Elements (registry.ai-sdk.dev/tool.json), with a call's state in a transcript's words rather than the AI SDK's
-// `ToolUIPart`: the board draws a conversation that happened, and hosts no model, so it has no `ai` package to type it by.
-// A call is running while its session may still answer it, and has no result once it cannot.
-//
-// AI Elements is written on Radix, with no React Aria variant, so this is adapted by hand to the aria base's `Collapsible`,
-// React Aria's `Disclosure`: `defaultExpanded` for `defaultOpen`, and the chevron turned by the trigger's `aria-expanded`
-// rather than Radix's `data-state`. `ToolContent` draws its children only while the call is open: a `DisclosurePanel`
-// keeps them mounted and hidden, where Radix's unmounted them, and a folded result (highlighted, and some are long) should
-// cost nothing until someone opens it. Its `className` styles what is drawn, not the panel: a panel hidden `until-found` is
-// still laid out, so a margin or a border on it would show under a closed fold.
 export type ToolState = 'running' | 'completed' | 'error' | 'no-result';
 
 export type ToolProps = Omit<ComponentProps<typeof Collapsible>, 'className'> & { className?: string };
@@ -56,6 +51,7 @@ const getStatusBadge = (status: ToolState) => (
   </Badge>
 );
 
+/** A call's line: its name, what it was about, how it went, and a chevron turned by the trigger's `aria-expanded`. */
 export const ToolHeader = ({ className, title, detail, state, ...props }: ToolHeaderProps) => (
   <CollapsibleTrigger className={cn('group flex w-full items-center justify-between gap-4 p-3 text-left', className)} {...props}>
     <div className="flex min-w-0 items-center gap-2">
@@ -79,6 +75,11 @@ export type ToolContentProps = Omit<ComponentProps<typeof CollapsibleContent>, '
   children?: ReactNode;
 };
 
+/**
+ * A call's input and result, drawn only while the call is open: a `DisclosurePanel` keeps its children mounted and hidden, and a folded
+ * result, highlighted and some long, costs nothing until someone opens it. `className` styles what is drawn, not the panel: a panel hidden
+ * `until-found` is still laid out, so a margin or a border on it would show under a closed fold.
+ */
 export const ToolContent = ({ className, children, ...props }: ToolContentProps) => {
   const expanded = useContext(DisclosureStateContext)?.isExpanded ?? false;
   return (

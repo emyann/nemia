@@ -21,9 +21,11 @@ async function openOn(page: Page, route: string, opened: Page[]) {
 }
 
 export default {
-  // A run removed while a person has its page open, and one of its steps' too: the feed says `removed`, each page reads the run's record
-  // again, finds none, and says the run is gone in place of what it drew — at once, the 404 not tried again. Its record is put back before
-  // the pages are closed, and the list, read again, has it.
+  /**
+   * A run removed while a person has its page open, and one of its steps' too, as `wf rm` removes it: its record gone from the store, and
+   * the feed says `removed`. Each page reads the run's record again, finds none, and says the run is gone in place of what it drew — at
+   * once, the 404 not tried again. Its record is put back before the pages are closed, and said on the feed, and the list, read again, has it.
+   */
   name: 'removed',
   route: '/runs',
   expect: async (page) => {
@@ -40,7 +42,6 @@ export default {
           throw new Refused(`the pages saw nothing wrong while the run was there — they saw:\n    ${problems().join('\n    ')}`);
       }
 
-      // As `wf rm` does it: the record gone from the store, and a line on the feed.
       fs.renameSync(record, record + AWAY);
       fed(id, 'removed');
       const said = new RegExp(
@@ -50,8 +51,11 @@ export default {
         [run, 'the run page'],
         [step, 'the step page'],
       ] as const) {
-        // Well inside the three tries a failure is given, which would take seven seconds: a run gone is said on the read that finds none.
-        await expectVisible(other.locator(`[data-run-gone="${id}"]`, { hasText: said }), `${where} says the run is gone`, 3_000);
+        await expectVisible(
+          other.locator(`[data-run-gone="${id}"]`, { hasText: said }),
+          `${where} says the run is gone on the read that finds none, well inside the seven seconds three tries of a failure would take`,
+          3_000,
+        );
         await expectCount(other.locator('article, header[aria-label="The step"]'), 0, `and ${where} draws nothing of what it last read`);
         await expectVisible(other.getByRole('link', { name: '← Runs' }), `and ${where} links to the runs the store has`);
       }
@@ -60,7 +64,6 @@ export default {
       await settled(step.other);
       await step.other.screenshot({ path: path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), fullPage: true });
 
-      // The one refusal each page sees: the read that found no run, as the browser reports it, and nothing else.
       const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
       for (const [{ problems }, where] of [
         [run, 'the run page'],
@@ -71,10 +74,11 @@ export default {
           (p) => p !== refused && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
         );
         if (!seen.includes(refused) || others.length)
-          throw new Refused(`${where} saw the read of a run gone, and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+          throw new Refused(
+            `${where} saw the read of a run gone, as the browser reports it, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+          );
       }
     } finally {
-      // Back before the pages close, and said on the feed as a run's word: the list reads it again, and so does closing them.
       if (fs.existsSync(record + AWAY)) {
         fs.renameSync(record + AWAY, record);
         fed(id, 'finished');

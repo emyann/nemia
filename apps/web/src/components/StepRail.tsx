@@ -16,7 +16,8 @@ type SummaryStep = RunSummary['steps'][number];
  * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the running
  * colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), violet looping back.
  * With `rounds`, a loop past its first round says the round it is on under its curve, as the run's page labels the edge: the open card's
- * tiles have the room, and the rail at rest leaves it to the pill's hover.
+ * tiles have the room, and the rail at rest leaves it to the pill's hover. The round is drawn after the dot, ringed in the card's colour over
+ * the curve, so the dot passes under it and not over its words.
  */
 function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
   return (
@@ -28,7 +29,6 @@ function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
             <path d={arrow.path} fill="none" style={{ stroke, ...edgeLine(arrow.state, arrow.loop) }} />
             <path d={arrow.head} fill={stroke} />
             {arrow.state === 'running' && <Travelling path={arrow.path} colour={stroke} />}
-            {/* After the dot, so the dot passes under the round and not over its words; ringed in the card's colour, over the curve. */}
             {rounds && arrow.round && (
               <text
                 data-round
@@ -111,7 +111,7 @@ const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boole
 /**
  * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with its
  * status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a tile
- * opens its inspector beside the floor (`onStep`).
+ * opens its inspector beside the floor (`onStep`). The attempts' times move every second while one counts, and every 30 s otherwise.
  */
 export function StepTiles({
   run,
@@ -132,7 +132,6 @@ export function StepTiles({
   const gate = gateOfSummary(run);
   const held = run.holding != null;
   const live = run.steps.some((step) => isLive(stepState(step.status, cancelled, held)));
-  // Every second while a step's attempt counts; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
   return (
     <section aria-label="The run's steps" className="border-l px-3">

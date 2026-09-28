@@ -10,7 +10,10 @@ import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
-// `agents_`: at /agents/skills/$from/$skill, and not drawn inside the Agents page, which has no outlet for it.
+/**
+ * The page of a skill, at /agents/skills/$from/$skill: `agents_` draws it on its own, not inside the Agents page, which has no outlet for
+ * it.
+ */
 export const Route = createFileRoute('/agents_/skills/$from/$skill')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(skillQuery(params.from, params.skill)),
   component: SkillPage,
@@ -28,26 +31,28 @@ const code = (text: string) => <code className="font-mono text-xs break-all">{te
  * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit, when
  * it is yours; to read, when it is the repository's or one HKB ships, which the board does not write. Save and the switch each write it back
  * against the version it was read at, and each changes every agent that gives it.
+ *
+ * The form is drawn from the skill as read, but for a file that moved under unsaved words (`drawnSkill`), and drawn anew under each new
+ * version a save or the switch brings. A write of the page is read back at once as the form's own, so its words do not read as unsaved. A
+ * write refused as stale reads the skill again: a form with unsaved words keeps them and says the file moved; one without shows the file as
+ * it now reads, and says beside the refusal that it has been read again since.
  */
 function SkillPage() {
   const { from, skill: name } = Route.useParams();
   const { data: detail } = useSuspenseQuery(skillQuery(from, name));
   const queryClient = useQueryClient();
   const mine = detail.skill.from === 'yours';
-  // The skill the form is drawn from: the read, until the file moves under unsaved words (`drawnSkill`). A write carries its version back.
   const [changed, setChanged] = useState(false);
   const [drawn, setDrawn] = useState(detail);
   const shown = drawnSkill(drawn, detail, changed);
   if (shown !== drawn) setDrawn(shown);
   const moved = shown.version !== detail.version;
 
-  // A write of this page is read back at once, as the form's own: its words are what was written, and would otherwise read as unsaved.
   const wroteIt = async ({ written: _, ...now }: SkillSaved) => {
     queryClient.setQueryData(skillQuery(from, name).queryKey, now);
     setDrawn(now);
     await invalidateSkills(queryClient);
   };
-  // Refused as stale, the skill is read again: a form with unsaved words keeps them and says the file moved; one without shows the file now.
   const readAgainIfStale = (err: Error) => (err instanceof SkillRefusal && err.status === 409 ? invalidateSkills(queryClient) : undefined);
   const save = useMutation({
     mutationFn: ({ draft, version }: { draft: SkillDraft; version: string }) => saveSkill(name, version, draft),
@@ -60,7 +65,6 @@ function SkillPage() {
     onError: readAgainIfStale,
   });
   const error = save.error ?? toggle.error;
-  // A stale refusal the page has since read past, with nothing unsaved to keep, says so beside the package's "read it again".
   const refusedAt = save.error ? save.variables?.version : toggle.variables?.version;
   const readPast = error instanceof SkillRefusal && error.status === 409 && !moved && refusedAt !== detail.version;
   const { skill } = detail;
@@ -99,7 +103,6 @@ function SkillPage() {
         {skill.dir}/SKILL.md
       </p>
       <SkillForm
-        // A new version is a new form: what was saved or switched, as it now reads — but not while the file moved under unsaved words.
         key={shown.version}
         detail={shown}
         readOnly={!mine}

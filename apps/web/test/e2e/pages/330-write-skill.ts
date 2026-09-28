@@ -24,13 +24,15 @@ const wrote = (page: Page, method: 'POST' | 'PUT', pathname: string) =>
   page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === pathname, { timeout: WAIT_MS });
 
 export default {
-  // A skill of your own, written on the board. In a page of its own first, a new skill named as one your library has already is refused, in
-  // the package's words, and nothing is written. Then `scribe` is made to name a skill nobody has yet, and from the Agents page New skill
-  // writes it: its folder in your library, its SKILL.md as the package renders it. Its page says `scribe` gives it and what it costs a turn,
-  // and the switch — pressed by its label — loads it every turn, which says it changes every agent that gives it, and moves `scribe`'s
-  // version; an edit of its description saved moves it again. In a page of its own, a save under a hand edit of the file is refused as stale:
-  // the page keeps the typed words, says the file moved, and Read it again shows the file. The Agents page lists it under your library. The skill and `scribe`'s file are
-  // both taken back, so the next visit, in either theme, reads the store as seeded.
+  /**
+   * A skill of your own, written on the board. In a page of its own, a new skill named as one your library has already is refused in the
+   * package's words, and nothing is written. Then `scribe` names a skill nobody has yet, and New skill, from the Agents page, writes it: its
+   * folder in your library, its SKILL.md as the package renders it. Its page says `scribe` gives it and what it costs a turn; the switch,
+   * pressed by its label, loads it every turn, says a change of it changes every agent that gives it, and moves `scribe`'s version. A saved
+   * edit of its description keeps the switch's line and moves the version again. In a page of its own, a save under a hand edit of the file
+   * is refused as stale: the page keeps the typed words and says the file moved, and Read it again shows the file. The Agents page lists
+   * the skill under your library. The page takes the skill and `scribe`'s file back, so each visit reads the store as seeded.
+   */
   name: 'write-skill',
   route: '/agents',
   expect: async (page) => {
@@ -48,7 +50,6 @@ export default {
     const clash = path.join(library, made.skill.id, 'SKILL.md');
     const clashWas = fs.readFileSync(clash, 'utf8');
 
-    // Refused, in a page of its own whose one refusal is the point: a name your library has already, which a new skill would write over.
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
@@ -100,7 +101,6 @@ export default {
       fs.writeFileSync(agentFile, naming);
       const unmade = await versionOfScribe();
 
-      // New skill, from the Agents page.
       await page.getByRole('link', { name: 'New skill' }).click();
       await page.waitForURL((url) => url.pathname === '/agents/skills/new', { timeout: WAIT_MS });
       const form = page.locator('form[aria-label="New skill"]');
@@ -134,7 +134,6 @@ export default {
       if (written !== expectedFile)
         throw new Refused(`skills/${SKILL.name}/SKILL.md is written as the package renders it — it holds ${JSON.stringify(written)}`);
 
-      // Its page: who gives it, what it costs a turn, and the switch.
       await page.waitForURL((url) => url.pathname === `/agents/skills/yours/${SKILL.name}`, { timeout: WAIT_MS });
       await expectVisible(page.getByRole('heading', { name: SKILL.name, level: 1 }), `${SKILL.name}'s page`);
       await expectVisible(
@@ -176,7 +175,6 @@ export default {
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `write-skill-page-${await themeOf(page)}.png`), fullPage: true });
 
-      // Edited: the switch waits while the form holds unsaved words, and the save keeps the switch's line.
       const edit = page.locator(`form[data-skill-form="${SKILL.name}"]`);
       await edit.getByRole('textbox', { name: 'Description', exact: true }).fill(SKILL.edited);
       if (!(await toggle.isDisabled())) throw new Refused('the switch waits while the form holds unsaved words');
@@ -197,8 +195,6 @@ export default {
       );
       if ((await versionOfScribe()) === preloaded) throw new Refused(`the edit moves the version of ${seeded.name}, which gives it`);
 
-      // Stale, in a page of its own whose one refusal is the point: the file changed by hand under unsaved words. The save is refused, the
-      // page reads the skill again, keeps the words and says the file moved; Read it again draws the form from the file and drops them.
       const stale = await page.context().newPage();
       try {
         const { problems } = watch(stale);
@@ -256,7 +252,6 @@ export default {
       }
       await idle(page);
 
-      // Listed on the Agents page, under your library.
       await page.getByRole('link', { name: '← Agents' }).click();
       await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
       const mine = page.locator('section[data-skill-place="yours"]');

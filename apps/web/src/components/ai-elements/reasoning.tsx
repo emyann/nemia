@@ -1,14 +1,8 @@
+/**
+ * A session's thought, folded: `Reasoning` on the aria base's `Collapsible`, `ReasoningTrigger` saying it is thinking or for how long it
+ * thought, and `ReasoningContent` drawing the thought, as it is written, through the board's `Markdown`.
+ */
 'use client';
-
-// From AI Elements (registry.ai-sdk.dev/reasoning.json). One change: `ReasoningContent` spread its collapsible's props onto
-// its markdown renderer as well; the text is given to the board's `Markdown` alone, as it is written.
-//
-// AI Elements is written on Radix, with no React Aria variant, so this is adapted by hand to the aria base's `Collapsible`,
-// React Aria's `Disclosure`, which `Reasoning` drives with `isExpanded` and `onExpandedChange`. Radix's
-// `useControllableState` is a few lines of state here, as the sidebar's provider has it. `ReasoningContent` draws the
-// thought only while it is open: a `DisclosurePanel` keeps its children mounted and hidden, where Radix's unmounted them.
-// Its `className` styles what is drawn, not the panel: a panel hidden `until-found` is still laid out, so a margin or a
-// border on it would show under a closed thought.
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -50,6 +44,11 @@ export type ReasoningProps = Omit<
 const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
+/**
+ * A thought's fold: open as `open` says, or on a state of its own from `defaultOpen`, driving the `Collapsible` with `isExpanded` and
+ * `onExpandedChange`; `onOpenChange` is told of each change. It times the streaming — how long it took is read off a clock as it ends, not in
+ * a render — unless `duration` is given, and where it opened by default, it folds itself once, a second after the streaming ends.
+ */
 export const Reasoning = memo(
   ({
     className,
@@ -76,10 +75,8 @@ export const Reasoning = memo(
     const duration = durationProp ?? durationState;
 
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
-    // When the streaming started: read by the effect alone, never drawn.
     const startTime = useRef<number | null>(null);
 
-    // Track duration when streaming starts and ends
     useEffect(() => {
       if (isStreaming) {
         if (startTime.current === null) startTime.current = Date.now();
@@ -88,14 +85,11 @@ export const Reasoning = memo(
       if (startTime.current === null) return;
       const took = Math.ceil((Date.now() - startTime.current) / MS_IN_S);
       startTime.current = null;
-      // A clock read as the streaming ends: how long it took is known then and not in a render.
       setDuration(took);
     }, [isStreaming]);
 
-    // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {
       if (defaultOpen && !isStreaming && isOpen && !hasAutoClosed) {
-        // Add a small delay before closing to allow user to see the content
         const timer = setTimeout(() => {
           setIsOpen(false);
           setHasAutoClosed(true);
@@ -157,6 +151,10 @@ export type ReasoningContentProps = Omit<ComponentProps<typeof CollapsibleConten
   children: string;
 };
 
+/**
+ * The thought, drawn only while it is open: a `DisclosurePanel` keeps its children mounted and hidden. `className` styles what is drawn, not
+ * the panel: a panel hidden `until-found` is still laid out, so a margin or a border on it would show under a closed thought.
+ */
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isOpen } = useReasoning();
 

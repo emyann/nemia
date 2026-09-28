@@ -18,7 +18,8 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
 /**
  * The run's state for the decision's cache: where the run stands, who it waits on, what a hold on it says, and each step's task and
  * settled word. A decision is read again only when one of those moves: a hold written, lifted, or whose runs have shipped.
- * `holding` is read tolerantly, for an api older than the hold.
+ * A run without `holding` is stamped as one nobody holds. A step's word is read as on a run nobody holds, so a gate in flight or not
+ * is one stamp either way: the hold is stamped on its own.
  *
  * A filed step still in flight is one word, whatever the engine calls it: `running (working)`, `working (quiescent)`,
  * `starting`, `between attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
@@ -35,7 +36,6 @@ export const decisionStamp = (
     run.waitingOnYou,
     run.holding?.word ?? null,
     run.steps.map((s) => {
-      // Unheld on purpose: a gate in flight or not is one stamp either way, and the hold is stamped on its own, above.
       const state = stepState(s.status, run.cancelledAt !== null, false);
       const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
       return [s.name, s.taskId, inFlight ? 'in flight' : s.status];
@@ -47,8 +47,7 @@ export const decisionStamp = (
  * touched, counted once; the lines of every file, each file counted once; and how many branches git could not read.
  *
  * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from
- * its parent's branch, so a fan-out's result branches each carry the parent's changes, and summing them counted the parent's lines once
- * per branch. A file on several branches counts the change with the most lines among them — the parent's plus a follower's own on top of
+ * its parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on several branches counts the change with the most lines among them — the parent's plus a follower's own on top of
  * it. Two siblings that each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints
  * each branch on its own, is where the whole of it is. A binary file adds no lines.
  */
@@ -88,14 +87,17 @@ export const mostLines = (groups: readonly Group[]): number => Math.max(0, ...gr
 
 export type DiffLine = 'meta' | 'hunk' | 'added' | 'removed' | 'context';
 
-/** What a line of a unified diff is, for its colour: a file's header lines, a hunk's header, an added line, a removed one, or context. */
+/**
+ * What a line of a unified diff is, for its colour: a file's header lines (`+++`, `---`, and every line no other kind claims, such as
+ * `diff --git`, `index`, `new file mode`, `rename from`, `similarity index`, `Binary files … differ`), a hunk's header, an added line, a
+ * removed one, or context.
+ */
 export function diffLine(line: string): DiffLine {
   if (line.startsWith('@@')) return 'hunk';
   if (line.startsWith('+++ ') || line.startsWith('--- ')) return 'meta';
   if (line.startsWith('+')) return 'added';
   if (line.startsWith('-')) return 'removed';
   if (line.startsWith(' ') || line === '' || line.startsWith('\\')) return 'context';
-  // `diff --git`, `index`, `new file mode`, `rename from`, `similarity index`, `Binary files … differ`.
   return 'meta';
 }
 

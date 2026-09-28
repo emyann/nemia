@@ -11,7 +11,7 @@ import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } fr
 import { invalidateAgents } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
-// `agents_`: at /agents/$from/$agent, and not drawn inside the Agents page, which has no outlet for it.
+/** The page of an agent, at /agents/$from/$agent: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
 export const Route = createFileRoute('/agents_/$from/$agent')({
   loader: ({ context, params }) =>
     Promise.all([
@@ -30,9 +30,12 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
 /**
- * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, when it is the repository's, which
- * the board does not write. Save puts it back against the version it was read at, and Remove takes it away while no node names it. Under it,
- * the Try panel, for an agent of yours.
+ * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the
+ * repository's, which the board does not write. Yours has no Source, whose toggle would drop what was typed. The form is drawn under
+ * `formKeyOf`'s key, so a new version is a new form. Save puts it back against the version it was read at, and Remove takes it away while no
+ * node names it. Once the form copies a skill, the page reads the agent past the cache, before the copy's invalidation lands, to keep the
+ * form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, the Try panel
+ * for an agent of yours; the repository's is not tried, since a try runs with no repository, where its agents are not read.
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();
@@ -53,7 +56,6 @@ function AgentPage() {
             ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } })
             : undefined,
         invalidate: () => invalidateAgents(queryClient),
-        // The form a copy kept stays until the agent reads at the save's version: let go before, it was drawn from the file before the save.
         release: () =>
           setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('yours', saved.agent.name).queryKey)?.version)),
       }),
@@ -68,14 +70,11 @@ function AgentPage() {
   const error = save.error ?? remove.error;
   const form = (
     <AgentForm
-      // A new version is a new form: what was saved, as it now reads — but for the version this page's own copy of a skill moved it to.
       key={formKey}
       listing={agent}
       keyForm={keyForm}
       readOnly={!mine}
       onSkillCopied={async () => {
-        // Read before the copy's invalidation lands, past the cache, so the form is kept before the page sees the version move. A read that
-        // fails keeps nothing: the page reads the agent again, as after any write.
         const now = await readAgent(from, name).catch(() => null);
         setKept(now && keptAfterCopy(agent, now, formKey));
       }}
@@ -140,22 +139,22 @@ function AgentPage() {
           {form}
         </>
       ) : (
-        // Only the repository's has Source: yours is edited, and a toggle would drop what was typed.
         <AsWritten file={agent.file} source={agent.source}>
           {form}
         </AsWritten>
       )}
 
-      {/* Only an agent of yours is tried: a try runs with no repository, where a repository's agent is not read. */}
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
   );
 }
 
-/** Remove, asked twice: the first press asks, the second removes. */
+/**
+ * Remove, asked twice: the first press asks, the second removes. The question names the agent's file and the file it names beside it, its
+ * result schema (`output`), which goes with it unless another agent names it.
+ */
 function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: boolean; onRemove: () => void }) {
   const [asking, setAsking] = useState(false);
-  // The file the agent names beside it, which goes with it unless another agent names it: the result schema.
   const beside = [agent.keys.output].filter((file): file is string => Boolean(file));
   if (!asking)
     return (

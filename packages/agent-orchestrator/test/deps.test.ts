@@ -4,8 +4,11 @@
  * The plan is pure and tested as data. `provisionDeps` is tested the way the run calls it, at shipped
  * defaults, over a real git repository and its worktree, with a main `node_modules` written by hand the
  * way npm leaves one — workspace links, a third-party package, a scope, `.bin`, npm's own dot files — so
- * nothing here asks a registry. Each test is a refusal: it fails against the one link to main's whole
- * tree that worktrees used to get.
+ * nothing here asks a registry. Each test is a refusal: it fails against a worktree whose `node_modules`
+ * is one link to main's whole tree.
+ *
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads: nothing here files a run,
+ * and nothing here touches the operator's store.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,11 +21,8 @@ import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-deps-');
-// runner.ts reads WF_ROOT as it loads. Nothing here files a run, and nothing here touches the operator's store either.
 process.env.WF_ROOT = ROOT;
 const { provisionDeps } = await import('../src/runner.ts');
-
-// ─── the plan, as data ──────────────────────────────────────────────────────
 
 test('deps.ts reads no disk and spawns nothing: it imports path, and nothing else', () => {
   const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'deps.ts'), 'utf8');
@@ -42,12 +42,10 @@ test("the plan: workspace packages to the worktree's copy, every other package m
       { name: 'app', link: '../apps/app' },
       { name: 'third' },
       { name: 'x', link: '../packages/x' },
-      // A `file:` dependency outside the repository, and a link within node_modules: neither is a workspace.
       { name: 'far', link: '../../elsewhere/far' },
       { name: 'alias', link: 'third' },
     ],
     scopes: { '@fx': [{ name: 'other' }, { name: 'sx', link: '../../packages/sx' }] },
-    // A bin that is a file, not npm's link to one: hardlinked like a package.
     bins: [
       { name: 'xbin', link: '../x/bin.js' },
       { name: 'sxbin', link: '../@fx/sx/bin.js' },
@@ -56,22 +54,26 @@ test("the plan: workspace packages to the worktree's copy, every other package m
     ],
   };
   const nm = '/wt/run/implement/node_modules';
-  assert.deepEqual(depsPlan('/repo', '/wt/run/implement', listing), [
-    { kind: 'dir', path: nm },
-    { kind: 'dir', path: `${nm}/@fx` },
-    { kind: 'tree', path: `${nm}/@fx/other`, from: '/repo/node_modules/@fx/other' },
-    { kind: 'link', path: `${nm}/@fx/sx`, target: '../../packages/sx' },
-    { kind: 'link', path: `${nm}/app`, target: '../apps/app' },
-    { kind: 'tree', path: `${nm}/third`, from: '/repo/node_modules/third' },
-    { kind: 'link', path: `${nm}/x`, target: '../packages/x' },
-    { kind: 'link', path: `${nm}/far`, target: '/repo/node_modules/far' },
-    { kind: 'link', path: `${nm}/alias`, target: '/repo/node_modules/alias' },
-    { kind: 'dir', path: `${nm}/.bin` },
-    { kind: 'link', path: `${nm}/.bin/xbin`, target: '../x/bin.js' },
-    { kind: 'link', path: `${nm}/.bin/sxbin`, target: '../@fx/sx/bin.js' },
-    { kind: 'link', path: `${nm}/.bin/third`, target: '../third/cli.js' },
-    { kind: 'tree', path: `${nm}/.bin/shim`, from: '/repo/node_modules/.bin/shim' },
-  ]);
+  assert.deepEqual(
+    depsPlan('/repo', '/wt/run/implement', listing),
+    [
+      { kind: 'dir', path: nm },
+      { kind: 'dir', path: `${nm}/@fx` },
+      { kind: 'tree', path: `${nm}/@fx/other`, from: '/repo/node_modules/@fx/other' },
+      { kind: 'link', path: `${nm}/@fx/sx`, target: '../../packages/sx' },
+      { kind: 'link', path: `${nm}/app`, target: '../apps/app' },
+      { kind: 'tree', path: `${nm}/third`, from: '/repo/node_modules/third' },
+      { kind: 'link', path: `${nm}/x`, target: '../packages/x' },
+      { kind: 'link', path: `${nm}/far`, target: '/repo/node_modules/far' },
+      { kind: 'link', path: `${nm}/alias`, target: '/repo/node_modules/alias' },
+      { kind: 'dir', path: `${nm}/.bin` },
+      { kind: 'link', path: `${nm}/.bin/xbin`, target: '../x/bin.js' },
+      { kind: 'link', path: `${nm}/.bin/sxbin`, target: '../@fx/sx/bin.js' },
+      { kind: 'link', path: `${nm}/.bin/third`, target: '../third/cli.js' },
+      { kind: 'tree', path: `${nm}/.bin/shim`, from: '/repo/node_modules/.bin/shim' },
+    ],
+    "far, a file: dependency outside the repository, and alias, a link within node_modules, are no workspace: main's, linked; shim, a bin that is a file, not npm's link to one, is hardlinked like a package",
+  );
 });
 
 test(".worktreeinclude: paths to copy, a leading / anchored at the root as gitignore's is, node_modules set aside, and every line outside the repository refused by name", () => {
@@ -96,21 +98,24 @@ test(".worktreeinclude: paths to copy, a leading / anchored at the root as gitig
     '.git',
     '.git/hooks',
   ].join('\n');
-  assert.deepEqual(worktreeInclude(text), {
-    // `/etc/hosts` is the repository's etc/hosts, as a line in a .gitignore would be: nothing outside it.
-    copy: ['.env.local', 'config/local', 'tools/cache.json', 'spaced.txt', 'etc/hosts'],
-    provisioned: ['node_modules', 'apps/web/node_modules'],
-    refused: [
-      { line: '../x', why: 'is outside the repository' },
-      { line: 'a/../../y', why: 'is outside the repository' },
-      { line: '/../z', why: 'is outside the repository' },
-      { line: 'C:\\secrets', why: 'is absolute' },
-      { line: '.', why: 'is the repository itself' },
-      { line: '/', why: 'is the repository itself' },
-      { line: '.git', why: "is git's own" },
-      { line: '.git/hooks', why: "is git's own" },
-    ],
-  });
+  assert.deepEqual(
+    worktreeInclude(text),
+    {
+      copy: ['.env.local', 'config/local', 'tools/cache.json', 'spaced.txt', 'etc/hosts'],
+      provisioned: ['node_modules', 'apps/web/node_modules'],
+      refused: [
+        { line: '../x', why: 'is outside the repository' },
+        { line: 'a/../../y', why: 'is outside the repository' },
+        { line: '/../z', why: 'is outside the repository' },
+        { line: 'C:\\secrets', why: 'is absolute' },
+        { line: '.', why: 'is the repository itself' },
+        { line: '/', why: 'is the repository itself' },
+        { line: '.git', why: "is git's own" },
+        { line: '.git/hooks', why: "is git's own" },
+      ],
+    },
+    "/etc/hosts is the repository's etc/hosts, as a line in a .gitignore would be: nothing outside it",
+  );
 });
 
 test("what parts a worktree's lockfile from what main has on disk: a package missing, another version, a link elsewhere — not an optional one main did not take", () => {
@@ -164,8 +169,11 @@ test("what parts a worktree's lockfile from what main has on disk: a package mis
     'apps/web/node_modules/third',
     'nested in a workspace, links to the root tree cannot give it, though main has it',
   );
-  // In place — the checkout against the merge staged in it — nothing is linked, so a package nested in a workspace is what is on disk there.
-  assert.equal(lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk, true), null, 'installed where it is named');
+  assert.equal(
+    lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk, true),
+    null,
+    'in place, the checkout against the merge staged in it, nothing is linked: a package nested in a workspace is installed where it is named',
+  );
   assert.equal(
     lockfileParting(lock({ ...base, 'apps/web/node_modules/third': { ...third, version: '2.0.0' } }), onDisk, true),
     'apps/web/node_modules/third',
@@ -227,8 +235,6 @@ test('the brief says a tree was installed, under Where to look and before the cl
   assert.match(failed, /Run `npm ci` here before anything that needs a dependency/);
 });
 
-// ─── provisioning, over a real repository ───────────────────────────────────
-
 const write = (file: string, text: string, mode?: number) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text, mode === undefined ? undefined : { mode });
@@ -243,7 +249,9 @@ const npmLockfile = (cwd: string) =>
 /**
  * A main checkout as npm workspaces leave it: `packages/x` with a bin, `@fx/sx` in `packages/sx`, and
  * `apps/app`, which requires x — committed with the lockfile npm writes for them — and a `node_modules`
- * written by hand. Then a worktree cut from it, in which `packages/x` says something else.
+ * written by hand. Its `.package-lock.json`, npm's record of what it installed, is the lockfile, as npm
+ * leaves it: the run does not read it, since it can name what is not there, and a check that did would be
+ * fooled by it. Then a worktree cut from it, in which `packages/x` says something else.
  */
 function aCheckout(): { main: string; wt: string } {
   const main = fs.mkdtempSync(path.join(ROOT, 'main-'));
@@ -272,8 +280,6 @@ function aCheckout(): { main: string; wt: string } {
   write(path.join(nm, 'third/cli.js'), "#!/usr/bin/env node\nconsole.log('main-third-cli');\n", 0o755);
   link('../x/bin.js', path.join(nm, '.bin/xbin'));
   link('../third/cli.js', path.join(nm, '.bin/third'));
-  // npm's record of what it installed: what the lockfile named. The run does not read it — it can name what
-  // is not there — but a check that did would be fooled by it, so it is as npm would leave it.
   fs.copyFileSync(path.join(main, 'package-lock.json'), path.join(nm, '.package-lock.json'));
   write(path.join(nm, '.vite-temp/cache'), 'main\n');
 
@@ -363,13 +369,13 @@ test("a bin of a workspace package runs the worktree's file; a third-party bin r
 
 test("a lockfile that differs from main's provisions a tree of its own with npm ci — once — and none of main's is in it", async () => {
   const { main, wt } = aCheckout();
-  // The branch adds a workspace package, and its lockfile says so.
   write(path.join(wt, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
   write(path.join(wt, 'packages/y/index.js'), "module.exports = 'branch-y';\n");
   npmLockfile(wt);
   assert.notEqual(
     fs.readFileSync(path.join(wt, 'package-lock.json'), 'utf8'),
     fs.readFileSync(path.join(main, 'package-lock.json'), 'utf8'),
+    'the branch adds a workspace package, and its lockfile says so',
   );
   const mains = snapshot(path.join(main, 'node_modules'));
 
@@ -391,15 +397,16 @@ test("a lockfile that differs from main's provisions a tree of its own with npm 
 
 test("a lockfile main has not installed yet provisions a tree of its own, though it is main's lockfile byte for byte", async () => {
   const { main, wt } = aCheckout();
-  // packages/y is merged into both, and main's lockfile names it — written by `npm install
-  // --package-lock-only`, as CLAUDE.md's worktree note used to advise — but main's tree was installed before.
   for (const root of [main, wt]) {
     write(path.join(root, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
     write(path.join(root, 'packages/y/index.js'), "module.exports = 'y';\n");
   }
   npmLockfile(main);
   fs.copyFileSync(path.join(main, 'package-lock.json'), path.join(wt, 'package-lock.json'));
-  assert.ok(!fs.existsSync(path.join(main, 'node_modules/y')), 'main has not installed it');
+  assert.ok(
+    !fs.existsSync(path.join(main, 'node_modules/y')),
+    "packages/y is merged into both and main's lockfile, written by npm install --package-lock-only, names it: main has not installed it",
+  );
   assert.match(
     fs.readFileSync(path.join(main, 'node_modules/.package-lock.json'), 'utf8'),
     /node_modules\/y/,
@@ -414,24 +421,29 @@ test('a second provisioning is a no-op, and replaces nothing a step installed ov
   const { main, wt } = aCheckout();
   await provisionDeps(main, wt);
   const nm = path.join(wt, 'node_modules');
-  // What `npm install` in the worktree does to a package it updates: the directory is replaced.
   fs.rmSync(path.join(nm, 'third'), { recursive: true });
   write(path.join(nm, 'third/index.js'), "module.exports = 'installed-here';\n");
   const once = snapshot(nm);
 
   assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 0 });
   assert.deepEqual(snapshot(nm), once, "main's other files are not added to the package the step installed");
-  assert.equal(required(wt, 'third').value, 'installed-here');
+  assert.equal(
+    required(wt, 'third').value,
+    'installed-here',
+    'the package npm install in the worktree updated, its directory replaced, is the one installed',
+  );
 });
 
 test('a package a pass died making is made again, whole, and not taken for a package meanwhile', async () => {
   const { main, wt } = aCheckout();
   await provisionDeps(main, wt);
   const nm = path.join(wt, 'node_modules');
-  // As a pass leaves it that died inside the walk: the package's place empty, a part of it under the name it is made at.
   fs.rmSync(path.join(nm, 'third'), { recursive: true });
   write(path.join(nm, '.wf-making-third/index.js'), 'half\n');
-  assert.throws(() => required(wt, 'third'), 'what is half made is not found as the package');
+  assert.throws(
+    () => required(wt, 'third'),
+    "a pass that died inside the walk leaves the package's place empty and a part of it under the name it is made at: what is half made is not found as the package",
+  );
 
   assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 1 });
   assert.deepEqual(fs.readdirSync(path.join(nm, 'third')).sort(), ['cli.js', 'index.js']);

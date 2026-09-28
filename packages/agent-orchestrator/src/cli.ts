@@ -13,6 +13,8 @@ import {
   type Interval,
   AGENT_FACING,
   CHECK_AFFECTING,
+  Conflict,
+  Invalid,
   LESSON,
   accept,
   feedCursorRefusal,
@@ -310,7 +312,7 @@ a run's task ids carry the run and the step, so its output already names the wor
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
 const usage = (message: string): never => {
-  throw Object.assign(new Error(message), { exitCode: 2 });
+  throw new Invalid({ message });
 };
 
 /** What `wf` exits with on what `main` threw: its `exitCode` when that is a whole number from 1 to 255, and 1 otherwise. */
@@ -1061,10 +1063,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (other !== undefined)
         usage(`wf tick takes no ${other}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`);
       const held = storeRefusal('tick');
-      if (held)
-        throw Object.assign(new Error(stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held), {
-          exitCode: 2,
-        });
+      if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held });
       const { runs: results, queue, feedError, cost, refused, unreadable } = await tick(e, { repo: path.resolve('.') });
       if (feedError) console.error(feedError);
       for (const why of unreadable ?? []) console.error(`left out: ${why}`);

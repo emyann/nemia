@@ -62,8 +62,10 @@ version, and the version above must be the pin. An upgrade re-measures the table
   (`src/facade/engine.ts`).
 - A refusal written for a file that must not load the `effect` barrel — a pure file, or the orchestrator's refusals — is a
   `Data.TaggedError` imported from `effect/Data`, never from `effect`, and carries `exitCode: 2` as every refusal here does
-  (the root `CLAUDE.md`, *Errors say what to do next*). `effect/Data` loads 14 modules; the barrel loads 203, about 100 ms, on
-  every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`. No file uses one yet.
+  (the root `CLAUDE.md`, *Errors say what to do next*): `Missing`, `Conflict` and `Invalid` in
+  `packages/agent-orchestrator/src/refusal/refusal.ts`, thrown as `new Invalid({ message })`. `effect/Data` loads 14 modules; the
+  barrel loads 203, about 100 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
+  `packages/agent-orchestrator/test/refusal.test.ts` pins.
 
 ## Plain faces
 

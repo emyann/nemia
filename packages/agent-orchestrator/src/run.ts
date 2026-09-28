@@ -10,6 +10,7 @@ import path from 'node:path';
 import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check/check.ts';
 import { depsLines, inside, type Provisioned } from './workspace/workspace.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
+import { Invalid } from './refusal/refusal.ts';
 
 export { durationWord };
 import {
@@ -1158,12 +1159,9 @@ export type RunSlot = { inFlight: number; cap: number };
 export function runCapOf(value: string | undefined): number {
   if (value === undefined || !value.trim()) return 0;
   if (!/^\d+$/.test(value.trim())) {
-    throw Object.assign(
-      new Error(
-        `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`,
-      ),
-      { exitCode: 2 },
-    );
+    throw new Invalid({
+      message: `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`,
+    });
   }
   return Number(value.trim());
 }

@@ -35,6 +35,7 @@ import {
   type SkillAgain,
 } from './rendering.ts';
 import { inputsRoot } from './record/places.store.ts';
+import { Invalid } from './refusal/refusal.ts';
 import { countRecord, readText, within } from './meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -172,12 +173,11 @@ function recordRefusal(raw: unknown): string {
  * A run record that is there and does not read as one: a person's or a program's edit, or a newer `wf`'s. Said by `readRun` with the fix,
  * and left out of `listRuns`, so one record nobody can read stops no other run.
  */
-export class UnreadableRecord extends Error {
-  readonly exitCode = 2;
+export class UnreadableRecord extends Invalid {
   constructor(id: string, why: string) {
-    super(
-      `run ${id}: its record, ${runFile(id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer wf wrote it, read this store with that wf.`,
-    );
+    super({
+      message: `run ${id}: its record, ${runFile(id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer wf wrote it, read this store with that wf.`,
+    });
   }
 }
 

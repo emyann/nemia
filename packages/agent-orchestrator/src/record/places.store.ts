@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { GIVEN, givenPlan, type FolderRun, type WorkspacePlan } from '../run.ts';
+import { Conflict } from '../refusal/refusal.ts';
 
 /** What a kind of workspace does for a run: make a step's directory, and hand a finished step's work on. */
 export type Place = {
@@ -63,13 +64,11 @@ function ownGiven(workspace: string): void {
   const found = fs.lstatSync(at, { throwIfNoEntry: false });
   if (!found || (found.isDirectory() && !found.isSymbolicLink())) return;
   const what = found.isSymbolicLink() ? 'a link' : 'not a directory';
-  throw Object.assign(
-    new Error(
+  throw new Conflict({
+    message:
       `${at} is ${what}, and \`${GIVEN}/\` in a step's folder is the run's own: it is emptied and written each time the step is filed, so it is never followed. ` +
-        `Remove or rename it — the step's own work belongs outside \`${GIVEN}/\` — and the next tick files the step.`,
-    ),
-    { exitCode: 2 },
-  );
+      `Remove or rename it — the step's own work belongs outside \`${GIVEN}/\` — and the next tick files the step.`,
+  });
 }
 
 /**

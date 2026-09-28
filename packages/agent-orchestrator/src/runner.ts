@@ -17,6 +17,8 @@
  * and no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
+export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
+export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,

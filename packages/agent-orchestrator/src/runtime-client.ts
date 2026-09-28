@@ -27,6 +27,7 @@ import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.sto
 import { CHECK } from './check/check.ts';
 import { HOME } from './store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './workflow.ts';
+import { Invalid } from './refusal/refusal.ts';
 
 export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
@@ -121,7 +122,7 @@ export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.u
  */
 export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
   const read = readRemote();
-  if (read.unread) throw Object.assign(new Error(read.unread), { exitCode: 2 });
+  if (read.unread) throw new Invalid({ message: read.unread });
   return read.agents;
 }
 

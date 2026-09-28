@@ -31,17 +31,9 @@ import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type M
 import { ioCounts, type IoCounts } from './core/engine/tally.ts';
 import { tickMemoLayer } from './core/engine/memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
+import { ADMIT_INSTEAD, admit, answer, answerRefusalOf, close, file, filingOf, refusalOf, requestStop } from './core/engine/filing.ts';
 import {
-  ADMIT_INSTEAD,
-  admit,
-  answer,
-  answerRefusalOf,
-  close,
   everyView,
-  file,
-  filingOf,
-  refusalOf,
-  requestStop,
   tick,
   tickRefusalOf,
   viewOfState,
@@ -468,7 +460,7 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
 
 /**
  * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, the
- * half every door refuses (`engine.ts`), whose type checks the ranges here rest on.
+ * half every door refuses (`filing.ts`), whose type checks the ranges here rest on.
  *
  * Checked at the API, not only at the CLI: a word the harness rejects would fail its spawn, and with it the whole tick. Which
  * words a harness takes is asked of the harness; the engine never learns them, and the Effect door, which has no harnesses to
@@ -906,7 +898,8 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.t
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
 export { remoteConfigRefusal } from './a2a-remote.ts';
 export { denialText, nameFor } from './core/domain.ts';
-export { refusedText, retiredKeyRefusal } from './core/engine/engine.ts';
+export { refusedText } from './core/engine/engine.ts';
+export { retiredKeyRefusal } from './core/engine/filing.ts';
 export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
 export type { SessionState, Ended, Outcome } from './core/session.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';

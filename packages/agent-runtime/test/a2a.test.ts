@@ -10,7 +10,8 @@ import { Effect, Layer } from 'effect';
 import { A2A_PROTOCOL_VERSION, Role, TaskState } from '@a2a-js/sdk';
 import { ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { a2aOps, a2aRunner, InProcessTransport } from '../src/a2a-client.ts';
-import { file, requestStop, tick } from '../src/core/engine/engine.ts';
+import { file, requestStop } from '../src/core/engine/filing.ts';
+import { tick } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { HarnessHandler } from '../src/a2a-handler.ts';
 import {

@@ -17,7 +17,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { HARNESS_ARGS } from '../src/harness-args.ts';
 
-const CORE = ['src/core/session.ts', 'src/core/domain.ts', 'src/core/engine/engine.ts', 'src/core/lifecycle.ts'];
+const CORE = [
+  'src/core/session.ts',
+  'src/core/domain.ts',
+  'src/core/engine/engine.ts',
+  'src/core/engine/filing.ts',
+  'src/core/lifecycle.ts',
+];
 
 /** The code alone: block comments and line comments out, so a sentence about a model is not a read of one. */
 const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');

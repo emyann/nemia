@@ -28,32 +28,17 @@
  *
  * The list, in groups:
  *
- * - filing work, asking about it and stopping it (`engine.ts`);
+ * - filing work, asking about it and stopping it (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
  *   that checks a task before filing it holds its own copy to.
  */
 
-export {
-  file,
-  FileRefused,
-  requestStop,
-  answer,
-  close,
-  InputRefused,
-  admit,
-  AdmitRefused,
-  view,
-  viewOfState,
-  tick,
-  TickRefused,
-  step,
-  settleTask,
-  StepRefused,
-  GRACE_MS,
-} from './core/engine/engine.ts';
-export type { Filing, RefusedMove, TaskView } from './core/engine/engine.ts';
+export { file, FileRefused, requestStop, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/filing.ts';
+export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/engine.ts';
+export type { Filing } from './core/engine/filing.ts';
+export type { RefusedMove, TaskView } from './core/engine/engine.ts';
 
 export { Journal, JournalError } from './core/engine/journal.ts';
 export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/journal.ts';

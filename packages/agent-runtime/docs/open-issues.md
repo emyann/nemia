@@ -79,7 +79,7 @@ cannot be told apart from what its parent spent. `claude-detached` records what 
 
 ### 6. The Effect door's `file` refuses no harness's words
 
-**Where.** `file` in `agent-runtime/src/core/engine/engine.ts` refuses what the task says of itself; the refusals in a harness's
+**Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
 words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade.ts`), because that is where the
 configured harnesses, and so their words, are known.
 

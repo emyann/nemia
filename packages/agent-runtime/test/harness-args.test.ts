@@ -14,7 +14,7 @@ import { Runner, testOps, type RunnerOps } from '../src/runner.ts';
 import { composite } from '../src/runner-composite.ts';
 import { sdkRunner } from '../src/runner-sdk.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { file, type Filing } from '../src/core/engine/engine.ts';
+import { file, type Filing } from '../src/core/engine/filing.ts';
 
 const task = { brief: 'b', cwd: '/r' };
 type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];

@@ -8,10 +8,10 @@
  * (`listed`), never echoed from the request.
  *
  * A schema pasted for an `output:` is the one file `writeWorkflow` never writes, so it travels in the same PUT (`schemas`) and is judged with
- * the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`). As two writes, a schema
- * written and the folder then refused left the file behind under "nothing written".
+ * the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder leaves
+ * no schema behind under "nothing written".
  *
- * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder no longer holds it: a step edited,
+ * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a step edited,
  * added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
  *
  * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes nothing
@@ -390,7 +390,8 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
  * refuses it in its words, naming the step. `output` names its file: the schema is the folder's.
  *
  * A step with an agent (`spec.agent`) is written as `agent:`, its own keys and its own note. Sent as the listing has it — `own` with the
- * keys its file sets and its note — a role key `own.keys` does not name is its agent's, and is not written; its wiring is always its own.
+ * keys its file sets and its note — a role key `own.keys` does not name is its agent's, and is not written, since written it would pin the
+ * agent's value in the step; its wiring is always its own.
  * Sent without `own`, every key it sets is its own and `body` is its note (the package's `StepDraft`, whose `agent` is a name).
  */
 function draftOf(step: StepBody, at: string, route: string, shape: string): StepDraft | Refusal {
@@ -407,7 +408,6 @@ function draftOf(step: StepBody, at: string, route: string, shape: string): Step
         error: `${route}: ${called}'s \`${key}\` is ${TYPES[kind].said}, or null for unset, and this request's was ${JSON.stringify(value)}. Send ${shape}.`,
       };
     }
-    // A role key the step's file does not set is its agent's: written, it would pin the agent's value in the step.
     if (mine && isRoleKey(key) && !mine.keys.includes(key)) continue;
     draft[key] = key === 'output' ? { file: value } : value;
   }
@@ -535,6 +535,7 @@ export type SchemaWas = { file: string; was: string | undefined };
  * is not what it held. Then a file the failing write never opened is not written to — a read-only one, which putting back would refuse in turn —
  * and one a write truncated and did not finish is put back all the same. `fs.writeFileSync` truncates before it writes, so a write that fails
  * after the open (the disk full, a read that broke) leaves a file shorter than it was, and no bookkeeping of which writes returned can tell.
+ * A file gone, or that cannot be read, is written back.
  *
  * Exported for the test, which reads and refuses each of those three.
  */
@@ -548,9 +549,7 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
     let holds: string | undefined;
     try {
       holds = fs.readFileSync(at, 'utf8');
-    } catch {
-      /* gone, or no longer readable: written back below */
-    }
+    } catch {}
     if (holds !== was) fs.writeFileSync(at, was);
   }
 }
@@ -563,6 +562,9 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
  * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was; and so it is when the
  * disk refuses a schema itself, whether it refuses the open (a file read-only among them) or the write after it (the disk full), which leaves
  * the save no more written than a refusal does.
+ *
+ * Every schema the save has reached is put back, the one it was writing among them, should that write fail, or a later one, or the folder:
+ * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 function write(
   name: string,
@@ -592,8 +594,6 @@ function write(
     }
   });
   const schemasWritten = writing.filter((s, i) => s.text !== before[i].was).map((s) => s.file);
-  // Every schema the save has reached, the one it is writing among them: what is put back should that write fail, or a later one, or the
-  // folder. A write that fails partway has changed the file all the same, so a schema counts as written before the write, not after it.
   const written: SchemaWas[] = [];
   let result;
   try {
@@ -616,10 +616,20 @@ function write(
   };
 }
 
+/**
+ * The builder's routes. Each write is guarded (guard.ts) and writes only yours (`yoursOnly`: 403 for the repository's, with the copy to
+ * make by hand); the body is refused as `postWords`, `putWords` and `draftOf` say (400), the package's refusal is a 422 with the steps it
+ * names (`write`), and anything else a 500.
+ *
+ * - `GET /api/workflows/keys` — what a step's form is drawn from: the package's keys, in its order, and what each may be set to.
+ * - `POST /api/workflows/:from` — a new folder of yours with its first step: `writeWorkflow` on a folder that is not there yet. 409 for a
+ *   name yours has already, a workflow or another file. 201 with the folder read back.
+ * - `PUT /api/workflows/:from/:name` — a folder of yours put back from its steps: every step it is to have, as the listing has them, with
+ *   the schemas pasted for them. 404 or 409 as `folderOf` says; 409 when the `version` the draft was read at is not what the folder holds
+ *   now, since a step edited, added or removed since would be written over — nothing is written. 200 with the folder read back.
+ */
 export const builder = new Hono()
-  // What a step's form is drawn from: the package's keys, in its order, and what each may be set to.
   .get('/api/workflows/keys', (c) => c.json(keyForm()))
-  // A new folder of yours with its first step: `writeWorkflow` on a folder that is not there yet.
   .post('/api/workflows/:from', async (c) => {
     const { from } = c.req.param();
     const route = `POST /api/workflows/${from}`;
@@ -658,7 +668,6 @@ export const builder = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // A folder of yours put back from its steps: every step it is to have, as the listing has them.
   .put('/api/workflows/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `PUT /api/workflows/${from}/${name}`;
@@ -689,7 +698,6 @@ export const builder = new Hono()
         const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
         return c.json({ error: `${folder.error}${make}` }, folder.status);
       }
-      // What the draft was read from, against what the folder holds now: a step edited, added or removed since would be written over.
       const now = versionOf(folder.dir, placesOf(repo));
       if (now !== body.version) {
         return c.json(

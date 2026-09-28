@@ -123,7 +123,6 @@ function howOf(how: RetryHow, command: string): RetryHow | Refusal {
       error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
     };
   }
-  // Not above zero: not an amount, as `wf retry --budget` refuses one, in the package's words.
   if (how.budget !== undefined && !(how.budget > 0)) return { status: 400, error: budgetRefusal(how, command)! };
   return how;
 }
@@ -142,13 +141,39 @@ const roundWords =
     return `POST …/round takes a JSON object: ${ROUND_SHAPE}.`;
   };
 
+/**
+ * The board's writes for a person's asks of a run. Each route is guarded as a start is (guard.ts), answers 404 for a run or a step it does
+ * not have and 400 for a body that is not an ask, and writes through the package's own verb, whose refusals it quotes verbatim: the api
+ * judges none of it. A 202 is accepted and not yet done: the next tick honours the ask once, as it does one made at the command line. A
+ * write that fails otherwise is a 502 naming the command that asks the same way.
+ *
+ * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
+ *   by `retry()`, `wf retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the ask
+ *   (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read, and a
+ *   step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing
+ *   signed, is taken as `wf retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
+ *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try.
+ * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
+ *   cap raised. Made by `round()`, `wf round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with 400,
+ *   which `roundAsk` refuses first, whatever the run; a round the loop may not go, or a budget not above what its steps have cost
+ *   (`roundAsk`), with 409.
+ * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `wf say`'s own, which hands them
+ *   to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
+ *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
+ *   session its harness does not list running. Words the harness did not take are the engine's error, verbatim, with 502: nothing was
+ *   journalled, and asking again may work. Its 202 means the session's harness took the words and the engine journalled them; whether the
+ *   session reads them is the session's.
+ * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `wf approve`'s own, which
+ *   writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words (`approvalWordsRefusal`)
+ *   with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after — not gated, not signed off
+ *   yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message, as `wf retry --message` is.
+ * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands, through `accept()`, `wf accept`'s own,
+ *   which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again: false`.
+ *   Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be accepted
+ *   (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that ended
+ *   `again: false`, a try already accepted, a run called off.
+ */
 export const asks = new Hono()
-  // The board's second write: a person's ask for another try of a step — the answer to a step that signed off blocked, a nudge, a
-  // recheck — made by the package's `retry()`, `wf retry`'s own, which writes the ask file and nothing else; the next tick honours it
-  // once. Guarded as a start is (guard.ts). Refused in the package's words, verbatim: a message that cannot ride on the ask
-  // (`messageRefusal`, 422) before the run is read, and a step that may not be tried again that way (`retryRefusal`, 409) after.
-  // A step whose session its harness blocked, with nothing signed, is taken as `wf retry` takes it (`stopBlocked`): the ask is written as
-  // any other, and the tick stops the session before it files the try — which the answer's `stopFirst` says, for the board to word.
   .post('/api/runs/:id/steps/:step/retry', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -165,13 +190,10 @@ export const asks = new Hono()
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const how = howOf(read.body, `wf retry ${id} ${step}`);
     if ('status' in how) return c.json({ error: how.error }, how.status);
-    // A budget on a recheck, which files no session to spend it, is the package's to refuse before the run is read, as a message on one is.
     const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
-      // Accepted, and not yet done: the try is filed by the next tick, as one asked for at the command line is — or, where `stopFirst`, by
-      // a tick after the one that stops the step's blocked session.
       return c.json({ try: ask.try, file, stopFirst }, 202);
     } catch (err) {
       const said = err instanceof Error ? err.message : String(err);
@@ -184,10 +206,6 @@ export const asks = new Hono()
       );
     }
   })
-  // A person's ask for another round of a run's loop — the loop out of rounds, or held on a step of it past its budget, with the cap raised —
-  // made by the package's `round()`, `wf round`'s own, which writes the ask file and nothing else; the next tick honours it once. Guarded as a
-  // try is (guard.ts). Refused in the package's words, verbatim: a budget not above zero (400), before anything is decided of the run; a round
-  // the loop may not go, or a budget not above what its steps have cost (`roundAsk`, 409).
   .post('/api/runs/:id/round', async (c) => {
     const id = c.req.param('id');
     const refused = refusedBeforeReading(
@@ -207,11 +225,9 @@ export const asks = new Hono()
     }
     try {
       const { ask, file } = await round(e, id, how.step, how.budget);
-      // Accepted, and not yet done: the round is filed by the next tick, as one asked for at the command line is.
       return c.json({ step: ask.step, round: ask.round, file }, 202);
     } catch (err) {
       const said = err instanceof Error ? err.message : String(err);
-      // `roundAsk` refuses a budget not above zero first, whatever the run: a body that is not an amount, in its words.
       if ((err as { exitCode?: unknown }).exitCode === 2)
         return c.json({ error: said }, how.budget !== undefined && !(how.budget > 0) ? 400 : 409);
       return c.json(
@@ -220,11 +236,6 @@ export const asks = new Hono()
       );
     }
   })
-  // The board's third write: a person's words to a step's running session, through the package's `say()` — `wf say`'s own — which hands them
-  // to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back (`said`).
-  // Guarded as a start and an ask are (guard.ts). Refused in the package's words, and the engine's, verbatim (409): a step not filed, settled,
-  // or of a cancelled run; empty words; a session its harness does not list running. Words the harness did not take are the engine's error,
-  // verbatim (502): nothing was journalled, and asking again may work.
   .post('/api/runs/:id/steps/:step/say', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -245,18 +256,12 @@ export const asks = new Hono()
     if ('status' in read) return c.json({ error: read.error }, read.status);
     try {
       const { said } = await say(e, id, step, read.body.text);
-      // Accepted: the session's harness took the words, and the engine journalled them. Whether the session reads them is the session's.
       return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
     } catch (err) {
       const words = err instanceof Error ? err.message : String(err);
       return c.json({ error: words }, (err as { exitCode?: unknown }).exitCode === 2 ? 409 : 502);
     }
   })
-  // The board's fourth write: a person's approval of a step waiting at its gate, through the package's `approve()` — `wf approve`'s own — which
-  // writes the approval file and nothing else; the next tick files what waits on the step. Guarded as a try is (guard.ts). Refused in the
-  // package's words, verbatim: words that are empty (`approvalWordsRefusal`, 422) before the run is read, and a step that may not be approved
-  // (`approvalRefusal`, 409) after — not gated, not signed off yet, already approved, sent back, or of a run called off. Sending it back is
-  // `POST …/retry` with a message, as `wf retry --message` is.
   .post('/api/runs/:id/steps/:step/approve', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -280,7 +285,6 @@ export const asks = new Hono()
     if (empty) return c.json({ error: empty }, 422);
     try {
       const { approval, file } = await approve(e, id, step, message);
-      // Accepted, and not yet done: what waits on the step is filed by the next tick, as it is for an approval given at the command line.
       return c.json({ try: approval.try, at: approval.at, message: approval.message ?? null, file }, 202);
     } catch (err) {
       const said = err instanceof Error ? err.message : String(err);
@@ -291,11 +295,6 @@ export const asks = new Hono()
       );
     }
   })
-  // The board's fifth write: a person's acceptance of a loop out of rounds, as it stands, through the package's `accept()` — `wf accept`'s own —
-  // which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again: false`.
-  // Guarded as an approval is (guard.ts). Refused in the package's words, verbatim: words that are missing or empty (`acceptWordsRefusal`,
-  // 422) before the run is read, and a loop that may not be accepted (`acceptAsk`, 409) after — a step with no `loop:`, a round the run files
-  // itself or one already asked for, a loop that ended `again: false`, a try already accepted, a run called off. The api judges none of it.
   .post('/api/runs/:id/steps/:step/accept', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -319,7 +318,6 @@ export const asks = new Hono()
     if (words) return c.json({ error: words }, 422);
     try {
       const { acceptance, file } = await accept(e, id, step, message);
-      // Accepted, and not yet done: what waits on the loop is filed by the next tick, as it is for an acceptance given at the command line.
       return c.json({ step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file }, 202);
     } catch (err) {
       const said = err instanceof Error ? err.message : String(err);

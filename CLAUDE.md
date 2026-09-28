@@ -11,11 +11,6 @@ turns declared work into its tasks, watches them and reconciles. They were `agen
 What people type and what is on disk kept its name on purpose: the `wf` and `ae` commands, `~/.agent-workflows` (`WF_ROOT`)
 and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record there.
 
-Beside them, and optional: `packages/agent-judge` asks TypeSafe's Jev a typed question once and records the
-answer (the `judge` CLI; Effect inside, plain Promises out). It imports nothing from the workspace and nothing
-imports it — `test/boundary.test.ts` refuses both — with no `TYPESAFE_API_KEY` every question reads `unsure`,
-and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *Never in a tick*).
-
 ## Check your work
 
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
@@ -61,7 +56,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   two groups of other projects do, in a few words, with no name and no link (an agent kanban; a Go agent SDK, its sandbox runtime and
   an A2A adapter for Claude Code). `packages/agent-orchestrator/test/others.test.ts` reads every file but `package-lock.json` and the
   vendored `.claude/skills/shadcn/`, and refuses a line naming one; the names sit there in base64. What we integrate (Claude Code,
-  Codex, A2A, `@a2a-js/sdk`) and what is compared by name on purpose (TypeSafe, Tekton, Argo, n8n, Kubernetes) are not on it.
+  Codex, A2A, `@a2a-js/sdk`) and what is compared by name on purpose (TypeSafe, which the dated documents still name; Tekton, Argo,
+  n8n, Kubernetes) are not on it.
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
@@ -162,9 +158,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   escapes, wrote a raw NUL and DEL into a regular expression's class in `apps/api/src/builder.ts`: ripgrep then took the whole file for
   binary, and a search of `apps/api/src` did not find it. Each app's `test/source.test.ts` refuses a raw control character in its `src` and
   `test`; a script that needs one builds it with `String.fromCharCode` (learned by the run that built the workflow builder, round 2).
-  The same happened to a byte order mark: writing `\uFEFF` through the file tools put a raw BOM into `agent-judge`'s `card.ts` and
-  `card.test.ts`, twice — and into this very line as it was written, caught only by looking for one — and that package's
-  `test/source.test.ts` refuses one too (learned by the run that built the judge package).
+  The same happens to a byte order mark: writing `\uFEFF` through the file tools can put a raw BOM into a file, and did, twice in one
+  run and once into this very line as it was written, caught only by looking for one. No test refuses a BOM (the apps' `source.test.ts`
+  reads control characters, and a BOM is not one), so after writing an escape of one, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`).
 - **An e2e fixture written relative to now crosses midnight.** The quota seed resets the five-hour window 130 minutes out, and the
   page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
   e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
@@ -885,9 +881,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   - *Between packages, only the public contract.* Another package reaches the runtime through `agent-runtime` and
     `agent-runtime/effect` alone, and the apps reach the orchestrator through `agent-orchestrator`, `agent-orchestrator/run`
     and `agent-orchestrator/workflow` alone — never a subpath outside `exports`, a relative path, `import.meta.resolve` or a
-    built path into `src/`. `./workflow` is the pure format; the folder readers are exported from `agent-orchestrator`. The
-    judge imports nothing from the workspace and nothing imports it (`packages/agent-runtime/test/contract.test.ts`,
-    `packages/agent-orchestrator/test/contract.test.ts`, `packages/agent-judge/test/boundary.test.ts`).
+    built path into `src/`. `./workflow` is the pure format; the folder readers are exported from `agent-orchestrator`
+    (`packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`).
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`). Pure files — `assess` in `run.ts` among them — read no disk, spawn
     nothing, and import no runtime and no file of the other kinds. Store files are the I/O beneath the controllers, import

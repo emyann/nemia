@@ -98,7 +98,8 @@
     // edits nothing shared. packages/agent-orchestrator/test/comments.test.ts reads these blocks.
     {
       "files": ["apps/api/**"],
-      "excludeFiles": ["apps/api/**"],
+      // The test helper and its test are held byte for byte to the runtime's copy, which the runtime's cleanup card cleans in every package.
+      "excludeFiles": ["apps/api/test/scratch.ts", "apps/api/test/scratch.test.ts"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

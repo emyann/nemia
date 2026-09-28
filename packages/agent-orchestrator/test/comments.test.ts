@@ -37,11 +37,26 @@ function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'u
 /** The override blocks that carry the comment guards, in the order the config lists them. */
 const guardBlocks = (config: Config): Block[] => config.overrides.filter((block) => 'comments/no-code-comments' in block.rules);
 
-/** Whether a block's guards run: no `excludeFiles` takes its package back out. */
-const isOn = (block: Block): boolean => block.excludeFiles === undefined;
-
 /** The package a block covers, from its `files` glob. */
 const packageOf = (block: Block): string => block.files[0].replace(/\/\*\*$/, '');
+
+/** Whether a block's guards run: its `excludeFiles` does not take its whole package back out. */
+const isOn = (block: Block): boolean => !(block.excludeFiles ?? []).includes(`${packageOf(block)}/**`);
+
+/** The files an on block exempts from its guards, each a path from the root. */
+const exemptOf = (block: Block): string[] => (isOn(block) ? (block.excludeFiles ?? []) : []);
+
+/** What is wrong with the files an on block exempts: each must be one file of its own package that is on disk, never a glob. */
+const exemptionProblems = (block: Block): string[] =>
+  exemptOf(block).flatMap((file) =>
+    /[*?[\]{}!]/.test(file)
+      ? [`${file} is a glob: exempt each file by its path`]
+      : !file.startsWith(`${packageOf(block)}/`)
+        ? [`${file} is outside ${packageOf(block)}`]
+        : !fs.existsSync(path.join(ROOT, file))
+          ? [`${file} is not on disk: take it off`]
+          : [],
+  );
 
 /** Every workspace package: the folders under packages/ and apps/ with a package.json, from the root. */
 const workspacePackages = (): string[] =>
@@ -320,7 +335,17 @@ test('there is one guard block per workspace package, each covering its package 
     const glob = [`${packageOf(block)}/**`];
     assert.deepEqual(block.files, glob);
     if (!isOn(block)) assert.deepEqual(block.excludeFiles, glob, `${packageOf(block)}'s block excludes something else than its package`);
+    assert.deepEqual(exemptionProblems(block), [], packageOf(block));
   }
+});
+
+test('REFUSED: a block that is on exempts only files of its own package that are on disk, each by its path', () => {
+  const block = (excludeFiles: string[]): Block => ({ files: ['apps/api/**'], excludeFiles, rules: {} });
+  assert.deepEqual(exemptionProblems(block(['apps/api/test/**'])), ['apps/api/test/** is a glob: exempt each file by its path']);
+  assert.deepEqual(exemptionProblems(block(['apps/web/test/scratch.ts'])), ['apps/web/test/scratch.ts is outside apps/api']);
+  assert.deepEqual(exemptionProblems(block(['apps/api/test/gone.ts'])), ['apps/api/test/gone.ts is not on disk: take it off']);
+  assert.deepEqual(exemptionProblems(block(['apps/api/package.json'])), []);
+  assert.deepEqual(exemptionProblems(block(['apps/api/**'])), [], 'a block that is off exempts nothing file by file');
 });
 
 /** `.oxlintrc.json`'s text with `pkg`'s guards switched on: its block's `excludeFiles` line deleted, as its cleanup card does. */
@@ -480,11 +505,13 @@ test("no word on the other programs' list is a name the code has already", () =>
 });
 
 test('in every package whose guards are on, a name a comment quotes in backticks is one the code has', () => {
-  const on = guardBlocks(readConfig()).filter(isOn).map(packageOf);
+  const blocks = guardBlocks(readConfig()).filter(isOn);
+  const on = blocks.map(packageOf);
+  const exempt = new Set(blocks.flatMap(exemptOf));
   const names = knownNames();
   const scanned = new Set<string>();
   const stale = sourceFiles()
-    .filter((file) => on.some((pkg) => file.startsWith(`${pkg}/`)))
+    .filter((file) => on.some((pkg) => file.startsWith(`${pkg}/`)) && !exempt.has(file))
     .flatMap((file) => {
       scanned.add(on.find((pkg) => file.startsWith(`${pkg}/`)) ?? '');
       return staleNames(file, fs.readFileSync(path.join(ROOT, file), 'utf8'), names);

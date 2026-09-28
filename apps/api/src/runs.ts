@@ -46,6 +46,11 @@ export type RunSummary = {
    */
   startedAt: string | null;
   cancelledAt: string | null;
+  /**
+   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what it
+   * kept — for the mark beside its status; null on a run never pruned.
+   */
+  pruned: { said: string } | null;
   /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */

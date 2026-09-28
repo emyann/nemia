@@ -60,7 +60,7 @@ export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: s
     if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) throw new Error('not a file of yours');
     registration = JSON.parse(await fs.promises.readFile(file, 'utf8'));
   } catch (e) {
-    throw new Error(`the session's registration, ${file}, cannot be read (${e instanceof Error ? e.message : String(e)}): it has exited, or runs somewhere this process cannot see.`);
+    throw new Error(`the session's registration, ${file}, cannot be read (${e instanceof Error ? e.message : String(e)}): it has exited, or runs somewhere this process cannot see.`, { cause: e });
   }
   if (registration?.sessionId !== sessionId) {
     throw new Error(`pid ${pid} is registered to ${String(registration?.sessionId)} now, not ${sessionId}: the session has exited.`);
@@ -71,7 +71,7 @@ export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: s
   }
   let stat: fs.Stats;
   try { stat = await fs.promises.lstat(socket); } catch (e) {
-    throw new Error(`session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`);
+    throw new Error(`session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`, { cause: e });
   }
   const refused = inboxSocketRefuses(socket, stat, uid);
   if (refused) throw new Error(refused);

@@ -136,7 +136,7 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
   const { printed, threw } = await typed(t, ['up', '10'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, 3);
-  assert.deepEqual(seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]), Array(3).fill([process.pid, process.cwd(), 10, procStartOf(process.pid)]));
+  assert.deepEqual(seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]), Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]));
   assert.equal(typeof seen[0]!.procStart, 'number', 'its process named by its start, with /proc on this host');
   assert.equal(seen[0]!.passedAt, null, 'no pass completed before the first');
   assert.ok(Date.parse(seen[0]!.startedAt) >= before - 1);

@@ -241,6 +241,7 @@ function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onE
             await onLine(line, got.ends[i]!);
           }
         }
+        // oxlint-disable-next-line no-unmodified-loop-condition -- a drain called during an await sets `again`, and `stop()` sets `stopped`
       } while (again && !stopped);
     } catch (e) {
       onError?.(e);

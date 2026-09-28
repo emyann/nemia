@@ -57,7 +57,7 @@ test('REFUSED: each name, in a sentence, a link, a comment, a quote or another c
     `**The pattern to follow:** <https://github.com/${author}/${adapter}>`,
     `"quote": "the approver is a file. ${cap(kanban)} runs a decomposer in the dispatcher every tick"`,
     `the reviewer answers with \`${tool}request_changes\``,
-    `${kanban.toUpperCase()}`,
+    kanban.toUpperCase(),
   ]) assert.deepEqual(othersNamed(line), [`1: ${line.trim()}`], line);
   assert.deepEqual(othersNamed(`one\ntwo ${cap(runtime)}\nthree`), [`2: two ${cap(runtime)}`], 'the line is named');
 });

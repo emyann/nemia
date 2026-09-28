@@ -286,7 +286,7 @@ export function foldersIn(dir: string): string[] {
     names = fs.readdirSync(dir);
   } catch (err) {
     if (['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException).code ?? '')) return [];
-    throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`);
+    throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`, { cause: err });
   }
   return names.filter((name) => {
     if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
@@ -330,7 +330,7 @@ export function folderOf(name: string, from: WorkflowSource | undefined, repo: s
     };
   }
   const there = sources.flatMap((s) => foldersIn(s.dir).map((folder) => `${folder} (${s.from})`));
-  const where = `${from ? sources.filter((s) => s.from === from).map((s) => s.dir).join('') : sources.map((s) => s.dir).join(' or ')}`;
+  const where = from ? sources.filter((s) => s.from === from).map((s) => s.dir).join('') : sources.map((s) => s.dir).join(' or ');
   return {
     status: 404,
     error: there.length

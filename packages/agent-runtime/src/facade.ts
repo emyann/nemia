@@ -643,7 +643,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const name = nameFor(taskId, last.n);
       let observed: Map<string, Sighting>;
       try { observed = await go(runner.observe); } catch (e) {
-        throw new Error(`say: the \`${harness}\` registry could not be read (${e instanceof Error ? e.message : String(e)}), so ${name} could not be found. Nothing was said; ask again.`);
+        throw new Error(`say: the \`${harness}\` registry could not be read (${e instanceof Error ? e.message : String(e)}), so ${name} could not be found. Nothing was said; ask again.`, { cause: e });
       }
       const sighting = observed.get(name);
       // Registered and not listed: on `claude`, whose listing reads past a registry that failed so its jobs stay seen, that
@@ -670,11 +670,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
         throw refuse(`\`${taskId}\` runs on the \`${harness}\` remote A2A agent, whose Task takes words only once it asks for input, and it is at work. Say them when \`ae ls\` shows it waiting, or ${resume.charAt(0).toLowerCase()}${resume.slice(1)}`);
       }
       try { await go(deliver({ name, sessionId: sighting.sessionId }, text)); } catch (e) {
-        throw new Error(`say: ${name} was not given the words (${e instanceof Error ? e.message : String(e)}). Nothing was journalled.`);
+        throw new Error(`say: ${name} was not given the words (${e instanceof Error ? e.message : String(e)}). Nothing was journalled.`, { cause: e });
       }
       const said: Said = { at: new Date().toISOString(), attempt: last.n, text };
       try { await go(Effect.flatMap(Journal, (j) => j.append(taskId, { kind: 'said', ...said }))); } catch (e) {
-        throw new Error(`say: ${name} was given the words, but they could not be journalled (${e instanceof Error ? e.message : String(e)}): the record does not show them.`);
+        throw new Error(`say: ${name} was given the words, but they could not be journalled (${e instanceof Error ? e.message : String(e)}): the record does not show them.`, { cause: e });
       }
       return said;
     },

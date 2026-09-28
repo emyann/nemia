@@ -109,10 +109,10 @@ export const breakdownLines = (c: PassCost): string[] => {
   const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]!) : cell.padStart(widths[k]!))).join('  ')}`;
   const harnesses = Object.entries(c.harnesses).sort(([a], [b]) => a.localeCompare(b)).map(([name, h]) =>
     `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started` +
-      `${h.unread ? `, ${h.unread} could not read it` : ''}`);
+      (h.unread ? `, ${h.unread} could not read it` : ''));
   return [
     `the last pass, at ${c.at}: ${msWord(c.ms)} ms, ${plural(c.records, 'run record')} read, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started` +
-      `${c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''}`,
+      (c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''),
     line(head),
     ...rows.map(line),
     ...(harnesses.length ? ['observed, by harness (at once, so their times overlap):', ...harnesses] : ['no harness was observed']),

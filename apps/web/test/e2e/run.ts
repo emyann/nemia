@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     execFileSync(process.execPath, [vite, 'build'], { cwd: WEB, stdio: 'pipe' });
   } catch (err) {
     const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
-    throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''));
+    throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''), { cause: err });
   }
 
   // A string from here on, and the same store the pages read off world.ts.

@@ -39,7 +39,19 @@
     // an optimisation nothing performs.
     "react/preserve-manual-memoization": "off",
     "react/set-state-in-effect": "off",
-    "react/purity": "off"
+    "react/purity": "off",
+    // From the suspicious category, the rules that find a bug or needless code rather than a style.
+    "preserve-caught-error": "error",
+    // Not typescript/consistent-return: a declared return type already makes tsc require a value on every path, and the rule misreads
+    // what tsc understands (an exhaustive switch, `assert.fail`, an effect that returns its cleanup only when it set something up).
+    "no-unmodified-loop-condition": "error",
+    // Not typescript/no-unnecessary-type-conversion: a draft the board sends is typed as its current shape, and a page opened before a
+    // change sends what it had, as a driver may report a state that is none; String() there is the guard the type cannot state.
+    "typescript/no-unnecessary-template-expression": "error",
+    // Not typescript/no-unnecessary-boolean-literal-compare: `x !== true` is how a guard refuses a caller that does not keep the type
+    // (`holdOpen: 'yes'`), and its fix to `!x` let that caller through; the refusal's own test caught it.
+    "typescript/no-unnecessary-type-arguments": "error",
+    "unicorn/no-array-fill-with-reference-type": "error"
   },
   "overrides": [
     {

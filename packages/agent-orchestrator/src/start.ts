@@ -76,7 +76,7 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
   const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
   if (ending) {
     throw Object.assign(new Error(
-      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on ${'the base branch'} itself, where the work already is, so there would be nothing to merge.\n`
+      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n`
       + `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
     ), { exitCode: 2 });
   }

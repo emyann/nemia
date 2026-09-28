@@ -100,7 +100,7 @@ export async function launch(): Promise<Browser> {
   try {
     return await chromium.launch();
   } catch (err) {
-    throw new Error(`Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`);
+    throw new Error(`Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`, { cause: err });
   }
 }
 

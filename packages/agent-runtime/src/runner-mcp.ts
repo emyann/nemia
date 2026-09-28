@@ -59,7 +59,7 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
     text = fs.readFileSync(file, 'utf8');
   } catch { return undefined; }
   try { JSON.parse(text); } catch (e) {
-    throw new Error(`${file} is not valid JSON (${(e as Error).message}), and Claude Code starts no session with it named. Fix the file, or remove it from the checkout.`);
+    throw new Error(`${file} is not valid JSON (${(e as Error).message}), and Claude Code starts no session with it named. Fix the file, or remove it from the checkout.`, { cause: e });
   }
   return file;
 };

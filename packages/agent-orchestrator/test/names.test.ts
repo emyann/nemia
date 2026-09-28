@@ -117,7 +117,7 @@ test('REFUSED: a former name in an import, a path, a sentence or a dependency', 
     `See packages/${workflows}/docs/features.md, section 3.`,
     `the ${engine}'s open issue 24`,
     `  "${engine}": "*"`,
-    `${workflows}`,
+    workflows,
   ]) assert.deepEqual(formerNames(line), [`1: ${line.trim()}`], line);
   assert.deepEqual(formerNames(`one\ntwo ${engine}\nthree`), [`2: two ${engine}`], 'the line is named');
 });

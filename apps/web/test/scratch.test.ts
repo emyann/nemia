@@ -24,6 +24,7 @@ const tmpdirCalls = (text: string) => text.split('\n')
 
 test('REFUSED: a line that makes a root under the temp directory by hand is found', () => {
   // Spelled in two, or this file would call it by name.
+  // oxlint-disable-next-line typescript/no-unnecessary-template-expression -- built in two, so this file does not name the call it refuses
   const call = `${'tmp'}dir`;
   assert.deepEqual(tmpdirCalls(`const a = 1;\nconst dir = fs.mkdtempSync(path.join(os.${call}(), 'ae-x-'));\n`),
     [`2: const dir = fs.mkdtempSync(path.join(os.${call}(), 'ae-x-'));`]);

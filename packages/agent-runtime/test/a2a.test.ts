@@ -588,7 +588,7 @@ test('the in-process transport maps the three names the handler spells otherwise
     && e.message === 'the `fake` harness has no extended card: its card is the whole of it.');
   await assert.rejects(t.listTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', pageSize: 0, pageToken: '' }),
     (e) => e instanceof PushNotificationNotSupportedError && e.message === 'the `fake` harness sends no notifications: poll getTask.');
-  const drain = async (g: AsyncGenerator<unknown>) => { for await (const _ of g) { /* nothing is yielded */ } };
+  const drain = async (g: AsyncGenerator) => { for await (const _ of g) { /* nothing is yielded */ } };
   await assert.rejects(drain(t.resubscribeTask({ tenant: '', id: 'ae/t-1/1' })),
     (e) => e instanceof UnsupportedOperationError && e.message === 'this agent does not stream: poll getTask.');
   await assert.rejects(drain(t.sendMessageStream({ tenant: '', message: undefined, configuration: undefined, metadata: undefined })),

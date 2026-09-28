@@ -61,7 +61,8 @@ const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-h
     const file = path.join(bin, `${task.harness === 'codex' ? 'codex' : 'claude'}.argv`);
     // A detached harness is run by its worker, a moment after the tick returns.
     const until = Date.now() + 15_000;
-    while (attempt?.reason !== 'unstartable' && !fs.existsSync(file) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+    // A spawn refused at the tick writes no argv, so there is nothing to wait for.
+    if (attempt?.reason !== 'unstartable') while (!fs.existsSync(file) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
     return { root, attempt, args: fs.existsSync(file) ? argvIn(file) : undefined };
   }).finally(() => {
     if (prevHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prevHome;

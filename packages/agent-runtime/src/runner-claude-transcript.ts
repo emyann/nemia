@@ -389,6 +389,6 @@ export const renderTranscript = (messages: readonly unknown[]): string =>
             return block.type === 'text' ? block.text : block.type === 'tool_use' ? `[${block.name}]` : `[${block.type}]`;
           }).join(' ')
         : typeof content === 'string' ? content : '';
-      return `${(msg.type ?? '?').padEnd(9)} ${String(text).replace(/\s+/g, ' ').slice(0, 160)}`;
+      return `${(msg.type ?? '?').padEnd(9)} ${text.replace(/\s+/g, ' ').slice(0, 160)}`;
     })
     .join('\n');

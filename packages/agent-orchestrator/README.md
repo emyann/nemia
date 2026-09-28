@@ -1379,7 +1379,13 @@ it files the step.
   file git ignores, which never reaches the branch. Every pass until the check is filed copies only what
   changed, so a pass that dies halfway loses nothing, and nothing is written through a link a step made in
   its directory.
-- **The step's check is given it** as `WF_ARTIFACTS`.
+- **The step's check is given it** as `WF_ARTIFACTS`. An ending's check (`workspace: main`) runs the e2e on
+  the merge staged in the checkout, after the ending's gate, so its pictures are of the merged tree and are
+  read by nobody once the merge has landed. On the pass that writes a landing's `{ commit }`, the tick removes
+  every regular `.png` directly in the ending's directory that its closeout does not name, never through a
+  link, and writes `e2e-pictures.txt` in their place: why, the check's log, and each name with its size
+  (`dropLandedPictures`). A check that refused or did not finish lands nothing, and keeps every picture, the
+  failed page's among them. The pictures a reviewer read are implement's, in its own directory, and stay.
 - **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
   root is read from `<dir>`, where it was collected, or else from the branch, as before collection — so a run
   from before it reads as it did, worktree or not. A file whose copy something the step made in `<dir>` refused
@@ -2700,7 +2706,7 @@ holding a concurrency slot forever.
 | `src/places.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `workflow-store.ts`, and reads no git |
 | `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
-| `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), and what its files directory holds (`artifactFiles`) |
+| `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), and a landed ending's check pictures removed (`dropLandedPictures`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |

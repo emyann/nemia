@@ -30,8 +30,23 @@ workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the fou
 with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — and a feed of what the
 tick judged, followed with `wf watch` (its package half; the board's half is a card of its own) — and one `wf up` per store, with a heartbeat
 in `daemon.json` that `wf ls` reads, and the Factory reads too — have shipped.
-tick judged, followed with `wf watch` (its package half), and streamed by the api (`GET /api/feed/stream`; the board reading it is a
-card of its own) — have shipped.
+
+State as of 2026-09-28: everything above, and since, each in a *Shipped* section below — the board following the feed; the ending's
+check run by the run, which lands the merge or aborts it; `denials: fail` (§10); a gate and a blocked sign-off held open on the step's
+own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
+own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
+
+**What remains, in order.** Of the numbered items, three are open:
+
+1. §1, a run that grows steps from a plan.
+2. §2's board half of Remote Control: the run page's word that a step's session is reachable from a phone, and whether a session was
+   in fact bridged, which nothing reads (runtime open issue 23).
+3. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
+   4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
+
+Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
+thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those
+leftovers are open too.
 
 ## Shipped: the check
 
@@ -2014,6 +2029,12 @@ the feed takes, from which a read gives exactly the lines after it, with a non-A
 
 ### Still to build: the board follows the feed (a card of its own)
 
+*Built since; noted 2026-09-28, the list below kept as it was asked.* The board holds one stream of the feed (`useFeed` in
+`apps/web/src/lib/useFeed.ts`), and each event invalidates exactly what it can change (`keysOf` in `apps/web/src/lib/feed.ts`). While the stream is open, the runs, a
+run's record and the ceilings are polled once a minute (`FALLBACK_MS`, `pace(5_000)`), and every 5 s while it is down. The header says
+whether the board follows the feed (`data-feed`). An e2e page that edits the store by hand says so on the feed (`fed()` in the e2e's
+`board.ts`). CLAUDE.md keeps what it taught.
+
 - **One EventSource on `/api/feed/stream`** for the app, opened with no cursor (the whole feed replays, so batch what it does into one
   invalidation per animation frame), and closed on the `error` that ends a response, not on the last event (CLAUDE.md).
 - **Per event**: `step` and `run` invalidate `['runs']` and the named run's record with `exact: true` — never `['runs', <id>]` by prefix,
@@ -2146,6 +2167,41 @@ What was built:
 Left for later:
 
 - **The whole directory or none**: nothing keeps one screenshot and prunes the rest. And the board still has no prune button.
+## Shipped: a landed ending keeps no pictures of the merged tree
+
+Measured read-only on the owner's store on 2026-09-28: `runs/` was 3.81 GB, almost all of it the e2e's PNGs (18,176 files, 3.73 GB) under
+`runs/*/artifacts`, 3.26 GB of it in `implement/` (182 runs) and 0.54 GB in `ship/` (115). The request read the two sets as copies. They
+are not: nothing copies them. `collectArtifacts` copies only what a closeout names, and a ship's closeout names no picture. They are two
+photographs of two trees: implement's, which the implementer takes of its branch with `WF_ARTIFACTS=<artifacts/implement> npm run e2e`
+before it signs off (its skill `look-at-a-page`), and ship's, which the ship's check takes of the merge staged in the checkout (the
+shipped check line runs the e2e only where no `WF_BASE_REF` is set, and the tick gives that check `WF_ARTIFACTS=<artifacts/ship>`). In
+the latest web run, agents card 3c, 202 of its 252 pictures differ byte for byte between the two.
+
+Who reads each: implement's are the ui reviewer's (`screenshots`, `input: implement`), the board's (a file a closeout names, `artifactOf`)
+and `wf decide`'s list. Ship's are taken after the ship's gate, so no person reads them before; when the check fails, its headline names
+`<page>-<theme>-failed.png` and the pages before it show how far it got. When it passes, the run commits, and nothing shows them but
+`wf decide`'s list of names and sizes.
+
+What was built: on the pass that writes a landing's `{ commit }` — the commit made on the check's exit 0, or found on HEAD after a restart
+— `landEnding` removes every regular `.png` directly in the ending's directory that its closeout does not name, never through a link, and
+writes `e2e-pictures.txt` in their place: why, where the check's output and stderr are, and each name with its size (`dropLandedPictures`
+in artifacts.ts). The note is written before anything is removed and left as it is after, so a pass that dies halfway leaves the whole list
+and the next removes the rest. An abort, an untouched landing, a refused check and one that did not finish keep every picture.
+
+Why not a hardlink of byte-identical files: once a landed ship keeps no pictures there is no pair across steps left on a pass, and within
+a step the files are still written to — `collectArtifacts` copies onto a file that has a link, which would write through it into the
+other name. The pairs within one set (`builder` and `builder-saved`, and a few more, about 2.7 MB a set) are left.
+
+The saving, measured on a fixture of the store's shape (`ship.test.ts`: 252 pictures of 194 KB): 48.9 MB freed a landed web run, less a
+note of a few KB. On the owner's store as it is, the 21 runs whose ship landed a commit hold 453 MB of such pictures: that much would
+have been freed, 12% of `runs/`. Forward only: runs landed before this keep them, and nothing reclaims them yet.
+
+Left for later:
+
+- **The pictures already on the store** (453 MB of landed ships, and the ships of runs from before the run landed its merges): a reclaim,
+  by `wf prune` or a one-off, is a decision of its own, since `wf prune` promises to keep a run's files.
+- **Implement's own e2e is the larger cost**: about 44 MB on nearly every run, web or not, since the implementer runs it before it signs
+  off. What a finished run needs of those after its reviewer has read them is the next question.
 
 ## Shipped: holding a run that has started — `wf hold`, the orchestrator's half
 
@@ -3626,7 +3682,9 @@ Five things the reviews of §9's package half and of the checkout hold found and
   step that has run still awaiting approval with its branch merged. Each reader, turned off alone, fails a store test.
 - **What the board cannot show yet, and an open question**, in the two sections above: a supervisor waiting for its person draws as a
   failed run (the supervisor's *What it leaves*); a held ending draws as plain `waiting`, since the board passes no checkout; and a merge
-  conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*).
+  conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*). *Since: the merge
+  conflict is answered — an approved ending that stops sends the work back to the loop's step (`Retry.back`), in the ending's section
+  under **Answered** (noted 2026-09-28).*
 - From the root, `npx turbo run test --force`, counted as this file counts them: agent-orchestrator 613 (611 passed, 2 skipped), from 606 —
   seven new tests, and four that changed: the supervisor's shape, whose `disallow:` grew; the brief of a step in the checkout whose run cut
   no branch, which now refuses the claim too; two endings for one checkout, which asserts the run held back is in flight; and §8's pinned
@@ -4364,7 +4422,9 @@ next turn: the same task, the same id, in the session that signed.
 **What it leaves.** A closed task reads `between attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
 a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. A blocked run is
 `finished` to `wf cancel`, so its waiting task stays open until it is answered, or the run is forgotten with `wf rm`. Rounds stay
-`-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner.
+`-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner. Since 2026-09-28 that item is called *tries as
+attempts*, because the runtime's stage 4c is admission, which is done.
+
 ## Shipped: the rule lists under Claude Code's names — `disallowedTools:` and `allowedTools:`
 
 A step's two rule lists were `disallow:` and `allow:` until 2026-09-23; they are `disallowedTools:` and `allowedTools:` now, the names
@@ -4833,7 +4893,8 @@ which A2A has no field for yet.
 - **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,
   and a test holds them so. `wf --help`'s sentence on the keys names `remote` among the rest.
 - **Left**: the board's word for it on the run page; the supervisor; and whether a session was in fact bridged, which nothing reads
-  (engine open issue 23).
+  (engine open issue 23). *Since: the supervisor shipped as §9 (2026-09-17); the board's word and the bridge are what is left
+  (noted 2026-09-28).*
 
 **Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
 whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
@@ -5095,6 +5156,10 @@ keeps its.
 
 ## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)
 
+Shipped 2026-09-24 as *Shipped: a gate and a blocked sign-off wait on the step's own task*, above. What was registered is kept as it
+was asked. A step's tries and rounds as attempts of one task, called 4c below and not the runtime's stage 4c (admission, done
+2026-09-25), is still open, as *tries as attempts* (2026-09-28).
+
 **Registered** 2026-09-23, the orchestrator's half of R1. Part 4a shipped the runtime's: a task filed `holdOpen: true` waits
 `input-required` with nothing running when an attempt signs, `answer` starts a turn that `--resume`s its session, and
 `close` settles it (`packages/agent-runtime/README.md`, *Waiting for a person*; measured live as M12). Today a gate's
@@ -5119,7 +5184,9 @@ Built since, by the design's cards: 1a (the machinery) and 1b (the shipped proce
 (the card generated from the skills, with the `card:` key and the `.skills.json` files retired), and 3a (an agent of yours composes its
 skills on the board from your library, this repository's and HKB's shipped ones, a shipped one copied into your library first, each
 with what it costs a turn; `systemPrompt` as radios by what the agent does), and 3b (a skill of your own written on the board, with a
-page of its own that lists who gives it and holds `preload:` as a switch with its cost). 3c, trying an agent on a short brief, follows.
+page of its own that lists who gives it and holds `preload:` as a switch with its cost), and 3c (an agent tried on a short brief from its page on the board, a try refused and said
+on its listing when the try's fence does not reach it). Their commits: 3a `ef147a1` and 3b `c8145ca` (2026-09-25), 3c `60afb7b`
+(2026-09-26). Noted 2026-09-28; until then the line said 3c followed.
 
 ## Engine-side work
 

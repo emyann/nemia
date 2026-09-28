@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { accept, advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
+const { accept, advance, approve, artifactFiles, artifactsDir, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 const { abortMerge, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
 
@@ -369,17 +369,33 @@ const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch:
  * A run at its ending, approved and filed, whose shipper did as its recipe says: staged the merge of the result in the repository's checkout
  * and signed off `done` with the message — and the pass after, which files ship's check on that merge.
  */
-async function stagedAndSigned(given: { repo?: string; board?: ReturnType<typeof board>; message?: string } = {}) {
+async function stagedAndSigned(given: { repo?: string; board?: ReturnType<typeof board>; message?: string; artifacts?: string[] } = {}) {
   const at = await atTheGate(given);
   await approve(at.e, at.id, 'ship', 'Merge it.');
   assert.deepEqual((await advance(at.e, readRun(at.id))).filed, ['ship']);
   git(at.repo, 'merge', '--no-ff', '--no-commit', at.branch);
-  at.settle(`${at.id}-ship`, 'succeeded', { ...SIGNED, message: given.message ?? MESSAGE });
+  at.settle(`${at.id}-ship`, 'succeeded', { ...SIGNED, artifacts: given.artifacts ?? [], message: given.message ?? MESSAGE });
   const signed = await advance(at.e, readRun(at.id));
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
 const mergeHead = (repo: string): boolean => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
+
+/**
+ * What the ship's check leaves in its files directory when its e2e runs on the merged tree (`WF_ARTIFACTS`): a picture per page and
+ * theme, `-failed` for a page that failed. The owner's store on 2026-09-28 had 252 of them, 48.9 MB, in the latest web run's
+ * `artifacts/ship`, about 194 KB each: that shape by default. The bytes in the directory before, to measure what a landing frees.
+ */
+const photographed = (id: string, { count = 252, bytes = 194_000 } = {}): { dir: string; pictures: string[]; before: number } => {
+  const dir = artifactsDir({ id }, 'ship');
+  fs.mkdirSync(dir, { recursive: true });
+  const pictures = Array.from({ length: count }, (_, i) => `page-${String(i).padStart(3, '0')}-${i % 2 ? 'dark' : 'light'}.png`);
+  pictures[0] = 'answer-light-failed.png';
+  for (const name of pictures) fs.writeFileSync(path.join(dir, name), Buffer.alloc(bytes, 1));
+  return { dir, pictures, before: bytesIn(dir) };
+};
+const bytesIn = (dir: string): number => artifactFiles({ id: path.basename(path.dirname(path.dirname(dir))) }, 'ship').reduce((sum, f) => sum + f.bytes, 0);
+const pngsIn = (dir: string): string[] => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort() : []);
 
 test("an approved ending stages the merge and signs off its message; the run executes ship's check on the merged tree, and commits the merge only on its exit 0", async () => {
   const { repo, id, branch, e, tasks, settle, base, signed, checkId } = await stagedAndSigned();
@@ -414,6 +430,11 @@ test("an approved ending stages the merge and signs off its message; the run exe
     assert.equal(mergeHead(repo), true);
   }
 
+  // What the check's e2e took of the merged tree stays while it runs.
+  const shot = photographed(id);
+  await advance(e, readRun(id));
+  assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort());
+
   settle(checkId, 'succeeded', undefined, 0);
   const landed = await advance(e, readRun(id));
   const head = git(repo, 'rev-parse', 'HEAD');
@@ -425,6 +446,18 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(mergeHead(repo), false);
   assert.deepEqual(readRun(id).steps.ship!.landed, { commit: head });
   assert.ok(landed.notes.includes(`ship: its check passed on the merge, and the run committed its merge onto main as ${head.slice(0, 7)}`), landed.notes.join('\n'));
+  // Landed, its pictures of the merged tree are read by nobody: removed on the pass that lands, a note in their place, and what that frees
+  // measured on the store's shape — every byte of them, less the note's.
+  assert.deepEqual(pngsIn(shot.dir), []);
+  assert.ok(landed.notes.includes('ship: removed the 252 pictures its check took of the merged tree (46.6 MB); e2e-pictures.txt says what they were'), landed.notes.join('\n'));
+  const note = fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8');
+  assert.match(note, new RegExp(`^ship's check passed on the merge, and the run committed it as ${head.slice(0, 12)}\\.\nSo the run removed the 252 pictures`));
+  assert.ok(note.includes(`ae logs ${checkId}; its stderr: ${path.join(ROOT, 'checks', `${checkId}.stderr`)}`), note);
+  assert.ok(note.includes('  answer-light-failed.png  189.5 KB\n'), note);
+  const after = bytesIn(shot.dir);
+  assert.equal(shot.before, 252 * 194_000);
+  assert.equal(after, Buffer.byteLength(note));
+  assert.ok(shot.before - after > 48_000_000, `freed ${shot.before - after} of ${shot.before} bytes`);
   assert.equal(landed.status, 'succeeded');
   const { decision } = await decide(e, id);
   assert.equal(decision.kind, 'shipped');
@@ -433,9 +466,31 @@ test("an approved ending stages the merge and signs off its message; the run exe
   // `wf ls`, and the board after it, say what landed — the commit — where nothing else of a run names it.
   assert.equal(shipLine.note, `the run committed its merge onto main as ${head.slice(0, 7)}`);
 
-  // Once for the try: a pass after it commits nothing more, whatever the checkout holds.
+  // Once for the try: a pass after it commits nothing more, whatever the checkout holds — and removes nothing more, nor writes the note again.
+  fs.writeFileSync(path.join(shot.dir, 'late.png'), 'a picture put there after the landing');
   await advance(e, readRun(id));
   assert.equal(git(repo, 'rev-parse', 'HEAD'), head);
+  assert.deepEqual(pngsIn(shot.dir), ['late.png']);
+  assert.equal(fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'), note);
+});
+
+test("REFUSED at shipped defaults: a landing removes only the check's pictures — a picture the ending's closeout names, a file that is no picture, one in a folder, and a link are kept, and nothing is removed through a link", async () => {
+  const outside = path.join(fs.mkdtempSync(path.join(ROOT, 'outside-')), 'kept.png');
+  fs.writeFileSync(outside, 'not the run\'s');
+  const { id, e, settle, checkId } = await stagedAndSigned();
+  const dir = artifactsDir({ id }, 'ship');
+  fs.mkdirSync(path.join(dir, 'shots'), { recursive: true });
+  for (const name of ['named.png', 'also-named.png', 'page-light.png', 'trace.txt', 'shots/deep.png']) fs.writeFileSync(path.join(dir, name), name);
+  fs.symlinkSync(outside, path.join(dir, 'link.png'));
+  // The ending names two of its pictures, one by absolute path in its directory and one from the workspace root, as a closeout may.
+  settle(`${id}-ship`, 'succeeded', { ...SIGNED, artifacts: [path.join(dir, 'named.png'), 'also-named.png'], message: MESSAGE });
+  settle(checkId, 'succeeded', undefined, 0);
+  await advance(e, readRun(id));
+  assert.ok('commit' in readRun(id).steps.ship!.landed!, 'it landed');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['also-named.png', 'e2e-pictures.txt', 'link.png', 'named.png', 'shots', 'trace.txt']);
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'shots')), ['deep.png']);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'not the run\'s', 'and what the link leads to is untouched');
+  assert.match(fs.readFileSync(path.join(dir, 'e2e-pictures.txt'), 'utf8'), /removed the 1 picture the check[^]*\n {2}page-light\.png {2}14 B\n/);
 });
 
 for (const [said, exitCode, words] of [
@@ -444,8 +499,13 @@ for (const [said, exitCode, words] of [
 ] as const) {
   test(`REFUSED at shipped defaults: a check that ${said} on the merge has the run abort it — the base branch never moves, and a try of ship merges again, never --recheck`, async (t) => {
     const { repo, id, e, tasks, settle, base, checkId } = await stagedAndSigned();
+    const shot = photographed(id, { count: 4, bytes: 10 });
     settle(checkId, 'failed', undefined, exitCode);
     const pass = await advance(e, readRun(id));
+    // Nothing landed, so every picture stays for whoever reads why — the failed page's among them — and no note stands in for them.
+    assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort());
+    assert.equal(fs.existsSync(path.join(shot.dir, 'e2e-pictures.txt')), false);
+    assert.ok(!pass.notes.some((n) => n.includes('pictures')), pass.notes.join('\n'));
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'nothing landed');
     assert.equal(git(repo, 'status', '--porcelain'), '', 'and the checkout is as it was: the merge was aborted');
     assert.equal(mergeHead(repo), false);
@@ -483,18 +543,25 @@ test("a pass after a restart does what the last one would have: a merge committe
     settle(checkId, 'succeeded', undefined, 0);
     git(repo, 'commit', '-q', '-m', 'the commit the pass made before it died');
     const head = git(repo, 'rev-parse', 'HEAD');
+    // And it had written the note and removed some of the pictures: the rest go, and the note, which lists them all, is left as it is.
+    const shot = photographed(id, { count: 3, bytes: 10 });
+    fs.writeFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'the note of the pass that died\n');
     await advance(e, readRun(id));
     assert.deepEqual(readRun(id).steps.ship!.landed, { commit: head });
+    assert.deepEqual(pngsIn(shot.dir), []);
+    assert.equal(fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'), 'the note of the pass that died\n');
     assert.equal(git(repo, 'rev-parse', 'HEAD'), head, 'nothing committed again');
     assert.equal((await decide(e, id)).decision.kind, 'shipped');
   }
   // And after `git merge --abort` of a refused merge: what the check said is recorded, and nothing is aborted again.
   {
     const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
+    const shot = photographed(id, { count: 3, bytes: 10 });
     settle(checkId, 'failed', undefined, 1);
     git(repo, 'merge', '--abort');
     await advance(e, readRun(id));
     assert.deepEqual(readRun(id).steps.ship!.landed, { aborted: 'its check refused the merge (exit 1)' });
+    assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort(), 'nothing landed: every picture is kept');
     assert.equal(git(repo, 'rev-parse', 'HEAD'), base);
   }
   // A check that passed on a merge that is no longer staged commits nothing: the run does not merge again on its own.
@@ -557,8 +624,10 @@ test("REFUSED at shipped defaults: a merge the run is not to commit is aborted �
   {
     const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
     fs.writeFileSync(path.join(repo, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\necho "commit-msg: refused by the hook" >&2\necho "  see CONTRIBUTING" >&2\nexit 1\n', { mode: 0o755 });
+    const shot = photographed(id, { count: 3, bytes: 10 });
     settle(checkId, 'succeeded', undefined, 0);
     await advance(e, readRun(id));
+    assert.deepEqual(pngsIn(shot.dir), [...shot.pictures].sort(), 'its check passed and nothing landed: every picture is kept');
     const landed = readRun(id).steps.ship!.landed as { aborted: string };
     assert.match(landed.aborted, /^git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/, "git's lines, joined on one");
     // Which `wf ls` prints on the step's row: never a line break inside it.

@@ -116,6 +116,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `the factory page … ✓`, with nothing printed. `exitOn` (`visit.ts`) now ends both streams with the failure in a few lines (`headlineOf`:
   the page, the theme and the error; the element Playwright waited for and what lay over it; the picture), and `visit.test.ts` reads the
   end of each. Anything a check runs that can fail says why last, on stdout too (learned by thin runtime stage 2 part 4b, round 2).
+- **A landed ending's files directory keeps no pictures of the merged tree.** The ship's check runs the e2e on the merge with its own
+  `WF_ARTIFACTS`, after the gate, so those pictures are a second photograph, of another tree — not copies of implement's, which the
+  reviewers read. On the pass that lands `{ commit }`, `dropLandedPictures` (`agent-orchestrator/src/artifacts.ts`) removes every `.png`
+  there that the ending's closeout does not name, and `e2e-pictures.txt` says what they were; a check that did not pass keeps them all.
+  An ending that wants a picture kept after a pass names it in its closeout (learned by the run that measured the store at 3.8 GB).
 - **The e2e's watch counts every 4xx a page sees against it.** A refusal the e2e makes on purpose goes
   in a page of its own, with a watch that must see that one refusal and nothing else (the `answer` page,
   learned by the run that added the answer box). And the e2e visits every page in light, then every page

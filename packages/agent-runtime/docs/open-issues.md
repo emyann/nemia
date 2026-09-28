@@ -5,6 +5,14 @@ it can be picked up later without reconstructing it from commit history. The las
 record of what was fixed, with commits, so the open items have their context. A fixed item leaves
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
+State as of 2026-09-28: the list under *Bugs* holds only what is open, or open in part: an issue fixed with gaps left (33 to 35)
+stays, with its gaps. Issues 19 to 22, 24, 25 and 30 are closed, and kept whole under *Closed since 2026-09-16, kept for their
+context*, above *Fixed*. Since the paragraph below, the runtime has become thin: steps are jobs and the A2A seam carries every
+call (issues 27 to 29, 31), the lifecycle is a statechart (stage 5), the pass skips a settled task until the feed names it
+(issue 33), a remote A2A agent can run a step (stage 6 parts 1 and 2, issue 34), and a failed look at a harness is no
+longer read as nothing seen, for the pass (issue 35). `docs/eval-thin-runtime.md` at the
+repository's root tracks the stages.
+
 State as of 2026-09-16: agent-runtime after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
@@ -295,61 +303,6 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
   session has been measured end to end under the engine.
 
-### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
-
-**Where it is now** (2026-09-25). The runtime keeps no ceiling since thin runtime stage 4c part 2, so it counts no slot:
-`tick()` reports `running`, the sessions at work per harness, and a `blocked` one is not among them. The rule moved to
-agent-orchestrator in part 1: `holdsSlot` in its `src/admission.ts` counts a session at work, one starting and one
-admitted and not yet started, and not one blocked on a person (`needs-human`) or held for an answer. Its
-`test/admission.test.ts` makes each case happen, a blocked session working again counted again included.
-
-**What is left, unchanged and now the orchestrator's.** It is reasoning, not a measurement: a session on a permission
-prompt makes no API calls, so it costs nothing against the subscription's rate limit, but no blocked session's API
-traffic has been watched, and `claude agents` lists a session `blocked` for its own stalls too — a login refresh (issue
-16). Blocked sessions that all move again at once can put a pool past its ceiling until enough of them end; nothing is
-stopped for it, and nothing more is admitted while the count is at or past the ceiling.
-
-### 20. Pools are declared, and one ceiling fits every pool (moved to the orchestrator)
-
-**Where it is now** (2026-09-25). The runtime counts no pools since stage 4c part 2: `pool` is gone from `HarnessSpec` and
-`PromiseRunner`, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
-naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/admission.ts`: `claude` and
-`claude-detached` one pool, since they are one subscription; `codex` and `check` each their own; a harness no line names
-its own. Its `test/pool.test.ts` proves it at shipped defaults, with fake `claude` and `codex`.
-
-**What is left, now the orchestrator's.**
-
-- **One number for every pool.** `WF_MAX_CONCURRENT` holds Claude Code's pool, Codex's and a `check`'s to the same count,
-  though a `check` is a shell command under no rate limit. A number per pool would be a map where the number is; nothing
-  has asked for one.
-- **A pool is a line in `POOLS`, never discovered.** A harness the orchestrator gains that drives Claude Code is a pool of
-  its own until a line says `claude`.
-
-A layer other than the orchestrator that shares one ceiling between harnesses keeps its own list; the runtime starts every
-task it is given and admits a queued one on its word.
-
-### 21. A free slot goes to the oldest filing, and the filer's clock says which that is (moved to the orchestrator)
-
-**Where it is now** (2026-09-25). The runtime chooses no order since stage 4c part 2: a pass walks the board in the order
-the store lists it and starts every task not queued, and `State` carries `filedAt` for the layer above to read. The rule
-moved to agent-orchestrator in part 1: `toAdmit` in its `src/admission.ts` admits momentum first, then the earlier filing,
-then the lower id, and its `test/admission.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
-
-**What is left, now the orchestrator's.** The time is the filer's clock: `file()` stamps `new Date()` in the process that
-files, so two processes with skewed clocks filing onto one board are ordered by their clocks — one machine, one clock,
-today. A retry is a new task, filed when it is asked for, so it no longer keeps its task's place; momentum puts it before
-a newer run's first step. A time that does not parse orders its task last, never refused.
-
-### 22. A task's `priority` is read when a slot is free, and only then (retired)
-
-**Where it is now** (2026-09-25). `priority` is retired: a runtime that keeps no ceiling has no slot for it to choose.
-Both doors refuse it at any value, `0` and `undefined` as an own key included (exit 2, naming `queued: true` and `admit`),
-and a journal that carries one from before is folded unread; `ae ls` prints no priority. The run's momentum it carried
-until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read off the run records by the filing rules
-(`stepMomentum`, `MOMENTUM` in `src/run.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
-and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
-run's first step waiting for as long as it lasts.
-
 ### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
@@ -385,89 +338,6 @@ door, which the named key never did, so `claudeJob` and `claudeDetached` refuse 
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
   fails the day the control is bridged without it, or the flagged session is not.
-
-### 24. A session held by its own background shell never ends, and its closeout is never read
-
-**Measured** (2026-09-17, Claude Code 2.1.274, run `the-queue-on-the-board-queue-ppu1`). The implement step signed off with
-`StructuredOutput` at 02:53Z, all its work committed. A shell it had started with `run_in_background` —
-`until grep -q "Local:" …/lookweb.log; do sleep 0.5; done`, waiting for a dev server it had already stopped — kept looping. The
-registration under `~/.claude/sessions/` read `status: shell` from then on, `claude agents` listed the session `busy`, the engine
-read the attempt as working, and seventy-seven minutes later nothing had been read. Three Monitor tasks it had armed expired
-in the meantime, each waking the session for one turn, which did not change the status. Ending the shell by hand (`kill` on
-the bash) let the session go idle within seconds.
-
-**Effect.** A step whose agent leaves a background shell running is never settled: no `unsigned`, no nudge, no check, no
-review — the run waits for a person to notice, and the closeout on the transcript is worth nothing until then. A budget does
-not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
-
-**Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
-own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/runner.ts`;
-`lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
-session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
-an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
-
-- **the floor**, so a session mid-turn — which writes nothing for minutes at a time — is not read as quiet;
-- **the last word**: a session that has spoken since its closeout is still going. The check is over the last `user` or
-  `assistant` line, because Claude Code writes an `attachment` and a `system` line (`turn_duration`) after the closing
-  turn's result — measured on the transcript above — and a check over the very last line would never fire;
-- **its own**: a resumed session inherits its parent's closing turn, so a continuation that has written nothing of its
-  own yet would otherwise be read as finished before it began. Judged against the session's own start in the registry,
-  as usage is; no start, no reading.
-
-**What it costs a pass** (found in review, round 1). A busy session now costs its transcript's mtime every pass, and a
-read of the transcript once it has been cold for the floor — which every tool call longer than ninety seconds is. That
-read is kept while the transcript stays as it found it, by the machinery a finished session's read already used
-(`keptRead`, now told by its caller which reads are worth keeping), so such a call costs one read, not one per pass.
-Measured on the largest transcript on this machine, 39.5 MB: a read and its scan 174–282 ms, the mtime through the SDK's
-`getSessionInfo` 17–60 ms. Keeping it changes no answer — the branch is reached only while nothing has written, which is
-the condition under which a second read would say the same thing — and the pin drops the moment the mtime passes it.
-
-**What it rests on**, with issue 13's caveats. `claude agents --json` prints each row's `status` from the session's
-registration; 2.1.274's own vocabulary is `busy`, `shell`, `idle`, `waiting`, and its view renders `busy` and `shell`
-alike as working. The engine reads only `busy` as busy — `shell` is not a turn, and the ordinary floor already ends such
-a session, which `test/shell.test.ts` pins. Which word the measured session was listed under was not recorded: the
-person read the view, which shows both as working, and its registration read `shell`. What is certain is that the engine
-read it busy, because that is the only gate that fits — its transcript was cold for seventy minutes, `getSessionInfo`
-reads that transcript's mtime today, and no end was written. A release that renames the field, or changes the shape of a
-closing turn, makes this rule silent again; only `AE_LIVE=1` would notice. The upper layer's courtesy remains a line in
-CLAUDE.md: a background loop must time out.
-
-**Not measured.** No live session has been read quiet this way; the rule is held by fake registries and transcript files
-only. A session that gives its closeout and then runs a long turn that writes nothing for ninety seconds would be read
-as finished — the harness's own `[structured-output-enforce]` retry could be such a turn — and what that costs is the
-end being written on a statement the session might have revised, which is the same trade the `busy` rule makes
-elsewhere, with the floor and the last word in front of it.
-
-### 25. A session that ends in prose is nudged once for its closeout, and the nudge did not get it
-
-**Measured** (2026-09-17, twice: runs `the-workflow-builder-on-the-4ifo` and `the-web-app-s-components-on-3xq9`, both
-`dev-build` implement steps with no `output:` schema). Each finished its work — every commit in, the full check green, a
-clean tree — and ended its turn with a prose summary ("The workflow builder is done: …") instead of calling
-`StructuredOutput`. The engine ended the attempt `unsigned`, and the step read *waiting on you* in the workflow layer. A
-`wf retry --message` saying, in so many words, "you ended in prose instead of calling the StructuredOutput closeout tool;
-change nothing; sign off now" made each sign off within thirty seconds, for under a dollar. Whatever the engine's own
-unsigned nudge says, it did not get either session to sign off; a person's sentence naming the tool did.
-
-**Effect.** A finished step costs a person's attention and a try to be read as done, on a path that is the common one
-for a long implement: the model summarises and stops.
-
-**Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
-and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
-Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
-cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/domain.ts`). The words are the
-fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
-told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
-`claude --bg` runner reports it.
-
-**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
-false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `run.ts`, filed by `retriesDue`),
-which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
-folds it and spawns with it.
-
-**Not measured.** Whether the wording alone closes the next such session — the two that were measured were closed by a
-person. The harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run
-`the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
-known.
 
 ### 26. A session's context window: `--autocompact` works on `--bg`, and a small one can stall a session
 
@@ -720,30 +590,6 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   whose result the output reader takes as the job's (`claudeStreamOutput`, the last result). Not seen live.
 - **The longest line a job's stdin reads was not measured.** Claude Code's inbox drops a line over 1,048,576 characters,
   and a `--bg` session's words are refused past it; a job's are not refused on length.
-
-### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
-
-A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
-(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
-group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
-`stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
-answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
-told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
-re-issuing tick.
-
-**Fixed** (2026-09-23, in review of stage 3). The stop is left on disk before the pid is read: `stop` writes a marker of its own
-(`<name>.stop`, so the run file keeps one writer, the worker) and then reads the run file again, signalling the pid it finds
-there. The worker looks for the marker once its pid is published and before it starts the harness, and on finding it writes
-`stopped` and starts nothing — the worker `spawn` launched, whose run file had no pid, alone: one started again by hand on a
-run file its worker left (issue 29) has a pid there already, and was not what an earlier stop was asked of. Whichever of the two came first, one sees the other: a worker that found no marker published
-its pid before the marker was written, so the stop's second read finds it. So `CANCELED` is true whenever it is answered, the
-engine's stop is heard on its first pass, and nothing waits or is held in memory. `spawn` clears a marker left under the
-name, so a run spawned again after a stop starts. Each order is made to happen on demand in `test/detached.test.ts`, the
-worker frozen before its first rename: stopped while frozen, the harness never runs; stopped with the marker's write held
-until the harness has started, the second read signals it. Each test fails with its half of the fix taken out, and
-`test/codex-agent.test.ts` cancels a Task the moment it is sent, which fails every time without the worker's check. A
-handler answering `WORKING` until the listing says `stopped`, the other way considered, would have changed every
-harness's cancel and still left a direct caller to ask again.
 
 ### 31. Codex as an A2A agent: what maps, and what `codex exec` cannot do
 
@@ -1087,6 +933,175 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
    says so, not a default; nothing has asked for one.
 5. **hkb migration**: two decisions to make before starting — see
    [hkb-migration.md](hkb-migration.md), "Two consequences to decide on *before* starting".
+
+## Closed since 2026-09-16, kept for their context
+
+Moved out of the open list on 2026-09-28, each as it was written. Issues 19 to 21 moved to agent-orchestrator with admission
+(thin runtime stage 4c, 2026-09-25), and what they leave is its to keep; 22 is retired. 24 and 25 were fixed on 2026-09-17,
+held by fake registries and transcripts, and what they did not measure stays said under each. 30 was fixed on 2026-09-23, in
+review of stage 3, and says how under its heading. 19 to 22, 24 and 25 each have their row in *Fixed*, below.
+
+### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
+
+**Where it is now** (2026-09-25). The runtime keeps no ceiling since thin runtime stage 4c part 2, so it counts no slot:
+`tick()` reports `running`, the sessions at work per harness, and a `blocked` one is not among them. The rule moved to
+agent-orchestrator in part 1: `holdsSlot` in its `src/admission.ts` counts a session at work, one starting and one
+admitted and not yet started, and not one blocked on a person (`needs-human`) or held for an answer. Its
+`test/admission.test.ts` makes each case happen, a blocked session working again counted again included.
+
+**What is left, unchanged and now the orchestrator's.** It is reasoning, not a measurement: a session on a permission
+prompt makes no API calls, so it costs nothing against the subscription's rate limit, but no blocked session's API
+traffic has been watched, and `claude agents` lists a session `blocked` for its own stalls too — a login refresh (issue
+16). Blocked sessions that all move again at once can put a pool past its ceiling until enough of them end; nothing is
+stopped for it, and nothing more is admitted while the count is at or past the ceiling.
+
+### 20. Pools are declared, and one ceiling fits every pool (moved to the orchestrator)
+
+**Where it is now** (2026-09-25). The runtime counts no pools since stage 4c part 2: `pool` is gone from `HarnessSpec` and
+`PromiseRunner`, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
+naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/admission.ts`: `claude` and
+`claude-detached` one pool, since they are one subscription; `codex` and `check` each their own; a harness no line names
+its own. Its `test/pool.test.ts` proves it at shipped defaults, with fake `claude` and `codex`.
+
+**What is left, now the orchestrator's.**
+
+- **One number for every pool.** `WF_MAX_CONCURRENT` holds Claude Code's pool, Codex's and a `check`'s to the same count,
+  though a `check` is a shell command under no rate limit. A number per pool would be a map where the number is; nothing
+  has asked for one.
+- **A pool is a line in `POOLS`, never discovered.** A harness the orchestrator gains that drives Claude Code is a pool of
+  its own until a line says `claude`.
+
+A layer other than the orchestrator that shares one ceiling between harnesses keeps its own list; the runtime starts every
+task it is given and admits a queued one on its word.
+
+### 21. A free slot goes to the oldest filing, and the filer's clock says which that is (moved to the orchestrator)
+
+**Where it is now** (2026-09-25). The runtime chooses no order since stage 4c part 2: a pass walks the board in the order
+the store lists it and starts every task not queued, and `State` carries `filedAt` for the layer above to read. The rule
+moved to agent-orchestrator in part 1: `toAdmit` in its `src/admission.ts` admits momentum first, then the earlier filing,
+then the lower id, and its `test/admission.test.ts` gives the fixtures in the opposite order so the tiebreak is proven.
+
+**What is left, now the orchestrator's.** The time is the filer's clock: `file()` stamps `new Date()` in the process that
+files, so two processes with skewed clocks filing onto one board are ordered by their clocks — one machine, one clock,
+today. A retry is a new task, filed when it is asked for, so it no longer keeps its task's place; momentum puts it before
+a newer run's first step. A time that does not parse orders its task last, never refused.
+
+### 22. A task's `priority` is read when a slot is free, and only then (retired)
+
+**Where it is now** (2026-09-25). `priority` is retired: a runtime that keeps no ceiling has no slot for it to choose.
+Both doors refuse it at any value, `0` and `undefined` as an own key included (exit 2, naming `queued: true` and `admit`),
+and a journal that carries one from before is folded unread; `ae ls` prints no priority. The run's momentum it carried
+until stage 4c is agent-orchestrator's `momentumOf` (`src/admission.ts`), read off the run records by the filing rules
+(`stepMomentum`, `MOMENTUM` in `src/run.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
+and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
+run's first step waiting for as long as it lasts.
+
+### 24. A session held by its own background shell never ends, and its closeout is never read
+
+**Measured** (2026-09-17, Claude Code 2.1.274, run `the-queue-on-the-board-queue-ppu1`). The implement step signed off with
+`StructuredOutput` at 02:53Z, all its work committed. A shell it had started with `run_in_background` —
+`until grep -q "Local:" …/lookweb.log; do sleep 0.5; done`, waiting for a dev server it had already stopped — kept looping. The
+registration under `~/.claude/sessions/` read `status: shell` from then on, `claude agents` listed the session `busy`, the engine
+read the attempt as working, and seventy-seven minutes later nothing had been read. Three Monitor tasks it had armed expired
+in the meantime, each waking the session for one turn, which did not change the status. Ending the shell by hand (`kill` on
+the bash) let the session go idle within seconds.
+
+**Effect.** A step whose agent leaves a background shell running is never settled: no `unsigned`, no nudge, no check, no
+review — the run waits for a person to notice, and the closeout on the transcript is worth nothing until then. A budget does
+not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
+
+**Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
+own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/runner.ts`;
+`lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
+session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
+an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
+
+- **the floor**, so a session mid-turn — which writes nothing for minutes at a time — is not read as quiet;
+- **the last word**: a session that has spoken since its closeout is still going. The check is over the last `user` or
+  `assistant` line, because Claude Code writes an `attachment` and a `system` line (`turn_duration`) after the closing
+  turn's result — measured on the transcript above — and a check over the very last line would never fire;
+- **its own**: a resumed session inherits its parent's closing turn, so a continuation that has written nothing of its
+  own yet would otherwise be read as finished before it began. Judged against the session's own start in the registry,
+  as usage is; no start, no reading.
+
+**What it costs a pass** (found in review, round 1). A busy session now costs its transcript's mtime every pass, and a
+read of the transcript once it has been cold for the floor — which every tool call longer than ninety seconds is. That
+read is kept while the transcript stays as it found it, by the machinery a finished session's read already used
+(`keptRead`, now told by its caller which reads are worth keeping), so such a call costs one read, not one per pass.
+Measured on the largest transcript on this machine, 39.5 MB: a read and its scan 174–282 ms, the mtime through the SDK's
+`getSessionInfo` 17–60 ms. Keeping it changes no answer — the branch is reached only while nothing has written, which is
+the condition under which a second read would say the same thing — and the pin drops the moment the mtime passes it.
+
+**What it rests on**, with issue 13's caveats. `claude agents --json` prints each row's `status` from the session's
+registration; 2.1.274's own vocabulary is `busy`, `shell`, `idle`, `waiting`, and its view renders `busy` and `shell`
+alike as working. The engine reads only `busy` as busy — `shell` is not a turn, and the ordinary floor already ends such
+a session, which `test/shell.test.ts` pins. Which word the measured session was listed under was not recorded: the
+person read the view, which shows both as working, and its registration read `shell`. What is certain is that the engine
+read it busy, because that is the only gate that fits — its transcript was cold for seventy minutes, `getSessionInfo`
+reads that transcript's mtime today, and no end was written. A release that renames the field, or changes the shape of a
+closing turn, makes this rule silent again; only `AE_LIVE=1` would notice. The upper layer's courtesy remains a line in
+CLAUDE.md: a background loop must time out.
+
+**Not measured.** No live session has been read quiet this way; the rule is held by fake registries and transcript files
+only. A session that gives its closeout and then runs a long turn that writes nothing for ninety seconds would be read
+as finished — the harness's own `[structured-output-enforce]` retry could be such a turn — and what that costs is the
+end being written on a statement the session might have revised, which is the same trade the `busy` rule makes
+elsewhere, with the floor and the last word in front of it.
+
+### 25. A session that ends in prose is nudged once for its closeout, and the nudge did not get it
+
+**Measured** (2026-09-17, twice: runs `the-workflow-builder-on-the-4ifo` and `the-web-app-s-components-on-3xq9`, both
+`dev-build` implement steps with no `output:` schema). Each finished its work — every commit in, the full check green, a
+clean tree — and ended its turn with a prose summary ("The workflow builder is done: …") instead of calling
+`StructuredOutput`. The engine ended the attempt `unsigned`, and the step read *waiting on you* in the workflow layer. A
+`wf retry --message` saying, in so many words, "you ended in prose instead of calling the StructuredOutput closeout tool;
+change nothing; sign off now" made each sign off within thirty seconds, for under a dollar. Whatever the engine's own
+unsigned nudge says, it did not get either session to sign off; a person's sentence naming the tool did.
+
+**Effect.** A finished step costs a person's attention and a try to be read as done, on a path that is the common one
+for a long implement: the model summarises and stops.
+
+**Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
+and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
+Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
+cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/domain.ts`). The words are the
+fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
+told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
+`claude --bg` runner reports it.
+
+**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
+false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `run.ts`, filed by `retriesDue`),
+which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
+folds it and spawns with it.
+
+**Not measured.** Whether the wording alone closes the next such session — the two that were measured were closed by a
+person. The harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run
+`the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
+known.
+
+### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
+
+A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
+(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
+group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
+`stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
+answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
+told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
+re-issuing tick.
+
+**Fixed** (2026-09-23, in review of stage 3). The stop is left on disk before the pid is read: `stop` writes a marker of its own
+(`<name>.stop`, so the run file keeps one writer, the worker) and then reads the run file again, signalling the pid it finds
+there. The worker looks for the marker once its pid is published and before it starts the harness, and on finding it writes
+`stopped` and starts nothing — the worker `spawn` launched, whose run file had no pid, alone: one started again by hand on a
+run file its worker left (issue 29) has a pid there already, and was not what an earlier stop was asked of. Whichever of the two came first, one sees the other: a worker that found no marker published
+its pid before the marker was written, so the stop's second read finds it. So `CANCELED` is true whenever it is answered, the
+engine's stop is heard on its first pass, and nothing waits or is held in memory. `spawn` clears a marker left under the
+name, so a run spawned again after a stop starts. Each order is made to happen on demand in `test/detached.test.ts`, the
+worker frozen before its first rename: stopped while frozen, the harness never runs; stopped with the marker's write held
+until the harness has started, the second read signals it. Each test fails with its half of the fix taken out, and
+`test/codex-agent.test.ts` cancels a Task the moment it is sent, which fails every time without the worker's check. A
+handler answering `WORKING` until the listing says `stopped`, the other way considered, would have changed every
+harness's cancel and still left a direct caller to ask again.
 
 ## Fixed
 

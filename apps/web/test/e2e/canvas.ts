@@ -40,7 +40,7 @@ export function onTheFloor(page: Page): {
   };
 }
 
-/** A run's card on the Factory, and the edge from one card into another (`after`). */
+/** A run's card on the Factory. */
 export const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);
 
 /** Where a node is on its canvas, in the canvas's own units, whatever the zoom or the pan: where React Flow put it (`translate(x, y)`). */
@@ -159,7 +159,7 @@ export async function expectClearOfEachOther(page: Page): Promise<void> {
 /**
  * Every card on a floor just fitted is clear of the panels drawn over the floor — the buttons at its top, the zoom controls, the legend
  * and the minimap at its bottom — so each can be read and pressed where it is. Measured, not seen: a card's footer under the legend is
- * drawn, and a press on its Approve lands on the legend (learned by the run that kept the runs waiting on you on the floor).
+ * drawn, and a press on its Approve lands on the legend. `when` names the moment in the refusal.
  */
 export async function expectClearOfPanels(page: Page, when: string): Promise<void> {
   const under = await page
@@ -188,6 +188,7 @@ export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number
 export const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
 export const cardsOf = (page: Page, ...ids: string[]): Locator =>
   page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
+/** The edge from a run into one that waits on it (`--after`). */
 export const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
 /** The edge from a run into a card held until it ships (`wf hold`), which `runEdges` names apart from an `--after` one. */
 export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>

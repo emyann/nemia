@@ -29,15 +29,15 @@ const flights = new WeakMap<Page, Flights>();
  * A page that navigates or reloads leaves its requests in flight behind, and Playwright (1.62) says nothing more of them: no
  * `requestfinished`, no `requestfailed`. So once the page's own navigation has committed, every request in flight but that navigation's is
  * let go — those the old document asked for while the navigation was on its way too, as its polls may — which is what Playwright's own
- * `networkidle` does at a commit (`_onClearLifecycle`). The new document asks for nothing before its commit.
+ * `networkidle` does at a commit. The new document asks for nothing before its commit. A same-document navigation (`history.pushState`)
+ * asks for nothing, and lets nothing go.
  */
 export function track(page: Page): void {
   if (flights.has(page)) return;
   const f: Flights = { open: new Set(), last: Date.now() };
-  // The page's own navigation, asked for and not yet committed.
-  let leaving: Request | undefined;
+  let uncommittedNavigation: Request | undefined;
   page.on('request', (request) => {
-    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) leaving = request;
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) uncommittedNavigation = request;
     if (isFeedStream(request)) return;
     f.open.add(request);
     f.last = Date.now();
@@ -47,11 +47,10 @@ export function track(page: Page): void {
   };
   page.on('requestfinished', done);
   page.on('requestfailed', done);
-  // Also said of a same-document navigation (`history.pushState`), which asks for nothing and leaves nothing behind.
   page.on('framenavigated', (frame) => {
-    if (frame !== page.mainFrame() || leaving === undefined) return;
-    for (const request of f.open) if (request !== leaving) f.open.delete(request);
-    leaving = undefined;
+    if (frame !== page.mainFrame() || uncommittedNavigation === undefined) return;
+    for (const request of f.open) if (request !== uncommittedNavigation) f.open.delete(request);
+    uncommittedNavigation = undefined;
     f.last = Date.now();
   });
   flights.set(page, f);
@@ -94,7 +93,6 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
 export function watch(page: Page): { problems: () => string[] } {
   track(page);
   const seen: string[] = [];
-  // In the order the browser said them: each feed stream when it opened, and the commit of the page's own last navigation.
   let order = 0;
   let navigated = 0;
   let leaving = false;
@@ -173,7 +171,7 @@ export async function expectTexts(locator: Locator, texts: readonly string[], as
   );
 }
 
-/** Every element matched lies inside `frame`'s box: a node on its canvas, not hanging off the edge. */
+/** Every element matched lies inside `frame`'s box, give or take a pixel for borders that round onto its edge: a node on its canvas, not hanging off the edge. */
 export async function expectInside(elements: Locator, frame: Locator, assertion: string): Promise<void> {
   const box = await frame.boundingBox();
   if (!box) throw new Refused(`${assertion} — the frame is not on the page`);
@@ -181,7 +179,6 @@ export async function expectInside(elements: Locator, frame: Locator, assertion:
   for (const [i, element] of (await elements.all()).entries()) {
     const b = await element.boundingBox();
     const name = (await element.getAttribute('data-id')) ?? `#${i + 1}`;
-    // A pixel of slack for borders that round onto the frame's edge.
     const inside =
       b && b.x >= box.x - 1 && b.y >= box.y - 1 && b.x + b.width <= box.x + box.width + 1 && b.y + b.height <= box.y + box.height + 1;
     if (!inside) outside.push(name);
@@ -210,17 +207,16 @@ export async function settled(page: Page, timeout = 3_000): Promise<void> {
 
 /**
  * The page is in the theme asked for: the browser prefers it, and the page's ground is dark in the dark
- * and light in the light. Without the second half, both screenshots of a page could be the same picture.
+ * and light in the light. Without the second half, both screenshots of a page could be the same picture. The ground's colour is read
+ * back as sRGB off a pixel painted with it, whatever its space (Tailwind's are oklch); a ground nobody painted is the browser's white.
  */
 export async function expectTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   const seen = await page.evaluate(() => {
     const color = getComputedStyle(document.body).backgroundColor;
-    // Painted onto a pixel, so a colour in any space (Tailwind's are oklch) reads back as sRGB.
     const pixel = document.createElement('canvas').getContext('2d')!;
     pixel.fillStyle = color;
     pixel.fillRect(0, 0, 1, 1);
     const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
-    // A ground nobody painted is the browser's white.
     const luminance = a === 0 ? 1 : (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     return { color, luminance, prefersDark: matchMedia('(prefers-color-scheme: dark)').matches };
   });

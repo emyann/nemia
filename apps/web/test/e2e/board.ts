@@ -62,7 +62,7 @@ export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs
 export const themeOf = (page: Page): Promise<string> =>
   page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
-/** The places of the three queued cards, as the board says them. */
+/** The places of the queued cards, as the board says them. */
 export const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
 
 /** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
@@ -106,8 +106,11 @@ export async function expectKeys(page: Page, file: Locator, api: string, set: Re
       throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
     const row = rows.filter({ has: page.locator(`th[scope="row"]`, { hasText: new RegExp(`^${key}$`) }) });
     await expectTexts(row.locator('[data-value]'), [value ?? 'not set'], `${key}'s value reads ${value ?? 'not set'}`);
-    // The meaning is markdown: its code spans are drawn as code, so the text read has no backticks.
-    await expectTexts(row.locator('[data-meaning]'), [meaning.replaceAll('`', '')], `${key}'s row says what it means, as the package does`);
+    await expectTexts(
+      row.locator('[data-meaning]'),
+      [meaning.replaceAll('`', '')],
+      `${key}'s row says what it means, as the package does, its markdown code spans drawn as code`,
+    );
   }
 }
 

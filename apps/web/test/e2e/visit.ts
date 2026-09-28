@@ -23,20 +23,19 @@ export type PageSpec = { name: string; route: string; expect: (page: Page) => Pr
 const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.route}) in the ${theme} theme`;
 
 /**
- * What the e2e says once its store is gone. It sits in the temporary directory, which the machine may sweep while the pages are visited:
- * on 2026-09-24 a slow WSL boot ran checks while `systemd-tmpfiles --remove --boot` was still emptying /tmp, twelve minutes long, and it
- * reached the store halfway through the dark theme. Every run then read 404, the board said each was removed with `wf rm`, and the page
- * being visited failed on an answer box it never drew, blamed on the branch under check.
+ * What the e2e says once its store is gone. The store sits in the temporary directory, which the machine may sweep while the pages are
+ * visited; every run then reads 404, the board says each was removed with `wf rm`, and the page being visited fails on what it never drew,
+ * which is not the branch's fault. The message names the store, says to run the e2e again, and names the sweep that removes it.
  */
 export const storeGone = (store: string): string =>
   `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again` +
   '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
 
+/** A page that failed in a theme: where, why, and its picture — the store gone, given `lost`, said first, and what the page then failed on after it. */
 class PageFailure extends Error {
   constructor(where: string, cause: unknown, screenshot: string, lost?: string) {
     const why =
       cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
-    // With the store gone, that is the failure, and what the page could not find follows from it.
     super(
       lost
         ? `${where}: ${lost}\n  what the page then failed on: ${why}\n  what it looked like: ${screenshot}`
@@ -45,6 +44,10 @@ class PageFailure extends Error {
   }
 }
 
+/**
+ * One page in one theme: loaded, held to its spec, and photographed as a person would see it, once whatever the last assertion started has
+ * settled. Resolves with the screenshot; rejects with a `PageFailure` and a picture of the page as it failed.
+ */
 async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme, out: string, store?: string): Promise<string> {
   const page = await context.newPage();
   const { problems } = watch(page);
@@ -54,7 +57,6 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
     if (!spec.follows) await idle(page);
     await expectTheme(page, theme);
     await spec.expect(page);
-    // What a person would see, once whatever the last assertion started has settled.
     if (!spec.follows) await idle(page);
     await settled(page);
     await page.screenshot({ path: shot, fullPage: true });
@@ -74,7 +76,8 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
 /**
  * Every page, in the light theme and then the dark, each in a 1280 × 800 browser; a screenshot of each
  * into `out`. Rejects on the first page that fails, naming the page, the theme and the assertion — or, once the `store` the api serves
- * is gone, saying so in place of the assertion (`storeGone`), and visiting no page after it.
+ * is gone, saying so in place of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a
+ * page's second page too, has its requests counted from its first, for `idle`.
  */
 export async function visitAll(browser: Browser, base: string, pages: readonly PageSpec[], out: string, store?: string): Promise<string[]> {
   fs.mkdirSync(out, { recursive: true });
@@ -87,7 +90,6 @@ export async function visitAll(browser: Browser, base: string, pages: readonly P
   const shots: string[] = [];
   for (const theme of THEMES) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
-    // Every page opened in it, a page's second page too, has its requests counted from its first, for `idle`.
     context.on('page', track);
     try {
       for (const spec of pages) {
@@ -123,10 +125,9 @@ const RETRYING =
 /**
  * A failure in a few lines: its first; for an error Playwright threw, the element it waited for and the last thing its call log says
  * that is not it trying again — what was in the way; and the picture. The whole of it runs to dozens of lines of call log, and each
- * server's last lines follow it.
+ * server's last lines follow it. The colour Playwright dims its call log with, whether or not a terminal reads it, is taken out.
  */
 export function headlineOf(message: string): string[] {
-  // Playwright dims its call log in colour, whether or not a terminal reads it.
   // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
   const lines = message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
   const clip = (line: string) => (line.length > HEADLINE_WIDTH ? `${line.slice(0, HEADLINE_WIDTH - 1)}…` : line);
@@ -148,9 +149,8 @@ export function headlineOf(message: string): string[] {
 
 /**
  * The process ends with `main`: exit 0 once it resolves; exit 1 once it rejects, saying what failed and
- * then whatever `explain` adds — and then, last, what failed again in a few lines (`headlineOf`), on stderr and on stdout both. A check
- * shows the tail of what it printed and logs its stdout alone: said once, first, on stderr, the reason was under thirty lines of the
- * servers' output and in no log, and the check read as an exit 1 with nothing printed.
+ * then whatever `explain` adds — and then, last, what failed again in a few lines (`headlineOf`), on stderr and on stdout both: a check
+ * shows the tail of what it printed and logs its stdout alone, so the reason ends both streams.
  */
 export function exitOn(main: Promise<void>, cleanUp: () => void, explain: () => string = () => ''): void {
   main.then(

@@ -8,6 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import {
   ideaCard,
   inboxListing,
@@ -59,6 +60,11 @@ export const inboxCards = (): string[] =>
  */
 export const queueDir = (): string => path.join(HOME, 'queue');
 
+/** A try as the tick writes it (`QueueTry`); any key beside these is left unread. */
+const isQueueTry = Schema.is(
+  Schema.Struct({ at: Schema.String, text: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean }),
+);
+
 /** The tries the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
 export function queueTries(): Map<string, QueueTry> {
   const tries = new Map<string, QueueTry>();
@@ -70,16 +76,9 @@ export function queueTries(): Map<string, QueueTry> {
   }
   for (const file of names) {
     try {
-      const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueTry>;
-      if (
-        typeof r.at === 'string' &&
-        typeof r.text === 'string' &&
-        typeof r.repo === 'string' &&
-        typeof r.why === 'string' &&
-        typeof r.refused === 'boolean'
-      ) {
+      const r: unknown = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8'));
+      if (isQueueTry(r))
         tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-      }
     } catch {
       /* torn, or removed since the listing */
     }

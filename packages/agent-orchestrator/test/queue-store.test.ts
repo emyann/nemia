@@ -28,6 +28,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, cancel, decide, listRuns, readInbox, readRun, start, tick } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
+const { queueTries } = await import('../src/inbox-store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -977,4 +978,21 @@ test('a record that does not read as a run stops no other run: the pass files th
   const leftOut = errs.filter((l) => l.startsWith('left out: run r-broken: its record, '));
   assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs.join('')}`);
   assert.ok(leftOut[0]!.includes('does not read as a run: its `workspace` is missing'), leftOut[0]);
+});
+
+test('a try the tick wrote down is read only as the tick writes it: a file whose `refused` is no boolean, or missing, or that is no try at all, is none — the card is tried again — and a key beside the five is left unread', () => {
+  emptyStore(undefined);
+  const queue = path.join(ROOT, 'queue');
+  fs.mkdirSync(queue, { recursive: true });
+  const kept = { at: '2026-09-16T09:00:00.000Z', text: 'the card', repo: '/r', why: 'no workflow', refused: true };
+  const files: Record<string, unknown> = {
+    kept: { ...kept, by: 'a newer tick' },
+    yes: { ...kept, refused: 'yes' },
+    unsaid: { at: kept.at, text: kept.text, repo: kept.repo, why: kept.why },
+    unrepo: { ...kept, repo: 7 },
+    list: [kept],
+  };
+  for (const [name, body] of Object.entries(files)) fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(body));
+  fs.writeFileSync(path.join(queue, 'torn.json'), '{"at": "2026');
+  assert.deepEqual([...queueTries()], [['kept', kept]]);
 });

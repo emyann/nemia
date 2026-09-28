@@ -10,9 +10,11 @@ import type { Usage } from './domain.ts';
 import type { TranscriptEvent } from './runner.ts';
 import { isoTime } from './runner-transcript.ts';
 
-/** Where a Claude Code session's transcript is, found once and remembered. */
+/** The folder Claude Code writes its transcripts under, one folder per project: `projects` in `CLAUDE_CONFIG_DIR` or `~/.claude`. */
 const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
 const transcripts = new Map<string, string>();
+
+/** Where a Claude Code session's transcript is, found once and remembered — or `undefined` while no project folder holds it. */
 export const transcriptFile = (sessionId: string): string | undefined => {
   const known = transcripts.get(sessionId);
   if (known && fs.existsSync(known)) return known;
@@ -41,14 +43,15 @@ export const transcriptFile = (sessionId: string): string | undefined => {
  * one it inherited: a resumed transcript holds its parent's whole conversation, parent's calls
  * included, under the child's own session id.
  *
- * `lastWord` is what tells a session held by something other than the work from one still doing it
- * (issue 24), so it is read here, off the same file, rather than by a second pass over it.
+ * `lastWord` is what tells a session held by something other than the work from one still doing it,
+ * so it is read here, off the same file, rather than by a second pass over it. Only a line that names
+ * `StructuredOutput` is parsed: most lines are not it, and the tool's own definition names it too, so
+ * only an `assistant` line's `tool_use` block counts.
  */
 export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: number; lastWord: boolean } | undefined => {
   const lines = jsonl.split('\n');
   let found: { payload: unknown; at: number; id?: string } | undefined;
   for (const line of lines) {
-    // Most lines are not it, and the tool's own definition mentions the name too.
     if (!line.includes('StructuredOutput')) continue;
     let entry: { type?: string; timestamp?: string; message?: { content?: unknown } };
     try {
@@ -74,11 +77,11 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
  *
  * Only those two line types are the conversation. Claude Code writes bookkeeping around the closing turn —
  * the structured output's own `attachment` line, then a `system` line carrying the turn's duration — and a
- * check that took the very last line would therefore never fire on a real session. Measured on the
- * transcript issue 24 was written from: `assistant`(tool_use) · `attachment` · `user`(tool_result) ·
- * `system`, and nothing else for seventy minutes.
+ * check that took the very last line would therefore never fire on a real session: a closing turn is
+ * written `assistant`(tool_use) · `attachment` · `user`(tool_result) · `system`.
  *
- * Backwards, because only the end matters and a transcript runs to tens of megabytes.
+ * Backwards, because only the end matters and a transcript runs to tens of megabytes. A line still
+ * being written, or one that is not JSON, is skipped.
  */
 const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -89,7 +92,7 @@ const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
       entry = JSON.parse(line);
     } catch {
       continue;
-    } // a line still being written, or one that is not JSON
+    }
     if (entry?.type !== 'user' && entry?.type !== 'assistant') continue;
     const content = entry.message?.content;
     return (
@@ -125,26 +128,25 @@ const resultText = (content: unknown): string =>
  * one `system` event, and any other line — a title, another attachment, a file-history snapshot — none.
  * Pure, so both runners that read Claude Code's transcripts share it.
  *
- * Read as Claude Code writes them (measured on the 150 transcripts last written on this machine, up to
- * 2.1.270): every conversation line carries a `uuid` and a `timestamp`; a line nearly always holds one
+ * Read as Claude Code writes them: every conversation line carries a `uuid` and a `timestamp`; a line nearly always holds one
  * block, so a block's id is the line's `uuid` and its place in it; a `tool_result` sits in a `user`
  * line and names its call by `tool_use_id`; and thinking is often written with its text empty, which
  * gives a thinking event with no `text` rather than an invented one. A line the harness itself put into
  * the conversation (`isMeta`, like "Continue from where you left off.") is `system`. A subagent's line
  * (`isSidechain`) is left out, as the SDK's reading leaves it. A block of a type not read here is a
- * `text` event naming it, as `renderTranscript` names one. A line with no time gives nothing: none has
- * been seen, and a time made up for one would be a lie about when it was said.
+ * `text` event naming it, as `renderTranscript` names one. A line with no time gives nothing: a time
+ * made up for one would be a lie about when it was said.
  *
- * Words another process put into the session — a peer's `SendMessage`, or `say` — are written two ways
- * (measured on 2.1.270, posting to a `--bg` session's inbox). Arriving while it works, as an `attachment`
+ * Words another process put into the session — a peer's `SendMessage`, or `say` to a `--bg` session's
+ * inbox — are written two ways. Arriving while it works, as an `attachment`
  * line whose `queued_command` carries the words as `prompt` and a `peer` origin: read here as a `system`
  * event with those words, since the model is handed them as a reminder, not as its user's. Arriving while it
  * is idle, as the `isMeta` user line that starts its next turn, wrapped in Claude Code's own sentence about
  * where it came from: read as any `isMeta` line is.
  *
  * Words the session's own user said while it worked are the same attachment with the user's origin: `human` for a person
- * typing into it, and none at all for a job's next message on its stdin (`-p --input-format stream-json`, measured on
- * 2.1.280, which renders it to the model as "The user sent a new message while you were working"). Read as a `user`
+ * typing into it, and none at all for a job's next message on its stdin (`-p --input-format stream-json`, which Claude
+ * Code renders to the model as "The user sent a new message while you were working"). Read as a `user`
  * text event, as the words that started the turn are. A queued command that is not a prompt — Claude Code's notice that
  * a task it ran in the background ended (`task-notification`) — gives nothing.
  */
@@ -281,6 +283,7 @@ const tokensOf = (modelUsage: unknown): Tokens => {
   return { inputTokens: sum.uncachedTokens + sum.cacheReadTokens + sum.cacheWriteTokens, ...sum };
 };
 
+/** A transcript line read as a `cost-state` — or `undefined` for any other line, or one that is not JSON. */
 const costStateOf = (line: string): CostState | undefined => {
   let e: Record<string, unknown> | null;
   try {
@@ -302,8 +305,8 @@ const costStateOf = (line: string): CostState | undefined => {
 
 /**
  * How far before the session's start in the registry a `cost-state`'s `startTime` may be and still be the count this
- * session began. Claude Code starts counting a moment before or after it registers the session — 10 to 440 ms either
- * way, measured on 2.1.272 — and a count carried on from an earlier process of the session began minutes before.
+ * session began. Claude Code starts counting a moment before or after it registers the session — well under a second
+ * either way — and a count carried on from an earlier process of the session began minutes before.
  */
 const COST_START_SLACK_MS = 5_000;
 
@@ -311,10 +314,9 @@ const COST_START_SLACK_MS = 5_000;
  * An attempt's cost, from the `cost-state` lines around it: the last written after its first line, less the one the
  * session had written before that, when its count was carried on from it.
  *
- * Measured on the `--bg` transcripts on this machine (2.1.246 to 2.1.272), and by stopping a session by hand: Claude
- * Code writes the line twice as a session's process exits — `claude stop` returns once it has — never per turn, and
- * with no time of its own, so a line belongs to the attempt whose lines it follows. And `--resume` carries the count
- * on: one session continued twice wrote $28.32, $43.04 and $47.21, all three under its first process's `startTime`. So
+ * Claude Code writes the line twice as a session's process exits — `claude stop` returns once it has — never per turn,
+ * and with no time of its own, so a line belongs to the attempt whose lines it follows. And `--resume` carries the count
+ * on: every continuation of a session writes its running total under its first process's `startTime`. So
  * a continuation's own cost is its total less its session's total when it began — the difference is recorded, not the
  * session's total, so an attempt's cost is its own, as its tokens are, and as a resumed `claude -p` reports its own.
  *
@@ -362,8 +364,7 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
  * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
  * a continuation would report its parent's work as its own. A response is written as one line per
- * content block, each repeating its `message.id` and `usage` (measured: 160 lines, 85 responses),
- * so responses are counted once, by id. Tokens are given only when every counted response carried
+ * content block, each repeating its `message.id` and `usage`, so responses are counted once, by id. Tokens are given only when every counted response carried
  * them.
  *
  * The attempt's lines begin at the first line whose own time is at or after `since`, and end where the session was
@@ -371,20 +372,21 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * ended can have been resumed by a later task since, and what that task spent is not this attempt's.
  *
  * An attempt that compacted its conversation — a `compact_boundary` among its lines — made a call for each summary that
- * writes no `assistant` line, so its responses undercount it: 408,348 input tokens counted against the 601,367 its
- * `cost-state` said, over three compactions (2.1.278, open issue 26). Its tokens are the `cost-state`'s instead, its own
- * share as its cost is, and none until one is written.
+ * writes no `assistant` line, so its responses undercount it. Its tokens are the
+ * `cost-state`'s instead, its own share as its cost is, and none until one is written.
  *
  * The input is counted in its three classes — `input_tokens` uncached, `cache_creation_input_tokens` written to the
  * cache, `cache_read_input_tokens` read from it — and `inputTokens` is their sum. The peak is the largest of the three
  * together on any one of the attempt's responses, or on the summary call of any of its compactions, whose context Claude
- * Code writes on the boundary (`compactMetadata.preTokens`: on 25 boundaries read, at or a few thousand past the last
- * response before it). A resumed attempt's first response reads its parent's conversation, and its peak keeps that.
+ * Code writes on the boundary (`compactMetadata.preTokens`: at or a few thousand past the last response before it). A
+ * resumed attempt's first response reads its parent's conversation, and its peak keeps that. Only a boundary after the
+ * attempt began counts: a resumed transcript carries its parent's last boundary, and that summary is not this attempt's.
  *
- * `compactions` counts the attempt's own boundaries: a session compacts well short of its window (173,584 and 173,254
- * under a 200k one, open issue 26), so its peak never says it reached it. And the attempt's first response is kept
- * apart — its context and its cache write — since that is where a continuation either reads its parent's conversation
- * from the cache or writes it there again.
+ * `compactions` counts the attempt's own boundaries: a session compacts well short of its window, so its peak never
+ * says it reached it. And the attempt's first response is kept apart — its context and its cache write — since that is
+ * where a continuation either reads its parent's conversation from the cache or writes it there again.
+ *
+ * A line that is not JSON is skipped.
  */
 export const transcriptUsage = (jsonl: string, since: number): Usage => {
   const responses = new Map<string, { uncached: number; write: number; read: number; output: number } | null>();
@@ -393,7 +395,6 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   let after: CostState | undefined;
   let begun = false;
   let compactions = 0;
-  // The context each of the attempt's compactions summarised, as Claude Code counted it (`compactMetadata.preTokens`).
   let summarised = 0;
   let name: string | undefined;
   for (const line of jsonl.split('\n')) {
@@ -409,9 +410,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
       let entry: { type?: unknown; agentName?: unknown } | null = null;
       try {
         entry = JSON.parse(line);
-      } catch {
-        /* not a line */
-      }
+      } catch {}
       if (entry?.type === 'agent-name' && typeof entry.agentName === 'string') {
         if (begun && name !== undefined && entry.agentName !== name) break;
         name = entry.agentName;
@@ -421,11 +420,8 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     if (!begun && line.includes('"timestamp"')) {
       try {
         begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since;
-      } catch {
-        /* not a line */
-      }
+      } catch {}
     }
-    // A resumed transcript carries its parent's last boundary, before this attempt began: that summary is not this attempt's.
     if (begun && line.includes('"compact_boundary"')) {
       try {
         const entry = JSON.parse(line) as { subtype?: unknown; compactMetadata?: { preTokens?: unknown } } | null;
@@ -434,9 +430,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
           const pre = entry.compactMetadata?.preTokens;
           if (typeof pre === 'number' && Number.isFinite(pre)) summarised = Math.max(summarised, pre);
         }
-      } catch {
-        /* not a line */
-      }
+      } catch {}
     }
     if (!line.includes('"assistant"')) continue;
     let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
@@ -492,7 +486,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   };
 };
 
-/** One line per message. The SDK's shapes vary by CLI version, so this reads defensively. */
+/** One line per message of the Agent SDK's. Its messages vary in shape, so every field is read as one that may be absent. */
 export const renderTranscript = (messages: readonly unknown[]): string =>
   messages
     .map((m) => {

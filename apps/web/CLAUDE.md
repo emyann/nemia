@@ -58,6 +58,10 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 
 ## React and Query
 
+- The React Compiler compiles `src` at build (`@rolldown/plugin-babel` after the router's plugin, in `vite.config.ts`); the node tests
+  load `src` uncompiled, so only the build and the e2e test the compiled app. A function it skips is logged at build as
+  `React Compiler skipped <file>:<line>: <why>`: read the build's output. A memo lists what its body reads, and an array rebuilt on every
+  refetch goes through `useContent`.
 - A link to a route is `routeLink` (`components/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - React Aria's `DisclosurePanel` keeps and lays out what it holds while closed: draw a fold's content only while open.

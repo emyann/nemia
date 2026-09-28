@@ -68,6 +68,7 @@ test('a description, what we integrate and what is compared by name pass', () =>
     'An agent kanban we compared with runs a decomposer in its dispatcher every tick.',
     'as a Go agent SDK reaches its sandbox runtime through one file of its own',
     'the pattern of an A2A adapter that keeps one Claude Code process per session',
+    // TypeSafe's Jev stays compared by name though its judge package was removed on 2026-09-28: the dated docs of its experiments name it.
     "Claude Code, Codex, A2A and `@a2a-js/sdk`; TypeSafe's Jev; Tekton, Argo, n8n, Kubernetes",
     'The harness kanban board, rebuilt on the two libraries that replaced its core. `.kanban/` and `kb-*` worktrees',
     'const max = Math.max(ax, 1); // a word that only contains a short name',

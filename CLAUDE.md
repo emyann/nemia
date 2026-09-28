@@ -43,6 +43,9 @@ holds what every change needs.
   them, and a pattern that no longer matches makes an assertion of absence pass for nothing.
 - **A type-aware lint fix trusts the type; a guard exists because a caller does not.** A value from a page, a journal, a harness or JSON
   arrives as it is: read every line a `--fix` changes in `src` before keeping it.
+- **A file written through a tool can turn an escape into the character it names**: a raw NUL, DEL or byte order mark. Build such a
+  character with `String.fromCharCode`, and after writing an escape of one, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`): the
+  apps' `source.test.ts` refuses a raw control character, and no test refuses a BOM.
 - **An optional field added to a returned type is dropped by every caller that rebuilds the answer field by field.** Grep for each
   place that spreads or rebuilds the type, and give the new fact one writer.
 

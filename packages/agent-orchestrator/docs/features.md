@@ -294,7 +294,8 @@ What it leaves:
   with a try due.
 - **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
   no exit code, so the missing exit code, not the phase, is what says it did not finish.
-- **`bin/wf.ts` exits 1 on every error**, including the verbs' refusals, which set `exitCode` 2.
+- **`bin/wf.ts` exited 1 on every error**, including the verbs' refusals, which set `exitCode` 2. Since 2026-09-28 it exits with a
+  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli.ts`, `test/exit-code.test.ts` runs `wf` as a process).
 - **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
 ## Shipped: going round again — `loop:`, `rounds:` and `wf round`
@@ -1665,8 +1666,8 @@ What it leaves:
 - **A card filed by hand under a name a record carries** lists as `started as` and is refused a start. `wf inbox add` names carry a
   random suffix, so this takes a hand-named file.
 - **`wf ls` does not say a run came from the inbox.** Only `wf decide` does.
-- **`bin/wf.ts` exits 1 on every refusal**, whatever `exitCode` it carries. This was here before the inbox, and was not changed. The tests
-  read `exitCode` off what `main` throws.
+- **`bin/wf.ts` exited 1 on every refusal**, whatever `exitCode` it carried. This was here before the inbox, and was not changed then; it
+  exits with the refusal's code since 2026-09-28 (`test/exit-code.test.ts`).
 - **The board had no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gave the api its routes and the board its page: *The board
   half*, below.
 
@@ -4113,31 +4114,11 @@ What a run-level guard ("do not start a run above 90%") would need — out of sc
    read from the api, bounded by the same keep.
 3. A refusal a person can act on, with the window, its reset and a way past it (a flag of `wf start`, say), shown on the queued card.
 
-## Shipped: the judge package (P5, first slice)
+## Removed: the judge package (P5, first slice)
 
-P5 of `docs/pivot-2026-09-18.md`, its first slice: `packages/agent-judge`, a new package. Nothing in `packages/agent-orchestrator` or `apps/`
-changed but this file. It asks TypeSafe's Jev (`jev-1.13.0`) a typed question once, and records what came of it. Its README
-is the account.
+Shipped on 2026-09-19 as `packages/agent-judge` and the `judge` command, and removed on 2026-09-28 at the owner's word: it was meant as
+an experiment, an agent, and had become a package nothing called. What it measured stays in `docs/pivot-2026-09-18.md` (§2 and P5).
 
-- **Optional.** It imports nothing from the workspace, and nothing imports it or `@typesafe-ai/sdk`: `test/boundary.test.ts`
-  refuses either. Without `TYPESAFE_API_KEY`, every question reads `unsure` and nothing is claimed,
-  written or sent, so a key set later asks with no `--reask`. `judge status` prints
-  `ready` or `off: …`, and exits 0 either way.
-- **Never in a tick.** Nothing in a tick, in `assess`, in `wf decide` or in a gate calls it. Before anything does, three things
-  must hold: the owner has adopted §5's proposed wording, the ask is filed from the pass as a task (as a check is), and the
-  key is kept out of `wf up`'s environment.
-- **Asked once.** A key is sha256 over the pinned model, the question's words and options, and the state's hash. Each key and
-  asking is a write-once file: a claim with `wx`, then an answer or failure written through `link`. The first whole answer to
-  land is linked as the key's `answer.json` and read alone, so a late answer never changes what was read. A failure is a
-  fact, and only `--reask` asks it again.
-- **The judgment.** `decide` gives `yes`, `no` or `unsure`, and every failure kind reads `unsure`.
-- **Effect** is inside the package only. The facade is plain Promises.
-- **`judge card <file>`** asks four properties of a card: web, plan, clear and size. It prints the shipped `dev*` folder they
-  map to, or why the card stays in the inbox.
-- **Tried live** on 2026-09-19 against two real cards (from the pivot's Jev experiments, kept outside the repository since
-  2026-09-25), each asked twice, with the record in a job's temp directory; the
-  second asking made 0 requests. `card-p06.md` stayed in the inbox, unsure about planning first (P 0.74).
-  `card-agents-board.md` mapped to `dev-planned-build`. The thresholds have not been measured on held-out cards.
 ## Shipped: a run with no repository — `workspace: folder` (P2, its first slice)
 
 The first slice of P2 in `docs/pivot-2026-09-18.md`, "a workspace is a choice". The owner's word at the plan gate: `workspace:

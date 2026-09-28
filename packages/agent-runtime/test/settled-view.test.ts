@@ -1,13 +1,12 @@
 /**
  * A settled task's view asks no harness, whatever its harness has (`viewOf` in `facade.ts`).
  *
- * Measured on 2026-09-25 with the tick's meter (`wf up --stats`, 192 runs in the store): a pass made 183 observes, 171 of them the
- * `check` harness, each listing about 300 run files — 52,497 listings and about 1.5 s a pass, every 4 s. A harness with no `find`
- * was observed on every view, even of a task settled days ago, and the orchestrator views every task of every run each pass.
+ * The orchestrator views every task of every run each pass, and a harness with no `find` (the orchestrator's `check`, which lists its
+ * run files on each observe) would otherwise be observed on every view, even of a task settled days ago.
  *
- * What a sighting gave a settled view was its session's id alone (its phase is its outcome, `waitingFor` is a `needs-human`
- * phase's, `usage` an attempt in flight's), and a check's `logs` — its verdict — are read by that id. It is on the record: the
- * handle the attempt's `ended` entry names. Counted on the runtime's own meter (`io().observed`), which counts every observe.
+ * What a sighting gives a settled view is its session's id alone (its phase is its outcome, `waitingFor` is a `needs-human` phase's,
+ * `usage` an attempt in flight's), and a check's `logs` — its verdict — are read by that id. It is on the record: the handle the
+ * attempt's `ended` entry names. Counted on the runtime's own meter (`io().observed`), which counts every observe.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -82,8 +81,7 @@ test('an unsettled `check` task is still observed: in flight, and before its fir
   assert.equal(calls(engine) - before, 0, 'and once settled, not');
 });
 
-test('REFUSED: a settled task on a harness that has `find` observes nothing either, when the record has no native id and find finds none', async () => {
-  // A harness that names no native id, and forgets a session once it is done: `find` finds nothing, and a view used to observe.
+test('REFUSED: a settled task on a harness that has `find` observes nothing either, when the record has no native id and find finds none (a harness that names no native id and forgets a session once it is done)', async () => {
   const sessions = new Map<string, Sighting>();
   const counts = { observe: 0, find: 0 };
   const runner = {

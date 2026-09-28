@@ -14,7 +14,7 @@ const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => ty
 /**
  * Why a task's `mcp` is not a map of MCP servers, as a sentence that says what to write — or
  * `undefined`. Closed, like a brief's keys, because Claude Code does not refuse an entry it cannot
- * use: on 2.1.270 a `url` with no `type` loads no server and says nothing.
+ * use: a `url` with no `type` loads no server and says nothing.
  */
 export const mcpRefuses = (mcp: unknown): string | undefined => {
   const shape =
@@ -52,12 +52,12 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
 };
 
 /**
- * The checkout's own `.mcp.json`, when it has one: the repository's servers, named so that
- * `--strict-mcp-config` keeps them. One that is not JSON is refused here, before anything runs —
- * named, it stops the CLI before a session exists ("MCP config is not a valid JSON", 2.1.270).
+ * The checkout's own `.mcp.json`, when it has one, as an absolute path: the repository's servers, named so that
+ * `--strict-mcp-config` keeps them. Absolute because Claude Code resolves the flag's path from inside the cwd, so a
+ * relative `repo` would name `repo/repo`. One that is not JSON is refused here, before anything runs — named, it stops
+ * the CLI before a session exists ("MCP config is not a valid JSON").
  */
 export const checkoutMcpConfig = (cwd: string): string | undefined => {
-  // Absolute: Claude Code resolves the flag's path from inside the cwd, so `repo` would name repo/repo.
   const file = path.resolve(cwd, '.mcp.json');
   let text: string;
   try {
@@ -80,7 +80,8 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
 /**
  * A task's `mcp`, written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
  * the task names none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
- * `headers` value may be a secret.
+ * `headers` value may be a secret. Returns the file's absolute path, as `checkoutMcpConfig` does: a
+ * `file` given relative is relative to the engine, not to the session's cwd.
  */
 export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | undefined => {
   if (!mcp || !Object.keys(mcp).length) {
@@ -89,7 +90,6 @@ export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | 
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });
-  // Absolute for the same reason as the checkout's: a root given relative is relative to the engine.
   return path.resolve(file);
 };
 
@@ -98,8 +98,8 @@ export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | 
  *
  * Strict loads those configs and nothing else — but not every server comes from a config. Claude in
  * Chrome, which drives the operator's own browser and whatever they are signed in to there, is
- * switched on by a user setting (`claudeInChromeDefaultEnabled`), and it was still connecting in a
- * `--bg` session spawned strict (2.1.270). So it is switched off by its own flag; a step that needs a
+ * switched on by a user setting (`claudeInChromeDefaultEnabled`), and it connects even in a `--bg`
+ * session spawned strict. So it is switched off by its own flag; a step that needs a
  * browser names one in `mcp` or its checkout's `.mcp.json`. Strict comes straight after the configs
  * because `--mcp-config` is variadic.
  */
@@ -111,7 +111,7 @@ export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): strin
 /**
  * The MCP server names a Codex config gives, as `codex mcp add` writes them: `[mcp_servers.<name>]`
  * tables and the tables under them. Not TOML in general — an inline `mcp_servers = {…}` is not read —
- * so a name it misses meets Codex's own merge, which is where a task stood before this was read.
+ * so a name it misses is left to Codex's own merge.
  */
 export const codexMcpServerNames = (toml: string): Set<string> => {
   const names = new Set<string>();
@@ -132,7 +132,7 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
 /**
  * A task's `mcp` as Codex's `mcp_servers` table, inline: `command`, `args`, `env`, or `url` with its
  * headers as `http_headers`. One value with every name quoted, because a dotted `-c` key is split on
- * every dot, quotes or none ("invalid transport in `mcp_servers."a`", 0.154.0).
+ * every dot, quotes or none (Codex answers "invalid transport in `mcp_servers."a`").
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
   tomlTable(

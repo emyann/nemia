@@ -17,23 +17,23 @@ const N2 = nameFor(TASK, 2);
 const seen = (...pairs: Array<[string, SessionState]>): Map<string, Sighting> =>
   new Map(pairs.map(([name, state], i) => [name, { sessionId: `s${i}`, state }]));
 
-/** A filing as `file` writes one since stage 4c: not queued, so the pass starts it with no word from above. */
+/** A filing as `file` writes one: not queued, so the pass starts it with no word from above. */
 const filed = (): Event => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', queued: false });
 
-/** The same filing as a journal written before stage 4c has it: no `queued` key, which reads as queued (`admit.test.ts`). */
+/** The same filing as a journal an older runtime wrote has it: no `queued` key, which reads as queued (`admit.test.ts`). */
 const keyless = (): Event => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo' });
 
-/** The layer above's word that a queued task may start: what a journal from before stage 4c needs before it starts. */
+/** The layer above's word that a queued task may start: what a filing with no `queued` key needs before it starts. */
 const admitted = (ms = 0): Event => ({ kind: 'admitted', at: at(ms) });
 
 /**
- * A `filed` entry as a journal written before stage 4a part 2 has it: with `maxAttempts` and a `resume` policy, which
- * the type no longer names and `fold` reads past.
+ * A `filed` entry as a journal an older runtime wrote may carry it: with `maxAttempts` and a `resume` policy, which the type
+ * does not name and `fold` reads past.
  */
 const legacyFiled = (extra: object = {}): Event =>
   ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts: 3, resume: 'always', ...extra }) as Event;
 
-test('a session its harness ended at a limit its configuration set ends as its harness said: the limit is carried on the attempt, and judged by nobody here (stage 4b)', () => {
+test('a session its harness ended at a limit its configuration set ends as its harness said: the limit is carried on the attempt, and judged by nobody here', () => {
   const events: Event[] = [
     { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', config: { budgetUsd: 0.01 } },
     { kind: 'starting', at: at(1), attempt: 1 },
@@ -46,7 +46,6 @@ test('a session its harness ended at a limit its configuration set ends as its h
     const at_ = `${state} at its cap`;
     const capped = new Map([[N1, { sessionId: 's0', state, nativeId: 'native-1', limit: 'budget' }]]);
     const plain = new Map([[N1, { sessionId: 's0', state, nativeId: 'native-1' }]]);
-    // The decision is the one the same end with no word of a limit gets: the limit changes nothing `decide` does.
     assert.deepEqual(decide(fold(TASK, events), capped, now(5)), decide(fold(TASK, events), plain, now(5)), at_);
     assert.deepEqual(
       decide(fold(TASK, events), capped, now(5)),
@@ -62,12 +61,11 @@ test('a session its harness ended at a limit its configuration set ends as its h
       end === 'done' ? { do: 'settle', outcome: 'succeeded' } : { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' };
     assert.deepEqual(decide(ended, new Map(), now(7)), settled, `${at_}: settled as any such end is`);
   }
-  // A task filed with no cap: no limit, and nothing on the attempt.
   const none = fold(TASK, [
     ...events,
     { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'native-1' },
   ]);
-  assert.equal('limit' in none.attempts[0], false);
+  assert.equal('limit' in none.attempts[0], false, 'a task filed with no cap: no limit, and nothing on the attempt');
 });
 
 test('a filed task starts its first attempt', () => {
@@ -91,20 +89,24 @@ test('a running session is left alone', () => {
 });
 
 test('a QUIESCENT session is still left alone — being between steps is legitimate', () => {
-  // `working` + not busy means the session believes it has work and is computing nothing. That is
-  // what a stall looks like, and also what a legitimate wait between self-driven steps looks like.
-  // `decide` cannot tell them apart, so it reports and waits; only the deadline ends the ambiguity.
   const s = fold(TASK, [filed(), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }]);
   const quiescent = new Map([[N1, { sessionId: 's0', state: 'working' as const, busy: false }]]);
-  assert.equal(decide(s, quiescent, now(5)).do, 'nothing');
+  assert.equal(
+    decide(s, quiescent, now(5)).do,
+    'nothing',
+    '`working` and not busy is a stall and a wait between self-driven steps alike: `decide` cannot tell them apart, so it reports and waits',
+  );
 
-  // ...but with a deadline, it ends.
   const bounded = fold(TASK, [
     { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', deadlineSeconds: 10 },
     { kind: 'starting', at: at(1_000), attempt: 1 },
     { kind: 'spawned', at: at(1_100), attempt: 1 },
   ]);
-  assert.deepEqual(decide(bounded, quiescent, now(30_000)), { do: 'stop', sessionId: 's0', why: 'deadline' });
+  assert.deepEqual(
+    decide(bounded, quiescent, now(30_000)),
+    { do: 'stop', sessionId: 's0', why: 'deadline' },
+    'with a deadline, it ends: only the deadline ends the ambiguity',
+  );
 });
 
 test('a blocked session is running, and says why', () => {
@@ -113,8 +115,6 @@ test('a blocked session is running, and says why', () => {
   assert.equal(a.do, 'nothing');
   assert.match(a.why, /needs a person/);
 });
-
-// ─── quiet: stopped, and whether it said it had finished ───────────────────
 
 /** Attempt 1 in flight, and the task filed with a closing statement asked for, or not. */
 const inFlight = (schema: boolean, legacy = false): Event[] => [
@@ -145,17 +145,20 @@ test('a QUIET session that was asked for no statement is done — quiet is all s
 });
 
 test('a QUIET session asked for a statement that gave none ends `done`, and says it gave none — `stated: false`, a fact the engine does not judge', () => {
-  // Stage 4a: `unsigned` is the orchestrator's word, read off `stated`. The engine recorded it `failed` before.
-  assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet(), now(5)), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'done',
-    reason: 'harness',
-    nativeId: 'n1',
-    closeout: undefined,
-    stated: false,
-  });
+  assert.deepEqual(
+    decide(fold(TASK, inFlight(true)), quiet(), now(5)),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'done',
+      reason: 'harness',
+      nativeId: 'n1',
+      closeout: undefined,
+      stated: false,
+    },
+    "`unsigned` is the orchestrator's word, read off `stated`",
+  );
   assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5)), {
     do: 'record-end',
     attempt: 1,
@@ -191,37 +194,47 @@ test("the HARNESS'S `done` without a statement is recorded as the harness said i
     closeout: { ok: true },
     stated: true,
   });
-  // A task that asked for nothing is told of nothing: no `stated` key.
-  assert.deepEqual(decide(fold(TASK, inFlight(false)), done(), now(5)), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'done',
-    reason: 'harness',
-    nativeId: 'n1',
-    closeout: undefined,
-  });
-  // A harness's `failed` is its verdict, statement or not, and a limit it names is no reason of the engine's.
-  assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'failed',
-    reason: 'harness',
-    nativeId: 'n1',
-    closeout: undefined,
-    stated: false,
-  });
-  assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ limit: 'budget' }), now(5)), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'done',
-    reason: 'harness',
-    nativeId: 'n1',
-    closeout: undefined,
-    stated: false,
-  });
+  assert.deepEqual(
+    decide(fold(TASK, inFlight(false)), done(), now(5)),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'done',
+      reason: 'harness',
+      nativeId: 'n1',
+      closeout: undefined,
+    },
+    'a task that asked for nothing is told of nothing: no `stated` key',
+  );
+  assert.deepEqual(
+    decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'failed',
+      reason: 'harness',
+      nativeId: 'n1',
+      closeout: undefined,
+      stated: false,
+    },
+    "a harness's `failed` is its verdict, statement or not",
+  );
+  assert.deepEqual(
+    decide(fold(TASK, inFlight(true)), done({ limit: 'budget' }), now(5)),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'done',
+      reason: 'harness',
+      nativeId: 'n1',
+      closeout: undefined,
+      stated: false,
+    },
+    "a limit the harness names is no reason of the engine's",
+  );
 });
 
 test('an end with `stated: false` settles SUCCEEDED, a journal that allowed more attempts included: the engine neither nudges nor retries it', () => {
@@ -241,7 +254,6 @@ test('an end with `stated: false` settles SUCCEEDED, a journal that allowed more
 });
 
 test('an old journal that recorded a `done` end with no statement on a schema task folds, and settles, as it did', () => {
-  // Written before the rule: `fold` reads the end as recorded and never re-derives it.
   const old = fold(TASK, [
     ...inFlight(true),
     { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1' },
@@ -249,6 +261,7 @@ test('an old journal that recorded a `done` end with no statement on a schema ta
   assert.deepEqual(
     old.attempts.map((a) => [a.ended, a.reason, a.closeout]),
     [['done', 'harness', undefined]],
+    '`fold` reads the end as recorded and never re-derives it',
   );
   assert.deepEqual(decide(old, seen(), now(9)), { do: 'settle', outcome: 'succeeded' });
 });
@@ -266,13 +279,13 @@ test('quiet ends only a WORKING session: not a blocked one, and no session its r
   );
 });
 
-/** A journal from before stage 4a, whose engine judged attempt 1 `unsigned`. */
+/** A journal an older runtime wrote, whose engine judged attempt 1 `unsigned`: a reason `decide` reads and never records. */
 const unsigned = (legacy = false): Event[] => [
   ...inFlight(true, legacy),
   { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1' },
 ];
 
-test("an old UNSIGNED end settles failed and says why, a journal that allowed more attempts included — never continued, never nudged: the nudge is the orchestrator's now", () => {
+test("an old UNSIGNED end settles failed and says why, a journal that allowed more attempts included — never continued, never nudged: the nudge is the orchestrator's", () => {
   for (const legacy of [false, true]) {
     const note = {
       do: 'settle',
@@ -375,14 +388,13 @@ test('the fold re-derives the same state from a replayed journal — restart saf
   );
 });
 
-test('ADOPTION: a session running under our name is adopted, never started twice', () => {
-  // The crash that matters: the spawn happened, the journal entry that records it did not.
+test('ADOPTION: a session running under our name is adopted, never started twice — the crash where the spawn happened and the journal entry that records it did not', () => {
   const s = fold(TASK, [filed(), { kind: 'starting', at: at(1), attempt: 1 }]);
   assert.equal(decide(s, seen(), now(5)).do, 'spawn', 'nothing out there: spawn it');
   assert.deepEqual(decide(s, seen([N1, 'working']), now(5)).do, 'nothing', 'already out there: adopt it');
 });
 
-test('a journal from before stage 4a part 2 caught between two attempts runs its second to its end: each has its own name, so the first cannot be mistaken for it', () => {
+test('a journal an older runtime wrote with `maxAttempts`, caught between two attempts, runs its second to its end: each has its own name, so the first cannot be mistaken for it', () => {
   const s = fold(TASK, [
     ...ran('failed', legacyFiled()),
     { kind: 'starting', at: at(4), attempt: 2 },
@@ -403,8 +415,6 @@ test('a journal from before stage 4a part 2 caught between two attempts runs its
     'and is ended off its own sighting',
   );
 });
-
-// ─── the deadline ───────────────────────────────────────────────────────────
 
 const withDeadline = (seconds: number): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', deadlineSeconds: seconds });
 
@@ -448,15 +458,17 @@ test('once the session is gone, the deadline ends its attempt DEADLINE, then set
 });
 
 test('a session that ended DONE is judged by that end, even read past the deadline — the deadline stops, it never overrules', () => {
-  // 2026-09-24: a check exited 0 at 607 s against 600. One pass recorded its end, then — stepping the task until nothing
-  // moves — read that end past the deadline and settled it `failed, deadline exceeded after 607s`.
   const done = { kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', exitCode: 0 } as const;
   const walked = decide(
     fold(TASK, [withDeadline(10), ...started()]),
     new Map([[N1, { sessionId: 's0', state: 'completed', exitCode: 0 }]]),
     now(20_000),
   );
-  assert.equal(walked.do, 'record-end');
+  assert.equal(
+    walked.do,
+    'record-end',
+    'a pass records the end, then steps the task until nothing moves: the next step reads that end past the deadline',
+  );
   assert.deepEqual(
     walked.do === 'record-end' && [walked.observed, walked.reason],
     ['done', 'harness'],
@@ -465,13 +477,15 @@ test('a session that ended DONE is judged by that end, even read past the deadli
   const ended = fold(TASK, [withDeadline(10), ...started([done])]);
   assert.deepEqual(decide(ended, seen(), now(20_001)), { do: 'settle', outcome: 'succeeded' }, 'in the same pass as its end');
   assert.deepEqual(decide(ended, seen([N1, 'completed']), now(20_001)), { do: 'settle', outcome: 'succeeded' });
-  // Stopped by its harness, it settles stopped, as it would inside the deadline.
   const stopped = fold(TASK, [withDeadline(10), ...started([{ ...done, observed: 'stopped', exitCode: undefined }])]);
-  assert.deepEqual(decide(stopped, seen(), now(20_001)), { do: 'settle', outcome: 'stopped', note: 'session stopped' });
+  assert.deepEqual(
+    decide(stopped, seen(), now(20_001)),
+    { do: 'settle', outcome: 'stopped', note: 'session stopped' },
+    'stopped by its harness, it settles stopped, as it would inside the deadline',
+  );
 });
 
-test('an attempt that FAILED past the deadline is judged by its end, and never followed by another', () => {
-  // Its harness ended it, so the deadline cut nothing: the note is the end's, as it is inside the deadline.
+test("an attempt that FAILED past the deadline is judged by its end, and never followed by another: its harness ended it, so the deadline cut nothing, and the note is the end's", () => {
   const events: Event[] = [
     withDeadline(10),
     ...started([{ kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', exitCode: 1 }]),
@@ -486,17 +500,18 @@ test('an attempt that FAILED past the deadline is judged by its end, and never f
 });
 
 test('the deadline runs from the first ATTEMPT, not from filing — a queued task burns nothing', () => {
-  // Filed at t0, started at t+1s. At t+10.5s it has run 9.5s, which is inside a 10s deadline.
   const s = fold(TASK, [withDeadline(10), ...started()]);
-  assert.equal(decide(s, seen([N1, 'working']), now(10_500)).do, 'nothing');
+  assert.equal(
+    decide(s, seen([N1, 'working']), now(10_500)).do,
+    'nothing',
+    'filed at 0 s and started at 1 s: at 10.5 s it has run 9.5 s, inside a 10 s deadline',
+  );
 });
 
 test('no deadline means no limit', () => {
   const s = fold(TASK, [filed(), ...started()]);
   assert.equal(decide(s, seen([N1, 'working']), now(999_999_999)).do, 'nothing');
 });
-
-// ─── one attempt per start ──────────────────────────────────────────────────
 
 const endedWith = (observed: Ended, reason: 'harness' | 'lost' | 'unstartable', first: Event = filed()): Event[] => [
   first,
@@ -522,22 +537,25 @@ test("an attempt that ended LOST, UNSTARTABLE or on its harness's failure settle
   }
 });
 
-test('a journal from before stage 4a part 2, filed with attempts to spare and `resume: always`, settles on its first failed attempt all the same', () => {
+test('a journal an older runtime wrote, filed with attempts to spare and `resume: always`, settles on its first failed attempt all the same', () => {
   for (const reason of ['lost', 'unstartable', 'harness'] as const) {
     const s = fold(TASK, endedWith('failed', reason, legacyFiled()));
     assert.equal('maxAttempts' in s || 'resume' in s, false, `${reason}: the retired keys are folded unread`);
     assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' }, reason);
   }
-  // And it folds to the state the same filing without them does — one as old, with no `queued` key either.
-  assert.deepEqual(fold(TASK, [legacyFiled()]), fold(TASK, [keyless()]));
+  assert.deepEqual(
+    fold(TASK, [legacyFiled()]),
+    fold(TASK, [keyless()]),
+    'it folds to the state the same filing without them does, with no `queued` key either',
+  );
 });
 
-// ─── no ceiling, in the pure layer ──────────────────────────────────────────
-// Since stage 4c part 2 `decide` is handed no count of sessions at work and no ceiling: a task not queued starts, whatever
-// else runs. How many run at once is the layer above's (`agent-orchestrator/test/admission.test.ts`).
-
-test('a task not queued starts, and `decide` is handed nothing to hold it back with', () => {
-  assert.deepEqual(decide(fold(TASK, [filed()]), seen(), now()), { do: 'start', attempt: 1, resumeFrom: undefined });
+test('a task not queued starts, and `decide` is handed nothing to hold it back with: no count of sessions at work and no ceiling', () => {
+  assert.deepEqual(
+    decide(fold(TASK, [filed()]), seen(), now()),
+    { do: 'start', attempt: 1, resumeFrom: undefined },
+    "it starts whatever else runs: how many run at once is the layer above's (`agent-orchestrator/test/admission.test.ts`)",
+  );
   assert.deepEqual(Object.keys(now()).sort(), ['at', 'graceMs'], 'the clock and the grace window, and no count');
 });
 
@@ -546,9 +564,12 @@ test('a task filed AGAINST a session continues it on the first attempt', () => {
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
 
-test('...a journal from before stage 4a part 2 that said `resume: never` included: that was a retry policy, and this is what the work is', () => {
-  // Older than stage 4c too, so it waits to be admitted, and starts once it is.
-  assert.equal(decide(fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' })]), seen(), now()).do, 'nothing');
+test('...a journal an older runtime wrote that said `resume: never` included: that is a retry policy, and this is what the work is', () => {
+  assert.equal(
+    decide(fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' })]), seen(), now()).do,
+    'nothing',
+    'with no `queued` key either, it waits to be admitted, and starts once it is',
+  );
   const s = fold(TASK, [legacyFiled({ resume: 'never', resumeFrom: 'sess-1' }), admitted()]);
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: 'sess-1' });
 });
@@ -560,7 +581,7 @@ const continuation = (then: Event[], first: Event = { kind: 'filed', at: at(0), 
   ...then,
 ];
 
-test('a continuation whose spawn was REFUSED settles failed, and its attempt keeps what it was to continue — which the layer above reads to try again (issue 5)', () => {
+test('a continuation whose spawn was REFUSED settles failed, and its attempt keeps what it was to continue — which the layer above reads to try again', () => {
   const refused: Event = {
     kind: 'ended',
     at: at(2),
@@ -592,8 +613,6 @@ test('a continuation whose attempt ran and was lost settles failed too, its own 
   assert.equal(s.attempts[0].nativeId, 'native-1');
 });
 
-// ─── when an attempt ended ──────────────────────────────────────────────────
-
 test('an ended attempt keeps the time it ended: the `at` of its `ended` entry', () => {
   const [a] = fold(TASK, ran('failed')).attempts;
   assert.equal(a.startedAt, at(1));
@@ -614,8 +633,6 @@ test('an attempt in flight has no end time, and does not borrow the one before i
     ],
   );
 });
-
-// ─── what a person said ─────────────────────────────────────────────────────
 
 /** The same journal with words said to attempt 1 just after it spawned. */
 const told = (events: Event[], text = 'widen the scope to the api'): Event[] => {
@@ -639,9 +656,7 @@ test('a `said` event changes no decision: running, blocked, ended done, failed, 
   }
 });
 
-test("`waitingFor` changes no decision: it is the harness's word for a person to read, and `decide` does not read it", () => {
-  // A container's `state.waiting.reason`, carried and never judged. If this ever fails, something turned a word a
-  // future Claude Code may change into a condition the engine acts on.
+test("`waitingFor` changes no decision: it is the harness's word for a person to read (Claude Code's `state.waiting.reason`, a word it may change), carried, and `decide` does not read it", () => {
   const cases: Array<[string, Event[], SessionState, ReturnType<typeof now>]> = [
     ['blocked', [filed(), ...started()], 'input-required', now(5_000)],
     ['working', [filed(), ...started()], 'working', now(5_000)],
@@ -681,11 +696,7 @@ test('the fold keeps every `said` in order, each with the attempt it was said to
   );
 });
 
-// ─── the contract: every ended attempt carries its statement or the reason it has none ──────────
-
-test('CONTRACT: every attempt a task settles over is ended — with the statement its session gave, untouched, or the reason it has none', () => {
-  // Every sighting, with and without a statement, a schema, a limit its harness names, and a cut — a person's stop, or the
-  // deadline — walked to its settle. Before 2026-09-19 a cut settled the task over an open attempt: neither.
+test("CONTRACT: every attempt a task settles over is ended — with the statement its session gave, untouched, or the reason it has none — under every sighting, with and without a statement, a schema, a limit its harness names (which changes no decision), and a cut (a person's stop, or the deadline), walked to its settle", () => {
   const STATEMENT = { summary: "the agent's words" };
   const states = [
     undefined,
@@ -733,7 +744,6 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
             let settled: string | undefined;
             for (let step = 0; step < 6 && !settled; step++) {
               const a = decide(fold(TASK, events), new Map(sighting ? [[N1, sighting]] : []), now(60_000));
-              // A limit is carried, never judged: every decision is the one the same sighting without it gets.
               const unlimited = sighting && (({ limit: _, ...rest }) => rest)(sighting);
               assert.deepEqual(
                 a,
@@ -772,10 +782,8 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
                 !['operator', 'deadline'].includes(attempt.reason!),
                 `${at_}: its harness ended it before the cut, and that end is recorded`,
               );
-            // An end on record is judged by that end: a deadline read in the same pass does not overrule it (2026-09-24).
             if (attempt.ended === 'done' && cut !== 'operator')
               assert.equal(settled, 'succeeded', `${at_}: ended done, and settled ${settled}`);
-            // Whether the statement came is on every end read off a sighting of a task that asked for one, and on no other.
             if (!schema) assert.equal('stated' in attempt, false, `${at_}: nothing asked, nothing reported`);
             else if (attempt.reason === 'harness')
               assert.equal(attempt.stated, attempt.closeout !== undefined, `${at_}: stated is whether a statement came`);
@@ -783,10 +791,8 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
   assert.ok(walked > 100, `walked ${walked}`);
 });
 
-// ─── a task held open (R1): a signed end waits on a person, an answer is a turn, a close settles ──────────
-
 const N3 = nameFor(TASK, 3);
-/** A task held open whose first attempt signed at 3 s; `extra` on the filing. */
+/** A task held open whose first attempt signed at 3 s, `extra` on the filing: held open, a signed end waits on a person, an answer is a turn, and a close settles. */
 const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
   {
     kind: 'filed',
@@ -848,33 +854,38 @@ test('HELD OPEN: a signed end waits as input-required, not settled — and past 
     { do: 'nothing', why: 'input-required' },
     'an hour past a 10 s deadline',
   );
-  // The control: the same journal without `holdOpen` settles on the signed end, as every task filed before did.
   const plain = held().map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) as Event[];
-  assert.deepEqual(decide(fold(TASK, plain), seen(), now(9_000)), { do: 'settle', outcome: 'succeeded' });
+  assert.deepEqual(
+    decide(fold(TASK, plain), seen(), now(9_000)),
+    { do: 'settle', outcome: 'succeeded' },
+    'the control: the same journal without `holdOpen` settles on the signed end',
+  );
   assert.equal(fold(TASK, plain).holdOpen, undefined);
 });
 
 test('HELD OPEN: an answer is a turn — an attempt continuing the session that signed, told the words instead of the brief', () => {
   const s = fold(TASK, [...held(), answer(60_000)]);
   assert.deepEqual(decide(s, seen(), now(61_000)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' });
-  // A journal from before stage 4a part 2 that said `resume: never` too: the answer continues a conversation, which no retry policy was a word about.
-  assert.deepEqual(decide(fold(TASK, [...held({ resume: 'never' } as object), answer(60_000)]), seen(), now(61_000)), {
-    do: 'start',
-    attempt: 2,
-    resumeFrom: 'native-1',
-    nudge: 'make it smaller',
-  });
-  // The turn's attempt carries its turn; the first does not, as none before holding open did.
+  assert.deepEqual(
+    decide(fold(TASK, [...held({ resume: 'never' } as object), answer(60_000)]), seen(), now(61_000)),
+    {
+      do: 'start',
+      attempt: 2,
+      resumeFrom: 'native-1',
+      nudge: 'make it smaller',
+    },
+    'a journal an older runtime wrote with `resume: never` too: the answer continues a conversation, which no retry policy is a word about',
+  );
   const t = fold(TASK, [...held(), answer(60_000), ...turn1(61_000)]);
   assert.deepEqual(
     t.attempts.map((a) => a.turn),
     [undefined, 1],
+    "the turn's attempt carries its turn; the first does not",
   );
   assert.equal('turn' in t.attempts[0], false);
   assert.deepEqual(decide(t, seen([N2, 'working']), now(62_000)).do, 'nothing', 'running');
-  // It signs, and waits again.
   const signed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done' })]);
-  assert.deepEqual(decide(signed, seen(), now(70_000)), { do: 'nothing', why: 'input-required' });
+  assert.deepEqual(decide(signed, seen(), now(70_000)), { do: 'nothing', why: 'input-required' }, 'it signs, and waits again');
 });
 
 test("HELD OPEN: the turn follows the journal order — an answer journalled before a start is that attempt's turn, after it is the next", () => {
@@ -894,12 +905,11 @@ test("HELD OPEN: the turn follows the journal order — an answer journalled bef
   );
 });
 
-test("HELD OPEN: two answers journalled before the turn started are both told, in order, and the last configuration given is the turn's own", () => {
+test("HELD OPEN: two answers journalled before the turn started are both told, in order, and the last configuration given is the turn's own, which the engine lays over the filing's (`configForTurn`)", () => {
   const own = { config: { budgetUsd: 1 } };
   const s = fold(TASK, [...held(own), answer(60_000, 'first', { budgetUsd: 2 }), answer(60_500, 'second')]);
   assert.deepEqual(decide(s, seen(), now(61_000)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'first\n\nsecond' });
   assert.deepEqual(turnOf(s).config, { budgetUsd: 2 }, 'the configuration given with the words, whole');
-  // What the turn gives for itself, and only that: the engine lays it over the filing's (`configForTurn`), unread here.
   assert.equal(turnOf(fold(TASK, [...held(own), answer(60_000)])).config, undefined, 'none given: nothing of its own');
   assert.equal(turnOf(fold(TASK, held(own))).config, undefined, 'turn 0: nothing of its own');
   assert.equal(
@@ -941,28 +951,32 @@ test("HELD OPEN: a turn is one attempt — one that fails, is lost or cannot sta
     },
   ]);
   assert.deepEqual(decide(unstartable, seen(), now(70_000)), settled, 'unstartable');
-  // A journal from before stage 4a part 2 that allowed a turn more attempts settles the same.
   const legacy = fold(TASK, [
     ...held({ maxAttempts: 3, resume: 'always' } as object),
     answer(60_000),
     ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' }),
   ]);
   assert.deepEqual(decide(legacy, seen(), now(70_000)), settled, 'legacy');
-  // A turn that ended `done` without its statement waits on a person like any other: the engine does not nudge it.
   const unstated = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done', nativeId: 'native-2', stated: false })]);
-  assert.deepEqual(decide(unstated, seen(), now(70_000)), { do: 'nothing', why: 'input-required' });
-  // And an old one the engine judged `unsigned` settles failed, as a task not held open does.
+  assert.deepEqual(
+    decide(unstated, seen(), now(70_000)),
+    { do: 'nothing', why: 'input-required' },
+    'a turn that ended `done` without its statement waits on a person like any other: the engine does not nudge it',
+  );
   const unsigned = fold(TASK, [
     ...held(),
     answer(60_000),
     ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' }),
   ]);
-  assert.deepEqual(decide(unsigned, seen(), now(70_000)), {
-    do: 'settle',
-    outcome: 'failed',
-    note: '1 attempt(s) of turn 1, none succeeded: the last ended without the closing statement it was asked for',
-  });
-  // A journal caught with two attempts in a turn counts both.
+  assert.deepEqual(
+    decide(unsigned, seen(), now(70_000)),
+    {
+      do: 'settle',
+      outcome: 'failed',
+      note: '1 attempt(s) of turn 1, none succeeded: the last ended without the closing statement it was asked for',
+    },
+    'an older end the engine judged `unsigned` settles failed, as a task not held open does',
+  );
   const twice = fold(TASK, [
     ...held(),
     answer(60_000),
@@ -971,15 +985,22 @@ test("HELD OPEN: a turn is one attempt — one that fails, is lost or cannot sta
     { kind: 'spawned', at: at(70_100), attempt: 3 },
     { kind: 'ended', at: at(72_000), attempt: 3, sessionId: 's2', observed: 'failed', reason: 'harness', nativeId: 'native-1' },
   ]);
-  assert.deepEqual(decide(twice, seen(), now(73_000)), { do: 'settle', outcome: 'failed', note: '2 attempt(s) of turn 1, none succeeded' });
-  // A turn its harness ended at its cap settles as any failed turn: the limit is on the attempt, for the layer above.
+  assert.deepEqual(
+    decide(twice, seen(), now(73_000)),
+    { do: 'settle', outcome: 'failed', note: '2 attempt(s) of turn 1, none succeeded' },
+    'a journal caught with two attempts in a turn counts both',
+  );
   const capped = fold(TASK, [
     ...held(),
     answer(60_000, 'w', { budgetUsd: 0.5 }),
     ...turn1(61_000, { observed: 'failed', limit: 'budget' }),
   ]);
   assert.deepEqual(decide(capped, seen(), now(70_000)), settled, 'at its cap');
-  assert.equal(capped.attempts.at(-1)!.limit, 'budget');
+  assert.equal(
+    capped.attempts.at(-1)!.limit,
+    'budget',
+    'a turn its harness ended at its cap settles as any failed turn: the limit is on the attempt, for the layer above',
+  );
 });
 
 test('HELD OPEN: a later turn continues only the session that signed the turn before — none recorded, it settles failed rather than start cold', () => {
@@ -996,8 +1017,11 @@ test('HELD OPEN: a later turn continues only the session that signed the turn be
     note: 'turn 1 has no session to continue: its harness recorded none for the attempt that signed',
   };
   assert.deepEqual(decide(fold(TASK, [...unrecorded(), answer(60_000)]), seen(), now(61_000)), settled);
-  // Not the session the task was filed against, which never heard the plan; nor an earlier attempt that failed.
-  assert.deepEqual(decide(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' }), answer(60_000)]), seen(), now(61_000)), settled);
+  assert.deepEqual(
+    decide(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' }), answer(60_000)]), seen(), now(61_000)),
+    settled,
+    'not the session the task was filed against, which never heard the plan',
+  );
   const failedFirst: Event[] = [
     held()[0],
     { kind: 'starting', at: at(500), attempt: 1 },
@@ -1007,7 +1031,7 @@ test('HELD OPEN: a later turn continues only the session that signed the turn be
       .map((e) => ('attempt' in e ? { ...e, attempt: 2 } : e)) as Event[]),
     answer(60_000),
   ];
-  assert.deepEqual(decide(fold(TASK, failedFirst), seen(), now(61_000)), settled);
+  assert.deepEqual(decide(fold(TASK, failedFirst), seen(), now(61_000)), settled, 'nor an earlier attempt that failed');
   assert.equal(
     turnOf(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' })])).continues,
     'before-the-task',
@@ -1035,9 +1059,12 @@ test('HELD OPEN: a close settles it — succeeded on a signed turn, failed after
     outcome: 'succeeded',
     note: 'closed',
   });
-  // The control: `closed` on a task not held open is no word decide reads — it settles as it would have.
   const plain = held().map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) as Event[];
-  assert.deepEqual(decide(fold(TASK, [...plain.slice(0, 3), closed]), seen([N1, 'working']), now(91_000)).do, 'nothing');
+  assert.deepEqual(
+    decide(fold(TASK, [...plain.slice(0, 3), closed]), seen([N1, 'working']), now(91_000)).do,
+    'nothing',
+    'the control: `closed` on a task not held open is no word decide reads',
+  );
 });
 
 test('HELD OPEN: a stop outranks the wait — a task waiting settles stopped, and one mid-turn stops its session first', () => {

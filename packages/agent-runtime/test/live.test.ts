@@ -1,49 +1,45 @@
 /**
- * Against the real harness — skipped unless `AE_LIVE=1`, because it spends money.
+ * Against the real harness — skipped unless `AE_LIVE=1`, because it spends money. A fence proven by a flag's help text is the
+ * kind of guard that is silently inert, so each is proven by a session that runs, beside a control identical but for the one
+ * field, which must do what the fenced one cannot: without the control, a session that never ran would pass too.
  *
- * `--tools` was wired having been verified only as far as `claude --help`, and a fence proven by a
- * flag's help text is the kind of guard that has been silently inert before. So this runs a real
- * `--bg` session told to write a file with no tool that can, beside a control identical but for
- * `tools` — without the control, a session that never ran would pass the first assertion too.
+ * - `--tools`: a `--bg` session told to write a file with no tool that can, and which still gives its closing statement.
+ * - `--disallowedTools`, on `--bg` and not only `-p`: a session told to run `npm run build` and `npm run e2e`, in `dontAsk`, in a
+ *   checkout whose `.claude/settings.json` allows both; the control must run both. Claude Code gives a `--bg` session in a
+ *   directory it does not trust none of the directory's settings, so the checkouts are made inside this package, and the test
+ *   is run from a checkout Claude Code trusts.
+ * - The MCP fence: a session filed with no `mcp`, in an empty directory, on a machine whose operator has servers, claude.ai
+ *   connectors and Claude in Chrome, reports no MCP server and no MCP tool; the control, given one server, reports that server
+ *   and its tool. Servers connect after a `--bg` session starts, so the brief waits for them.
+ * - The release of a settled session: `claude rm` could take the transcript with it, so a session told a word settles and is
+ *   released, then `ae logs` still reads it and a second task resuming it still says the word.
+ * - `say`, whose inbox answers nothing: a session told to wait for a message naming a file is told a name, and writes that file
+ *   and closes with its name; an identical session never told writes nothing.
+ * - A budget: `claude -p` stops at its cap after its first response or two; a `--bg` session spends past it, which is why
+ *   `file()` refuses a budget beside a background session, so that test files through the Effect door, which refuses no
+ *   harness's words.
+ * - A session that ends its turn without its closing statement: told to answer in plain text and give none, it is never recorded
+ *   as ended with none unless its end says so — `stated: false`, the fact the orchestrator reads as unsigned. Whether Claude
+ *   Code nudges such a session itself, or ends it on its own, is what the diagnostic says.
+ * - `claude.remoteControl`, under the engine: Claude Code registers a session filed with it under `sessions/` with a
+ *   `bridgeSessionId`, a file the engine never reads; the control has none, read again as long after, so a bridge it gets a
+ *   moment after it registers is seen too. Both have no tools, so a session anyone on the account can drive from claude.ai for
+ *   the minute it lives can do nothing.
+ * - Claude Code as a job (M1 to M12, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
+ *   and a `--bg` session only when asked; these keep what that rests on measurable on each Claude Code. `--allowedTools` takes
+ *   every word after it, so M1 gives the prompt first, and runs its eight jobs at once, each in a folder of its own. A resume's
+ *   result prints the whole session's cost, and a job resumed from a `--bg` session carries that session's spend on with no run
+ *   file that holds it, so its cost is dropped, never overcounted. Told only to run a sleep, haiku can decline it as pointless,
+ *   so M4 says why it asks; M4 is M6's control too: a job without a stdin to read still has `-p --resume` to be told with. A
+ *   job's words come on its stdin (`--input-format stream-json`) so that a person's can follow them, and M8 to M10 hold a job
+ *   given its brief so to the closeout, the spend cap and the denials of a job given a plain prompt.
+ * - Codex as an A2A agent (M13, only where `codex` is on PATH): a held Codex task is an A2A context, which rests on a claim no
+ *   fake can make — that `codex exec resume <thread>` goes on under the same thread id and in the same rollout, rather than
+ *   forking a thread of its own. A task told a word signs, waits with no worker, is answered, and says the word under the
+ *   thread id it signed with.
  *
- * `--disallowedTools` gets the same, on `--bg` and not only `-p`: a session told to run `npm run build` and
- * `npm run e2e`, beside a control identical but for `disallowedTools`. The control must run both, or the fenced
- * one running neither proves nothing — and the first version's did not. Both ran in `dontAsk` in a checkout whose
- * `.claude/settings.json` allows the two commands, as this repository's does for implement's check; the checkout
- * was a temporary directory, and the control was refused with dontAsk's own message: a `--bg` session there was
- * not given the directory's settings (the directory is untrusted, the likely reason). So the checkouts are made
- * inside this package, and the test is run from a checkout Claude Code trusts.
- *
- * The MCP fence gets the same: a session filed with no `mcp`, in an empty directory, on a machine
- * whose operator has servers, claude.ai connectors and Claude in Chrome, must report no MCP server and
- * no MCP tool — beside a control given one server, which must report that server and its tool.
- * Servers connect after a `--bg` session starts, so the brief waits for them. The first run did not:
- * both sessions answered while their servers were still connecting — Chrome among them, under strict.
- *
- * And the engine's release of a settled session is measured before it is trusted: `claude rm` could
- * have taken the transcript with it. So a session is told a word, settles and is released; then
- * `ae logs` must still read it, and a second task resuming it must still say the word.
- *
- * And `say` is measured before it is trusted, because the inbox it posts to answers nothing: a session told to
- * wait for a message naming a file is told a name, and must write that file and close with its name, while an
- * identical session never told must write nothing — without it, a session that wrote a file of its own accord
- * would pass.
- *
- * And a session that ends its turn without its closing statement is measured, because bug 1 was a success recorded for
- * exactly that, and only a fake `claude` has shown the fix: told to answer in plain text and give no statement, it must
- * never be recorded as ended with none unless its end says so — `stated: false`, the fact the orchestrator reads as
- * unsigned since stage 4a (before, the runtime judged it `unsigned` itself). Whether Claude Code nudges such a session
- * itself, or ends it on its own, is what the diagnostic says.
- *
- * And `claude.remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
- * engine never reads: a session filed with it must be registered under `sessions/` with a `bridgeSessionId`, beside a
- * control identical but for the field, which must have none — or the flag is not what bridged it. Both have no tools,
- * so a session anyone on the account can drive from claude.ai for the minute it lives can do nothing.
- *
- * And Codex as an A2A agent (M13, which runs only where `codex` is on PATH): a held Codex task is an A2A context, and that
- * rests on a claim no fake can make — that `codex exec resume <thread>` goes on under the same thread id and in the same
- * rollout, rather than forking a thread of its own. A task told a word signs, waits with no worker, is answered, and must
- * say the word under the thread id it signed with (codex-cli 0.154.0, 2026-09-23: one id, one rollout).
+ * Every session a test starts is stopped and removed at its end, whatever happened: a `claude stop` or `claude rm` that fails,
+ * on a session released already, is passed over.
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
@@ -72,7 +68,8 @@ const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
 /**
  * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
- * `act` threw on included.
+ * `act` threw on included. The engine releases a session once its end is on the record; this stops and removes each one that
+ * never got that far, and passes over a task with no view, which has nothing known to clean.
  */
 const settleThenCheck = async (
   engine: Engine,
@@ -92,14 +89,11 @@ const settleThenCheck = async (
     }
     check(views);
   } finally {
-    // The engine releases a session once its end is on the record; this is for one that never got that far.
     for (const [k, id] of Object.entries(ids)) {
       if (!views[k]) {
         try {
           views[k] = await engine.view(id);
-        } catch {
-          /* no view, nothing known to clean */
-        }
+        } catch {}
       }
     }
     for (const v of Object.values(views)) {
@@ -108,9 +102,7 @@ const settleThenCheck = async (
       for (const verb of ['stop', 'rm']) {
         try {
           execFileSync('claude', [verb, short], { stdio: 'ignore', timeout: 30_000 });
-        } catch {
-          /* best effort */
-        }
+        } catch {}
       }
     }
   }
@@ -135,7 +127,6 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    // Shipped defaults: the built-in harnesses, `claude` first, `auto` permission mode.
     const engine = createEngine({ root: tmp('board') });
     const fenced = tmp('fenced');
     const open = tmp('open');
@@ -151,7 +142,6 @@ test(
 
       assert.equal(views.fenced?.state.settled, 'succeeded', `fenced settled: ${views.fenced?.phase}`);
       assert.equal(fs.existsSync(path.join(fenced, 'PROOF.txt')), false, 'the fence held: no tool, no file');
-      // `--tools` must not take away the tool a closing statement is made with.
       assert.notEqual(views.fenced?.state.attempts.at(-1)?.closeout, undefined, 'the fenced session still gave its closeout');
     });
   },
@@ -198,7 +188,6 @@ test(
     const engine = createEngine({ root: tmp('deny-board') });
     const fenced = allowingCheckout('deny-fenced');
     const open = allowingCheckout('deny-open');
-    // The shipped reviewer's fence, less what this does not need: Bash only, in dontAsk.
     const common = {
       brief: DENY_BRIEF,
       closeoutSchema: DENY_CLOSEOUT,
@@ -293,7 +282,6 @@ test(
     await settleThenCheck(engine, ids, (views) => {
       const said = (k: string) => views[k]?.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
       assert.equal(views.given?.state.settled, 'succeeded', `control settled: ${views.given?.phase}`);
-      // Without the control, a session that answered before its servers connected passes the next assertion.
       assert.ok(
         said('given')?.mcpTools?.includes('mcp__aeprobe__ping'),
         `control: a session given a server reports its tool; it said ${JSON.stringify(said('given'))}`,
@@ -325,10 +313,18 @@ const NAME_CLOSEOUT = {
 
 /**
  * Told a file name while it works, a session writes that file; the same session never told writes none. A `--bg` session
- * is told through Claude Code's inbox, and a job (`claude -p`) on its stdin, by its worker.
+ * is told through Claude Code's inbox, and a job (`claude -p`) on its stdin, by its worker. Both are filed at shipped defaults,
+ * with Bash to wait with and Write to answer with.
+ *
+ * - The told session is told once it is seen at work, listed running in its sleep loop, inside `settleThenCheck`, so a `say`
+ *   that rejects still leaves no session behind.
+ * - Its own record then carries the words once, as the transcript reader gives them to a board, never as the model's mention
+ *   of the file's name, which would pass with the reader of words sent in broken: a job's as the person's words, since Claude
+ *   Code keeps a user message said on its stdin while it works as an attachment the reader gives as the user's, as the brief
+ *   is; a `--bg` session's as a system event whose text is the words, or Claude Code's sentence around them with the words on
+ *   a line of their own.
  */
 const sayReaches = (background: boolean) => async (t: TestContext) => {
-  // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
   const engine = createEngine({ root: tmp('say-board') });
   const told = tmp('say-told');
   const control = tmp('say-control');
@@ -365,8 +361,6 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
       assert.deepEqual(views.control?.state.said, []);
     },
     async () => {
-      // Told once it is seen at work: listed running, in its sleep loop. Inside `settleThenCheck`, so a `say` that
-      // rejects still leaves no session behind.
       const until = Date.now() + 5 * 60_000;
       while (!said && Date.now() < until) {
         await engine.tick();
@@ -378,12 +372,8 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     },
   );
 
-  // The session's own record has the words too, as the transcript reader gives them to a board — never the model's own
-  // mention of the file's name, which would pass with the reader of words sent in broken.
   const { events } = await engine.transcript(ids.told);
   if (!background) {
-    // A job's words are a user message on its stdin; said while it works, Claude Code keeps them as an attachment the
-    // reader gives as the user's words, as the brief is (2.1.280).
     const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
     assert.equal(
       arrived.length,
@@ -392,7 +382,6 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     );
     return;
   }
-  // A `--bg` session's, a system event whose text is the words, or Claude Code's sentence around them on a line of their own.
   const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
   assert.equal(
     arrived.length,
@@ -491,9 +480,7 @@ test(
         for (const verb of ['stop', 'rm']) {
           try {
             execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {
-            /* released already */
-          }
+          } catch {}
         }
       }
     }
@@ -506,9 +493,8 @@ const NOTES = Array.from(
     `line ${i + 1}: ${i % 7 === 0 ? 'a note' : 'nothing here'} — the quick brown fox jumps over the lazy dog, again and again and again`,
 ).join('\n');
 /**
- * A session that spends: a long file, read fifty lines a call. Told to read one short file forty times over, haiku did once
- * (by hand) and once declined it as a waste and asked what was wanted, which Claude Code lists `blocked` — so every call
- * reads lines it has not read.
+ * A session that spends: a long file, read fifty lines a call, so that every call reads lines it has not read. Told to read one
+ * short file over and over, haiku can decline it as a waste and ask what was wanted, which Claude Code lists `blocked`.
  */
 const LOOP_BRIEF = [
   'NOTES.txt has 2000 lines. Read all of it with your Read tool, 50 lines per call — offset 1, then 51, then 101, and so on',
@@ -562,7 +548,6 @@ test(
     timeout: 12 * 60_000,
   },
   async (t) => {
-    // Through the Effect door, which refuses no harness's words (open issue 6): `createEngine().file()` refuses this task.
     const root = tmp('bg-budget-board');
     const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
     const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
@@ -585,7 +570,6 @@ test(
       const [a] = v.state.attempts;
       t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
       assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
-      // `claude -p` at this cap stopped after its first response or two, under $0.03.
       assert.ok(
         (a?.usage?.toolCalls ?? 0) >= 5,
         `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusals in claudeBgRefuses and claudeCodeRefuses`,
@@ -600,9 +584,7 @@ test(
         for (const verb of ['stop', 'rm']) {
           try {
             execFileSync('claude', [verb, session.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {
-            /* released already */
-          }
+          } catch {}
         }
       }
     }
@@ -621,7 +603,6 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    // Shipped defaults but the model and the mode: `claude` as a background session, `auto`, one attempt. Quiet takes ninety seconds to be called.
     const engine = createEngine({ root: tmp('unsigned-board') });
     const ids = {
       unsigned: await engine.file({
@@ -648,16 +629,17 @@ test(
   },
 );
 
-/** The registration Claude Code wrote for the background session named `name`, under `sessions/` — or `undefined` while there is none. */
+/**
+ * The registration Claude Code wrote for the background session named `name`, under `sessions/` — or `undefined` while there is
+ * none. A file gone since the directory was read, or read mid-write, is passed over.
+ */
 const registrationOf = (name: string): Record<string, unknown> | undefined => {
   const dir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
   for (const f of fs.readdirSync(dir).filter((f) => /^\d+\.json$/.test(f))) {
     try {
       const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Record<string, unknown> | null;
       if (r?.name === name && r.kind === 'bg') return r;
-    } catch {
-      /* gone since the directory was read, or read mid-write */
-    }
+    } catch {}
   }
   return undefined;
 };
@@ -689,7 +671,6 @@ test(
         await new Promise((r) => setTimeout(r, 2_000));
         read();
       }
-      // A bridge the control got a moment after it registered would not be seen yet: look again, as long after.
       await new Promise((r) => setTimeout(r, 15_000));
       read();
       const shown = (r: Record<string, unknown> | undefined) =>
@@ -710,27 +691,18 @@ test(
         try {
           const v = await engine.view(id);
           if (v.sessionId) sessions.add(v.sessionId);
-        } catch {
-          /* nothing known to clean */
-        }
+        } catch {}
       }
       for (const s of sessions) {
         for (const verb of ['stop', 'rm']) {
           try {
             execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {
-            /* best effort */
-          }
+          } catch {}
         }
       }
     }
   },
 );
-
-/*
- * Stage 2's measurements: `claude` runs a step as a job (`claude -p`), and a `--bg` session only when asked. Each was first
- * taken by hand on Claude Code 2.1.280 (docs/open-issues.md, *Claude Code as a job*); these keep them measurable on the next.
- */
 
 /** One `claude -p` line of its stream: what the runner reads, parsed as the reader parses it. */
 type StreamLine = Record<string, unknown> & { type?: string; subtype?: string; session_id?: string };
@@ -820,7 +792,6 @@ test(
         fs.mkdirSync(cwd);
         const allow = mode === 'dontAsk' ? ['--allowedTools', 'Edit(**),Bash(npm test)'] : [];
         const brief = DENIED_BRIEF(path.join(probe, `outside-${label}`)).replace(' with finished set to true', ', the word FINISHED');
-        // The prompt first: `--allowedTools` takes every word after it, and took a prompt given last for a rule.
         const { exit, lines } = printed(
           [brief, '--permission-mode', mode, ...allow, ...(none ? ['--permission-prompts', 'none'] : [])],
           cwd,
@@ -828,7 +799,6 @@ test(
         return { label, exit, lines, outside: fs.existsSync(path.join(probe, `outside-${label}`, 'x.txt')) };
       }),
     );
-    // One at a time would take eight minutes: the eight are independent, each in a folder of its own.
     for (const { label, exit, lines, outside } of await Promise.all(runs)) {
       const result = resultOf(lines);
       const events = lines.filter((l) => l.type === 'system' && l.subtype === 'permission_denied');
@@ -919,7 +889,6 @@ test(
     const ask = 'What was the code word you were given? Give it as word in your closing statement.';
     const last = (v: TaskView) => v.state.attempts.at(-1);
 
-    // M3: `claude -p --resume` continues a `--bg` session.
     const bgWord = `ae${randomUUID().slice(0, 8)}`;
     const bg = await settled(await engine.file({ ...common, config: { model: 'haiku', background: true }, brief: tell(bgWord) }));
     assert.equal(bg.state.settled, 'succeeded', `the background session settled: ${bg.phase}`);
@@ -930,14 +899,12 @@ test(
     assert.equal(fromBg.state.settled, 'succeeded', `the job resumed from it settled: ${fromBg.phase}`);
     assert.deepEqual(last(fromBg)?.closeout, { word: bgWord }, 'and remembered the word');
     assert.equal(last(fromBg)?.nativeId, parent, 'in the same session');
-    // What it printed carries the background session's spend on, and no run file holds that spend: dropped, never overcounted.
     assert.equal(
       last(fromBg)?.usage?.costUsd,
       undefined,
       'a job whose parent was a background session records no cost it cannot tell apart',
     );
 
-    // M2: a resume's result prints the whole session's cost; the attempt is charged what the resume spent.
     const word = `ae${randomUUID().slice(0, 8)}`;
     const first = await settled(await engine.file({ ...common, config: { model: 'haiku' }, brief: tell(word) }));
     assert.equal(first.state.settled, 'succeeded', `the first job settled: ${first.phase}`);
@@ -953,7 +920,6 @@ test(
       "the resume, a short question on a warm cache, was charged less than the job it continued: not that job's spend again",
     );
 
-    // M5: a cap below the session's whole spend still lets a short resume finish — it caps the resume's own.
     const cap = Math.max(0.01, Math.round((one + two) * 50) / 100);
     const capped = await settled(
       await engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }),
@@ -1019,7 +985,6 @@ test(
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
       const cwd = tmp(`m4-${signal}`);
       const word = `ae${randomUUID().slice(0, 8)}`;
-      // In the words haiku followed by hand: told only to run it, it has declined a sleep as pointless.
       const job = started(
         [
           `I am testing how my build tool handles a slow step. Remember the code word ${word}. Please run exactly this Bash command, which is safe and expected: sleep 40 && echo SLEPT . Then reply DONE.`,
@@ -1084,19 +1049,11 @@ test(
         new RegExp(word),
         'its first answer — the turn that was running — has the word said while it slept',
       );
-      // The control is M4's: SIGINT, then `-p --resume` with the words, which a job without this stdin still has.
     } finally {
       job.child.kill('SIGKILL');
     }
   },
 );
-
-/*
- * Stage 2 part 2a: a job's words come on its stdin (`--input-format stream-json`), so that a person's can follow them. Before
- * the worker ran a job so, what a job is given as flags was measured under it against the same job given a plain prompt:
- * the closeout (`--json-schema`), the spend cap (`--max-budget-usd`) and a denial. Each streamed job is run as the worker
- * runs it: its brief the first line on its stdin, and its stdin ended at the first line of its stream that is a result.
- */
 
 /** One line of stream-json input: a user message, as M6 wrote them. */
 const userLine = (text: string) => `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
@@ -1111,13 +1068,13 @@ const plainJob = async (brief: string, args: string[], cwd: string, bound = 300_
 
 /**
  * A `claude -p --input-format stream-json` run as the worker runs it: the brief its first stdin line, stdin held open until
- * the first result, then ended. Also whether it exited on its own, stdin still open, within five seconds of its result.
+ * the first result, then ended. Also whether it exited on its own, stdin still open, within five seconds of its result. The
+ * result is found by parsing each line and reading its `type`: Claude Code prints `type` far down a result line's object, so
+ * no line starts `{"type":"result"`.
  */
 const streamedJob = async (brief: string, args: string[], cwd: string, bound = 300_000) => {
   const job = started(['--input-format', 'stream-json', ...args], cwd, 'pipe');
   job.child.stdin!.write(userLine(brief));
-  // The line parsed, and its own `type` read: measured on 2.1.280, a result line prints `type` far down its object, both here
-  // and under a prompt — `{"duration_api_ms":…` — so a line that starts `{"type":"result"` is never seen, and stdin never ended.
   const resulted = await until(() => job.lines().some((l) => l.type === 'result'), bound);
   const onItsOwn = resulted ? await job.exit(5_000) : 'running';
   job.child.stdin!.end();
@@ -1188,11 +1145,9 @@ test(
       );
       assert.equal(s.lines.filter((l) => l.type === 'result').length, 1, 'and one result: the brief is one turn');
     }
-    // M8: the closeout.
     assert.deepEqual(resultOf(m8p.lines)?.structured_output, { finished: true }, 'M8 control: a prompted job gives its structured_output');
     assert.deepEqual(resultOf(m8s.lines)?.structured_output, { finished: true }, 'M8: a streamed job gives its structured_output');
     assert.equal(m8s.exit, m8p.exit, 'M8: and exits as the prompted job did, once its stdin is ended');
-    // M9: the spend cap.
     assert.equal(resultOf(m9p.lines)?.subtype, 'error_max_budget_usd', 'M9 control: a prompted job stops at its cap');
     assert.equal(resultOf(m9s.lines)?.subtype, 'error_max_budget_usd', 'M9: a streamed job stops at its cap');
     assert.equal(m9s.exit, m9p.exit, 'M9: and exits with the code the prompted job did');
@@ -1200,7 +1155,6 @@ test(
       Number(resultOf(m9s.lines)?.total_cost_usd) < 0.05,
       `M9: having spent about its cap, not run past it: ${resultOf(m9s.lines)?.total_cost_usd}`,
     );
-    // M10: a denial.
     for (const [label, r] of [
       ['M10 control', m10p],
       ['M10', m10s],
@@ -1224,13 +1178,11 @@ test(
   },
 );
 
-/*
- * Stage 2 part 2: before the orchestrator filed every Claude Code step as a job, a job's fence was measured against a
- * background session's. The planner and the reviewers run `dontAsk` with no `allow:` of their own, fenced by this
- * repository's `.claude/settings.json` alone: a job that read no project settings would be denied every command they run.
- */
-
 /**
+ * M11 measures a job's fence against a background session's: the planner and the reviewers run `dontAsk` with no allow list of
+ * their own, fenced by the checkout's `.claude/settings.json` alone, so a job that read no project settings would be denied every
+ * command they run. A denial names a command by its first word (`denialOf`), so the two are told apart by count.
+ *
  * M11's two commands, named afresh on every run: `build` and `e2e` are names a person's own `~/.claude/settings.json`, or a
  * machine's managed settings, may well allow — this repository's does — and an allow from there would run the command with no
  * project settings read at all. A name made up on the spot is on no list but the one the checkout writes.
@@ -1272,7 +1224,6 @@ test(
     const job = oneAllowedCheckout('m11-job');
     const bg = oneAllowedCheckout('m11-bg');
     t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
-    // The planner's and the reviewer's fence: dontAsk, nothing allowed on the task, the checkout's settings the only list.
     const common = {
       brief: M11_BRIEF,
       closeoutSchema: DENY_CLOSEOUT,
@@ -1291,7 +1242,6 @@ test(
             `${k}: ${views[k]?.state.settled}, exit ${last(k)?.exitCode}, said ${JSON.stringify(last(k)?.closeout)}, denied ${JSON.stringify(last(k)?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(k === 'job' ? job : bg, f)))}`,
           );
         }
-        // The control: a background session there honours the settings, or nothing below is about a job.
         assert.equal(views.bg?.state.settled, 'succeeded', `the background session settled: ${views.bg?.phase}`);
         assert.deepEqual(
           M11_WRITTEN.filter((f) => fs.existsSync(path.join(bg, f))),
@@ -1306,7 +1256,6 @@ test(
           ['ALLOWED'],
           'the job ran the command its settings allow, and not the one they do not list',
         );
-        // A denial names a command by its first word (`denialOf`), so the two are told apart by count: the allowed one ran, one was denied.
         assert.deepEqual(
           last('job')?.denials,
           [{ tool: 'Bash', what: 'npm' }],
@@ -1331,7 +1280,6 @@ test(
     t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
     const engine = createEngine({ root });
-    // Said in the brief and nowhere else: only a session that continues the first knows it.
     const secret = `m12-${randomUUID().slice(0, 8)}`;
     const id = await engine.file({
       brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
@@ -1415,7 +1363,6 @@ test(
         }).pipe(Effect.provide(Journal.files(root))),
       ),
     );
-    // Said in the brief and nowhere else: only a turn that continues the first thread knows it.
     const secret = `m13-${randomUUID().slice(0, 8)}`;
     const id = await engine.file({
       brief: `Remember the code word ${secret}. Run no command. Give your final answer with word set to ready.`,

@@ -3,10 +3,10 @@
  *
  * The runtime keeps a durable journal, a deadline and the lifecycle; how a session is started — which model, what it may
  * touch, how hard it thinks — is the adapter's. So a task carries these under `config`, `domain.ts` and `engine.ts` pass
- * the object through without opening it (`test/core-reads.test.ts`), and the checks every adapter shares live here, in the
- * words they always had: asked by every `Runner` made with `Runner.layer`, and by `file` itself at both doors, so a runner
- * built with `Runner.of` alone is refused them too. What one harness takes and refuses
- * — its modes, its efforts, its windows — stays with that harness's runner.
+ * the object through without opening it (`test/core-reads.test.ts`), and the checks every adapter shares live here: asked
+ * by every `Runner` made with `Runner.layer`, and by `file` itself at both doors, so a runner built with `Runner.of` alone
+ * is refused them too. What one harness takes and refuses — its modes, its efforts, its windows — stays with that
+ * harness's runner.
  */
 import type { McpServer } from './runner.ts';
 import type { ClaudeFlags } from './runner-claude-vocabulary.ts';
@@ -20,7 +20,8 @@ export type HarnessArgs = {
   /**
    * The only tools the session may have, in its harness's names for them — `['Read', 'Grep', 'Glob']`. Absent: the
    * harness's own set; empty: none at all. Claude Code is given exactly the list (`--tools`). Codex has no tool list, so it
-   * runs `read-only` when the list has none of Bash, Write or Edit, and is not narrowed otherwise.
+   * runs `read-only` when the list has none of Bash, Write or Edit, and is not narrowed otherwise. Refused unless one name
+   * per entry, with no comma inside one: a comma splits it into two names on the way to the harness.
    */
   tools?: string[];
   /**
@@ -34,8 +35,8 @@ export type HarnessArgs = {
    * What the session may do without being asked, in Claude Code's permission rules — `['Edit(src/**)', 'Bash(npm test)']`,
    * one rule per entry, a path glob resolved against the session's `cwd`. Claude Code is given the list as
    * `--allowedTools`, and a deny beats it. Absent or empty: only what the permission mode allows by itself, which in
-   * `dontAsk` is reads inside the cwd and nothing that writes — measured on 2.1.278, and why a fenced session in a fresh
-   * directory needs this to write its own work. Codex has no tool list, and refuses a task that allows anything.
+   * `dontAsk` is reads inside the cwd and nothing that writes, so a fenced session in a fresh directory needs this to write
+   * its own work. Codex has no tool list, and refuses a task that allows anything.
    */
   allowedTools?: string[];
   /** How hard the harness should think, in its own words: `--effort` for Claude Code, `model_reasoning_effort` for Codex. */
@@ -70,7 +71,7 @@ export type HarnessArgs = {
    * result (`Sighting.limit`: `budget`). The harness counts one process's spend, so a cap is per attempt. A harness
    * feature carried as one of its arguments, and no policy of the runtime's: nothing here compares a cost with it, and
    * whether a step is over its budget is the caller's judgement (agent-orchestrator's `budget:`). Refused unless dollars
-   * above 0, and on a harness that keeps no cap: `claude --bg`, which spends past one (measured), and `codex`, which has none.
+   * above 0, and on a harness that keeps no cap: `claude --bg`, which spends past one, and `codex`, which has none.
    * A later turn of a task held open may give its own (`TURN_ARGS`).
    */
   budgetUsd?: number;
@@ -108,9 +109,9 @@ const KEYS: Record<keyof HarnessArgs, true> = {
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
 /**
- * A harness argument that was one of its own and is now Claude Code's flag in `config.claude`, by the flag's key there: filed at
- * its old place — under `config` or beside it — it is refused naming the new one (`argsRefusalOf`), and read from a journal written
- * before the move as the new one (`upgrade` in `journal.ts`). `remoteControl` moved on 2026-09-25.
+ * Each former harness argument of its own, by the key of the flag in `config.claude` that replaces it: filed at its former
+ * place — under `config` or beside it — it is refused naming the flag (`argsRefusalOf`), and read from a journal an older
+ * runtime wrote as the flag (`upgrade` in `journal.ts`).
  */
 export const FORMER_ARGS: Readonly<Record<string, string>> = { remoteControl: 'remoteControl' };
 
@@ -162,18 +163,22 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
 /**
  * Why a task's harness arguments cannot be filed, as a sentence that says what to write instead — or `undefined`.
  *
- * The checks every adapter shares, in the words `refusalOf` gave them before they moved here: a value no harness could use,
- * refused before it is journalled, since a journalled task is a promise the loop keeps trying to honour. Asked by every
- * `Runner` (`Runner.layer`), so the Effect door and `createEngine().file()` give one sentence for each. A harness's own
- * words — the modes and efforts it takes — are its runner's (`harnessRefusalOf` in `facade.ts`, open issue 6).
+ * The checks every adapter shares: a value no harness could use, refused before it is journalled, since a journalled task
+ * is a promise the loop keeps trying to honour. Asked by every `Runner` (`Runner.layer`), so the Effect door and
+ * `createEngine().file()` give one sentence for each. A harness's own words — the modes and efforts it takes — are its
+ * runner's (`harnessRefusalOf` in `facade.ts`).
  *
- * A harness argument filed beside `config` rather than in it is refused first: an untyped caller would otherwise have it
- * journalled nowhere and its session started without it. And before that, one that moved into Claude Code's flags
- * (`FORMER_ARGS`), wherever it was filed, with a sentence naming where it went.
+ * In order:
+ *
+ * 1. A former argument that Claude Code's flags replace (`FORMER_ARGS`), wherever it was filed, with a sentence naming where
+ *    it went. It is refused as an own key, whatever its value, `false` and `undefined` included, so a caller still writing
+ *    it is told where it went.
+ * 2. A harness argument filed beside `config` rather than in it: an untyped caller would otherwise have it journalled
+ *    nowhere and its session started without it.
+ * 3. `config` itself, then each of its arguments.
  */
 export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefined => {
   const filed = (spec as { config?: unknown }).config;
-  // An own key, whatever its value: a caller still writing `remoteControl: step.remote` is told where it went, false and undefined too.
   const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
   const former = Object.keys(FORMER_ARGS).find((key) => at(spec, key) || at(filed, key));
   if (former) {
@@ -190,7 +195,6 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (stray) return `\`config.${stray}\` is not a harness argument. A harness's arguments are: ${HARNESS_ARGS.join(', ')}.`;
   if (config.model === '') return "`model` is empty. Leave it out for the harness's default.";
   if (config.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
-  // One name per entry: a comma inside one would split into two names on the way to the harness.
   if (
     config.tools !== undefined &&
     !(Array.isArray(config.tools) && config.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))

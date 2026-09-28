@@ -35,7 +35,8 @@ export const isoTime = (t: unknown): string | undefined => {
  * it starts at (an id for a record that has none).
  *
  * Only whole lines are read: a line still being written waits for the next read, and the cursor stops
- * before it. A cursor is taken only while the file still holds, just before its offset, the bytes it
+ * before it. Lines are cut at a newline byte, which never occurs inside a UTF-8 character, so a cut
+ * never splits one. A cursor is taken only while the file still holds, just before its offset, the bytes it
  * was given at — so a file that shrank, or was replaced, is read again from the start, rather than from
  * the middle of something else or as nothing for ever. A line that is not JSON is passed over. No file
  * is no events and a cursor at the start. A cursor no read gave is refused: it is somebody's bug.
@@ -75,8 +76,6 @@ export const readTranscript = async (
     const from = asked > 0 && asked <= size && cursorAt(asked, await tailBefore(asked)) === after ? asked : 0;
     const chunk = await bytes(from, size);
     const events: TranscriptEvent[] = [];
-    // Line by line while a newline ends one: what follows the last is still being written. A newline
-    // byte never occurs inside a UTF-8 character, so cutting at one never splits a character.
     let read = 0;
     for (let end = chunk.indexOf(0x0a); end !== -1; end = chunk.indexOf(0x0a, read)) {
       let entry: unknown;

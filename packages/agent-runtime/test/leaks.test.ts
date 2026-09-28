@@ -2,6 +2,10 @@
  * The guard: a test file leaves no `ae-detached-*` folder and no worker behind, failed or passed. Each fixture under
  * `fixtures/` is run as a test file of its own, in a `node --test` of its own under `timeout`, with a temp directory
  * of its own, which is read after it ends: what the run left in it is what it leaked.
+ *
+ * A process is found in a root by its environment too: a harness a fake exec'd — `exec sleep 30` — names no root in its
+ * arguments and runs elsewhere, and still has the root on its PATH, or in an AE_ROOT it inherited. Until it has exec'd, its
+ * environment is its parent's, so the test waits for it, under a bound.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +16,12 @@ import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
-/** Runs `fixture` as a test file with `TMPDIR` its own, bounded: its status, what it printed, and the directory. */
+/**
+ * Runs `fixture` as a test file with `TMPDIR` its own, bounded: its status, what it printed, and the directory. The child runs
+ * without `NODE_TEST_CONTEXT`: a `node --test` under another reports to it instead of running, unless it is told it is on its own.
+ */
 const run = (fixture: string) => {
   const tmp = scratch('ae-leaks-');
-  // A child `node --test` under this one reports to it instead of running, unless it is told it is on its own.
   const { NODE_TEST_CONTEXT: _, ...env } = process.env;
   const r = spawnSync('timeout', ['-k', '5', '90', process.execPath, '--test', path.join('test', 'fixtures', fixture)], {
     cwd: PACKAGE,
@@ -58,7 +64,6 @@ test('REFUSED: a test file that makes its root by hand and never stops its worke
 });
 
 test('REFUSED: a test file that leaves a root scratch cannot remove fails, and names it', (t) => {
-  // Root may remove a folder it may not write, and nothing here can be left behind.
   if (process.getuid?.() === 0) return t.skip('run as root, which removes any folder');
   const { status, out, tmp } = run('leak-kept.ts');
   const kept = left(tmp);
@@ -70,8 +75,6 @@ test('REFUSED: a test file that leaves a root scratch cannot remove fails, and n
 });
 
 test('a process whose only tie to a root is its environment is found in it, and reaped', async () => {
-  // A harness exec'd from a fake — `exec sleep 30` — names no root in its arguments and runs elsewhere, and still has
-  // the root on its PATH, or in an AE_ROOT it inherited.
   const tmp = scratch('ae-leaks-');
   const child = spawn('sleep', ['30'], {
     cwd: '/',
@@ -80,7 +83,6 @@ test('a process whose only tie to a root is its environment is found in it, and 
     stdio: 'ignore',
   });
   child.unref();
-  // Read once the child has exec'd, under a bound: until then its environment is this process's.
   for (const bound = performance.now() + 10_000; !runningIn([tmp]).length;) {
     if (performance.now() > bound) break;
     await new Promise((r) => setTimeout(r, 25));

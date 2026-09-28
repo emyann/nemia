@@ -7,9 +7,8 @@ import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { machineTempDir, scratch } from './scratch.ts';
 
 // agent-orchestrator locates its store as its module loads: set first.
 process.env.WF_ROOT = scratch('hkb-api-quota-');
@@ -380,7 +379,7 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
   assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
   assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
-  assert.equal(ran.cwd, fs.realpathSync(os.tmpdir())); // not a root: where askUsage runs its claude
+  assert.equal(ran.cwd, fs.realpathSync(machineTempDir()), 'askUsage runs its claude in the temp directory');
   // Started without the user's settings — their plugins, hooks and skills' sync — without MCP servers, and writing no session.
   const started = fs
     .readFileSync(calls, 'utf8')

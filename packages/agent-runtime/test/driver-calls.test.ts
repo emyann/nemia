@@ -1,16 +1,16 @@
 /**
- * Every call the engine makes to a harness goes through the A2A seam (thin runtime, stage 1 parts 3 and 4), but for the
- * one named here: `refuses`, which judges a task before any session exists and so is no call to one.
+ * Every call the engine makes to a harness goes through the A2A seam, but for the one named here: `refuses`, which judges
+ * a task before any session exists and so is no call to one.
  *
  * Proven by behaviour, not by reading the code: every method of the harness's A2A agent (`HarnessHandler`) is run inside
  * an async context that marks it, and a driver records each verb it is asked outside one. A task is then taken through
  * every verb the engine has — file, tick, view, say, logs, transcript, stop, and the release a finished session gets —
- * and the only verbs asked directly must be the exemptions. The same driver behind the old shape, where the seam spread
- * the driver's own verbs beside its three, is reported by name, and so is the transcript part 3 left direct: the check
- * refuses what parts 3 and 4 moved.
+ * and the only verbs asked directly must be the exemptions. The check is made to refuse the two shapes that bypass the
+ * seam: the driver's own verbs spread beside the seam's three (`spawn`, `observe`, `stop`), each reported by name, and
+ * every verb through the seam but the transcript.
  *
- * A remote A2A agent (stage 6) is no driver behind `HarnessHandler`: its verbs are A2A calls over HTTP to another party's
- * agent, and `remote-agent.test.ts` proves each one reaches it by that agent's own count of the methods it answered.
+ * A remote A2A agent is no driver behind `HarnessHandler`: its verbs are A2A calls over HTTP to another party's agent, and
+ * `remote-agent.test.ts` proves each one reaches it by that agent's own count of the methods it answered.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,7 +23,7 @@ import { createEngine, type PromiseRunner, type Sighting } from '../src/facade.t
 import { promiseOps } from '../src/runner-promise.ts';
 import { scratch } from './scratch.ts';
 
-/** The verbs a driver may be asked directly, and why: the only ones. */
+/** The verbs a driver may be asked directly, the only ones: `refuses` judges a task before any session exists. */
 const EXEMPT = ['refuses'];
 
 const inCall = new AsyncLocalStorage<true>();
@@ -115,40 +115,37 @@ const everyVerb = async (harnesses: Record<string, PromiseRunner>) => {
 test('the engine reaches a harness through the A2A seam for every verb it asks, the transcript included', async () => {
   const s = spy();
   await marked(() => everyVerb({ fake: s.runner }));
-  // The run went where it should: every verb was asked, so none passed by being skipped.
   for (const verb of ['spawn', 'observe', 'find', 'say', 'logs', 'transcript', 'stop', 'release']) {
     assert.ok(s.asked.includes(verb), `${verb} was asked (${s.asked.join(', ')})`);
   }
-  assert.deepEqual(s.direct, []);
+  assert.deepEqual(s.direct, [], 'none asked outside the seam, and every one asked, so none passed by being skipped');
 });
 
-test('REFUSED: a driver asked directly, as the seam asked it before part 3, is named for each verb', async () => {
+test("REFUSED: a driver asked directly, its own verbs spread beside the seam's three, is named for each verb", async () => {
   const s = spy();
   const direct = promiseOps(s.runner);
-  // Part 2's shape: the driver's verbs spread beside the three the seam carried.
   const seam = a2aOps('fake', direct, async () => []);
-  const partTwo = { ...direct, spawn: seam.spawn, observe: seam.observe, stop: seam.stop };
+  const besideTheSeam = { ...direct, spawn: seam.spawn, observe: seam.observe, stop: seam.stop };
   await marked(async () => {
     s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
-    await Effect.runPromise(partTwo.find!('ae/t-1/1'));
-    await Effect.runPromise(partTwo.logs('s-9'));
-    await Effect.runPromise(partTwo.release!({ sessionId: 's-9', state: 'completed' }, {}));
-    await Effect.runPromise(partTwo.say!({ name: 'ae/t-1/1', sessionId: 's-9' }, 'hi'));
-    await Effect.runPromise(partTwo.observe);
+    await Effect.runPromise(besideTheSeam.find!('ae/t-1/1'));
+    await Effect.runPromise(besideTheSeam.logs('s-9'));
+    await Effect.runPromise(besideTheSeam.release!({ sessionId: 's-9', state: 'completed' }, {}));
+    await Effect.runPromise(besideTheSeam.say!({ name: 'ae/t-1/1', sessionId: 's-9' }, 'hi'));
+    await Effect.runPromise(besideTheSeam.observe);
   });
   assert.deepEqual(s.direct, ['find', 'logs', 'release', 'say'], 'every verb that bypassed the seam, and the observe that did not');
   assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
 });
 
-test('REFUSED: the transcript read directly, as part 3 left it, is named', async () => {
+test('REFUSED: the transcript read directly, spread from the driver beside every other verb through the seam, is named', async () => {
   const s = spy();
   const direct = promiseOps(s.runner);
-  // Part 3's shape: every verb through the seam but the transcript, spread from the driver beside them.
-  const partThree = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
+  const transcriptBeside = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
   await marked(async () => {
     s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
-    await Effect.runPromise(partThree.transcript('s-9'));
-    await Effect.runPromise(partThree.logs('s-9'));
+    await Effect.runPromise(transcriptBeside.transcript('s-9'));
+    await Effect.runPromise(transcriptBeside.logs('s-9'));
   });
   assert.deepEqual(s.direct, ['transcript'], 'the transcript bypassed the seam, and the logs did not');
   assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));

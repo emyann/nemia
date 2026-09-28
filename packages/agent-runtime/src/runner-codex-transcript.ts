@@ -8,15 +8,16 @@ import path from 'node:path';
 import type { TranscriptEvent } from './runner.ts';
 import { isoTime } from './runner-transcript.ts';
 
+const rollouts = new Map<string, string>();
+
 /**
  * A Codex thread's rollout, where Codex keeps its own record of the conversation:
- * `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<local time>-<thread id>.jsonl` (0.154.0). Found by the thread
+ * `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<local time>-<thread id>.jsonl`. Found by the thread
  * id — the `thread_id` of `exec --json`'s first event, which the worker keeps as the run's `nativeId` —
- * newest day first, and remembered once found.
+ * newest day first, and remembered once found. An id, not a path: an id with anything but what a thread
+ * id is made of (hex digits and `-`) finds none, so nothing else goes into a file name.
  */
-const rollouts = new Map<string, string>();
 export const codexRolloutFile = (threadId: string): string | undefined => {
-  // An id, not a path: nothing but what a thread id is made of goes into a file name.
   if (!/^[0-9a-f-]+$/.test(threadId)) return undefined;
   const known = rollouts.get(threadId);
   if (known && fs.existsSync(known)) return known;
@@ -57,7 +58,7 @@ const textsOf = (blocks: unknown): string[] =>
  *
  * A rollout says most things twice: once as the model was given them (`response_item`) and once as the
  * thread items Codex itself shows (`event_msg` / `item_completed`). The items are read, because they are
- * what a person would be shown (measured on the 34 rollouts on this machine, codex-cli 0.154.0):
+ * what a person would be shown:
  *
  * - `UserMessage` is the prompt alone. As the model is given it, it comes among instructions and context
  *   Codex injects — developer messages, plugin lists — which are no more the conversation than Claude
@@ -68,10 +69,10 @@ const textsOf = (blocks: unknown): string[] =>
  * - `FileChange` is the files a patch changed, with its status.
  *
  * What the records do not allow, and so is not given: the text of any thinking (reasoning is written
- * encrypted, and every summary was empty), and when a command or a change began — an item is written once
+ * encrypted, and its summaries are empty), and when a command or a change began — an item is written once
  * it has completed, so its call and its result carry that one time, and one still running is not there.
- * `task_complete` is a system event, its error's message when it has one. An item of a type not measured
- * is a system event naming it, rather than nothing. A record with no time gives nothing; none was seen.
+ * `task_complete` is a system event, its error's message when it has one. An item of a type not read here
+ * is a system event naming it, rather than nothing. A record with no time gives nothing.
  */
 export const codexRolloutEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
   const record = entry as {

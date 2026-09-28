@@ -34,7 +34,7 @@ const taskIn = (state: TaskState, artifacts: Artifact[] = []): Task => ({
   metadata: undefined,
 });
 
-test('each A2A state is passed through as its own name, and an interrupted one says what it waits for', () => {
+test('each A2A state is passed through as its own name, an interrupted one says what it waits for, and no state or one no version of A2A this runtime knows is working, which the deadline bounds', () => {
   const cases: Array<[TaskState, SessionState, string | undefined]> = [
     [TaskState.TASK_STATE_SUBMITTED, 'submitted', undefined],
     [TaskState.TASK_STATE_WORKING, 'working', undefined],
@@ -44,7 +44,6 @@ test('each A2A state is passed through as its own name, and an interrupted one s
     [TaskState.TASK_STATE_FAILED, 'failed', undefined],
     [TaskState.TASK_STATE_REJECTED, 'rejected', undefined],
     [TaskState.TASK_STATE_CANCELED, 'canceled', undefined],
-    // No state, or one no version of A2A this runtime knows: nothing has ended, and the deadline bounds it.
     [TaskState.TASK_STATE_UNSPECIFIED, 'working', undefined],
     [99 as TaskState, 'working', undefined],
   ];
@@ -103,8 +102,11 @@ test('a spawn is a plain user message: the brief, the context it continues, the 
   const cold = remoteMessageOf({ name: 'ae/t/1', brief: 'b', cwd: '/w' }, 'm-2');
   assert.equal(cold.contextId, '');
   assert.equal(cold.metadata, undefined);
-  // Handed to the runtime's own agent as a spawn, it is refused: it names no session to start.
-  assert.match(messageRefusal(cold) ?? '', /./);
+  assert.match(
+    messageRefusal(cold) ?? '',
+    /./,
+    "handed to the runtime's own agent as a spawn, it is refused: it names no session to start",
+  );
 });
 
 test('words for a waiting Task are a user message on that Task, in its context', () => {

@@ -1,8 +1,8 @@
 /**
- * What `file` refuses, at both doors, in one set of words (open issue 6).
+ * What `file` refuses, at both doors, in one set of words.
  *
  * The harness-agnostic refusals live under the Effect `file` (`refusalOf` in `src/engine.ts`), so a consumer of
- * `agent-runtime/effect` cannot journal `deadlineSeconds: NaN` — which stopped its task on the first pass — and
+ * `agent-runtime/effect` cannot journal `deadlineSeconds: NaN`, which would stop its task on the first pass, and
  * `createEngine().file()` throws the same sentence behind `file: `. The harness's own words stay at the facade
  * (`test/facade.test.ts`); the Effect door has no harnesses to ask.
  */
@@ -44,14 +44,25 @@ const promiseDoor = () => {
 
 const ok: Filing = { brief: 'b', cwd: '/r' };
 
-/** Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are cast, as a JSON caller would send them. */
+/**
+ * Every harness-agnostic refusal: what is filed beside `ok`, and the sentence it is refused in. Values a type forbids are
+ * cast, as a JSON caller would send them. Among them:
+ *
+ * - `maxAttempts` and `resume` are retired, at any value their defaults had: the runtime makes one attempt per start, and
+ *   trying again is the caller's.
+ * - `priority` is retired at any value: the runtime chooses no order, and the layer above admits.
+ * - `remoteControl` is Claude Code's own flag: refused as a harness argument or beside `config`, whatever it says, with a
+ *   sentence naming where it goes.
+ * - A harness argument goes under `config`, and nothing else goes there: one filed beside it (`model`, `permissionMode`,
+ *   `worktree`, `budgetUsd`), by an untyped caller or a record an older caller wrote, would otherwise start its session
+ *   without it, saying nothing; the refusal says where it goes.
+ */
 const REFUSALS: Array<
   [Partial<Record<keyof Filing | keyof HarnessArgs | 'maxAttempts' | 'resume' | 'priority' | 'remoteControl', unknown>>, RegExp]
 > = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
   [{ cwd: 'repo' }, new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`)],
-  // Retired, at what were their defaults: the runtime makes one attempt per start, and trying again is the caller's.
   [
     { maxAttempts: 1 },
     /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/,
@@ -78,7 +89,6 @@ const REFUSALS: Array<
   [{ config: { budgetUsd: Number.NaN } }, /^`budgetUsd: NaN` is not an amount of dollars\./],
   [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
   [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
-  // Retired in stage 4c part 2 (2026-09-25), at any value: the runtime chooses no order, and the layer above admits.
   [
     { priority: 0 },
     /^`priority` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order\. File tasks `queued: true` and `admit` each when it may start \(`ae admit <id>`\)/,
@@ -87,7 +97,6 @@ const REFUSALS: Array<
   [{ priority: -1 }, /^`priority` is retired:/],
   [{ priority: Number.NaN }, /^`priority` is retired:/],
   [{ priority: 'high' }, /^`priority` is retired:/],
-  // A harness argument until 2026-09-25, Claude Code's flag since: refused at its old place, whatever it says, naming the new one.
   [
     { config: { remoteControl: true } },
     /^`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`, or leave it out\.$/,
@@ -102,12 +111,9 @@ const REFUSALS: Array<
   [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
   [{ config: { contextTokens: 150000.5 } }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
   [{ config: { contextTokens: '200k' } }, /^`contextTokens: "200k"` is not a number of tokens\./],
-  // Where a harness's argument goes: under `config`, and nothing else there. A caller that still files one beside it —
-  // an untyped one, or a record written before it moved — would otherwise start its session without it, saying nothing.
   [{ model: 'opus' }, /^`model` is the harness's configuration: file it under `config`, as `config: \{ model: … \}`\.$/],
   [{ permissionMode: 'dontAsk', config: { model: 'opus' } }, /^`permissionMode` is the harness's configuration: file it under `config`/],
   [{ worktree: true }, /^`worktree` is the harness's configuration/],
-  // The spend cap was the runtime's own field until stage 4b (2026-09-25): a caller built before it is told where it went.
   [{ budgetUsd: 5 }, /^`budgetUsd` is the harness's configuration: file it under `config`, as `config: \{ budgetUsd: … \}`\.$/],
   [
     { config: 'opus' },
@@ -164,9 +170,12 @@ test('the Effect door journals a filing that refuses nothing, with every checked
   assert.deepEqual(await effect.listed(), [id]);
 });
 
-test("the Effect door still journals a harness's own words: it has no harness to ask (issue 6, what is left)", async () => {
-  // Pinned so the day the vocabulary half moves too, this test is the one that says so.
+test("the Effect door journals a harness's own words it cannot check: it has no harness to ask", async () => {
   const effect = effectDoor();
   await effect.run(file({ ...ok, harness: 'banana', config: { permissionMode: 'yolo' } }));
-  assert.equal((await effect.listed()).length, 1);
+  assert.equal(
+    (await effect.listed()).length,
+    1,
+    "a harness's own words are its runner's to refuse: the day the Effect door refuses them, this test says so",
+  );
 });

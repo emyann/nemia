@@ -9,9 +9,9 @@ import type { SpawnRequest } from './runner.ts';
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
  * speaks it and never in `domain.ts`.
  *
- * As the CLI checks them on 2.1.270: `--permission-mode` refuses any other word while it parses its
- * arguments, and still takes `default`, which its help no longer lists. `file()` asks before a task
- * is journalled. Refused at spawn instead, a bad mode failed the whole tick, on every pass.
+ * Claude Code's `--permission-mode` refuses any other word while it parses its arguments, and takes
+ * `default`, which its help does not list. `file()` asks before a task is journalled: refused at
+ * spawn instead, a bad mode would fail the whole tick, on every pass.
  */
 export const CLAUDE_PERMISSION_MODES: readonly string[] = [
   'acceptEdits',
@@ -25,16 +25,15 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = [
 
 /**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
- * refuse one: 2.1.270 prints a warning for an unknown `--effort` and runs at its default effort —
- * a knob that silently does nothing.
+ * refuse one: it prints a warning for an unknown `--effort` and runs at its default effort — a knob
+ * that silently does nothing.
  */
 export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * The context windows Claude Code takes, in tokens: `--autocompact`'s range, both ends included. The CLI refuses any other
  * value while it parses its arguments ("It must be 'auto', or between 100k and 1M"), so a `--bg` spawn given one would fail
- * on every pass; `file()` asks first. Measured on 2.1.278: 99999 and 1000001 refused, 100000 and 1000000 taken. A value is
- * handed over as its digits, never `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
+ * on every pass; `file()` asks first. 100000 and 1000000 are taken, 99999 and 1000001 refused. A value is handed over as its digits, never `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
  */
 export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
 
@@ -42,9 +41,9 @@ export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 1
  * Flags handed to Claude Code as they are, by a caller that knows them (`config.claude`): `{ appendSystemPromptFile: 'a.md',
  * pluginDir: ['p'] }` is `--append-system-prompt-file a.md --plugin-dir p`. A key is the flag in camelCase; `true` is the
  * flag alone, a string or a number the flag and its value, and a list the flag once per entry. The four named are the ones
- * agent-orchestrator gives, measured on 2.1.282 (`docs/spike-2026-09-25-agents-skills.md`); any other the CLI has is
- * taken, and one it does not have ends the session at its start, exit 1, with the CLI's words on its stderr, which the
- * attempt's logs keep (F22). What the runtime gives itself is refused (`CLAUDE_OWNED_FLAGS`).
+ * agent-orchestrator gives; any other the CLI has is taken, and one it does not have ends the session at its start, exit 1,
+ * with the CLI's words on its stderr, which the attempt's logs keep. What the runtime gives itself is refused
+ * (`CLAUDE_OWNED_FLAGS`).
  */
 export type ClaudeFlags = {
   /** A file whose text is appended to Claude Code's own system prompt, which is kept. */
@@ -58,7 +57,8 @@ export type ClaudeFlags = {
   /**
    * Bridge a background session to claude.ai (`--remote-control`, with a name for it as a string), where anyone signed in to the
    * account can drive it — type into it, answer its prompts, stop it — from a browser or a phone. Never a default, for that reason.
-   * A harness argument of its own until 2026-09-25 (`FORMER_ARGS`). Refused on a job — `claude -p` opens no bridge — and on any
+   * A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves here (`FORMER_ARGS`).
+   * Refused on a job — `claude -p` opens no bridge — and on any
    * harness but Claude Code; a harness brought as a `PromiseRunner` is handed it on the spawn and asked nothing.
    */
   remoteControl?: true | string;
@@ -70,6 +70,8 @@ export type ClaudeFlags = {
  * a task that gave one there would have it twice, or the session printing what no reader of it expects. Each is given its
  * own way — `model`, `permissionMode`, `tools`, `budgetUsd` and the rest are harness arguments of their own. The argv of
  * every Claude Code spawn is held to this list (`test/claude-code.test.ts`), so a flag the runtime starts giving is added.
+ * `settingSources` is given to every job, which reads its checkout's settings and not the operator's (`claudePrintFlags`),
+ * and not to a background session.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print',
@@ -100,7 +102,6 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'jsonSchema',
   'worktree',
   'maxBudgetUsd',
-  // Every job reads its checkout's settings and not the operator's (`claudePrintFlags`); a background session is not given it.
   'settingSources',
 ];
 
@@ -119,7 +120,7 @@ export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
 
 /**
  * Whether a task asks for its session bridged to claude.ai: Claude Code's `--remote-control`, given in its flags
- * (`config.claude.remoteControl`, a harness argument of its own until 2026-09-25). Only a background session opens one.
+ * (`config.claude.remoteControl`). Only a background session opens one.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
@@ -153,8 +154,7 @@ export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | u
 /**
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
  * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
- * and a `--bg` session given a $0.01 cap read a file 42 times, spent $0.19 and ended `done` (measured on 2.1.272, and by
- * `test/live.test.ts`). A cap that caps nothing is refused rather than carried; `claude -p` keeps one.
+ * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than carried; `claude -p` keeps one.
  */
 export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??

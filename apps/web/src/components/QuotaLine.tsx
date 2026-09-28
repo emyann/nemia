@@ -28,7 +28,9 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
         <p>{quota.said}</p>
         {last && (
           <p data-quota-last className="mt-0.5 flex flex-wrap items-baseline gap-x-3 opacity-60">
-            {last.windows.map((w) => <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />)}
+            {last.windows.map((w) => (
+              <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />
+            ))}
             <span data-quota-last-age>{last.asOf}</span>
           </p>
         )}
@@ -38,7 +40,9 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   const age = quota.askedAt ? agoWord(now.getTime() - Date.parse(quota.askedAt)) : null;
   return (
     <p data-quota="fresh" title={title} className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted-foreground">
-      {quota.windows.map((w) => <Window key={w.key} words={windowWords(w, now)} markAt={quota.markAt} data={{ 'data-quota-window': w.key }} emphasis />)}
+      {quota.windows.map((w) => (
+        <Window key={w.key} words={windowWords(w, now)} markAt={quota.markAt} data={{ 'data-quota-window': w.key }} emphasis />
+      ))}
       {age && (
         <span data-quota-age className="text-xs">
           read {age}
@@ -49,12 +53,28 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
 }
 
 /** One window's words: its label, the percentage — in the text's own colour when `emphasis` is off, as for the last reading — and its reset. */
-function Window({ words, markAt, data, emphasis = false }: { words: WindowWords; markAt: number; data: Record<string, string>; emphasis?: boolean }) {
+function Window({
+  words,
+  markAt,
+  data,
+  emphasis = false,
+}: {
+  words: WindowWords;
+  markAt: number;
+  data: Record<string, string>;
+  emphasis?: boolean;
+}) {
   return (
     <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'text-amber-700 dark:text-amber-400' : undefined}>
       {words.marked && <TriangleAlert aria-label={`${markAt}% or more used`} className="mr-1 inline size-3.5 -translate-y-px" />}
       {words.label}{' '}
-      <span className={words.marked ? 'font-semibold tabular-nums' : emphasis ? 'font-medium text-foreground tabular-nums' : 'font-medium tabular-nums'}>{words.used}</span>
+      <span
+        className={
+          words.marked ? 'font-semibold tabular-nums' : emphasis ? 'font-medium text-foreground tabular-nums' : 'font-medium tabular-nums'
+        }
+      >
+        {words.used}
+      </span>
       {words.resets && <span className="text-xs"> · {words.resets}</span>}
     </span>
   );

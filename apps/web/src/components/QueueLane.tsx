@@ -68,7 +68,11 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
             {workflowNameOf(card.workflow)}
           </span>
         )}
-        <span data-ghost-repo className="shrink-0 truncate" title={card.repo ?? 'It names no repository: it starts on the one wf up runs in'}>
+        <span
+          data-ghost-repo
+          className="shrink-0 truncate"
+          title={card.repo ?? 'It names no repository: it starts on the one wf up runs in'}
+        >
           {card.repo ? repoName(card.repo) : "wf up's repository"}
         </span>
       </span>

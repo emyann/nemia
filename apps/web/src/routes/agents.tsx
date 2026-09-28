@@ -36,10 +36,10 @@ function AgentsPage() {
     <article className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
-          An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is told
-          first, and how its sessions run. Yours are under {code('~/.agent-workflows/workflows/agents/')} and are edited here; this
-          repository's are under {code('workflows/agents/')}, read-only. An edit changes what a later {code('wf start')} freezes, never a run
-          already started.
+          An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
+          told first, and how its sessions run. Yours are under {code('~/.agent-workflows/workflows/agents/')} and are edited here; this
+          repository's are under {code('workflows/agents/')}, read-only. An edit changes what a later {code('wf start')} freezes, never a
+          run already started.
         </p>
         <div className="flex flex-wrap gap-2">
           <RouterLinkButton to="/agents/new" variant="outline">
@@ -83,7 +83,10 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
 function AgentCard({ agent }: { agent: AgentListing }) {
   // The keys it sets on its nodes, then what its sessions are told beyond its instructions: the skills it gives and its system prompt.
   const rows: [string, string][] = [
-    ...ROLE_KEYS.filter((key) => agent.keys[key] !== undefined).map((key): [string, string] => [KEY_LABELS[key].toLowerCase(), agent.keys[key]!]),
+    ...ROLE_KEYS.filter((key) => agent.keys[key] !== undefined).map((key): [string, string] => [
+      KEY_LABELS[key].toLowerCase(),
+      agent.keys[key]!,
+    ]),
     ...(agent.skills ? [['skills', agent.skills] as [string, string]] : []),
     ...(agent.systemPrompt ? [['system prompt', agent.systemPrompt] as [string, string]] : []),
   ];
@@ -109,7 +112,9 @@ function AgentCard({ agent }: { agent: AgentListing }) {
       {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
       {agent.error === null &&
         (agent.cardError !== null ? (
-          <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.cardError}</p>
+          <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">
+            {agent.cardError}
+          </p>
         ) : (
           <Skills skills={agent.card} />
         ))}

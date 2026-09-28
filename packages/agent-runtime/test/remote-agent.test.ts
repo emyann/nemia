@@ -22,7 +22,9 @@ import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, ty
 import { scratch } from './scratch.ts';
 
 const servers: RemoteServer[] = [];
-afterEach(async () => { await Promise.all(servers.splice(0).map((s) => s.close())); });
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map((s) => s.close()));
+});
 
 const serve = async (o: ServerOptions = {}) => {
   const s = await remoteServer(o);
@@ -33,10 +35,18 @@ const serve = async (o: ServerOptions = {}) => {
 const SCHEMA = { type: 'object' };
 const HELD = () => [{ state: 'working' as const }];
 
-const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) =>
-  ({ root, e: createEngine({ root, harnesses: { remote: { url: s.url } }, ...o }) });
+const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) => ({
+  root,
+  e: createEngine({ root, harnesses: { remote: { url: s.url } }, ...o }),
+});
 
-const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({ brief: 'paint the fence', cwd: '/nowhere/in/particular', harness: 'remote', closeoutSchema: SCHEMA, ...o });
+const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
+  brief: 'paint the fence',
+  cwd: '/nowhere/in/particular',
+  harness: 'remote',
+  closeoutSchema: SCHEMA,
+  ...o,
+});
 
 /** Tick until the task's view meets `ok`, under a bound of passes. */
 const until = async (e: Engine, id: string, ok: (v: TaskView) => boolean, what: string, passes = 60): Promise<TaskView> => {
@@ -53,12 +63,20 @@ const settled = (e: Engine, id: string) => until(e, id, (v) => v.state.settled !
 const running = (e: Engine, id: string) => until(e, id, (v) => v.phase.startsWith('running'), 'ran');
 
 const refusal = async (f: () => unknown): Promise<Error & { exitCode?: number }> => {
-  try { await f(); } catch (e) { return e as Error & { exitCode?: number }; }
+  try {
+    await f();
+  } catch (e) {
+    return e as Error & { exitCode?: number };
+  }
   throw new Error('it did not refuse');
 };
 
 const journalOf = (root: string, id: string) =>
-  fs.readFileSync(path.join(root, 'tasks', `${id}.jsonl`), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { kind: string; at: string });
+  fs
+    .readFileSync(path.join(root, 'tasks', `${id}.jsonl`), 'utf8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l) as { kind: string; at: string });
 const writeJournal = (root: string, id: string, events: object[]) =>
   fs.writeFileSync(path.join(root, 'tasks', `${id}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
@@ -69,20 +87,38 @@ test('the test agent serves its card and answers a message on each binding it li
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
   const json = await (await fetch(`${s.url}/.well-known/agent-card.json`)).json();
   const card = AgentCard.fromJSON(json);
-  assert.deepEqual(card.supportedInterfaces.map((i) => i.protocolBinding), ['JSONRPC', 'HTTP+JSON']);
+  assert.deepEqual(
+    card.supportedInterfaces.map((i) => i.protocolBinding),
+    ['JSONRPC', 'HTTP+JSON'],
+  );
   for (const binding of ['JSONRPC', 'HTTP+JSON']) {
     const client = await new ClientFactory({
-      transports: [new JsonRpcTransportFactory(), new RestTransportFactory()], preferredTransports: [binding],
+      transports: [new JsonRpcTransportFactory(), new RestTransportFactory()],
+      preferredTransports: [binding],
       cardResolver: { resolve: async () => card, normalizeAgentCard: (c: AgentCard) => c },
     }).createFromAgentCard(card);
     const answer = await client.sendMessage({
-      tenant: '', metadata: undefined, configuration: undefined,
-      message: { messageId: `m-${binding}`, contextId: '', taskId: '', role: Role.ROLE_USER, parts: [{ content: { $case: 'text', value: 'hi' }, metadata: undefined, filename: '', mediaType: '' }], metadata: undefined, extensions: [], referenceTaskIds: [] },
+      tenant: '',
+      metadata: undefined,
+      configuration: undefined,
+      message: {
+        messageId: `m-${binding}`,
+        contextId: '',
+        taskId: '',
+        role: Role.ROLE_USER,
+        parts: [{ content: { $case: 'text', value: 'hi' }, metadata: undefined, filename: '', mediaType: '' }],
+        metadata: undefined,
+        extensions: [],
+        referenceTaskIds: [],
+      },
     });
     assert.ok('status' in answer && answer.artifacts.length === 1, binding);
   }
   assert.equal(s.counts.sendMessage, 2);
-  assert.deepEqual(s.paths.map((p) => p.split('/')[2]), ['jsonrpc', 'rest']);
+  assert.deepEqual(
+    s.paths.map((p) => p.split('/')[2]),
+    ['jsonrpc', 'rest'],
+  );
 });
 
 // ─── what is refused ────────────────────────────────────────────────────────
@@ -102,7 +138,13 @@ test('a card that asks for a bearer token, with no credentials to give one: unst
 });
 
 test('what the runtime cannot send refuses too: an API key in a query, mutual TLS, an HTTP scheme it does not speak', async () => {
-  const digest = { ...bearer('x'), schemes: { d: { scheme: { $case: 'httpAuthSecurityScheme' as const, value: { description: '', scheme: 'Digest', bearerFormat: '' } } } }, requirements: [{ schemes: { d: { list: [] } } }] };
+  const digest = {
+    ...bearer('x'),
+    schemes: {
+      d: { scheme: { $case: 'httpAuthSecurityScheme' as const, value: { description: '', scheme: 'Digest', bearerFormat: '' } } },
+    },
+    requirements: [{ schemes: { d: { list: [] } } }],
+  };
   for (const [security, said] of [
     [apiKey('k', 'query'), /API key in a query, and this runtime sends a key only in a header/],
     [mtls(), /mutual TLS, and this runtime holds no client certificate/],
@@ -122,7 +164,11 @@ test('a card with two requirements is met by the first the secrets meet whole', 
   const key = apiKey('k-1');
   const s = await serve({
     script: () => [{ data: { ok: 1 }, state: 'completed' }],
-    security: { schemes: { ...bearer('b').schemes, ...key.schemes }, requirements: [...bearer('b').requirements, ...key.requirements], accepts: key.accepts },
+    security: {
+      schemes: { ...bearer('b').schemes, ...key.schemes },
+      requirements: [...bearer('b').requirements, ...key.requirements],
+      accepts: key.accepts,
+    },
   });
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'key' ? 'k-1' : undefined) });
   const id = await e.file(task());
@@ -197,7 +243,9 @@ test('createEngine refuses a remote agent it could never reach, or whose address
     assert.match(err.message, said);
     assert.ok(err.message.startsWith('createEngine: the `remote` harness'), err.message);
   }
-  const err = await refusal(() => createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url: 'https://a.example' } }, credentials: 'secret' as never }));
+  const err = await refusal(() =>
+    createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url: 'https://a.example' } }, credentials: 'secret' as never }),
+  );
   assert.equal(err.exitCode, 2);
   assert.match(err.message, /`credentials` is a function/);
 });
@@ -207,7 +255,10 @@ test('a task that carries harness arguments is refused on a remote agent, before
   const { e, root } = engineOn(s);
   const err = await refusal(() => e.file(task({ config: { model: 'x' } })));
   assert.equal(err.exitCode, 2);
-  assert.match(err.message, /the `remote` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take `model` out of `config`/);
+  assert.match(
+    err.message,
+    /the `remote` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take `model` out of `config`/,
+  );
   assert.ok(!fs.existsSync(path.join(root, 'tasks')) || fs.readdirSync(path.join(root, 'tasks')).length === 0);
 });
 
@@ -246,11 +297,18 @@ for (const bindings of BINDINGS) {
     assert.equal(done.state.attempts[0]!.stated, true);
     assert.equal(done.state.attempts[0]!.nativeId, s.sent[0]!.contextId || done.state.attempts[0]!.nativeId);
     assert.equal(s.counts.sendMessage, 1);
-    assert.ok(s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0]!)), `every call on the card's first binding: ${s.paths.join(', ')}`);
+    assert.ok(
+      s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0]!)),
+      `every call on the card's first binding: ${s.paths.join(', ')}`,
+    );
   });
 
   test(`${on}: a task that asks for input is blocked, waiting for it; say answers it on its Task, and it completes`, async () => {
-    const s = await serve({ bindings, script: (t) => (t.turn === 1 ? [{ state: 'input-required', words: 'which colour?' }] : [{ data: { colour: t.text }, state: 'completed' }]) });
+    const s = await serve({
+      bindings,
+      script: (t) =>
+        t.turn === 1 ? [{ state: 'input-required', words: 'which colour?' }] : [{ data: { colour: t.text }, state: 'completed' }],
+    });
     const { e, root } = engineOn(s);
     const id = await e.file(task());
     const v = await until(e, id, (x) => x.phase === 'needs-human', 'asked for input');
@@ -337,11 +395,18 @@ test("a card served as the SDK's own objects is read with its security schemes w
   assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
 });
 
-test('a harness given by its card, not its URL, is reached on the card\'s interface', async () => {
+test("a harness given by its card, not its URL, is reached on the card's interface", async () => {
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
-  const card = await (await fetch(`${s.url}/.well-known/agent-card.json`)).json() as Record<string, unknown>;
+  const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
   const asked: string[] = [];
-  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { card } }, credentials: (_, url) => { asked.push(url); return undefined; } });
+  const e = createEngine({
+    root: scratch('ae-remote-'),
+    harnesses: { remote: { card } },
+    credentials: (_, url) => {
+      asked.push(url);
+      return undefined;
+    },
+  });
   assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
   assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
 });
@@ -382,7 +447,11 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
   const id = await e.file(task());
   await running(e, id);
   // The crash: the registry holds the Task, and the engine died before `spawned` was written.
-  writeJournal(root, id, journalOf(root, id).filter((ev) => ev.kind !== 'spawned'));
+  writeJournal(
+    root,
+    id,
+    journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
+  );
   // A spawn asked again for the name adopts what the registry holds.
   await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
@@ -405,21 +474,30 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   await e.tick();
   const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
   const spawned = events.find((ev) => ev.kind === 'spawned');
-  assert.match(spawned?.error ?? '', /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/);
+  assert.match(
+    spawned?.error ?? '',
+    /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
+  );
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
   // The grace window passes with nothing listed under the name.
   const back = new Date(Date.now() - 31_000).toISOString();
-  writeJournal(root, id, events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)));
+  writeJournal(
+    root,
+    id,
+    events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
+  );
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const done = await settled(again, id);
   assert.equal(done.state.attempts[0]!.reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0);
 });
 
-test('a registry written before sightings spoke A2A\'s names is read in them, in `remote/` and in `remote/done/`, and left as written', async () => {
+test("a registry written before sightings spoke A2A's names is read in them, in `remote/` and in `remote/done/`, and left as written", async () => {
   // An agent nothing answers: what is read here is read off the registry alone.
-  const dead = { card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] } };
+  const dead = {
+    card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
+  };
   const root = scratch('ae-remote-');
   const e = createEngine({ root, harnesses: { remote: dead } });
   const [signed, stopped, asked, odd] = [await e.file(task()), await e.file(task()), await e.file(task()), await e.file(task())];
@@ -429,8 +507,14 @@ test('a registry written before sightings spoke A2A\'s names is read in them, in
   }
   // Each entry as the runtime before 2026-09-25 wrote it: `seen` in its former words.
   const entry = (id: string, seen: object, ended: boolean) => ({
-    name: `ae/${id}/1`, agent: 'remote', messageId: `m-${id}`, contextId: `c-${id}`, sentAt: at, taskId: `t-${id}`,
-    seen: { sessionId: `t-${id}`, nativeId: `c-${id}`, ...seen }, ...(ended ? { ended: true } : {}),
+    name: `ae/${id}/1`,
+    agent: 'remote',
+    messageId: `m-${id}`,
+    contextId: `c-${id}`,
+    sentAt: at,
+    taskId: `t-${id}`,
+    seen: { sessionId: `t-${id}`, nativeId: `c-${id}`, ...seen },
+    ...(ended ? { ended: true } : {}),
   });
   const open = {
     [signed]: entry(signed, { state: 'done', closeout: { payload: { outcome: 'done' }, at: 0 } }, true),
@@ -441,23 +525,40 @@ test('a registry written before sightings spoke A2A\'s names is read in them, in
   fs.mkdirSync(path.join(root, 'remote', 'done'), { recursive: true });
   for (const [id, en] of Object.entries(open)) fs.writeFileSync(entryFile(root, `ae/${id}/1`), `${JSON.stringify(en)}\n`);
   // Let go of before the change: a reply, as an agent that answered with a Message left it.
-  const replied = { name: 'ae/t-old/1', agent: 'remote', messageId: 'm-old', contextId: 'c-old', sentAt: at, taskId: 'm-old', reply: 'painted', ended: true, seen: { sessionId: 'm-old', state: 'done', nativeId: 'c-old' } };
+  const replied = {
+    name: 'ae/t-old/1',
+    agent: 'remote',
+    messageId: 'm-old',
+    contextId: 'c-old',
+    sentAt: at,
+    taskId: 'm-old',
+    reply: 'painted',
+    ended: true,
+    seen: { sessionId: 'm-old', state: 'done', nativeId: 'c-old' },
+  };
   const doneFile = path.join(root, 'remote', 'done', `${encodeURIComponent('ae/t-old/1')}.json`);
   fs.writeFileSync(doneFile, `${JSON.stringify(replied)}\n`);
 
   const ops = remoteOps('remote', dead, root);
   const seen = await Effect.runPromise(ops.observe);
-  assert.deepEqual([signed, stopped, asked, odd].map((id) => seen.get(`ae/${id}/1`)?.state), ['completed', 'canceled', 'auth-required', 'failed']);
+  assert.deepEqual(
+    [signed, stopped, asked, odd].map((id) => seen.get(`ae/${id}/1`)?.state),
+    ['completed', 'canceled', 'auth-required', 'failed'],
+  );
   assert.deepEqual(await Effect.runPromise(ops.find!('ae/t-old/1')), { sessionId: 'm-old' });
   assert.equal(await Effect.runPromise(ops.logs('m-old')), 'agent: painted', 'read from `remote/done/` by its session');
   assert.equal(await Effect.runPromise(ops.logs('c-old')), 'agent: painted', 'and by its context');
-  for (const [id, en] of Object.entries(open)) assert.deepEqual(JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8')), en, `${id}: the file keeps its words`);
+  for (const [id, en] of Object.entries(open))
+    assert.deepEqual(JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8')), en, `${id}: the file keeps its words`);
   assert.deepEqual(JSON.parse(fs.readFileSync(doneFile, 'utf8')), replied);
 
   // And the tasks settle as they did.
   for (let i = 0; i < 3; i++) await e.tick();
   const views = await Promise.all([signed, stopped, asked, odd].map((id) => e.view(id)));
-  assert.deepEqual(views.map((v) => v.state.settled), ['succeeded', 'stopped', null, 'failed']);
+  assert.deepEqual(
+    views.map((v) => v.state.settled),
+    ['succeeded', 'stopped', null, 'failed'],
+  );
   assert.equal(views[2]!.phase, 'needs-human');
   assert.equal(views[2]!.waitingFor, 'authentication');
   assert.ok(!fs.existsSync(entryFile(root, `ae/${signed}/1`)), 'an ended entry is let go of into `remote/done/`');
@@ -471,9 +572,20 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
   await running(e, id);
   // Point the harness at an address nothing answers: every GetTask fails.
   const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
-  const dead = createEngine({ root, harnesses: { remote: { card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] } } } });
+  const dead = createEngine({
+    root,
+    harnesses: {
+      remote: {
+        card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
+      },
+    },
+  });
   const back = new Date(Date.now() - 31_000).toISOString();
-  writeJournal(root, id, journalOf(root, id).map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)));
+  writeJournal(
+    root,
+    id,
+    journalOf(root, id).map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
+  );
   for (let i = 0; i < 3; i++) await dead.tick();
   const v = await dead.view(id);
   assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
@@ -485,8 +597,12 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
 // ─── the secret ─────────────────────────────────────────────────────────────
 
 /** Every file under `dir`, as text. */
-const everyFile = (dir: string): Array<[string, string]> => fs.readdirSync(dir, { recursive: true, encoding: 'utf8' })
-  .map((f) => path.join(dir, f)).filter((f) => fs.statSync(f).isFile()).map((f) => [f, fs.readFileSync(f, 'utf8')]);
+const everyFile = (dir: string): Array<[string, string]> =>
+  fs
+    .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .map((f) => path.join(dir, f))
+    .filter((f) => fs.statSync(f).isFile())
+    .map((f) => [f, fs.readFileSync(f, 'utf8')]);
 
 test('the secret is sent, and written nowhere: not the journal, the registry, the feed, nor the view', async () => {
   const token = 'tok-3f9a-SECRET-7c21';
@@ -497,9 +613,15 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   s.move(s.tasks()[0]!, { data: { ok: true }, state: 'completed' });
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');
-  assert.ok(s.headers.every((h) => h.authorization === `Bearer ${token}`), 'sent on every request');
+  assert.ok(
+    s.headers.every((h) => h.authorization === `Bearer ${token}`),
+    'sent on every request',
+  );
   const files = everyFile(root);
-  assert.ok(files.some(([f]) => f.includes(`${path.sep}remote${path.sep}`)) && files.some(([f]) => f.endsWith('feed.jsonl')), 'the registry and the feed were read');
+  assert.ok(
+    files.some(([f]) => f.includes(`${path.sep}remote${path.sep}`)) && files.some(([f]) => f.endsWith('feed.jsonl')),
+    'the registry and the feed were read',
+  );
   for (const [file, text] of files) assert.ok(!text.includes(token), `${file} holds the secret`);
   assert.ok(!JSON.stringify(v).includes(token));
   assert.ok(!JSON.stringify(await e.feed()).includes(token));
@@ -512,7 +634,12 @@ test('a card served at one origin that names its interfaces on another: unstarta
   const { e, root } = engineOn(s, { credentials: () => key });
   const a = (await settled(e, await e.file(task()))).state.attempts[0]!;
   assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', new RegExp(`card names ${elsewhere.url}/a2a/jsonrpc, ${elsewhere.url}/a2a/rest, and none is on ${s.url}, the origin the harness was given`));
+  assert.match(
+    a.error ?? '',
+    new RegExp(
+      `card names ${elsewhere.url}/a2a/jsonrpc, ${elsewhere.url}/a2a/rest, and none is on ${s.url}, the origin the harness was given`,
+    ),
+  );
   assert.match(a.error ?? '', /Nothing was sent/);
   assert.equal(elsewhere.paths.length, 0, 'the other origin was sent nothing');
   assert.equal(s.paths.length, 0);
@@ -563,14 +690,22 @@ test('a request the agent holds is given up after its bound: a card not read ref
   assert.equal(under.sending.pid, process.pid);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/send/1')?.state, 'submitted', 'being sent: a Task submitted');
   const t0 = Date.now();
-  while (JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).sending && Date.now() - t0 < 3_000) await new Promise((r) => setTimeout(r, 25));
+  while (JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).sending && Date.now() - t0 < 3_000)
+    await new Promise((r) => setTimeout(r, 25));
   const gaveUp = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
   assert.equal(gaveUp.taskId, undefined, 'the intent stays, with no Task');
   assert.equal(gaveUp.sending, undefined);
-  assert.equal((await Effect.runPromise(ops.observe)).has('ae/send/1'), false, 'given up: no session listed, which the grace window reads `lost`');
+  assert.equal(
+    (await Effect.runPromise(ops.observe)).has('ae/send/1'),
+    false,
+    'given up: no session listed, which the grace window reads `lost`',
+  );
   const send = await spawnOf('ae/send/1');
   assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
-  assert.match(send.message, /since the agent did not answer the send of `ae\/send\/1` within 0\.6 s: whether the agent made a Task of it is not known, and it is not sent twice/);
+  assert.match(
+    send.message,
+    /since the agent did not answer the send of `ae\/send\/1` within 0\.6 s: whether the agent made a Task of it is not known, and it is not sent twice/,
+  );
   s.hanging.a2a = false;
 
   await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
@@ -603,7 +738,10 @@ test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} 
   const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
   const { root, e } = engineOn(s);
   const id = await e.file(task());
-  const [ms] = await timed(async () => { await e.tick(); await e.tick(); });
+  const [ms] = await timed(async () => {
+    await e.tick();
+    await e.tick();
+  });
   assert.ok(ms < SPAWN_WAIT_MS + 3_000, `${ms} ms: the pass waited ${SPAWN_WAIT_MS / 1000} s for the answer, and went on`);
   const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
   assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
@@ -627,7 +765,9 @@ test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} 
 /** A gate an agent's first step waits on, and its key. */
 const gate = () => {
   let open!: () => void;
-  const shut = new Promise<void>((resolve) => { open = resolve; });
+  const shut = new Promise<void>((resolve) => {
+    open = resolve;
+  });
   return { shut, open };
 };
 
@@ -666,7 +806,16 @@ test('an intent whose sending process lives is left to it: read submitted in ano
   const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
   try {
     fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
-    fs.writeFileSync(entryFile(root, name), JSON.stringify({ name, agent: 'remote', messageId: 'm-there', sentAt: new Date().toISOString(), sending: { pid: other.pid, until: new Date(Date.now() + 60_000).toISOString() } }));
+    fs.writeFileSync(
+      entryFile(root, name),
+      JSON.stringify({
+        name,
+        agent: 'remote',
+        messageId: 'm-there',
+        sentAt: new Date().toISOString(),
+        sending: { pid: other.pid, until: new Date(Date.now() + 60_000).toISOString() },
+      }),
+    );
     const spawned = () => (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
     for (let i = 0; i < 5 && !spawned(); i++) await e.tick();
     assert.equal(spawned()?.error, undefined, 'the spawn leaves the send to the process making it');
@@ -675,7 +824,9 @@ test('an intent whose sending process lives is left to it: read submitted in ano
     assert.equal(v.phase, 'running (working)');
     assert.equal(v.sessionId, 'm-there', 'the session is the message until the agent names its Task');
     assert.equal(s.counts.sendMessage ?? 0, 0, 'nothing sent from here');
-  } finally { other.kill(); }
+  } finally {
+    other.kill();
+  }
 });
 
 test('an intent whose sending process died is in doubt: not listed, never sent again, `lost` past the grace window', async () => {
@@ -687,12 +838,28 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
   const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
   await new Promise((resolve) => gone.on('exit', resolve));
   fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
-  fs.writeFileSync(entryFile(root, name), JSON.stringify({ name, agent: 'remote', messageId: 'm-died', sentAt: new Date().toISOString(), sending: { pid: gone.pid, until: new Date(Date.now() + 60_000).toISOString() } }));
+  fs.writeFileSync(
+    entryFile(root, name),
+    JSON.stringify({
+      name,
+      agent: 'remote',
+      messageId: 'm-died',
+      sentAt: new Date().toISOString(),
+      sending: { pid: gone.pid, until: new Date(Date.now() + 60_000).toISOString() },
+    }),
+  );
   for (let i = 0; i < 5 && !journalOf(root, id).some((ev) => ev.kind === 'spawned'); i++) await e.tick();
   const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
-  assert.match(events.find((ev) => ev.kind === 'spawned')?.error ?? '', /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/);
+  assert.match(
+    events.find((ev) => ev.kind === 'spawned')?.error ?? '',
+    /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
+  );
   const back = new Date(Date.now() - 31_000).toISOString();
-  writeJournal(root, id, events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)));
+  writeJournal(
+    root,
+    id,
+    events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
+  );
   const done = await settled(createEngine({ root, harnesses: { remote: { url: s.url } } }), id);
   assert.equal(done.state.attempts[0]!.reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
@@ -725,21 +892,32 @@ test('a refusal that comes after the spawn returned ends the session `rejected`,
   const id = await e.file(task());
   const v = await until(e, id, (x) => x.state.settled !== null, 'settled', 400);
   assert.equal(v.state.settled, 'failed');
-  assert.equal(v.state.attempts[0]!.reason, 'harness', 'the agent refused the work once it had the send: a failed end, not a spawn refused');
+  assert.equal(
+    v.state.attempts[0]!.reason,
+    'harness',
+    'the agent refused the work once it had the send: a failed end, not a spawn refused',
+  );
   assert.match(await e.logs(id), /REJECTED — the agent refused the request's authentication \(401/);
   assert.equal(s.counts.sendMessage ?? 0, 0, 'the agent did nothing');
-  assert.ok(fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`)), 'kept, where a later spawn under the name reads it');
+  assert.ok(
+    fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`)),
+    'kept, where a later spawn under the name reads it',
+  );
 });
 
 // ─── credentials ────────────────────────────────────────────────────────────
 
-test('credentials is asked by the harness\'s name too, and missingCredential words the refusal of a secret not given', async () => {
+test("credentials is asked by the harness's name too, and missingCredential words the refusal of a secret not given", async () => {
   const s = await serve({ security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
   const asked: string[][] = [];
   const root = scratch('ae-remote-');
   const e = createEngine({
-    root, harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
-    credentials: (scheme, agentUrl, harness) => { asked.push([scheme, agentUrl, harness]); return harness === 'reviewer' ? 't0k' : undefined; },
+    root,
+    harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
+    credentials: (scheme, agentUrl, harness) => {
+      asked.push([scheme, agentUrl, harness]);
+      return harness === 'reviewer' ? 't0k' : undefined;
+    },
     missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
   });
   assert.equal((await settled(e, await e.file(task({ harness: 'reviewer' })))).state.settled, 'succeeded');
@@ -787,7 +965,9 @@ test('a pass makes one GetTask per open remote task, and none once they settle',
       assert.equal(o.calls, 1, `${n} tasks, pass ${pass}: one observe`);
       assert.equal(o.listed, n);
       assert.equal((s.counts.getTask ?? 0) - gets, n, 'one GetTask each');
-      t.diagnostic(`${n} open: pass ${pass} ${report.ms.toFixed(1)} ms, observe ${o.ms.toFixed(1)} ms, ${(o.ms / n).toFixed(2)} ms per task`);
+      t.diagnostic(
+        `${n} open: pass ${pass} ${report.ms.toFixed(1)} ms, observe ${o.ms.toFixed(1)} ms, ${(o.ms / n).toFixed(2)} ms per task`,
+      );
     }
     for (const taskId of s.tasks()) s.move(taskId, { data: { ok: true }, state: 'completed' });
     for (const id of ids) await settled(e, id);

@@ -13,10 +13,33 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
-const { accept, advance, approve, decide, forget, hold, holdAdvice, holdRefusal, holdWord, holdsOf, prune, readRun, retry, round, say, start, unhold } = await import('../src/runner.ts');
+const {
+  accept,
+  advance,
+  approve,
+  decide,
+  forget,
+  hold,
+  holdAdvice,
+  holdRefusal,
+  holdWord,
+  holdsOf,
+  prune,
+  readRun,
+  retry,
+  round,
+  say,
+  start,
+  unhold,
+} = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
 
 /** A repository with one commit. */
@@ -56,8 +79,14 @@ const twoSteps = () => {
 const looping = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'loop-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n');
-  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }));
+  fs.writeFileSync(
+    path.join(dir, 'review.md'),
+    '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 1\n---\nreview it\n',
+  );
+  fs.writeFileSync(
+    path.join(dir, 'review.schema.json'),
+    JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
+  );
   return dir;
 };
 
@@ -70,14 +99,26 @@ const board = () => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
-        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        id,
+        phase: t?.phase ?? 'pending',
+        sessionId: t ? 's' : null,
         state: {
-          brief: t ? 'filed' : '', settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
+          brief: t ? 'filed' : '',
+          settled,
+          stopRequested: false,
+          said: [],
+          attempts:
+            !t || t.phase === 'pending'
+              ? []
+              : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
         },
       };
     },
-    file: async (spec: { id: string }) => { filings.push(spec.id); tasks.set(spec.id, { phase: 'pending' }); return spec.id; },
+    file: async (spec: { id: string }) => {
+      filings.push(spec.id);
+      tasks.set(spec.id, { phase: 'pending' });
+      return spec.id;
+    },
     stop: async () => {},
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
@@ -110,7 +151,9 @@ const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
 /** `wf <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => { printed.push(a.join(' ')); });
+  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
+    printed.push(a.join(' '));
+  });
   try {
     await main(argv, e);
     return { printed: printed.join('\n'), error: undefined };
@@ -137,20 +180,35 @@ test('holdWord and holdAdvice say what holds a run and what is left to a person,
   assert.equal(holdWord([{ run: 'a-1' }, { run: 'b-2', cancelledAt: 'then' }]), 'held until a-1 and b-2 (cancelled) ship');
   assert.equal(holdWord([{ run: 'a-1', shipped: true }]), 'held until a-1 ships — it has shipped, and the next tick lifts the hold');
   assert.equal(holdWord([]), 'held, on a hold that names no run');
-  assert.equal(holdAdvice(run, [{ run: 'a-1' }]), 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says a-1 has shipped; to go on before then: wf hold r-1 --off');
-  assert.equal(holdAdvice(run, [{ run: 'a-1', missing: true }]), 'the store has no run a-1 — yours to resolve: wf hold r-1 --off, or wf cancel r-1');
-  assert.equal(holdAdvice(run, []), 'the hold on r-1 names no run, so no run\'s shipping lifts it — yours to lift: wf hold r-1 --off');
+  assert.equal(
+    holdAdvice(run, [{ run: 'a-1' }]),
+    'nothing of r-1 is filed, and nothing is asked of you, until wf decide says a-1 has shipped; to go on before then: wf hold r-1 --off',
+  );
+  assert.equal(
+    holdAdvice(run, [{ run: 'a-1', missing: true }]),
+    'the store has no run a-1 — yours to resolve: wf hold r-1 --off, or wf cancel r-1',
+  );
+  assert.equal(holdAdvice(run, []), "the hold on r-1 names no run, so no run's shipping lifts it — yours to lift: wf hold r-1 --off");
   for (const w of [[{ run: 'a-1' }], [{ run: 'a-1', missing: true as const }], [{ run: 'a-1', shipped: true as const }], []]) {
     assert.doesNotMatch(`${holdWord(w)} ${holdAdvice(run, w)}`, /waiting on you/);
   }
   // Every run named has shipped only when every one has: one not shipped is the whole of what holds it.
   const hold = { at: 't', until: ['a-1', 'b-2'] };
   const held = { ...run, hold } as Parameters<typeof holdsOf>[0];
-  assert.deepEqual(holdsOf(held, (id) => ({ record: { id } as never, shipped: id === 'a-1' })), [{ run: 'b-2' }]);
-  assert.deepEqual(holdsOf(held, (id) => ({ record: { id } as never, shipped: true })), [{ run: 'a-1', shipped: true }, { run: 'b-2', shipped: true }]);
+  assert.deepEqual(
+    holdsOf(held, (id) => ({ record: { id } as never, shipped: id === 'a-1' })),
+    [{ run: 'b-2' }],
+  );
+  assert.deepEqual(
+    holdsOf(held, (id) => ({ record: { id } as never, shipped: true })),
+    [
+      { run: 'a-1', shipped: true },
+      { run: 'b-2', shipped: true },
+    ],
+  );
 });
 
-test('REFUSED at shipped defaults: wf hold with neither --until nor --off, with both, a flag it does not take, --until with no run, and an id that is not a run\'s', async (t) => {
+test("REFUSED at shipped defaults: wf hold with neither --until nor --off, with both, a flag it does not take, --until with no run, and an id that is not a run's", async (t) => {
   const b = board();
   await refused(t, b.e, /^wf hold needs the runs to wait on, or --off/, 'hold', 'r-x');
   await refused(t, b.e, /^wf hold takes --until or --off, not both/, 'hold', 'r-x', '--until', 'a', '--off');
@@ -159,10 +217,34 @@ test('REFUSED at shipped defaults: wf hold with neither --until nor --off, with 
   await refused(t, b.e, /^--until takes the run to wait on/, 'hold', 'r-x', '--until', '--off');
   await refused(t, b.e, /^wf hold takes the run first/, 'hold', '--until', 'a');
   await refused(t, b.e, /wf hold writes its file under WF_ROOT by id/, 'hold', '../x', '--until', 'a');
-  await refused(t, b.e, /^--until "\.\.\/a" is not a run's id, and wf hold writes its file under WF_ROOT by id .* as in wf hold r-x --until add-a-flag-x1y2\.$/, 'hold', 'r-x', '--until', '../a');
+  await refused(
+    t,
+    b.e,
+    /^--until "\.\.\/a" is not a run's id, and wf hold writes its file under WF_ROOT by id .* as in wf hold r-x --until add-a-flag-x1y2\.$/,
+    'hold',
+    'r-x',
+    '--until',
+    '../a',
+  );
   // A run named by one of its files is fixed on --until, with the run to hold kept.
-  await refused(t, b.e, /^--until "a-1\.json" is not a run's id: \.json is on the name of one of its files under runs\/, not on the run's\. Give the id wf ls prints: wf hold r-x --until a-1\.$/, 'hold', 'r-x', '--until', 'a-1.json');
-  await refused(t, b.e, /^"r-x\.hold" is not a run's id: .* Give the id wf ls prints: wf hold r-x\.$/, 'hold', 'r-x.hold', '--until', 'a-1');
+  await refused(
+    t,
+    b.e,
+    /^--until "a-1\.json" is not a run's id: \.json is on the name of one of its files under runs\/, not on the run's\. Give the id wf ls prints: wf hold r-x --until a-1\.$/,
+    'hold',
+    'r-x',
+    '--until',
+    'a-1.json',
+  );
+  await refused(
+    t,
+    b.e,
+    /^"r-x\.hold" is not a run's id: .* Give the id wf ls prints: wf hold r-x\.$/,
+    'hold',
+    'r-x.hold',
+    '--until',
+    'a-1',
+  );
   await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--until', 'a');
   await refused(t, b.e, /^no such run: r-nope\. wf hold takes a run by its id/, 'hold', 'r-nope', '--off');
   // --until= is the same flag, and holds: nothing is refused of it here but the run it names.
@@ -181,7 +263,15 @@ test('REFUSED at shipped defaults: a hold on a run named that the store has not,
   const other = await aRunning(b, repo);
   await refused(t, b.e, new RegExp(`^--until ${other.id} is given twice`), 'hold', id, '--until', other.id, '--until', other.id);
   const shipped = await aDone(b, repo, { merged: true });
-  await refused(t, b.e, new RegExp(`^--until ${shipped.id}: ${shipped.id} has already shipped onto main, so there is nothing to wait for`), 'hold', id, '--until', shipped.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${shipped.id}: ${shipped.id} has already shipped onto main, so there is nothing to wait for`),
+    'hold',
+    id,
+    '--until',
+    shipped.id,
+  );
   const called = await aRunning(b, repo);
   assert.equal((await typed(t, b.e, 'cancel', called.id)).error, undefined);
   await refused(t, b.e, new RegExp(`^--until ${called.id}: ${called.id} was cancelled`), 'hold', id, '--until', called.id);
@@ -210,7 +300,15 @@ test('REFUSED at shipped defaults: a hold on a run already held, cancelled, ship
   const shipped = await aDone(b, repo, { merged: true });
   await refused(t, b.e, new RegExp(`^${shipped.id} has shipped: nothing of it is left to file`), 'hold', shipped.id, '--until', target.id);
   const done = await aDone(b, repo);
-  await refused(t, b.e, new RegExp(`^${done.id} has succeeded: nothing of it is left to file.*merge its branch once ${target.id} has shipped`), 'hold', done.id, '--until', target.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^${done.id} has succeeded: nothing of it is left to file.*merge its branch once ${target.id} has shipped`),
+    'hold',
+    done.id,
+    '--until',
+    target.id,
+  );
   for (const r of [called, shipped, done]) assert.ok(!fs.existsSync(holdFileOf(r.id)));
 });
 
@@ -219,18 +317,37 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
   const repo = aRepo();
   const a = await aRunning(b, repo);
   const child = start({ brief: 'after a', repo, workflowDir: oneStep(), after: [a.id] });
-  await refused(t, b.e, new RegExp(`^--until ${child.id}: ${child.id} already waits on ${a.id} to ship \\(${child.id} --after ${a.id}\\)`), 'hold', a.id, '--until', child.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${child.id}: ${child.id} already waits on ${a.id} to ship \\(${child.id} --after ${a.id}\\)`),
+    'hold',
+    a.id,
+    '--until',
+    child.id,
+  );
 
   const c = await aRunning(b, repo);
   const d = await aRunning(b, repo);
   assert.equal((await typed(t, b.e, 'hold', c.id, '--until', d.id)).error, undefined);
   assert.equal((await typed(t, b.e, 'hold', d.id, '--until', a.id)).error, undefined);
   // a → c → d → a: c waits on d, which waits on a.
-  await refused(t, b.e, new RegExp(`^--until ${c.id}: ${c.id} already waits on ${a.id} to ship \\(${c.id} held until ${d.id}, ${d.id} held until ${a.id}\\)`), 'hold', a.id, '--until', c.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${c.id}: ${c.id} already waits on ${a.id} to ship \\(${c.id} held until ${d.id}, ${d.id} held until ${a.id}\\)`),
+    'hold',
+    a.id,
+    '--until',
+    c.id,
+  );
   assert.ok(!fs.existsSync(holdFileOf(a.id)));
   // Pure, with the store in the opposite order: the circle is found whichever run is read first.
   const others = [readRun(d.id), readRun(c.id), readRun(child.id)];
-  assert.match(holdRefusal(readRun(a.id), [c.id], () => ({ record: readRun(c.id), shipped: false }), others) ?? '', /each would wait on the other for ever/);
+  assert.match(
+    holdRefusal(readRun(a.id), [c.id], () => ({ record: readRun(c.id), shipped: false }), others) ?? '',
+    /each would wait on the other for ever/,
+  );
 });
 
 test('a held run files nothing — the next step, nor on a hold written between the read and the filing — and goes on on the pass that reads every run it names shipped', async (t) => {
@@ -239,7 +356,10 @@ test('a held run files nothing — the next step, nor on a hold written between 
   const target = await aRunning(b, repo);
   const run = start({ brief: 'waits for the target', repo, workflowDir: oneStep() });
   const { printed } = await typed(t, b.e, 'hold', run.id, '--until', target.id);
-  assert.equal(printed, `${run.id}  held until ${target.id} ships — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`);
+  assert.equal(
+    printed,
+    `${run.id}  held until ${target.id} ships — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+  );
   await advance(b.e, readRun(run.id));
   const quiet = await advance(b.e, readRun(run.id));
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
@@ -247,7 +367,12 @@ test('a held run files nothing — the next step, nor on a hold written between 
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
   assert.match(ls, new RegExp(`→ held until ${target.id} ships  —  wf hold ${run.id} --off lifts it`));
   const screen = (await typed(t, b.e, 'decide', run.id)).printed;
-  assert.match(screen, new RegExp(`\n  held until ${target.id} ships\n  nothing of ${run.id} is filed, and nothing is asked of you, until wf decide says ${target.id} has shipped`));
+  assert.match(
+    screen,
+    new RegExp(
+      `\n  held until ${target.id} ships\n  nothing of ${run.id} is filed, and nothing is asked of you, until wf decide says ${target.id} has shipped`,
+    ),
+  );
 
   // The pass's own check at the filing: a run read before the hold was put is not filed on that read.
   const other = start({ brief: 'read before its hold', repo, workflowDir: oneStep() });
@@ -287,8 +412,18 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   assert.match((await typed(t, b.e, 'ls', atGate.id)).printed, /waiting on you: approve implement/, 'the gate is asked before');
   assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id)).error, undefined);
   const held = `${atGate.id} is held until ${target.id} ships (wf hold, at `;
-  await assert.rejects(approve(b.e, atGate.id, 'implement'), (err: Error & { exitCode?: number }) => err.message.startsWith(held) && err.exitCode === 2 && err.message.includes(`an approval would release work the hold keeps back`) && err.message.endsWith(`wf hold ${atGate.id} --off.`));
-  await assert.rejects(retry(b.e, atGate.id, 'implement', { mode: 'nudge', message: 'change it' }), (err: Error) => err.message.startsWith(held) && err.message.includes('a retry would release'));
+  await assert.rejects(
+    approve(b.e, atGate.id, 'implement'),
+    (err: Error & { exitCode?: number }) =>
+      err.message.startsWith(held) &&
+      err.exitCode === 2 &&
+      err.message.includes(`an approval would release work the hold keeps back`) &&
+      err.message.endsWith(`wf hold ${atGate.id} --off.`),
+  );
+  await assert.rejects(
+    retry(b.e, atGate.id, 'implement', { mode: 'nudge', message: 'change it' }),
+    (err: Error) => err.message.startsWith(held) && err.message.includes('a retry would release'),
+  );
   const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
   assert.doesNotMatch(ls, /waiting on you/, ls);
   assert.doesNotMatch(ls, VERBS, ls);
@@ -310,7 +445,10 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   assert.ok(!b.filings.includes(`${atGate.id}-review`), 'nothing filed');
   fs.rmSync(approvals, { recursive: true });
   // Lifted by hand: the gate is asked again, as it stood.
-  assert.equal((await typed(t, b.e, 'hold', atGate.id, '--off')).printed, `${atGate.id}  hold lifted — the next tick goes on, and what its steps ask is asked`);
+  assert.equal(
+    (await typed(t, b.e, 'hold', atGate.id, '--off')).printed,
+    `${atGate.id}  hold lifted — the next tick goes on, and what its steps ask is asked`,
+  );
   assert.match((await typed(t, b.e, 'ls', atGate.id)).printed, /waiting on you: approve implement/);
   assert.match((await typed(t, b.e, 'decide', atGate.id)).printed, new RegExp(`wf approve ${atGate.id} implement`));
 
@@ -331,8 +469,15 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   const before = (await typed(t, b.e, 'decide', loop.id)).printed;
   assert.match(before, /ROUNDS EXHAUSTED, waiting on you/, before);
   assert.equal((await typed(t, b.e, 'hold', loop.id, '--until', target.id)).error, undefined);
-  await assert.rejects(round(b.e, loop.id, 'review'), (err: Error) => err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('a round would release'));
-  await assert.rejects(accept(b.e, loop.id, 'review', 'as it stands'), (err: Error) => err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('an acceptance would release'));
+  await assert.rejects(
+    round(b.e, loop.id, 'review'),
+    (err: Error) => err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('a round would release'),
+  );
+  await assert.rejects(
+    accept(b.e, loop.id, 'review', 'as it stands'),
+    (err: Error) =>
+      err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('an acceptance would release'),
+  );
   const loopScreen = (await typed(t, b.e, 'decide', loop.id)).printed;
   assert.doesNotMatch(loopScreen, /waiting on you|ROUNDS EXHAUSTED/, loopScreen);
   assert.doesNotMatch(loopScreen, VERBS, loopScreen);
@@ -343,7 +488,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   assert.match((await typed(t, b.e, 'decide', loop.id)).printed, /ROUNDS EXHAUSTED, waiting on you/);
 });
 
-test('a blocked step\'s question stays on its record while the run is held, asked of nobody, and is asked again once the hold lifts', async (t) => {
+test("a blocked step's question stays on its record while the run is held, asked of nobody, and is asked again once the hold lifts", async (t) => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -385,10 +530,20 @@ test('REFUSED at shipped defaults: wf rm of a run another holds on names the hol
   b.settle(`${target.id}-implement`, 'stopped');
   const refusedRm = await forget(b.e, target.id, {});
   assert.equal(refusedRm.kind, 'refused');
-  assert.match(refusedRm.refusal ?? '', new RegExp(`^${run.id} is held until it ships: forgotten, its hold would wait on no such run for ever\\. Lift the hold: wf hold ${run.id} --off\\.$`));
+  assert.match(
+    refusedRm.refusal ?? '',
+    new RegExp(
+      `^${run.id} is held until it ships: forgotten, its hold would wait on no such run for ever\\. Lift the hold: wf hold ${run.id} --off\\.$`,
+    ),
+  );
   // The held run, told why it will never go on, and how to let it go.
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
-  assert.match(ls, new RegExp(`→ held until ${target.id} \\(cancelled\\) ships: ${target.id} was cancelled at .* — yours to resolve: wf hold ${run.id} --off, or wf cancel ${run.id}`));
+  assert.match(
+    ls,
+    new RegExp(
+      `→ held until ${target.id} \\(cancelled\\) ships: ${target.id} was cancelled at .* — yours to resolve: wf hold ${run.id} --off, or wf cancel ${run.id}`,
+    ),
+  );
   assert.equal((await typed(t, b.e, 'cancel', run.id)).error, undefined);
   assert.equal((await forget(b.e, run.id, {})).kind, 'forgotten');
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold went with the run');
@@ -411,25 +566,75 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
 
   const pruned = await aDone(b, repo);
   assert.equal((await prune(b.e, pruned.id, { yes: true, unmerged: true })).kind, 'pruned');
-  await refused(t, b.e, new RegExp(`^${pruned.id} was pruned at .*: nothing of it is filed again, so there is nothing to hold\\.$`), 'hold', pruned.id, '--until', target.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^${pruned.id} was pruned at .*: nothing of it is filed again, so there is nothing to hold\\.$`),
+    'hold',
+    pruned.id,
+    '--until',
+    target.id,
+  );
 
   const folder = start({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() });
-  await refused(t, b.e, new RegExp(`^${folder.id}'s team works in folders \\(workspace: folder\\)`), 'hold', folder.id, '--until', target.id);
-  await refused(t, b.e, new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(workspace: folder\\), which never ships onto a branch`), 'hold', id, '--until', folder.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^${folder.id}'s team works in folders \\(workspace: folder\\)`),
+    'hold',
+    folder.id,
+    '--until',
+    target.id,
+  );
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(workspace: folder\\), which never ships onto a branch`),
+    'hold',
+    id,
+    '--until',
+    folder.id,
+  );
 
   const inPlace = start({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false });
-  await refused(t, b.e, new RegExp(`^--until ${inPlace.id}: ${inPlace.id} worked on main itself \\(--no-worktree\\), so it has no result branch to ship`), 'hold', id, '--until', inPlace.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${inPlace.id}: ${inPlace.id} worked on main itself \\(--no-worktree\\), so it has no result branch to ship`),
+    'hold',
+    id,
+    '--until',
+    inPlace.id,
+  );
 
   git(repo, 'checkout', '-q', '-b', 'release');
   const onRelease = start({ brief: 'onto release', repo, workflowDir: oneStep() });
   git(repo, 'checkout', '-q', 'main');
-  await refused(t, b.e, new RegExp(`^--until ${onRelease.id}: ${onRelease.id} ships onto release, and ${id} onto main, so ${id} would wait on a branch it never meets`), 'hold', id, '--until', onRelease.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(
+      `^--until ${onRelease.id}: ${onRelease.id} ships onto release, and ${id} onto main, so ${id} would wait on a branch it never meets`,
+    ),
+    'hold',
+    id,
+    '--until',
+    onRelease.id,
+  );
 
   // Finished and never merged, then its worktree and branch deleted: git finds its work nowhere.
   const dropped = await aDone(b, repo);
   git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement!.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/implement`);
-  await refused(t, b.e, new RegExp(`^--until ${dropped.id}: wf/${dropped.id}/implement is gone, and git cannot find it on main, so ${id} would wait for ever`), 'hold', id, '--until', dropped.id);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--until ${dropped.id}: wf/${dropped.id}/implement is gone, and git cannot find it on main, so ${id} would wait for ever`),
+    'hold',
+    id,
+    '--until',
+    dropped.id,
+  );
 
   for (const r of [pruned, folder, run]) assert.ok(!fs.existsSync(holdFileOf(r.id)), `no hold written on ${r.id}`);
 });
@@ -468,7 +673,12 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
     return read.apply(this, args);
   });
-  assert.throws(() => unhold(run.id), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === `${run.id}'s hold changed as it was lifted: read it again (wf ls ${run.id}), then lift it: wf hold ${run.id} --off.`);
+  assert.throws(
+    () => unhold(run.id),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      err.message === `${run.id}'s hold changed as it was lifted: read it again (wf ls ${run.id}), then lift it: wf hold ${run.id} --off.`,
+  );
   t.mock.restoreAll();
   assert.deepEqual(JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')), put);
 
@@ -480,7 +690,12 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
     return write.apply(this, args);
   });
-  await assert.rejects(hold(b.e, race.id, [other.id]), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`${race.id} is already held until ${other.id} ships (wf hold, at ${first.at}). A hold is put once, whole`));
+  await assert.rejects(
+    hold(b.e, race.id, [other.id]),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      err.message.startsWith(`${race.id} is already held until ${other.id} ships (wf hold, at ${first.at}). A hold is put once, whole`),
+  );
   t.mock.restoreAll();
   assert.deepEqual(JSON.parse(fs.readFileSync(holdFileOf(race.id), 'utf8')), first, 'the first hold, whole');
 });
@@ -494,11 +709,20 @@ test('wf decide on a held run that also waits --after a run says both, and that 
   await hold(b.e, child.id, [target.id]);
   const screen = (await typed(t, b.e, 'decide', child.id)).printed;
   assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
-  assert.match(screen, new RegExp(`\n  held until ${target.id} ships as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`), screen);
+  assert.match(
+    screen,
+    new RegExp(`\n  held until ${target.id} ships as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`),
+    screen,
+  );
   assert.doesNotMatch(screen, VERBS, screen);
   // And a run named that never ships: how to let it go, on the same screen.
   assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
-  assert.match((await typed(t, b.e, 'decide', child.id)).printed, new RegExp(`held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: wf hold ${child.id} --off, or wf cancel ${child.id}$`));
+  assert.match(
+    (await typed(t, b.e, 'decide', child.id)).printed,
+    new RegExp(
+      `held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: wf hold ${child.id} --off, or wf cancel ${child.id}$`,
+    ),
+  );
 });
 
 test('REFUSED while held or pruned: wf say to a step that has settled offers no wf retry, which either refuses', async () => {
@@ -512,9 +736,19 @@ test('REFUSED while held or pruned: wf say to a step that has settled offers no 
   await advance(b.e, readRun(run.id));
   await assert.rejects(say(b.e, run.id, 'implement', 'hello'), (err: Error) => /: wf retry /.test(err.message), 'offered before the hold');
   await hold(b.e, run.id, [target.id]);
-  await assert.rejects(say(b.e, run.id, 'implement', 'hello'), (err: Error & { exitCode?: number }) => err.exitCode === 2
-    && err.message.endsWith(`no try is filed while ${run.id} is held until ${target.id} ships: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`) && !VERBS.test(err.message));
+  await assert.rejects(
+    say(b.e, run.id, 'implement', 'hello'),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      err.message.endsWith(
+        `no try is filed while ${run.id} is held until ${target.id} ships: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`,
+      ) &&
+      !VERBS.test(err.message),
+  );
   unhold(run.id);
   assert.equal((await prune(b.e, done.id, { yes: true, unmerged: true })).kind, 'pruned');
-  await assert.rejects(say(b.e, done.id, 'implement', 'hello'), (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message));
+  await assert.rejects(
+    say(b.e, done.id, 'implement', 'hello'),
+    (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
+  );
 });

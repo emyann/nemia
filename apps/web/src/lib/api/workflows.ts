@@ -109,11 +109,16 @@ export type WorkflowStepPage = {
 export const stepQuery = (from: string, workflow: string, step: string) =>
   queryOptions({
     queryKey: ['workflows', from, workflow, step],
-    queryFn: () => get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
+    queryFn: () =>
+      get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
   });
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
-export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;
+export const workflowNameOf = (workflowDir: string): string =>
+  workflowDir
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .at(-1) || workflowDir;
 
 /** The repository a start runs in, as the api resolved it: what the start form lists the runs of. Read once a visit. */
 export const repositoryQuery = queryOptions({
@@ -134,11 +139,21 @@ export type Started = { id: string; removed?: boolean; why?: string };
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[]; card?: string }): Promise<Started> {
+export async function startRun(start: {
+  workflow: string;
+  from: WorkflowListing['from'];
+  brief: string;
+  after?: readonly string[];
+  card?: string;
+}): Promise<Started> {
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
   const body = (await res.json().catch(() => undefined)) as { id?: unknown; removed?: unknown; why?: unknown; error?: unknown } | undefined;
   if (res.ok && typeof body?.id === 'string') {
-    return { id: body.id, ...(typeof body.removed === 'boolean' ? { removed: body.removed } : {}), ...(typeof body.why === 'string' ? { why: body.why } : {}) };
+    return {
+      id: body.id,
+      ...(typeof body.removed === 'boolean' ? { removed: body.removed } : {}),
+      ...(typeof body.why === 'string' ? { why: body.why } : {}),
+    };
   }
   if (res.ok) {
     // Written, it may well be: look before starting it again.

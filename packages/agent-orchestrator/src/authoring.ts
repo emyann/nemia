@@ -9,7 +9,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { agentNameRefusal, agentsFolderRefusal, AGENTS_FOLDER, skillEntryOf, skillNameRefusal, SKILLS_FOLDER, codexModeWritten, formerSandbox, frontmatterKey, isReadme, linkRefusal, parseAgent, parseFolder, parseWorkflow, renderAgent, renderSkill, renderStep, withPreload, type SkillDraft, stepNameRefusal, WorkflowError, type Agent, type AgentDraft, type SkillsFound, type StepDraft, type Workflow } from './workflow.ts';
+import {
+  agentNameRefusal,
+  agentsFolderRefusal,
+  AGENTS_FOLDER,
+  skillEntryOf,
+  skillNameRefusal,
+  SKILLS_FOLDER,
+  codexModeWritten,
+  formerSandbox,
+  frontmatterKey,
+  isReadme,
+  linkRefusal,
+  parseAgent,
+  parseFolder,
+  parseWorkflow,
+  renderAgent,
+  renderSkill,
+  renderStep,
+  withPreload,
+  type SkillDraft,
+  stepNameRefusal,
+  WorkflowError,
+  type Agent,
+  type AgentDraft,
+  type SkillsFound,
+  type StepDraft,
+  type Workflow,
+} from './workflow.ts';
 import { agentsFor, agentUsers, agentVersion, loadAgents, skillsFor, skillVersion, type Places } from './workflow-store.ts';
 import { HOME, isDirectory } from './store.ts';
 
@@ -40,18 +67,35 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. A run
  * is not changed by any of it: it froze its folder at `wf start`.
  */
-export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?: string, { anywhere = false, places }: { anywhere?: boolean; places?: Places } = {}): WorkflowWritten {
+export function writeWorkflow(
+  dir: string,
+  steps: readonly StepDraft[],
+  readme?: string,
+  { anywhere = false, places }: { anywhere?: boolean; places?: Places } = {},
+): WorkflowWritten {
   const at = path.resolve(dir);
-  const refuse = (why: string | undefined) => { if (why) throw new WorkflowError(why); };
+  const refuse = (why: string | undefined) => {
+    if (why) throw new WorkflowError(why);
+  };
   refuse(agentsFolderRefusal(at));
   if (!anywhere) refuse(workflowPlaceRefusal(at));
-  if (fs.existsSync(at) && !isDirectory(at)) refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
+  if (fs.existsSync(at) && !isDirectory(at))
+    refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
   // The folder as it is, read before a byte is written — and a workflow's files are its own, so a `.md` among them that is a link is refused.
   let entries: fs.Dirent[] = [];
-  try { entries = fs.readdirSync(at, { withFileTypes: true }); } catch { /* not there: a new workflow's folder is made below */ }
+  try {
+    entries = fs.readdirSync(at, { withFileTypes: true });
+  } catch {
+    /* not there: a new workflow's folder is made below */
+  }
   const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
   if (linked) {
-    refuse(linkRefusal(path.join(at, linked.name), "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes."));
+    refuse(
+      linkRefusal(
+        path.join(at, linked.name),
+        "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes.",
+      ),
+    );
   }
   if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
   for (const step of steps) refuse(stepNameRefusal(step?.name));
@@ -59,7 +103,11 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
   const texts = steps.map((step) => [step.name, renderStep(step)] as const);
   const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(at, file), 'utf8'); } catch { return undefined; }
+    try {
+      return fs.readFileSync(path.resolve(at, file), 'utf8');
+    } catch {
+      return undefined;
+    }
   };
   // Its agents and skills where a run of it would look for them (`lookupRoots`): the repository its folder is in, when it is in one, then the store.
   const where = places ?? placesAround(at);
@@ -68,7 +116,12 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   // A draft on codex by its agent's `harness:` alone, sending its sandbox as `permissionMode` — a page opened before `sandbox:` — would be
   // written in the former name, which the parser still reads: `renderStep` refuses it on a draft that says `harness: codex`, and this on one
   // whose agent says it.
-  const onCodex = steps.find((step) => step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined && parsed.find((s) => s.name === step.name)?.harness === 'codex');
+  const onCodex = steps.find(
+    (step) =>
+      step.permissionMode != null &&
+      formerSandbox(step.permissionMode) !== undefined &&
+      parsed.find((s) => s.name === step.name)?.harness === 'codex',
+  );
   if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
 
   fs.mkdirSync(at, { recursive: true });
@@ -89,10 +142,15 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   for (const [name, text] of texts) {
     const step = parsed.find((s) => s.name === name);
     put(`${name}.md`, text, (there) => {
-      try { return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step); } catch { return false; }
+      try {
+        return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step);
+      } catch {
+        return false;
+      }
     });
   }
-  if (readme !== undefined) put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
+  if (readme !== undefined)
+    put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
 }
 
@@ -202,17 +260,32 @@ const inUseByRepo = (name: string, users: readonly string[], repo: string, does:
  * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
  * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
  */
-export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, anywhere = false, repo, ...rest }: { version: string | null; from?: string; schema?: AgentSidecar | null; anywhere?: boolean; repo?: string }): AgentWritten {
+export function writeAgent(
+  dir: string,
+  draft: AgentDraft,
+  {
+    version,
+    from,
+    schema,
+    anywhere = false,
+    repo,
+    ...rest
+  }: { version: string | null; from?: string; schema?: AgentSidecar | null; anywhere?: boolean; repo?: string },
+): AgentWritten {
   const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
+  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
+    if (why) throw new AgentWriteError(why, kind, users);
+  };
   // A caller written before agents card 2 still hands the card file it would write: refused, since written nowhere it would be lost unsaid.
-  if (Object.hasOwn(rest, 'card')) refuse('`card` is not written with an agent since agents card 2: its card is generated from its skills. Send the agent without it.');
+  if (Object.hasOwn(rest, 'card'))
+    refuse('`card` is not written with an agent since agents card 2: its card is generated from its skills. Send the agent without it.');
   refuse(agentPlaceRefusal(at, anywhere));
   const name = draft?.name;
   refuse(agentNameRefusal(name));
   const old = from ?? name;
   if (from !== undefined) refuse(agentNameRefusal(from));
-  if (from !== undefined && version === null) refuse(`a new agent is not renamed from another: to rename ${AGENTS_FOLDER}/${from}.md, give the version it was read at.`);
+  if (from !== undefined && version === null)
+    refuse(`a new agent is not renamed from another: to rename ${AGENTS_FOLDER}/${from}.md, give the version it was read at.`);
   const file = (n: string) => path.join(at, `${n}.md`);
   const linked = (target: string) => Boolean(fs.lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink());
   const linkWhy = "an agent's file is its own: a write follows a link, and would write into whatever it points at, outside the folder.";
@@ -220,14 +293,27 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   const renamed = old !== name;
   const versionOf = (n: string) => agentVersion(at, n, skillsAt(at, repo));
   if (version === null) {
-    if (fs.existsSync(file(name))) refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
+    if (fs.existsSync(file(name)))
+      refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
   } else {
     const now = versionOf(old);
-    if (now === null) refuse(`${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`, 'missing');
-    if (now !== version) refuse(`${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`, 'stale');
+    if (now === null)
+      refuse(
+        `${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`,
+        'missing',
+      );
+    if (now !== version)
+      refuse(
+        `${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`,
+        'stale',
+      );
   }
   if (renamed) {
-    if (fs.existsSync(file(name)) && !sameFile(file(name), file(old))) refuse(`${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`, 'exists');
+    if (fs.existsSync(file(name)) && !sameFile(file(name), file(old)))
+      refuse(
+        `${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`,
+        'exists',
+      );
     const users = agentUsers(path.dirname(at), old);
     if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
     const theirs = repoUsers(at, old, repo);
@@ -240,26 +326,58 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   for (const { key, what, a, suggest, sidecar, named: mine } of given) {
     if (!sidecar) continue;
     const bad = typeof sidecar.file !== 'string' || !/^[^\\/]+\.json$/.test(sidecar.file) || sidecar.file.startsWith('.');
-    if (bad) refuse(`\`${sidecar?.file}\` is not a ${what}'s name: it is a .json file beside the agent, named with no folder — ${suggest(name)}, say.`);
-    if (sidecar.file !== mine) refuse(`${a} is ${sidecar.file}, and ${AGENTS_FOLDER}/${name}.md ${mine === undefined ? 'names none' : `names ${mine}`}: a ${what} travels with the agent whose \`${key}:\` names it. Set \`${key}: ${sidecar.file}\`, or send none.`);
-    if (linked(path.join(at, sidecar.file))) refuse(linkRefusal(path.join(at, sidecar.file), `a ${what} is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder.`));
-    const others = (fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }) : []).filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
-      .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), key) === sidecar.file; } catch { return false; } })
+    if (bad)
+      refuse(
+        `\`${sidecar?.file}\` is not a ${what}'s name: it is a .json file beside the agent, named with no folder — ${suggest(name)}, say.`,
+      );
+    if (sidecar.file !== mine)
+      refuse(
+        `${a} is ${sidecar.file}, and ${AGENTS_FOLDER}/${name}.md ${mine === undefined ? 'names none' : `names ${mine}`}: a ${what} travels with the agent whose \`${key}:\` names it. Set \`${key}: ${sidecar.file}\`, or send none.`,
+      );
+    if (linked(path.join(at, sidecar.file)))
+      refuse(
+        linkRefusal(
+          path.join(at, sidecar.file),
+          `a ${what} is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder.`,
+        ),
+      );
+    const others = (fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }) : [])
+      .filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
+      .filter((e) => {
+        try {
+          return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), key) === sidecar.file;
+        } catch {
+          return false;
+        }
+      })
       .map((e) => path.basename(e.name, '.md'));
-    if (others.length) refuse(`${sidecar.file} is the ${what} of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} declare. Name one of this agent's own: ${suggest(name)}, say.`);
+    if (others.length)
+      refuse(
+        `${sidecar.file} is the ${what} of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} declare. Name one of this agent's own: ${suggest(name)}, say.`,
+      );
   }
   const sending = given.flatMap(({ sidecar }) => sidecar ?? []);
   const read = (f: string): string | undefined => {
     const sent = sending.find((s) => s.file === f);
     if (sent) return sent.text;
-    try { return fs.readFileSync(path.resolve(at, f), 'utf8'); } catch { return undefined; }
+    try {
+      return fs.readFileSync(path.resolve(at, f), 'utf8');
+    } catch {
+      return undefined;
+    }
   };
   const agent = parseAgent(name, text, read);
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const removed: string[] = [];
-  const held = (f: string): string | undefined => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
+  const held = (f: string): string | undefined => {
+    try {
+      return fs.readFileSync(path.join(at, f), 'utf8');
+    } catch {
+      return undefined;
+    }
+  };
   const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
   try {
     for (const { sidecar, was } of before) {
@@ -268,7 +386,10 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
       written.push(sidecar.file);
     }
     // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
-    if (renamed && sameFile(file(name), file(old))) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+    if (renamed && sameFile(file(name), file(old))) {
+      fs.rmSync(file(old));
+      removed.push(`${old}.md`);
+    }
     fs.writeFileSync(file(name), text);
     written.push(`${name}.md`);
   } catch (err) {
@@ -281,7 +402,10 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     }
     throw err;
   }
-  if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+  if (renamed && !removed.length) {
+    fs.rmSync(file(old));
+    removed.push(`${old}.md`);
+  }
   // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
   // the board by mistake must not cost a person the schema they wrote: a file nothing names is harmless, and a person
   // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
@@ -296,21 +420,38 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
  * of `repo`'s workflows is given it, the repository having none of that name (`repoUsers`); other repositories are not read, since the
  * store does not know them, and one that named the agent refuses to load its workflow until given another.
  */
-export function removeAgent(dir: string, name: string, { version, anywhere = false, repo }: { version: string; anywhere?: boolean; repo?: string }): { dir: string; removed: string[] } {
+export function removeAgent(
+  dir: string,
+  name: string,
+  { version, anywhere = false, repo }: { version: string; anywhere?: boolean; repo?: string },
+): { dir: string; removed: string[] } {
   const at = path.resolve(dir);
-  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
+  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
+    if (why) throw new AgentWriteError(why, kind, users);
+  };
   refuse(agentPlaceRefusal(at, anywhere));
   refuse(agentNameRefusal(name));
   const file = path.join(at, `${name}.md`);
-  if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
+  if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink())
+    refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
   const now = agentVersion(at, name, skillsAt(at, repo));
   if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, 'missing');
-  if (now !== version) refuse(`${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`, 'stale');
+  if (now !== version)
+    refuse(
+      `${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`,
+      'stale',
+    );
   const users = agentUsers(path.dirname(at), name);
   if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
   const theirs = repoUsers(at, name, repo);
   if (theirs.length) refuse(inUseByRepo(name, theirs, repo!, 'removing it'), 'in-use', theirs);
-  const read = (f: string) => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
+  const read = (f: string) => {
+    try {
+      return fs.readFileSync(path.join(at, f), 'utf8');
+    } catch {
+      return undefined;
+    }
+  };
   const mine = SIDECARS.map(({ key }) => ({ key, named: frontmatterKey(read(`${name}.md`) ?? '', key) }));
   fs.rmSync(file);
   const removed = [`${name}.md`];
@@ -318,7 +459,10 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
     if (named === undefined || !/^[^\\/]+\.json$/.test(named)) continue;
     const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(read(f) ?? '', key) === named);
     const sidecarAt = path.join(at, named);
-    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(named); }
+    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) {
+      fs.rmSync(sidecarAt);
+      removed.push(named);
+    }
   }
   return { dir: at, removed };
 }
@@ -358,15 +502,25 @@ export function copySkill(from: string, to: string, name: string, { anywhere = f
   if (fs.lstatSync(source, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(source, linkWhy));
   const skillFile = path.join(source, 'SKILL.md');
   if (!fs.lstatSync(skillFile, { throwIfNoEntry: false })?.isFile()) {
-    refuse(`${path.resolve(from)} has no skill named ${name}: a skill is a folder holding a SKILL.md, and ${skillFile} is not there.`, 'missing');
+    refuse(
+      `${path.resolve(from)} has no skill named ${name}: a skill is a folder holding a SKILL.md, and ${skillFile} is not there.`,
+      'missing',
+    );
   }
   const files = (fs.readdirSync(source, { recursive: true }) as string[]).sort();
   const linked = files.find((file) => fs.lstatSync(path.join(source, file)).isSymbolicLink());
   if (linked !== undefined) refuse(linkRefusal(path.join(source, linked), linkWhy));
-  try { skillEntryOf(skillFile, name, fs.readFileSync(skillFile, 'utf8')); } catch (err) { refuse(err instanceof Error ? err.message : String(err)); }
+  try {
+    skillEntryOf(skillFile, name, fs.readFileSync(skillFile, 'utf8'));
+  } catch (err) {
+    refuse(err instanceof Error ? err.message : String(err));
+  }
   const target = path.join(at, name);
   if (fs.lstatSync(target, { throwIfNoEntry: false })) {
-    refuse(`${SKILLS_FOLDER}/${name} is there already, in ${at}, and a copy would write over it. Give it as it is, or remove that folder first.`, 'exists');
+    refuse(
+      `${SKILLS_FOLDER}/${name} is there already, in ${at}, and a copy would write over it. Give it as it is, or remove that folder first.`,
+      'exists',
+    );
   }
 
   fs.mkdirSync(at, { recursive: true });
@@ -382,7 +536,9 @@ export function copySkill(from: string, to: string, name: string, { anywhere = f
   return { dir: target, name, written };
 }
 
-const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): void => { if (why) throw new SkillWriteError(why, kind); };
+const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): void => {
+  if (why) throw new SkillWriteError(why, kind);
+};
 
 /**
  * The refusals a copy and a write of a skill share, judged before either reads a byte of it: `at` is a `skills/` beside the workflows the board
@@ -390,12 +546,18 @@ const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): vo
  * is a link, which a write would follow out of the store.
  */
 function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
-  if (path.basename(at) !== SKILLS_FOLDER) refuseSkill(`${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`);
+  if (path.basename(at) !== SKILLS_FOLDER)
+    refuseSkill(
+      `${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`,
+    );
   if (!anywhere && !isWorkflowsHolder(path.dirname(at))) {
-    refuseSkill(`${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's (<repo>/workflows/${SKILLS_FOLDER}, beside its .git). ${verb} to one of the two, or pass { anywhere: true } to write ${at} all the same.`);
+    refuseSkill(
+      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's (<repo>/workflows/${SKILLS_FOLDER}, beside its .git). ${verb} to one of the two, or pass { anywhere: true } to write ${at} all the same.`,
+    );
   }
   refuseSkill(skillNameRefusal(name));
-  for (const place of [at, path.dirname(at)]) if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuseSkill(linkRefusal(place, linkWhy));
+  for (const place of [at, path.dirname(at)])
+    if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuseSkill(linkRefusal(place, linkWhy));
 }
 
 /** A change `writeSkill` makes: a whole skill, as the board's form writes it, or its `preload:` line alone, as the board's switch does. */
@@ -416,7 +578,11 @@ export type SkillWritten = { dir: string; name: string; version: string; written
  * no longer reads may be written — that is how it is mended — so only what is written must read. A skill made is written in a hidden folder
  * beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails leaves no half a skill.
  */
-export function writeSkill(to: string, change: SkillChange, { version, anywhere = false }: { version: string | null; anywhere?: boolean }): SkillWritten {
+export function writeSkill(
+  to: string,
+  change: SkillChange,
+  { version, anywhere = false }: { version: string | null; anywhere?: boolean },
+): SkillWritten {
   const at = path.resolve(to);
   const name = change?.name;
   judgeSkillPlace(at, name, anywhere, 'Write it', 'a write follows a link, and would write whatever it points at, outside the store.');
@@ -425,16 +591,27 @@ export function writeSkill(to: string, change: SkillChange, { version, anywhere 
   const named = `${SKILLS_FOLDER}/${name}`;
   const whole = 'body' in change;
   for (const place of [target, file]) {
-    if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuseSkill(linkRefusal(place, "a skill's files are its own, and a write would follow the link. Remove it by hand."));
+    if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink())
+      refuseSkill(linkRefusal(place, "a skill's files are its own, and a write would follow the link. Remove it by hand."));
   }
   const rendered = (was?: string): string => {
-    try { return whole ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload); } catch (err) { throw new SkillWriteError(err instanceof Error ? err.message : String(err)); }
+    try {
+      return whole ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload);
+    } catch (err) {
+      throw new SkillWriteError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   if (version === null) {
-    if (!whole) refuseSkill(`${named} is a change of \`preload:\` alone, and there is no skill to change: write the whole skill — its description and instructions — to make it.`);
+    if (!whole)
+      refuseSkill(
+        `${named} is a change of \`preload:\` alone, and there is no skill to change: write the whole skill — its description and instructions — to make it.`,
+      );
     if (fs.lstatSync(target, { throwIfNoEntry: false })) {
-      refuseSkill(`${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it.`, 'exists');
+      refuseSkill(
+        `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it.`,
+        'exists',
+      );
     }
     const text = rendered();
     fs.mkdirSync(at, { recursive: true });
@@ -448,9 +625,11 @@ export function writeSkill(to: string, change: SkillChange, { version, anywhere 
       throw err;
     }
   } else {
-    if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, 'missing');
+    if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile())
+      refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, 'missing');
     const now = skillVersion(target);
-    if (now !== version) refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, 'stale');
+    if (now !== version)
+      refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, 'stale');
     const text = rendered(fs.readFileSync(file, 'utf8'));
     const staging = path.join(target, `.SKILL.md.writing-${process.pid}-${Date.now()}`);
     try {
@@ -478,14 +657,16 @@ export function placesAround(workflowDir: string): Places {
  * root first, then `repo`'s `.claude/`, then the store. What a card (`cardSkills`) and an agent's version are read with outside a start, so the
  * card names the skills a run would be given and its version moves with them.
  */
-export const agentSkillsFound = (dir: string, repo: string): SkillsFound => skillsFor(path.join(path.dirname(path.resolve(dir)), '_'), { repo: path.resolve(repo), home: HOME });
+export const agentSkillsFound = (dir: string, repo: string): SkillsFound =>
+  skillsFor(path.join(path.dirname(path.resolve(dir)), '_'), { repo: path.resolve(repo), home: HOME });
 
 /**
  * The skills a write's or a removal's version is read with: found as `repo`'s start finds them, as the board's listing reads the version the
  * write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
  * repository's `.claude/skills/` would be refused as changed since it was read on every save.
  */
-const skillsAt = (at: string, repo: string | undefined): SkillsFound | undefined => (repo === undefined ? undefined : agentSkillsFound(at, repo));
+const skillsAt = (at: string, repo: string | undefined): SkillsFound | undefined =>
+  repo === undefined ? undefined : agentSkillsFound(at, repo);
 
 /** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
 export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
@@ -498,7 +679,8 @@ export type AgentPlace = 'repo' | 'yours';
 /** Every agent of both places, in the order the places come, each read now. An agent that does not read carries its refusal. */
 export function listAgents(repo: string): Array<{ from: AgentPlace; dir: string; name: string; agent: Agent | WorkflowError }> {
   return agentPlaces(repo).flatMap(({ from, dir }) =>
-    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })));
+    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })),
+  );
 }
 
 /**
@@ -513,10 +695,21 @@ export function findAgent(name: string, repo: string, from?: AgentPlace): { from
   });
   const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
   if (!found.length) {
-    const has = agentPlaces(repo).filter((place) => fs.existsSync(place.dir)).map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
-    throw new WorkflowError(`no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${has.length ? has.join(' and ') : agentPlaces(repo).map((p) => p.dir).join(' and ')}. wf agents lists them.`);
+    const has = agentPlaces(repo)
+      .filter((place) => fs.existsSync(place.dir))
+      .map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
+    throw new WorkflowError(
+      `no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${
+        has.length
+          ? has.join(' and ')
+          : agentPlaces(repo)
+              .map((p) => p.dir)
+              .join(' and ')
+      }. wf agents lists them.`,
+    );
   }
-  if (found.length > 1) throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
+  if (found.length > 1)
+    throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
   const one = found[0]!;
   if (one.agent instanceof Error) throw one.agent;
   return { from: one.from, dir: one.dir, agent: one.agent };

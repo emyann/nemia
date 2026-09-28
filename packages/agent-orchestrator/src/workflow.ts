@@ -278,7 +278,32 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'denials', 'background', 'remote', 'deadlineSeconds', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after',
+  'resume',
+  'input',
+  'workspace',
+  'slot',
+  'agent',
+  'harness',
+  'model',
+  'effort',
+  'context',
+  'permissionMode',
+  'sandbox',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'denials',
+  'background',
+  'remote',
+  'deadlineSeconds',
+  'budget',
+  'check',
+  'retries',
+  'gate',
+  'output',
+  'loop',
+  'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -295,30 +320,41 @@ const COUNTS = {
  * `test/workflow.test.ts` holds the order and the one line.
  */
 export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
-  after: 'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
+  after:
+    'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
-  input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
-  workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
+  input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
+  workspace:
+    "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
-  agent: "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
-  harness: "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
+  agent:
+    "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
+  harness:
+    "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
-  context: "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
-  permissionMode: "Claude Code's permission mode — whether it asks, denies or allows what no rule decides — on `claude` and `claude-detached`; on codex the fence is `sandbox:`",
-  sandbox: "Codex's sandbox — `read-only`, `workspace-write` or `danger-full-access` — on `codex` only; on Claude Code the fence is `permissionMode:`; `workspace-write` when unset",
+  context:
+    "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
+  permissionMode:
+    "Claude Code's permission mode — whether it asks, denies or allows what no rule decides — on `claude` and `claude-detached`; on codex the fence is `sandbox:`",
+  sandbox:
+    "Codex's sandbox — `read-only`, `workspace-write` or `danger-full-access` — on `codex` only; on Claude Code the fence is `permissionMode:`; `workspace-write` when unset",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallowedTools: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
-  allowedTools: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
-  denials: "`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only",
-  background: "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`",
-  remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only",
+  allowedTools:
+    "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
+  denials:
+    '`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only',
+  background:
+    '`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`',
+  remote:
+    '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,
   gate: "`true`: the step's closeout waits for a person — `wf approve` — before anything after it is filed, verified first where it has a check",
-  output: "a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`",
+  output: 'a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`',
   loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
   rounds: COUNTS.rounds.counts,
 };
@@ -338,12 +374,14 @@ export const outputFields = (step: Workflow): string[] => Object.keys(step.outpu
  * work, and "not a key a step has" would be a worse answer than the truth.
  */
 const REFUSED: Record<string, string> = {
-  guide: 'the harness reads CLAUDE.md or AGENTS.md from the step\'s workspace on its own. Standing rules belong'
-    + ' in that file, and what only this step needs to know belongs in the body',
+  guide:
+    "the harness reads CLAUDE.md or AGENTS.md from the step's workspace on its own. Standing rules belong" +
+    ' in that file, and what only this step needs to know belongs in the body',
   // Retired on 2026-09-23 (thin runtime, stage 4a part 2), with the runtime's own `maxAttempts` and `resume`.
-  maxAttempts: 'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing'
-    + ' to count. Trying again is the run\'s: `retries: N` files the step again after its check refuses it, and `wf retry <run> <step>`'
-    + ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
+  maxAttempts:
+    'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing' +
+    " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `wf retry <run> <step>`" +
+    ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
 };
 
 /** The harness a step runs on when it names none. */
@@ -363,10 +401,13 @@ export const REMOTE_NAME = /^[a-z][a-z0-9-]*$/;
 export const isRemoteHarness = (harness: string | undefined): boolean => harness?.startsWith(REMOTE_PREFIX) ?? false;
 
 /** The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure. */
-export const remoteNameOf = (harness: string | undefined): string | undefined => (isRemoteHarness(harness) ? harness!.slice(REMOTE_PREFIX.length) : undefined);
+export const remoteNameOf = (harness: string | undefined): string | undefined =>
+  isRemoteHarness(harness) ? harness!.slice(REMOTE_PREFIX.length) : undefined;
 
-const RUNS_AS_CONFIGURED = "is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one";
-const FENCED_THERE = "fences a session on this machine, and a remote agent runs on another party's, under their fence: nothing here would hold it";
+const RUNS_AS_CONFIGURED =
+  'is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one';
+const FENCED_THERE =
+  "fences a session on this machine, and a remote agent runs on another party's, under their fence: nothing here would hold it";
 
 /**
  * The keys a step on a remote A2A agent may not set, and why: each tells a harness of ours something, and a remote agent is not one. Refused
@@ -385,10 +426,12 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   allowedTools: FENCED_THERE,
   denials: 'stops the step on a call its harness denied, and a remote agent reports none',
   budget: 'is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost',
-  output: 'declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step\'s sign-off, and a data part on its reply is what it says',
+  output:
+    "declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step's sign-off, and a data part on its reply is what it says",
   loop: 'goes round again on the `again` its `output:` declares, and a step on a remote agent declares no `output:`',
-  resume: 'continues a session a harness of ours kept, and the run keeps none of a remote agent\'s: a new Task is sent',
-  check: 'is a command the run executes in the step\'s workspace, and a remote agent works on another party\'s machine: nothing it does reaches the workspace, and a check would judge work nobody did there',
+  resume: "continues a session a harness of ours kept, and the run keeps none of a remote agent's: a new Task is sent",
+  check:
+    "is a command the run executes in the step's workspace, and a remote agent works on another party's machine: nothing it does reaches the workspace, and a check would judge work nobody did there",
 };
 
 /**
@@ -408,12 +451,16 @@ export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) =>
  * checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading assumes a harness of ours.
  */
 function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
-  const said = (key: string, why: string) => refuse(`${step}: \`${key}: ${meta[key as StepKey]}\` ${why}, and \`harness: ${harness}\` is a remote A2A agent. Delete the line — from the step, or from the agent it names if the agent gives it.`);
+  const said = (key: string, why: string) =>
+    refuse(
+      `${step}: \`${key}: ${meta[key as StepKey]}\` ${why}, and \`harness: ${harness}\` is a remote A2A agent. Delete the line — from the step, or from the agent it names if the agent gives it.`,
+    );
   for (const key of STEP_KEYS) {
     const why = REMOTE_REFUSED[key];
     if (why !== undefined && meta[key] !== undefined) said(key, why);
   }
-  if (meta.workspace?.trim() === 'main') said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
+  if (meta.workspace?.trim() === 'main')
+    said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
 }
 
 /*
@@ -504,9 +551,11 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const m = FRONTMATTER.exec(text);
   if (!m && /^---[ \t]*\n/.test(text)) {
-    refuse(`${name}: the frontmatter opened on the first line never closes, so every key in it would be read as prose. End it with a line that is just \`---\`.`);
+    refuse(
+      `${name}: the frontmatter opened on the first line never closes, so every key in it would be read as prose. End it with a line that is just \`---\`.`,
+    );
   }
-  return { block: m ? m[1] ?? '' : null, body: (m ? text.slice(m[0].length) : text).trim() };
+  return { block: m ? (m[1] ?? '') : null, body: (m ? text.slice(m[0].length) : text).trim() };
 }
 
 /**
@@ -520,11 +569,21 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
  * parser sees the resolved step; `agent` on it says what was the step's own.
  */
-export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents, skills?: SkillsFound): Workflow {
+export function parseWorkflow(
+  name: string,
+  text: string,
+  read?: (file: string) => string | undefined,
+  agents?: Agents,
+  skills?: SkillsFound,
+): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
-  let { meta: { agent: attached, ...meta }, spelled } = block === null
-    ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
-    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  let {
+    meta: { agent: attached, ...meta },
+    spelled,
+  } =
+    block === null
+      ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
+      : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
     return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
@@ -537,7 +596,10 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   // codex with a sandbox of its own is not also given the agent's permission mode, which no line of it could unset — and the other way round.
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
-  if (!body) throw new WorkflowError(`${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`);
+  if (!body)
+    throw new WorkflowError(
+      `${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`,
+    );
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
@@ -545,10 +607,12 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
-  const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
-    const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
-    return value === undefined ? [] : [[key, value]];
-  }));
+  const given = Object.fromEntries(
+    STEP_KEYS.flatMap((key) => {
+      const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
+      return value === undefined ? [] : [[key, value]];
+    }),
+  );
   return {
     ...step,
     agent: {
@@ -566,9 +630,12 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
 /** The folder of the skill `skill` that step `step`'s agent names, or why not: none of the places has it, or two of one repository do. */
 export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound): string {
   const found = skills.at.get(skill);
-  if (found instanceof WorkflowError) refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, which cannot be used — ${found.message}`);
+  if (found instanceof WorkflowError)
+    refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, which cannot be used — ${found.message}`);
   if (found !== undefined) return found;
-  return refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, and no skills folder has it — looked in ${skills.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`);
+  return refuse(
+    `${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, and no skills folder has it — looked in ${skills.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`,
+  );
 }
 
 /** The fence a step's lines write, under either name: Claude Code's permission mode or Codex's sandbox. */
@@ -586,18 +653,29 @@ function agentOf(step: string, name: string, agents: Agents | undefined): Agent 
   if (found instanceof WorkflowError) refuse(`${step}: \`agent: ${name}\` names an agent whose file is refused — ${found.message}`);
   if (found) return found;
   const there = [...(agents?.keys() ?? [])].sort();
-  return refuse(`${step}: \`agent: ${name}\` is not an agent here. `
-    + (there.length
-      ? `The agents are: ${there.join(', ')} — name one, or write ${AGENTS_FOLDER}/${name}.md beside them.`
-      : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or delete the line.`));
+  return refuse(
+    `${step}: \`agent: ${name}\` is not an agent here. ` +
+      (there.length
+        ? `The agents are: ${there.join(', ')} — name one, or write ${AGENTS_FOLDER}/${name}.md beside them.`
+        : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or delete the line.`),
+  );
 }
 
 /**
  * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
  * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it.
  */
-function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: string, read: ((file: string) => string | undefined) | undefined, spelled: Spelled = {}): Workflow {
-  const after = (meta.after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+function stepFrom(
+  name: string,
+  meta: Partial<Record<StepKey, string>>,
+  body: string,
+  read: ((file: string) => string | undefined) | undefined,
+  spelled: Spelled = {},
+): Workflow {
+  const after = (meta.after ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
@@ -606,7 +684,9 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
   const output = outputOf(name, meta.output, read);
   // What Claude Code's `/agents` wizard writes for "the parent's model" (`.claude/agents/`, 2.1.282), and a run's session has no parent.
   if (meta.model?.trim() === 'inherit') {
-    refuse(`${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`);
+    refuse(
+      `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`,
+    );
   }
   autoRefusal(name, harness, meta.model, meta.permissionMode);
 
@@ -634,7 +714,10 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
     gate: gateOf(name, meta.gate),
-    input: meta.input?.split(',').map((s) => s.trim()).filter(Boolean),
+    input: meta.input
+      ?.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     output,
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
@@ -648,7 +731,9 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
 function autoRefusal(step: string, harness: string | undefined, model: string | undefined, permissionMode: string | undefined): void {
   const dropped = autoDropped(harness, model, permissionMode);
   if (!dropped) return;
-  refuse(`${step}: \`model: ${model}\` ${dropped}. Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`);
+  refuse(
+    `${step}: \`model: ${model}\` ${dropped}. Name a mode the model keeps: \`permissionMode: acceptEdits\`, which writes in the step's directory unasked, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules for what it may do — \`allowedTools: Edit(**), Bash(npm test)\`. Or run a model that keeps \`auto\`: sonnet, opus or fable.`,
+  );
 }
 
 /**
@@ -658,12 +743,17 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
  * first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording for the load's
  * refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
  */
-export function autoDropped(harness: string | undefined, model: string | undefined, permissionMode: string | undefined): string | undefined {
+export function autoDropped(
+  harness: string | undefined,
+  model: string | undefined,
+  permissionMode: string | undefined,
+): string | undefined {
   if (harness === 'codex' || isRemoteHarness(harness) || keepsAuto(model)) return undefined;
   if ((permissionMode ?? DEFAULT_PERMISSION_MODE) !== 'auto') return undefined;
-  const asked = permissionMode === undefined
-    ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
-    : 'says `permissionMode: auto`';
+  const asked =
+    permissionMode === undefined
+      ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
+      : 'says `permissionMode: auto`';
   return `${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about (F21, Claude Code 2.1.282, measured)`;
 }
 
@@ -699,9 +789,13 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools',
  * follows a line of its own — a key, even; and a comma inside a step's name in `after:` or `input:`, which would be read as two names.
  */
 export function renderStep(step: StepDraft): string {
-  const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
-  if (unknown !== undefined) refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
-  if (step.harness === 'codex' && step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined) refuse(codexModeWritten(step.name, step.permissionMode));
+  const unknown = Object.keys(step).find(
+    (key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null,
+  );
+  if (unknown !== undefined)
+    refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
+  if (step.harness === 'codex' && step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined)
+    refuse(codexModeWritten(step.name, step.permissionMode));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
@@ -722,9 +816,14 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
   if (Array.isArray(value)) {
     if (!value.length && EMPTY_IS_UNSET.includes(key)) return undefined;
     const entries = value.map(String);
-    const split = (key === 'after' || key === 'input') ? entries.find((entry) => entry.includes(',')) : undefined;
+    const split = key === 'after' || key === 'input' ? entries.find((entry) => entry.includes(',')) : undefined;
     if (split !== undefined) {
-      refuse(`${step}: \`${key}\` lists \`${split}\`, and a list is split on every comma, so it would be read as ${split.split(',').map((s) => `\`${s.trim()}\``).join(', ')}. A step's name has no comma: give each step an entry of its own.`);
+      refuse(
+        `${step}: \`${key}\` lists \`${split}\`, and a list is split on every comma, so it would be read as ${split
+          .split(',')
+          .map((s) => `\`${s.trim()}\``)
+          .join(', ')}. A step's name has no comma: give each step an entry of its own.`,
+      );
     }
     text = entries.join(', ');
   } else if (key === 'context' && typeof value === 'number') {
@@ -733,12 +832,16 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
     // The file it names: the schema is the folder's. An `output` naming no file is written with no value, which the parser refuses.
     text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
   } else if (typeof value === 'object' || typeof value === 'function') {
-    refuse(`${step}: \`${key}\` is ${JSON.stringify(value) ?? `a ${typeof value}`}, and a frontmatter line holds a word, a number or a list: an object would be written as \`[object Object]\`.`);
+    refuse(
+      `${step}: \`${key}\` is ${JSON.stringify(value) ?? `a ${typeof value}`}, and a frontmatter line holds a word, a number or a list: an object would be written as \`[object Object]\`.`,
+    );
   } else {
     text = String(value as string | number | boolean | bigint | symbol);
   }
   if (/[\r\n]/.test(text)) {
-    refuse(`${step}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line${key === 'check' ? ' — commands joined with `&&`' : ''}.`);
+    refuse(
+      `${step}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line${key === 'check' ? ' — commands joined with `&&`' : ''}.`,
+    );
   }
   return text;
 }
@@ -750,15 +853,20 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
 function loopOf(step: string, loop: string | undefined, output: StepOutput | undefined): string | undefined {
   if (loop === undefined) return undefined;
   if (loop.includes(',')) {
-    refuse(`${step}: \`loop: ${loop}\` names more than one step. A loop runs one earlier step again, and every step between it and this one follows: name the first of them.`);
+    refuse(
+      `${step}: \`loop: ${loop}\` names more than one step. A loop runs one earlier step again, and every step between it and this one follows: name the first of them.`,
+    );
   }
   const named = `${step}: \`loop: ${loop}\` runs ${loop} again when this step's closeout says \`again: true\``;
   const declare = 'Declare it — `"again": { "type": "boolean" }`, listed in `required` — so the run reads a yes or a no, never prose.';
-  if (!output) refuse(`${named}, and this step declares no \`output:\`, so its closeout has no \`again\`. Give it an \`output:\` schema. ${declare}`);
+  if (!output)
+    refuse(`${named}, and this step declares no \`output:\`, so its closeout has no \`again\`. Give it an \`output:\` schema. ${declare}`);
   const again = output.schema.properties.again;
   if (!again) refuse(`${named}, and \`output: ${output.file}\` does not declare \`again\`. ${declare}`);
   if (again.type !== 'boolean') {
-    refuse(`${named}, and \`output: ${output.file}\` declares \`again\` as ${JSON.stringify(again.type ?? again)}. It is \`"type": "boolean"\`: true or false, and nothing the run would have to interpret.`);
+    refuse(
+      `${named}, and \`output: ${output.file}\` declares \`again\` as ${JSON.stringify(again.type ?? again)}. It is \`"type": "boolean"\`: true or false, and nothing the run would have to interpret.`,
+    );
   }
   return loop;
 }
@@ -766,15 +874,18 @@ function loopOf(step: string, loop: string | undefined, output: StepOutput | und
 /** `rounds:`, which counts the rounds of a loop: refused on a step with no `loop:`, and `DEFAULT_ROUNDS` on one that does not say. */
 function roundsOf(step: string, loop: string | undefined, rounds: string | undefined): number | undefined {
   if (rounds !== undefined && loop === undefined) {
-    refuse(`${step}: \`rounds: ${rounds}\` counts the rounds of a loop, and this step has no \`loop:\`. Add \`loop: <step>\`, naming the earlier step to run again, or delete the line. To try one step again after its check refuses it, that is \`retries:\`.`);
+    refuse(
+      `${step}: \`rounds: ${rounds}\` counts the rounds of a loop, and this step has no \`loop:\`. Add \`loop: <step>\`, naming the earlier step to run again, or delete the line. To try one step again after its check refuses it, that is \`retries:\`.`,
+    );
   }
-  return loop === undefined ? undefined : countOf(step, 'rounds', rounds) ?? DEFAULT_ROUNDS;
+  return loop === undefined ? undefined : (countOf(step, 'rounds', rounds) ?? DEFAULT_ROUNDS);
 }
 
 /** The refusal of a key no step has, by name: with a reason of its own where it has one (`REFUSED`), and otherwise with the keys a step has. */
-const unknownKey = (step: string, key: string): string => (Object.hasOwn(REFUSED, key)
-  ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
-  : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
+const unknownKey = (step: string, key: string): string =>
+  Object.hasOwn(REFUSED, key)
+    ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
+    : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
 
 /**
  * A key's former name, and the name it has now: what a step or an agent file written before a key was renamed still says. Claude Code's
@@ -797,11 +908,17 @@ const SANDBOX_SINCE = '2026-09-23';
  * was Codex's own still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
  * codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming `sandbox:`. Pure.
  */
-function codexSandboxNamed<K extends string>(file: string, meta: Partial<Record<K | 'permissionMode' | 'sandbox', string>>, harness: string | undefined): Partial<Record<K | 'permissionMode' | 'sandbox', string>> {
+function codexSandboxNamed<K extends string>(
+  file: string,
+  meta: Partial<Record<K | 'permissionMode' | 'sandbox', string>>,
+  harness: string | undefined,
+): Partial<Record<K | 'permissionMode' | 'sandbox', string>> {
   const word = meta.permissionMode;
   if (harness !== 'codex' || word === undefined) return meta;
   if (meta.sandbox !== undefined) {
-    refuse(`${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: until ${SANDBOX_SINCE} a codex step named its sandbox as \`permissionMode:\`, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`);
+    refuse(
+      `${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: until ${SANDBOX_SINCE} a codex step named its sandbox as \`permissionMode:\`, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
+    );
   }
   const sandbox = sandboxNamed(word);
   if (!SANDBOXES.codex!.includes(sandbox)) return meta;
@@ -838,7 +955,11 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
  * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A line
  * under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as written.
  */
-function readKeys<K extends string>(step: string, block: string, refusal: (key: string) => string | undefined): { meta: Partial<Record<K, string>>; spelled: Spelled } {
+function readKeys<K extends string>(
+  step: string,
+  block: string,
+  refusal: (key: string) => string | undefined,
+): { meta: Partial<Record<K, string>>; spelled: Spelled } {
   const meta: Partial<Record<K, string>> = {};
   const spelled: Spelled = {};
   for (const raw of block.split('\n')) {
@@ -847,7 +968,9 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
     if (!line || line.startsWith('#')) continue;
     const i = line.indexOf(':');
     if (i <= 0) {
-      refuse(`${step}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`);
+      refuse(
+        `${step}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`,
+      );
     }
     const written = line.slice(0, i).trim();
     const key = keyNamed(written);
@@ -860,22 +983,28 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
     if (Object.hasOwn(meta, key)) {
       const first = spelled[key] ?? key;
       if (first !== written) {
-        refuse(`${step}: \`${key}\` is set twice, as \`${first}:\` and as \`${written}:\` — \`${first === key ? written : first}:\` is its former name, and reads as \`${key}:\`. Keep the \`${key}:\` line and delete the other.`);
+        refuse(
+          `${step}: \`${key}\` is set twice, as \`${first}:\` and as \`${written}:\` — \`${first === key ? written : first}:\` is its former name, and reads as \`${key}:\`. Keep the \`${key}:\` line and delete the other.`,
+        );
       }
-      refuse(`${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`);
+      refuse(
+        `${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`,
+      );
     }
     if (!value) {
-      refuse(key === 'check'
-        ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
-        : key === 'tools'
-          ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
-          : key === 'disallowedTools'
-            ? `${step}: \`${written}\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
-          : key === 'allowedTools'
-            ? `${step}: \`${written}\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
-            : key === 'budget'
-              ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
-              : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+      refuse(
+        key === 'check'
+          ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
+          : key === 'tools'
+            ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
+            : key === 'disallowedTools'
+              ? `${step}: \`${written}\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
+              : key === 'allowedTools'
+                ? `${step}: \`${written}\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
+                : key === 'budget'
+                  ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
+                  : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`,
+      );
     }
     meta[key as K] = value;
     if (written !== key) spelled[key] = written;
@@ -888,12 +1017,18 @@ function harnessOf(step: string, harness: string | undefined): string | undefine
   if (isRemoteHarness(harness)) {
     const name = remoteNameOf(harness)!;
     if (REMOTE_NAME.test(name)) return harness;
-    refuse(`${step}: \`harness: ${harness}\` names a remote A2A agent, and \`${name}\` is not a name one is declared under: lowercase words joined by dashes, as \`a2a-agents.json\` in the store declares them — \`harness: a2a:reviewer\`.`);
+    refuse(
+      `${step}: \`harness: ${harness}\` names a remote A2A agent, and \`${name}\` is not a name one is declared under: lowercase words joined by dashes, as \`a2a-agents.json\` in the store declares them — \`harness: a2a:reviewer\`.`,
+    );
   }
   if (harness === 'check') {
-    refuse(`${step}: \`harness: check\` is the run's own harness — it executes a step's \`check:\` command, and no step runs on it. Put the command in \`check:\` and run the step on one of: ${HARNESSES.join(', ')}.`);
+    refuse(
+      `${step}: \`harness: check\` is the run's own harness — it executes a step's \`check:\` command, and no step runs on it. Put the command in \`check:\` and run the step on one of: ${HARNESSES.join(', ')}.`,
+    );
   }
-  return refuse(`${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}, and \`a2a:<name>\` for a remote A2A agent the store's \`a2a-agents.json\` declares. Without the line, the step runs on ${DEFAULT_HARNESS}.`);
+  return refuse(
+    `${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}, and \`a2a:<name>\` for a remote A2A agent the store's \`a2a-agents.json\` declares. Without the line, the step runs on ${DEFAULT_HARNESS}.`,
+  );
 }
 
 const VOCABULARY = {
@@ -904,8 +1039,10 @@ const VOCABULARY = {
 
 /** The two fences, each one harness's: what a step on the other harness is told to write instead. */
 const FENCE_ELSEWHERE = {
-  permissionMode: (word: string) => `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex!.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
-  sandbox: () => `\`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${CLAUDE_MODES.join(', ')} — with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`. Write \`permissionMode:\` instead, or run the step on codex`,
+  permissionMode: (word: string) =>
+    `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex!.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
+  sandbox: () =>
+    `\`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${CLAUDE_MODES.join(', ')} — with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`. Write \`permissionMode:\` instead, or run the step on codex`,
 } as const;
 
 /**
@@ -918,20 +1055,27 @@ function wordOf(step: string, key: keyof typeof VOCABULARY, word: string | undef
   const words = lists[on];
   if (word === undefined || words?.includes(word)) return word;
   const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
-  if (!words) return refuse(`${step}: \`${key}: ${word}\` is not a key ${on} takes${where}. ${FENCE_ELSEWHERE[key as keyof typeof FENCE_ELSEWHERE](word)}.`);
+  if (!words)
+    return refuse(
+      `${step}: \`${key}: ${word}\` is not a key ${on} takes${where}. ${FENCE_ELSEWHERE[key as keyof typeof FENCE_ELSEWHERE](word)}.`,
+    );
   if (key === 'sandbox' && word === 'bypassPermissions') {
-    return refuse(`${step}: \`sandbox: bypassPermissions\` is Claude Code's word for its widest mode. Codex's own name for the sandbox that fences nothing is \`danger-full-access\`: write \`sandbox: danger-full-access\`. On ${on} it is one of: ${words.join(', ')}.`);
+    return refuse(
+      `${step}: \`sandbox: bypassPermissions\` is Claude Code's word for its widest mode. Codex's own name for the sandbox that fences nothing is \`danger-full-access\`: write \`sandbox: danger-full-access\`. On ${on} it is one of: ${words.join(', ')}.`,
+    );
   }
   const owner = HARNESSES.find((h) => lists[h]?.includes(word));
   // The other fence's word: a sandbox written as a mode, on a harness that has modes, or the other way round.
   const other = key === 'permissionMode' ? 'sandbox' : key === 'sandbox' ? 'permissionMode' : undefined;
   const across = other && HARNESSES.find((h) => VOCABULARY[other].lists[h]?.includes(word));
   return refuse(
-    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${where}.`
-    + ` On ${on} it is one of: ${words.join(', ')}.`
-    + (owner ? ` \`${word}\` is ${owner}'s word, and this step does not run on ${owner}.` : '')
-    + (across ? ` \`${word}\` is ${VOCABULARY[other].noun} ${across} has, written \`${other}: ${word}\` on a step that runs on ${across}.` : '')
-    + ' Without the line, the harness uses its own default.',
+    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${where}.` +
+      ` On ${on} it is one of: ${words.join(', ')}.` +
+      (owner ? ` \`${word}\` is ${owner}'s word, and this step does not run on ${owner}.` : '') +
+      (across
+        ? ` \`${word}\` is ${VOCABULARY[other].noun} ${across} has, written \`${other}: ${word}\` on a step that runs on ${across}.`
+        : '') +
+      ' Without the line, the harness uses its own default.',
   );
 }
 
@@ -950,21 +1094,35 @@ function toolsOf(step: string, tools: string | undefined, harness: string | unde
   const named = `${step}: \`tools: ${tools}\``;
   const written = `A step's tools are the harness's names for them, bare and comma-separated: ${TOOLS_EXAMPLE}.`;
   if (harness === 'codex') {
-    refuse(`${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`sandbox: read-only\` for a step that must not write.`);
+    refuse(
+      `${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`sandbox: read-only\` for a step that must not write.`,
+    );
   }
   if (/\([^)]*,|\[[^\]]*,|"[^"]*,|'[^']*,/.test(tools)) {
-    const pieces = tools.split(',').map((s) => `\`${s.trim()}\``).join(', ');
-    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as names. ${written}`);
+    const pieces = tools
+      .split(',')
+      .map((s) => `\`${s.trim()}\``)
+      .join(', ');
+    refuse(
+      `${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as names. ${written}`,
+    );
   }
-  const names = tools.split(',').map((s) => s.trim()).filter(Boolean);
+  const names = tools
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (!names.length) refuse(`${named} names no tool. ${written} Without the line, the step has the harness's own set.`);
   const spaced = names.find((n) => /\s/.test(n));
   if (spaced && !spaced.includes('(')) refuse(`${named} has a space inside \`${spaced}\`, which is not one name. ${written}`);
   const dressed = names.find((n) => /[\s()[\]"'`]/.test(n));
   if (dressed) {
-    refuse(`${named} has \`${dressed}\`, which is not a tool name: ${dressed.includes('(')
-      ? `it is a rule for what a tool may run, and \`tools:\` says which tools the session has — \`${dressed.slice(0, dressed.indexOf('('))}\`, whole`
-      : 'a name is written bare, without quotes or brackets'}. ${written}`);
+    refuse(
+      `${named} has \`${dressed}\`, which is not a tool name: ${
+        dressed.includes('(')
+          ? `it is a rule for what a tool may run, and \`tools:\` says which tools the session has — \`${dressed.slice(0, dressed.indexOf('('))}\`, whole`
+          : 'a name is written bare, without quotes or brackets'
+      }. ${written}`,
+    );
   }
   return names;
 }
@@ -987,7 +1145,7 @@ const RULE_LIST = {
     written: 'what the session may not have',
     may: 'may not run',
     sandbox: '`sandbox: read-only` for a step that must not write',
-    absent: 'the step is denied nothing beyond the checkout\'s settings',
+    absent: "the step is denied nothing beyond the checkout's settings",
     two: 'Two commands are two rules: `Bash(git push), Bash(git reset)`.',
   },
   allowedTools: {
@@ -1012,27 +1170,48 @@ const RULE_LIST = {
  * — and `tools:`'s quote check fired on such a rule whenever another entry followed it. A list written in brackets or quotes
  * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list at all.
  */
-function rulesOf(step: string, key: 'disallowedTools' | 'allowedTools', written: string | undefined, harness: string | undefined, spelled?: string): string[] | undefined {
+function rulesOf(
+  step: string,
+  key: 'disallowedTools' | 'allowedTools',
+  written: string | undefined,
+  harness: string | undefined,
+  spelled?: string,
+): string[] | undefined {
   if (written === undefined) return undefined;
   const w = RULE_LIST[key];
   // A line under the key's former name is quoted as written, and said to be the key.
   const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
   const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
   if (harness === 'codex') {
-    refuse(`${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`);
+    refuse(
+      `${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`,
+    );
   }
   if (/\([^)]*,/.test(written)) {
-    const pieces = written.split(',').map((x) => `\`${x.trim()}\``).join(', ');
-    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${shape} ${w.two}`);
+    const pieces = written
+      .split(',')
+      .map((x) => `\`${x.trim()}\``)
+      .join(', ');
+    refuse(
+      `${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${shape} ${w.two}`,
+    );
   }
-  const rules = written.split(',').map((x) => x.trim()).filter(Boolean);
+  const rules = written
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
   if (!rules.length) refuse(`${named} names no rule. ${shape} Without the line, ${w.absent}.`);
   const odd = rules.find((r) => !RULE.test(r));
   if (odd) {
-    refuse(`${named} has \`${odd}\`, which is not one rule: ${/[()]/.test(odd)
-      ? 'a rule has one pair of parentheses, right after the name, closed'
-      : /\s/.test(odd) ? 'a space outside the parentheses separates two rules, to the harness'
-      : 'a rule is a bare name, without quotes or brackets'}. ${shape}`);
+    refuse(
+      `${named} has \`${odd}\`, which is not one rule: ${
+        /[()]/.test(odd)
+          ? 'a rule has one pair of parentheses, right after the name, closed'
+          : /\s/.test(odd)
+            ? 'a space outside the parentheses separates two rules, to the harness'
+            : 'a rule is a bare name, without quotes or brackets'
+      }. ${shape}`,
+    );
   }
   const inert = rules.find((r) => FILE_TOOLS.some((tool) => r.startsWith(`${tool}(`)));
   if (inert) refuse(fileRuleRefusal(named, inert, key));
@@ -1059,9 +1238,11 @@ const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
  * covers the file-editing tools whichever list it is in.
  */
 const fileRuleRefusal = (named: string, rule: string, key: 'disallowedTools' | 'allowedTools'): string =>
-  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${key === 'allowedTools'
-    ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
-    : 'allows the write anyway — so the step would be fenced by nothing while its file reads as fenced'}. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
+  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${
+    key === 'allowedTools'
+      ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
+      : 'allows the write anyway — so the step would be fenced by nothing while its file reads as fenced'
+  }. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
 
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it
@@ -1072,7 +1253,9 @@ function remoteOf(step: string, remote: string | undefined): boolean | undefined
   if (remote === undefined) return undefined;
   if (remote === 'true') return true;
   if (remote === 'false') return false;
-  return refuse(`${step}: \`remote: ${remote}\` is not \`true\` or \`false\`. \`remote: true\` bridges every session of the step to claude.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not. Write one of the two, or delete the line.`);
+  return refuse(
+    `${step}: \`remote: ${remote}\` is not \`true\` or \`false\`. \`remote: true\` bridges every session of the step to claude.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not. Write one of the two, or delete the line.`,
+  );
 }
 
 /**
@@ -1083,10 +1266,14 @@ function remoteOf(step: string, remote: string | undefined): boolean | undefined
 function backgroundOf(step: string, background: string | undefined, harness: string | undefined): boolean | undefined {
   if (background === undefined) return undefined;
   if (background !== 'true' && background !== 'false') {
-    refuse(`${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job (\`claude -p\`). Write one of the two, or delete the line.`);
+    refuse(
+      `${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job (\`claude -p\`). Write one of the two, or delete the line.`,
+    );
   }
   if (background === 'true' && (harness ?? DEFAULT_HARNESS) !== 'claude') {
-    refuse(`${step}: \`background: true\` asks for a Claude Code background session (\`claude --bg\`), and the \`${harness}\` harness has no such mode: ${harness === 'codex' ? '`codex exec` runs a prompt and exits' : '`claude-detached` runs `claude -p` and nothing else'}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`.`);
+    refuse(
+      `${step}: \`background: true\` asks for a Claude Code background session (\`claude --bg\`), and the \`${harness}\` harness has no such mode: ${harness === 'codex' ? '`codex exec` runs a prompt and exits' : '`claude-detached` runs `claude -p` and nothing else'}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`.`,
+    );
   }
   return background === 'true';
 }
@@ -1099,8 +1286,12 @@ function countOf(step: string, key: keyof typeof COUNTS, value: string | undefin
   // `5m` is the one that shipped: NaN, journalled as null, and the step stopped on its first tick.
   // The unit is what the author meant, so the message does the arithmetic rather than the author.
   const unit = key === 'deadlineSeconds' ? /^(\d+)\s*([smh])$/.exec(value) : null;
-  const instead = unit ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\`` : `for example \`${key}: ${example}\``;
-  return refuse(`${step}: \`${key}: ${value}\` is not a count. \`${key}\` is ${counts}: a whole number ${least ? 'above zero' : 'of zero or more'}, in digits${unit ? ' with no unit' : ''} — ${instead}.`);
+  const instead = unit
+    ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\``
+    : `for example \`${key}: ${example}\``;
+  return refuse(
+    `${step}: \`${key}: ${value}\` is not a count. \`${key}\` is ${counts}: a whole number ${least ? 'above zero' : 'of zero or more'}, in digits${unit ? ' with no unit' : ''} — ${instead}.`,
+  );
 }
 
 const CONTEXT_EXAMPLE = '`context: 200k`, or `context: 150000`';
@@ -1117,7 +1308,8 @@ export function tokensOf(written: string): number | undefined {
 }
 
 /** A context window as `renderStep` writes it, whatever the file said: thousands with `k` when it is a whole number of them, digits otherwise. */
-export const contextText = (tokens: number): string => (Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
+export const contextText = (tokens: number): string =>
+  Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
 
 /**
  * `context:` as tokens, refused unless a number of them (`tokensOf`) in the range the step's harness takes (`CONTEXT_WINDOWS`), and on a
@@ -1131,16 +1323,24 @@ function contextOf(step: string, context: string | undefined, harness: string | 
   const range = CONTEXT_WINDOWS[on];
   if (!range) {
     const windowed = HARNESSES.filter((h) => CONTEXT_WINDOWS[h]);
-    return refuse(`${named} sets the session's context window, and ${on} has no such knob: \`codex exec\` runs on its model's own window, whatever the step says. Delete the line, or run the step on ${windowed.join(' or ')}.`);
+    return refuse(
+      `${named} sets the session's context window, and ${on} has no such knob: \`codex exec\` runs on its model's own window, whatever the step says. Delete the line, or run the step on ${windowed.join(' or ')}.`,
+    );
   }
   const tokens = tokensOf(context);
   if (tokens === undefined) {
-    return refuse(`${named} is not a number of tokens. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example ${CONTEXT_EXAMPLE}.`);
+    return refuse(
+      `${named} is not a number of tokens. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example ${CONTEXT_EXAMPLE}.`,
+    );
   }
   if (tokens < range.least || tokens > range.most) {
     const thousands = tokens * 1_000 >= range.least && tokens * 1_000 <= range.most && /^\d+$/.test(context.trim());
-    return refuse(`${named} is ${tokens} tokens, and ${on} takes a window from ${contextText(range.least)} to ${contextText(range.most)} tokens${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
-      + (thousands ? ` For ${tokens} thousand, write \`context: ${tokens}k\`.` : ` Give one in that range — ${CONTEXT_EXAMPLE} — or delete the line for the model's whole window.`));
+    return refuse(
+      `${named} is ${tokens} tokens, and ${on} takes a window from ${contextText(range.least)} to ${contextText(range.most)} tokens${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.` +
+        (thousands
+          ? ` For ${tokens} thousand, write \`context: ${tokens}k\`.`
+          : ` Give one in that range — ${CONTEXT_EXAMPLE} — or delete the line for the model's whole window.`),
+    );
   }
   return tokens;
 }
@@ -1150,7 +1350,10 @@ function contextOf(step: string, context: string | undefined, harness: string | 
  * session was started with, since Claude Code's resumed copy keeps only the flags it is given, and one given another window would compact
  * where the session it continues did not. `validate` refuses a `resume:` step whose own `context:` differs; one without the line inherits.
  */
-export function sessionContext(step: Pick<Workflow, 'name' | 'resume' | 'context'>, steps: readonly Pick<Workflow, 'name' | 'resume' | 'context'>[]): number | undefined {
+export function sessionContext(
+  step: Pick<Workflow, 'name' | 'resume' | 'context'>,
+  steps: readonly Pick<Workflow, 'name' | 'resume' | 'context'>[],
+): number | undefined {
   const seen = new Set<string>();
   let at: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = step;
   while (at?.resume && !seen.has(at.name)) {
@@ -1184,27 +1387,39 @@ const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none
  * Why a `claude --bg` session keeps no budget, in the engine's words (agent-runtime's `claudeCodeRefuses`), which `test/vocabulary.test.ts`
  * holds this copy to.
  */
-const BACKGROUND_KEEPS_NO_CAP = 'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured)';
+const BACKGROUND_KEEPS_NO_CAP =
+  'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured)';
 
 /**
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), on codex, and beside `background: true`, as the engine refuses a
  * `budgetUsd` there — here, so a folder is refused at `wf start` and not on its first pass. `$5` and `5 USD` are what the author meant, so
  * the refusal writes the amount back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
  */
-function budgetOf(step: string, budget: string | undefined, harness: string | undefined, background: boolean | undefined): number | undefined {
+function budgetOf(
+  step: string,
+  budget: string | undefined,
+  harness: string | undefined,
+  background: boolean | undefined,
+): number | undefined {
   if (budget === undefined) return undefined;
   const named = `${step}: \`budget: ${budget}\``;
   if (harness === 'codex') {
-    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude or claude-detached, whose \`claude -p\` ends a session once the step's tries together have cost the budget.`);
+    refuse(
+      `${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude or claude-detached, whose \`claude -p\` ends a session once the step's tries together have cost the budget.`,
+    );
   }
   if (background) {
-    refuse(`${named} is a spend cap, and \`background: true\` runs the step as a background session: ${BACKGROUND_KEEPS_NO_CAP}. Delete \`background: true\` to run the step as a job (\`claude -p\`), which ends its session at the cap, or delete the budget line.`);
+    refuse(
+      `${named} is a spend cap, and \`background: true\` runs the step as a background session: ${BACKGROUND_KEEPS_NO_CAP}. Delete \`background: true\` to run the step as a job (\`claude -p\`), which ends its session at the cap, or delete the budget line.`,
+    );
   }
   const amount = dollarsOf(budget);
   if (amount !== undefined) return amount;
   const bare = budget.replace(/^\$\s*/, '').replace(/\s*(?:usd|dollars?)$/i, '');
   const unit = dollarsOf(bare) !== undefined;
-  return refuse(`${named} is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`);
+  return refuse(
+    `${named} is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`,
+  );
 }
 
 /**
@@ -1215,9 +1430,13 @@ function gateOf(step: string, gate: string | undefined): true | undefined {
   if (gate === undefined) return undefined;
   if (gate === 'true') return true;
   if (gate === 'false') {
-    refuse(`${step}: \`gate: false\` is what a step without the line already is. Delete the line: a step has no gate unless it says \`gate: true\`, or a run is started with --gate ${step}.`);
+    refuse(
+      `${step}: \`gate: false\` is what a step without the line already is. Delete the line: a step has no gate unless it says \`gate: true\`, or a run is started with --gate ${step}.`,
+    );
   }
-  return refuse(`${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`);
+  return refuse(
+    `${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`,
+  );
 }
 
 /**
@@ -1234,32 +1453,49 @@ export const WORKSPACES: readonly string[] = ['main', 'folder'];
  * stages, and commits that merge onto the base branch on its word; and not on codex, which cannot be denied the commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
  */
 function workspaceOf(
-  step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined, gate: string | undefined, retries: string | undefined,
+  step: string,
+  workspace: string | undefined,
+  check: string | undefined,
+  resume: string | undefined,
+  gate: string | undefined,
+  retries: string | undefined,
   harness: string | undefined,
 ): 'main' | 'folder' | undefined {
   if (workspace === undefined) return undefined;
   if (workspace === 'folder') return 'folder';
   if (workspace === 'worktree') {
-    refuse(`${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`);
+    refuse(
+      `${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`,
+    );
   }
   if (workspace !== 'main') {
-    refuse(`${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`);
+    refuse(
+      `${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`,
+    );
   }
   // A check beside it is run by the run on the merge the step leaves staged, and it lands or aborts that merge (`landingDue`): only on a step a
   // person approves first, since the run commits onto the base branch on the check's word, and nothing else may start that.
   if (check !== undefined && gate?.trim() !== 'true') {
-    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no \`gate: true\`. Add \`gate: true\`, or delete the \`check:\` line.`);
+    refuse(
+      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no \`gate: true\`. Add \`gate: true\`, or delete the \`check:\` line.`,
+    );
   }
   // The run keeps such a step from committing the merge itself with a deny list (`filedDenies`), and codex takes none.
   if (check !== undefined && harness === 'codex') {
-    refuse(`${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying \`git commit\` — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`);
+    refuse(
+      `${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying \`git commit\` — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
+    );
   }
   // A try of an ending does the act on the base branch again, and only a person asks for one: `wf retry`, never `retries:`.
   if (retries !== undefined) {
-    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: wf retry <run> ${step}. Delete the \`retries:\` line.`);
+    refuse(
+      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: wf retry <run> ${step}. Delete the \`retries:\` line.`,
+    );
   }
   if (resume !== undefined) {
-    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`);
+    refuse(
+      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`,
+    );
   }
   return 'main';
 }
@@ -1272,16 +1508,27 @@ export const DENIALS: readonly string[] = ['fail'];
  * codex, whose `codex exec` records none, and beside `background: true`, whose `claude --bg` session records none (agent-runtime's open
  * issue 28). Only a job, `claude -p` on `claude` or `claude-detached`, says what it was denied.
  */
-function denialsOf(step: string, denials: string | undefined, harness: string | undefined, background: boolean | undefined): 'fail' | undefined {
+function denialsOf(
+  step: string,
+  denials: string | undefined,
+  harness: string | undefined,
+  background: boolean | undefined,
+): 'fail' | undefined {
   if (denials === undefined) return undefined;
   if (denials !== 'fail') {
-    refuse(`${step}: \`denials: ${denials}\` is not \`fail\`. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing. Write \`denials: fail\`, or delete the line.`);
+    refuse(
+      `${step}: \`denials: ${denials}\` is not \`fail\`. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing. Write \`denials: fail\`, or delete the line.`,
+    );
   }
   if ((harness ?? DEFAULT_HARNESS) === 'codex') {
-    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`);
+    refuse(
+      `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`,
+    );
   }
   if (background) {
-    refuse(`${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job (\`claude -p\`), which records each call it was denied, or delete \`denials: fail\`.`);
+    refuse(
+      `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job (\`claude -p\`), which records each call it was denied, or delete \`denials: fail\`.`,
+    );
   }
   return 'fail';
 }
@@ -1335,7 +1582,14 @@ export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
 function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
   if (!path.startsWith('/') || path.startsWith('//')) return path;
   if (cwd && path.startsWith(`${dirOf(cwd)}/`)) return path.slice(dirOf(cwd).length + 1);
-  return `/${runId ? path.split('/').map((part) => (part === runId ? '*' : part)).join('/') : path}`;
+  return `/${
+    runId
+      ? path
+          .split('/')
+          .map((part) => (part === runId ? '*' : part))
+          .join('/')
+      : path
+  }`;
 }
 
 /**
@@ -1369,7 +1623,10 @@ function pathUnder(pattern: string, path: string, cwd: string | undefined): bool
   const relative = !pattern.startsWith('//');
   if (relative && !cwd) return false;
   const bare = relative ? pattern.replace(/^\.?\//, '') : pattern.slice(1);
-  const glob = bare.split(/(\*\*|\*|\?)/).map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&'))).join('');
+  const glob = bare
+    .split(/(\*\*|\*|\?)/)
+    .map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&')))
+    .join('');
   // A relative pattern with no `/` in it names a file at any depth below the directory, as a gitignore line does.
   const from = relative ? `${dirOf(cwd!).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
   return new RegExp(`^${from}${glob}(?:/.*)?$`, 's').test(target);
@@ -1386,14 +1643,18 @@ export const SLOTS: readonly string[] = ['none'];
 function slotOf(step: string, slot: string | undefined): 'none' | undefined {
   if (slot === undefined) return undefined;
   if (slot === 'none') return 'none';
-  return refuse(`${step}: \`slot: ${slot}\` is not \`none\`. \`slot: none\` keeps this step's run out of the cap on runs in flight (WF_MAX_RUNS), for a workflow of one step that watches the other runs rather than doing a run's work. Without the line, the run waits for a slot and holds one, like every other run.`);
+  return refuse(
+    `${step}: \`slot: ${slot}\` is not \`none\`. \`slot: none\` keeps this step's run out of the cap on runs in flight (WF_MAX_RUNS), for a workflow of one step that watches the other runs rather than doing a run's work. Without the line, the run waits for a slot and holds one, like every other run.`,
+  );
 }
 
 function checkOf(step: string, check: string | undefined): string | undefined {
   // Each of these reads as "no check" to a person and as a command to the shell, which cannot find
   // it: exit 127 on every attempt, for a check nobody meant to run.
   if (check !== undefined && ['none', '""', "''"].includes(check)) {
-    refuse(`${step}: \`check: ${check}\` would run \`${check}\` as a shell command, which exits 127 and fails the step every time. Delete the line — a step without \`check:\` runs no check.`);
+    refuse(
+      `${step}: \`check: ${check}\` would run \`${check}\` as a shell command, which exits 127 and fails the step every time. Delete the line — a step without \`check:\` runs no check.`,
+    );
   }
   return check;
 }
@@ -1406,7 +1667,11 @@ function checkOf(step: string, check: string | undefined): string | undefined {
  * `additionalProperties: false`. Refused here rather than by the harness at spawn, which is after a
  * run has started and a step has been filed on it.
  */
-function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): StepOutput | undefined {
+function outputOf(
+  step: string,
+  file: string | undefined,
+  read: ((file: string) => string | undefined) | undefined,
+): StepOutput | undefined {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
   // An agent is named by its file, `agents/reviewer.md`; a step by its name, `review`.
@@ -1414,34 +1679,57 @@ function outputOf(step: string, file: string | undefined, read: ((file: string) 
   // Refused before it is read: a folder is what a run freezes and the builder writes back, and a schema outside it is part of the step
   // that neither carries. Read through the api, a file outside it would also answer a refusal with the start of whatever it holds.
   if (path.isAbsolute(file) || path.normalize(file).split(/[\\/]/)[0] === '..') {
-    refuse(`${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${beside} and name it from there — \`output: ${path.basename(beside, '.md')}.schema.json\` — or delete the line, and the step declares no output.`);
+    refuse(
+      `${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${beside} and name it from there — \`output: ${path.basename(beside, '.md')}.schema.json\` — or delete the line, and the step declares no output.`,
+    );
   }
-  if (!read) refuse(`${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`);
+  if (!read)
+    refuse(
+      `${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`,
+    );
   const text = read(file);
   if (text === undefined) {
-    refuse(`${named} is not there. It is a JSON Schema file, relative to the workflow folder — write it beside ${beside}, correct the path, or delete the line and the step declares no output.`);
+    refuse(
+      `${named} is not there. It is a JSON Schema file, relative to the workflow folder — write it beside ${beside}, correct the path, or delete the line and the step declares no output.`,
+    );
   }
   let schema: unknown;
-  try { schema = JSON.parse(text); } catch (e) {
-    refuse(`${named} is not JSON (${(e as Error).message}). It is a JSON Schema: an object with \`"type": "object"\` and the fields the step declares under \`properties\`.`);
+  try {
+    schema = JSON.parse(text);
+  } catch (e) {
+    refuse(
+      `${named} is not JSON (${(e as Error).message}). It is a JSON Schema: an object with \`"type": "object"\` and the fields the step declares under \`properties\`.`,
+    );
   }
   if (!isObject(schema) || schema.type !== 'object' || !isObject(schema.properties) || !Object.keys(schema.properties).length) {
-    refuse(`${named} is not a schema of fields. Give it \`"type": "object"\` and at least one field under \`properties\` — or delete the line, and the step declares no output.`);
+    refuse(
+      `${named} is not a schema of fields. Give it \`"type": "object"\` and at least one field under \`properties\` — or delete the line, and the step declares no output.`,
+    );
   }
-  const extra = Object.keys(schema).filter((k) => !['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$schema'].includes(k));
+  const extra = Object.keys(schema).filter(
+    (k) => !['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$schema'].includes(k),
+  );
   if (extra.length) {
-    refuse(`${named} sets ${extra.map((k) => `\`${k}\``).join(', ')} beside its fields, and only its \`properties\` are merged into the closeout — the rest would be dropped on the way to the harness. Inline what the fields refer to, and delete the key.`);
+    refuse(
+      `${named} sets ${extra.map((k) => `\`${k}\``).join(', ')} beside its fields, and only its \`properties\` are merged into the closeout — the rest would be dropped on the way to the harness. Inline what the fields refer to, and delete the key.`,
+    );
   }
   const taken = Object.keys(schema.properties).filter((k) => (CLOSEOUT_FIELDS as readonly string[]).includes(k));
   if (taken.length) {
-    refuse(`${named} declares ${taken.map((k) => `\`${k}\``).join(', ')}, which every closeout already has. ${CLOSEOUT_FIELDS.map((k) => `\`${k}\``).join(', ')} are the run's, and \`summary\` goes to the person who decides, never to a step. Rename the field.`);
+    refuse(
+      `${named} declares ${taken.map((k) => `\`${k}\``).join(', ')}, which every closeout already has. ${CLOSEOUT_FIELDS.map((k) => `\`${k}\``).join(', ')} are the run's, and \`summary\` goes to the person who decides, never to a step. Rename the field.`,
+    );
   }
   const loose = looseAt(schema, '');
   if (loose && 'ref' in loose) {
-    refuse(`${named} uses \`${loose.ref}\` at ${loose.at || 'the top'}. The run checks a schema is strict by reading it, and does not follow references — an object it did not read would reach the harness unchecked. Inline what it points at, and delete \`${loose.ref}\`.`);
+    refuse(
+      `${named} uses \`${loose.ref}\` at ${loose.at || 'the top'}. The run checks a schema is strict by reading it, and does not follow references — an object it did not read would reach the harness unchecked. Inline what it points at, and delete \`${loose.ref}\`.`,
+    );
   }
   if (loose) {
-    refuse(`${named} is not strict at ${loose.at || 'the top'}: ${loose.why}. Codex refuses a structured output whose objects do not list every property in \`required\` and set \`"additionalProperties": false\`. A field that may be absent is required and nullable instead — \`"type": ["string", "null"]\`.`);
+    refuse(
+      `${named} is not strict at ${loose.at || 'the top'}: ${loose.why}. Codex refuses a structured output whose objects do not list every property in \`required\` and set \`"additionalProperties": false\`. A field that may be absent is required and nullable instead — \`"type": ["string", "null"]\`.`,
+    );
   }
   return { file, schema: schema as OutputSchema };
 }
@@ -1490,7 +1778,9 @@ export function skillEntryOf(file: string, id: string, text: string): AgentSkill
   const { words, list } = entryValuesOf(file, text);
   const description = words('description');
   if (description === undefined) {
-    refuse(`${file} has no \`description:\`, and the A2A protocol marks a skill's description REQUIRED — Claude Code lists a skill by it too. Write one line saying what it does: \`description: <what it does, one line>\`.`);
+    refuse(
+      `${file} has no \`description:\`, and the A2A protocol marks a skill's description REQUIRED — Claude Code lists a skill by it too. Write one line saying what it does: \`description: <what it does, one line>\`.`,
+    );
   }
   const examples = list('examples');
   return {
@@ -1503,10 +1793,15 @@ export function skillEntryOf(file: string, id: string, text: string): AgentSkill
 }
 
 /** The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one line of text, or a list — and refused as it refuses. */
-function entryValuesOf(file: string, text: string): { words: (key: EntryKey) => string | undefined; list: (key: EntryKey) => string[] | undefined } {
+function entryValuesOf(
+  file: string,
+  text: string,
+): { words: (key: EntryKey) => string | undefined; list: (key: EntryKey) => string[] | undefined } {
   const { block } = splitFrontmatter(file, text);
   if (block === null) {
-    refuse(`${file} has no frontmatter, and a skill's card entry is read from it: Claude Code lists a skill by its description. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`);
+    refuse(
+      `${file} has no frontmatter, and a skill's card entry is read from it: Claude Code lists a skill by its description. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`,
+    );
   }
   const values: Partial<Record<EntryKey, string | string[]>> = {};
   let reading: EntryKey | undefined;
@@ -1520,23 +1815,31 @@ function entryValuesOf(file: string, text: string): { words: (key: EntryKey) => 
     }
     const i = line.indexOf(':');
     const key = i > 0 ? line.slice(0, i).trim() : '';
-    reading = (ENTRY_KEYS as readonly string[]).includes(key) ? key as EntryKey : undefined;
+    reading = (ENTRY_KEYS as readonly string[]).includes(key) ? (key as EntryKey) : undefined;
     if (reading === undefined) continue;
-    if (Object.hasOwn(values, reading)) refuse(`${file}: \`${reading}\` is set twice, and YAML reads no file that says two things. Keep one line.`);
+    if (Object.hasOwn(values, reading))
+      refuse(`${file}: \`${reading}\` is set twice, and YAML reads no file that says two things. Keep one line.`);
     const value = entryValue(file, reading, line.slice(i + 1).trim());
     if (value !== undefined) values[reading] = value;
   }
   const words = (key: EntryKey): string | undefined => {
     const value = values[key];
-    if (Array.isArray(value)) refuse(`${file}: \`${key}\` is one line of text, not a list. Write it so: \`${key}: <${key === 'description' ? 'what it does' : key}>\`.`);
+    if (Array.isArray(value))
+      refuse(
+        `${file}: \`${key}\` is one line of text, not a list. Write it so: \`${key}: <${key === 'description' ? 'what it does' : key}>\`.`,
+      );
     return value?.trim() || undefined;
   };
   const list = (key: EntryKey): string[] | undefined => {
     const value = values[key];
     if (value === undefined) return undefined;
     const example = key === 'tags' ? '["code", "review"]' : '["Use this when…"]';
-    if (!Array.isArray(value)) refuse(`${file}: \`${key}: ${value}\` is one line of text, and \`${key}\` is a list: \`${key}: ${example}\`.`);
-    if (!value.length) refuse(`${file}: \`${key}\` is an empty list, which says as little as none. Give ${key === 'tags' ? 'a word or two' : 'one'} — \`${key}: ${example}\` — or delete the line${key === 'tags' ? ', and the skill is tagged with its name' : ''}.`);
+    if (!Array.isArray(value))
+      refuse(`${file}: \`${key}: ${value}\` is one line of text, and \`${key}\` is a list: \`${key}: ${example}\`.`);
+    if (!value.length)
+      refuse(
+        `${file}: \`${key}\` is an empty list, which says as little as none. Give ${key === 'tags' ? 'a word or two' : 'one'} — \`${key}: ${example}\` — or delete the line${key === 'tags' ? ', and the skill is tagged with its name' : ''}.`,
+      );
     return value;
   };
   return { words, list };
@@ -1594,7 +1897,10 @@ export function renderSkill(draft: SkillDraft, was?: string): string {
   if (named !== undefined) refuse(named);
   const file = `${SKILLS_FOLDER}/${draft.name}/SKILL.md`;
   const oneLine = (key: string, text: string): string => {
-    if (/[\r\n]/.test(text)) refuse(`${file}: \`${key}\` holds a line break, and a card reads each of its keys off one line: what follows the break would be read as a line of its own. Write it on one line.`);
+    if (/[\r\n]/.test(text))
+      refuse(
+        `${file}: \`${key}\` holds a line break, and a card reads each of its keys off one line: what follows the break would be read as a line of its own. Write it on one line.`,
+      );
     return text;
   };
   const words = (key: 'title' | 'description'): string[] => {
@@ -1629,7 +1935,11 @@ export function renderSkill(draft: SkillDraft, was?: string): string {
  */
 function keptLines(text: string): string[] {
   let block: string | null;
-  try { block = splitFrontmatter('', text).block; } catch { return []; }
+  try {
+    block = splitFrontmatter('', text).block;
+  } catch {
+    return [];
+  }
   const kept: string[] = [];
   let keeping = false;
   for (const raw of (block ?? '').split('\n')) {
@@ -1659,7 +1969,10 @@ function keptLines(text: string): string[] {
  */
 export function withPreload(file: string, text: string, on: boolean): string {
   const { block } = splitFrontmatter(file, text);
-  if (block === null) refuse(`${file} has no frontmatter, and \`preload:\` is a line of it. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`);
+  if (block === null)
+    refuse(
+      `${file} has no frontmatter, and \`preload:\` is a line of it. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`,
+    );
   const normal = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const rest = normal.slice(FRONTMATTER.exec(normal)![0].length);
   const lines: string[] = [];
@@ -1672,15 +1985,18 @@ export function withPreload(file: string, text: string, on: boolean): string {
   if (on) lines.push('preload: true');
   const written = `---\n${lines.map((line) => `${line}\n`).join('')}---\n${rest}`;
   if ((frontmatterKey(written, 'preload') === 'true') !== on) {
-    refuse(`${file}: its \`preload:\` could not be written so it reads ${on}: a line of its frontmatter sets it where a line of its own would not be read. Edit the file by hand.`);
+    refuse(
+      `${file}: its \`preload:\` could not be written so it reads ${on}: a line of its frontmatter sets it where a line of its own would not be read. Edit the file by hand.`,
+    );
   }
   return written;
 }
 
 /** The refusal of a card key written over more than one line. */
-const oneLine = (file: string, key: EntryKey): string => (ENTRY_LISTS.includes(key)
-  ? `${file}: \`${key}\` is a list written over several lines, and a card reads each of its keys off one line. Write it on one: \`${key}: ${key === 'tags' ? '["code", "review"]' : '["Use this when…"]'}\`.`
-  : `${file}: \`${key}\` goes on over several lines, and a card reads each of its keys off one line. Write it on one: \`${key}: "<${key === 'description' ? 'what it does' : key}>"\`.`);
+const oneLine = (file: string, key: EntryKey): string =>
+  ENTRY_LISTS.includes(key)
+    ? `${file}: \`${key}\` is a list written over several lines, and a card reads each of its keys off one line. Write it on one: \`${key}: ${key === 'tags' ? '["code", "review"]' : '["Use this when…"]'}\`.`
+    : `${file}: \`${key}\` goes on over several lines, and a card reads each of its keys off one line. Write it on one: \`${key}: "<${key === 'description' ? 'what it does' : key}>"\`.`;
 
 /**
  * One value of a card key, as YAML reads it where the two agree: a plain value, one in double quotes (JSON's escapes, which are YAML's), one in
@@ -1689,25 +2005,36 @@ const oneLine = (file: string, key: EntryKey): string => (ENTRY_LISTS.includes(k
  */
 function entryValue(file: string, key: EntryKey, written: string): string | string[] | undefined {
   if (!written) return undefined;
-  const form = ENTRY_LISTS.includes(key) ? `\`${key}: ${key === 'tags' ? '["code", "review"]' : '["Use this when…"]'}\`` : `\`${key}: "<${key === 'description' ? 'what it does' : key}>"\``;
+  const form = ENTRY_LISTS.includes(key)
+    ? `\`${key}: ${key === 'tags' ? '["code", "review"]' : '["Use this when…"]'}\``
+    : `\`${key}: "<${key === 'description' ? 'what it does' : key}>"\``;
   const cannot = (why: string): never => refuse(`${file}: \`${key}: ${written}\` ${why}. Write it on one line, as JSON: ${form}.`);
   if (/^[|>]/.test(written)) return refuse(oneLine(file, key));
   if (written.startsWith('[')) {
     let read: unknown;
-    try { read = JSON.parse(written); } catch { return cannot('is not a list a card reads — a list is JSON, on one line, each item in double quotes'); }
-    if (!Array.isArray(read) || read.some((item) => typeof item !== 'string' || !item.trim())) return cannot('is not a list of words, each a line of text');
+    try {
+      read = JSON.parse(written);
+    } catch {
+      return cannot('is not a list a card reads — a list is JSON, on one line, each item in double quotes');
+    }
+    if (!Array.isArray(read) || read.some((item) => typeof item !== 'string' || !item.trim()))
+      return cannot('is not a list of words, each a line of text');
     return (read as string[]).map((item) => item.trim());
   }
   if (written.startsWith('"')) {
     try {
       const read: unknown = JSON.parse(written);
       if (typeof read === 'string') return read;
-    } catch { /* refused below */ }
+    } catch {
+      /* refused below */
+    }
     return cannot('is not one quoted line: a quote inside it is written \\", and nothing follows the closing quote');
   }
   if (written.startsWith("'")) {
     const m = /^'((?:[^']|'')*)'$/.exec(written);
-    return m ? m[1]!.replace(/''/g, "'") : cannot("is not one quoted line: a quote inside it is written '', and nothing follows the closing quote");
+    return m
+      ? m[1]!.replace(/''/g, "'")
+      : cannot("is not one quoted line: a quote inside it is written '', and nothing follows the closing quote");
   }
   if (/^[{&*!%@`]/.test(written)) return cannot('starts with a character YAML reads as something other than text');
   if (/:(\s|$)/.test(written)) return cannot('holds a colon and a space, which YAML reads as a map, not as text');
@@ -1716,7 +2043,19 @@ function entryValue(file: string, key: EntryKey, written: string): string | stri
 }
 
 /** Keywords whose value is a schema. `items` may also be an array of them, as older drafts wrote it. */
-const ONE_SCHEMA = ['items', 'additionalItems', 'additionalProperties', 'unevaluatedItems', 'unevaluatedProperties', 'contains', 'propertyNames', 'not', 'if', 'then', 'else'];
+const ONE_SCHEMA = [
+  'items',
+  'additionalItems',
+  'additionalProperties',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+  'contains',
+  'propertyNames',
+  'not',
+  'if',
+  'then',
+  'else',
+];
 /** Keywords whose value is an array of schemas. */
 const SCHEMA_LISTS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
 /** Keywords whose value maps a name to a schema. */
@@ -1742,7 +2081,8 @@ function looseAt(node: unknown, at: string): { at: string; why: string } | { at:
     const required = Array.isArray(node.required) ? node.required : [];
     const missing = properties.filter((p) => !required.includes(p));
     const stray = required.filter((r) => !properties.includes(r as string));
-    if (missing.length) return { at, why: `${missing.map((p) => `\`${p}\``).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not in \`required\`` };
+    if (missing.length)
+      return { at, why: `${missing.map((p) => `\`${p}\``).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not in \`required\`` };
     if (stray.length) return { at, why: `\`required\` names ${stray.map((p) => `\`${String(p)}\``).join(', ')}, which is not a property` };
     if (node.additionalProperties !== false) return { at, why: '`additionalProperties` is not `false`' };
   }
@@ -1750,7 +2090,8 @@ function looseAt(node: unknown, at: string): { at: string; why: string } | { at:
   const children: Array<[string, unknown]> = [];
   for (const k of SCHEMA_MAPS) {
     const map = node[k];
-    if (isObject(map)) for (const [name, v] of Object.entries(map)) children.push([k === 'properties' ? below(name) : below(`${k}.${name}`), v]);
+    if (isObject(map))
+      for (const [name, v] of Object.entries(map)) children.push([k === 'properties' ? below(name) : below(`${k}.${name}`), v]);
   }
   for (const k of ONE_SCHEMA) {
     const values = k === 'items' && Array.isArray(node.items) ? node.items : [node[k]];
@@ -1780,16 +2121,21 @@ export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
  */
 export function stepNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its file is named, without .md — implement, say.';
-  if (typeof name !== 'string' || !name.trim()) return `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`;
+  if (typeof name !== 'string' || !name.trim())
+    return `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`;
   const as = `\`${name}\` is not a step's name:`;
   if (/[\\/]/.test(name)) return `${as} a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`;
   // oxlint-disable-next-line no-control-regex -- a name holding a control character is refused, so the class must name them
-  if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
-  if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`;
-  if (name !== name.trim()) return `${as} \`after:\` trims every name it lists, so no step could wait on it. Write it without the spaces around it.`;
+  if (/[\u0000-\u001f\u007f]/.test(name))
+    return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
+  if (name.startsWith('.'))
+    return `${as} a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`;
+  if (name !== name.trim())
+    return `${as} \`after:\` trims every name it lists, so no step could wait on it. Write it without the spaces around it.`;
   if (name.includes(',')) return `${as} \`after:\` and \`input:\` split on every comma, so no step could wait on it. ${fix}`;
   if (/\.md$/i.test(name)) return `${as} it is a file's name, and a step is named without its .md: \`${name.slice(0, -3)}\`.`;
-  if (isReadme(`${name}.md`)) return `${as} ${name}.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`;
+  if (isReadme(`${name}.md`))
+    return `${as} ${name}.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`;
   if (new TextEncoder().encode(`${name}.md`).length > 255) return `${as} ${name}.md is longer than a file's name may be, 255 bytes. ${fix}`;
   return undefined;
 }
@@ -1836,7 +2182,12 @@ export const stepFiles = (entries: readonly string[]): string[] => entries.filte
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a folder
  * written is refused for what a folder read would be, in the same words.
  */
-export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined, agents?: Agents, skills?: SkillsFound): Workflow[] {
+export function parseFolder(
+  files: ReadonlyArray<readonly [name: string, text: string]>,
+  read?: (file: string) => string | undefined,
+  agents?: Agents,
+  skills?: SkillsFound,
+): Workflow[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
   const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills));
   validate(steps);
@@ -1849,7 +2200,22 @@ export function parseFolder(files: ReadonlyArray<readonly [name: string, text: s
  * the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is
  * refused by name.
  */
-export const AGENT_KEYS = ['description', 'skills', 'systemPrompt', 'harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'] as const;
+export const AGENT_KEYS = [
+  'description',
+  'skills',
+  'systemPrompt',
+  'harness',
+  'model',
+  'effort',
+  'context',
+  'permissionMode',
+  'sandbox',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'remote',
+  'output',
+] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
  * The agent keys that are the agent's own and no step's: what it is for, the skills it is given and its system prompt. A step has none of them, so none is a `STEP_KEY`, and code outside the package that reads the role keys leaves them out
@@ -1897,7 +2263,11 @@ export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
 export function skillTurnCost(id: string, text: string): SkillCost {
   let block: string | null = null;
   let body = text;
-  try { ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text)); } catch { /* read as all body */ }
+  try {
+    ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text));
+  } catch {
+    /* read as all body */
+  }
   const framed = `---\n${block ?? ''}---\n`;
   const preload = block !== null && frontmatterKey(framed, 'preload') === 'true';
   const description = block === null ? '' : (frontmatterKey(framed, 'description') ?? '').replace(/^(["'])(.*)\1$/, '$2');
@@ -1921,7 +2291,8 @@ export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; loo
 export const AUTO_UNSUPPORTED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
 
 /** Whether Claude Code keeps `auto` on `model`: false for one measured to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
-export const keepsAuto = (model: string | undefined): boolean => model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
+export const keepsAuto = (model: string | undefined): boolean =>
+  model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
 
 /** The permission mode a Claude Code step is filed with when it names none: the runtime's own (`--permission-mode auto`). */
 export const DEFAULT_PERMISSION_MODE = 'auto';
@@ -1958,11 +2329,13 @@ export const CLAUDE_CODE_IGNORED: readonly string[] = ['color'];
  * the run carries none of them to its sessions, so a line read and dropped would be a constraint nobody enforces (as `fileRuleRefusal`).
  */
 const CLAUDE_CODE_REFUSED: Record<string, string> = {
-  maxTurns: 'a run bounds a session by the step\'s `budget:` and `deadlineSeconds:`, never by a count of turns',
-  mcpServers: 'a run gives a session no MCP servers of an agent\'s own; the repository\'s `.mcp.json` is what its sessions load',
-  hooks: 'a run starts no hooks of an agent\'s own; hooks go in the repository\'s `.claude/settings.json`, which its sessions read in a checkout Claude Code trusts',
-  memory: 'a run keeps no memory of an agent\'s own between sessions: what a step knows is its brief, its workspace and the session it continues',
-  isolation: 'where a step works is the step\'s `workspace:` — a worktree of its own unless it says `main` or `folder`',
+  maxTurns: "a run bounds a session by the step's `budget:` and `deadlineSeconds:`, never by a count of turns",
+  mcpServers: "a run gives a session no MCP servers of an agent's own; the repository's `.mcp.json` is what its sessions load",
+  hooks:
+    "a run starts no hooks of an agent's own; hooks go in the repository's `.claude/settings.json`, which its sessions read in a checkout Claude Code trusts",
+  memory:
+    "a run keeps no memory of an agent's own between sessions: what a step knows is its brief, its workspace and the session it continues",
+  isolation: "where a step works is the step's `workspace:` — a worktree of its own unless it says `main` or `folder`",
 };
 
 /** Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. */
@@ -1993,11 +2366,17 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   // `color` is Claude Code's alone (`CLAUDE_CODE_IGNORED`): read, and dropped here.
-  const { meta: { description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written }, spelled } = block === null
-    ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color', string>>, spelled: {} }
-    : readKeys<AgentKey | 'name' | 'color'>(file, block, (key) => agentKeyRefusal(file, key));
+  const {
+    meta: { description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written },
+    spelled,
+  } =
+    block === null
+      ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color', string>>, spelled: {} }
+      : readKeys<AgentKey | 'name' | 'color'>(file, block, (key) => agentKeyRefusal(file, key));
   if (said !== undefined && said !== name) {
-    refuse(`${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`);
+    refuse(
+      `${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`,
+    );
   }
   // `skills:` named a card file until 2026-09-25 and `card:` did after it, until agents card 2 generated the card from the skills.
   if (listed !== undefined && isCardFile(listed)) refuse(cardRetired(file, 'skills', listed));
@@ -2006,7 +2385,9 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   const skills = skillNamesOf(file, listed);
   const systemPrompt = systemPromptOf(file, prompt);
   if (systemPrompt === 'own' && !body.trim()) {
-    refuse(`${file}: \`systemPrompt: own\` puts the agent's instructions in place of Claude Code's system prompt, and this agent has none: its sessions would start with no system prompt at all. Write its instructions below the frontmatter, or delete the line.`);
+    refuse(
+      `${file}: \`systemPrompt: own\` puts the agent's instructions in place of Claude Code's system prompt, and this agent has none: its sessions would start with no system prompt at all. Write its instructions below the frontmatter, or delete the line.`,
+    );
   }
   const composed = composedRefusal(file, skills, systemPrompt, step);
   if (composed !== undefined) refuse(composed);
@@ -2039,8 +2420,12 @@ export function cardRetired(file: string, key: 'card' | 'skills', named?: string
 function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
   const named = `${file}: \`skills: ${written}\``;
-  const shape = 'Each is a skill\'s name — its folder in skills/, lowercase words joined by dashes — comma-separated: `skills: review-a-change, write-a-note`.';
-  const names = written.split(',').map((s) => s.trim()).filter(Boolean);
+  const shape =
+    "Each is a skill's name — its folder in skills/, lowercase words joined by dashes — comma-separated: `skills: review-a-change, write-a-note`.";
+  const names = written
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (!names.length) refuse(`${named} names no skill. ${shape}`);
   const odd = names.find((n) => !SKILL_NAME.test(n));
   if (odd) refuse(`${named} has \`${odd}\`, which is not a skill's name. ${shape}`);
@@ -2053,7 +2438,9 @@ function skillNamesOf(file: string, written: string | undefined): string[] | und
 function systemPromptOf(file: string, written: string | undefined): SystemPrompt | undefined {
   if (written === undefined) return undefined;
   if ((SYSTEM_PROMPTS as readonly string[]).includes(written)) return written as SystemPrompt;
-  return refuse(`${file}: \`systemPrompt: ${written}\` is not one of ${SYSTEM_PROMPTS.join(', ')}. \`default\` keeps Claude Code's system prompt and appends the agent's instructions after it; \`no-coding\` keeps it less its coding instructions; \`own\` replaces it with the agent's instructions. Without the line, it is \`default\`.`);
+  return refuse(
+    `${file}: \`systemPrompt: ${written}\` is not one of ${SYSTEM_PROMPTS.join(', ')}. \`default\` keeps Claude Code's system prompt and appends the agent's instructions after it; \`no-coding\` keeps it less its coding instructions; \`own\` replaces it with the agent's instructions. Without the line, it is \`default\`.`,
+  );
 }
 
 /**
@@ -2062,24 +2449,34 @@ function systemPromptOf(file: string, written: string | undefined): SystemPrompt
  * again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or `harness:`
  * can take away what the agent's allowed.
  */
-function composedRefusal(named: string, skills: readonly string[] | undefined, systemPrompt: SystemPrompt | undefined, step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>): string | undefined {
+function composedRefusal(
+  named: string,
+  skills: readonly string[] | undefined,
+  systemPrompt: SystemPrompt | undefined,
+  step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
+): string | undefined {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
   // A session continued keeps the system prompt it was started with, and the plugins with it (F13): what this agent gives would reach nothing.
   if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
     return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with (F13): it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
   }
   if (isRemoteHarness(step.harness)) {
-    if (listed) return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and \`harness: ${step.harness}\` is a remote A2A agent, which has the skills its operator gave it — its card says which — and loads none of ours. Delete the line, or run the step on claude.`;
-    if (systemPrompt !== undefined) return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
+    if (listed)
+      return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and \`harness: ${step.harness}\` is a remote A2A agent, which has the skills its operator gave it — its card says which — and loads none of ours. Delete the line, or run the step on claude.`;
+    if (systemPrompt !== undefined)
+      return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
     return undefined;
   }
   if (step.harness === 'codex') {
-    if (listed) return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
-    if (systemPrompt !== undefined && systemPrompt !== 'default') return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
+    if (listed)
+      return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
+    if (systemPrompt !== undefined && systemPrompt !== 'default')
+      return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
     return undefined;
   }
   if (!listed) return undefined;
-  const why = 'the tool a session loads a skill with: Claude Code gives a session only what its tools allow, and a skill it cannot load is a name in its prompt and nothing more (F11, measured)';
+  const why =
+    'the tool a session loads a skill with: Claude Code gives a session only what its tools allow, and a skill it cannot load is a name in its prompt and nothing more (F11, measured)';
   if (step.tools !== undefined && !step.tools.includes('Skill')) {
     return `${named}: ${listed} gives the agent skills, and \`tools: ${step.tools.join(', ')}\` has no \`Skill\`, ${why}. Add \`Skill\` to \`tools:\`, or delete \`skills:\`.`;
   }
@@ -2119,25 +2516,40 @@ export function renderAgent(draft: AgentDraft): string {
   const keys = (draft.keys ?? {}) as Record<string, string | null | undefined>;
   for (const key of Object.keys(keys)) {
     if (keys[key] == null) continue;
-    if (key === 'name') refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
-    if (isOwnKey(key)) refuse(`${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${key === 'description' ? 'description' : key === 'skills' ? 'skills' : 'system prompt'}, once.`);
+    if (key === 'name')
+      refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
+    if (isOwnKey(key))
+      refuse(
+        `${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${key === 'description' ? 'description' : key === 'skills' ? 'skills' : 'system prompt'}, once.`,
+      );
     if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined) refuse(codexModeWritten(file, keys.permissionMode));
+  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined)
+    refuse(codexModeWritten(file, keys.permissionMode));
   // A card file is what a page drawn before agents card 2 sends — as `card`, or as `skills:` from before 2026-09-25 — and is written nowhere now.
   const sent = (draft as { card?: unknown }).card;
-  if (sent != null) refuse(`${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page open since before then sends it: reload it, and save again.`);
+  if (sent != null)
+    refuse(
+      `${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page open since before then sends it: reload it, and save again.`,
+    );
   if (draft.skills != null && isCardFile(String(draft.skills))) {
     refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page open since before then sends it: reload it, and save again.`);
   }
-  const own: Record<AgentOwnKey, string | null | undefined> = { description: draft.description, skills: draft.skills, systemPrompt: draft.systemPrompt };
+  const own: Record<AgentOwnKey, string | null | undefined> = {
+    description: draft.description,
+    skills: draft.skills,
+    systemPrompt: draft.systemPrompt,
+  };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const lines = values.flatMap(([key, value]) => {
     if (value == null) return [];
     const text = String(value);
-    if (/[\r\n]/.test(text)) refuse(`${file}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line.`);
+    if (/[\r\n]/.test(text))
+      refuse(
+        `${file}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line.`,
+      );
     return [`${key}: ${text}`];
   });
   const body = String(draft.body ?? '').trim();
@@ -2186,7 +2598,9 @@ export function agentCard(agent: Agent, version: string, skills: readonly AgentS
   const named = `${AGENTS_FOLDER}/${agent.name}.md`;
   if (!agent.description?.trim()) refuse(noDescription(agent.name));
   if (!skills.length) {
-    refuse(`${named}: its card has no skills, and the A2A protocol marks a card's skills REQUIRED. They are generated: an entry for each skill its \`skills:\` gives, or one made from its own description when it gives none (\`cardSkills\`).`);
+    refuse(
+      `${named}: its card has no skills, and the A2A protocol marks a card's skills REQUIRED. They are generated: an entry for each skill its \`skills:\` gives, or one made from its own description when it gives none (\`cardSkills\`).`,
+    );
   }
   return {
     name: agent.name,
@@ -2219,15 +2633,20 @@ export function ownSkill(agent: Pick<Agent, 'name' | 'description'>): AgentSkill
  */
 export function agentNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its file is named, without .md — reviewer, say.';
-  if (typeof name !== 'string' || !name.trim()) return `An agent has no name, and an agent is named by its file in ${AGENTS_FOLDER}/. ${fix}`;
+  if (typeof name !== 'string' || !name.trim())
+    return `An agent has no name, and an agent is named by its file in ${AGENTS_FOLDER}/. ${fix}`;
   const as = `\`${name}\` is not an agent's name:`;
   if (/[\\/]/.test(name)) return `${as} an agent is a file in ${AGENTS_FOLDER}/, and a slash names a file in another folder. ${fix}`;
   // oxlint-disable-next-line no-control-regex -- a name holding a control character is refused, so the class must name them
-  if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
-  if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing ${AGENTS_FOLDER}/ does not see. ${fix}`;
-  if (name !== name.trim()) return `${as} \`agent:\` is trimmed as it is read, so no step could name it. Write it without the spaces around it.`;
+  if (/[\u0000-\u001f\u007f]/.test(name))
+    return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
+  if (name.startsWith('.'))
+    return `${as} a name that starts with a dot is a hidden file, which a person listing ${AGENTS_FOLDER}/ does not see. ${fix}`;
+  if (name !== name.trim())
+    return `${as} \`agent:\` is trimmed as it is read, so no step could name it. Write it without the spaces around it.`;
   if (/\.md$/i.test(name)) return `${as} it is a file's name, and an agent is named without its .md: \`${name.slice(0, -3)}\`.`;
-  if (isReadme(`${name}.md`)) return `${as} ${AGENTS_FOLDER}/${name}.md is the folder's README, which says what the agents are for and is never read as one. ${fix}`;
+  if (isReadme(`${name}.md`))
+    return `${as} ${AGENTS_FOLDER}/${name}.md is the folder's README, which says what the agents are for and is never read as one. ${fix}`;
   if (new TextEncoder().encode(`${name}.md`).length > 255) return `${as} ${name}.md is longer than a file's name may be, 255 bytes. ${fix}`;
   return undefined;
 }
@@ -2300,16 +2719,23 @@ export const formerKeyLine = (file: string, former: string): string =>
  * nothing else. Pure: `workflowDescription` (`workflow-store.ts`) reads the README and asks this.
  */
 export function readmeDescription(text: string): string | null {
-  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(FRONTMATTER, '');
+  text = text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(FRONTMATTER, '');
   for (const block of text.split(/\n[ \t]*\n/)) {
-    const lines = block.split('\n').map((line) => line.trim()).filter((line) => line && !/^#{1,6}(\s|$)/.test(line));
+    const lines = block
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !/^#{1,6}(\s|$)/.test(line));
     if (lines.length) return lines.join(' ');
   }
   return null;
 }
 
 /** Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does (`validate`). */
-export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean => steps.length > 0 && steps.every((s) => s.workspace === 'folder');
+export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean =>
+  steps.length > 0 && steps.every((s) => s.workspace === 'folder');
 
 /**
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
@@ -2325,13 +2751,18 @@ export function validate(steps: readonly Workflow[]): void {
     }
     for (const from of s.input ?? []) {
       const producer = steps.find((x) => x.name === from);
-      if (!producer) throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
+      if (!producer)
+        throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
       // Directly, or through `resume` — which the parser has already added to `after`.
       if (!s.after.includes(from) && s.resume !== from) {
-        throw new WorkflowError(`${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`);
+        throw new WorkflowError(
+          `${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`,
+        );
       }
       if (!producer.output) {
-        throw new WorkflowError(`${s.name}: \`input: ${from}\`, but ${from} declares no \`output:\`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step. Give ${from}.md an \`output:\` schema, or delete the line.`);
+        throw new WorkflowError(
+          `${s.name}: \`input: ${from}\`, but ${from} declares no \`output:\`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step. Give ${from}.md an \`output:\` schema, or delete the line.`,
+        );
       }
     }
     if (s.resume) {
@@ -2345,7 +2776,9 @@ export function validate(steps: readonly Workflow[]): void {
       // One window for a session's whole chain: the continuation is filed with the one its session was started with (`sessionContext`).
       const window = sessionContext(target, steps);
       if (s.context !== undefined && s.context !== window) {
-        throw new WorkflowError(`${s.name}: \`context: ${contextText(s.context)}\`, and it continues ${target.name}'s session, which runs on ${window === undefined ? "the model's whole window" : `\`context: ${contextText(window)}\``}. A session keeps one window: delete the line, and ${s.name} continues on ${target.name}'s${window === undefined ? '' : `, or give ${target.name} the window you meant for both`}.`);
+        throw new WorkflowError(
+          `${s.name}: \`context: ${contextText(s.context)}\`, and it continues ${target.name}'s session, which runs on ${window === undefined ? "the model's whole window" : `\`context: ${contextText(window)}\``}. A session keeps one window: delete the line, and ${s.name} continues on ${target.name}'s${window === undefined ? '' : `, or give ${target.name} the window you meant for both`}.`,
+        );
       }
     }
   }
@@ -2384,11 +2817,15 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
     const named = `${s.name}: \`workspace: main\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
     if (waiting.length) {
-      throw new WorkflowError(`${named}, and ${waiting.join(', ')} ${waiting.length > 1 ? 'wait' : 'waits'} on it — each would start from a checkout this step has changed, and none of them is where the run's work is. It is a workflow's last step: nothing may wait on it. Move ${waiting.join(', ')} before ${s.name}, or delete the line.`);
+      throw new WorkflowError(
+        `${named}, and ${waiting.join(', ')} ${waiting.length > 1 ? 'wait' : 'waits'} on it — each would start from a checkout this step has changed, and none of them is where the run's work is. It is a workflow's last step: nothing may wait on it. Move ${waiting.join(', ')} before ${s.name}, or delete the line.`,
+      );
     }
     const beside = steps.filter((x) => x.name !== s.name && !steps.some((other) => other.after.includes(x.name))).map((x) => x.name);
     if (beside.length) {
-      throw new WorkflowError(`${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`);
+      throw new WorkflowError(
+        `${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`,
+      );
     }
   }
 }
@@ -2405,8 +2842,8 @@ function validateFolder(steps: readonly Workflow[]): void {
   const not = steps.filter((s) => s.workspace !== 'folder').map((s) => s.name);
   if (!folder.length || !not.length) return;
   throw new WorkflowError(
-    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.`
-    + ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
+    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.` +
+      ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
   );
 }
 
@@ -2448,10 +2885,10 @@ function validateFolderMode(steps: readonly Workflow[]): void {
     ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
     : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
-    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}`
-    + ' — a read or a write outside the folder can, and an unattended background session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
-    + ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.`
-    + " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
+    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
+      ' — a read or a write outside the folder can, and an unattended background session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).' +
+      ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
+      " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }
 
@@ -2468,9 +2905,9 @@ function validateSlot(steps: readonly Workflow[]): void {
   const beside = steps.filter((s) => s !== watcher).map((s) => s.name);
   if (!watcher || !beside.length) return;
   throw new WorkflowError(
-    `${watcher.name}: \`slot: none\` takes this step's whole RUN out of the cap on runs in flight (WF_MAX_RUNS), and this workflow has ${beside.join(', ')} beside it`
-    + ` — a slot is a run's, not a step's, so ${beside.join(', ')} would run outside the cap too. A run that takes no slot is one step: a session that watches the other runs.`
-    + ` Delete the line, or give ${watcher.name} a folder of its own.`,
+    `${watcher.name}: \`slot: none\` takes this step's whole RUN out of the cap on runs in flight (WF_MAX_RUNS), and this workflow has ${beside.join(', ')} beside it` +
+      ` — a slot is a run's, not a step's, so ${beside.join(', ')} would run outside the cap too. A run that takes no slot is one step: a session that watches the other runs.` +
+      ` Delete the line, or give ${watcher.name} a folder of its own.`,
   );
 }
 
@@ -2528,18 +2965,26 @@ function renamedKeys(step: Workflow): Workflow {
   const agent = step.agent;
   const given = agent?.given ? Object.keys(agent.given) : [];
   if (![...fields, ...(agent?.keys ?? []), ...given].some((key) => keyNamed(key) !== key)) return step;
-  const renamed = Object.fromEntries(Object.entries(step)
-    .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(step, keyNamed(key)))
-    .map(([key, value]) => [keyNamed(key), value])) as Workflow;
+  const renamed = Object.fromEntries(
+    Object.entries(step)
+      .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(step, keyNamed(key)))
+      .map(([key, value]) => [keyNamed(key), value]),
+  ) as Workflow;
   if (!agent) return renamed;
   return {
     ...renamed,
     agent: {
       ...agent,
       keys: [...new Set(agent.keys.map((key) => keyNamed(key) as StepKey))],
-      ...(agent.given ? { given: Object.fromEntries(Object.entries(agent.given)
-        .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(agent.given, keyNamed(key)))
-        .map(([key, value]) => [keyNamed(key), value])) } : {}),
+      ...(agent.given
+        ? {
+            given: Object.fromEntries(
+              Object.entries(agent.given)
+                .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(agent.given, keyNamed(key)))
+                .map(([key, value]) => [keyNamed(key), value]),
+            ),
+          }
+        : {}),
     },
   };
 }
@@ -2553,7 +2998,8 @@ function renamedKeys(step: Workflow): Workflow {
  */
 function sandboxRead(step: Workflow): Workflow {
   const agent = step.agent;
-  const legacy = step.permissionMode !== undefined || Boolean(agent?.keys.includes('permissionMode')) || agent?.given?.permissionMode !== undefined;
+  const legacy =
+    step.permissionMode !== undefined || Boolean(agent?.keys.includes('permissionMode')) || agent?.given?.permissionMode !== undefined;
   if (step.harness !== 'codex' || !legacy) return step;
   const { permissionMode: word, ...rest } = step;
   const read: Workflow = { ...rest, ...(rest.sandbox === undefined && word !== undefined ? { sandbox: sandboxNamed(word) } : {}) };
@@ -2564,7 +3010,9 @@ function sandboxRead(step: Workflow): Workflow {
     agent: {
       ...agent,
       keys: [...new Set(agent.keys.map((key) => (key === 'permissionMode' ? 'sandbox' : key)))],
-      ...(agent.given ? { given: { ...others, ...(others.sandbox === undefined && given !== undefined ? { sandbox: sandboxNamed(given) } : {}) } } : {}),
+      ...(agent.given
+        ? { given: { ...others, ...(others.sandbox === undefined && given !== undefined ? { sandbox: sandboxNamed(given) } : {}) } }
+        : {}),
     },
   };
 }
@@ -2580,7 +3028,9 @@ function sandboxRead(step: Workflow): Workflow {
  */
 export function withFormerNames(step: Workflow): Workflow {
   const fields = step as unknown as Record<string, unknown>;
-  const copies = Object.entries(FORMER_KEYS).filter(([, now]) => fields[now] !== undefined).map(([former, now]) => [former, fields[now]]);
+  const copies = Object.entries(FORMER_KEYS)
+    .filter(([, now]) => fields[now] !== undefined)
+    .map(([former, now]) => [former, fields[now]]);
   // A codex step's sandbox, under the field the old tick filed it from: `permissionMode` (`sandboxRead`).
   if (step.harness === 'codex' && step.sandbox !== undefined) copies.push(['permissionMode', step.sandbox]);
   return copies.length ? { ...step, ...Object.fromEntries(copies) } : step;
@@ -2594,7 +3044,10 @@ export function upstreamOf(steps: readonly Workflow[], name: string): Set<string
     const at = queue.pop();
     const current = steps.find((s) => s.name === at);
     for (const a of current?.after ?? []) {
-      if (!found.has(a)) { found.add(a); queue.push(a); }
+      if (!found.has(a)) {
+        found.add(a);
+        queue.push(a);
+      }
     }
   }
   return found;
@@ -2629,40 +3082,55 @@ function validateLoops(steps: readonly Workflow[]): void {
     const target = s.loop!;
     const named = `${s.name}: \`loop: ${target}\``;
     if (target === s.name) {
-      throw new WorkflowError(`${named} names this step. A loop runs an earlier step again, then every step between it and this one, then this one: name the step this one reviews, which it waits on through \`after\`.`);
+      throw new WorkflowError(
+        `${named} names this step. A loop runs an earlier step again, then every step between it and this one, then this one: name the step this one reviews, which it waits on through \`after\`.`,
+      );
     }
     const producer = steps.find((x) => x.name === target);
     if (!producer) throw new WorkflowError(`${named} names a step that is not here. Correct the name, or delete the line.`);
     // A loop's target is continued each round, in the session it kept (`resumeFrom`), and the run keeps none of a remote agent's.
     if (isRemoteHarness(producer.harness)) {
-      throw new WorkflowError(`${named}, and ${target} runs on \`harness: ${producer.harness}\`, a remote A2A agent: a loop's target is continued each round in the session it kept, and the run keeps none of a remote agent's. Loop back to a step on a harness of ours, or delete the line.`);
+      throw new WorkflowError(
+        `${named}, and ${target} runs on \`harness: ${producer.harness}\`, a remote A2A agent: a loop's target is continued each round in the session it kept, and the run keeps none of a remote agent's. Loop back to a step on a harness of ours, or delete the line.`,
+      );
     }
     if (!upstreamOf(steps, s.name).has(target)) {
-      throw new WorkflowError(`${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`);
+      throw new WorkflowError(
+        `${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`,
+      );
     }
     if (producer.output && Object.hasOwn(producer.output.schema.properties, LOOP_REPLIES)) {
-      throw new WorkflowError(`${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`);
+      throw new WorkflowError(
+        `${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`,
+      );
     }
 
     const span = loopSpan(steps, s);
     for (const name of span) {
       const other = spans.get(name);
       if (other) {
-        throw new WorkflowError(`${name} is in two loops: ${other.name}'s (\`loop: ${other.loop}\`) and ${s.name}'s (\`loop: ${target}\`). A round of either would file it again under the other. Give it one loop: make one loop's steps end before the other's begin.`);
+        throw new WorkflowError(
+          `${name} is in two loops: ${other.name}'s (\`loop: ${other.loop}\`) and ${s.name}'s (\`loop: ${target}\`). A round of either would file it again under the other. Give it one loop: make one loop's steps end before the other's begin.`,
+        );
       }
       spans.set(name, s);
       if (name === target) continue;
       const step = steps.find((x) => x.name === name)!;
       if (step.resume) {
-        throw new WorkflowError(`${name}: \`resume: ${step.resume}\`, and ${name} is in ${s.name}'s loop (\`loop: ${target}\`), which files it as a new session each round — so it cannot continue another. Delete the line: only the loop's first step, ${target}, is continued, and the run does that itself.`);
+        throw new WorkflowError(
+          `${name}: \`resume: ${step.resume}\`, and ${name} is in ${s.name}'s loop (\`loop: ${target}\`), which files it as a new session each round — so it cannot continue another. Delete the line: only the loop's first step, ${target}, is continued, and the run does that itself.`,
+        );
       }
       const [from] = step.after;
       const siblings = steps.filter((x) => from !== undefined && x.after.includes(from)).map((x) => x.name);
       if (step.after.length !== 1 || siblings.length !== 1) {
-        const why = step.after.length > 1
-          ? `it waits on ${step.after.join(' and ')}, so it merges their branches into a worktree of its own`
-          : `${siblings.filter((x) => x !== name).join(' and ')} ${siblings.length > 2 ? 'wait' : 'waits'} on ${from} too, so ${name} forks a worktree of its own`;
-        throw new WorkflowError(`${named} files ${span.filter((x) => x !== target).join(', then ')} again after ${target} each round, in the workspace ${target} works in, and ${name} does not work there: ${why}, cut once, which would not have the next round's work. A loop's steps are a chain — each waits on the one before it, and nothing else does. Move what runs beside them after ${s.name}.`);
+        const why =
+          step.after.length > 1
+            ? `it waits on ${step.after.join(' and ')}, so it merges their branches into a worktree of its own`
+            : `${siblings.filter((x) => x !== name).join(' and ')} ${siblings.length > 2 ? 'wait' : 'waits'} on ${from} too, so ${name} forks a worktree of its own`;
+        throw new WorkflowError(
+          `${named} files ${span.filter((x) => x !== target).join(', then ')} again after ${target} each round, in the workspace ${target} works in, and ${name} does not work there: ${why}, cut once, which would not have the next round's work. A loop's steps are a chain — each waits on the one before it, and nothing else does. Move what runs beside them after ${s.name}.`,
+        );
       }
     }
   }

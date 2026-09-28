@@ -40,20 +40,29 @@ export default {
     };
 
     await expectVisible(
-      page.locator('[data-daemon="none"]', { hasText: /^Nothing ticks this store, so no run moves: no wf up has held it\. Start one with npx wf up in the repository\.$/ }),
+      page.locator('[data-daemon="none"]', {
+        hasText: /^Nothing ticks this store, so no run moves: no wf up has held it\. Start one with npx wf up in the repository\.$/,
+      }),
       'with no daemon.json, the header says nothing ticks the store, and how to start what does',
     );
     try {
       fs.writeFileSync(file, daemonFile(20 * MIN));
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
-        hasText: new RegExp(`^Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. Start one with npx wf up in .+ — it takes the store over\\.$`),
+        hasText: new RegExp(
+          `^Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. Start one with npx wf up in .+ — it takes the store over\\.$`,
+        ),
       });
-      await expectVisible(stalled, 'a wf up alive and silent for 20 minutes is said as stalled, with its silence and the command that takes the store over');
+      await expectVisible(
+        stalled,
+        'a wf up alive and silent for 20 minutes is said as stalled, with its silence and the command that takes the store over',
+      );
       await expectVisible(stalled.locator('code', { hasText: /^npx wf up$/ }), 'the command set apart as code');
       await expectCount(line, 1, 'one line, and no other');
       if (!(await stalled.getAttribute('title'))?.startsWith(`wf up: stalled, pid ${process.pid}`)) {
-        throw new Refused(`the line holds wf ls's own words on hover — its title is ${JSON.stringify(await stalled.getAttribute('title'))}`);
+        throw new Refused(
+          `the line holds wf ls's own words on hover — its title is ${JSON.stringify(await stalled.getAttribute('title'))}`,
+        );
       }
       await expectUncut(stalled, 'the line is read whole, wrapped rather than cut');
       await shoot('stale');
@@ -72,6 +81,10 @@ export default {
       fs.rmSync(file, { force: true });
     }
     await reload(page);
-    await expectCount(page.locator('[data-daemon="none"]'), 1, 'with the file taken back, the header says again that nothing ticks the store');
+    await expectCount(
+      page.locator('[data-daemon="none"]'),
+      1,
+      'with the file taken back, the header says again that nothing ticks the store',
+    );
   },
 } satisfies PageSpec;

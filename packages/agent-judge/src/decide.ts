@@ -22,11 +22,26 @@ import { refuse } from './key.ts';
  * - `in-flight`: a claim still inside its deadline, read by a replay, which never waits.
  */
 export type FailureKind =
-  | 'no-key' | 'refused' | 'rate-limited' | 'timed-out' | 'unreachable' | 'malformed' | 'wrong-model'
-  | 'interrupted' | 'in-flight';
+  | 'no-key'
+  | 'refused'
+  | 'rate-limited'
+  | 'timed-out'
+  | 'unreachable'
+  | 'malformed'
+  | 'wrong-model'
+  | 'interrupted'
+  | 'in-flight';
 
 export const FAILURE_KINDS: readonly FailureKind[] = [
-  'no-key', 'refused', 'rate-limited', 'timed-out', 'unreachable', 'malformed', 'wrong-model', 'interrupted', 'in-flight',
+  'no-key',
+  'refused',
+  'rate-limited',
+  'timed-out',
+  'unreachable',
+  'malformed',
+  'wrong-model',
+  'interrupted',
+  'in-flight',
 ];
 
 export type Answered<Q extends Question = Question> = {
@@ -70,7 +85,8 @@ export function decide(j: Judgment<NoulQuestion> | Judgment<ScoreQuestion> | Jud
   if (j.status === 'failed') return 'unsure';
   const v = valueOf(j);
   if (v === undefined) return refuse(`judge: decide reads a noul or a score; a ${j.answer.type} has no threshold. Read its \`choice\`.`);
-  if (j.answer.type === 'noul' && (t.yes > 1 || t.no < 0)) refuse(`judge: a noul's thresholds are probabilities, 0 to 1; ${JSON.stringify(t)} is not.`);
+  if (j.answer.type === 'noul' && (t.yes > 1 || t.no < 0))
+    refuse(`judge: a noul's thresholds are probabilities, 0 to 1; ${JSON.stringify(t)} is not.`);
   return v >= t.yes ? 'yes' : v <= t.no ? 'no' : 'unsure';
 }
 

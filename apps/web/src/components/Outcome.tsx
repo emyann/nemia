@@ -31,13 +31,19 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p data-outcome={word} data-by={outcome.by} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge className={cn('text-sm', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}>{word}</Badge>{' '}
+          <Badge className={cn('text-sm', BADGE[outcome.by === 'agent' && outcome.outcome === 'blocked' ? 'blocked' : outcome.by])}>
+            {word}
+          </Badge>{' '}
           <span className="text-xs text-neutral-500">{BY[outcome.by]}</span>
         </p>
         {aside}
       </div>
       {outcome.by === 'agent' && outcome.cut && <p className="text-xs text-red-700 dark:text-red-400">… {outcome.cut}.</p>}
-      {outcome.by !== 'agent' && <p data-reason className="text-neutral-600 dark:text-neutral-400">{outcome.words}</p>}
+      {outcome.by !== 'agent' && (
+        <p data-reason className="text-neutral-600 dark:text-neutral-400">
+          {outcome.words}
+        </p>
+      )}
     </div>
   );
 }
@@ -46,8 +52,20 @@ export function OutcomeHead({ outcome, aside }: { outcome: Outcome; aside?: Reac
  * A closeout's field under its name, drawn as `outputKind` says from its value and the schema it was declared by. `named` false where
  * the name is said already, on the fold the field sits in.
  */
-export function FieldView({ name, named = true, schema, value, artifacts, images }: {
-  name: string; named?: boolean; schema: unknown; value: unknown; artifacts: readonly StepArtifact[]; images: ReadonlySet<string>;
+export function FieldView({
+  name,
+  named = true,
+  schema,
+  value,
+  artifacts,
+  images,
+}: {
+  name: string;
+  named?: boolean;
+  schema: unknown;
+  value: unknown;
+  artifacts: readonly StepArtifact[];
+  images: ReadonlySet<string>;
 }) {
   const kind = outputKind(schema, value, images);
   return (
@@ -58,7 +76,17 @@ export function FieldView({ name, named = true, schema, value, artifacts, images
   );
 }
 
-function KindView({ kind, schema, value, artifacts }: { kind: OutputKind; schema: unknown; value: unknown; artifacts: readonly StepArtifact[] }) {
+function KindView({
+  kind,
+  schema,
+  value,
+  artifacts,
+}: {
+  kind: OutputKind;
+  schema: unknown;
+  value: unknown;
+  artifacts: readonly StepArtifact[];
+}) {
   switch (kind) {
     case 'findings':
       return <Records kind={kind} records={value as Array<Record<string, unknown>>} place={findingPlace} />;
@@ -89,7 +117,10 @@ type Place = (record: Record<string, unknown>) => { place: string; rest: string[
 
 /** A finding's place, `file:line`, or the file alone when its line is null: it is about something absent. */
 const findingPlace: Place = (r) => ({
-  place: r.line === null || r.line === undefined ? String(r.file) : `${String(r.file)}:${typeof r.line === 'number' || typeof r.line === 'string' ? r.line : JSON.stringify(r.line)}`,
+  place:
+    r.line === null || r.line === undefined
+      ? String(r.file)
+      : `${String(r.file)}:${typeof r.line === 'number' || typeof r.line === 'string' ? r.line : JSON.stringify(r.line)}`,
   rest: Object.keys(r).filter((k) => k !== 'file' && k !== 'line'),
 });
 
@@ -130,7 +161,11 @@ function Records({ kind, records, place }: { kind: 'findings' | 'table'; records
                         <span className="font-mono text-[11px] text-neutral-500">{key}</span>{' '}
                       </>
                     )}
-                    {typeof record[key] === 'string' ? <Markdown>{record[key]}</Markdown> : <code className="font-mono text-xs">{text(record[key])}</code>}
+                    {typeof record[key] === 'string' ? (
+                      <Markdown>{record[key]}</Markdown>
+                    ) : (
+                      <code className="font-mono text-xs">{text(record[key])}</code>
+                    )}
                   </div>
                 ))}
               </td>
@@ -160,12 +195,12 @@ function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
             <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
             <div className="flex items-start gap-1.5 text-neutral-500">
               <span className="shrink-0">
-                →{' '}<Badge className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Badge>
+                → <Badge className={ANSWER[answer] ?? ANSWER["won't fix"]}>{answer}</Badge>
               </span>
               {why && (
                 <>
-                  {' '}<span aria-hidden>·</span>{' '}
-                  <Markdown>{why}</Markdown>
+                  {' '}
+                  <span aria-hidden>·</span> <Markdown>{why}</Markdown>
                 </>
               )}
             </div>
@@ -185,7 +220,8 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
       </span>
       {description && (
         <>
-          {' '}<span className="text-xs text-neutral-500">— {description}</span>
+          {' '}
+          <span className="text-xs text-neutral-500">— {description}</span>
         </>
       )}
     </p>
@@ -217,7 +253,10 @@ function StringList({ items, artifacts }: { items: string[]; artifacts: readonly
 /** A value as the JSON it came as. */
 export function Json({ value, ...data }: { value: unknown; 'data-raw'?: boolean }) {
   return (
-    <pre {...data} className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950">
+    <pre
+      {...data}
+      className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950"
+    >
       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
     </pre>
   );

@@ -67,8 +67,13 @@ const same = (a: FeedSaid | undefined, b: FeedSaid): boolean => a !== undefined 
  * `now` is every run in the store, as the pass read it: a run not in it is a run that is gone. A removed run's steps get no line of their own.
  */
 export function feedChanges(fold: FeedFold, now: ReadonlyMap<string, FeedWords>, at: string): FeedLine[] {
-  const line = (run: string, step: string | undefined, said: FeedSaid): FeedLine =>
-    ({ at, run, ...(step !== undefined ? { step } : {}), word: said.word, ...(said.note !== undefined ? { note: said.note } : {}) });
+  const line = (run: string, step: string | undefined, said: FeedSaid): FeedLine => ({
+    at,
+    run,
+    ...(step !== undefined ? { step } : {}),
+    word: said.word,
+    ...(said.note !== undefined ? { note: said.note } : {}),
+  });
   const out: FeedLine[] = [];
   for (const [id, words] of now) {
     const before = fold.get(id);

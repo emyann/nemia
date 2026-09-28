@@ -18,17 +18,28 @@ export type Sayable = { open: true } | { open: false; why: string };
  * or stopped — which is the run page's to answer or try again. What the page cannot see coming, the api refuses in the package's words or
  * the engine's, and the box shows that refusal as it is.
  */
-export function sayable(run: Pick<RunDetail, 'cancelledAt'>, step: Pick<RunDetail['steps'][number], 'name' | 'taskId' | 'status'>): Sayable {
+export function sayable(
+  run: Pick<RunDetail, 'cancelledAt'>,
+  step: Pick<RunDetail['steps'][number], 'name' | 'taskId' | 'status'>,
+): Sayable {
   if (run.cancelledAt !== null) {
-    return { open: false, why: `The run was called off, so ${step.name}'s session is being stopped, not steered, and nothing more is filed for it.` };
+    return {
+      open: false,
+      why: `The run was called off, so ${step.name}'s session is being stopped, not steered, and nothing more is filed for it.`,
+    };
   }
-  if (!step.taskId) return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
+  if (!step.taskId)
+    return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
   // A hold stops what is filed next and the answers to a gate, never a session at work: `wf say` is not refused on a held run.
   const state = stepState(step.status, false, false);
   if (state === 'working' || state === 'needs-human') return { open: true };
-  if (state === 'unknown') return { open: false, why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.` };
+  if (state === 'unknown')
+    return { open: false, why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.` };
   if (state === 'waiting') {
-    return { open: false, why: `${step.name} is filed and its session has not started, so there is nobody to say anything to yet. Say it here once it runs.` };
+    return {
+      open: false,
+      why: `${step.name} is filed and its session has not started, so there is nobody to say anything to yet. Say it here once it runs.`,
+    };
   }
   return {
     open: false,

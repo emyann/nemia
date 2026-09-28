@@ -32,7 +32,11 @@ export function Conversation({ turns, live, density = 'page', className }: Props
       <MessageScroller className={className}>
         <MessageScrollerViewport aria-label="The step's conversation">
           <MessageScrollerContent
-            className={cn(density === 'page' ? 'mx-auto w-full max-w-3xl gap-5 px-4 py-6' : 'gap-3 py-1 pr-1 text-xs [&_[data-slot=bubble-content]]:text-xs')}
+            className={cn(
+              density === 'page'
+                ? 'mx-auto w-full max-w-3xl gap-5 px-4 py-6'
+                : 'gap-3 py-1 pr-1 text-xs [&_[data-slot=bubble-content]]:text-xs',
+            )}
           >
             {turns.map((turn, i) => (
               <MessageScrollerItem key={turn.key} messageId={turn.key}>

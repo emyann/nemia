@@ -27,11 +27,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /** The arguments of every run the fake recorded, in order. */
-const runsIn = (log: string) => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
+const runsIn = (log: string) =>
+  fs
+    .readFileSync(log, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as string[]);
 const valueOf = (args: string[], flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
 
 test('claude-detached at shipped defaults: a session that stops at its cap ends its attempt failed, at the limit `budget` its harness named, with what it cost — and its task settles failed, with no attempt 2 and no word of a budget of its own', async () => {
@@ -39,17 +48,27 @@ test('claude-detached at shipped defaults: a session that stops at its cap ends 
   const runs = path.join(bin, 'runs.jsonl');
   // What `claude -p --output-format json` printed when a session crossed its `--max-budget-usd` (2.1.272, keys trimmed).
   const result = {
-    type: 'result', subtype: 'error_max_budget_usd', is_error: true, terminal_reason: 'budget_exhausted',
-    errors: ['Reached maximum budget ($0.01)'], total_cost_usd: 0.01804, duration_api_ms: 718, num_turns: 2,
+    type: 'result',
+    subtype: 'error_max_budget_usd',
+    is_error: true,
+    terminal_reason: 'budget_exhausted',
+    errors: ['Reached maximum budget ($0.01)'],
+    total_cost_usd: 0.01804,
+    duration_api_ms: 718,
+    num_turns: 2,
     session_id: '5e551011-0000-4000-8000-00000000b0d9',
   };
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const args = process.argv.slice(2);
 if (args[0] === 'agents') { process.stdout.write('[]'); process.exit(0); }
 require('node:fs').appendFileSync(${JSON.stringify(runs)}, JSON.stringify(args) + '\\n');
 process.stdout.write(${JSON.stringify(JSON.stringify(result))} + '\\n');
 process.exitCode = 1;
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
 
   await onPath(bin, async () => {
     const engine = createEngine({ root: tmp('root') });
@@ -64,13 +83,17 @@ process.exitCode = 1;
     assert.equal(state.settled, 'failed');
     assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     const [a] = state.attempts;
-    assert.deepEqual([a!.ended, a!.reason, a!.limit, a!.exitCode], ['failed', 'harness', 'budget', 1], 'it ended at its cap, as its harness said');
+    assert.deepEqual(
+      [a!.ended, a!.reason, a!.limit, a!.exitCode],
+      ['failed', 'harness', 'budget', 1],
+      'it ended at its cap, as its harness said',
+    );
     assert.deepEqual(a!.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
     assert.equal(a!.nativeId, result.session_id, 'a session a new filing could continue');
     const settled = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
-    const note = settled?.kind === 'settled' ? settled.note ?? '' : '';
+    const note = settled?.kind === 'settled' ? (settled.note ?? '') : '';
     assert.equal(note, '1 attempt(s), none succeeded', 'settled as any failed attempt is');
-    assert.doesNotMatch(note, /budget/, 'the runtime says nothing of a budget: whether a cap reached is the reason is the caller\'s to say');
+    assert.doesNotMatch(note, /budget/, "the runtime says nothing of a budget: whether a cap reached is the reason is the caller's to say");
 
     const argvs = runsIn(runs);
     assert.equal(argvs.length, 1, 'claude -p ran once');
@@ -84,7 +107,9 @@ test('claude --bg is given --max-budget-usd on the attempt of a task that reache
   const runs = path.join(bin, 'runs.jsonl');
   fs.writeFileSync(registry, '[]');
   // A registry, as `claude agents` keeps one: `--bg` adds a session, busy, so nothing reads a transcript; `rm` removes it.
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -102,7 +127,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now() });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const root = tmp('root');
   const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));

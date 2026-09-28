@@ -22,15 +22,22 @@ type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => voi
 /** What `main` printed on stdout, a line each. `wf start` files nothing, so it asks the engine nothing. */
 const printedBy = async (t: Mock, argv: string[]): Promise<string[]> => {
   const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.join(' ')); });
-  try { await main(argv, {} as Engine); } finally { log.mock.restore(); }
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+    out.push(args.join(' '));
+  });
+  try {
+    await main(argv, {} as Engine);
+  } finally {
+    log.mock.restore();
+  }
   return out;
 };
 
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   return repo;
@@ -59,6 +66,14 @@ test('`wf start` on a folder that writes `disallow:` or `allow:` starts the run 
 });
 
 test('`wf start` on a folder on the new names says nothing of former ones', async (t) => {
-  const printed = await printedBy(t, ['start', 'write it', '--workflows', team('disallowedTools: SendMessage', 'allowedTools: Edit(**)'), '--repo', aRepo(), '--no-worktree']);
+  const printed = await printedBy(t, [
+    'start',
+    'write it',
+    '--workflows',
+    team('disallowedTools: SendMessage', 'allowedTools: Edit(**)'),
+    '--repo',
+    aRepo(),
+    '--no-worktree',
+  ]);
   assert.doesNotMatch(printed.join('\n'), /former name|is read as `/);
 });

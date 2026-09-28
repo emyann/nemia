@@ -9,7 +9,32 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, agentsDir, agentsFolderRefusal, codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, isCardFile, isReadme, linkRefusal, ownSkill, parseAgent, parseFolder, readmeDescription, skillEntryOf, SKILLS_FOLDER, splitFrontmatter, stepFiles, WorkflowError, type Agent, type Agents, type AgentSkill, type SkillsFound, type Workflow } from './workflow.ts';
+import {
+  AGENTS_FOLDER,
+  agentsDir,
+  agentsFolderRefusal,
+  codexModeLine,
+  formerKeyLine,
+  formerKeysIn,
+  frontmatterKey,
+  isCardFile,
+  isReadme,
+  linkRefusal,
+  ownSkill,
+  parseAgent,
+  parseFolder,
+  readmeDescription,
+  skillEntryOf,
+  SKILLS_FOLDER,
+  splitFrontmatter,
+  stepFiles,
+  WorkflowError,
+  type Agent,
+  type Agents,
+  type AgentSkill,
+  type SkillsFound,
+  type Workflow,
+} from './workflow.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
@@ -34,7 +59,8 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
  * Whether two of `roots` are one repository's two places — its `workflows/` and its `.claude/` — where a name in both is refused rather than
  * one of them chosen: a person reading either folder would take the one before them for the one that runs.
  */
-const sameRepository = (a: string, b: string): boolean => path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
+const sameRepository = (a: string, b: string): boolean =>
+  path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
 
 /**
  * Every agent a workflow's steps may name (`lookupRoots`), each read or the refusal of it, as `loadAgents` reads one folder: the first root
@@ -46,9 +72,17 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
     const dir = path.join(root, AGENTS_FOLDER);
     for (const [name, agent] of loadAgents(dir)) {
       const first = found.get(name);
-      if (!first) { found.set(name, { at: root, agent }); continue; }
+      if (!first) {
+        found.set(name, { at: root, agent });
+        continue;
+      }
       if (sameRepository(first.at, root)) {
-        found.set(name, { at: first.at, agent: new WorkflowError(`${name} is an agent in both ${path.join(first.at, AGENTS_FOLDER, `${name}.md`)} and ${path.join(dir, `${name}.md`)}, one repository's two places for agents, and nothing says which runs. Keep one of them.`) });
+        found.set(name, {
+          at: first.at,
+          agent: new WorkflowError(
+            `${name} is an agent in both ${path.join(first.at, AGENTS_FOLDER, `${name}.md`)} and ${path.join(dir, `${name}.md`)}, one repository's two places for agents, and nothing says which runs. Keep one of them.`,
+          ),
+        });
       }
     }
   }
@@ -66,14 +100,26 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
   for (const root of roots) {
     const dir = path.join(root, SKILLS_FOLDER);
     let names: string[];
-    try { names = fs.readdirSync(dir).sort(); } catch { continue; }
+    try {
+      names = fs.readdirSync(dir).sort();
+    } catch {
+      continue;
+    }
     for (const name of names) {
       const at = path.join(dir, name);
       if (!fs.statSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false })?.isFile()) continue;
       const first = found.get(name);
-      if (!first) { found.set(name, { at: root, dir: at }); continue; }
+      if (!first) {
+        found.set(name, { at: root, dir: at });
+        continue;
+      }
       if (sameRepository(first.at, root)) {
-        found.set(name, { at: first.at, dir: new WorkflowError(`${name} is a skill in both ${path.join(first.at, SKILLS_FOLDER, name)} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`) });
+        found.set(name, {
+          at: first.at,
+          dir: new WorkflowError(
+            `${name} is a skill in both ${path.join(first.at, SKILLS_FOLDER, name)} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
+          ),
+        });
       }
     }
   }
@@ -95,9 +141,18 @@ export function loadWorkflows(dir: string, places: Places = {}): Workflow[] {
   if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it${noStepsBecause(dir, entries)}`);
 
   const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+    try {
+      return fs.readFileSync(path.resolve(dir, file), 'utf8');
+    } catch {
+      return undefined;
+    }
   };
-  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, agentsFor(dir, places), skillsFor(dir, places));
+  return parseFolder(
+    files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]),
+    read,
+    agentsFor(dir, places),
+    skillsFor(dir, places),
+  );
 }
 
 /**
@@ -110,10 +165,18 @@ export function loadWorkflows(dir: string, places: Places = {}): Workflow[] {
  */
 export function formerKeyLines(dir: string): string[] {
   const read = (at: string): string => {
-    try { return fs.readFileSync(at, 'utf8'); } catch { return ''; }
+    try {
+      return fs.readFileSync(at, 'utf8');
+    } catch {
+      return '';
+    }
   };
   let files: string[];
-  try { files = stepFiles(fs.readdirSync(dir)); } catch { return []; }
+  try {
+    files = stepFiles(fs.readdirSync(dir));
+  } catch {
+    return [];
+  }
   const steps = files.map((file) => [file, read(path.join(dir, file))] as const);
   const agents = [...new Set(steps.flatMap(([, text]) => frontmatterKey(text, 'agent') ?? []))].sort();
   const agentAt = (agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
@@ -126,7 +189,8 @@ export function formerKeyLines(dir: string): string[] {
     ...steps.flatMap(([file, text]) => {
       const at = path.join(dir, file);
       const agent = frontmatterKey(text, 'agent');
-      const harness = frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(read(agentAt(agent)), 'harness'));
+      const harness =
+        frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(read(agentAt(agent)), 'harness'));
       return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, harness)];
     }),
     ...agents.flatMap((agent) => {
@@ -153,15 +217,21 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
 /** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
 export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
   let names: readonly string[];
-  try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
-  return names.filter((name) => {
-    if (name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
-    try {
-      return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
-    } catch {
-      return false;
-    }
-  }).sort();
+  try {
+    names = entries ?? fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((name) => {
+      if (name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
+      try {
+        return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
+      } catch {
+        return false;
+      }
+    })
+    .sort();
 }
 
 const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
@@ -182,10 +252,12 @@ export function workflowFolder(given: string, from: string, repo: string): strin
   const workflows = path.join(repo, 'workflows');
   if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
   const theirs = workflowsIn(workflows);
-  throw new WorkflowError(`no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. `
-    + (theirs.length
-      ? `The repository's workflows are: ${theirs.join(', ')} — name one, or give the path to a workflow folder.`
-      : `Give the path to a workflow folder, or the name of a folder of steps under ${workflows}.`));
+  throw new WorkflowError(
+    `no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. ` +
+      (theirs.length
+        ? `The repository's workflows are: ${theirs.join(', ')} — name one, or give the path to a workflow folder.`
+        : `Give the path to a workflow folder, or the name of a folder of steps under ${workflows}.`),
+  );
 }
 
 /**
@@ -196,16 +268,29 @@ export function workflowFolder(given: string, from: string, repo: string): strin
 export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
   const agents = new Map<string, Agent | WorkflowError>();
   let entries: fs.Dirent[];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return agents; }
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return agents;
+  }
   const read = (file: string): string | undefined => {
-    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+    try {
+      return fs.readFileSync(path.resolve(dir, file), 'utf8');
+    } catch {
+      return undefined;
+    }
   };
   for (const file of stepFiles(entries.map((e) => e.name))) {
     const name = path.basename(file, '.md');
     const at = path.join(dir, file);
     try {
       if (entries.find((e) => e.name === file)!.isSymbolicLink()) {
-        throw new WorkflowError(linkRefusal(at, `an agent's file is its own: read through a link, what every step naming ${AGENTS_FOLDER}/${file} is told would be whatever the link points at, outside the folder, and would change with it.`));
+        throw new WorkflowError(
+          linkRefusal(
+            at,
+            `an agent's file is its own: read through a link, what every step naming ${AGENTS_FOLDER}/${file} is told would be whatever the link points at, outside the folder, and would change with it.`,
+          ),
+        );
       }
       agents.set(name, parseAgent(name, fs.readFileSync(at, 'utf8'), read));
     } catch (err) {
@@ -227,7 +312,11 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
     const dir = path.join(workflowsDir, workflow);
     for (const file of stepFiles(fs.readdirSync(dir))) {
       let text: string;
-      try { text = fs.readFileSync(path.join(dir, file), 'utf8'); } catch { continue; }
+      try {
+        text = fs.readFileSync(path.join(dir, file), 'utf8');
+      } catch {
+        continue;
+      }
       if (frontmatterKey(text, 'agent') === name) users.push(`${workflow}/${path.basename(file, '.md')}`);
     }
   }
@@ -270,19 +359,30 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
  */
 export function skillVersion(dir: string): string | null {
   if (!fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })) return null;
-  return createHash('sha256').update(JSON.stringify(folderForVersion(dir))).digest('hex').slice(0, 16);
+  return createHash('sha256')
+    .update(JSON.stringify(folderForVersion(dir)))
+    .digest('hex')
+    .slice(0, 16);
 }
 
 /** A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through. */
 function readForVersion(file: string): string | { unreadable: string } | { link: string } {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
-  try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return { unreadable: (err as Error).message };
+  }
 }
 
 /** Every file under a skill's folder, by its path in the folder, sorted, each as a version counts it. */
 function folderForVersion(dir: string): Array<[string, unknown]> {
   let entries: string[];
-  try { entries = (fs.readdirSync(dir, { recursive: true }) as string[]).sort(); } catch (err) { return [['', { unreadable: (err as Error).message }]]; }
+  try {
+    entries = (fs.readdirSync(dir, { recursive: true }) as string[]).sort();
+  } catch (err) {
+    return [['', { unreadable: (err as Error).message }]];
+  }
   return entries.flatMap((entry) => {
     const at = path.join(dir, entry);
     const stat = fs.lstatSync(at, { throwIfNoEntry: false });
@@ -294,7 +394,10 @@ function folderForVersion(dir: string): Array<[string, unknown]> {
 export function skillNamesIn(text: string): string[] {
   const line = frontmatterKey(text, 'skills');
   if (line === undefined || isCardFile(line)) return [];
-  return line.split(',').map((s) => s.trim()).filter(Boolean);
+  return line
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -314,11 +417,17 @@ export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>
     const at = found.at.get(skill);
     if (at instanceof WorkflowError) throw new WorkflowError(`${named} gives the skill \`${skill}\`, which cannot be used — ${at.message}`);
     if (at === undefined) {
-      throw new WorkflowError(`${named} gives the skill \`${skill}\`, and no skills folder has it — looked in ${found.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`);
+      throw new WorkflowError(
+        `${named} gives the skill \`${skill}\`, and no skills folder has it — looked in ${found.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`,
+      );
     }
     const file = path.join(at, 'SKILL.md');
     let text: string;
-    try { text = fs.readFileSync(file, 'utf8'); } catch (err) { throw new WorkflowError(`${file} cannot be read (${(err as Error).message}), and ${named}'s card is read from it.`); }
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (err) {
+      throw new WorkflowError(`${file} cannot be read (${(err as Error).message}), and ${named}'s card is read from it.`);
+    }
     return skillEntryOf(file, skill, text);
   });
 }

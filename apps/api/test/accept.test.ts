@@ -29,13 +29,17 @@ const write = (file: string, text: string) => {
 };
 
 /** A step's task that ran once on Codex and signed off with `closeout`. */
-const signedOff = (taskId: string, closeout: object) => write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), jsonl([
-  { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(1), attempt: 1 },
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-  { kind: 'settled', at: at(9), outcome: 'succeeded' },
-]));
+const signedOff = (taskId: string, closeout: object) =>
+  write(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    jsonl([
+      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(1), attempt: 1 },
+      { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: at(9), outcome: 'succeeded' },
+    ]),
+  );
 
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
@@ -46,16 +50,38 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
  */
 const loopingRun = (id: string, on: number, again: boolean): string => {
   const tries = (name: string) => Array.from({ length: on - 1 }, (_, i) => ({ taskId: `${id}-${name}-${i + 1}`, then: 'round' }));
-  const step = (name: string) => ({ taskId: `${id}-${name}-${on}`, branch: `wf/${id}/implement`, ...(on > 1 ? { tries: tries(name) } : {}) });
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Parse the --flag option',
-    workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-    workflow: [
-      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-      { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex', loop: 'implement', rounds: 2, output: { file: 'review.json', schema: AGAIN } },
-    ],
-    steps: { implement: step('implement'), review: step('review') },
-  }));
+  const step = (name: string) => ({
+    taskId: `${id}-${name}-${on}`,
+    branch: `wf/${id}/implement`,
+    ...(on > 1 ? { tries: tries(name) } : {}),
+  });
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Parse the --flag option',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: at(0),
+      workflow: [
+        { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+        {
+          name: 'review',
+          after: ['implement'],
+          body: 'Review it.',
+          harness: 'codex',
+          loop: 'implement',
+          rounds: 2,
+          output: { file: 'review.json', schema: AGAIN },
+        },
+      ],
+      steps: { implement: step('implement'), review: step('review') },
+    }),
+  );
   // From round 2 a loop's target owes an answer to the findings it was handed (`owesReplies`), and an empty list is no answer.
   const replies = [{ finding: 'src/flag.ts — the flag is not stored', answer: 'fixed', why: 'It is stored now.' }];
   signedOff(`${id}-implement-${on}`, on > 1 ? { ...DONE, replies } : DONE);
@@ -78,10 +104,19 @@ loopingRun(CANCELLED, 2, true);
 write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
-const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+const BOARD = {
+  'content-type': 'application/json',
+  'sec-fetch-site': 'same-origin',
+  origin: 'http://localhost:5173',
+  host: '127.0.0.1:8787',
+};
 
 const acceptOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/accept`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request(`/api/runs/${run}/steps/${step}/accept`, {
+    method: 'POST',
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** What the package's `accept()` refuses, word for word: what `wf accept` prints. */
 const acceptRefuses = async (step: string, message?: string, run = R): Promise<string> => {
@@ -113,13 +148,22 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
     const res = await acceptOver('review', body, { ...BOARD, 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
     const { error } = await res.json();
-    assert.ok(error.startsWith(`POST /api/runs/${R}/steps/review/accept refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a loop a person accepts`), error);
+    assert.ok(
+      error.startsWith(
+        `POST /api/runs/${R}/steps/review/accept refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a loop a person accepts`,
+      ),
+      error,
+    );
     assert.ok(error.endsWith(`Accept it from the run's page on the board, or with \`wf accept ${R} review --message "<why>"\`.`), error);
   }
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
     const res = await acceptOver('review', body, { ...BOARD, host });
     assert.equal(res.status, 403, host);
-    assert.ok((await res.json()).error.startsWith(`POST /api/runs/${R}/steps/review/accept refuses a request addressed to ${host}: the api accepts the work of a loop out of rounds as it stands only for a request to this machine`));
+    assert.ok(
+      (await res.json()).error.startsWith(
+        `POST /api/runs/${R}/steps/review/accept refuses a request addressed to ${host}: the api accepts the work of a loop out of rounds as it stands only for a request to this machine`,
+      ),
+    );
   }
   for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
     const res = await acceptOver('review', body, { ...BOARD, 'content-type': type });
@@ -171,9 +215,21 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
 
 test("REFUSED at shipped defaults: a round the run files itself, a loop that ended `again: false`, a step with no `loop:`, a run called off, and a round already asked for are 409s in `acceptAsk`'s words — and nothing is written", async () => {
   const cases: Array<[string, string, RegExp]> = [
-    [LEFT, 'review', /^review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself: there is nothing for you to end yet\./],
-    [ENDED, 'review', /^review signed off without asking for another round \(`again: false`\), so its loop is over on its own word and there is nothing left open to accept\./],
-    [R, 'implement', /^implement has no `loop:`, so it closes no loop and there are no findings to accept — this run's loops close at review\./],
+    [
+      LEFT,
+      'review',
+      /^review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself: there is nothing for you to end yet\./,
+    ],
+    [
+      ENDED,
+      'review',
+      /^review signed off without asking for another round \(`again: false`\), so its loop is over on its own word and there is nothing left open to accept\./,
+    ],
+    [
+      R,
+      'implement',
+      /^implement has no `loop:`, so it closes no loop and there are no findings to accept — this run's loops close at review\./,
+    ],
     [CANCELLED, 'review', new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}, and a cancelled run files nothing`)],
   ];
   for (const [run, step, words] of cases) {

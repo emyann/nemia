@@ -76,7 +76,9 @@ const FILE = /^(\d+)\.(asked|answer|failed)\.json$/;
 const ANSWER = 'answer.json';
 
 const failRecord = (what: string, file: string, e: unknown): never => {
-  throw new RecordError(`judge: cannot ${what} ${file}: ${(e as Error).message}. Check the record directory, or pass another with --record.`);
+  throw new RecordError(
+    `judge: cannot ${what} ${file}: ${(e as Error).message}. Check the record directory, or pass another with --record.`,
+  );
 };
 
 export const keyDir = (root: string, key: string) => path.join(root, key);
@@ -105,7 +107,8 @@ export const readFacts = (root: string, key: string): Facts => {
     }
     const ok = typeof fact === 'object' && fact !== null && (fact as Common).key === key;
     if (!m) {
-      if (!ok || !Number.isInteger((fact as Common).n)) failRecord('read', file, new Error(`it is not an answer of key ${key.slice(0, 12)}…`));
+      if (!ok || !Number.isInteger((fact as Common).n))
+        failRecord('read', file, new Error(`it is not an answer of key ${key.slice(0, 12)}…`));
       answer = fact as AnswerFact;
       continue;
     }
@@ -173,8 +176,12 @@ export const settle = (root: string, key: string, n: number): boolean => {
 export const readSettled = (root: string, key: string, q: Question, model: string): Facts => {
   const facts = readFacts(root, key);
   if (facts.answer) return facts;
-  const whole = [...facts.askings.keys()].sort((a, b) => a - b)
-    .find((n) => { const a = facts.askings.get(n)!.answer; return a !== undefined && !notAnAnswer(a, q, model); });
+  const whole = [...facts.askings.keys()]
+    .sort((a, b) => a - b)
+    .find((n) => {
+      const a = facts.askings.get(n)!.answer;
+      return a !== undefined && !notAnAnswer(a, q, model);
+    });
   if (whole === undefined) return facts;
   settle(root, key, whole);
   return readFacts(root, key);
@@ -185,7 +192,11 @@ export const host = os.hostname();
 // ─── reading a key ──────────────────────────────────────────────────────────────────────────────
 
 /** Why a raw answer is not an answer to `q` from `model`, or null when it is one. */
-export const notAnAnswer = (fact: AnswerFact, q: Question, model: string): { kind: 'malformed' | 'wrong-model'; message: string } | null => {
+export const notAnAnswer = (
+  fact: AnswerFact,
+  q: Question,
+  model: string,
+): { kind: 'malformed' | 'wrong-model'; message: string } | null => {
   const a = fact.raw as Record<string, unknown> | null;
   const malformed = (why: string) => ({ kind: 'malformed' as const, message: `${why}; the reply is kept raw in ${fact.n}.answer.json` });
   if (typeof fact.answeredBy === 'string' && fact.answeredBy !== model) {
@@ -197,12 +208,14 @@ export const notAnAnswer = (fact: AnswerFact, q: Question, model: string): { kin
   if (q.type === 'noul' && !probability(a.noul)) return malformed(`its noul is ${JSON.stringify(a.noul)}, not a probability`);
   if (q.type === 'score') {
     const top = (q.criteria as readonly unknown[]).length - 1;
-    if (!(typeof a.score === 'number' && a.score >= 0 && a.score <= top)) return malformed(`its score is ${JSON.stringify(a.score)}, not between 0 and ${top}`);
+    if (!(typeof a.score === 'number' && a.score >= 0 && a.score <= top))
+      return malformed(`its score is ${JSON.stringify(a.score)}, not between 0 and ${top}`);
   }
   if (q.type === 'choice' && !(typeof a.choice === 'string' && Object.hasOwn(q.criteria, a.choice))) {
     return malformed(`its choice ${JSON.stringify(a.choice)} is not one of the options`);
   }
-  if (q.type !== 'noul' && !probability(a.confidence)) return malformed(`its confidence is ${JSON.stringify(a.confidence)}, not a probability`);
+  if (q.type !== 'noul' && !probability(a.confidence))
+    return malformed(`its confidence is ${JSON.stringify(a.confidence)}, not a probability`);
   if (typeof fact.answeredBy !== 'string') return malformed('the reply does not say which model answered');
   return null;
 };
@@ -230,7 +243,10 @@ export const reading = (key: string, facts: Facts, q: Question, model: string, n
       : { status: 'answered', answer: facts.answer.raw as never, key, at: facts.answer.at, model: facts.answer.answeredBy as string };
   }
   const ns = [...facts.askings.keys()].sort((a, b) => a - b);
-  const whole = ns.find((n) => { const a = facts.askings.get(n)!.answer; return a !== undefined && !notAnAnswer(a, q, model); });
+  const whole = ns.find((n) => {
+    const a = facts.askings.get(n)!.answer;
+    return a !== undefined && !notAnAnswer(a, q, model);
+  });
   if (whole !== undefined) return { status: 'unsettled', n: whole };
   if (ns.length === 0) return { status: 'none' };
   const n = ns[ns.length - 1]!;
@@ -240,7 +256,10 @@ export const reading = (key: string, facts: Facts, q: Question, model: string, n
   const deadline = Date.parse(c!.deadline);
   if (now <= deadline) return { status: 'waiting', n, deadline };
   return {
-    status: 'failed', key, at: c!.at, kind: 'interrupted',
+    status: 'failed',
+    key,
+    at: c!.at,
+    kind: 'interrupted',
     message: `asking ${n} was claimed by process ${c!.pid} on ${c!.host} at ${c!.at} and nothing came of it by ${c!.deadline}; re-ask it`,
   };
 };

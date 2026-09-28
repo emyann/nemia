@@ -8,7 +8,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, denialText, refusedText, retiredKeyRefusal, type Attempt, type Engine, type Event, type HarnessArgs, type State, type TaskSpec, type TaskView, type Usage } from './facade.ts';
+import {
+  createEngine,
+  denialText,
+  refusedText,
+  retiredKeyRefusal,
+  type Attempt,
+  type Engine,
+  type Event,
+  type HarnessArgs,
+  type State,
+  type TaskSpec,
+  type TaskView,
+  type Usage,
+} from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -20,9 +33,21 @@ import { createEngine, denialText, refusedText, retiredKeyRefusal, type Attempt,
  * none can be accepted here and then dropped.
  */
 export const BRIEF_KEYS = [
-  'cwd', 'harness', 'model', 'permissionMode', 'deadlineSeconds',
-  'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
-  'contextTokens', 'background', 'holdOpen', 'queued',
+  'cwd',
+  'harness',
+  'model',
+  'permissionMode',
+  'deadlineSeconds',
+  'resumeFrom',
+  'worktree',
+  'closeoutSchema',
+  'tools',
+  'effort',
+  'budgetUsd',
+  'contextTokens',
+  'background',
+  'holdOpen',
+  'queued',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -30,12 +55,19 @@ const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly str
 
 /** Keys a brief had until the runtime made one attempt per start (stage 4a part 2): refused by name, saying where trying again went. */
 const RETIRED_BRIEF_KEYS = ['maxAttempts', 'resume'] as const;
-const isRetiredBriefKey = (key: string): key is (typeof RETIRED_BRIEF_KEYS)[number] => (RETIRED_BRIEF_KEYS as readonly string[]).includes(key);
+const isRetiredBriefKey = (key: string): key is (typeof RETIRED_BRIEF_KEYS)[number] =>
+  (RETIRED_BRIEF_KEYS as readonly string[]).includes(key);
 
 /** A refusal: exit code 2, and a sentence that says what to write instead. */
 const refuse = (message: string) => Object.assign(new Error(`brief: ${message}`), { exitCode: 2 });
 
-const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+const isDirectory = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
 
 /**
  * A brief is a markdown file: optional `key: value` frontmatter, body is the prompt.
@@ -49,7 +81,8 @@ const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); 
 export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const source = text.replace(/\r\n/g, '\n');
   const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
-  if (!m && source.startsWith('---\n')) throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
+  if (!m && source.startsWith('---\n'))
+    throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
 
   const meta = new Map<BriefKey, string>();
   for (const raw of m?.[1]?.split('\n') ?? []) {
@@ -73,32 +106,44 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
 
   const deadlineSeconds = meta.get('deadlineSeconds');
   if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
-    throw refuse(`\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`);
+    throw refuse(
+      `\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`,
+    );
   }
   const budgetUsd = meta.get('budgetUsd');
   // Digits and a point: `$5` and `5 USD` are what a person writes, and `Number` would make the one NaN and refuse neither.
   if (budgetUsd !== undefined && !(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
-    throw refuse(`\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`);
+    throw refuse(
+      `\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`,
+    );
   }
   const contextTokens = meta.get('contextTokens');
   // Digits: a number of tokens. `200k` is what a person writes, and the refusal does the arithmetic. Whether the harness takes the
   // number is `file()`'s to say.
   if (contextTokens !== undefined && !(/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens)))) {
     const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
-    throw refuse(`\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2]!.toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`);
+    throw refuse(
+      `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2]!.toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
+    );
   }
   const background = meta.get('background');
   if (background !== undefined && background !== 'true' && background !== 'false') {
-    throw refuse(`\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`);
+    throw refuse(
+      `\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`,
+    );
   }
   // The one way to hold a task back from `ae` since the runtime's ceiling was retired (stage 4c part 2): `ae admit` starts it.
   const queued = meta.get('queued');
   if (queued !== undefined && queued !== 'true' && queued !== 'false') {
-    throw refuse(`\`queued: ${queued}\` is not true or false. Write \`queued: true\` to have the task wait for \`ae admit <id>\` before it starts, or leave it out to start it on the next tick.`);
+    throw refuse(
+      `\`queued: ${queued}\` is not true or false. Write \`queued: true\` to have the task wait for \`ae admit <id>\` before it starts, or leave it out to start it on the next tick.`,
+    );
   }
   const holdOpen = meta.get('holdOpen');
   if (holdOpen !== undefined && holdOpen !== 'true' && holdOpen !== 'false') {
-    throw refuse(`\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`);
+    throw refuse(
+      `\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`,
+    );
   }
   const cwd = meta.get('cwd');
   if (cwd !== undefined && !isDirectory(path.resolve(cwd))) {
@@ -110,11 +155,19 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const schemaPath = meta.get('closeoutSchema');
   if (schemaPath !== undefined) {
     let schemaText: string;
-    try { schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8'); }
-    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`); }
+    try {
+      schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8');
+    } catch (e) {
+      throw refuse(
+        `\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`,
+      );
+    }
     let parsed: unknown;
-    try { parsed = JSON.parse(schemaText); }
-    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`); }
+    try {
+      parsed = JSON.parse(schemaText);
+    } catch (e) {
+      throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`);
+    }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       throw refuse(`\`closeoutSchema: ${schemaPath}\` is not a JSON Schema: a schema is a JSON object.`);
     }
@@ -122,24 +175,31 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   }
 
   // One line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
-  const toolList = meta.get('tools')?.split(',').map((t) => t.trim());
+  const toolList = meta
+    .get('tools')
+    ?.split(',')
+    .map((t) => t.trim());
   if (toolList?.some((t) => !t)) {
-    throw refuse(`\`tools: ${meta.get('tools')}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`);
+    throw refuse(
+      `\`tools: ${meta.get('tools')}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`,
+    );
   }
 
   const worktree = meta.get('worktree');
   // The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
-  const config: HarnessArgs = Object.fromEntries(Object.entries({
-    model: meta.get('model'),
-    permissionMode: meta.get('permissionMode'),
-    // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
-    worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
-    tools: toolList,
-    effort: meta.get('effort'),
-    contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
-    background: background !== undefined ? background === 'true' : undefined,
-    budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
-  }).filter(([, value]) => value !== undefined));
+  const config: HarnessArgs = Object.fromEntries(
+    Object.entries({
+      model: meta.get('model'),
+      permissionMode: meta.get('permissionMode'),
+      // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
+      worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
+      tools: toolList,
+      effort: meta.get('effort'),
+      contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
+      background: background !== undefined ? background === 'true' : undefined,
+      budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
+    }).filter(([, value]) => value !== undefined),
+  );
   return {
     brief,
     cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
@@ -157,7 +217,9 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
 /** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
 export const limitLines = (state: Pick<State, 'config'>): string[] => [
   ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
-  ...(state.config?.contextTokens !== undefined ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`] : []),
+  ...(state.config?.contextTokens !== undefined
+    ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`]
+    : []),
 ];
 
 /** A count for a person: 20400 → 20.4k, 1234567 → 1.2M. */
@@ -169,8 +231,10 @@ const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ?
  */
 export const usageLine = (u: Usage | null): string => {
   if (!u) return 'usage not measured';
-  const tokens = u.inputTokens !== undefined && u.outputTokens !== undefined
-    ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out` : ' · tokens not measured';
+  const tokens =
+    u.inputTokens !== undefined && u.outputTokens !== undefined
+      ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out`
+      : ' · tokens not measured';
   const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
   const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
   return `${turns} · ${calls}${tokens} · ${costLine(u)}${readLine(u)}`;
@@ -184,8 +248,10 @@ export const usageLine = (u: Usage | null): string => {
  */
 const readLine = (u: Usage): string => {
   if (u.inputTokens === undefined) return '';
-  const classes = u.cacheReadTokens !== undefined && u.cacheWriteTokens !== undefined && u.uncachedTokens !== undefined
-    ? `read ${count(u.cacheReadTokens)} · wrote ${count(u.cacheWriteTokens)} · uncached ${count(u.uncachedTokens)}` : 'cache not measured';
+  const classes =
+    u.cacheReadTokens !== undefined && u.cacheWriteTokens !== undefined && u.uncachedTokens !== undefined
+      ? `read ${count(u.cacheReadTokens)} · wrote ${count(u.cacheWriteTokens)} · uncached ${count(u.uncachedTokens)}`
+      : 'cache not measured';
   const peak = u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}` : 'peak not measured';
   const compacted = u.compactions ? ` · compacted ${u.compactions === 1 ? 'once' : `${u.compactions} times`}` : '';
   return ` · ${classes} · ${peak}${compacted}`;
@@ -211,9 +277,10 @@ const duration = (ms: number): string => {
  * above it are. One still running has no end to print, and a length up to now would need a clock
  * this line is not handed.
  */
-const ranLine = (a: Attempt): string => a.endedAt === null
-  ? `since ${a.startedAt.slice(11, 19)}`
-  : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
+const ranLine = (a: Attempt): string =>
+  a.endedAt === null
+    ? `since ${a.startedAt.slice(11, 19)}`
+    : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
 
 /**
  * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
@@ -255,19 +322,34 @@ export const taskLine = (v: TaskView) => {
  * read three different ways depending on which verb printed it.
  */
 const KINDS: Record<string, string> = {
-  filed: 'filed', starting: 'starting', spawned: 'started',
-  ended: 'ended', measured: 'measured', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
-  input: 'answered', closed: 'closed', admitted: 'admitted',
+  filed: 'filed',
+  starting: 'starting',
+  spawned: 'started',
+  ended: 'ended',
+  measured: 'measured',
+  settled: 'SETTLED',
+  'stop-requested': 'stop asked',
+  said: 'said',
+  input: 'answered',
+  closed: 'closed',
+  admitted: 'admitted',
 };
 
 export const entryLine = (taskId: string, event: Event) => {
-  const extra = event.kind === 'settled' ? `  ${event.outcome}`
-    : event.kind === 'measured' ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
-    : event.kind === 'ended' ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
-    : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
-    : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
-    : event.kind === 'input' ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
-    : '';
+  const extra =
+    event.kind === 'settled'
+      ? `  ${event.outcome}`
+      : event.kind === 'measured'
+        ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
+        : event.kind === 'ended'
+          ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+          : event.kind === 'spawned' && event.error
+            ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
+            : event.kind === 'said'
+              ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
+              : event.kind === 'input'
+                ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
+                : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
 
@@ -325,7 +407,8 @@ const HELP = `ae — an engine for agent sessions
  * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: it was the runtime's ceiling until stage 4c part 2
  * (2026-09-25), and read and dropped, a person who set it would believe in a ceiling nothing keeps.
  */
-export const AE_MAX_CONCURRENT_RETIRED = 'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
+export const AE_MAX_CONCURRENT_RETIRED =
+  'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
 
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
@@ -388,7 +471,12 @@ export async function main(argv: string[]): Promise<void> {
       const at = rest.indexOf('--budget');
       const budget = at === -1 ? undefined : rest[at + 1];
       if (at !== -1 && !(budget !== undefined && /^\d*\.?\d+$/.test(budget) && Number(budget) > 0)) {
-        throw Object.assign(new Error(`answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`), { exitCode: 2 });
+        throw Object.assign(
+          new Error(
+            `answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`,
+          ),
+          { exitCode: 2 },
+        );
       }
       const words = (at === -1 ? rest : [...rest.slice(0, at), ...rest.slice(at + 2)]).join(' ');
       const input = await engine.answer(arg, words, budget !== undefined ? { config: { budgetUsd: Number(budget) } } : {});
@@ -405,13 +493,17 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       const ids = argv.slice(1);
       const admitted = new Set(await engine.admit(ids));
-      for (const id of ids) console.log(`${id}  ${admitted.has(id) ? 'admitted: the next tick starts it' : 'waits for no admission: left as it is'}`);
+      for (const id of ids)
+        console.log(`${id}  ${admitted.has(id) ? 'admitted: the next tick starts it' : 'waits for no admission: left as it is'}`);
       return;
     }
 
     case 'tick': {
       const r = await engine.tick();
-      const load = Object.entries(r.running).map(([h, n]) => `${h}:${n}`).join(' ') || 'idle';
+      const load =
+        Object.entries(r.running)
+          .map(([h, n]) => `${h}:${n}`)
+          .join(' ') || 'idle';
       console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
       for (const m of r.refused) console.log(refusedText(m));
       return;
@@ -449,7 +541,9 @@ export async function main(argv: string[]): Promise<void> {
           intervalMs: every,
           onTick: (r) => {
             if (!r.actions) return;
-            const load = Object.entries(r.running).map(([h, n]) => `${h}:${n}`).join(' ');
+            const load = Object.entries(r.running)
+              .map(([h, n]) => `${h}:${n}`)
+              .join(' ');
             console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
           },
           onError: (e) => console.error(String(e)),

@@ -12,7 +12,20 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lastLines } from './check.ts';
-import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
+import {
+  depsPlan,
+  inside,
+  isModuleKey,
+  lockfilePackages,
+  lockfileParting,
+  refusalLines,
+  worktreeInclude,
+  type DepEntry,
+  type DepsListing,
+  type Installed,
+  type Provisioned,
+  type WorktreeInclude,
+} from './deps.ts';
 import { folderPlace } from './places.ts';
 import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
@@ -24,7 +37,6 @@ const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
-
 /**
  * Where the worktree's `package-lock.json` asks for a tree the main checkout does not have on disk, or
  * null when links will do: `lockfileParting`, over a look at each package path the lockfile names.
@@ -35,7 +47,13 @@ const execFileAsync = promisify(execFile);
  * has one — a repository without one is not npm's, and links are all there is.
  */
 export function lockfileParts(mainRoot: string, worktree: string): string | null {
-  const read = (file: string): string | null => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
+  const read = (file: string): string | null => {
+    try {
+      return fs.readFileSync(file, 'utf8');
+    } catch {
+      return null;
+    }
+  };
   const wanted = read(path.join(worktree, 'package-lock.json'));
   const mains = read(path.join(mainRoot, 'package-lock.json'));
   if (wanted === null) return mains === null ? null : 'package-lock.json';
@@ -44,17 +62,31 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
   }
 
   let lock: unknown = null;
-  try { lock = JSON.parse(wanted); } catch { /* parts at package-lock.json */ }
+  try {
+    lock = JSON.parse(wanted);
+  } catch {
+    /* parts at package-lock.json */
+  }
   const installed: Record<string, Installed | null> = {};
   for (const key of Object.keys(lockfilePackages(lock) ?? {}).filter(isModuleKey)) {
     const at = path.join(mainRoot, key);
     const st = lstatOf(at);
     if (!st) installed[key] = null;
     else if (st.isSymbolicLink()) {
-      installed[key] = { link: true, resolved: path.relative(mainRoot, path.resolve(path.dirname(at), fs.readlinkSync(at))).split(path.sep).join('/') };
+      installed[key] = {
+        link: true,
+        resolved: path
+          .relative(mainRoot, path.resolve(path.dirname(at), fs.readlinkSync(at)))
+          .split(path.sep)
+          .join('/'),
+      };
     } else {
       let version: string | undefined;
-      try { version = JSON.parse(fs.readFileSync(path.join(at, 'package.json'), 'utf8')).version; } catch { /* a package without a manifest has no version */ }
+      try {
+        version = JSON.parse(fs.readFileSync(path.join(at, 'package.json'), 'utf8')).version;
+      } catch {
+        /* a package without a manifest has no version */
+      }
       installed[key] = { link: false, version };
     }
   }
@@ -76,14 +108,17 @@ function listDeps(modules: string): DepsListing | null {
   if (!fs.statSync(modules, { throwIfNoEntry: false })?.isDirectory()) return null;
   const entriesOf = (dir: string): DepEntry[] => {
     try {
-      return fs.readdirSync(dir, { withFileTypes: true }).map((d) =>
-        d.isSymbolicLink() ? { name: d.name, link: fs.readlinkSync(path.join(dir, d.name)) } : { name: d.name });
-    } catch { return []; }
+      return fs
+        .readdirSync(dir, { withFileTypes: true })
+        .map((d) => (d.isSymbolicLink() ? { name: d.name, link: fs.readlinkSync(path.join(dir, d.name)) } : { name: d.name }));
+    } catch {
+      return [];
+    }
   };
   const entries = entriesOf(modules);
-  const scopes = Object.fromEntries(entries
-    .filter((e) => e.name.startsWith('@') && e.link === undefined)
-    .map((e) => [e.name, entriesOf(path.join(modules, e.name))]));
+  const scopes = Object.fromEntries(
+    entries.filter((e) => e.name.startsWith('@') && e.link === undefined).map((e) => [e.name, entriesOf(path.join(modules, e.name))]),
+  );
   return { entries, scopes, bins: entriesOf(path.join(modules, '.bin')) };
 }
 
@@ -99,14 +134,20 @@ const HARDLINK_REFUSED = new Set(['EXDEV', 'EPERM', 'ENOTSUP']);
  */
 function hardlinkTree(from: string, to: string): number {
   const st = fs.lstatSync(from);
-  if (st.isSymbolicLink()) { fs.symlinkSync(fs.readlinkSync(from), to); return 1; }
+  if (st.isSymbolicLink()) {
+    fs.symlinkSync(fs.readlinkSync(from), to);
+    return 1;
+  }
   if (st.isDirectory()) {
     fs.mkdirSync(to);
     let made = 1;
     for (const name of fs.readdirSync(from)) made += hardlinkTree(path.join(from, name), path.join(to, name));
     return made;
   }
-  if (st.isFile()) { fs.linkSync(from, to); return 1; }
+  if (st.isFile()) {
+    fs.linkSync(from, to);
+    return 1;
+  }
   return 0;
 }
 
@@ -137,11 +178,15 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   if (lockfileParts(mainRoot, worktree)) {
     try {
       countSpawn();
-      await execFileAsync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+      await execFileAsync('npm', ['ci', '--no-audit', '--no-fund'], {
+        cwd: worktree,
+        timeout: NPM_CI_TIMEOUT_MS,
+        maxBuffer: 64 * 1024 * 1024,
+      });
       return { tree: 'own', installed: true };
     } catch (err) {
       const { stderr, message } = err as { stderr?: string; message?: string };
-      return { tree: 'failed', error: lastLines(stderr?.trim() ? stderr : message ?? String(err), 10) };
+      return { tree: 'failed', error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10) };
     }
   }
 
@@ -154,7 +199,8 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
     for (const action of depsPlan(mainRoot, worktree, listing)) {
       const there = lstatOf(action.path);
       if (there) {
-        if (action.kind === 'tree' && there.isSymbolicLink() && fs.readlinkSync(action.path) === action.from) why ??= 'an earlier pass linked them';
+        if (action.kind === 'tree' && there.isSymbolicLink() && fs.readlinkSync(action.path) === action.from)
+          why ??= 'an earlier pass linked them';
         continue;
       }
       if (action.kind === 'dir') fs.mkdirSync(action.path);
@@ -210,9 +256,20 @@ function includeFiles(repo: string, worktree: string): string[] {
   for (const rel of include.copy) {
     const from = path.join(repo, rel);
     let real: string;
-    try { real = fs.realpathSync(from); } catch { absent.push(rel); continue; }
-    if (!inside(root, real)) { notes.push(`.worktreeinclude: refused "${rel}" leads outside the repository`); continue; }
-    if (!ignored(repo, rel)) { notes.push(`.worktreeinclude: refused "${rel}" is not gitignored — the hand-off would commit it`); continue; }
+    try {
+      real = fs.realpathSync(from);
+    } catch {
+      absent.push(rel);
+      continue;
+    }
+    if (!inside(root, real)) {
+      notes.push(`.worktreeinclude: refused "${rel}" leads outside the repository`);
+      continue;
+    }
+    if (!ignored(repo, rel)) {
+      notes.push(`.worktreeinclude: refused "${rel}" is not gitignored — the hand-off would commit it`);
+      continue;
+    }
     const to = path.join(worktree, rel);
     try {
       fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -233,7 +290,8 @@ function includeFiles(repo: string, worktree: string): string[] {
  * own: a queued card whose `repo:` is no git repository made the tick run `rev-parse` there on every pass, and each one printed git's `fatal:
  * not a git repository` on the daemon's terminal, beside the one line `wf up` says about the card.
  */
-export const git = (repo: string, ...args: string[]) => execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+export const git = (repo: string, ...args: string[]) =>
+  execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /**
  * Cut the run's starting workspace.
@@ -302,8 +360,7 @@ export async function workspaceFor(
   if (plan.kind === 'merge') {
     for (const other of plan.also) {
       try {
-        git(workspace, '-c', 'user.email=wf@local', '-c', 'user.name=wf',
-            'merge', '--no-edit', of(other).branch);
+        git(workspace, '-c', 'user.email=wf@local', '-c', 'user.name=wf', 'merge', '--no-edit', of(other).branch);
       } catch {
         // Left in place, markers and all. The step waiting on several others is the one whose
         // job this is, and it is told so in its brief.
@@ -315,9 +372,13 @@ export async function workspaceFor(
   // After the merges, because the step works on the merged tree — its lockfile included.
   const notes = includeFiles(run.repo, workspace);
   const deps = await provisionDeps(run.repo, workspace);
-  if (deps.tree === 'own' && deps.installed) notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
+  if (deps.tree === 'own' && deps.installed)
+    notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
   if (deps.tree === 'failed') notes.push(`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`);
-  if (deps.tree === 'linked') notes.push(`node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`);
+  if (deps.tree === 'linked')
+    notes.push(
+      `node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`,
+    );
   return { workspace, branch, conflicted, deps, notes };
 }
 
@@ -336,18 +397,24 @@ export function handOff(workspace: string, step: string, when = ''): { commit: s
   try {
     if (!execCounted('git', ['status', '--porcelain'], quiet).trim()) return undefined;
     execCounted('git', ['add', '-A'], quiet);
-    execCounted('git', [
-      '-c', 'user.email=wf@local', '-c', 'user.name=wf',
-      'commit', '-m', `${step}: hand off what was left uncommitted${when}`,
-    ], quiet);
+    execCounted(
+      'git',
+      ['-c', 'user.email=wf@local', '-c', 'user.name=wf', 'commit', '-m', `${step}: hand off what was left uncommitted${when}`],
+      quiet,
+    );
     return { commit: git(workspace, 'rev-parse', 'HEAD') };
-  } catch (err) { return { error: failedWords(err) }; }
+  } catch (err) {
+    return { error: failedWords(err) };
+  }
 }
 
 /** What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its exit status. */
 function failedWords(err: unknown, lines = 4): string {
   const { stderr, status } = err as { stderr?: unknown; status?: number | null };
-  const said = (Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const said = (Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 
@@ -356,7 +423,11 @@ function failedWords(err: unknown, lines = 4): string {
  * feeds, and untrimmed, since a name may end in a space. A lockfile's diff is large, so is the buffer.
  */
 export const gitSays = (repo: string, ...args: string[]): string | undefined => {
-  try { return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
+  try {
+    return execCounted('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
+  } catch {
+    return undefined;
+  }
 };
 
 /**
@@ -369,7 +440,9 @@ function mergeHeadFile(repo: string): string | undefined {
     if (fs.statSync(dotGit).isDirectory()) return path.join(dotGit, 'MERGE_HEAD');
     const named = /^gitdir:\s*(.+)$/m.exec(readText(dotGit))?.[1]?.trim();
     return named ? path.join(path.resolve(repo, named), 'MERGE_HEAD') : undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -389,7 +462,13 @@ export const mergeInProgress = (repo: string): boolean => {
  */
 export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
   const file = mergeHeadFile(repo);
-  const heads = file && fs.existsSync(file) ? readText(file).split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  const heads =
+    file && fs.existsSync(file)
+      ? readText(file)
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean)
+      : [];
   const shas = new Set(Object.values(tips));
   const merging = !heads.length ? 'none' : heads.every((h) => shas.has(h)) ? 'ours' : 'other';
   const missing = Object.entries(tips)
@@ -408,7 +487,9 @@ export function commitMerge(repo: string, message: string): { commit: string } |
   try {
     execCounted('git', ['commit', '-F', '-'], { cwd: repo, encoding: 'utf8', input: message, stdio: ['pipe', 'pipe', 'pipe'] });
     return { commit: git(repo, 'rev-parse', 'HEAD') };
-  } catch (err) { return { error: failedWords(err) }; }
+  } catch (err) {
+    return { error: failedWords(err) };
+  }
 }
 
 /** Abort the merge in progress in `repo` (`git merge --abort`): undefined once it is, or git's words on why it is not. */
@@ -416,5 +497,7 @@ export function abortMerge(repo: string): { error: string } | undefined {
   try {
     git(repo, 'merge', '--abort');
     return undefined;
-  } catch (err) { return { error: failedWords(err) }; }
+  } catch (err) {
+    return { error: failedWords(err) };
+  }
 }

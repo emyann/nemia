@@ -15,9 +15,26 @@ import { scratch } from './scratch.ts';
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 
 const git = (cwd: string, ...args: string[]): string =>
-  execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
-    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
-  });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=e2e',
+      '-c',
+      'user.email=e2e@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      'core.hooksPath=/dev/null',
+      ...args,
+    ],
+    {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    },
+  );
 
 const writeAll = (root: string, files: Record<string, string>): void => {
   for (const [file, text] of Object.entries(files)) {
@@ -30,13 +47,20 @@ const writeAll = (root: string, files: Record<string, string>): void => {
  * A repository holding `base`, and two branches off it, `one` and `other`, each writing its own files over it; then `other` merged into
  * `one`, as a person merges main into a branch. Answers the repository, and whether the merge was clean.
  */
-function mergeOf(base: Record<string, string>, one: Record<string, string>, other: Record<string, string>): { repo: string; clean: boolean; said: string } {
+function mergeOf(
+  base: Record<string, string>,
+  one: Record<string, string>,
+  other: Record<string, string>,
+): { repo: string; clean: boolean; said: string } {
   const repo = scratch('hkb-e2e-merge-');
   git(repo, 'init', '-q', '-b', 'main');
   writeAll(repo, base);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-qm', 'base');
-  for (const [branch, files] of [['one', one], ['other', other]] as const) {
+  for (const [branch, files] of [
+    ['one', one],
+    ['other', other],
+  ] as const) {
     git(repo, 'checkout', '-qb', branch, 'main');
     writeAll(repo, files);
     git(repo, 'add', '-A');
@@ -58,7 +82,9 @@ const PAGES = path.relative(REPO, PAGES_DIR);
 
 /** The repository's pages and NAMES, and its .gitattributes, at their paths. */
 const shippedPages = (): Record<string, string> => ({
-  ...Object.fromEntries(fs.readdirSync(PAGES_DIR).map((file) => [path.join(PAGES, file), fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')])),
+  ...Object.fromEntries(
+    fs.readdirSync(PAGES_DIR).map((file) => [path.join(PAGES, file), fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')]),
+  ),
   '.gitattributes': fs.readFileSync(path.join(REPO, '.gitattributes'), 'utf8'),
 });
 
@@ -69,8 +95,10 @@ const lastAndNext = (): [string, string] => {
 };
 
 /** A page added as a run adds one: its file, and its line at the end of NAMES. */
-const added = (base: Record<string, string>, file: string, name: string): Record<string, string> =>
-  ({ [path.join(PAGES, file)]: pageFile(name), [path.join(PAGES, NAMES)]: `${base[path.join(PAGES, NAMES)]}${name}\n` });
+const added = (base: Record<string, string>, file: string, name: string): Record<string, string> => ({
+  [path.join(PAGES, file)]: pageFile(name),
+  [path.join(PAGES, NAMES)]: `${base[path.join(PAGES, NAMES)]}${name}\n`,
+});
 
 test('two branches that each add a page and its line in NAMES, with the same number, merge cleanly, and both are visited', () => {
   const base = shippedPages();
@@ -80,7 +108,10 @@ test('two branches that each add a page and its line in NAMES, with the same num
   const merged = pageFiles(path.join(repo, PAGES));
   assert.deepEqual(merged.slice(-3), [last, `${next}-alpha.ts`, `${next}-beta.ts`]);
   assert.equal(merged.length, fs.readdirSync(PAGES_DIR).length - 1 + 2);
-  assert.ok(['alpha', 'beta'].every((name) => namesIn(path.join(repo, PAGES)).has(name)), 'NAMES keeps both lines');
+  assert.ok(
+    ['alpha', 'beta'].every((name) => namesIn(path.join(repo, PAGES)).has(name)),
+    'NAMES keeps both lines',
+  );
 });
 
 test('without the union rule for NAMES, the same two pages conflict on their lines', () => {
@@ -92,7 +123,11 @@ test('without the union rule for NAMES, the same two pages conflict on their lin
 
 test('the old shape — one array of pages every run appends to — conflicts on the same two adds', () => {
   const list = (...names: string[]) => `const PAGES: PageSpec[] = [\n${names.map((name) => `  ${name},\n`).join('')}];\n`;
-  const { clean } = mergeOf({ 'run.ts': list('agents', 'capabilities') }, { 'run.ts': list('agents', 'capabilities', 'alpha') }, { 'run.ts': list('agents', 'capabilities', 'beta') });
+  const { clean } = mergeOf(
+    { 'run.ts': list('agents', 'capabilities') },
+    { 'run.ts': list('agents', 'capabilities', 'alpha') },
+    { 'run.ts': list('agents', 'capabilities', 'beta') },
+  );
   assert.equal(clean, false, 'two appends at the end of one array conflict');
 });
 
@@ -103,11 +138,15 @@ function withLesson(claude: string, lesson: string): string {
   return `${claude.slice(0, next).trimEnd()}\n${lesson}\n${claude.slice(next)}`;
 }
 
-test('two branches that each add a lesson to CLAUDE.md, at the same place, merge cleanly with the repository\'s .gitattributes', () => {
+test("two branches that each add a lesson to CLAUDE.md, at the same place, merge cleanly with the repository's .gitattributes", () => {
   const claude = fs.readFileSync(path.join(REPO, 'CLAUDE.md'), 'utf8');
   const attributes = fs.readFileSync(path.join(REPO, '.gitattributes'), 'utf8');
   const [alpha, beta] = ['- **Alpha learned something.** And wrote it down.', '- **Beta learned something else.** And wrote that down.'];
-  const { repo, clean, said } = mergeOf({ 'CLAUDE.md': claude, '.gitattributes': attributes }, { 'CLAUDE.md': withLesson(claude, alpha) }, { 'CLAUDE.md': withLesson(claude, beta) });
+  const { repo, clean, said } = mergeOf(
+    { 'CLAUDE.md': claude, '.gitattributes': attributes },
+    { 'CLAUDE.md': withLesson(claude, alpha) },
+    { 'CLAUDE.md': withLesson(claude, beta) },
+  );
   assert.ok(clean, `the merge is clean — git said:\n${said}`);
   const merged = fs.readFileSync(path.join(repo, 'CLAUDE.md'), 'utf8');
   for (const lesson of [alpha, beta]) assert.equal(merged.split(lesson).length - 1, 1, `the merge keeps ${lesson} once`);
@@ -116,6 +155,10 @@ test('two branches that each add a lesson to CLAUDE.md, at the same place, merge
 
 test('without the union rule, the same two lessons conflict', () => {
   const claude = fs.readFileSync(path.join(REPO, 'CLAUDE.md'), 'utf8');
-  const { clean } = mergeOf({ 'CLAUDE.md': claude }, { 'CLAUDE.md': withLesson(claude, '- one') }, { 'CLAUDE.md': withLesson(claude, '- other') });
+  const { clean } = mergeOf(
+    { 'CLAUDE.md': claude },
+    { 'CLAUDE.md': withLesson(claude, '- one') },
+    { 'CLAUDE.md': withLesson(claude, '- other') },
+  );
   assert.equal(clean, false);
 });

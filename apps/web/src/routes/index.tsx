@@ -17,8 +17,7 @@ export const Route = createFileRoute('/')({
   component: Factory,
   errorComponent: ({ error }) => (
     <p className="p-4 text-sm text-red-600">
-      Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running
-      (<code>npm run dev</code>)?
+      Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });

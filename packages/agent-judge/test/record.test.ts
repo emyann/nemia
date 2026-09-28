@@ -23,7 +23,10 @@ const judgeOver = (record: string, fetch: ReturnType<typeof stub>['fetch'], more
   judge({ model: MODEL, record, env: ENV, fetch, retries: 0, ...more });
 
 const rejects = async (p: Promise<unknown>, pattern: RegExp) => {
-  const e = await p.then(() => assert.fail('it did not reject'), (e: Error & { exitCode?: number }) => e);
+  const e = await p.then(
+    () => assert.fail('it did not reject'),
+    (e: Error & { exitCode?: number }) => e,
+  );
   assert.equal(e.exitCode, 2);
   assert.match(e.message, pattern);
 };
@@ -40,13 +43,18 @@ test('asked once: a second ask of the same words and state makes no request', as
   assert.deepEqual(second.answers, first.answers);
   assert.equal(files(record).filter((f) => f.endsWith('.answer.json')).length, 2);
   assert.equal(files(record).filter((f) => f.endsWith('.asked.json')).length, 2);
-  assert.ok(files(record).every((f) => !f.endsWith('.tmp')), 'no temp file is left');
+  assert.ok(
+    files(record).every((f) => !f.endsWith('.tmp')),
+    'no temp file is left',
+  );
 });
 
-test('the record holds the state\'s hash, never its text', async () => {
+test("the record holds the state's hash, never its text", async () => {
   const record = tmp('record');
   await judgeOver(record, stub(answering({})).fetch).ask({ card: 'a secret-ish sentence' }, { web });
-  const text = files(record).map((f) => fs.readFileSync(path.join(record, f), 'utf8')).join('');
+  const text = files(record)
+    .map((f) => fs.readFileSync(path.join(record, f), 'utf8'))
+    .join('');
   assert.ok(!text.includes('secret-ish'));
   assert.match(text, /"state":"sha256:[0-9a-f]{64}"/);
 });
@@ -92,7 +100,10 @@ test('reask: failed asks exactly the failed keys again, as the next asking', asy
   assert.equal(decide(asked.answers.plan, T), 'no');
   const planKey = asked.answers.plan.key;
   assert.deepEqual(files(path.join(record, planKey)), ['1.asked.json', '1.failed.json', '2.answer.json', '2.asked.json', 'answer.json']);
-  assert.equal(fs.readFileSync(path.join(record, planKey, 'answer.json'), 'utf8'), fs.readFileSync(path.join(record, planKey, '2.answer.json'), 'utf8'));
+  assert.equal(
+    fs.readFileSync(path.join(record, planKey, 'answer.json'), 'utf8'),
+    fs.readFileSync(path.join(record, planKey, '2.answer.json'), 'utf8'),
+  );
   const none = await judgeOver(record, s.fetch).ask(state, { web, plan }, { reask: 'failed' });
   assert.equal(none.requests, 0, 'nothing failed is left to re-ask');
 });
@@ -114,10 +125,22 @@ test('a claim whose asker never wrote back reads interrupted past its deadline, 
   const key = keyOf(MODEL, web, state);
   fs.mkdirSync(path.join(record, key));
   const at = new Date(Date.now() - 60_000).toISOString();
-  fs.writeFileSync(path.join(record, key, '1.asked.json'), JSON.stringify({
-    v: 1, key, n: 1, id: 'web', model: MODEL, question: questionOf(web), state: stateHash(state), at,
-    deadline: new Date(Date.now() - 30_000).toISOString(), pid: 4242, host: 'elsewhere',
-  }));
+  fs.writeFileSync(
+    path.join(record, key, '1.asked.json'),
+    JSON.stringify({
+      v: 1,
+      key,
+      n: 1,
+      id: 'web',
+      model: MODEL,
+      question: questionOf(web),
+      state: stateHash(state),
+      at,
+      deadline: new Date(Date.now() - 30_000).toISOString(),
+      pid: 4242,
+      host: 'elsewhere',
+    }),
+  );
   const s = stub(answering({ web: 0.9 }));
   const read = await judgeOver(record, s.fetch).ask(state, { web });
   assert.equal(s.calls.length, 0);
@@ -132,11 +155,33 @@ test('a claim inside its deadline is waited on, not asked', async () => {
   const record = tmp('record');
   const key = keyOf(MODEL, web, state);
   fs.mkdirSync(path.join(record, key));
-  const common = { v: 1 as const, key, n: 1, id: 'web', model: MODEL, question: questionOf(web) as never, state: stateHash(state), at: new Date().toISOString() };
-  fs.writeFileSync(path.join(record, key, '1.asked.json'), JSON.stringify({ ...common, deadline: new Date(Date.now() + 10_000).toISOString(), pid: 1, host: 'h' }));
-  setTimeout(() => writeFact(record, 'answer', {
-    ...common, request: 'r', requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul: 0.05 }, usage: {},
-  } satisfies AnswerFact), 120);
+  const common = {
+    v: 1 as const,
+    key,
+    n: 1,
+    id: 'web',
+    model: MODEL,
+    question: questionOf(web) as never,
+    state: stateHash(state),
+    at: new Date().toISOString(),
+  };
+  fs.writeFileSync(
+    path.join(record, key, '1.asked.json'),
+    JSON.stringify({ ...common, deadline: new Date(Date.now() + 10_000).toISOString(), pid: 1, host: 'h' }),
+  );
+  setTimeout(
+    () =>
+      writeFact(record, 'answer', {
+        ...common,
+        request: 'r',
+        requestId: null,
+        ms: 5,
+        answeredBy: MODEL,
+        raw: { type: 'noul', noul: 0.05 },
+        usage: {},
+      } satisfies AnswerFact),
+    120,
+  );
   const s = stub(answering({ web: 0.9 }));
   const asked = await judgeOver(record, s.fetch).ask(state, { web });
   assert.equal(s.calls.length, 0);
@@ -155,20 +200,40 @@ test('two askers at once: one request, one answer file, the same answer for both
 
 // Every asking of `web` under `state`, written by hand the way an asker writes them.
 const webKey = keyOf(MODEL, web, state);
-const common = (n: number) => ({ v: 1 as const, key: webKey, n, id: 'web', model: MODEL, question: questionOf(web) as never, state: stateHash(state), at: new Date().toISOString() });
+const common = (n: number) => ({
+  v: 1 as const,
+  key: webKey,
+  n,
+  id: 'web',
+  model: MODEL,
+  question: questionOf(web) as never,
+  state: stateHash(state),
+  at: new Date().toISOString(),
+});
 /** A claim whose asker stalled: its deadline has passed, and nothing came of it yet. */
 const stalled = (record: string, n: number) => {
   fs.mkdirSync(path.join(record, webKey), { recursive: true });
-  fs.writeFileSync(path.join(record, webKey, `${n}.asked.json`), JSON.stringify({ ...common(n), deadline: new Date(Date.now() - 1_000).toISOString(), pid: 4242, host: 'elsewhere' }));
+  fs.writeFileSync(
+    path.join(record, webKey, `${n}.asked.json`),
+    JSON.stringify({ ...common(n), deadline: new Date(Date.now() - 1_000).toISOString(), pid: 4242, host: 'elsewhere' }),
+  );
 };
 /** A stalled asker's answer landing at last, as the asker writes it: the fact, then its link to the key's answer. */
 const lands = (record: string, n: number, noul: number) => {
-  writeFact(record, 'answer', { ...common(n), request: `r${n}`, requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul }, usage: {} });
+  writeFact(record, 'answer', {
+    ...common(n),
+    request: `r${n}`,
+    requestId: null,
+    ms: 5,
+    answeredBy: MODEL,
+    raw: { type: 'noul', noul },
+    usage: {},
+  });
   return settle(record, webKey, n);
 };
 const readWeb = async (record: string) => decide((await judgeOver(record, stub().fetch).ask(state, { web })).answers.web, T);
 
-test('asking 2 answered and read, then asking 1\'s late answer lands: the read stays asking 2\'s', async () => {
+test("asking 2 answered and read, then asking 1's late answer lands: the read stays asking 2's", async () => {
   const record = tmp('record');
   stalled(record, 1);
   assert.equal(await readWeb(record), 'unsure', 'asking 1 reads interrupted');
@@ -177,13 +242,17 @@ test('asking 2 answered and read, then asking 1\'s late answer lands: the read s
   assert.equal(s.calls.length, 1);
   assert.equal(decide(reasked.answers.web, T), 'yes');
   assert.equal(await readWeb(record), 'yes');
-  assert.equal(lands(record, 1, 0.05), false, 'the late answer does not become the key\'s');
+  assert.equal(lands(record, 1, 0.05), false, "the late answer does not become the key's");
   assert.equal(await readWeb(record), 'yes');
   assert.equal(await readWeb(record), 'yes');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(record, webKey, '1.answer.json'), 'utf8')).raw.noul, 0.05, 'the late answer is kept as a fact of its asking');
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(record, webKey, '1.answer.json'), 'utf8')).raw.noul,
+    0.05,
+    'the late answer is kept as a fact of its asking',
+  );
 });
 
-test('asking 1 stalls, asking 2 is claimed and stalls, asking 1\'s answer lands and is read, then asking 2\'s lands: the read stays asking 1\'s', async () => {
+test("asking 1 stalls, asking 2 is claimed and stalls, asking 1's answer lands and is read, then asking 2's lands: the read stays asking 1's", async () => {
   const record = tmp('record');
   stalled(record, 1);
   stalled(record, 2);
@@ -192,13 +261,25 @@ test('asking 1 stalls, asking 2 is claimed and stalls, asking 1\'s answer lands 
   assert.equal(lands(record, 2, 0.05), false);
   assert.equal(await readWeb(record), 'yes');
   assert.equal(await readWeb(record), 'yes');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(record, webKey, '2.answer.json'), 'utf8')).raw.noul, 0.05, 'the late answer is kept as a fact of its asking');
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(record, webKey, '2.answer.json'), 'utf8')).raw.noul,
+    0.05,
+    'the late answer is kept as a fact of its asking',
+  );
 });
 
 test('an answer its asker wrote and never linked is settled by the next recorded read; a replay reads it in-flight and writes nothing', async () => {
   const record = tmp('record');
   stalled(record, 1);
-  writeFact(record, 'answer', { ...common(1), request: 'r', requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul: 0.9 }, usage: {} });
+  writeFact(record, 'answer', {
+    ...common(1),
+    request: 'r',
+    requestId: null,
+    ms: 5,
+    answeredBy: MODEL,
+    raw: { type: 'noul', noul: 0.9 },
+    usage: {},
+  });
   const before = files(record);
   const replayed = await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { web });
   assert.equal(replayed.answers.web.status === 'failed' && replayed.answers.web.kind, 'in-flight');
@@ -212,9 +293,27 @@ test('a fact is never written over: a second answer for the same asking is refus
   const record = tmp('record');
   const key = keyOf(MODEL, web, state);
   fs.mkdirSync(path.join(record, key));
-  const fact = { v: 1 as const, key, n: 1, id: 'web', model: MODEL, question: questionOf(web) as never, state: stateHash(state), at: '', request: 'r', requestId: null, ms: 1, answeredBy: MODEL, raw: null, usage: {} };
+  const fact = {
+    v: 1 as const,
+    key,
+    n: 1,
+    id: 'web',
+    model: MODEL,
+    question: questionOf(web) as never,
+    state: stateHash(state),
+    at: '',
+    request: 'r',
+    requestId: null,
+    ms: 1,
+    answeredBy: MODEL,
+    raw: null,
+    usage: {},
+  };
   writeFact(record, 'answer', fact);
-  assert.throws(() => writeFact(record, 'answer', fact), (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^judge: cannot write .*EEXIST/.test(e.message));
+  assert.throws(
+    () => writeFact(record, 'answer', fact),
+    (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^judge: cannot write .*EEXIST/.test(e.message),
+  );
   assert.deepEqual(files(path.join(record, key)), ['1.answer.json']);
 });
 
@@ -223,14 +322,20 @@ test('a file on record that is not a fact is refused by name', async () => {
   const key = keyOf(MODEL, web, state);
   fs.mkdirSync(path.join(record, key));
   fs.writeFileSync(path.join(record, key, '1.answer.json'), '{ not json');
-  await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), new RegExp(`^judge: cannot read .*${key}/1\\.answer\\.json: .*--record\\.$`));
+  await rejects(
+    judgeOver(record, stub(answering({})).fetch).ask(state, { web }),
+    new RegExp(`^judge: cannot read .*${key}/1\\.answer\\.json: .*--record\\.$`),
+  );
   fs.writeFileSync(path.join(record, key, '1.answer.json'), JSON.stringify({ key: 'another', n: 1 }));
   await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), /it is not a record of key/);
   fs.writeFileSync(path.join(record, key, '1.answer.json'), JSON.stringify({ key, n: 2 }));
   await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), /asking 1/);
   fs.rmSync(path.join(record, key, '1.answer.json'));
   fs.writeFileSync(path.join(record, key, 'answer.json'), JSON.stringify({ key: 'another', n: 1 }));
-  await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), new RegExp(`^judge: cannot read .*${key}/answer\\.json: it is not an answer of key`));
+  await rejects(
+    judgeOver(record, stub(answering({})).fetch).ask(state, { web }),
+    new RegExp(`^judge: cannot read .*${key}/answer\\.json: it is not an answer of key`),
+  );
 });
 
 test('a record it cannot write is refused, and nothing is asked', { skip: os.userInfo().uid === 0 && 'root writes anywhere' }, async () => {

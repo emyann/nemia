@@ -35,10 +35,11 @@ function frontmatterOf(file: string, text: string): Record<string, unknown> {
   return read as Record<string, unknown>;
 }
 
-const agentsIn = (place: string): Agent[] => [...loadAgents(path.join(place, 'agents')).values()].map((a) => {
-  if (a instanceof Error) throw a;
-  return a;
-});
+const agentsIn = (place: string): Agent[] =>
+  [...loadAgents(path.join(place, 'agents')).values()].map((a) => {
+    if (a instanceof Error) throw a;
+    return a;
+  });
 
 test('every shipped SKILL.md reads as YAML, its name its folder and its description one line of text — REFUSED: a description whose quoting breaks it', () => {
   let read = 0;
@@ -68,8 +69,17 @@ test('every shipped SKILL.md reads as YAML, its name its folder and its descript
     'description: "Reads the "diff" as a second engineer would"',
     'description: "Reads the diff',
     'description: `git diff`, read as a second engineer would',
-  ]) assert.throws(() => frontmatterOf(file, text.replace(line, broken)), (e: Error) => e instanceof yaml.YAMLException, broken);
-  assert.deepEqual(Object.keys(frontmatterOf(file, text.replace(line, 'description: Reads the diff, as a second engineer would'))).includes('description'), true, 'plain words read');
+  ])
+    assert.throws(
+      () => frontmatterOf(file, text.replace(line, broken)),
+      (e: Error) => e instanceof yaml.YAMLException,
+      broken,
+    );
+  assert.deepEqual(
+    Object.keys(frontmatterOf(file, text.replace(line, 'description: Reads the diff, as a second engineer would'))).includes('description'),
+    true,
+    'plain words read',
+  );
 });
 
 test("each shipped agent's card is generated from its skills' frontmatter as YAML reads it — and every shipped skill is some agent's", () => {
@@ -78,7 +88,11 @@ test("each shipped agent's card is generated from its skills' frontmatter as YAM
     const found = skillsFor(path.join(place, '_'));
     for (const agent of agentsIn(place)) {
       const card = cardSkills(agent, found);
-      assert.deepEqual(card.map((s) => s.id), agent.skills, `${agent.name}: its card lists what its skills are, in order`);
+      assert.deepEqual(
+        card.map((s) => s.id),
+        agent.skills,
+        `${agent.name}: its card lists what its skills are, in order`,
+      );
       for (const entry of card) {
         const file = path.join(place, 'skills', entry.id, 'SKILL.md');
         const { title, description, tags, examples } = frontmatterOf(file, fs.readFileSync(file, 'utf8'));
@@ -124,13 +138,21 @@ function reachProblems(agent: Pick<Agent, 'name' | 'body' | 'keys' | 'skills'>, 
   const problems: string[] = [];
   for (const skill of agent.skills ?? []) {
     const about = sentences.filter((s) => s.includes(`\`${skill}\``));
-    if (!about.length) { problems.push(`${agent.name}: its body never names ${skill}`); continue; }
-    if (preloaded(skill) && !about.some((s) => s.includes('given you whole'))) problems.push(`${agent.name}: ${skill} is told whole, and the body does not say so`);
+    if (!about.length) {
+      problems.push(`${agent.name}: its body never names ${skill}`);
+      continue;
+    }
+    if (preloaded(skill) && !about.some((s) => s.includes('given you whole')))
+      problems.push(`${agent.name}: ${skill} is told whole, and the body does not say so`);
     if (!preloaded(skill)) {
-      if (!about.some((s) => s.includes('with the Skill tool')) && !about.some((s) => sentences[sentences.indexOf(s) - 1]?.includes('with the Skill tool'))) {
+      if (
+        !about.some((s) => s.includes('with the Skill tool')) &&
+        !about.some((s) => sentences[sentences.indexOf(s) - 1]?.includes('with the Skill tool'))
+      ) {
         problems.push(`${agent.name}: ${skill} is loaded, and the body does not say with the Skill tool`);
       }
-      if (tools && !tools.includes('Skill')) problems.push(`${agent.name}: ${skill} is loaded with the Skill tool, which its tools do not allow`);
+      if (tools && !tools.includes('Skill'))
+        problems.push(`${agent.name}: ${skill} is loaded with the Skill tool, which its tools do not allow`);
     }
   }
   return problems;
@@ -140,14 +162,20 @@ test("each shipped agent's body names each of its skills and how it reaches it: 
   const preloadedIn = (place: string) => (skill: string) => preloads(path.join(place, 'skills', skill));
   for (const place of PLACES) {
     for (const agent of agentsIn(place)) assert.deepEqual(reachProblems(agent, preloadedIn(place)), [], agent.name);
-    assert.deepEqual(fs.readdirSync(path.join(place, 'skills')).filter(preloadedIn(place)).sort(), PRELOADED.filter((s) => fs.existsSync(path.join(place, 'skills', s))), place);
+    assert.deepEqual(
+      fs.readdirSync(path.join(place, 'skills')).filter(preloadedIn(place)).sort(),
+      PRELOADED.filter((s) => fs.existsSync(path.join(place, 'skills', s))),
+      place,
+    );
   }
 
   const agents = new Map(agentsIn(PLACES[0]!).map((a) => [a.name, a]));
   const shipped = preloadedIn(PLACES[0]!);
   const reviewer = agents.get('reviewer')!;
   const planner = agents.get('planner')!;
-  assert.deepEqual(reachProblems({ ...reviewer, body: reviewer.body.replaceAll('`send-work-round-again`', 'the other skill') }, shipped), ['reviewer: its body never names send-work-round-again']);
+  assert.deepEqual(reachProblems({ ...reviewer, body: reviewer.body.replaceAll('`send-work-round-again`', 'the other skill') }, shipped), [
+    'reviewer: its body never names send-work-round-again',
+  ]);
   assert.deepEqual(reachProblems({ ...reviewer, keys: { ...reviewer.keys, tools: 'Read, Grep, Glob, Bash' } }, shipped), [
     'reviewer: review-a-change is loaded with the Skill tool, which its tools do not allow',
     'reviewer: send-work-round-again is loaded with the Skill tool, which its tools do not allow',
@@ -166,7 +194,12 @@ test("a shipped agent renders as `wf start` renders it: skills to load named in 
     const file = path.join(place, 'skills', skill, 'SKILL.md');
     return splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body;
   };
-  const cases: Array<[folder: string, step: string]> = [['dev-planned', 'plan'], ['dev-planned', 'review'], ['dev', 'ship'], ['note', 'review']];
+  const cases: Array<[folder: string, step: string]> = [
+    ['dev-planned', 'plan'],
+    ['dev-planned', 'review'],
+    ['dev', 'ship'],
+    ['note', 'review'],
+  ];
   for (const [i, [folder, name]] of cases.entries()) {
     const dir = path.join(REPO, 'workflows', folder);
     const steps = loadWorkflows(dir);
@@ -179,11 +212,25 @@ test("a shipped agent renders as `wf start` renders it: skills to load named in 
     const plugin = pluginOf(agent.name);
     assert.ok(prompt.startsWith(agent.instructions!.trimEnd()), `${folder}/${name}: the agent's instructions first`);
     const loaded = agent.skills!.filter((s) => !PRELOADED.includes(s));
-    if (loaded.length) assert.ok(prompt.includes(`Your skills, each loaded with the Skill tool by its name when you need it: ${loaded.map((s) => `\`${plugin}:${s}\``).join(', ')}.`), `${folder}/${name}\n\n${prompt}`);
+    if (loaded.length)
+      assert.ok(
+        prompt.includes(
+          `Your skills, each loaded with the Skill tool by its name when you need it: ${loaded.map((s) => `\`${plugin}:${s}\``).join(', ')}.`,
+        ),
+        `${folder}/${name}\n\n${prompt}`,
+      );
     for (const skill of agent.skills!) {
-      assert.equal(fs.readFileSync(path.join(at, plugin, 'skills', skill, 'SKILL.md'), 'utf8'), fs.readFileSync(path.join(REPO, 'workflows', 'skills', skill, 'SKILL.md'), 'utf8'), `${folder}/${name}: ${skill} in the plugin`);
+      assert.equal(
+        fs.readFileSync(path.join(at, plugin, 'skills', skill, 'SKILL.md'), 'utf8'),
+        fs.readFileSync(path.join(REPO, 'workflows', 'skills', skill, 'SKILL.md'), 'utf8'),
+        `${folder}/${name}: ${skill} in the plugin`,
+      );
       const whole = `## Skill \`${plugin}:${skill}\`\n\n${skillText(path.join(REPO, 'workflows'), skill)}`;
-      assert.equal(prompt.includes(whole), PRELOADED.includes(skill), `${folder}/${name}: ${skill} ${PRELOADED.includes(skill) ? 'is' : 'is not'} told whole\n\n${prompt}`);
+      assert.equal(
+        prompt.includes(whole),
+        PRELOADED.includes(skill),
+        `${folder}/${name}: ${skill} ${PRELOADED.includes(skill) ? 'is' : 'is not'} told whole\n\n${prompt}`,
+      );
     }
   }
 });
@@ -195,7 +242,10 @@ test("a shipped step whose rendered folder is gone is told every skill whole in 
     assert.ok(brief.startsWith(step.agent!.instructions!.trimEnd()), `${step.name}: the instructions first`);
     for (const skill of step.agent!.skills!) {
       const file = path.join(REPO, 'workflows', 'skills', skill, 'SKILL.md');
-      assert.ok(brief.includes(`## Skill \`${skill}\`\n\n${splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body}`), `${step.name}: ${skill} told whole\n\n${brief}`);
+      assert.ok(
+        brief.includes(`## Skill \`${skill}\`\n\n${splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body}`),
+        `${step.name}: ${skill} told whole\n\n${brief}`,
+      );
     }
   }
   const ship = loadWorkflows(dir).find((s) => s.name === 'ship')!;

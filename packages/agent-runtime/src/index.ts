@@ -26,7 +26,24 @@
  */
 
 // ─── file work, ask about it, stop it ───────────────────────────────────────
-export { file, FileRefused, requestStop, answer, close, InputRefused, admit, AdmitRefused, view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './engine.ts';
+export {
+  file,
+  FileRefused,
+  requestStop,
+  answer,
+  close,
+  InputRefused,
+  admit,
+  AdmitRefused,
+  view,
+  viewOfState,
+  tick,
+  TickRefused,
+  step,
+  settleTask,
+  StepRefused,
+  GRACE_MS,
+} from './engine.ts';
 export type { Filing, RefusedMove, TaskView } from './engine.ts';
 
 // ─── the feed: how an upper layer reacts without polling a task ─────────────
@@ -35,7 +52,16 @@ export type { FeedEntry, Cursor, JournalOps } from './journal.ts';
 
 // ─── harnesses: bring your own ──────────────────────────────────────────────
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
-export type { ExpectedSession, McpServer, Observation, RunnerOps, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
+export type {
+  ExpectedSession,
+  McpServer,
+  Observation,
+  RunnerOps,
+  SpawnRequest,
+  Transcript,
+  TranscriptCursor,
+  TranscriptEvent,
+} from './runner.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness-args.ts';
 export type { HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';

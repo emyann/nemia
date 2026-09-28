@@ -8,7 +8,8 @@ import { decisionStamp } from '../src/lib/decide.ts';
 /** GET /api/runs/:id answering `body`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: object) {
   const before = globalThis.fetch;
-  globalThis.fetch = (async () => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
   t.after(() => {
     globalThis.fetch = before;
   });
@@ -16,12 +17,16 @@ function answering(t: { after: (fn: () => void) => void }, body: object) {
 
 const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] };
 /** A run's totals on the clock, with nothing filed: what a detail carries once its api has the timeline. */
-const TOTALS = { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } };
+const TOTALS = {
+  rounds: [],
+  run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' },
+};
 /** A detail cut to what the check reads: the run as an api from before `graph` answers it, give or take the rest. */
 const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, onYou: [], ...extra }) as unknown as RunDetail;
 
 const refusesStale = (err: Error) =>
-  err.message.startsWith('The api answered run \'r-1\' without its graph, so it is older than this board') && /Restart the api/.test(err.message);
+  err.message.startsWith("The api answered run 'r-1' without its graph, so it is older than this board") &&
+  /Restart the api/.test(err.message);
 
 test("a run's detail without its graph is refused, naming the fix — an api started before the board drew the graph", async (t) => {
   answering(t, detail());
@@ -45,17 +50,27 @@ test("a run's detail with its graph is read as the api gave it", async (t) => {
 test("a run's detail whose steps come without their tries is refused, naming the step and the fix — an api started before the board showed rounds", async (t) => {
   const stale = detail({ graph, steps: [{ name: 'implement', tries: [] }, { name: 'review' }] });
   const refusesTries = (err: Error) =>
-    err.message.startsWith('The api answered run \'r-1\' without the tries of its step \'review\', so it is older than this board') && /Restart the api/.test(err.message);
+    err.message.startsWith("The api answered run 'r-1' without the tries of its step 'review', so it is older than this board") &&
+    /Restart the api/.test(err.message);
   assert.throws(() => withGraph('r-1', stale), refusesTries);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null }] })));
+  assert.doesNotThrow(() =>
+    withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null }] })),
+  );
 });
 
 test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
-  const stale = detail({ graph, steps: [{ name: 'implement', tries: [], said: [] }, { name: 'review', tries: [] }] });
+  const stale = detail({
+    graph,
+    steps: [
+      { name: 'implement', tries: [], said: [] },
+      { name: 'review', tries: [] },
+    ],
+  });
   const refusesSaid = (err: Error) =>
-    err.message.startsWith('The api answered run \'r-1\' without what was said to its step \'review\', so it is older than this board') && /Restart the api/.test(err.message);
+    err.message.startsWith("The api answered run 'r-1' without what was said to its step 'review', so it is older than this board") &&
+    /Restart the api/.test(err.message);
   assert.throws(() => withGraph('r-1', stale), refusesSaid);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesSaid);
@@ -64,13 +79,18 @@ test("a run's detail whose steps come without what was said to them is refused, 
 test("REFUSED: a run's detail without where its time went — a step's timeline, or the run's totals — naming what is missing and the fix", async (t) => {
   const timed = { name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null };
   const refuses = (what: string) => (err: Error) =>
-    err.message.startsWith(`The api answered run 'r-1' without ${what}, so it is older than this board`) && /Restart the api/.test(err.message);
+    err.message.startsWith(`The api answered run 'r-1' without ${what}, so it is older than this board`) &&
+    /Restart the api/.test(err.message);
   const stale = detail({ graph, steps: [timed, { name: 'review', tries: [], said: [] }] });
   assert.throws(() => withGraph('r-1', stale), refuses("the timeline of its step 'review'"));
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the timeline of its step 'review'"));
   for (const totals of [undefined, null, {}, { rounds: [] }, { run: TOTALS.run }]) {
-    assert.throws(() => withGraph('r-1', detail({ graph, steps: [timed], timeline: totals })), refuses('the timeline of the run'), JSON.stringify(totals));
+    assert.throws(
+      () => withGraph('r-1', detail({ graph, steps: [timed], timeline: totals })),
+      refuses('the timeline of the run'),
+      JSON.stringify(totals),
+    );
   }
   assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [timed] })));
 });
@@ -88,13 +108,18 @@ test("saying something to a step posts the words as JSON and resolves with the e
   });
   assert.deepEqual(await sayToStep('r 1', 'implement', 'Widen it.'), { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.' });
   const [{ url, init }] = sent as [{ url: string; init: RequestInit }];
-  assert.deepEqual([url, init.method, (init.headers as Record<string, string>)['content-type'], init.body], ['/api/runs/r%201/steps/implement/say', 'POST', 'application/json', '{"text":"Widen it."}']);
+  assert.deepEqual(
+    [url, init.method, (init.headers as Record<string, string>)['content-type'], init.body],
+    ['/api/runs/r%201/steps/implement/say', 'POST', 'application/json', '{"text":"Widen it."}'],
+  );
 
   const refusal = "implement is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything.";
   answer = () => new Response(JSON.stringify({ error: refusal }), { status: 409 });
   await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => err.message === refusal);
   answer = () => new Response('{}', { status: 202 });
-  await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => /^POST \/api\/runs\/r-1\/steps\/implement\/say answered 202 +without what it journalled/.test(err.message));
+  await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) =>
+    /^POST \/api\/runs\/r-1\/steps\/implement\/say answered 202 +without what it journalled/.test(err.message),
+  );
 });
 
 const { workflowNameOf } = await import('../src/lib/api.ts');
@@ -144,12 +169,24 @@ test("REFUSED: a start the api refuses rejects with the api's message word for w
   let answer = answered(500, {});
   starting(t, () => answer);
   const refusals: Array<[number, string]> = [
-    [400, 'POST /api/runs names the workflow to start in `workflow`, a folder\'s name: `{ "workflow": "<name>", "brief": "<what to do>" }`.'],
-    [403, "POST /api/runs refuses a request made by a page on another site (Sec-Fetch-Site: cross-site): a run's brief is what an agent acts on in this repository."],
-    [404, "No workflow 'nope' in /code/app/workflows or /home/me/.agent-workflows/workflows. The workflows there are: dev (repo), ui (repo)."],
-    [409, "Both the repository and yours have a workflow named 'dev'. Say which with `\"from\": \"repo\"` or `\"from\": \"yours\"`."],
+    [
+      400,
+      'POST /api/runs names the workflow to start in `workflow`, a folder\'s name: `{ "workflow": "<name>", "brief": "<what to do>" }`.',
+    ],
+    [
+      403,
+      "POST /api/runs refuses a request made by a page on another site (Sec-Fetch-Site: cross-site): a run's brief is what an agent acts on in this repository.",
+    ],
+    [
+      404,
+      "No workflow 'nope' in /code/app/workflows or /home/me/.agent-workflows/workflows. The workflows there are: dev (repo), ui (repo).",
+    ],
+    [409, 'Both the repository and yours have a workflow named \'dev\'. Say which with `"from": "repo"` or `"from": "yours"`.'],
     [415, 'POST /api/runs takes its body as `content-type: application/json`, and this request sent `text/plain`.'],
-    [422, "build-check: a step may not be named for another step's check. build has a `check:`, and the run files it as build-check. Rename build-check.md."],
+    [
+      422,
+      "build-check: a step may not be named for another step's check. build has a `check:`, and the run files it as build-check. Rename build-check.md.",
+    ],
   ];
   for (const [status, error] of refusals) {
     answer = answered(status, { error });
@@ -158,14 +195,22 @@ test("REFUSED: a start the api refuses rejects with the api's message word for w
 });
 
 test('an answer with nothing to say says what came back: the status line of an error that is not JSON, and a warning to look before starting again on a success with no id', async (t) => {
-  let answer = new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway', headers: { 'content-type': 'text/html' } });
+  let answer = new Response('<html>Bad Gateway</html>', {
+    status: 502,
+    statusText: 'Bad Gateway',
+    headers: { 'content-type': 'text/html' },
+  });
   starting(t, () => answer);
   await assert.rejects(startRun(asked), (err: Error) => err.message === 'POST /api/runs answered 502 Bad Gateway');
   answer = answered(422, { message: 'not the field the board reads' }, 'Unprocessable Entity');
   await assert.rejects(startRun(asked), (err: Error) => err.message === 'POST /api/runs answered 422 Unprocessable Entity');
   answer = answered(201, { run: 'give-the-board-a-legend-ab12' }, 'Created');
-  await assert.rejects(startRun(asked), (err: Error) =>
-    err.message.startsWith("POST /api/runs answered 201 Created without the new run's id") && /look on the Runs page before starting it again/.test(err.message));
+  await assert.rejects(
+    startRun(asked),
+    (err: Error) =>
+      err.message.startsWith("POST /api/runs answered 201 Created without the new run's id") &&
+      /look on the Runs page before starting it again/.test(err.message),
+  );
 });
 /** Until `done` holds, or two seconds have passed. */
 async function until(done: () => boolean): Promise<void> {
@@ -189,8 +234,13 @@ test("a run's decision is asked for once while a live step's engine word moves, 
 
   // A fan-out `assess` calls failed: implement signed off blocked, and tokens still working.
   const run = (tokens: string) => ({
-    status: 'failed', cancelledAt: null, waitingOnYou: ['implement'],
-    steps: [{ name: 'implement', taskId: 't-1', status: 'succeeded · BLOCKED' }, { name: 'tokens', taskId: 't-2', status: tokens }],
+    status: 'failed',
+    cancelledAt: null,
+    waitingOnYou: ['implement'],
+    steps: [
+      { name: 'implement', taskId: 't-1', status: 'succeeded · BLOCKED' },
+      { name: 'tokens', taskId: 't-2', status: tokens },
+    ],
   });
   const observer = new QueryObserver(client, decisionQuery('r-1', decisionStamp(run('running (working)'))));
   const shown: unknown[] = [];
@@ -224,9 +274,11 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
   assert.ok(from >= 0, `the first answer is among what was shown: ${JSON.stringify(shown)}`);
   assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
-  assert.ok(shown.slice(from).every((data) => data !== undefined), JSON.stringify(shown));
+  assert.ok(
+    shown.slice(from).every((data) => data !== undefined),
+    JSON.stringify(shown),
+  );
 });
-
 
 const { askTry } = await import('../src/lib/api.ts');
 
@@ -245,7 +297,11 @@ function asking(t: { after: (fn: () => void) => void }, status: number, body: st
 test("an answer is asked for as the api takes it — POST, JSON, the step by name — and resolves with the try, its ask file and the package's `stopFirst`", async (t) => {
   const sent: Array<{ url: string; init: RequestInit }> = [];
   asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false }), sent);
-  assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), { try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false });
+  assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), {
+    try: 2,
+    file: '/store/runs/r 1.asks/retry-implement-2',
+    stopFirst: false,
+  });
   assert.equal(sent.length, 1);
   assert.equal(sent[0]!.url, '/api/runs/r%201/steps/implement/retry');
   assert.equal(sent[0]!.init.method, 'POST');
@@ -259,44 +315,67 @@ test("an answer is asked for as the api takes it — POST, JSON, the step by nam
 });
 
 test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an answer without the try it asked for, or without JSON, says so", async (t) => {
-  const refusal = "working is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).";
+  const refusal =
+    'working is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).';
   const sent: Array<{ url: string; init: RequestInit }> = [];
   asking(t, 409, JSON.stringify({ error: refusal }), sent);
   await assert.rejects(askTry('r-1', 'working', { mode: 'nudge' }), (err: Error) => err.message === refusal);
 
   globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true }), { status: 202 })) as typeof fetch;
-  await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) =>
-    /^POST \/api\/runs\/r-1\/steps\/implement\/retry answered 202 .*without the try it asked for/.test(err.message) && /before asking again/.test(err.message));
+  await assert.rejects(
+    askTry('r-1', 'implement', { mode: 'nudge' }),
+    (err: Error) =>
+      /^POST \/api\/runs\/r-1\/steps\/implement\/retry answered 202 .*without the try it asked for/.test(err.message) &&
+      /before asking again/.test(err.message),
+  );
 
   globalThis.fetch = (async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })) as typeof fetch;
-  await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway');
+  await assert.rejects(
+    askTry('r-1', 'implement', { mode: 'nudge' }),
+    (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway',
+  );
 });
 
 const { askRound } = await import('../src/lib/api.ts');
 
 test("a raise is posted as JSON beside the try's mode, or with the round's step, and resolves with what the api asked for; a refusal rejects with the package's words, verbatim, and an answer without the round says so", async (t) => {
-  const refusal = "--budget 4 is not above $4.25, what tokens's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: wf retry r-1 tokens --budget <amount>.";
+  const refusal =
+    "--budget 4 is not above $4.25, what tokens's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: wf retry r-1 tokens --budget <amount>.";
   let answer = () => answered(202, { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
   const sent = starting(t, () => answer());
-  assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'nudge', budget: 5 }), { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
+  assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'nudge', budget: 5 }), {
+    try: 3,
+    file: '/store/runs/r-1.asks/retry-tokens-3',
+    stopFirst: false,
+  });
   answer = () => answered(409, { error: refusal });
   await assert.rejects(askTry('r-1', 'tokens', { mode: 'nudge', budget: 4 }), (err: Error) => err.message === refusal);
 
   answer = () => answered(202, { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
-  assert.deepEqual(await askRound('r 1', { step: 'review', budget: 3 }), { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
-  const words = '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: wf round r-1 review --budget <amount>.';
+  assert.deepEqual(await askRound('r 1', { step: 'review', budget: 3 }), {
+    step: 'review',
+    round: 3,
+    file: '/store/runs/r 1.asks/round-review-3',
+  });
+  const words =
+    '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: wf round r-1 review --budget <amount>.';
   answer = () => answered(409, { error: words });
   await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
   answer = () => answered(202, {});
-  await assert.rejects(askRound('r-1', { budget: 3 }), (err: Error) => /^POST \/api\/runs\/r-1\/round answered 202 +without the round it asked for/.test(err.message));
+  await assert.rejects(askRound('r-1', { budget: 3 }), (err: Error) =>
+    /^POST \/api\/runs\/r-1\/round answered 202 +without the round it asked for/.test(err.message),
+  );
 
-  assert.deepEqual(sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]), [
-    ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 5 }],
-    ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 4 }],
-    ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
-    ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
-    ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
-  ]);
+  assert.deepEqual(
+    sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]),
+    [
+      ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 5 }],
+      ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 4 }],
+      ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
+      ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
+      ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
+    ],
+  );
 });
 
 const { acceptLoop } = await import('../src/lib/api.ts');
@@ -305,26 +384,40 @@ test("an acceptance is posted as JSON to the looping step's route with the words
   const at = '2026-09-22T10:00:00.000Z';
   let answer = () => answered(202, { step: 'review', try: 3, at, message: 'Good enough.', file: '/store/runs/r 1.asks/accept-review-3' });
   const sent = starting(t, () => answer());
-  assert.deepEqual(await acceptLoop('r 1', 'review', { message: 'Good enough.' }), { step: 'review', try: 3, at, message: 'Good enough.', file: '/store/runs/r 1.asks/accept-review-3' });
+  assert.deepEqual(await acceptLoop('r 1', 'review', { message: 'Good enough.' }), {
+    step: 'review',
+    try: 3,
+    at,
+    message: 'Good enough.',
+    file: '/store/runs/r 1.asks/accept-review-3',
+  });
 
-  const words = "review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself.";
+  const words = 'review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself.';
   answer = () => answered(409, { error: words });
   await assert.rejects(acceptLoop('r-1', 'review', { message: 'Good enough.' }), (err: Error) => err.message === words);
   answer = () => answered(202, { ok: true });
-  await assert.rejects(acceptLoop('r-1', 'review', { message: 'Good enough.' }), (err: Error) =>
-    /^POST \/api\/runs\/r-1\/steps\/review\/accept answered 202 .*without the acceptance it wrote/.test(err.message) && /before accepting again/.test(err.message));
+  await assert.rejects(
+    acceptLoop('r-1', 'review', { message: 'Good enough.' }),
+    (err: Error) =>
+      /^POST \/api\/runs\/r-1\/steps\/review\/accept answered 202 .*without the acceptance it wrote/.test(err.message) &&
+      /before accepting again/.test(err.message),
+  );
 
-  assert.deepEqual(sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]), [
-    ['/api/runs/r%201/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
-    ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
-    ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
-  ]);
+  assert.deepEqual(
+    sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]),
+    [
+      ['/api/runs/r%201/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+      ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+      ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
+    ],
+  );
 });
 
 test("REFUSED: a run's detail without its gate — who it waits on in wf ls's words, or a step's need and gate — naming what is missing and the fix; an api started before the board approved a step", async (t) => {
   const gated = { name: 'plan', tries: [], said: [], timeline: [], approve: 'approve plan', gate: { awaiting: true, approval: null } };
   const refuses = (what: string) => (err: Error) =>
-    err.message === `The api answered run 'r-1' without ${what}, so it is older than this board, whose run page approves a step at its gate. Restart the api (\`npm run dev\` from the repository, or whatever serves /api), then reload the page.`;
+    err.message ===
+    `The api answered run 'r-1' without ${what}, so it is older than this board, whose run page approves a step at its gate. Restart the api (\`npm run dev\` from the repository, or whatever serves /api), then reload the page.`;
   // The detail an api from before the gate answers: every field the board had before, and none of the gate's.
   const { approve: _approve, gate: _gate, ...before } = gated;
   const stale = detail({ graph, steps: [before], onYou: undefined });
@@ -332,13 +425,22 @@ test("REFUSED: a run's detail without its gate — who it waits on in wf ls's wo
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the gate of its step 'plan'"));
   // One field of the two is not the gate either, whichever it is, nor is a run without `onYou` whose steps have theirs.
-  assert.throws(() => withGraph('r-1', detail({ graph, steps: [gated, { ...before, name: 'review', approve: null }] })), refuses("the gate of its step 'review'"));
+  assert.throws(
+    () => withGraph('r-1', detail({ graph, steps: [gated, { ...before, name: 'review', approve: null }] })),
+    refuses("the gate of its step 'review'"),
+  );
   assert.throws(() => withGraph('r-1', detail({ graph, steps: [{ ...before, gate: null }] })), refuses("the gate of its step 'plan'"));
   for (const onYou of [undefined, null, 'approve plan']) {
-    assert.throws(() => withGraph('r-1', detail({ graph, steps: [gated], onYou })), refuses("who it waits on in wf ls's words"), JSON.stringify(onYou));
+    assert.throws(
+      () => withGraph('r-1', detail({ graph, steps: [gated], onYou })),
+      refuses("who it waits on in wf ls's words"),
+      JSON.stringify(onYou),
+    );
   }
   // Null is an answer: a step with no gate, and nothing to approve.
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })));
+  assert.doesNotThrow(() =>
+    withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })),
+  );
 });
 
 test('a run removed while its page is open is said as gone on the one read that finds none: its last read is kept, and a 404 is not tried again', async (t) => {
@@ -371,7 +473,12 @@ test('a run removed while its page is open is said as gone on the one read that 
 
 test('only a 404 is a run gone: any other failure is tried again three times, as before', () => {
   assert.equal(runGone(new ReadRefusal('No run', 404)), true);
-  for (const other of [new ReadRefusal('the api is down', 502), new ReadRefusal('refused', 400), new Error('without its graph'), undefined]) {
+  for (const other of [
+    new ReadRefusal('the api is down', 502),
+    new ReadRefusal('refused', 400),
+    new Error('without its graph'),
+    undefined,
+  ]) {
     assert.equal(runGone(other), false, String(other));
     assert.equal(retryRun(0, other), true, `${String(other)} is tried again`);
     assert.equal(retryRun(3, other), false, `${String(other)} three times, and no more`);

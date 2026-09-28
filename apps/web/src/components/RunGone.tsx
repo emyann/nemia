@@ -10,8 +10,8 @@ export function RunGone({ run }: { run: RunDetail }) {
   return (
     <p data-run-gone={run.id} role="status" className="max-w-3xl text-sm text-amber-700 dark:text-amber-400">
       <CircleSlash aria-hidden className="mr-1 inline size-3.5 -translate-y-px" />
-      {titleOf(run)} is no longer in this store: it was removed, with <code className="font-medium">wf rm</code>, while this page was open. Runs lists
-      the runs the store has.
+      {titleOf(run)} is no longer in this store: it was removed, with <code className="font-medium">wf rm</code>, while this page was open.
+      Runs lists the runs the store has.
     </p>
   );
 }

@@ -51,10 +51,13 @@ export const tickMemoLayer = (options: { verify?: boolean } = {}) =>
 
 /** Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip. */
 export const divergence = (kept: Releasable, fresh: State, decided: { do: string }): string | undefined =>
-  !settledQuiet(fresh) ? `the memo kept it settled (${kept.settled}), and its journal says it is not`
-    : decided.do !== 'nothing' ? `the memo kept it as deciding nothing, and it decides \`${decided.do}\``
-    : !isDeepStrictEqual(releasableOf(fresh), kept) ? 'its journal has changed since the memo folded it, and the feed did not say so'
-    : undefined;
+  !settledQuiet(fresh)
+    ? `the memo kept it settled (${kept.settled}), and its journal says it is not`
+    : decided.do !== 'nothing'
+      ? `the memo kept it as deciding nothing, and it decides \`${decided.do}\``
+      : !isDeepStrictEqual(releasableOf(fresh), kept)
+        ? 'its journal has changed since the memo folded it, and the feed did not say so'
+        : undefined;
 
 /** A pass whose memo skipped a task its journal says it should not have: the feed missed an append. Only in `verify`. */
 export class TickMemoDiverged extends Schema.TaggedError<TickMemoDiverged>()('TickMemoDiverged', {

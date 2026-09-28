@@ -24,12 +24,33 @@ test('REFUSED: the box is closed, saying why and where to go instead, for a run 
     if (said.open) return assert.fail(`the box is open for ${JSON.stringify(s)}${run.cancelledAt ? ' on a run called off' : ''}`);
     return said.why;
   };
-  assert.equal(why({ cancelledAt: '2026-09-14T06:00:00.000Z' }, step('running (working)')), "The run was called off, so implement's session is being stopped, not steered, and nothing more is filed for it.");
-  assert.equal(why(live, step('waiting', null)), 'implement is not filed yet, so it has no session to say anything to. Say it here once it runs.');
+  assert.equal(
+    why({ cancelledAt: '2026-09-14T06:00:00.000Z' }, step('running (working)')),
+    "The run was called off, so implement's session is being stopped, not steered, and nothing more is filed for it.",
+  );
+  assert.equal(
+    why(live, step('waiting', null)),
+    'implement is not filed yet, so it has no session to say anything to. Say it here once it runs.',
+  );
   assert.equal(why(live, step('unknown')), "The engine has no record of implement's task, so there is no session to say anything to.");
-  assert.equal(why(live, step('pending')), 'implement is filed and its session has not started, so there is nobody to say anything to yet. Say it here once it runs.');
-  const ended = "implement's session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page, and the next try is told what you write.";
-  for (const status of ['succeeded · BLOCKED', 'verified ✓', 'unverified · done', 'checking', 'failed ✗ check (exit 1)', 'unsigned', 'rounds exhausted', 'failed', 'stopped', 'succeeded']) {
+  assert.equal(
+    why(live, step('pending')),
+    'implement is filed and its session has not started, so there is nobody to say anything to yet. Say it here once it runs.',
+  );
+  const ended =
+    "implement's session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page, and the next try is told what you write.";
+  for (const status of [
+    'succeeded · BLOCKED',
+    'verified ✓',
+    'unverified · done',
+    'checking',
+    'failed ✗ check (exit 1)',
+    'unsigned',
+    'rounds exhausted',
+    'failed',
+    'stopped',
+    'succeeded',
+  ]) {
     assert.equal(why(live, step(status)), ended, status);
   }
 });
@@ -46,8 +67,13 @@ test('what the page has just said is shown beside what the api read, once each, 
   assert.deepEqual(mergeSaid([], []), []);
 });
 
-const event = (id: string, s: number, kind: TranscriptEvent['kind'], more: Partial<TranscriptEvent> = {}): TranscriptEvent =>
-  ({ id, at: at(s), role: 'assistant', kind, ...more });
+const event = (id: string, s: number, kind: TranscriptEvent['kind'], more: Partial<TranscriptEvent> = {}): TranscriptEvent => ({
+  id,
+  at: at(s),
+  role: 'assistant',
+  kind,
+  ...more,
+});
 /** The prompt, words, two calls with nothing said between them, and words. */
 const EVENTS: TranscriptEvent[] = [
   event('u-1', 1, 'text', { role: 'user', text: 'Implement it.' }),
@@ -61,9 +87,16 @@ test("what a person said is a turn of its own among the conversation's, before t
   const turns = foldTranscript(EVENTS);
   assert.deepEqual(withSaid(turns, []), turns);
   const laid = withSaid(turns, [said(at(35), 'Mid-fold.'), said(at(5), 'Early.'), said(at(50), 'Late.', 2)]);
-  assert.deepEqual(laid.map((t) => (t.kind === 'told' ? `told: ${t.text}` : t.kind)), ['said', 'told: Early.', 'said', 'tools', 'told: Mid-fold.', 'said', 'told: Late.']);
+  assert.deepEqual(
+    laid.map((t) => (t.kind === 'told' ? `told: ${t.text}` : t.kind)),
+    ['said', 'told: Early.', 'said', 'tools', 'told: Mid-fold.', 'said', 'told: Late.'],
+  );
   assert.deepEqual(laid.at(-1), { kind: 'told', key: `told:2:${at(50)}`, at: at(50), attempt: 2, text: 'Late.', arrived: null });
-  assert.deepEqual(laid.filter((t) => t.kind !== 'told'), turns, "the conversation's own turns, as they were");
+  assert.deepEqual(
+    laid.filter((t) => t.kind !== 'told'),
+    turns,
+    "the conversation's own turns, as they were",
+  );
 });
 
 test('words said while calls wait leave them waiting: a told turn does not end the tail, as words the session says do', () => {
@@ -85,7 +118,8 @@ const arrival = (id: string, s: number, text: string): TranscriptEvent => event(
 test("words the session's transcript shows reaching it are drawn once, as what was said, where they reached it — read between calls by a working session, or starting an idle one's turn", () => {
   const words = 'Widen the scope to apps/api too.';
   const told = said(at(12), words);
-  const drawnWith = (turns: ReturnType<typeof withSaid>) => turns.filter((t) => (t.kind === 'system' || t.kind === 'told') && t.text.includes(words)).length;
+  const drawnWith = (turns: ReturnType<typeof withSaid>) =>
+    turns.filter((t) => (t.kind === 'system' || t.kind === 'told') && t.text.includes(words)).length;
 
   // Working: the words alone, between the session's words and its calls. Folded and laid in as they were, they are drawn twice.
   const working = [...EVENTS.slice(0, 2), arrival('att-1', 15, words), ...EVENTS.slice(2)];
@@ -95,7 +129,11 @@ test("words the session's transcript shows reaching it are drawn once, as what w
   assert.deepEqual(heard.events, EVENTS, "the session's line for the words is taken out, and nothing else");
   const once = withSaid(foldTranscript(heard.events), heard.said);
   assert.equal(drawnWith(once), 1);
-  assert.deepEqual(once.map((t) => t.kind), ['said', 'said', 'told', 'tools', 'said'], 'where the words reached it');
+  assert.deepEqual(
+    once.map((t) => t.kind),
+    ['said', 'said', 'told', 'tools', 'said'],
+    'where the words reached it',
+  );
 
   // Idle: the words after Claude Code's line for a peer's message, starting a turn after the session's last words.
   const late = said(at(44), words);

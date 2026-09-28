@@ -37,18 +37,26 @@ export const codexOutput = (output: string): HarnessOutput => {
   for (const line of output.split('\n')) {
     if (!line.includes('"type"')) continue;
     let event: { type?: unknown; usage?: Record<string, unknown>; item?: { id?: unknown; type?: unknown } };
-    try { event = JSON.parse(line); } catch { continue; }
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
     if (event.type === 'turn.started') started++;
     else if (event.type === 'turn.completed') {
       const count = (key: string) => (typeof event.usage?.[key] === 'number' ? (event.usage[key] as number) : undefined);
       const input = count('input_tokens');
       const out = count('output_tokens');
       const read = count('cached_input_tokens');
-      completed.push(input === undefined || out === undefined ? null : {
-        input: count('cache_write_input_tokens') ? undefined : input,
-        ...(read !== undefined && read <= input && count('cache_write_input_tokens') === 0 ? { read } : {}),
-        output: out,
-      });
+      completed.push(
+        input === undefined || out === undefined
+          ? null
+          : {
+              input: count('cache_write_input_tokens') ? undefined : input,
+              ...(read !== undefined && read <= input && count('cache_write_input_tokens') === 0 ? { read } : {}),
+              output: out,
+            },
+      );
     } else if (event.type === 'item.started' || event.type === 'item.completed') {
       const { id, type } = event.item ?? {};
       if (typeof id !== 'string' || typeof type !== 'string') continue;
@@ -57,14 +65,17 @@ export const codexOutput = (output: string): HarnessOutput => {
     }
   }
   if (started === 0 && completed.length === 0) return {};
-  const turns = completed.length === started && completed.every((c) => c !== null)
-    ? (completed as Array<{ input?: number; read?: number; output: number }>) : undefined;
+  const turns =
+    completed.length === started && completed.every((c) => c !== null)
+      ? (completed as Array<{ input?: number; read?: number; output: number }>)
+      : undefined;
   const sum = (key: 'input' | 'read') => turns!.reduce((n, t) => n + t[key]!, 0);
   const usage: Usage = {
     ...(uncounted ? {} : { toolCalls: calls.size }),
     ...(turns?.every((t) => t.input !== undefined) ? { inputTokens: sum('input') } : {}),
     ...(turns?.every((t) => t.input !== undefined && t.read !== undefined)
-      ? { uncachedTokens: sum('input') - sum('read'), cacheWriteTokens: 0, cacheReadTokens: sum('read') } : {}),
+      ? { uncachedTokens: sum('input') - sum('read'), cacheWriteTokens: 0, cacheReadTokens: sum('read') }
+      : {}),
     ...(turns ? { outputTokens: turns.reduce((n, t) => n + t.output, 0) } : {}),
   };
   return Object.keys(usage).length ? { usage } : {};
@@ -104,13 +115,25 @@ export const claudeResultOutput = (output: string): HarnessOutput => readClaude(
  * result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
  */
 const readClaude = (output: string, denied: readonly unknown[], inputs: ReadonlyMap<string, unknown>): HarnessOutput => {
-  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown; usage?: Record<string, unknown>; permission_denials?: unknown } | undefined;
+  let result:
+    | {
+        type?: unknown;
+        subtype?: unknown;
+        structured_output?: unknown;
+        total_cost_usd?: unknown;
+        duration_api_ms?: unknown;
+        usage?: Record<string, unknown>;
+        permission_denials?: unknown;
+      }
+    | undefined;
   for (const line of output.split('\n')) {
     if (!line.includes('"result"')) continue;
     try {
       const parsed = JSON.parse(line) as typeof result;
       if (parsed?.type === 'result') result = parsed;
-    } catch { /* not the result line */ }
+    } catch {
+      /* not the result line */
+    }
   }
   if (!result) {
     const denials = deniedCalls(denied, inputs);
@@ -118,12 +141,26 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
   }
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
   const [costUsd, apiMs] = [n(result.total_cost_usd), n(result.duration_api_ms)];
-  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens']
-    .map((key) => n(result.usage?.[key]));
-  const tokens = uncachedTokens !== undefined && cacheWriteTokens !== undefined && cacheReadTokens !== undefined && outputTokens !== undefined
-    && uncachedTokens + cacheWriteTokens + cacheReadTokens > 0
-    ? { inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
-    : {};
+  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
+    'input_tokens',
+    'cache_creation_input_tokens',
+    'cache_read_input_tokens',
+    'output_tokens',
+  ].map((key) => n(result.usage?.[key]));
+  const tokens =
+    uncachedTokens !== undefined &&
+    cacheWriteTokens !== undefined &&
+    cacheReadTokens !== undefined &&
+    outputTokens !== undefined &&
+    uncachedTokens + cacheWriteTokens + cacheReadTokens > 0
+      ? {
+          inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens,
+          uncachedTokens,
+          cacheWriteTokens,
+          cacheReadTokens,
+          outputTokens,
+        }
+      : {};
   const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
   // A resume's result names only what the resume was denied, though its cost is its session's (2.1.280, open issue 28, M7).
   const denials = deniedCalls([...denied, ...(Array.isArray(result.permission_denials) ? result.permission_denials : [])], inputs);
@@ -136,7 +173,13 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
 };
 
 /** The tools whose calls name one file, and the key of their input that names it. */
-const FILE_KEYS: Readonly<Record<string, string>> = { Read: 'file_path', Write: 'file_path', Edit: 'file_path', MultiEdit: 'file_path', NotebookEdit: 'notebook_path' };
+const FILE_KEYS: Readonly<Record<string, string>> = {
+  Read: 'file_path',
+  Write: 'file_path',
+  Edit: 'file_path',
+  MultiEdit: 'file_path',
+  NotebookEdit: 'notebook_path',
+};
 
 /**
  * A denied call as a person reads it, and as a permission rule would name it: a command by its first word
@@ -148,9 +191,8 @@ export const denialOf = (tool: string, input: unknown): Denial => {
     const v = (input as Record<string, unknown> | null | undefined)?.[key];
     return typeof v === 'string' && v.trim() ? v.trim() : undefined;
   };
-  const what = tool === 'Bash' ? at('command')?.split(/\s+/)[0]
-    : tool === 'Skill' ? at('skill')
-    : FILE_KEYS[tool] ? at(FILE_KEYS[tool]!) : undefined;
+  const what =
+    tool === 'Bash' ? at('command')?.split(/\s+/)[0] : tool === 'Skill' ? at('skill') : FILE_KEYS[tool] ? at(FILE_KEYS[tool]!) : undefined;
   return what ? { tool, what } : { tool };
 };
 
@@ -170,7 +212,8 @@ const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, un
     const input = given ?? inputs.get(key);
     // Named again, its place stays the first; an input the first naming lacked is taken from the later one.
     const first = seen.get(key);
-    if (!first || (first.input === undefined && input !== undefined)) seen.set(key, { denial: denialOf(first?.denial.tool ?? tool, input), input });
+    if (!first || (first.input === undefined && input !== undefined))
+      seen.set(key, { denial: denialOf(first?.denial.tool ?? tool, input), input });
   }
   return [...seen.values()].map((d) => d.denial);
 };
@@ -191,9 +234,13 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
     try {
       const e = JSON.parse(line) as { type?: unknown; subtype?: unknown };
       if (e?.type === 'system' && e.subtype === 'permission_denied') events.push(e);
-    } catch { /* not an event */ }
+    } catch {
+      /* not an event */
+    }
   }
-  const wanted = new Set(events.map((e) => (e as { tool_use_id?: unknown }).tool_use_id).filter((id): id is string => typeof id === 'string'));
+  const wanted = new Set(
+    events.map((e) => (e as { tool_use_id?: unknown }).tool_use_id).filter((id): id is string => typeof id === 'string'),
+  );
   const inputs = new Map<string, unknown>();
   if (wanted.size) {
     for (const line of output.split('\n')) {
@@ -204,7 +251,9 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
         for (const block of e.message.content as Array<Record<string, unknown>>) {
           if (block?.type === 'tool_use' && typeof block.id === 'string' && wanted.has(block.id)) inputs.set(block.id, block.input);
         }
-      } catch { /* not an event */ }
+      } catch {
+        /* not an event */
+      }
     }
   }
   return readClaude(output, events, inputs);

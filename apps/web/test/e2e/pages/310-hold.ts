@@ -44,7 +44,10 @@ export default {
       await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
       await expectVisible(card.getByText('held', { exact: true }), 'its badge says held');
       for (const step of GATED.steps) {
-        await expectVisible(card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="held"]`), `${step}'s pill on its rail is held`);
+        await expectVisible(
+          card.locator(`ul[aria-label="Steps"] [data-step="${step}"][data-state="held"]`),
+          `${step}'s pill on its rail is held`,
+        );
       }
       // The edge: one, from the run it is held until into its card, counted, since a straight edge's path is hidden to Playwright.
       await expectCount(edge, 1, `an edge comes into ${id}'s card from ${until}'s, which it is held until`);
@@ -62,7 +65,10 @@ export default {
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${word}$`) }), `the run's page says ${word}`);
-      await expectVisible(section.locator('[data-advice]', { hasText: new RegExp(`^${advice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }), 'and how to lift it');
+      await expectVisible(
+        section.locator('[data-advice]', { hasText: new RegExp(`^${advice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }),
+        'and how to lift it',
+      );
       await expectVisible(section.getByRole('link', { name: until, exact: true }), `and links ${until}`);
       const step = page.locator(`article > section#step-${gated}`);
       await expectVisible(step.locator('[data-state="held"]'), `${gated}'s chip is held on its page`);
@@ -79,7 +85,10 @@ export default {
 
     // Lifted: the page says no hold, and offers the gate again; the Factory draws no hold edge, and the card offers Approve as before.
     await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold lifted, the run page says no hold');
-    await expectVisible(page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
+    await expectVisible(
+      page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }),
+      `and offers ${gated}'s Approve again`,
+    );
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);

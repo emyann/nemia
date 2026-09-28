@@ -52,7 +52,8 @@ function StepPage() {
         {agent && (
           <div className="space-y-1">
             <p data-step-agent className="text-xs text-neutral-500">
-              Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions it is told first.
+              Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions
+              it is told first.
             </p>
             {/* What that agent says it can do (`skills:`), read beside this workflow: a description of the work, which fences nothing. */}
             <Skills skills={page.agentSkills} className="pl-3" />
@@ -66,8 +67,8 @@ function StepPage() {
           rows={page.keys}
           note={
             <>
-              As the loader reads them, which a run freezes at <code>wf start</code>: <code>after</code> names the step <code>resume</code> names,
-              and a loop that sets no <code>rounds</code> runs 3. Source shows what the file says.
+              As the loader reads them, which a run freezes at <code>wf start</code>: <code>after</code> names the step <code>resume</code>{' '}
+              names, and a loop that sets no <code>rounds</code> runs 3. Source shows what the file says.
             </>
           }
         />

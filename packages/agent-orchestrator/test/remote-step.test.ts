@@ -27,8 +27,14 @@ type Engine = ReturnType<typeof engine>;
 const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
   const lines: string[] = [];
   const log = console.log;
-  console.log = (...args: unknown[]) => { lines.push(args.join(' ')); };
-  try { await main(argv, e as Parameters<typeof main>[1]); } finally { console.log = log; }
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(' '));
+  };
+  try {
+    await main(argv, e as Parameters<typeof main>[1]);
+  } finally {
+    console.log = log;
+  }
   return lines.join('\n').split('\n');
 };
 
@@ -36,11 +42,15 @@ const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
 function team(name: string, agent: string): string {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'ask.md'), `---\nworkspace: folder\nharness: a2a:${agent}\n---\nRead the note and say whether it is right.\n`);
+  fs.writeFileSync(
+    path.join(dir, 'ask.md'),
+    `---\nworkspace: folder\nharness: a2a:${agent}\n---\nRead the note and say whether it is right.\n`,
+  );
   return dir;
 }
 
-const declare = (agents: Record<string, { url: string }>): void => fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify(agents));
+const declare = (agents: Record<string, { url: string }>): void =>
+  fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify(agents));
 
 const GIVEN = path.join(ROOT, 'tides.md');
 fs.writeFileSync(GIVEN, '# Tides\n');
@@ -97,7 +107,10 @@ test('a step on a remote agent is sent its brief, with the secret its card asks 
   assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
   assert.match(brief, /Files were given with it \(`wf start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
   assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);
-  assert.ok(server.headers.some((h) => h.authorization === 'Bearer s3cret'), 'the secret went in the header its card asks for');
+  assert.ok(
+    server.headers.some((h) => h.authorization === 'Bearer s3cret'),
+    'the secret went in the header its card asks for',
+  );
 
   const view = await e.view(`${id}-ask`);
   assert.equal(view.phase, 'succeeded');
@@ -106,12 +119,19 @@ test('a step on a remote agent is sent its brief, with the secret its card asks 
   assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
   assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
   // The secret is in no file of the store.
-  const everything = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
+  const everything = (dir: string): string[] =>
+    fs
+      .readdirSync(dir, { withFileTypes: true })
+      .flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
   for (const file of everything(ROOT)) assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `${file} holds the secret`);
 });
 
-test("a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs", async () => {
-  const { server, decided } = await remoteRun('blocker', { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } }, 's3cret');
+test('a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs', async () => {
+  const { server, decided } = await remoteRun(
+    'blocker',
+    { data: { outcome: 'blocked', summary: 'The note cites no source.', needs: 'a source for the tide tables', artifacts: [] } },
+    's3cret',
+  );
   assert.equal(server.sent.length, 1);
   const said = decided.join('\n');
   assert.match(said, /blocked/, said);
@@ -126,12 +146,17 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
   // Offered a new Task, and not a session continued nor a model, which `wf retry` refuses on a remote step.
-  assert.ok(decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  wf retry ${id} ask`), decided.join('\n'));
+  assert.ok(
+    decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  wf retry ${id} ask`),
+    decided.join('\n'),
+  );
   assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
 });
 
 test('a Task the agent leaves waiting on a question reads as waiting on you: wf logs prints the question, and wf say answers it', async () => {
-  const server = await a2aServer({ answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }) });
+  const server = await a2aServer({
+    answer: (text) => (text.includes('Brest') ? { text: 'Right, for Brest.' } : { asks: 'Which tide tables — Brest or Dover?' }),
+  });
   try {
     declare({ asker: { url: server.url } });
     const id = await started(team('asker-team', 'asker'));
@@ -147,7 +172,13 @@ test('a Task the agent leaves waiting on a question reads as waiting on you: wf 
     assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
     const decided = (await printed(['decide', id], e)).join('\n');
     // Where a person answers it is `wf say`, not a Claude Code session a remote agent is not in.
-    assert.match(decided, new RegExp(`ask: waiting for an input — read its question with wf logs ${id} ask, and answer it with wf say ${id} ask "<your answer>"`), decided);
+    assert.match(
+      decided,
+      new RegExp(
+        `ask: waiting for an input — read its question with wf logs ${id} ask, and answer it with wf say ${id} ask "<your answer>"`,
+      ),
+      decided,
+    );
     assert.equal(decided.includes('claude agents'), false, decided);
     assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
 

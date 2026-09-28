@@ -13,7 +13,10 @@ export async function get<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   if (!res.ok) {
     // The api says what to do next in `error`, which is worth more than the status line.
-    const said = await res.json().then((body: { error?: unknown }) => body.error, () => undefined);
+    const said = await res.json().then(
+      (body: { error?: unknown }) => body.error,
+      () => undefined,
+    );
     throw new ReadRefusal(typeof said === 'string' ? said : `GET ${path} answered ${res.status} ${res.statusText}`, res.status);
   }
   return (await res.json()) as T;

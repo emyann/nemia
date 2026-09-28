@@ -7,9 +7,48 @@
  */
 import fs from 'node:fs';
 import type { Engine } from './runtime-client.ts';
-import { acceptAsk, approvalRefusal, approvedFirst, assess, cancelPlan, holdRefusal, idRefusal, retryable, retryRefusal, roundAsk, sayRefusal, type Acceptance, type Approval, type CancelPlan, type Hold, type RoundAsk, type Run, type Said } from './run.ts';
+import {
+  acceptAsk,
+  approvalRefusal,
+  approvedFirst,
+  assess,
+  cancelPlan,
+  holdRefusal,
+  idRefusal,
+  retryable,
+  retryRefusal,
+  roundAsk,
+  sayRefusal,
+  type Acceptance,
+  type Approval,
+  type CancelPlan,
+  type Hold,
+  type RoundAsk,
+  type Run,
+  type Said,
+} from './run.ts';
 import { tryOf, type RetryAsk, type RetryHow } from './retry.ts';
-import { acceptFile, acceptanceIn, approvalFile, approvalIn, askFile, askIn, holdFile, listRuns, lstatOf, markCancelled, readAsks, readRun, removeHold, roundAskFile, roundAskIn, runFile, stepsOf, writeAsk, writeHold } from './store.ts';
+import {
+  acceptFile,
+  acceptanceIn,
+  approvalFile,
+  approvalIn,
+  askFile,
+  askIn,
+  holdFile,
+  listRuns,
+  lstatOf,
+  markCancelled,
+  readAsks,
+  readRun,
+  removeHold,
+  roundAskFile,
+  roundAskIn,
+  runFile,
+  stepsOf,
+  writeAsk,
+  writeHold,
+} from './store.ts';
 import { standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, phaseOfView, spendReader, taskPhases } from './views.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from './tick.ts';
@@ -76,30 +115,63 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a
  * step is running and refused as one: a caller takes the harness's word on purpose, never by default.
  */
-export async function retry(e: Engine, id: string, stepName: string, how: RetryHow, { stopBlocked = false }: { stopBlocked?: boolean } = {}): Promise<Asked> {
+export async function retry(
+  e: Engine,
+  id: string,
+  stepName: string,
+  how: RetryHow,
+  { stopBlocked = false }: { stopBlocked?: boolean } = {},
+): Promise<Asked> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
   const refusal = (asks: readonly RetryAsk[]) =>
-    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, blocked, spendOf);
-  const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
+    retryRefusal(
+      steps,
+      run,
+      stepName,
+      how,
+      phaseOf,
+      closeoutReader(views, run),
+      closeoutAsked(views),
+      exitVerdicts(views, run),
+      asks,
+      blocked,
+      spendOf,
+    );
+  const refuse = (message: string): never => {
+    throw Object.assign(new Error(message), { exitCode: 2 });
+  };
 
   const refused = refusal(readAsks(id).asks);
   if (refused) refuse(refused);
   const ask: RetryAsk = {
-    step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}),
-    ...(how.message !== undefined ? { message: how.message } : {}), ...(how.budget !== undefined ? { budget: how.budget } : {}), at: new Date().toISOString(),
+    step: stepName,
+    try: tryOf(run, stepName) + 1,
+    mode: how.mode,
+    ...(how.model ? { model: how.model } : {}),
+    ...(how.message !== undefined ? { message: how.message } : {}),
+    ...(how.budget !== undefined ? { budget: how.budget } : {}),
+    at: new Date().toISOString(),
   };
   const file = askFile(id, stepName, ask.try);
   // Someone asked in the moment since the look above: said as the look would have said it. Or a file is at the ask's name that no pass reads as one.
   if (!writeAsk(file, ask)) {
-    refuse(refusal(readAsks(id).asks) ?? strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`)
-      ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
+    refuse(
+      refusal(readAsks(id).asks) ??
+        strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`) ??
+        `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`,
+    );
   }
   const step = steps.find((s) => s.name === stepName)!;
-  return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness };
+  return {
+    run,
+    ask,
+    file,
+    stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness,
+  };
 }
 
 /** What `wf approve` did: the run, the approval as written, and its file. */
@@ -118,25 +190,49 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * Sending back is not this verb's: `wf retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
  */
 export async function approve(e: Engine, id: string, stepName: string, message?: string): Promise<Approved> {
-  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
-  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.`);
+  const refuse = (words: string): never => {
+    throw Object.assign(new Error(words), { exitCode: 2 });
+  };
+  if (!fs.existsSync(runFile(id)))
+    refuse(`no such run: ${id}. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.`);
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   // Where the result stands against the base branch, read off git, for an ending that merges: one whose result is already on the base has
   // nothing to merge. Asked of git only for such a step — no other gate's approval turns on it.
   const standings = steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? standingsOf(run) : [];
-  const refusal = (now: Run) => approvalRefusal(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), exitVerdicts(views, now), readAsks(id).asks, spendReader(views), standings);
+  const refusal = (now: Run) =>
+    approvalRefusal(
+      steps,
+      now,
+      stepName,
+      message,
+      phaseOf,
+      closeoutReader(views, now),
+      closeoutAsked(views),
+      exitVerdicts(views, now),
+      readAsks(id).asks,
+      spendReader(views),
+      standings,
+    );
   const refused = refusal(run);
   if (refused) refuse(refused);
-  const approval: Approval = { step: stepName, try: tryOf(run, stepName), at: new Date().toISOString(), ...(message !== undefined ? { message } : {}) };
+  const approval: Approval = {
+    step: stepName,
+    try: tryOf(run, stepName),
+    at: new Date().toISOString(),
+    ...(message !== undefined ? { message } : {}),
+  };
   const file = approvalFile(id, stepName, approval.try);
   // Someone approved in the moment since the look above: said as the look would have said it. Or a file is at the name that opens no gate.
   if (!writeAsk(file, approval)) {
     const read = approvalIn(file, stepName, approval.try);
-    refuse(refusal(readRun(id)) ?? (typeof read === 'string' && lstatOf(file)
-      ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${read}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
-      : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: wf ls ${id}.`));
+    refuse(
+      refusal(readRun(id)) ??
+        (typeof read === 'string' && lstatOf(file)
+          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${read}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
+          : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: wf ls ${id}.`),
+    );
   }
   return { run, approval, file };
 }
@@ -193,19 +289,34 @@ export async function round(e: Engine, id: string, stepName?: string, budget?: n
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  const answer = (asks: readonly RoundAsk[]) => roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
-  const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
+  const answer = (asks: readonly RoundAsk[]) =>
+    roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
+  const refuse = (message: string): never => {
+    throw Object.assign(new Error(message), { exitCode: 2 });
+  };
 
   const first = answer(readAsks(id).rounds);
   if ('refusal' in first) return refuse(first.refusal);
-  const ask: RoundAsk = { step: first.step, round: first.round, ...(first.budget !== undefined ? { budget: first.budget } : {}), at: new Date().toISOString() };
+  const ask: RoundAsk = {
+    step: first.step,
+    round: first.round,
+    ...(first.budget !== undefined ? { budget: first.budget } : {}),
+    at: new Date().toISOString(),
+  };
   const file = roundAskFile(id, ask.step, ask.round);
   // Someone asked in the moment since the look above: said as the look would have said it.
   if (!writeAsk(file, ask)) {
     const now = answer(readAsks(id).rounds);
-    refuse('refusal' in now ? now.refusal
-      : strayAsk(file, roundAskIn(file, ask.step, ask.round), `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`)
-        ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`);
+    refuse(
+      'refusal' in now
+        ? now.refusal
+        : (strayAsk(
+            file,
+            roundAskIn(file, ask.step, ask.round),
+            `round ${ask.round} of ${ask.step}'s loop`,
+            `wf round ${id} ${ask.step}`,
+          ) ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`),
+    );
   }
   return { run, ask, file };
 }
@@ -225,12 +336,16 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * Going round once more is not this verb's: `wf round <run> [<step>]` — and the two are offered side by side (`roundLines`).
  */
 export async function accept(e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> {
-  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
-  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`);
+  const refuse = (words: string): never => {
+    throw Object.assign(new Error(words), { exitCode: 2 });
+  };
+  if (!fs.existsSync(runFile(id)))
+    refuse(`no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`);
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  const answer = (now: Run, rounds: readonly RoundAsk[]) => acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
+  const answer = (now: Run, rounds: readonly RoundAsk[]) =>
+    acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
 
   const first = answer(run, readAsks(id).rounds);
   if ('refusal' in first) return refuse(first.refusal);
@@ -240,10 +355,13 @@ export async function accept(e: Engine, id: string, stepName?: string, message?:
   if (!writeAsk(file, acceptance)) {
     const now = answer(readRun(id), readAsks(id).rounds);
     const read = acceptanceIn(file, acceptance.step, acceptance.try);
-    refuse('refusal' in now ? now.refusal
-      : typeof read === 'string' && lstatOf(file)
-        ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${read}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
-        : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`);
+    refuse(
+      'refusal' in now
+        ? now.refusal
+        : typeof read === 'string' && lstatOf(file)
+          ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${read}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
+          : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`,
+    );
   }
   return { run, acceptance, file };
 }
@@ -263,7 +381,9 @@ export type Holding = { run: Run; hold: Hold };
  * two people put at once is the first one's, and the second is refused as already held.
  */
 export async function hold(e: Engine, id: string, until: readonly string[]): Promise<Holding> {
-  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
+  const refuse = (words: string): never => {
+    throw Object.assign(new Error(words), { exitCode: 2 });
+  };
   const bad = idRefusal(id, 'hold');
   if (bad) refuse(bad);
   // A run named is fixed on its own flag: the command that fixes it keeps the run to hold.
@@ -271,7 +391,8 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
     const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
     if (badUntil) refuse(`--until ${badUntil}`);
   }
-  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`);
+  if (!fs.existsSync(runFile(id)))
+    refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`);
   const run = readRun(id);
   const read = new Map(await Promise.all([...new Set(until)].filter((u) => u !== id).map(async (u) => [u, await parentOf(e, u)] as const)));
   // Finished: shipped as a run `--after` it reads it, or succeeded with nothing left but a person's merge. Asked only of a run a hold could
@@ -283,7 +404,18 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
       const steps = stepsOf(run);
       const { views, phaseOf } = await taskPhases(e, run);
       const { asks, rounds } = readAsks(id);
-      const { status } = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+      const { status } = assess(
+        steps,
+        run,
+        phaseOf,
+        closeoutReader(views, run),
+        closeoutAsked(views),
+        exitVerdicts(views, run),
+        asks,
+        rounds,
+        harnessBlocked(views),
+        spendReader(views),
+      );
       if (status === 'succeeded') finished = 'succeeded';
     }
   }
@@ -291,7 +423,8 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
   if (refused) refuse(refused);
   const put = writeHold(id, until);
   // Someone held it in the moment since the look above: said as the look would have said it.
-  if (!put) return refuse(holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`);
+  if (!put)
+    return refuse(holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`);
   return { run: { ...run, hold: put }, hold: put };
 }
 
@@ -300,13 +433,16 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
  * asked again. Refused, exit 2: an id that is not a run's, a run not there, and a run nobody holds.
  */
 export function unhold(id: string): Holding {
-  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
+  const refuse = (words: string): never => {
+    throw Object.assign(new Error(words), { exitCode: 2 });
+  };
   const bad = idRefusal(id, 'hold');
   if (bad) refuse(bad);
   if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.`);
   const run = readRun(id);
   if (!run.hold) refuse(`${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`);
   // The hold read above, and no other: one lifted and put again since is a person's newer word, and stays.
-  if (!removeHold(id, run.hold!.at) && fs.existsSync(holdFile(id))) refuse(`${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`);
+  if (!removeHold(id, run.hold!.at) && fs.existsSync(holdFile(id)))
+    refuse(`${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`);
   return { run, hold: run.hold! };
 }

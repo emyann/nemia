@@ -53,7 +53,8 @@ export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }
       <div className="space-y-0.5">
         <h2 className="text-sm font-semibold">New workflow</h2>
         <p className="text-xs text-neutral-500">
-          A folder of yours, under <code className="font-mono">~/.agent-workflows/workflows/</code>, with its first step. Its builder opens once it is made.
+          A folder of yours, under <code className="font-mono">~/.agent-workflows/workflows/</code>, with its first step. Its builder opens
+          once it is made.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -61,13 +62,25 @@ export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }
           <label htmlFor={ids.name} className="block text-xs font-medium">
             Workflow name
           </label>
-          <input id={ids.name} value={name} onChange={(event) => setName(event.target.value)} placeholder="triage" className={`${INPUT} font-mono`} />
+          <input
+            id={ids.name}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="triage"
+            className={`${INPUT} font-mono`}
+          />
         </div>
         <div className="space-y-1">
           <label htmlFor={ids.step} className="block text-xs font-medium">
             First step
           </label>
-          <input id={ids.step} value={step} onChange={(event) => setStep(event.target.value)} placeholder="plan" className={`${INPUT} font-mono`} />
+          <input
+            id={ids.step}
+            value={step}
+            onChange={(event) => setStep(event.target.value)}
+            placeholder="plan"
+            className={`${INPUT} font-mono`}
+          />
         </div>
       </div>
       <div className="space-y-1">

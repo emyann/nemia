@@ -21,22 +21,35 @@ export const codexRolloutFile = (threadId: string): string | undefined => {
   const known = rollouts.get(threadId);
   if (known && fs.existsSync(known)) return known;
   const sessions = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
-  const newestFirst = (...dir: string[]) => { try { return fs.readdirSync(path.join(sessions, ...dir)).sort().reverse(); } catch { return []; } };
-  for (const y of newestFirst()) for (const m of newestFirst(y)) for (const d of newestFirst(y, m)) {
-    const name = newestFirst(y, m, d).find((f) => f.startsWith('rollout-') && f.endsWith(`-${threadId}.jsonl`));
-    if (name) {
-      const file = path.join(sessions, y, m, d, name);
-      rollouts.set(threadId, file);
-      return file;
+  const newestFirst = (...dir: string[]) => {
+    try {
+      return fs
+        .readdirSync(path.join(sessions, ...dir))
+        .sort()
+        .reverse();
+    } catch {
+      return [];
     }
-  }
+  };
+  for (const y of newestFirst())
+    for (const m of newestFirst(y))
+      for (const d of newestFirst(y, m)) {
+        const name = newestFirst(y, m, d).find((f) => f.startsWith('rollout-') && f.endsWith(`-${threadId}.jsonl`));
+        if (name) {
+          const file = path.join(sessions, y, m, d, name);
+          rollouts.set(threadId, file);
+          return file;
+        }
+      }
   return undefined;
 };
 
 /** The text of a list of content blocks, as far as each has any. */
 const textsOf = (blocks: unknown): string[] =>
   Array.isArray(blocks)
-    ? blocks.map((b) => (typeof b === 'string' ? b : (b as { text?: unknown } | null)?.text)).filter((t): t is string => typeof t === 'string')
+    ? blocks
+        .map((b) => (typeof b === 'string' ? b : (b as { text?: unknown } | null)?.text))
+        .filter((t): t is string => typeof t === 'string')
     : [];
 
 /**
@@ -61,18 +74,27 @@ const textsOf = (blocks: unknown): string[] =>
  * is a system event naming it, rather than nothing. A record with no time gives nothing; none was seen.
  */
 export const codexRolloutEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
-  const record = entry as { timestamp?: unknown; type?: unknown; payload?: { type?: unknown; item?: unknown; turn_id?: unknown; error?: unknown } | null } | null;
+  const record = entry as {
+    timestamp?: unknown;
+    type?: unknown;
+    payload?: { type?: unknown; item?: unknown; turn_id?: unknown; error?: unknown } | null;
+  } | null;
   const at = isoTime(record?.timestamp);
   const payload = record?.payload;
   if (!at || record?.type !== 'event_msg' || !payload) return [];
   if (payload.type === 'task_complete') {
     const error = (payload.error as { message?: unknown } | null | undefined)?.message;
-    return [{
-      id: typeof payload.turn_id === 'string' ? `${payload.turn_id}:complete` : `@${offset}`, at, role: 'system', kind: 'system',
-      text: typeof error === 'string' ? error : 'task_complete',
-    }];
+    return [
+      {
+        id: typeof payload.turn_id === 'string' ? `${payload.turn_id}:complete` : `@${offset}`,
+        at,
+        role: 'system',
+        kind: 'system',
+        text: typeof error === 'string' ? error : 'task_complete',
+      },
+    ];
   }
-  const item = payload.type === 'item_completed' ? payload.item as Record<string, unknown> | null | undefined : undefined;
+  const item = payload.type === 'item_completed' ? (payload.item as Record<string, unknown> | null | undefined) : undefined;
   if (!item) return [];
   const id = typeof item.id === 'string' && item.id ? item.id : `@${offset}`;
   switch (item.type) {
@@ -86,18 +108,36 @@ export const codexRolloutEvents = (entry: unknown, offset: number): TranscriptEv
     }
     case 'CommandExecution':
       return [
-        { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'CommandExecution', input: { command: item.command, cwd: item.cwd } } },
         {
-          id, at, role: 'user', kind: 'tool_result',
-          result: { text: typeof item.aggregated_output === 'string' ? item.aggregated_output : '', isError: !(item.status === 'completed' && item.exit_code === 0) },
+          id,
+          at,
+          role: 'assistant',
+          kind: 'tool_use',
+          tool: { name: 'CommandExecution', input: { command: item.command, cwd: item.cwd } },
+        },
+        {
+          id,
+          at,
+          role: 'user',
+          kind: 'tool_result',
+          result: {
+            text: typeof item.aggregated_output === 'string' ? item.aggregated_output : '',
+            isError: !(item.status === 'completed' && item.exit_code === 0),
+          },
         },
       ];
     case 'FileChange':
       return [
         { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: item.changes } } },
         {
-          id, at, role: 'user', kind: 'tool_result',
-          result: { text: [item.stdout, item.stderr].filter((s): s is string => typeof s === 'string' && s !== '').join('\n'), isError: item.status !== 'completed' },
+          id,
+          at,
+          role: 'user',
+          kind: 'tool_result',
+          result: {
+            text: [item.stdout, item.stderr].filter((s): s is string => typeof s === 'string' && s !== '').join('\n'),
+            isError: item.status !== 'completed',
+          },
         },
       ];
     default:

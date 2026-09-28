@@ -27,11 +27,16 @@ process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
 const { approve, forget, listRuns, prune, readRun, retry, start } = await import('../src/runner.ts');
 const { tick, freshRestMemo } = await import('../src/tick.ts');
-const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } = await import('../src/store.ts');
+const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
+  await import('../src/store.ts');
 const { feedFile } = await import('../src/feed-store.ts');
 
 const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd: repo,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {
@@ -44,7 +49,9 @@ const aRepo = (): string => {
 /** A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs. */
 const folder = (...steps: string[]) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  steps.forEach((name, k) => fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n${k ? `after: ${steps[k - 1]}\n` : ''}---\n${name} it\n`));
+  steps.forEach((name, k) =>
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n${k ? `after: ${steps[k - 1]}\n` : ''}---\n${name} it\n`),
+  );
   return dir;
 };
 
@@ -53,10 +60,19 @@ const memoryJournal = (): PromiseJournal => {
   const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
   return {
-    async append(taskId, event) { tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); feed.push({ taskId, event }); },
-    async read(taskId) { return [...(tasks.get(taskId) ?? [])]; },
-    async list() { return [...tasks.keys()].sort(); },
-    async feed(after) { return { entries: feed.slice(after as number | undefined), cursor: feed.length }; },
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed(after) {
+      return { entries: feed.slice(after as number | undefined), cursor: feed.length };
+    },
   };
 };
 
@@ -68,13 +84,27 @@ const engine = () => {
   const sessions = new Map<string, Sighting>();
   let n = 0;
   const runner: PromiseRunner = {
-    async spawn(r) { n++; sessions.set(r.name, { sessionId: `s-${n}`, nativeId: `native-${n}`, state: 'working', busy: true }); },
-    async observe() { return new Map(sessions); },
-    async stop(id) { for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false }); },
-    async logs() { return ''; },
+    async spawn(r) {
+      n++;
+      sessions.set(r.name, { sessionId: `s-${n}`, nativeId: `native-${n}`, state: 'working', busy: true });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
+    async stop(id) {
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+    },
+    async logs() {
+      return '';
+    },
   };
   const journal = memoryJournal();
-  const e = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal, harnesses: { claude: runner, codex: runner, check: runner }, defaultHarness: 'claude' });
+  const e = createEngine({
+    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+    journal,
+    harnesses: { claude: runner, codex: runner, check: runner },
+    defaultHarness: 'claude',
+  });
   /** Sign every session at work but those of the runs `keep` names, which stay in flight, with `closeout`, or `SIGNED` where it names none. */
   const signAll = (keep: readonly Run[] = [], closeout: (name: string) => object | undefined = () => undefined) => {
     for (const [name, s] of sessions) {
@@ -114,7 +144,10 @@ const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
 };
 
 /** One pass, measured once the memo is steady: the pass that follows is the one compared. */
-const steady = async (): Promise<PassCost> => { await finish(); return measured(); };
+const steady = async (): Promise<PassCost> => {
+  await finish();
+  return measured();
+};
 
 const started = (n: number, workflowDir = ONE, repo = REPO, isolate = false) =>
   Array.from({ length: n }, (_, k) => start({ brief: `run ${k}`, repo, workflowDir, isolate }));
@@ -143,13 +176,23 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
 
   const [none, hundred, twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
   // Read off the views the runtime's pass reported (`reportedEngine`): before, each run in flight cost a view of its step, and this said `>= 3`.
-  assert.ok(journals(none) < 3, `the three runs in flight are read off the runtime's pass, with no view of their own (${journals(none)} reads)`);
+  assert.ok(
+    journals(none) < 3,
+    `the three runs in flight are read off the runtime's pass, with no view of their own (${journals(none)} reads)`,
+  );
   assert.ok(observes(none) >= 1, `and their harness observed (${observes(none)} observes)`);
-  for (const [at, c] of [[100, hundred], [200, twoHundred]] as const) {
+  for (const [at, c] of [
+    [100, hundred],
+    [200, twoHundred],
+  ] as const) {
     assert.equal(c.rested, at, `every finished run of ${at} answered from memory`);
     assert.equal(journals(c), journals(none), `${at} finished runs: no journal read more than the runs in flight make`);
     assert.equal(observes(c), observes(none), `${at} finished runs: no observe more`);
-    assert.equal(gits(c), gits(none) + ISOLATED_REPOS.length, `${at} finished runs: one for-each-ref a repository whose runs' tips are read, and no more`);
+    assert.equal(
+      gits(c),
+      gits(none) + ISOLATED_REPOS.length,
+      `${at} finished runs: one for-each-ref a repository whose runs' tips are read, and no more`,
+    );
     assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
   }
   assert.equal(none.rested ?? 0, 0);
@@ -159,8 +202,14 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
   const [none, , twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
   const fresh = await measured(freshRestMemo());
   assert.equal(fresh.rested ?? 0, 0, 'nothing answered from memory');
-  assert.ok(journals(fresh) >= journals(none) + 200, `each of the 200 finished runs' tasks read (${journals(fresh)} reads, against ${journals(twoHundred)})`);
-  assert.ok(gits(fresh) >= gits(none) + 6, `each of the six runs whose tips are read asks git on its own (${gits(fresh)} processes, against ${gits(twoHundred)})`);
+  assert.ok(
+    journals(fresh) >= journals(none) + 200,
+    `each of the 200 finished runs' tasks read (${journals(fresh)} reads, against ${journals(twoHundred)})`,
+  );
+  assert.ok(
+    gits(fresh) >= gits(none) + 6,
+    `each of the six runs whose tips are read asks git on its own (${gits(fresh)} processes, against ${gits(twoHundred)})`,
+  );
   // And the pass that follows, on the engine's own memo, is as it was: an empty memo is a cost, never an answer.
   assert.equal(journals(await measured()), journals(twoHundred));
 });
@@ -184,7 +233,9 @@ const answered = async (id: string) => (await verified()).runs.find((a) => a.run
 /** A finished run worked in place, from the store built above, not yet touched by a test. */
 const touched = new Set<string>();
 const aResting = (isolate = false): Run => {
-  const run = listRuns().find((r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && MEMO.runs.has(r.id));
+  const run = listRuns().find(
+    (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && MEMO.runs.has(r.id),
+  );
   assert.ok(run, 'a run at rest is left to touch');
   touched.add(run.id);
   return run;
@@ -198,7 +249,12 @@ const evicts = async (what: string, change: (run: Run) => void | Promise<void>, 
   const before = await rested();
   assert.ok(MEMO.runs.has(run.id), `${what}: the run is at rest before`);
   await change(run);
-  for (let k = 0; k < afresh; k++) assert.equal(await rested(), before - 1, `${what}: the run is judged afresh (pass ${k + 1}), and every other run still answered from memory`);
+  for (let k = 0; k < afresh; k++)
+    assert.equal(
+      await rested(),
+      before - 1,
+      `${what}: the run is judged afresh (pass ${k + 1}), and every other run still answered from memory`,
+    );
   assert.equal(await rested(), before, `${what}: and at rest again on the pass after`);
   return run;
 };
@@ -211,8 +267,10 @@ test('its record written again, word for word, takes a run out of the memo', asy
   });
 });
 
-test('a person\'s marker beside the record — cancelled, pruned — takes a run out, and the pass that reads it says what it says', async () => {
-  const cancelled = await evicts('.cancelled', (run) => { markCancelled(run.id); });
+test("a person's marker beside the record — cancelled, pruned — takes a run out, and the pass that reads it says what it says", async () => {
+  const cancelled = await evicts('.cancelled', (run) => {
+    markCancelled(run.id);
+  });
   assert.equal((await answered(cancelled.id)).status, 'cancelled');
   const pruned = await evicts('.pruned', (run) => {
     fs.writeFileSync(pruneFile(run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
@@ -220,7 +278,7 @@ test('a person\'s marker beside the record — cancelled, pruned — takes a run
   assert.ok((await answered(pruned.id)).run.pruned, 'the run reads as pruned');
 });
 
-test('a hold takes a run out of the memo for as long as it holds: what it waits on is another run\'s', async () => {
+test("a hold takes a run out of the memo for as long as it holds: what it waits on is another run's", async () => {
   const run = aResting();
   const before = await rested();
   fs.writeFileSync(holdFile(run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [inFlight[0]!.id] })}\n`);
@@ -243,7 +301,10 @@ test('an ask takes a run out, and the try it asks for is filed: a retry, and an 
 
   const gated = start({ brief: 'gated', repo: REPO, workflowDir: TWO, isolate: false, gates: ['plan'] });
   touched.add(gated.id);
-  for (let k = 0; k < 8 && !MEMO.runs.has(gated.id); k++) { await verified(); h.signAll(inFlight); }
+  for (let k = 0; k < 8 && !MEMO.runs.has(gated.id); k++) {
+    await verified();
+    h.signAll(inFlight);
+  }
   assert.ok(MEMO.runs.has(gated.id), 'a run waiting at a gate, its task settled, is at rest');
   assert.equal(readRun(gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
   const waiting = await rested();
@@ -267,7 +328,9 @@ test('an acceptance, and an ask moved into done/, each take a run out', async ()
 });
 
 test('what the runtime appends to a task — what it cost — takes its run out', async () => {
-  await evicts('measured', (run) => h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 0.25 } }));
+  await evicts('measured', (run) =>
+    h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 0.25 } }),
+  );
 });
 
 test('a result branch moved takes its run out and its tip is written; one deleted, and a commit on the base branch, move nothing', async () => {
@@ -275,7 +338,14 @@ test('a result branch moved takes its run out and its tip is written; one delete
   const [branch, tip] = Object.entries(readRun(run.id).tips ?? {})[0] ?? [];
   assert.ok(branch && tip, 'the run has a tip on its record');
   const moved = git(run.repo, 'commit-tree', `${tip}^{tree}`, '-p', tip, '-m', 'moved');
-  await evicts('a branch moved', () => { git(run.repo, 'update-ref', `refs/heads/${branch}`, moved); }, run, 2);
+  await evicts(
+    'a branch moved',
+    () => {
+      git(run.repo, 'update-ref', `refs/heads/${branch}`, moved);
+    },
+    run,
+    2,
+  );
   assert.equal(readRun(run.id).tips![branch], moved, 'the tip the pass saw is on the record');
 
   const before = await rested();
@@ -307,8 +377,10 @@ test('REFUSED: a file in the asks directory that no reader reads still takes its
   });
 });
 
-test('REFUSED: an event on a task\'s journal alone — no file in the store moved — takes its run out: the pass reads the feed', async () => {
-  await evicts('a journal line', (run) => h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { turns: 3 } }));
+test("REFUSED: an event on a task's journal alone — no file in the store moved — takes its run out: the pass reads the feed", async () => {
+  await evicts('a journal line', (run) =>
+    h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { turns: 3 } }),
+  );
 });
 
 test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchanged, throws under verifyRest, naming the run', async () => {
@@ -317,7 +389,10 @@ test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchan
   const kept = MEMO.runs.get(run.id)!;
   const was = kept.advanced;
   kept.advanced = { ...was, status: 'failed' };
-  await assert.rejects(verified(), (err: Error) => err.message.includes(run.id) && /from its memo of runs at rest, and a full pass answers otherwise/.test(err.message));
+  await assert.rejects(
+    verified(),
+    (err: Error) => err.message.includes(run.id) && /from its memo of runs at rest, and a full pass answers otherwise/.test(err.message),
+  );
   kept.advanced = was;
   await rested();
 });
@@ -327,12 +402,15 @@ test('REFUSED: a memo that holds a run a full pass finds not at rest throws unde
   const { run: _, ...advanced } = await answered(inFlight[0]!.id);
   const run = readRun(inFlight[0]!.id);
   MEMO.runs.set(run.id, { stamp: restStamps().get(run.id)!, record: JSON.stringify(run), tipped: [], advanced });
-  await assert.rejects(verified(), (err: Error) => err.message.includes(run.id) && /a full pass finds it not at rest \(status, settled, inFlight\)/.test(err.message));
+  await assert.rejects(
+    verified(),
+    (err: Error) => err.message.includes(run.id) && /a full pass finds it not at rest \(status, settled, inFlight\)/.test(err.message),
+  );
   MEMO.runs.delete(run.id);
   await rested();
 });
 
-test('a run\'s stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory', () => {
+test("a run's stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory", () => {
   const run = aResting();
   const stamp = () => restStamps().get(run.id);
   const was = stamp();
@@ -355,11 +433,16 @@ test('a run\'s stamp moves with any file named for it, a marker nobody has named
  * (`handOffDue`) that it can only try in a directory that is not there.
  */
 const worktreesGone = (run: Run) => {
-  const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as { steps: Record<string, { workspace?: string; handedOff?: string }> };
+  const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as {
+    steps: Record<string, { workspace?: string; handedOff?: string }>;
+  };
   for (const step of Object.values(record.steps)) {
     delete step.handedOff;
     if (!step.workspace) continue;
-    assert.ok(step.workspace?.startsWith(path.join(ROOT, 'worktrees', run.id)), `only a worktree the run made is removed (${step.workspace})`);
+    assert.ok(
+      step.workspace?.startsWith(path.join(ROOT, 'worktrees', run.id)),
+      `only a worktree the run made is removed (${step.workspace})`,
+    );
     fs.rmSync(step.workspace, { recursive: true, force: true });
   }
   fs.writeFileSync(runFile(run.id), JSON.stringify(record, null, 2));
@@ -375,7 +458,13 @@ test('a run called off before anything of it was filed rests like a finished one
   assert.equal(await rested(), before + 1, 'answered from memory on the next, and judged the same in full (verifyRest)');
   assert.equal((await answered(run!.id)).status, 'cancelled');
   // And a word of a person's takes it out as it takes any run out: its record's stamp moved.
-  await evicts('.pruned', (r) => { fs.writeFileSync(pruneFile(r.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`); }, run!);
+  await evicts(
+    '.pruned',
+    (r) => {
+      fs.writeFileSync(pruneFile(r.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
+    },
+    run!,
+  );
 });
 
 test('a finished run whose worktrees are gone owes no hand-off, and rests — succeeded, failed at a step, and called off', async () => {
@@ -387,10 +476,24 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
   const before = await measured();
   for (const run of [ok, broke, off]) assert.ok(MEMO.runs.has(run!.id), `${run!.id} at rest with its worktrees there`);
   for (const run of [ok, broke, off]) await evicts(`${run!.id}: its worktrees gone`, worktreesGone, run);
-  assert.deepEqual([ok, broke, off].map((r) => readRun(r!.id).steps.plan?.handedOff ?? null), [null, null, null], 'no hand-off written down: none was made');
-  assert.deepEqual(await Promise.all([ok, broke, off].map(async (r) => (await answered(r!.id)).status)), ['succeeded', 'failed', 'cancelled']);
+  assert.deepEqual(
+    [ok, broke, off].map((r) => readRun(r!.id).steps.plan?.handedOff ?? null),
+    [null, null, null],
+    'no hand-off written down: none was made',
+  );
+  assert.deepEqual(await Promise.all([ok, broke, off].map(async (r) => (await answered(r!.id)).status)), [
+    'succeeded',
+    'failed',
+    'cancelled',
+  ]);
   const after = await measured();
-  console.log('COST', JSON.stringify({ before: { rested: before.rested, git: gits(before), journals: journals(before), spawned: before.spawned }, after: { rested: after.rested, git: gits(after), journals: journals(after), spawned: after.spawned } }));
+  console.log(
+    'COST',
+    JSON.stringify({
+      before: { rested: before.rested, git: gits(before), journals: journals(before), spawned: before.spawned },
+      after: { rested: after.rested, git: gits(after), journals: journals(after), spawned: after.spawned },
+    }),
+  );
   assert.equal(after.rested, before.rested, 'every one of them answered from memory');
   assert.equal(gits(after), gits(before), 'no git process of their own: a hand-off tried in a directory that is gone was one each a pass');
   assert.equal(journals(after), journals(before), 'and no journal read');
@@ -403,11 +506,17 @@ test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone
   const run = start({ brief: 'two roots', repo: ISOLATED_REPOS[1]!, workflowDir: dir, isolate: true });
   touched.add(run.id);
   for (let k = 0; k < 12 && (await answered(run.id)).status !== 'succeeded'; k++) h.signAll(inFlight);
-  const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as { steps: Record<string, { workspace: string; handedOff?: string }> };
+  const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as {
+    steps: Record<string, { workspace: string; handedOff?: string }>;
+  };
   assert.notEqual(record.steps.left!.workspace, record.steps.right!.workspace, 'a worktree each');
   delete record.steps.right!.handedOff;
   fs.rmSync(record.steps.right!.workspace, { recursive: true, force: true });
   fs.writeFileSync(runFile(run.id), JSON.stringify(record, null, 2));
   const pruning = await prune(h.e, run.id, { unmerged: true });
-  assert.equal(pruning.kind, 'prunable', `the worktree left is prunable, not refused as right's hand-off still owed: ${pruning.kind === 'refused' ? pruning.refusal : pruning.kind}`);
+  assert.equal(
+    pruning.kind,
+    'prunable',
+    `the worktree left is prunable, not refused as right's hand-off still owed: ${pruning.kind === 'refused' ? pruning.refusal : pruning.kind}`,
+  );
 });

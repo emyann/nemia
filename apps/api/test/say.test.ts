@@ -50,7 +50,9 @@ const inbox = async () => {
   const server = net.createServer({ allowHalfOpen: true }, (c) => {
     let got = '';
     c.setEncoding('utf8');
-    c.on('data', (d) => { got += d; });
+    c.on('data', (d) => {
+      got += d;
+    });
     c.on('end', () => {
       for (const line of got.split('\n')) if (line.trim()) lines.push(JSON.parse(line));
       c.end();
@@ -70,7 +72,10 @@ const runningSession = (taskId: string, socket: string): string => {
   const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
   rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0, pid });
   fs.writeFileSync(registry, JSON.stringify(rows));
-  write(path.join(config, 'sessions', `${pid}.json`), JSON.stringify({ pid, sessionId, name: `ae/${taskId}/1`, kind: 'bg', messagingSocketPath: socket }));
+  write(
+    path.join(config, 'sessions', `${pid}.json`),
+    JSON.stringify({ pid, sessionId, name: `ae/${taskId}/1`, kind: 'bg', messagingSocketPath: socket }),
+  );
   return sessionId;
 };
 
@@ -82,31 +87,66 @@ const implementSession = runningSession('t-implement', box.path);
 runningSession('t-deaf', path.join(tmp('gone'), 'in.sock'));
 journal('t-settled', [
   ...started,
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ae/t-settled/1', observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] } },
+  {
+    kind: 'ended',
+    at: at(9),
+    attempt: 1,
+    sessionId: 'ae/t-settled/1',
+    observed: 'done',
+    reason: 'harness',
+    closeout: { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] },
+  },
   { kind: 'settled', at: at(9), outcome: 'succeeded' },
 ]);
 // The cancelled run's step is at work, and its inbox listens: only the run's mark refuses it.
 runningSession('t-cancelled', box.path);
 
-const record = (id: string, steps: Record<string, { taskId: string | null }>) => write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-  id, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Say something to it',
-  workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: Object.keys(steps).map((name) => ({ name, after: [], body: `${name} it.` })),
-  steps,
-}));
+const record = (id: string, steps: Record<string, { taskId: string | null }>) =>
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Say something to it',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: at(0),
+      workflow: Object.keys(steps).map((name) => ({ name, after: [], body: `${name} it.` })),
+      steps,
+    }),
+  );
 record(R, { implement: { taskId: 't-implement' }, deaf: { taskId: 't-deaf' }, settled: { taskId: 't-settled' }, review: { taskId: null } });
 record(C, { implement: { taskId: 't-cancelled' } });
 write(path.join(root, 'runs', `${C}.cancelled`), at(5));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
-const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+const BOARD = {
+  'content-type': 'application/json',
+  'sec-fetch-site': 'same-origin',
+  origin: 'http://localhost:5173',
+  host: '127.0.0.1:8787',
+};
 
 const sayTo = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/say`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request(`/api/runs/${run}/steps/${step}/say`, {
+    method: 'POST',
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** Every file the api could have written: the runs' records and marks, and the engine's journals. */
-const written = () => Object.fromEntries([path.join(root, 'runs'), tasksDir].flatMap((dir) =>
-  fs.readdirSync(dir).sort().map((f) => [path.join(dir, f), fs.readFileSync(path.join(dir, f), 'utf8')])));
+const written = () =>
+  Object.fromEntries(
+    [path.join(root, 'runs'), tasksDir].flatMap((dir) =>
+      fs
+        .readdirSync(dir)
+        .sort()
+        .map((f) => [path.join(dir, f), fs.readFileSync(path.join(dir, f), 'utf8')]),
+    ),
+  );
 
 /** What the package's `say()` refuses the words for, word for word: what `wf say` prints. */
 const sayRefuses = async (step: string, text: string, run = R): Promise<string> => {
@@ -127,18 +167,26 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
   for (const site of ['cross-site', 'same-site', 'none']) {
     const res = await sayTo('implement', body, { ...BOARD, 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
-    assert.equal((await res.json()).error,
-      `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`wf say ${R} implement "<words>"\`.`);
+    assert.equal(
+      (await res.json()).error,
+      `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`wf say ${R} implement "<words>"\`.`,
+    );
   }
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
     const res = await sayTo('implement', body, { ...BOARD, host });
     assert.equal(res.status, 403, host);
-    assert.ok((await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/say refuses a request addressed to ${host}: the api hands a person's words to a step's running session only for a request to this machine`));
+    assert.ok(
+      (await res.json()).error.startsWith(
+        `POST /api/runs/${R}/steps/implement/say refuses a request addressed to ${host}: the api hands a person's words to a step's running session only for a request to this machine`,
+      ),
+    );
   }
   for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
     const res = await sayTo('implement', body, { ...BOARD, 'content-type': type });
     assert.equal(res.status, 415, type);
-    assert.ok((await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/say takes its body as \`content-type: application/json\``));
+    assert.ok(
+      (await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/say takes its body as \`content-type: application/json\``),
+    );
   }
   const bodies: Array<[unknown, RegExp]> = [
     ['Widen the scope to apps/api too.', /^POST …\/say takes a JSON body: `\{ "text": "<words>" \}`\.$/],
@@ -161,9 +209,19 @@ test("REFUSED at shipped defaults: empty words (the engine's sentence), a settle
   const cases: Array<[string, string, string, RegExp]> = [
     [R, 'implement', '', /^say: `text` is empty\. Give the words the session should hear\.$/],
     [R, 'implement', ' \n\t', /^say: `text` is empty\. Give the words the session should hear\.$/],
-    [R, 'settled', 'Widen the scope.', /^settled is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything\. .*: wf retry r-say settled --message "<words>"\.$/],
+    [
+      R,
+      'settled',
+      'Widen the scope.',
+      /^settled is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything\. .*: wf retry r-say settled --message "<words>"\.$/,
+    ],
     [R, 'review', 'Look at the parser first.', /^review has not been filed yet, so there is no session to hear anything\./],
-    [C, 'implement', 'Widen the scope.', /^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z: its sessions are being stopped, not steered/],
+    [
+      C,
+      'implement',
+      'Widen the scope.',
+      /^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z: its sessions are being stopped, not steered/,
+    ],
   ];
   for (const [run, step, text, words] of cases) {
     const res = await sayTo(step, { text }, BOARD, run);
@@ -202,14 +260,23 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   assert.deepEqual([said.attempt, said.text], [1, words]);
   assert.ok(Date.parse(said.at) >= sent - 1000, said.at);
 
-  assert.deepEqual(box.lines, [{ type: 'user', session_id: implementSession, message: { role: 'user', content: words } }], 'the words on the inbox, as given');
+  assert.deepEqual(
+    box.lines,
+    [{ type: 'user', session_id: implementSession, message: { role: 'user', content: words } }],
+    'the words on the inbox, as given',
+  );
   assert.deepEqual((await engine().view('t-implement')).state.said, [said], "the engine's journal of the task");
   const steps = await detailSteps();
   const implement = steps.find((s) => s.name === 'implement')!;
   assert.deepEqual([implement.said, implement.note], [[said], 'said to 1×']);
-  for (const other of steps.filter((s) => s.name !== 'implement')) assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
+  for (const other of steps.filter((s) => s.name !== 'implement'))
+    assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
   assert.equal((await list(engine(), readRun(R))).steps.find((s) => s.name === 'implement')!.note, 'said to 1×', "`wf ls`'s words");
   const summary = (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === R);
   assert.equal(summary.steps.find((s: Step) => s.name === 'implement').note, 'said to 1×', 'and on the list');
-  assert.deepEqual(Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir))), records, "the runs' records untouched, and no file of the api's");
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir))),
+    records,
+    "the runs' records untouched, and no file of the api's",
+  );
 });

@@ -26,14 +26,19 @@ const GUARDED = { name: 'agent-runtime', dir: 'packages/agent-runtime', entries:
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 
 /** A line of prose — a `//` line, or a line of a block comment — read as nothing, with the line kept so numbers still count. */
-const withoutComments = (text: string): string => text.split('\n').map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line)).join('\n');
+const withoutComments = (text: string): string =>
+  text
+    .split('\n')
+    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
+    .join('\n');
 
 /** Every module a piece of source names: imports and re-exports, type-only included, `import()`, `require()` and the two resolvers. */
 function specifiersIn(text: string): string[] {
   const found = new Set<string>();
   for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
   for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
-  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]!);
+  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g))
+    found.add(m[1]!);
   return [...found].sort();
 }
 
@@ -56,23 +61,41 @@ function breaches(file: string, text: string, guarded: Guarded): string[] {
   const src = new RegExp(`${guarded.name}(?:['"\`]\\s*,\\s*['"\`]|/)src\\b`);
   code.split('\n').forEach((line, i) => {
     if (resolver.test(line)) out.push(`${file}:${i + 1} resolves ${guarded.name} to build a path beside its entry: ${instead}`);
-    else if (/\b(?:join|resolve|URL)\s*\(|\b(?:import|require)\s*\(\s*[^'"\s]/.test(line) && src.test(line)) out.push(`${file}:${i + 1} builds a path into ${guarded.dir}/src: ${instead}`);
+    else if (/\b(?:join|resolve|URL)\s*\(|\b(?:import|require)\s*\(\s*[^'"\s]/.test(line) && src.test(line))
+      out.push(`${file}:${i + 1} builds a path into ${guarded.dir}/src: ${instead}`);
   });
   return out;
 }
 
 /** Every source file git lists outside the guarded package, tracked or not yet added, that is on disk. */
 function workspaceFiles(guarded: Guarded): string[] {
-  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
   return listed.split('\n').filter((f) => SOURCE.test(f) && !f.startsWith(`${guarded.dir}/`) && fs.existsSync(path.join(ROOT, f)));
 }
 
 test('the scan reads the packages and apps above this one — or it would pass by reading nothing', () => {
   const files = workspaceFiles(GUARDED);
-  for (const dir of ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/test', 'apps/api/src', 'apps/api/test', 'apps/web/src', 'apps/web/test/e2e']) {
-    assert.ok(files.some((f) => f.startsWith(`${dir}/`)), `the scan reads ${dir}`);
+  for (const dir of [
+    'packages/agent-orchestrator/src',
+    'packages/agent-orchestrator/test',
+    'apps/api/src',
+    'apps/api/test',
+    'apps/web/src',
+    'apps/web/test/e2e',
+  ]) {
+    assert.ok(
+      files.some((f) => f.startsWith(`${dir}/`)),
+      `the scan reads ${dir}`,
+    );
   }
-  assert.ok(files.some((f) => specifiersIn(fs.readFileSync(path.join(ROOT, f), 'utf8')).includes('agent-runtime')), 'and some of it imports agent-runtime');
+  assert.ok(
+    files.some((f) => specifiersIn(fs.readFileSync(path.join(ROOT, f), 'utf8')).includes('agent-runtime')),
+    'and some of it imports agent-runtime',
+  );
 });
 
 test('code outside packages/agent-runtime reaches it through agent-runtime and agent-runtime/effect alone', () => {
@@ -84,16 +107,32 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
   const at = 'packages/agent-orchestrator/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
   const instead = 'reach it through agent-runtime or agent-runtime/effect';
-  assert.deepEqual(refused("import { decide } from 'agent-runtime/src/domain.ts';"), [`${at} imports agent-runtime/src/domain.ts, which is not an entry of agent-runtime: ${instead}`]);
-  assert.deepEqual(refused("import type { TaskView } from 'agent-runtime/engine';"), [`${at} imports agent-runtime/engine, which is not an entry of agent-runtime: ${instead}`]);
-  assert.deepEqual(refused("import pkg from 'agent-runtime/package.json' with { type: 'json' };"), [`${at} imports agent-runtime/package.json, which is not an entry of agent-runtime: ${instead}`]);
-  assert.deepEqual(refused("import { codex } from '../../agent-runtime/src/runner-codex.ts';"), [`${at} imports ../../agent-runtime/src/runner-codex.ts, a path into packages/agent-runtime: ${instead}`]);
-  assert.deepEqual(breaches('apps/api/test/x.test.ts', "const { fold } = await import('../../../packages/agent-runtime/src/domain.ts');", GUARDED),
-    [`apps/api/test/x.test.ts imports ../../../packages/agent-runtime/src/domain.ts, a path into packages/agent-runtime: ${instead}`]);
-  assert.deepEqual(refused("const v = await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-runtime')).href);"),
-    [`${at}:1 resolves agent-runtime to build a path beside its entry: ${instead}`]);
-  assert.deepEqual(refused("const d = await import(path.join(ROOT, 'packages', 'agent-runtime', 'src', 'domain.ts'));"), [`${at}:1 builds a path into packages/agent-runtime/src: ${instead}`]);
-  assert.deepEqual(refused('const d = require(`${ROOT}/packages/agent-runtime/src/domain.ts`);'), [`${at}:1 builds a path into packages/agent-runtime/src: ${instead}`]);
+  assert.deepEqual(refused("import { decide } from 'agent-runtime/src/domain.ts';"), [
+    `${at} imports agent-runtime/src/domain.ts, which is not an entry of agent-runtime: ${instead}`,
+  ]);
+  assert.deepEqual(refused("import type { TaskView } from 'agent-runtime/engine';"), [
+    `${at} imports agent-runtime/engine, which is not an entry of agent-runtime: ${instead}`,
+  ]);
+  assert.deepEqual(refused("import pkg from 'agent-runtime/package.json' with { type: 'json' };"), [
+    `${at} imports agent-runtime/package.json, which is not an entry of agent-runtime: ${instead}`,
+  ]);
+  assert.deepEqual(refused("import { codex } from '../../agent-runtime/src/runner-codex.ts';"), [
+    `${at} imports ../../agent-runtime/src/runner-codex.ts, a path into packages/agent-runtime: ${instead}`,
+  ]);
+  assert.deepEqual(
+    breaches('apps/api/test/x.test.ts', "const { fold } = await import('../../../packages/agent-runtime/src/domain.ts');", GUARDED),
+    [`apps/api/test/x.test.ts imports ../../../packages/agent-runtime/src/domain.ts, a path into packages/agent-runtime: ${instead}`],
+  );
+  assert.deepEqual(
+    refused("const v = await import(new URL('./runner-claude-vocabulary.ts', import.meta.resolve('agent-runtime')).href);"),
+    [`${at}:1 resolves agent-runtime to build a path beside its entry: ${instead}`],
+  );
+  assert.deepEqual(refused("const d = await import(path.join(ROOT, 'packages', 'agent-runtime', 'src', 'domain.ts'));"), [
+    `${at}:1 builds a path into packages/agent-runtime/src: ${instead}`,
+  ]);
+  assert.deepEqual(refused('const d = require(`${ROOT}/packages/agent-runtime/src/domain.ts`);'), [
+    `${at}:1 builds a path into packages/agent-runtime/src: ${instead}`,
+  ]);
 });
 
 test('and what is not a route is not refused: the entries, the CLI spawned, and prose that names a file in src', () => {
@@ -118,15 +157,28 @@ test("agent-runtime's exports are . (facade.ts) and ./effect (index.ts), and not
 
 /** `decide` is the runtime's judgement, pure and not for a consumer to call (src/index.ts says why); `fold` is exported beside it on purpose. */
 function exportBreaches(entries: Record<string, readonly string[]>): string[] {
-  const out = Object.entries(entries).filter(([, names]) => names.includes('decide')).map(([entry]) => `${entry} exports decide, the runtime's judgement: export what it decided (fold, the events), never the function`);
-  if (!Object.values(entries).some((names) => names.includes('fold'))) out.push('no entry exports fold: the check for decide would pass on entries that export nothing');
+  const out = Object.entries(entries)
+    .filter(([, names]) => names.includes('decide'))
+    .map(([entry]) => `${entry} exports decide, the runtime's judgement: export what it decided (fold, the events), never the function`);
+  if (!Object.values(entries).some((names) => names.includes('fold')))
+    out.push('no entry exports fold: the check for decide would pass on entries that export nothing');
   return out;
 }
 
 test('decide is exported by neither entry', async () => {
-  const entries = { 'agent-runtime': Object.keys(await import('agent-runtime')), 'agent-runtime/effect': Object.keys(await import('agent-runtime/effect')) };
+  const entries = {
+    'agent-runtime': Object.keys(await import('agent-runtime')),
+    'agent-runtime/effect': Object.keys(await import('agent-runtime/effect')),
+  };
   assert.deepEqual(exportBreaches(entries), []);
-  assert.deepEqual(exportBreaches({ ...entries, 'agent-runtime/effect': [...entries['agent-runtime/effect'], 'decide'] }),
-    ["agent-runtime/effect exports decide, the runtime's judgement: export what it decided (fold, the events), never the function"], 'REFUSED: decide exported');
-  assert.deepEqual(exportBreaches({ 'agent-runtime': [], 'agent-runtime/effect': [] }), ['no entry exports fold: the check for decide would pass on entries that export nothing'], 'REFUSED: entries read as empty');
+  assert.deepEqual(
+    exportBreaches({ ...entries, 'agent-runtime/effect': [...entries['agent-runtime/effect'], 'decide'] }),
+    ["agent-runtime/effect exports decide, the runtime's judgement: export what it decided (fold, the events), never the function"],
+    'REFUSED: decide exported',
+  );
+  assert.deepEqual(
+    exportBreaches({ 'agent-runtime': [], 'agent-runtime/effect': [] }),
+    ['no entry exports fold: the check for decide would pass on entries that export nothing'],
+    'REFUSED: entries read as empty',
+  );
 });

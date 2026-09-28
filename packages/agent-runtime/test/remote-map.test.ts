@@ -10,11 +10,28 @@ import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_
 import type { SessionState } from '../src/domain.ts';
 
 const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
-const data = (value: Record<string, unknown>): Part => ({ content: { $case: 'data', value }, metadata: undefined, filename: '', mediaType: '' });
-const artifact = (...parts: Part[]): Artifact => ({ artifactId: `a${parts.length}`, name: '', description: '', parts, metadata: undefined, extensions: [] });
+const data = (value: Record<string, unknown>): Part => ({
+  content: { $case: 'data', value },
+  metadata: undefined,
+  filename: '',
+  mediaType: '',
+});
+const artifact = (...parts: Part[]): Artifact => ({
+  artifactId: `a${parts.length}`,
+  name: '',
+  description: '',
+  parts,
+  metadata: undefined,
+  extensions: [],
+});
 
 const taskIn = (state: TaskState, artifacts: Artifact[] = []): Task => ({
-  id: 't-1', contextId: 'c-1', status: { state, message: undefined, timestamp: undefined }, artifacts, history: [], metadata: undefined,
+  id: 't-1',
+  contextId: 'c-1',
+  status: { state, message: undefined, timestamp: undefined },
+  artifacts,
+  history: [],
+  metadata: undefined,
 });
 
 test('each A2A state is passed through as its own name, and an interrupted one says what it waits for', () => {
@@ -47,26 +64,41 @@ test('the closing statement is the data part of the last artifact that has one, 
   const done = (...artifacts: Artifact[]) => sightingOfTask(taskIn(TaskState.TASK_STATE_COMPLETED, artifacts), 1234).closeout;
   assert.deepEqual(done(artifact(data({ n: 1 })), artifact(data({ n: 2 }))), { payload: { n: 2 }, at: 1234 }, 'in the last artifact');
   assert.deepEqual(done(artifact(data({ n: 1 })), artifact(text('words, no data'))), { payload: { n: 1 }, at: 1234 }, 'in an earlier one');
-  assert.deepEqual(done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))), { payload: { n: 3 }, at: 1234 }, 'the last data part of it');
+  assert.deepEqual(
+    done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))),
+    { payload: { n: 3 }, at: 1234 },
+    'the last data part of it',
+  );
   assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `stated: false`');
   assert.equal(done(), undefined);
 });
 
 test('a statement published while the Task is not complete is not read: it would end the attempt early', () => {
-  for (const state of [TaskState.TASK_STATE_WORKING, TaskState.TASK_STATE_INPUT_REQUIRED, TaskState.TASK_STATE_FAILED, TaskState.TASK_STATE_CANCELED]) {
+  for (const state of [
+    TaskState.TASK_STATE_WORKING,
+    TaskState.TASK_STATE_INPUT_REQUIRED,
+    TaskState.TASK_STATE_FAILED,
+    TaskState.TASK_STATE_CANCELED,
+  ]) {
     assert.equal(sightingOfTask(taskIn(state, [artifact(data({ early: true }))]), 1).closeout, undefined, TaskState[state]);
   }
 });
 
 test('a spawn is a plain user message: the brief, the context it continues, the schema under the extension, and no mark', () => {
-  const m = remoteMessageOf({ name: 'ae/t/1', brief: 'do it', cwd: '/w', config: { model: 'x' }, resumeFrom: 'c-9', closeoutSchema: { type: 'object' } }, 'm-1');
+  const m = remoteMessageOf(
+    { name: 'ae/t/1', brief: 'do it', cwd: '/w', config: { model: 'x' }, resumeFrom: 'c-9', closeoutSchema: { type: 'object' } },
+    'm-1',
+  );
   assert.equal(m.messageId, 'm-1');
   assert.equal(m.role, Role.ROLE_USER);
   assert.equal(m.contextId, 'c-9');
   assert.equal(m.taskId, '', 'the agent names the Task');
-  assert.deepEqual(m.parts.map((p) => p.content), [{ $case: 'text', value: 'do it' }]);
+  assert.deepEqual(
+    m.parts.map((p) => p.content),
+    [{ $case: 'text', value: 'do it' }],
+  );
   assert.deepEqual(m.metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: { type: 'object' } } });
-  assert.deepEqual(m.extensions, [], 'not marked: a remote agent is not asked to start a session by the runtime\'s name');
+  assert.deepEqual(m.extensions, [], "not marked: a remote agent is not asked to start a session by the runtime's name");
   assert.ok(!JSON.stringify(m).includes('/w') && !JSON.stringify(m).includes('model'), 'nothing of the local harnesses rides along');
   const cold = remoteMessageOf({ name: 'ae/t/1', brief: 'b', cwd: '/w' }, 'm-2');
   assert.equal(cold.contextId, '');
@@ -78,14 +110,41 @@ test('a spawn is a plain user message: the brief, the context it continues, the 
 test('words for a waiting Task are a user message on that Task, in its context', () => {
   const m = remoteFollowUpOf('t-1', 'c-1', 'blue', 'm-3');
   assert.deepEqual([m.taskId, m.contextId, m.messageId, m.role], ['t-1', 'c-1', 'm-3', Role.ROLE_USER]);
-  assert.deepEqual(m.parts.map((p) => p.content), [{ $case: 'text', value: 'blue' }]);
+  assert.deepEqual(
+    m.parts.map((p) => p.content),
+    [{ $case: 'text', value: 'blue' }],
+  );
 });
 
 test("a Task's logs are its messages, its state and its artifacts, as text", () => {
   const t: Task = {
     ...taskIn(TaskState.TASK_STATE_COMPLETED, [artifact(data({ ok: true }))]),
-    status: { state: TaskState.TASK_STATE_COMPLETED, timestamp: undefined, message: { messageId: 'm', contextId: 'c-1', taskId: 't-1', role: Role.ROLE_AGENT, parts: [text('finished')], metadata: undefined, extensions: [], referenceTaskIds: [] } },
-    history: [{ messageId: 'u', contextId: 'c-1', taskId: 't-1', role: Role.ROLE_USER, parts: [text('do it')], metadata: undefined, extensions: [], referenceTaskIds: [] }],
+    status: {
+      state: TaskState.TASK_STATE_COMPLETED,
+      timestamp: undefined,
+      message: {
+        messageId: 'm',
+        contextId: 'c-1',
+        taskId: 't-1',
+        role: Role.ROLE_AGENT,
+        parts: [text('finished')],
+        metadata: undefined,
+        extensions: [],
+        referenceTaskIds: [],
+      },
+    },
+    history: [
+      {
+        messageId: 'u',
+        contextId: 'c-1',
+        taskId: 't-1',
+        role: Role.ROLE_USER,
+        parts: [text('do it')],
+        metadata: undefined,
+        extensions: [],
+        referenceTaskIds: [],
+      },
+    ],
   };
   assert.equal(logsOfTask(t), 'user: do it\nCOMPLETED — finished\nartifact a1: {"ok":true}');
 });

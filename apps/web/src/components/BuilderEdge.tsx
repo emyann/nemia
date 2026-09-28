@@ -15,11 +15,22 @@ export const BACKWARD_DEPTH = 80;
  * it leaves. An `after` edge that points backwards, which only steps waiting on each other have, dips beneath the row too: drawn straight it
  * would cross both blocks, and its button would sit on the forward edge's.
  */
-export function BuilderEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, data }: EdgeProps<BuilderFlowEdge>) {
+export function BuilderEdge({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  markerEnd,
+  data,
+}: EdgeProps<BuilderFlowEdge>) {
   const loop = data?.loop ?? false;
   const under = loop || targetX < sourceX;
   const [path, labelX, labelY] = under
-    ? (({ path, labelX, labelY }) => [path, labelX, labelY] as const)(loopPath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY }, loop ? undefined : BACKWARD_DEPTH))
+    ? (({ path, labelX, labelY }) => [path, labelX, labelY] as const)(
+        loopPath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY }, loop ? undefined : BACKWARD_DEPTH),
+      )
     : getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   return (
     <>

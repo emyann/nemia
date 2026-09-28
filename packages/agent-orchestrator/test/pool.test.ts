@@ -40,7 +40,9 @@ const gate = require('node:path').join(${JSON.stringify(gates)}, ${prompt});
 const wait = () => (fs.existsSync(gate) ? process.exit(0) : setTimeout(wait, 50));
 wait();
 `;
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'agents') {
@@ -63,12 +65,18 @@ if (args.includes('--input-format')) {
   const prompt = args[args.indexOf('-p') + 1];
   ${runUntilGate('prompt')}
 }
-`, { mode: 0o755 });
-  fs.writeFileSync(path.join(bin, 'codex'), `#!${process.execPath}
+`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(bin, 'codex'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 ${runUntilGate('args.at(-1)')}
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   process.env.PATH = `${bin}:${process.env.PATH}`;
   process.env.CODEX_HOME = scratch('wf-pool-codex-home-');
   return {
@@ -84,7 +92,15 @@ const cwd = scratch('wf-pool-cwd-');
 
 /** A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. */
 const file = (id: string, harness: string) =>
-  e.file({ id, cwd, harness, brief: harness === 'check' ? checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, { WF_RUN: 'r', WF_STEP: id }) : id });
+  e.file({
+    id,
+    cwd,
+    harness,
+    brief:
+      harness === 'check'
+        ? checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, { WF_RUN: 'r', WF_STEP: id })
+        : id,
+  });
 
 const attempts = async (id: string) => (await e.view(id)).state.attempts.length;
 
@@ -115,18 +131,25 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
     await file('a1', 'claude-detached');
     await file('a2', 'claude');
     await tick(e);
-    assert.equal(await attempts('a1') + await attempts('a2'), 0, 'admitted on this pass, started on the next');
+    assert.equal((await attempts('a1')) + (await attempts('a2')), 0, 'admitted on this pass, started on the next');
     assert.deepEqual([(await e.view('a1')).admission, (await e.view('a2')).admission], ['admitted', 'admitted']);
     await tick(e);
     await until(['a1', 'a2'], 'running (working)');
 
-    for (const [id, harness] of [['b1', 'claude'], ['b2', 'claude-detached'], ['c1', 'codex'], ['c2', 'codex'], ['c3', 'codex']]) await file(id!, harness!);
+    for (const [id, harness] of [
+      ['b1', 'claude'],
+      ['b2', 'claude-detached'],
+      ['c1', 'codex'],
+      ['c2', 'codex'],
+      ['c3', 'codex'],
+    ])
+      await file(id!, harness!);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
     assert.equal(await attempts('b2'), 0, 'and so does a claude-detached one');
     assert.equal((await e.view('b1')).admission, 'queued');
-    assert.equal(await attempts('c1') + await attempts('c2'), 2, 'codex is not counted in that pool');
+    assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
     assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
 
     // The claude-detached session ends. The slot it frees is the pool's, and goes to the next task in it: b1, filed first.
@@ -153,18 +176,24 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
     await tick(e);
     await until(['p1', 'p2'], 'running (working)');
 
-    for (const [id, harness] of [['q1', 'claude-detached'], ['d1', 'check'], ['d2', 'check'], ['d3', 'check']]) await file(id!, harness!);
+    for (const [id, harness] of [
+      ['q1', 'claude-detached'],
+      ['d1', 'check'],
+      ['d2', 'check'],
+      ['d3', 'check'],
+    ])
+      await file(id!, harness!);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
-    assert.equal(await attempts('d1') + await attempts('d2'), 2, 'a check is not counted in it');
+    assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
     assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
   } finally {
     await drain();
   }
 });
 
-test('one pass — the runtime\'s tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting', async () => {
+test("one pass — the runtime's tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting", async () => {
   try {
     for (const id of ['s1', 's2', 's3', 's4']) await file(id, 'claude');
     // The pass that admits s1 and s2: its `admit` is a word to the journals, and asks no harness.

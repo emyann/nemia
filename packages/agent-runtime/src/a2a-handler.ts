@@ -20,22 +20,49 @@
 import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
 import type {
-  AgentCard, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-  GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigsRequest,
-  ListTaskPushNotificationConfigsResponse, ListTasksRequest, ListTasksResponse, Message, SendMessageRequest, StreamResponse,
-  SubscribeToTaskRequest, Task, TaskPushNotificationConfig,
+  AgentCard,
+  CancelTaskRequest,
+  DeleteTaskPushNotificationConfigRequest,
+  GetExtendedAgentCardRequest,
+  GetTaskPushNotificationConfigRequest,
+  GetTaskRequest,
+  ListTaskPushNotificationConfigsRequest,
+  ListTaskPushNotificationConfigsResponse,
+  ListTasksRequest,
+  ListTasksResponse,
+  Message,
+  SendMessageRequest,
+  StreamResponse,
+  SubscribeToTaskRequest,
+  Task,
+  TaskPushNotificationConfig,
 } from '@a2a-js/sdk';
 import type { A2ARequestHandler, ServerCallContext } from '@a2a-js/sdk/server';
 import {
-  ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, RequestMalformedError, TaskNotCancelableError,
-  TaskNotFoundError, UnsupportedOperationError,
+  ExtendedAgentCardNotConfiguredError,
+  PushNotificationNotSupportedError,
+  RequestMalformedError,
+  TaskNotCancelableError,
+  TaskNotFoundError,
+  UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import { fold, isLive, phaseWordOf, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
 import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
-  canceledTask, contextRefusal, failedSpawnTask, followUpRefusal, followUpText, messageRefusal, nameParts, RUNTIME_EXTENSION,
-  spawnOf, startedTask, taskOfAttempt, taskOfSighting, type SessionMethod,
+  canceledTask,
+  contextRefusal,
+  failedSpawnTask,
+  followUpRefusal,
+  followUpText,
+  messageRefusal,
+  nameParts,
+  RUNTIME_EXTENSION,
+  spawnOf,
+  startedTask,
+  taskOfAttempt,
+  taskOfSighting,
+  type SessionMethod,
 } from './a2a-map.ts';
 
 /**
@@ -68,23 +95,38 @@ export type RuntimeExtensionParams = { methods: SessionMethod[]; say: boolean };
 export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
   name: harness,
   description: `The \`${harness}\` harness: one agent session per task, started by a message and polled until it ends.`,
-  supportedInterfaces: [], provider: undefined, version: '1',
+  supportedInterfaces: [],
+  provider: undefined,
+  version: '1',
   capabilities: {
-    streaming: false, pushNotifications: false, extendedAgentCard: false,
-    extensions: [{
-      uri: RUNTIME_EXTENSION, required: false,
-      description: 'A spawn is a message marked with this extension: it starts a session under the name its taskId gives. The methods listed answer what A2A has no call for.',
-      params: {
-        methods: [
-          ...(ops.find ? ['findSession' as const] : []), 'sessionLogs' as const, ...(ops.release ? ['releaseSession' as const] : []),
-          ...(ops.transcript ? ['sessionTranscript' as const] : []), ...(ops.observeFor ? ['observeSessions' as const] : []),
-        ],
-        say: ops.say !== undefined,
-      } satisfies RuntimeExtensionParams,
-    }],
+    streaming: false,
+    pushNotifications: false,
+    extendedAgentCard: false,
+    extensions: [
+      {
+        uri: RUNTIME_EXTENSION,
+        required: false,
+        description:
+          'A spawn is a message marked with this extension: it starts a session under the name its taskId gives. The methods listed answer what A2A has no call for.',
+        params: {
+          methods: [
+            ...(ops.find ? ['findSession' as const] : []),
+            'sessionLogs' as const,
+            ...(ops.release ? ['releaseSession' as const] : []),
+            ...(ops.transcript ? ['sessionTranscript' as const] : []),
+            ...(ops.observeFor ? ['observeSessions' as const] : []),
+          ],
+          say: ops.say !== undefined,
+        } satisfies RuntimeExtensionParams,
+      },
+    ],
   },
-  securitySchemes: {}, securityRequirements: [], defaultInputModes: ['text/plain'], defaultOutputModes: ['text/plain'],
-  skills: [], signatures: [],
+  securitySchemes: {},
+  securityRequirements: [],
+  defaultInputModes: ['text/plain'],
+  defaultOutputModes: ['text/plain'],
+  skills: [],
+  signatures: [],
 });
 
 /**
@@ -104,7 +146,10 @@ export interface SessionMethods {
   /** What a session printed, read by the id its harness lists it under, or the one its end was recorded with. */
   sessionLogs(params: { sessionId: string }, context: ServerCallContext): Promise<{ logs: string }>;
   /** Let go of a session whose end is on the record; what it consumed, when the harness reads that only as it exits. */
-  releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }, context: ServerCallContext): Promise<{ usage: Usage | null }>;
+  releaseSession(
+    params: { session: Sighting; task: { worktree?: string | boolean } },
+    context: ServerCallContext,
+  ): Promise<{ usage: Usage | null }>;
   /**
    * A session's conversation from `after` on, and the cursor to ask again with; `null` when no session goes by the name
    * yet. Asked by name, the id is found here: the one the journal ended the attempt with, else the harness's. Asked by
@@ -117,7 +162,10 @@ export interface SessionMethods {
    * is a pass in this process, which reads every task at once. `unread` is every expected name the driver could not look for
    * this time (`Observation`): neither listed nor gone.
    */
-  observeSessions(params: { expected: readonly ExpectedSession[] }, context: ServerCallContext): Promise<{ tasks: Task[]; unread: string[] }>;
+  observeSessions(
+    params: { expected: readonly ExpectedSession[] },
+    context: ServerCallContext,
+  ): Promise<{ tasks: Task[]; unread: string[] }>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -190,10 +238,13 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     // that is a spawn under a name of its own — once the session has ended: spawned while it runs, a second process would
     // resume the same conversation beside it. Before any observe: a harness with no channel is asked nothing.
     if (!this.ops.say) {
-      throw new UnsupportedOperationError(`the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked \`${RUNTIME_EXTENSION}\` — in this session's contextId.`);
+      throw new UnsupportedOperationError(
+        `the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked \`${RUNTIME_EXTENSION}\` — in this session's contextId.`,
+      );
     }
     const seen = (await this.run(this.ops.observe)).get(m.taskId);
-    if (!seen) throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
+    if (!seen)
+      throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
     const elsewhere = contextRefusal(m.taskId, m.contextId, seen);
     if (elsewhere) throw new RequestMalformedError(elsewhere);
     if (!isLive(seen.state)) {
@@ -223,7 +274,10 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     const attempt = parts && state?.attempts.find((a) => a.n === parts.n);
     const waiting = state !== undefined && waitsForInput(state) && state.attempts.at(-1) === attempt;
     if (seen) return waiting ? taskOfSighting(params.id, seen, TaskState.TASK_STATE_INPUT_REQUIRED) : taskOfSighting(params.id, seen);
-    if (!attempt) throw new TaskNotFoundError(`no session \`${params.id}\`: the \`${this.harness}\` harness lists none, and no attempt was journalled under it.`);
+    if (!attempt)
+      throw new TaskNotFoundError(
+        `no session \`${params.id}\`: the \`${this.harness}\` harness lists none, and no attempt was journalled under it.`,
+      );
     return taskOfAttempt(params.id, attempt, randomUUID(), waiting);
   }
 
@@ -250,11 +304,15 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    */
   async listTasks(params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
     if (params.statusTimestampAfter !== undefined) {
-      throw new UnsupportedOperationError('this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.');
+      throw new UnsupportedOperationError(
+        'this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.',
+      );
     }
     const size = params.pageSize ?? DEFAULT_PER_PAGE;
     if (!Number.isInteger(size) || size < 1 || size > MOST_PER_PAGE) {
-      throw new RequestMalformedError(`\`pageSize: ${size}\` is not a page: give a whole number from 1 to ${MOST_PER_PAGE}, or none for ${DEFAULT_PER_PAGE}.`);
+      throw new RequestMalformedError(
+        `\`pageSize: ${size}\` is not a page: give a whole number from 1 to ${MOST_PER_PAGE}, or none for ${DEFAULT_PER_PAGE}.`,
+      );
     }
     const status = params.status ?? TaskState.TASK_STATE_UNSPECIFIED;
     let snap: Snapshot;
@@ -263,18 +321,25 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       const listed = await this.run(this.ops.observe);
       const tasks = [...listed.entries()]
         .map(([name, s]: [string, Sighting]) => taskOfSighting(name, s))
-        .filter((t) => (!params.contextId || t.contextId === params.contextId)
-          && (status === TaskState.TASK_STATE_UNSPECIFIED || t.status!.state === status))
+        .filter(
+          (t) =>
+            (!params.contextId || t.contextId === params.contextId) &&
+            (status === TaskState.TASK_STATE_UNSPECIFIED || t.status!.state === status),
+        )
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       snap = { id: ++this.listings, contextId: params.contextId, status, tasks };
     } else {
       const m = /^([0-9]+):([0-9]+)$/.exec(params.pageToken);
       const current = m ? this.open.get(Number(m[1])) : undefined;
       if (!m || !current || Number(m[2]) > current.tasks.length) {
-        throw new RequestMalformedError(`\`pageToken: ${params.pageToken}\` is not a page of a listing still open: list again from the first page.`);
+        throw new RequestMalformedError(
+          `\`pageToken: ${params.pageToken}\` is not a page of a listing still open: list again from the first page.`,
+        );
       }
       if (current.contextId !== params.contextId || current.status !== status) {
-        throw new RequestMalformedError('a page is asked for with other filters than its listing: ask every page with the filters of the first.');
+        throw new RequestMalformedError(
+          'a page is asked for with other filters than its listing: ask every page with the filters of the first.',
+        );
       }
       snap = current;
       offset = Number(m[2]);
@@ -303,12 +368,15 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
 
   async sessionLogs(params: { sessionId: string }, _context: ServerCallContext): Promise<{ logs: string }> {
     if (typeof params.sessionId !== 'string' || !params.sessionId) {
-      throw new RequestMalformedError("the request names no session: send the id its harness lists it under as `sessionId`.");
+      throw new RequestMalformedError('the request names no session: send the id its harness lists it under as `sessionId`.');
     }
     return { logs: await this.run(this.ops.logs(params.sessionId)) };
   }
 
-  async releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }, _context: ServerCallContext): Promise<{ usage: Usage | null }> {
+  async releaseSession(
+    params: { session: Sighting; task: { worktree?: string | boolean } },
+    _context: ServerCallContext,
+  ): Promise<{ usage: Usage | null }> {
     if (!this.ops.release) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness has nothing to let go of: its registry is the record.`);
     }
@@ -331,33 +399,44 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    */
   async sessionTranscript(params: TranscriptRequest, _context: ServerCallContext): Promise<Transcript | null> {
     if (!this.ops.transcript) {
-      throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).`);
+      throw new UnsupportedOperationError(
+        `the \`${this.harness}\` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).`,
+      );
     }
     if (params.sessionId !== undefined) {
       if (params.name !== undefined) {
         throw new RequestMalformedError('the request names the session twice, by `name` and by `sessionId`: send one.');
       }
       if (typeof params.sessionId !== 'string' || !params.sessionId) {
-        throw new RequestMalformedError('the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.');
+        throw new RequestMalformedError(
+          'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+        );
       }
       return this.run(this.ops.transcript(params.sessionId, params.after));
     }
     const parts = typeof params.name === 'string' ? nameParts(params.name) : undefined;
-    if (!parts) throw new RequestMalformedError(`\`${params.name}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`);
+    if (!parts)
+      throw new RequestMalformedError(`\`${params.name}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`);
     const attempt = fold(parts.taskId, await this.events(parts.taskId)).attempts.find((a) => a.n === parts.n);
     const inFlight = attempt === undefined || attempt.ended === null;
-    const found = !attempt?.nativeId && inFlight && this.ops.find
-      ? await this.run(this.ops.find(params.name)).catch(() => undefined)
-      : undefined;
-    const sessionId = attempt?.nativeId ?? found?.sessionId
-      ?? (await this.run(this.ops.observe).catch(() => new Map<string, Sighting>())).get(params.name)?.sessionId;
+    const found =
+      !attempt?.nativeId && inFlight && this.ops.find ? await this.run(this.ops.find(params.name)).catch(() => undefined) : undefined;
+    const sessionId =
+      attempt?.nativeId ??
+      found?.sessionId ??
+      (await this.run(this.ops.observe).catch(() => new Map<string, Sighting>())).get(params.name)?.sessionId;
     if (!sessionId) return null;
     return this.run(this.ops.transcript(sessionId, params.after));
   }
 
-  async observeSessions(params: { expected: readonly ExpectedSession[] }, _context: ServerCallContext): Promise<{ tasks: Task[]; unread: string[] }> {
+  async observeSessions(
+    params: { expected: readonly ExpectedSession[] },
+    _context: ServerCallContext,
+  ): Promise<{ tasks: Task[]; unread: string[] }> {
     if (!this.ops.observeFor) {
-      throw new UnsupportedOperationError(`the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`);
+      throw new UnsupportedOperationError(
+        `the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`,
+      );
     }
     if (!Array.isArray(params.expected) || !params.expected.every((e) => typeof e?.name === 'string' && nameParts(e.name))) {
       throw new RequestMalformedError('`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.');
@@ -366,15 +445,24 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return { tasks: [...seen].map(([name, s]) => taskOfSighting(name, s)), unread: [...unread] };
   }
 
-  async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext): Promise<TaskPushNotificationConfig> {
+  async createTaskPushNotificationConfig(
+    _params: TaskPushNotificationConfig,
+    _context: ServerCallContext,
+  ): Promise<TaskPushNotificationConfig> {
     throw this.noPush();
   }
 
-  async getTaskPushNotificationConfig(_params: GetTaskPushNotificationConfigRequest, _context: ServerCallContext): Promise<TaskPushNotificationConfig> {
+  async getTaskPushNotificationConfig(
+    _params: GetTaskPushNotificationConfigRequest,
+    _context: ServerCallContext,
+  ): Promise<TaskPushNotificationConfig> {
     throw this.noPush();
   }
 
-  async listTaskPushNotificationConfigs(_params: ListTaskPushNotificationConfigsRequest, _context: ServerCallContext): Promise<ListTaskPushNotificationConfigsResponse> {
+  async listTaskPushNotificationConfigs(
+    _params: ListTaskPushNotificationConfigsRequest,
+    _context: ServerCallContext,
+  ): Promise<ListTaskPushNotificationConfigsResponse> {
     throw this.noPush();
   }
 
@@ -391,4 +479,3 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return new PushNotificationNotSupportedError(`the \`${this.harness}\` harness sends no notifications: poll getTask.`);
   }
 }
-

@@ -45,7 +45,16 @@ const HINTS: Partial<Record<AgentRoleKey, string>> = {
  *
  * `onSave` is handed the draft and resolves once written, or rejects with the refusal; the form keeps what was typed either way.
  */
-export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal, onSave, onSkillCopied, footer }: {
+export function AgentForm({
+  listing,
+  keyForm,
+  readOnly = false,
+  saving,
+  refusal,
+  onSave,
+  onSkillCopied,
+  footer,
+}: {
   listing: AgentListing | null;
   keyForm: KeyForm | undefined;
   readOnly?: boolean;
@@ -104,7 +113,11 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Name"
-          hint={listing ? 'Its file is agents/<name>.md; a node names it with agent: <name>. Renamed only while no node names it.' : 'Its file is agents/<name>.md; a node names it with agent: <name>.'}
+          hint={
+            listing
+              ? 'Its file is agents/<name>.md; a node names it with agent: <name>. Renamed only while no node names it.'
+              : 'Its file is agents/<name>.md; a node names it with agent: <name>.'
+          }
           value={form.name}
           onChange={(name) => setForm((f) => ({ ...f, name }))}
           readOnly={readOnly}
@@ -174,10 +187,19 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
             <GivenSkills rows={listing?.given ?? []} none="It gives no skills." />
           </div>
         ) : (
-          <SkillPicker skills={form.skills} given={listing?.given ?? []} onSkills={(skills) => setForm((f) => ({ ...f, skills }))} onCopied={onSkillCopied} />
+          <SkillPicker
+            skills={form.skills}
+            given={listing?.given ?? []}
+            onSkills={(skills) => setForm((f) => ({ ...f, skills }))}
+            onCopied={onSkillCopied}
+          />
         )}
         {!readOnly && <SkillToolNote form={form} setKey={setKey} />}
-        <SystemPrompt value={form.systemPrompt} onChange={(picked) => setForm((f) => ({ ...f, systemPrompt: pickSystemPrompt(picked, listing?.systemPrompt ?? '') }))} readOnly={readOnly} />
+        <SystemPrompt
+          value={form.systemPrompt}
+          onChange={(picked) => setForm((f) => ({ ...f, systemPrompt: pickSystemPrompt(picked, listing?.systemPrompt ?? '') }))}
+          readOnly={readOnly}
+        />
       </fieldset>
 
       <Field
@@ -217,12 +239,20 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
  * its skills, or of a SKILL.md, and shows once saved. Where none can be made the package's refusal stands in their place.
  */
 function GeneratedCard({ listing }: { listing: AgentListing | null }) {
-  const how = 'Generated from its skills: an entry for each, read off its SKILL.md — title, description, tags and examples — or one from its description when it gives none.';
-  if (!listing) return <p data-card-generated className="text-xs text-muted-foreground">{how} Shown once it is saved.</p>;
+  const how =
+    'Generated from its skills: an entry for each, read off its SKILL.md — title, description, tags and examples — or one from its description when it gives none.';
+  if (!listing)
+    return (
+      <p data-card-generated className="text-xs text-muted-foreground">
+        {how} Shown once it is saved.
+      </p>
+    );
   return (
     <div data-card className="space-y-2">
       {listing.cardError !== null ? (
-        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-red-700 dark:text-red-400">{listing.cardError}</p>
+        <p data-card-error className="font-mono text-xs whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+          {listing.cardError}
+        </p>
       ) : (
         <Skills skills={listing.card} none={listing.error !== null ? 'Nothing, while its file does not read.' : undefined} />
       )}
@@ -232,7 +262,17 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
 }
 
 /** A text field: a line, or `area`'s textarea. The skill's form draws its fields with it too. */
-export function Field({ label, hint, value, onChange, readOnly, mono = false, area, placeholder, className }: {
+export function Field({
+  label,
+  hint,
+  value,
+  onChange,
+  readOnly,
+  mono = false,
+  area,
+  placeholder,
+  className,
+}: {
   label: string;
   hint: string | null | undefined;
   value: string;
@@ -264,7 +304,14 @@ export function Field({ label, hint, value, onChange, readOnly, mono = false, ar
 }
 
 /** A key set to one of the words it may take, or left unset. */
-function Choice({ label, hint, value, choices, onChange, readOnly }: {
+function Choice({
+  label,
+  hint,
+  value,
+  choices,
+  onChange,
+  readOnly,
+}: {
   label: string;
   hint: string | null | undefined;
   value: string;
@@ -312,25 +359,40 @@ function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKe
   const gap = skillToolGap(form);
   if (!gap) return null;
   return (
-    <div data-skill-tool-note className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+    <div
+      data-skill-tool-note
+      className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+    >
       <p className="min-w-0 flex-1">
         {gap === 'tools' ? (
-          <>Its tools leave out <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not use these skills, and a save is refused.</>
+          <>
+            Its tools leave out <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not use
+            these skills, and a save is refused.
+          </>
         ) : (
-          <>Its denied tools take <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not use these skills, and a save is refused.</>
+          <>
+            Its denied tools take <code className="font-mono">Skill</code>, the tool a session loads a skill with: its sessions could not
+            use these skills, and a save is refused.
+          </>
         )}
       </p>
       {gap === 'tools' ? (
-        <Button variant="outline" size="xs" onPress={() => setKey('tools', toolsWithSkill(form.keys.tools))}>Add Skill to its tools</Button>
+        <Button variant="outline" size="xs" onPress={() => setKey('tools', toolsWithSkill(form.keys.tools))}>
+          Add Skill to its tools
+        </Button>
       ) : (
-        <Button variant="outline" size="xs" onPress={() => setKey('disallowedTools', deniedWithoutSkill(form.keys.disallowedTools))}>Take Skill off its denied tools</Button>
+        <Button variant="outline" size="xs" onPress={() => setKey('disallowedTools', deniedWithoutSkill(form.keys.disallowedTools))}>
+          Take Skill off its denied tools
+        </Button>
       )}
     </div>
   );
 }
 
-export const RADIO = 'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
-export const DOT = 'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
+export const RADIO =
+  'group flex cursor-default items-start gap-2.5 rounded border border-neutral-200 px-3 py-2 outline-none data-selected:border-neutral-900 data-focus-visible:ring-2 data-focus-visible:ring-ring/50 data-disabled:cursor-not-allowed dark:border-neutral-800 dark:data-selected:border-neutral-300';
+export const DOT =
+  'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
 
 /**
  * `systemPrompt:`, as a choice of what the agent does: Claude Code's instructions whole, less their coding section, or none — which drops
@@ -366,7 +428,9 @@ function SystemPrompt({ value, onChange, readOnly }: { value: string; onChange: 
               {isExpanded ? '▾' : '▸'} For experts
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {isExpanded && <div className="grid gap-2 pt-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>}
+              {isExpanded && (
+                <div className="grid gap-2 pt-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
+              )}
             </CollapsibleContent>
           </>
         )}

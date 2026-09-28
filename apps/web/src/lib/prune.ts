@@ -33,7 +33,7 @@ export type Awaiting = NonNullable<Decidable['awaiting']>;
  * (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. `awaiting` is read tolerantly, for an
  * api older than it.
  */
-export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? decision.awaiting ?? null : null);
+export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
 
 /**
  * Whether the run's page offers a prune at all: a git run (the package prunes git runs alone), with nothing moving, and with worktrees or
@@ -53,35 +53,45 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
   if (!prunable(run)) return null;
   const { worktrees, files } = run.onDisk;
   const warning = awaiting ? unmergedWarning(run.id, awaiting) : null;
-  const merge = !awaiting ? null : awaiting.direct ? 'It waits on your decision: only the last choice prunes it.' : 'Nobody merged it: only the last choice prunes it.';
+  const merge = !awaiting
+    ? null
+    : awaiting.direct
+      ? 'It waits on your decision: only the last choice prunes it.'
+      : 'Nobody merged it: only the last choice prunes it.';
   const most = files ? (worktrees ? 'Its worktrees and its files' : 'Its files') : 'Its worktrees';
   const choices: PruneChoice[] = [
     ...(worktrees
-      ? [{
-          key: 'worktrees' as const,
-          label: 'Its worktrees',
-          says: `The folders its steps worked in. Its record, its branches${files ? ' and its files' : ''} are kept.`,
-          how: { artifacts: false, unmerged: false },
-          unavailable: merge,
-        }]
+      ? [
+          {
+            key: 'worktrees' as const,
+            label: 'Its worktrees',
+            says: `The folders its steps worked in. Its record, its branches${files ? ' and its files' : ''} are kept.`,
+            how: { artifacts: false, unmerged: false },
+            unavailable: merge,
+          },
+        ]
       : []),
     ...(files
-      ? [{
-          key: 'files' as const,
-          label: most,
-          says: 'And the files its steps handed on (wf prune --artifacts): a closeout that names one then says it was pruned. Its record and branches are kept.',
-          how: { artifacts: true, unmerged: false },
-          unavailable: merge,
-        }]
+      ? [
+          {
+            key: 'files' as const,
+            label: most,
+            says: 'And the files its steps handed on (wf prune --artifacts): a closeout that names one then says it was pruned. Its record and branches are kept.',
+            how: { artifacts: true, unmerged: false },
+            unavailable: merge,
+          },
+        ]
       : []),
     ...(awaiting && warning !== null
-      ? [{
-          key: 'unmerged' as const,
-          label: `${most}, though ${awaiting.direct ? 'nobody decided it' : 'nobody merged it'}`,
-          says: warning,
-          how: { artifacts: files, unmerged: true },
-          unavailable: null,
-        }]
+      ? [
+          {
+            key: 'unmerged' as const,
+            label: `${most}, though ${awaiting.direct ? 'nobody decided it' : 'nobody merged it'}`,
+            says: warning,
+            how: { artifacts: files, unmerged: true },
+            unavailable: null,
+          },
+        ]
       : []),
   ];
   return { choices, warning };
@@ -93,7 +103,8 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  */
 export function unmergedWarning(id: string, awaiting: Awaiting): string {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved (wf prune --unmerged).';
-  if (awaiting.direct) return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;
+  if (awaiting.direct)
+    return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;
   const branches = awaiting.branches.length ? awaiting.branches.join(', ') : `wf/${id}/…`;
   return `Its work was never merged: once pruned, ${branches} ${awaiting.branches.length > 1 ? 'are' : 'is'} the only copy of it. ${after}`;
 }

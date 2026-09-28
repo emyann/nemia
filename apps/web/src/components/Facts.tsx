@@ -25,25 +25,32 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  */
-export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> => (isRemote(spec, filed) ? remoteRows(spec, filed) : [
-
-  ['harness', code(spec.harness)],
-  ['model', modelRow(spec.model, filed)],
-  ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
-  // The session's context window, as the step writes it — `200k` — and the model's whole window where neither the step nor the try has one.
-  ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
-  ['after', spec.after.length ? code(spec.after.join(', ')) : null],
-  // Only where the step says it: `main`, the repository's own checkout rather than a worktree of the run's. A detail from an api that does
-  // not carry the key says nothing, rather than an empty row.
-  ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
-  // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
-  ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
-  ['resume', code(spec.resume)],
-  // A codex step's fence is its sandbox, which the engine's task files as its permission mode: the same row, under Codex's name.
-  [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
-  ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
-  ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
-]);
+export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> =>
+  isRemote(spec, filed)
+    ? remoteRows(spec, filed)
+    : [
+        ['harness', code(spec.harness)],
+        ['model', modelRow(spec.model, filed)],
+        ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
+        // The session's context window, as the step writes it — `200k` — and the model's whole window where neither the step nor the try has one.
+        ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
+        ['after', spec.after.length ? code(spec.after.join(', ')) : null],
+        // Only where the step says it: `main`, the repository's own checkout rather than a worktree of the run's. A detail from an api that does
+        // not carry the key says nothing, rather than an empty row.
+        ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
+        // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
+        ...(spec.loop === null
+          ? []
+          : ([
+              ['loop', code(spec.loop)],
+              ['rounds', spec.rounds],
+            ] satisfies Array<[string, ReactNode]>)),
+        ['resume', code(spec.resume)],
+        // A codex step's fence is its sandbox, which the engine's task files as its permission mode: the same row, under Codex's name.
+        [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
+        ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
+        ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+      ];
 
 /** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
 const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
@@ -54,7 +61,7 @@ const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.
  * would say the run chose what nobody here chose. The address is the store's word now; where it no longer declares the agent, says so.
  */
 function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
-  const address = filed?.remote === undefined || filed.remote === null ? null : filed.remote.address ?? 'no longer in a2a-agents.json';
+  const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
   return [
     ['harness', code(spec.harness ?? (filed?.remote ? `a2a:${filed.remote.name}` : null))],
     ['agent', filed?.remote?.address ? code(address) : address],
@@ -65,7 +72,8 @@ function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, Rea
 }
 
 /** What a step's fence is called on its harness: `sandbox` on codex, whose `sandbox:` it is, and `permission mode` on Claude Code. */
-export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string => (spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode');
+export const fenceLabel = (spec: Pick<StepSpec, 'harness' | 'sandbox'>): string =>
+  spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode';
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
@@ -75,19 +83,32 @@ const secondsWord = (seconds: number | null) => (seconds === null ? null : `${se
  * One field of what a step runs with: the workflow's word, the engine's where the workflow has none — `unset` where the engine was
  * given none either, for the harness to choose — and the engine's where it filed the try with another.
  */
-function ranWith(workflow: string | null, filed: StepFiled | null, pick: (filed: StepFiled) => string | null, unset = "harness's own"): ReactNode {
+function ranWith(
+  workflow: string | null,
+  filed: StepFiled | null,
+  pick: (filed: StepFiled) => string | null,
+  unset = "harness's own",
+): ReactNode {
   const engine = filed && pick(filed);
   if (!filed || (workflow !== null && (engine === null || engine === workflow))) return code(workflow);
-  return workflow === null
-    ? <Marked value={engine ?? unset} mark="default" word={engine === null} />
-    : <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${engine}.`} />;
+  return workflow === null ? (
+    <Marked value={engine ?? unset} mark="default" word={engine === null} />
+  ) : (
+    <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${engine}.`} />
+  );
 }
 
 /** The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the workflow says. */
 function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
   if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
   const says = workflow === null ? 'names no model' : `says ${workflow}`;
-  return <Marked value={filed.model ?? filed.askedModel} mark="this try" title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`} />;
+  return (
+    <Marked
+      value={filed.model ?? filed.askedModel}
+      mark="this try"
+      title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`}
+    />
+  );
 }
 
 /**
@@ -101,13 +122,25 @@ function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
   if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.permissionMode, workflow));
   if (runs.by === 'tools') {
     const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
-    return <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />;
+    return (
+      <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />
+    );
   }
   if (workflow === null) return <Marked value={runs.mode} mark="default" />;
   if (asFiled !== workflow) {
-    return <Marked value={runs.mode} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`} />;
+    return (
+      <Marked
+        value={runs.mode}
+        mark="this try"
+        title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`}
+      />
+    );
   }
-  return runs.mode === workflow ? code(workflow) : <Marked value={runs.mode} mark="as run" title={`The workflow says ${workflow}, which its harness runs as ${runs.mode}.`} />;
+  return runs.mode === workflow ? (
+    code(workflow)
+  ) : (
+    <Marked value={runs.mode} mark="as run" title={`The workflow says ${workflow}, which its harness runs as ${runs.mode}.`} />
+  );
 }
 
 /**
@@ -154,7 +187,18 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   const text = costText(step);
   if (!text) return [['spent', step.taskId ? 'not measured' : null]];
   const over = pastBudget(step);
-  return [['spent', <span key="spent" data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>{text}</span>]];
+  return [
+    [
+      'spent',
+      <span
+        key="spent"
+        data-spent={over ? 'over' : 'within'}
+        className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}
+      >
+        {text}
+      </span>,
+    ],
+  ];
 }
 
 /**
@@ -185,7 +229,9 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
             <span key={part}>
               {i > 0 && ' · '}
               {/^(peak|compacted)\b/.test(part) && peak ? (
-                <span data-peak={peak} className={`font-semibold ${WARN}`} title={PEAK_TITLE[peak]}>{part}</span>
+                <span data-peak={peak} className={`font-semibold ${WARN}`} title={PEAK_TITLE[peak]}>
+                  {part}
+                </span>
               ) : (
                 part
               )}
@@ -193,9 +239,12 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
           ))}
         </span>
       )}
-      {rebuilt > 0 && rest.map((part) => (
-        <span key={part} data-rebuilt={rebuilt} className={`block text-xs ${WARN}`} title={REBUILT_TITLE}>{part}</span>
-      ))}
+      {rebuilt > 0 &&
+        rest.map((part) => (
+          <span key={part} data-rebuilt={rebuilt} className={`block text-xs ${WARN}`} title={REBUILT_TITLE}>
+            {part}
+          </span>
+        ))}
     </span>
   );
 }
@@ -204,7 +253,8 @@ const PEAK_TITLE: Record<Exclude<PeakMark, null>, string> = {
   cap: "It reached the step's context: cap: Claude Code compacted the conversation, a summary in place of what it read, or was about to.",
   large: 'Its context passed 200k tokens on a step with no context: cap. Every response reads all of it.',
 };
-const REBUILT_TITLE = 'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
+const REBUILT_TITLE =
+  'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
 
 /**
  * The command a step is judged by, and once its check refused, what it exited with and the last lines of
@@ -218,7 +268,14 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
         rows={[
           ['command', code(command)],
           ...(refused
-            ? [['refused', <span key="refused" className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">{refused.exit}</span>] as [string, ReactNode]]
+            ? [
+                [
+                  'refused',
+                  <span key="refused" className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">
+                    {refused.exit}
+                  </span>,
+                ] as [string, ReactNode],
+              ]
             : []),
         ]}
       />
@@ -251,9 +308,7 @@ export function Told({ told, filed }: { told: string; filed: boolean }) {
       <summary className="cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
         {filed ? 'What it was told' : 'What it would be told now'}
       </summary>
-      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
-        {told}
-      </pre>
+      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 text-xs dark:bg-neutral-900">{told}</pre>
     </details>
   );
 }

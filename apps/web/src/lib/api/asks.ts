@@ -15,10 +15,16 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string; budget?: number }): Promise<{ try: number; file: string; stopFirst: boolean }> {
+export async function askTry(
+  runId: string,
+  step: string,
+  how: { mode: RetryMode; model?: string; message?: string; budget?: number },
+): Promise<{ try: number; file: string; stopFirst: boolean }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { try?: unknown; file?: unknown; stopFirst?: unknown; error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as
+    | { try?: unknown; file?: unknown; stopFirst?: unknown; error?: unknown }
+    | undefined;
   if (res.ok && typeof body?.try === 'number') return { try: body.try, file: String(body.file), stopFirst: body.stopFirst === true };
   if (res.ok) {
     // Written, it may well be: look before asking again.
@@ -38,11 +44,17 @@ export async function askTry(runId: string, step: string, how: { mode: RetryMode
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
  */
-export async function askRound(runId: string, how: { step?: string; budget?: number }): Promise<{ step: string; round: number; file: string }> {
+export async function askRound(
+  runId: string,
+  how: { step?: string; budget?: number },
+): Promise<{ step: string; round: number; file: string }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/round`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { step?: unknown; round?: unknown; file?: unknown; error?: unknown } | undefined;
-  if (res.ok && typeof body?.step === 'string' && typeof body.round === 'number') return { step: body.step, round: body.round, file: String(body.file) };
+  const body = (await res.json().catch(() => undefined)) as
+    | { step?: unknown; round?: unknown; file?: unknown; error?: unknown }
+    | undefined;
+  if (res.ok && typeof body?.step === 'string' && typeof body.round === 'number')
+    return { step: body.step, round: body.round, file: String(body.file) };
   if (res.ok) {
     // Written, it may well be: look before asking again.
     throw new Error(
@@ -61,10 +73,16 @@ export async function askRound(runId: string, how: { step?: string; budget?: num
  *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
-export async function approveStep(runId: string, step: string, how: { message?: string }): Promise<{ try: number; at: string; message: string | null; file: string }> {
+export async function approveStep(
+  runId: string,
+  step: string,
+  how: { message?: string },
+): Promise<{ try: number; at: string; message: string | null; file: string }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as
+    | { try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown }
+    | undefined;
   if (res.ok && typeof body?.try === 'number' && typeof body.at === 'string') {
     return { try: body.try, at: body.at, message: typeof body.message === 'string' ? body.message : null, file: String(body.file) };
   }
@@ -87,10 +105,16 @@ export async function approveStep(runId: string, step: string, how: { message?: 
  *
  * Sent as `application/json`, which the api requires of it, as of an approval. Going round once more is `askRound`.
  */
-export async function acceptLoop(runId: string, step: string, how: { message: string }): Promise<{ step: string; try: number; at: string; message: string; file: string }> {
+export async function acceptLoop(
+  runId: string,
+  step: string,
+  how: { message: string },
+): Promise<{ step: string; try: number; at: string; message: string; file: string }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/accept`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as
+    | { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown }
+    | undefined;
   if (res.ok && typeof body?.step === 'string' && typeof body.try === 'number' && typeof body.at === 'string') {
     return { step: body.step, try: body.try, at: body.at, message: String(body.message), file: String(body.file) };
   }
@@ -114,7 +138,9 @@ export async function acceptLoop(runId: string, step: string, how: { message: st
 export async function sayToStep(runId: string, step: string, text: string): Promise<Said> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/say`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
-  const body = (await res.json().catch(() => undefined)) as { at?: unknown; attempt?: unknown; text?: unknown; error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as
+    | { at?: unknown; attempt?: unknown; text?: unknown; error?: unknown }
+    | undefined;
   if (res.ok && typeof body?.at === 'string' && typeof body.attempt === 'number' && typeof body.text === 'string') {
     return { at: body.at, attempt: body.attempt, text: body.text };
   }

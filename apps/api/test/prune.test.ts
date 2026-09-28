@@ -23,9 +23,15 @@ const { app } = await import('../src/app.ts');
 const { engine, prune, prunedKept, prunedWords, readRun } = await import('agent-orchestrator');
 
 const git = (...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
-    cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  execFileSync(
+    'git',
+    ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+    {
+      cwd: repo,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
 const repo = fs.mkdtempSync(path.join(root, 'repo-'));
 git('init', '-q', '-b', 'main');
 fs.writeFileSync(path.join(repo, 'README.md'), '# app\n');
@@ -43,14 +49,16 @@ const journal = (taskId: string, events: object[]) =>
   write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((event) => `${JSON.stringify(event)}\n`).join(''));
 const filed = { kind: 'filed', at: at(0), brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' };
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
-const signedOff = (taskId: string) => journal(taskId, [
-  filed,
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(1), attempt: 1 },
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: DONE },
-  { kind: 'settled', at: at(9), outcome: 'succeeded' },
-]);
-const working = (taskId: string) => journal(taskId, [filed, { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(1), attempt: 1 }]);
+const signedOff = (taskId: string) =>
+  journal(taskId, [
+    filed,
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(1), attempt: 1 },
+    { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: DONE },
+    { kind: 'settled', at: at(9), outcome: 'succeeded' },
+  ]);
+const working = (taskId: string) =>
+  journal(taskId, [filed, { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(1), attempt: 1 }]);
 
 const implement = { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' };
 const worktreeOf = (id: string) => path.join(root, 'worktrees', id, 'implement');
@@ -75,11 +83,22 @@ function gitRun(id: string, { merge, working: busy = false }: { merge: boolean; 
   const taskId = `${id}-implement`;
   if (busy) working(taskId);
   else signedOff(taskId);
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true, brief: `Run ${id}`, createdAt: at(0),
-    workflowDir: path.join(root, 'no-such-workflow'), workflow: [implement],
-    steps: { implement: { taskId, workspace: worktreeOf(id), branch, ...(busy ? {} : { handedOff: taskId }) } },
-  }));
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo,
+      workspace: repo,
+      baseRef: base,
+      branch: 'main',
+      isolate: true,
+      brief: `Run ${id}`,
+      createdAt: at(0),
+      workflowDir: path.join(root, 'no-such-workflow'),
+      workflow: [implement],
+      steps: { implement: { taskId, workspace: worktreeOf(id), branch, ...(busy ? {} : { handedOff: taskId }) } },
+    }),
+  );
 }
 
 gitRun('p-merged', { merge: true });
@@ -99,24 +118,47 @@ journal('p-failed-merged-implement', [
 // A run that worked on main itself (`--no-worktree`): no branch of its own to merge, and it waits on your decision all the same.
 signedOff('p-direct-implement');
 write(path.join(filesDir('p-direct'), 'implement', 'shot.png'), 'a picture');
-write(path.join(root, 'runs', 'p-direct.json'), JSON.stringify({
-  id: 'p-direct', repo, workspace: repo, baseRef: base, branch: 'main', isolate: false, brief: 'Run p-direct', createdAt: at(0),
-  workflowDir: path.join(root, 'no-such-workflow'), workflow: [implement],
-  steps: { implement: { taskId: 'p-direct-implement', workspace: repo, branch: 'main', handedOff: 'p-direct-implement' } },
-}));
+write(
+  path.join(root, 'runs', 'p-direct.json'),
+  JSON.stringify({
+    id: 'p-direct',
+    repo,
+    workspace: repo,
+    baseRef: base,
+    branch: 'main',
+    isolate: false,
+    brief: 'Run p-direct',
+    createdAt: at(0),
+    workflowDir: path.join(root, 'no-such-workflow'),
+    workflow: [implement],
+    steps: { implement: { taskId: 'p-direct-implement', workspace: repo, branch: 'main', handedOff: 'p-direct-implement' } },
+  }),
+);
 
 // A folder run whose one step signed off: its folder is its work, and never pruned.
 const work = path.join(root, 'folders', 'p-folder');
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
 signedOff('p-folder-write');
-write(path.join(root, 'runs', 'p-folder.json'), JSON.stringify({
-  id: 'p-folder', place: { kind: 'folder' }, workspace: work, brief: 'Write a note.', createdAt: at(0),
-  workflowDir: path.join(root, 'no-such-workflow'),
-  workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
-  steps: { write: { taskId: 'p-folder-write', workspace: path.join(work, 'write'), branch: null } },
-}));
+write(
+  path.join(root, 'runs', 'p-folder.json'),
+  JSON.stringify({
+    id: 'p-folder',
+    place: { kind: 'folder' },
+    workspace: work,
+    brief: 'Write a note.',
+    createdAt: at(0),
+    workflowDir: path.join(root, 'no-such-workflow'),
+    workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
+    steps: { write: { taskId: 'p-folder-write', workspace: path.join(work, 'write'), branch: null } },
+  }),
+);
 
-const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+const BOARD = {
+  'content-type': 'application/json',
+  'sec-fetch-site': 'same-origin',
+  origin: 'http://localhost:5173',
+  host: '127.0.0.1:8787',
+};
 /** A prune as the board sends it: a POST with the two switches as JSON, through the same guard as every write. */
 const pruneOn = (id: string, body: unknown = {}, headers: Record<string, string> = BOARD) =>
   app.request(`/api/runs/${id}/prune`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
@@ -125,7 +167,7 @@ type Summary = { id: string; pruned: { said: string } | null };
 const listed = async (): Promise<Map<string, Summary>> => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  return new Map((await res.json() as Summary[]).map((r) => [r.id, r]));
+  return new Map(((await res.json()) as Summary[]).map((r) => [r.id, r]));
 };
 const detail = async (id: string) => {
   const res = await app.request(`/api/runs/${id}`);
@@ -140,9 +182,12 @@ const detail = async (id: string) => {
  * What a refusal must leave as it was: every file of the run in the store's `runs/`, its files directory, its worktree, and every branch.
  */
 const stateOf = (id: string) => ({
-  runs: Object.fromEntries(fs.readdirSync(path.join(root, 'runs'))
-    .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
-    .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')])),
+  runs: Object.fromEntries(
+    fs
+      .readdirSync(path.join(root, 'runs'))
+      .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
+      .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]),
+  ),
   files: fs.existsSync(filesDir(id)),
   worktree: fs.existsSync(worktreeOf(id)),
   branches: git('branch', '--list', '--format=%(refname:short) %(objectname)').split('\n').filter(Boolean).sort(),
@@ -157,7 +202,7 @@ test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`:
   for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
     const res = await app.request(`/api/runs/${id}/decision`);
     assert.equal(res.status, 200, id);
-    const body = await res.json() as { awaiting?: unknown };
+    const body = (await res.json()) as { awaiting?: unknown };
     awaiting.set(id, body.awaiting ?? null);
     const said = await packageSays(id, { artifacts: true });
     const refusedUnmerged = said.kind === 'refused' && said.refusal.includes(`wf prune ${id} --unmerged`);
@@ -180,7 +225,10 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.pruned, true);
-  assert.deepEqual(body.worktrees.map((w: { path: string }) => w.path), [worktreeOf('p-merged')]);
+  assert.deepEqual(
+    body.worktrees.map((w: { path: string }) => w.path),
+    [worktreeOf('p-merged')],
+  );
   assert.equal(body.artifacts.path, filesDir('p-merged'));
   assert.deepEqual(body.left, []);
   assert.match(body.lines[0], /^p-merged {2}pruned: removed 1 worktree and its files, .* freed; its record and branches are kept$/);
@@ -194,10 +242,16 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   assert.ok(pruned.artifacts, 'the marker says the files went');
   const run = (await listed()).get('p-merged')!;
   assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
-  assert.match(run.pruned!.said, /its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/);
+  assert.match(
+    run.pruned!.said,
+    /its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/,
+  );
   const page = await detail('p-merged');
   assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
-  assert.deepEqual(page.pruned!.worktrees.map((w) => w.path), [worktreeOf('p-merged')]);
+  assert.deepEqual(
+    page.pruned!.worktrees.map((w) => w.path),
+    [worktreeOf('p-merged')],
+  );
   // Nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test).
   assert.deepEqual(page.onDisk, { worktrees: false, files: false });
 });
@@ -223,7 +277,10 @@ test('REFUSED at shipped defaults: a finished run nobody merged, pruned without 
     assert.equal(res.status, 409, JSON.stringify(how));
     const { error } = await res.json();
     assert.equal(error, said.refusal);
-    assert.match(error, /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/);
+    assert.match(
+      error,
+      /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/,
+    );
     assert.ok(error.includes(`wf prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
     assert.deepEqual(stateOf('p-unmerged'), before, JSON.stringify(how));
   }
@@ -278,7 +335,7 @@ test('REFUSED at shipped defaults: a prune of a run the store has not — none b
   }
 });
 
-test('REFUSED at shipped defaults: a body that is not `wf prune`\'s two switches is a 400, before the run is read, and nothing is touched', async () => {
+test("REFUSED at shipped defaults: a body that is not `wf prune`'s two switches is a 400, before the run is read, and nothing is touched", async () => {
   gitRun('p-body', { merge: true });
   const cases: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],

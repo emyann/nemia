@@ -2,7 +2,23 @@
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
  * (`GET /api/ceilings`, app.ts).
  */
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, lastCeilings, lastPassCost, listRuns, parentOf, type ParentRun, type PassCost, phaseOfView, readAsks, slotWord, spendReader, stepsOf } from 'agent-orchestrator';
+import {
+  closeoutAsked,
+  closeoutReader,
+  exitVerdicts,
+  harnessBlocked,
+  lastCeilings,
+  lastPassCost,
+  listRuns,
+  parentOf,
+  type ParentRun,
+  type PassCost,
+  phaseOfView,
+  readAsks,
+  slotWord,
+  spendReader,
+  stepsOf,
+} from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { everyView, seenBy } from './store.ts';
@@ -54,7 +70,18 @@ export async function ceilingsOf(): Promise<Ceilings> {
       continue;
     }
     const { asks, rounds } = readAsks(run.id);
-    const a = assess(steps, run, phase, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+    const a = assess(
+      steps,
+      run,
+      phase,
+      closeoutReader(views, run),
+      closeoutAsked(views),
+      exitVerdicts(views, run),
+      asks,
+      rounds,
+      harnessBlocked(views),
+      spendReader(views),
+    );
     const parents = new Map<string, ParentRun>();
     if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
     needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps) });

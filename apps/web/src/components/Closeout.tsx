@@ -207,15 +207,33 @@ function DeclaredFields({ closeout, fold = false }: { closeout: StepCloseout; fo
   const images = imagePaths(closeout.artifacts);
   const field = (name: string, value: unknown, first = false) => {
     const folded = fold && foldsAtGate(value, first);
-    const view = <FieldView key={name} name={name} named={!folded} schema={closeout.schema[name]} value={value} artifacts={closeout.artifacts} images={images} />;
-    return folded ? <Fold key={name} name={name} count={(value as unknown[]).length}>{view}</Fold> : view;
+    const view = (
+      <FieldView
+        key={name}
+        name={name}
+        named={!folded}
+        schema={closeout.schema[name]}
+        value={value}
+        artifacts={closeout.artifacts}
+        images={images}
+      />
+    );
+    return folded ? (
+      <Fold key={name} name={name} count={(value as unknown[]).length}>
+        {view}
+      </Fold>
+    ) : (
+      view
+    );
   };
   return (
     <>
       {Object.entries(closeout.output).map(([name, value], i) => field(name, value, i === 0))}
       {closeout.replies && field('replies', closeout.replies)}
       {closeout.missing.length > 0 && (
-        <p data-missing className="text-xs text-amber-700 dark:text-amber-400">declared and not given: {closeout.missing.join(', ')}</p>
+        <p data-missing className="text-xs text-amber-700 dark:text-amber-400">
+          declared and not given: {closeout.missing.join(', ')}
+        </p>
       )}
     </>
   );
@@ -225,7 +243,12 @@ function DeclaredFields({ closeout, fold = false }: { closeout: StepCloseout; fo
 function Fold({ name, count, children }: { name: string; count: number; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <details data-fold={name} open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="rounded border border-neutral-200 dark:border-neutral-800">
+    <details
+      data-fold={name}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      className="rounded border border-neutral-200 dark:border-neutral-800"
+    >
       <summary className="cursor-pointer px-2 py-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
         <span className="font-mono">{name}</span> · {count}
       </summary>
@@ -259,9 +282,7 @@ export function HandedOn({ closeout }: { closeout: StepCloseout }) {
 export function ClosedNeeds({ needs }: { needs: string }) {
   return (
     <div data-needs className="text-amber-700 dark:text-amber-400">
-      <p className="font-medium">Needs:</p>{' '}
-      <Markdown>{needs}</Markdown>
+      <p className="font-medium">Needs:</p> <Markdown>{needs}</Markdown>
     </div>
   );
 }
-

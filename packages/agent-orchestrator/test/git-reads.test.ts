@@ -40,9 +40,36 @@ const READS = [
  * `Bash(git -C:*)` would admit `git -C <dir> push`, which the deny `Bash(git push:*)` does not match.
  */
 const NEVER = [
-  'commit', 'merge', 'push', 'pull', 'checkout', 'switch', 'reset', 'rebase', 'cherry-pick', 'revert', 'tag', 'stash', 'add', 'rm',
-  'mv', 'restore', 'clean', 'worktree', 'update-ref', 'config', 'remote', 'am', 'apply', 'gc', 'prune', 'notes', 'replace',
-  'filter-branch', 'grep', 'fetch',
+  'commit',
+  'merge',
+  'push',
+  'pull',
+  'checkout',
+  'switch',
+  'reset',
+  'rebase',
+  'cherry-pick',
+  'revert',
+  'tag',
+  'stash',
+  'add',
+  'rm',
+  'mv',
+  'restore',
+  'clean',
+  'worktree',
+  'update-ref',
+  'config',
+  'remote',
+  'am',
+  'apply',
+  'gc',
+  'prune',
+  'notes',
+  'replace',
+  'filter-branch',
+  'grep',
+  'fetch',
 ];
 
 /** Why a `Bash(git …)` allow is refused, or undefined for one on `READS` that names no verb on `NEVER`. Not a git rule: undefined. */
@@ -51,9 +78,11 @@ function refusalOf(rule: string): string | undefined {
   if (body === undefined) return rule.startsWith('Bash(git') ? `${rule}: not one Bash rule` : undefined;
   const [, verb = '', ...rest] = body.replace(/:\*$/, '').split(/\s+/);
   if (verb === '') return `${rule}: every git command, by prefix`;
-  if (verb.startsWith('-')) return `${rule}: an option before the verb (${verb}) reaches every verb after it, \`git -C <dir> push\` included`;
+  if (verb.startsWith('-'))
+    return `${rule}: an option before the verb (${verb}) reaches every verb after it, \`git -C <dir> push\` included`;
   if (NEVER.includes(verb)) return `${rule}: git ${verb} writes, runs a program or moves a ref`;
-  if (verb === 'branch' && !(rest.length === 0 || (rest.length === 1 && rest[0] === '--list'))) return `${rule}: git branch other than --list moves refs`;
+  if (verb === 'branch' && !(rest.length === 0 || (rest.length === 1 && rest[0] === '--list')))
+    return `${rule}: git branch other than --list moves refs`;
   if (!READS.includes(rule)) return `${rule}: not on the named list of git reads`;
   return undefined;
 }
@@ -68,14 +97,24 @@ test('every git allow in the shipped settings is a read on the named list, and t
   // The reads the steps' recorded denials asked for are there, word for word: whether the branch still merges, and where.
   for (const rule of ['Bash(git merge-tree:*)', 'Bash(git merge-base:*)', 'Bash(git ls-tree:*)']) assert.ok(allow.includes(rule), rule);
   // And the deny list is the one it was: a push, and a branch deleted by force.
-  assert.deepEqual(shipped().deny.filter((r) => r.startsWith('Bash(git')), ['Bash(git push)', 'Bash(git push:*)', 'Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)']);
+  assert.deepEqual(
+    shipped().deny.filter((r) => r.startsWith('Bash(git')),
+    ['Bash(git push)', 'Bash(git push:*)', 'Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)'],
+  );
 });
 
 test('REFUSED: a git allow for -C, grep, fetch, a verb that writes, a bare git, or a branch that is not --list, beside the shipped rules', () => {
   const { allow } = shipped();
   const refused = [
-    'Bash(git -C:*)', 'Bash(git -c:*)', 'Bash(git --git-dir:*)', 'Bash(git:*)', 'Bash(git)', 'Bash(git branch -m:*)', 'Bash(git branch:*)',
-    ...NEVER.map((verb) => `Bash(git ${verb}:*)`), ...NEVER.map((verb) => `Bash(git ${verb})`),
+    'Bash(git -C:*)',
+    'Bash(git -c:*)',
+    'Bash(git --git-dir:*)',
+    'Bash(git:*)',
+    'Bash(git)',
+    'Bash(git branch -m:*)',
+    'Bash(git branch:*)',
+    ...NEVER.map((verb) => `Bash(git ${verb}:*)`),
+    ...NEVER.map((verb) => `Bash(git ${verb})`),
   ];
   for (const rule of refused) {
     const said = refusals([...allow, rule]);

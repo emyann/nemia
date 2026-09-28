@@ -27,7 +27,9 @@ const fakeClaude = () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
   fs.writeFileSync(registry, '[]');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -36,7 +38,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -49,7 +53,11 @@ if (args[0] === '--bg') {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /** A task whose one session the registry lists blocked, and the engine that reads it. */
@@ -60,7 +68,7 @@ const blocked = async () => {
   return { engine, id };
 };
 
-test('a blocked session carries what its harness says it waits for, in the harness\'s own words, onto the task\'s view', async () => {
+test("a blocked session carries what its harness says it waits for, in the harness's own words, onto the task's view", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const { engine, id } = await blocked();

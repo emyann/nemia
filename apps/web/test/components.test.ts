@@ -35,7 +35,12 @@ registerHooks({
     const fileName = fileURLToPath(url);
     const { outputText } = ts.transpileModule(fs.readFileSync(fileName, 'utf8'), {
       fileName,
-      compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, verbatimModuleSyntax: true },
+      compilerOptions: {
+        jsx: ts.JsxEmit.ReactJSX,
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        verbatimModuleSyntax: true,
+      },
     });
     return { format: 'module', source: outputText, shortCircuit: true };
   },
@@ -68,10 +73,18 @@ const exhaustedNote = 'round 3 of 3, and it asked again — once more: wf round 
 
 /** The one element's `title`, unescaped as a browser reads it. */
 const titleOf = (html: string): string | undefined =>
-  /title="([^"]*)"/.exec(html)?.[1]?.replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
+  /title="([^"]*)"/
+    .exec(html)?.[1]
+    ?.replaceAll('&quot;', '"')
+    .replaceAll('&#x27;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
 
 test("a chip carries the step's note after what its state means, on hover — and only a note it was given", () => {
-  const withNote = renderToStaticMarkup(createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, note: exhaustedNote }));
+  const withNote = renderToStaticMarkup(
+    createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, note: exhaustedNote }),
+  );
   assert.match(withNote, /data-state="exhausted"/);
   assert.equal(titleOf(withNote), `${stateMeaning.exhausted}\n${exhaustedNote}`);
 
@@ -92,21 +105,70 @@ const at = '2026-09-13T00:00:00.000Z';
 /** A run of one looping step out of rounds, as GET /api/runs/:id gives it, with `note` on its step. */
 function runWith(note: string | null): RunDetail {
   return {
-    id: 'r-1', brief: 'Go round again', repo: '/code/app', workflowDir: '/code/app/workflow', baseRef: 'abc123', branch: 'main',
-    isolate: true, createdAt: at, cancelledAt: null, status: 'failed', moving: false, waitingOnYou: ['review'], onYou: ['review'], gates: [], warning: null,
+    id: 'r-1',
+    brief: 'Go round again',
+    repo: '/code/app',
+    workflowDir: '/code/app/workflow',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    createdAt: at,
+    cancelledAt: null,
+    status: 'failed',
+    moving: false,
+    waitingOnYou: ['review'],
+    onYou: ['review'],
+    gates: [],
+    warning: null,
     graph: { roots: ['review'], edges: [] },
-    steps: [{
-      name: 'review', spec: null, filed: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
-      status: 'rounds exhausted', note, closeout: null, check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
-      used: { usage: null, used: 'not measured', cost: 'not measured' },
-      tries: [{
-        try: 1, round: 1, then: null, current: true, taskId: 't-1', note, status: 'rounds exhausted', check: null, closeout: null,
+    steps: [
+      {
+        name: 'review',
+        spec: null,
+        filed: null,
+        body: 'Review it.',
+        told: null,
+        taskId: 't-1',
+        workspace: null,
+        branch: 'wf/r-1/implement',
+        status: 'rounds exhausted',
+        note,
+        closeout: null,
+        check: null,
         attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
-      }],
-      timeline: [],
-    }],
-    timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
+        used: { usage: null, used: 'not measured', cost: 'not measured' },
+        tries: [
+          {
+            try: 1,
+            round: 1,
+            then: null,
+            current: true,
+            taskId: 't-1',
+            note,
+            status: 'rounds exhausted',
+            check: null,
+            closeout: null,
+            attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+          },
+        ],
+        timeline: [],
+      },
+    ],
+    timeline: {
+      rounds: [],
+      run: {
+        loop: null,
+        round: null,
+        tasks: 0,
+        inFlight: 0,
+        queuedMs: 0,
+        ranMs: 0,
+        wallMs: null,
+        queued: '—',
+        ran: '—',
+        wall: 'not known',
+      },
+    },
   };
 }
 
@@ -120,11 +182,17 @@ test("the inspector's Details show a step's note under its chip", () => {
   assert.ok(html.slice(note).startsWith(`<p data-note="true"`) && html.includes(`>${exhaustedNote}</p>`), html);
 
   const bare = runWith(null);
-  assert.doesNotMatch(renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0]!, onClose: () => {} })), /data-note/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0]!, onClose: () => {} })),
+    /data-note/,
+  );
 });
 
 /** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
-function runOf(status: string, { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+function runOf(
+  status: string,
+  { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
+): RunDetail {
   const run = runWith(note);
   return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0]!, status }] };
 }
@@ -136,8 +204,18 @@ function runOf(status: string, { note = null, waitingOnYou, cancelledAt = null }
  */
 function nodeMarkup(run: RunDetail): string {
   const props = {
-    id: 'review', type: 'step' as const, data: stepData(run, 0), selected: false, dragging: false, zIndex: 0,
-    isConnectable: false, positionAbsoluteX: 0, positionAbsoluteY: 0, selectable: false, deletable: false, draggable: false,
+    id: 'review',
+    type: 'step' as const,
+    data: stepData(run, 0),
+    selected: false,
+    dragging: false,
+    zIndex: 0,
+    isConnectable: false,
+    positionAbsoluteX: 0,
+    positionAbsoluteY: 0,
+    selectable: false,
+    deletable: false,
+    draggable: false,
   };
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
@@ -159,7 +237,8 @@ test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked 
     }
   }
   // Waiting on you too, but work to try again rather than a decision: not a gate.
-  for (const status of ['unsigned', 'failed ✗ check (exit 1)']) assert.equal(gateDrawn(nodeMarkup(runOf(status, { waitingOnYou: ['review'] }))), false, status);
+  for (const status of ['unsigned', 'failed ✗ check (exit 1)'])
+    assert.equal(gateDrawn(nodeMarkup(runOf(status, { waitingOnYou: ['review'] }))), false, status);
 });
 
 test('a step a person has sent round or asked to retry is no gate from the moment they ask: the canvas draws what the api says', () => {
@@ -185,12 +264,20 @@ function loopRun(notes: { implement: string | null; review: string | null }): Ru
   const base = runWith(null);
   const step = { ...base.steps[0]!, status: 'unverified · done', spec: null };
   return {
-    ...base, status: 'running', waitingOnYou: [],
+    ...base,
+    status: 'running',
+    waitingOnYou: [],
     graph: {
       roots: ['implement'],
-      edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 3 }],
+      edges: [
+        { from: 'implement', to: 'review', kind: 'after' },
+        { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+      ],
     },
-    steps: [{ ...step, name: 'implement', note: notes.implement }, { ...step, name: 'review', note: notes.review }],
+    steps: [
+      { ...step, name: 'implement', note: notes.implement },
+      { ...step, name: 'review', note: notes.review },
+    ],
   };
 }
 
@@ -198,12 +285,39 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
   const run = loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' });
 
   const edges = stepEdges(run, 'r-1/');
-  const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({ id, source, target, type, sourceHandle, targetHandle, label, data });
+  const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({
+    id,
+    source,
+    target,
+    type,
+    sourceHandle,
+    targetHandle,
+    label,
+    data,
+  });
   assert.deepEqual(edges.map(shape), [
     // An `after` edge takes each node's handle on its side: no handle named.
-    { id: 'r-1/implement->review', source: 'r-1/implement', target: 'r-1/review', type: 'state', sourceHandle: undefined, targetHandle: undefined, label: undefined, data: { state: 'done', loop: false } },
+    {
+      id: 'r-1/implement->review',
+      source: 'r-1/implement',
+      target: 'r-1/review',
+      type: 'state',
+      sourceHandle: undefined,
+      targetHandle: undefined,
+      label: undefined,
+      data: { state: 'done', loop: false },
+    },
     // Out of rounds, nothing is due: the edge back rests.
-    { id: 'r-1/loop:review->implement', source: 'r-1/review', target: 'r-1/implement', type: 'state', sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET, label: 'round 3 of 3', data: { state: 'to-come', loop: true } },
+    {
+      id: 'r-1/loop:review->implement',
+      source: 'r-1/review',
+      target: 'r-1/implement',
+      type: 'state',
+      sourceHandle: LOOP_SOURCE,
+      targetHandle: LOOP_TARGET,
+      label: 'round 3 of 3',
+      data: { state: 'to-come', loop: true },
+    },
   ]);
 
   const due = stepEdges(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
@@ -222,7 +336,12 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
  */
 function withMotion<T>(reduce: boolean | undefined, render: () => T): T {
   const before = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
-  const matchMedia = (media: string) => ({ media, matches: reduce === true && media === '(prefers-reduced-motion: reduce)', addEventListener() {}, removeEventListener() {} });
+  const matchMedia = (media: string) => ({
+    media,
+    matches: reduce === true && media === '(prefers-reduced-motion: reduce)',
+    addEventListener() {},
+    removeEventListener() {},
+  });
   if (reduce === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');
   else Object.defineProperty(globalThis, 'matchMedia', { value: matchMedia, configurable: true, writable: true });
   try {
@@ -239,7 +358,9 @@ const UNDER = { sourceX: 524, sourceY: 110, targetX: 112, targetY: 110, sourcePo
 
 /** An edge `stepEdges` made, as React Flow hands it to `StateEdge` — its arrow a url by then — drawn inside an svg. */
 function edgeMarkup(edge: StateFlowEdge): string {
-  const props = { ...edge, ...(edge.data?.loop ? UNDER : SIDES), markerEnd: "url('#arrow')", deletable: false } as unknown as Parameters<typeof StateEdge>[0];
+  const props = { ...edge, ...(edge.data?.loop ? UNDER : SIDES), markerEnd: "url('#arrow')", deletable: false } as unknown as Parameters<
+    typeof StateEdge
+  >[0];
   return renderToStaticMarkup(createElement('svg', null, createElement(StateEdge, props)));
 }
 
@@ -250,7 +371,9 @@ const pathOf = (html: string): string | undefined => /<path [^>]*\bd="([^"]+)"[^
 const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend)));
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
-  const [, back] = stepEdges(loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' }));
+  const [, back] = stepEdges(
+    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' }),
+  );
   const html = withMotion(false, () => edgeMarkup(back!));
   const d = pathOf(html);
   assert.ok(d?.startsWith('M 524,110 C 524,'), html);
@@ -263,8 +386,19 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
 
   // On each node, the handles under it come after the ones on its sides, which an edge naming no handle takes.
   const node = nodeMarkup(runOf('unverified · done', { waitingOnYou: [] }));
-  const handles = [...node.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map((m) => [m[3], m[2], m[1] ?? null]);
-  assert.deepEqual(handles, [['target', 'left', null], ['source', 'right', null], ['source', 'bottom', LOOP_SOURCE], ['target', 'bottom', LOOP_TARGET]], node);
+  const handles = [...node.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map(
+    (m) => [m[3], m[2], m[1] ?? null],
+  );
+  assert.deepEqual(
+    handles,
+    [
+      ['target', 'left', null],
+      ['source', 'right', null],
+      ['source', 'bottom', LOOP_SOURCE],
+      ['target', 'bottom', LOOP_TARGET],
+    ],
+    node,
+  );
 });
 
 /** A run of steps, each its name, the word `wf ls` gives it, and the step it comes after, if any: the roots are the rest. */
@@ -272,7 +406,9 @@ function runOfSteps(steps: Array<[name: string, status: string, after?: string]>
   const base = runWith(null);
   const edges = steps.flatMap(([name, , from]): GraphEdge[] => (from ? [{ from, to: name, kind: 'after' }] : []));
   return {
-    ...base, status: 'running', waitingOnYou: [],
+    ...base,
+    status: 'running',
+    waitingOnYou: [],
     graph: { roots: steps.filter(([, , from]) => !from).map(([name]) => name), edges },
     steps: steps.map(([name, status]) => ({ ...base.steps[0]!, name, status, note: null })),
   };
@@ -294,7 +430,11 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
   const drawn = stepEdges(run);
   const html = new Map(drawn.map((edge) => [edge.id, withMotion(false, () => edgeMarkup(edge))]));
   const moving = ['implement->review', 'tokens->theme'];
-  assert.deepEqual([...html].filter(([, markup]) => travelling(markup).length > 0).map(([id]) => id), moving, 'into a step at work or at its check');
+  assert.deepEqual(
+    [...html].filter(([, markup]) => travelling(markup).length > 0).map(([id]) => id),
+    moving,
+    'into a step at work or at its check',
+  );
 
   for (const id of moving) {
     const markup = html.get(id)!;
@@ -312,7 +452,11 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     assert.match(html.get(id)!, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/, id);
   }
   for (const edge of drawn) {
-    assert.equal((edge.markerEnd as EdgeMarker).color, edgeStroke(edge.data!.state, edge.data!.loop), `an arrow on ${edge.id}, in its colour`);
+    assert.equal(
+      (edge.markerEnd as EdgeMarker).color,
+      edgeStroke(edge.data!.state, edge.data!.loop),
+      `an arrow on ${edge.id}, in its colour`,
+    );
     // The travelling dot is the one animation: never React Flow's dash march as well.
     assert.equal(edge.animated, undefined, edge.id);
   }
@@ -324,36 +468,105 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  */
 function summaryRun(): RunSummary {
   const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null };
-  const step = (name: string, status: string, extra = {}) => ({ name, taskId: `t-${name}`, branch: null, status, note: null, ...none, ...extra });
+  const step = (name: string, status: string, extra = {}) => ({
+    name,
+    taskId: `t-${name}`,
+    branch: null,
+    status,
+    note: null,
+    ...none,
+    ...extra,
+  });
   const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
   return {
-    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Tile it', workflowDir: '/code/app/workflow', createdAt: at, startedAt: at,
-    cancelledAt: null, after: [], waiting: null, status: 'running', moving: true, cost: null,
+    id: 'r-1',
+    repo: '/code/app',
+    place: 'git',
+    work: null,
+    brief: 'Tile it',
+    workflowDir: '/code/app/workflow',
+    createdAt: at,
+    startedAt: at,
+    cancelledAt: null,
+    after: [],
+    waiting: null,
+    status: 'running',
+    moving: true,
+    cost: null,
     steps: [
-      step('implement', 'verified ✓'), step('review', 'running (working)'), step('respond', 'waiting', { taskId: null }),
-      step('tokens', 'unverified · done'), step('theme', 'awaiting approval', { approve: 'approve theme' }),
+      step('implement', 'verified ✓'),
+      step('review', 'running (working)'),
+      step('respond', 'waiting', { taskId: null }),
+      step('tokens', 'unverified · done'),
+      step('theme', 'awaiting approval', { approve: 'approve theme' }),
     ],
-    graph: { roots: ['implement', 'tokens'], edges: [after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme')] },
-    waitingOnYou: ['theme'], onYou: ['approve theme'],
+    graph: {
+      roots: ['implement', 'tokens'],
+      edges: [after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme')],
+    },
+    waitingOnYou: ['theme'],
+    onYou: ['approve theme'],
     toDecide: { kind: 'approve', step: 'theme', back: [] },
   } as unknown as RunSummary;
 }
 const railMarkup = (run: RunSummary, reduce = false): string =>
-  withMotion(reduce, () => renderToStaticMarkup(createElement(StepRail, { run, flow: railOf(run.steps.map((s) => s.name), run.graph, flowSteps(run), false) })));
+  withMotion(reduce, () =>
+    renderToStaticMarkup(
+      createElement(StepRail, {
+        run,
+        flow: railOf(
+          run.steps.map((s) => s.name),
+          run.graph,
+          flowSteps(run),
+          false,
+        ),
+      }),
+    ),
+  );
 const tilesMarkup = (run: RunSummary, selected: string | null = null, reduce = false): string =>
-  withMotion(reduce, () => renderToStaticMarkup(createElement(StepTiles, {
-    run, detail: null, selected, onStep: () => {}, flow: tilesOf(run.steps.map((s) => s.name), run.graph, flowSteps(run), false),
-  })));
+  withMotion(reduce, () =>
+    renderToStaticMarkup(
+      createElement(StepTiles, {
+        run,
+        detail: null,
+        selected,
+        onStep: () => {},
+        flow: tilesOf(
+          run.steps.map((s) => s.name),
+          run.graph,
+          flowSteps(run),
+          false,
+        ),
+      }),
+    ),
+  );
 
 test("a card at rest draws its run's steps as a rail: a pill each in its state, the ones at work or waiting on you ringed, and an arrow between each, the one into work moving", () => {
   const html = railMarkup(summaryRun());
-  const pills = [...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"( data-live="true")?/g)].map((m) => [m[1], m[2], Boolean(m[3])]);
-  assert.deepEqual(pills, [
-    ['implement', 'verified', false], ['tokens', 'unverified', false], ['review', 'working', true], ['theme', 'awaiting-approval', true], ['respond', 'waiting', false],
-  ], html);
-  const arrows = Object.fromEntries([...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1]!.replaceAll('&gt;', '>'), m[2]]));
+  const pills = [...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"( data-live="true")?/g)].map((m) => [
+    m[1],
+    m[2],
+    Boolean(m[3]),
+  ]);
+  assert.deepEqual(
+    pills,
+    [
+      ['implement', 'verified', false],
+      ['tokens', 'unverified', false],
+      ['review', 'working', true],
+      ['theme', 'awaiting-approval', true],
+      ['respond', 'waiting', false],
+    ],
+    html,
+  );
+  const arrows = Object.fromEntries(
+    [...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1]!.replaceAll('&gt;', '>'), m[2]]),
+  );
   assert.deepEqual(arrows, {
-    'step:implement->step:review': 'running', 'step:review->step:respond': 'to-come', 'step:implement->step:respond': 'to-come', 'step:tokens->step:theme': 'to-come',
+    'step:implement->step:review': 'running',
+    'step:review->step:respond': 'to-come',
+    'step:implement->step:respond': 'to-come',
+    'step:tokens->step:theme': 'to-come',
   });
   // One dot, on the arrow into the step at work; none where the person asked for reduced motion, where the colour says it alone.
   assert.equal(travelling(html).length, 1, html);
@@ -367,12 +580,21 @@ test("an opened card's tiles each name the step, its chip and what it waits on a
   const html = tilesMarkup(summaryRun(), 'review');
   assert.match(html, /<section aria-label="The run&#x27;s steps"/);
   const tiles = [...html.matchAll(/data-tile="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(tiles, [['implement', 'verified'], ['tokens', 'unverified'], ['review', 'working'], ['theme', 'awaiting-approval'], ['respond', 'waiting']]);
+  assert.deepEqual(tiles, [
+    ['implement', 'verified'],
+    ['tokens', 'unverified'],
+    ['review', 'working'],
+    ['theme', 'awaiting-approval'],
+    ['respond', 'waiting'],
+  ]);
   assert.match(html, /aria-label="Inspect step theme"/);
   // The gate that ends the run says what approving it does, in the node's words.
   assert.match(html, /<span data-need="approve" title="[^"]*" class="[^"]*">approve theme to run it<\/span>/, html);
   // The step being inspected is pressed, and only it.
-  assert.deepEqual([...html.matchAll(/aria-pressed="true"[^>]*data-tile="([^"]+)"|data-tile="([^"]+)"[^>]*aria-pressed="true"/g)].map((m) => m[1] ?? m[2]), ['review']);
+  assert.deepEqual(
+    [...html.matchAll(/aria-pressed="true"[^>]*data-tile="([^"]+)"|data-tile="([^"]+)"[^>]*aria-pressed="true"/g)].map((m) => m[1] ?? m[2]),
+    ['review'],
+  );
   // Before the run's detail is read, a tile's attempt line waits for it.
   assert.equal([...html.matchAll(/<span class="truncate">…<\/span>/g)].length, 5);
   assert.equal(travelling(html).length, 1);
@@ -380,7 +602,9 @@ test("an opened card's tiles each name the step, its chip and what it waits on a
 });
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {
-  const [, due] = stepEdges(loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
+  const [, due] = stepEdges(
+    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
+  );
   const html = withMotion(false, () => edgeMarkup(due!));
   const d = pathOf(html);
   assert.ok(d?.startsWith('M 524,110 C 524,'), `still from under the looping step: ${d}`);
@@ -392,8 +616,15 @@ test("a loop's edge back moves as a running edge does while its round is due, al
 });
 
 test('where the person asked for reduced motion nothing travels — on a running edge, a loop whose round is due, or the legend — and colour and arrow still say it', () => {
-  const [running] = stepEdges(runOfSteps([['implement', 'verified ✓'], ['review', 'running (working)', 'implement']]));
-  const [, due] = stepEdges(loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
+  const [running] = stepEdges(
+    runOfSteps([
+      ['implement', 'verified ✓'],
+      ['review', 'running (working)', 'implement'],
+    ]),
+  );
+  const [, due] = stepEdges(
+    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
+  );
   assert.equal((running!.markerEnd as EdgeMarker).color, 'var(--edge-running)');
 
   // Asked for; and a server, with no browser to ask, which sets nothing moving either.
@@ -417,24 +648,48 @@ test('where the person asked for reduced motion nothing travels — on a running
 test('the legend draws an edge in each state as the canvas draws it: dashed and still, moving, solid, and looping back', () => {
   const html = withMotion(false, legendMarkup);
   const items = new Map(
-    html.split('<span class="flex items-center gap-1">').slice(1).map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
+    html
+      .split('<span class="flex items-center gap-1">')
+      .slice(1)
+      .map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
   );
   assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
   assert.match(items.get('to come')!, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
   assert.match(items.get('running')!, /stroke:var\(--edge-running\);stroke-width:2"/);
   assert.match(items.get('done')!, /stroke:var\(--edge-done\);stroke-width:1.5"/);
   assert.match(items.get('loops back')!, /stroke:var\(--edge-loop\);stroke-width:1.5;stroke-dasharray:5 4/);
-  for (const [label, item] of items) assert.equal(travelling(item).length, label === 'running' ? 1 : 0, `${label} moves only if it is the running sample`);
+  for (const [label, item] of items)
+    assert.equal(travelling(item).length, label === 'running' ? 1 : 0, `${label} moves only if it is the running sample`);
 });
 
 test("the inspector's Details show `loop` and `rounds` beside `after` on a looping step, and not on another", () => {
   const run = runWith(null);
-  const spec = { harness: 'codex', model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: 'implement', rounds: 3 };
+  const spec = {
+    harness: 'codex',
+    model: null,
+    effort: null,
+    after: ['implement'],
+    resume: null,
+    permissionMode: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: 'implement',
+    rounds: 3,
+  };
   const looping = { ...run.steps[0]!, spec };
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
   const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
-  assert.deepEqual(labels.slice(at('after'), at('after') + 4), [['after', 'implement'], ['loop', 'implement'], ['rounds', '3'], ['resume', '—']], html);
+  assert.deepEqual(
+    labels.slice(at('after'), at('after') + 4),
+    [
+      ['after', 'implement'],
+      ['loop', 'implement'],
+      ['rounds', '3'],
+      ['resume', '—'],
+    ],
+    html,
+  );
 
   const plain = { ...looping, spec: { ...spec, loop: null, rounds: null } };
   const without = renderToStaticMarkup(createElement(StepInspector, { run, step: plain, onClose: () => {} }));
@@ -446,13 +701,15 @@ const { ToolCallView, ToolRun, TurnView } = await import('../src/components/conv
 const { foldTranscript, tailStart } = await import('../src/lib/transcript.ts');
 type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
 
-test("a thought is drawn folded: a line that says it thought, and its text only once it is opened", () => {
+test('a thought is drawn folded: a line that says it thought, and its text only once it is opened', () => {
   const thoughts: TranscriptEvent[] = [
     { id: 'a-1:0', at, role: 'assistant', kind: 'thinking', text: 'The word goes in a file.' },
     { id: 'a-2:0', at, role: 'assistant', kind: 'thinking' },
     { id: 'a-3:0', at, role: 'assistant', kind: 'text', text: 'Writing it.' },
   ];
-  const [withText, without] = foldTranscript(thoughts).map((turn) => renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })));
+  const [withText, without] = foldTranscript(thoughts).map((turn) =>
+    renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })),
+  );
   assert.match(withText!, /data-turn="thinking"/);
   assert.match(withText!, /aria-expanded="false"/);
   assert.doesNotMatch(withText!, /data-expanded/, 'folded: its fold is not marked expanded');
@@ -488,7 +745,16 @@ test('a tool call is drawn with its result: folded, how its result says it went;
 
 test('a StructuredOutput call is drawn as the closeout, named, with its outcome — not as a tool call', () => {
   const [turn] = foldTranscript([
-    { id: 'toolu_closeout', at, role: 'assistant', kind: 'tool_use', tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable', needs: 'A writable WORD.txt', artifacts: [] } } },
+    {
+      id: 'toolu_closeout',
+      at,
+      role: 'assistant',
+      kind: 'tool_use',
+      tool: {
+        name: 'StructuredOutput',
+        input: { outcome: 'blocked', summary: 'WORD.txt is not writable', needs: 'A writable WORD.txt', artifacts: [] },
+      },
+    },
   ]);
   const html = renderToStaticMarkup(createElement(TurnView, { turn: turn!, live: false, last: true, tail: true }));
   assert.match(html, /aria-label="Closeout"/);
@@ -509,7 +775,9 @@ test('in a live fold with nothing said after it, every call still waiting is run
   assert.ok(fold.kind === 'tools');
   assert.equal(tailStart(turns), 1, 'the fold is in the tail');
   const states = (live: boolean, tail: boolean) =>
-    [...renderToStaticMarkup(createElement(ToolRun, { turn: fold, live, tail, defaultOpen: true })).matchAll(/data-tool-state="([^"]+)"/g)].map((m) => m[1]);
+    [
+      ...renderToStaticMarkup(createElement(ToolRun, { turn: fold, live, tail, defaultOpen: true })).matchAll(/data-tool-state="([^"]+)"/g),
+    ].map((m) => m[1]);
   assert.deepEqual(states(true, true), ['running', 'running']);
   // And refused: once the session is not live, or has said something since, a call with no result had none.
   assert.deepEqual(states(false, true), ['no-result', 'no-result']);
@@ -542,15 +810,31 @@ const { Markdown } = await import('../src/components/Markdown.tsx');
 /** A text, as the board renders it. */
 const md = (text: string): string => renderToStaticMarkup(createElement(Markdown, null, text));
 
-test("markdown is drawn as GFM: headings two levels down, lists, a table, a task list, strikethrough, an autolink and a footnote", () => {
+test('markdown is drawn as GFM: headings two levels down, lists, a table, a task list, strikethrough, an autolink and a footnote', () => {
   const html = md(
     [
-      '# Title', '## What it needs', '###### Deepest', '',
-      '- one', '- two', '', '1. first', '2. second', '',
-      '| file | lines |', '|:--|--:|', '| a.ts | 12 |', '',
-      '- [x] done', '- [ ] to do', '',
-      '~~gone~~ and www.example.com', '',
-      'A claim[^1].', '', '[^1]: Its source.',
+      '# Title',
+      '## What it needs',
+      '###### Deepest',
+      '',
+      '- one',
+      '- two',
+      '',
+      '1. first',
+      '2. second',
+      '',
+      '| file | lines |',
+      '|:--|--:|',
+      '| a.ts | 12 |',
+      '',
+      '- [x] done',
+      '- [ ] to do',
+      '',
+      '~~gone~~ and www.example.com',
+      '',
+      'A claim[^1].',
+      '',
+      '[^1]: Its source.',
     ].join('\n'),
   );
   assert.match(html, /^<div data-markdown="true"/);
@@ -560,7 +844,11 @@ test("markdown is drawn as GFM: headings two levels down, lists, a table, a task
   assert.doesNotMatch(html, /<h[12][\s>]/);
   assert.match(html, /<ul[^>]*>\s*<li[^>]*>one<\/li>\s*<li[^>]*>two<\/li>\s*<\/ul>/);
   assert.match(html, /<ol[^>]*>\s*<li[^>]*>first<\/li>/);
-  assert.match(html, /<div class="[^"]*overflow-x-auto[^"]*"><table[^>]*><thead><tr><th[^>]*style="text-align:left"[^>]*>file<\/th><th[^>]*style="text-align:right"[^>]*>lines<\/th>/, 'a table, in a box that scrolls sideways');
+  assert.match(
+    html,
+    /<div class="[^"]*overflow-x-auto[^"]*"><table[^>]*><thead><tr><th[^>]*style="text-align:left"[^>]*>file<\/th><th[^>]*style="text-align:right"[^>]*>lines<\/th>/,
+    'a table, in a box that scrolls sideways',
+  );
   assert.match(html, /<td[^>]*>a\.ts<\/td><td[^>]*>12<\/td>/);
   assert.match(html, /<input type="checkbox" disabled=""[^>]*checked=""\/> done/, 'a task done, its box not to be ticked from the board');
   assert.match(html, /<input type="checkbox" disabled=""[^>]*\/> to do/);
@@ -579,7 +867,9 @@ test('a link opens in a new tab and gives the page it opens nothing of this one;
 });
 
 test('REFUSED: raw HTML in a text is shown as the text it is — no element is made of it, inline or as a block', () => {
-  const html = md('Before <b>bold</b> <img src=x onerror="alert(1)"> after.\n\n<script>alert(1)</script>\n\n<div onclick="alert(1)">a block</div>\n\n<a href="https://example.com">a tag</a>');
+  const html = md(
+    'Before <b>bold</b> <img src=x onerror="alert(1)"> after.\n\n<script>alert(1)</script>\n\n<div onclick="alert(1)">a block</div>\n\n<a href="https://example.com">a tag</a>',
+  );
   assert.match(html, /&lt;b&gt;bold&lt;\/b&gt;/);
   assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
@@ -598,7 +888,10 @@ test('REFUSED: a link whose address could run script is its words and no link; a
   }
   const image = md('![the diagram](https://example.com/d.png) and ![](javascript:alert(1))');
   assert.doesNotMatch(image, /<img/);
-  assert.match(image, /<a href="https:\/\/example\.com\/d\.png" target="_blank" rel="noreferrer noopener" data-image="true"[^>]*>image: the diagram<\/a>/);
+  assert.match(
+    image,
+    /<a href="https:\/\/example\.com\/d\.png" target="_blank" rel="noreferrer noopener" data-image="true"[^>]*>image: the diagram<\/a>/,
+  );
   assert.match(image, /<span data-image="true">image<\/span>/, 'an image whose address was emptied is a word');
 });
 
@@ -610,15 +903,21 @@ test("a fenced block is the board's code block in its fence's language; one it h
   assert.match(html, /Run <code class="[^"]*font-mono[^"]*">npm test<\/code>:/);
 });
 
-test("two texts with footnotes on one page name theirs apart — no id twice, each reference to its own note", () => {
+test('two texts with footnotes on one page name theirs apart — no id twice, each reference to its own note', () => {
   const html = renderToStaticMarkup(
-    createElement('div', null, createElement(Markdown, null, 'One[^1].\n\n[^1]: First.'), createElement(Markdown, null, 'Two[^1].\n\n[^1]: Second.')),
+    createElement(
+      'div',
+      null,
+      createElement(Markdown, null, 'One[^1].\n\n[^1]: First.'),
+      createElement(Markdown, null, 'Two[^1].\n\n[^1]: Second.'),
+    ),
   );
   const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]!);
   assert.equal(ids.length, 6, 'a reference, a label and a note, in each');
   assert.equal(new Set(ids).size, ids.length, `no id twice: ${ids.join(', ')}`);
   for (const [, href] of html.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(href!), `#${href} names an element on the page`);
-  for (const [, label] of html.matchAll(/aria-describedby="([^"]+)"/g)) assert.ok(ids.includes(label!), `${label} names an element on the page`);
+  for (const [, label] of html.matchAll(/aria-describedby="([^"]+)"/g))
+    assert.ok(ids.includes(label!), `${label} names an element on the page`);
 });
 
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
@@ -627,35 +926,78 @@ type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
 async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; refused: boolean; selected: boolean }): Promise<string> {
   const { SpecNode } = await import('../src/components/StepNode.tsx');
   const props = {
-    id: 'review', type: 'spec' as const, data: { name: 'review', index: 1, spec, ...(build ? { build } : {}) }, selected: false, dragging: false, zIndex: 0,
-    isConnectable: false, positionAbsoluteX: 0, positionAbsoluteY: 0, selectable: false, deletable: false, draggable: false,
+    id: 'review',
+    type: 'spec' as const,
+    data: { name: 'review', index: 1, spec, ...(build ? { build } : {}) },
+    selected: false,
+    dragging: false,
+    zIndex: 0,
+    isConnectable: false,
+    positionAbsoluteX: 0,
+    positionAbsoluteY: 0,
+    selectable: false,
+    deletable: false,
+    draggable: false,
   };
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(SpecNode, props)));
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], remote: null,
-  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
+  harness: null,
+  model: null,
+  effort: null,
+  context: null,
+  after: [],
+  resume: null,
+  input: [],
+  agent: null,
+  permissionMode: null,
+  sandbox: null,
+  tools: null,
+  disallowedTools: [],
+  allowedTools: [],
+  remote: null,
+  deadlineSeconds: null,
+  budget: null,
+  check: null,
+  retries: null,
+  gate: null,
+  output: null,
+  loop: null,
+  rounds: null,
 };
 
-const unescaped = (text: string) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+const unescaped = (text: string) =>
+  text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
 test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no attempt", async () => {
   const html = await specMarkup({
-    ...unset, harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash'], permissionMode: 'dontAsk',
-    check: 'npm test && npm run typecheck', output: 'review.schema.json', loop: 'implement', rounds: 3,
+    ...unset,
+    harness: 'claude',
+    model: 'opus',
+    after: ['implement'],
+    tools: ['Read', 'Grep', 'Glob', 'Bash'],
+    permissionMode: 'dontAsk',
+    check: 'npm test && npm run typecheck',
+    output: 'review.schema.json',
+    loop: 'implement',
+    rounds: 3,
   });
   assert.match(html, />step 02</);
   assert.match(html, /title="review">review</);
   assert.match(html, />claude · opus</);
   const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
-  assert.deepEqual(lines, [
-    ['check', 'npm test && npm run typecheck'],
-    ['effort', "harness's own"],
-    ['tools', '4'],
-    ['mode', 'dontAsk'],
-    ['loop', 'implement · 3 rounds'],
-  ], html);
+  assert.deepEqual(
+    lines,
+    [
+      ['check', 'npm test && npm run typecheck'],
+      ['effort', "harness's own"],
+      ['tools', '4'],
+      ['mode', 'dontAsk'],
+      ['loop', 'implement · 3 rounds'],
+    ],
+    html,
+  );
   assert.match(html, /<dt[^>]*>tools<\/dt><dd[^>]*title="Read, Grep, Glob, Bash"/, html);
 
   // Nothing has happened to it: no chip, no attempt, no gate, no spinner — none of what a run's step shows below its head.
@@ -665,15 +1007,33 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, e
   assert.doesNotMatch(html, /running now/, html);
 
   // Its handles are a run's step's, in the same order, so an edge meets it where it meets a run's step.
-  const handles = [...html.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map((m) => [m[3], m[2], m[1] ?? null]);
-  assert.deepEqual(handles, [['target', 'left', null], ['source', 'right', null], ['source', 'bottom', LOOP_SOURCE], ['target', 'bottom', LOOP_TARGET]], html);
+  const handles = [...html.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map(
+    (m) => [m[3], m[2], m[1] ?? null],
+  );
+  assert.deepEqual(
+    handles,
+    [
+      ['target', 'left', null],
+      ['source', 'right', null],
+      ['source', 'bottom', LOOP_SOURCE],
+      ['target', 'bottom', LOOP_TARGET],
+    ],
+    html,
+  );
 });
 
 test("a step that sets nothing is drawn on the defaults: its harness's own effort and tools under its head, and nothing else", async () => {
   const html = await specMarkup(unset);
   assert.match(html, />default harness · default model</);
   const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
-  assert.deepEqual(lines, [['effort', "harness's own"], ['tools', "harness's own"]], html);
+  assert.deepEqual(
+    lines,
+    [
+      ['effort', "harness's own"],
+      ['tools', "harness's own"],
+    ],
+    html,
+  );
   assert.doesNotMatch(html, /data-state=/, html);
 
   const { specLines } = await import('../src/components/StepNode.tsx');
@@ -687,12 +1047,16 @@ test("a step on the builder has handles a person draws with — out on the right
     const type = classes.includes('source') ? 'source' : 'target';
     return [type, m[2], m[1] ?? null, classes.includes('connectable'), classes.includes('connectablestart')];
   });
-  assert.deepEqual(handles, [
-    ['target', 'left', null, true, false],
-    ['source', 'right', null, true, true],
-    ['source', 'bottom', LOOP_SOURCE, true, true],
-    ['target', 'bottom', LOOP_TARGET, true, false],
-  ], html);
+  assert.deepEqual(
+    handles,
+    [
+      ['target', 'left', null, true, false],
+      ['source', 'right', null, true, true],
+      ['source', 'bottom', LOOP_SOURCE, true, true],
+      ['target', 'bottom', LOOP_TARGET, true, false],
+    ],
+    html,
+  );
   // Underneath, a loop's two dots are apart, so the one a person drags from is not under the one a loop comes into.
   assert.match(html, new RegExp(`data-handleid="${LOOP_SOURCE}"[^>]*style="left:70%"`), html);
   assert.match(html, new RegExp(`data-handleid="${LOOP_TARGET}"[^>]*style="left:30%"`), html);
@@ -718,31 +1082,62 @@ test('a step with more than three tools counts them on its node, named in the ti
   assert.deepEqual(toolsOf(null), [['tools', "harness's own"]]);
   assert.deepEqual(toolsOf([]), [['tools', 'none']]);
   // The effort a step sets, and the harness's own where it sets none.
-  assert.deepEqual(specLines({ ...unset, effort: 'high' }).find(([label]) => label === 'effort'), ['effort', 'high']);
+  assert.deepEqual(
+    specLines({ ...unset, effort: 'high' }).find(([label]) => label === 'effort'),
+    ['effort', 'high'],
+  );
   // A codex step's fence under Codex's name, `sandbox`, never Claude Code's `mode`.
   const fenced = specLines({ ...unset, harness: 'codex', sandbox: 'read-only' });
-  assert.deepEqual(fenced.find(([label]) => label === 'sandbox'), ['sandbox', 'read-only']);
-  assert.equal(fenced.find(([label]) => label === 'mode'), undefined);
-  assert.deepEqual(specLines(unset).find(([label]) => label === 'effort'), ['effort', "harness's own"]);
+  assert.deepEqual(
+    fenced.find(([label]) => label === 'sandbox'),
+    ['sandbox', 'read-only'],
+  );
+  assert.equal(
+    fenced.find(([label]) => label === 'mode'),
+    undefined,
+  );
+  assert.deepEqual(
+    specLines(unset).find(([label]) => label === 'effort'),
+    ['effort', "harness's own"],
+  );
   // The context window, under the effort, as the package writes it — and no line where the step sets none, the model's whole window.
   const lines = specLines({ ...unset, effort: 'high', context: 200_000 });
-  assert.deepEqual(lines.slice(0, 2), [['effort', 'high'], ['context', '200k']]);
-  assert.deepEqual(specLines({ ...unset, context: 123_456 }).find(([label]) => label === 'context'), ['context', '123456']);
-  assert.equal(specLines(unset).some(([label]) => label === 'context'), false);
+  assert.deepEqual(lines.slice(0, 2), [
+    ['effort', 'high'],
+    ['context', '200k'],
+  ]);
+  assert.deepEqual(
+    specLines({ ...unset, context: 123_456 }).find(([label]) => label === 'context'),
+    ['context', '123456'],
+  );
+  assert.equal(
+    specLines(unset).some(([label]) => label === 'context'),
+    false,
+  );
 
   /** The tools line as drawn: what it shows, and its title. */
   const toolsLine = (html: string) => {
     const m = /<dt[^>]*>tools<\/dt><dd[^>]*title="([^"]*)"[^>]*>([^<]*)<\/dd>/.exec(html);
     return m && { shows: m[2], title: m[1] };
   };
-  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: [...four, 'Edit'] })), { shows: '5', title: 'Read, Grep, Glob, Bash, Edit' });
-  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: four.slice(0, 3) })), { shows: 'Read, Grep, Glob', title: 'Read, Grep, Glob' });
+  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: [...four, 'Edit'] })), {
+    shows: '5',
+    title: 'Read, Grep, Glob, Bash, Edit',
+  });
+  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: four.slice(0, 3) })), {
+    shows: 'Read, Grep, Glob',
+    title: 'Read, Grep, Glob',
+  });
 });
 // ─── the decision ────────────────────────────────────────────────────────────
 
 /** Each bar's added and removed widths, in the order the bars are drawn. */
 const barsOf = (html: string): Array<[number, number]> =>
-  [...html.matchAll(/<span data-added="true"[^>]*style="width:([\d.]+)%"[^>]*><\/span><span data-removed="true"[^>]*style="width:([\d.]+)%"/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  [
+    ...html.matchAll(
+      /<span data-added="true"[^>]*style="width:([\d.]+)%"[^>]*><\/span><span data-removed="true"[^>]*style="width:([\d.]+)%"/g,
+    ),
+  ].map((m) => [Number(m[1]), Number(m[2])]);
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 
@@ -766,20 +1161,34 @@ test("each group's bar is its share of the most lines a group changed: the large
 
   const html = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/r-1/implement', radius: radiusWith() } }));
   // (root) +2 −0, assets binary only, packages/x +453 −1 — which is the most, and fills the track.
-  assert.deepEqual(barsOf(html), [[0.44, 0], [0, 0], [99.78, 0.22]]);
+  assert.deepEqual(barsOf(html), [
+    [0.44, 0],
+    [0, 0],
+    [99.78, 0.22],
+  ]);
   assert.match(html, /data-group="packages\/x"[\s\S]*?>2 files<[\s\S]*?>\+453<\/span> <span[^>]*>−1<\/span>/);
   assert.match(html, /data-group="assets"[\s\S]*?>binary<\/span>/);
   assert.match(html, /data-group="\(root\)"[\s\S]*?>−0<\/span><span[^>]*> · 1 binary<\/span>/);
 });
 
 test('the agent-facing chips are amber and the check-affecting ones outlined red, each titled with why — and neither is drawn when there are none', () => {
-  const both = renderToStaticMarkup(createElement(Chips, { agentFacing: ['CLAUDE.md'], checkAffecting: ['package.json', 'packages/x/test/add.test.ts'] }));
-  const chips = [...both.matchAll(/<span data-chip="([^"]+)" title="([^"]+)" class="([^"]+)">([^<]+)<\/span>/g)].map((m) => ({ kind: m[1], title: m[2], cls: m[3], file: m[4] }));
-  assert.deepEqual(chips.map(({ kind, title, file }) => [kind, title, file]), [
-    ['agent-facing', 'the next agent reads this', 'CLAUDE.md'],
-    ['check-affecting', 'could make its check pass', 'package.json'],
-    ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
-  ]);
+  const both = renderToStaticMarkup(
+    createElement(Chips, { agentFacing: ['CLAUDE.md'], checkAffecting: ['package.json', 'packages/x/test/add.test.ts'] }),
+  );
+  const chips = [...both.matchAll(/<span data-chip="([^"]+)" title="([^"]+)" class="([^"]+)">([^<]+)<\/span>/g)].map((m) => ({
+    kind: m[1],
+    title: m[2],
+    cls: m[3],
+    file: m[4],
+  }));
+  assert.deepEqual(
+    chips.map(({ kind, title, file }) => [kind, title, file]),
+    [
+      ['agent-facing', 'the next agent reads this', 'CLAUDE.md'],
+      ['check-affecting', 'could make its check pass', 'package.json'],
+      ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
+    ],
+  );
   assert.match(chips[0]!.cls, /\bbg-amber-100\b/);
   for (const chip of chips.slice(1)) {
     assert.match(chip.cls, /\bring-red-400\b/);
@@ -794,14 +1203,18 @@ test('the agent-facing chips are amber and the check-affecting ones outlined red
   const plain = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/r-1/implement', radius: radiusWith() } }));
   assert.doesNotMatch(plain, /data-chip|agent-facing|check-affecting/);
   // A branch git could not read says so, and draws no row.
-  const unread = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/gone', radius: { error: 'git could not diff abc...wf/gone' } } }));
+  const unread = renderToStaticMarkup(
+    createElement(TouchedBranch, { touched: { branch: 'wf/gone', radius: { error: 'git could not diff abc...wf/gone' } } }),
+  );
   assert.match(unread, />not read: git could not diff abc\.\.\.wf\/gone</);
   assert.doesNotMatch(unread, /data-bar|data-group/);
 });
 
 test('the lesson chip is green with what was written, amber when nothing was, and dashed when a branch could not be read', () => {
   const chip = (lesson: { said: string; state: 'written' | 'nothing' | 'unknown' }) => {
-    const m = /<span data-lesson="(\w+)" title="[^"]*" class="([^"]+)">([^<]+)<\/span>/.exec(renderToStaticMarkup(createElement(LessonChip, { lesson })));
+    const m = /<span data-lesson="(\w+)" title="[^"]*" class="([^"]+)">([^<]+)<\/span>/.exec(
+      renderToStaticMarkup(createElement(LessonChip, { lesson })),
+    );
     assert.ok(m, lesson.state);
     return { state: m[1], cls: m[2]!, text: m[3] };
   };
@@ -822,31 +1235,57 @@ test('the lesson chip is green with what was written, amber when nothing was, an
 });
 
 test('a diff is folded under its file, coloured by line, and a capped one says how many more lines `wf decide` prints', () => {
-  const lines = ['diff --git a/package.json b/package.json', '--- a/package.json', '+++ b/package.json', '@@ -1 +1 @@', '-{"a":1}', '+{"a":2}', ' }'];
-  const capped = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 26 }, counts: { added: 1, removed: 1 } }));
+  const lines = [
+    'diff --git a/package.json b/package.json',
+    '--- a/package.json',
+    '+++ b/package.json',
+    '@@ -1 +1 @@',
+    '-{"a":1}',
+    '+{"a":2}',
+    ' }',
+  ];
+  const capped = renderToStaticMarkup(
+    createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 26 }, counts: { added: 1, removed: 1 } }),
+  );
   assert.match(capped, /^<details data-diff="package\.json"/, 'collapsed: a details element with no open attribute');
   assert.doesNotMatch(capped, /<details[^>]*\bopen\b/);
   assert.match(capped, /<summary[^>]*>.*package\.json.*\+1<\/span> <span[^>]*>−1<\/span>/);
-  assert.deepEqual([...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]), ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context']);
+  assert.deepEqual(
+    [...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]),
+    ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context'],
+  );
   assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — <code>wf decide<\/code> prints all<\/p>/);
 
   const whole = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 0 } }));
   assert.doesNotMatch(whole, /data-cut|more line/);
-  assert.match(renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 1 } })), />1 more line — <code>/);
+  assert.match(
+    renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 1 } })),
+    />1 more line — <code>/,
+  );
 });
 
 test('the Decide section copies its commands and runs none: a button per command, and each only copies', () => {
   const commands = [
-    { label: 'once more', command: 'wf retry r-1 implement', said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)' },
+    {
+      label: 'once more',
+      command: 'wf retry r-1 implement',
+      said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)',
+    },
     { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null },
     { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null },
   ] as const;
   const decision = {
     touched: [{ branch: 'wf/r-1/implement', radius: radiusWith({ agentFacing: ['CLAUDE.md'] }) }],
     lesson: { said: 'CLAUDE.md +2 −0', state: 'written' as const },
-    sensitive: [{ branch: 'wf/r-1/implement', files: [{ path: 'packages/x/test/add.test.ts', lines: ['@@ -1 +1,451 @@'], cut: 3 }], error: null }],
+    sensitive: [
+      { branch: 'wf/r-1/implement', files: [{ path: 'packages/x/test/add.test.ts', lines: ['@@ -1 +1,451 @@'], cut: 3 }], error: null },
+    ],
     used: {},
-    total: { usage: { toolCalls: 34 }, used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured' },
+    total: {
+      usage: { toolCalls: 34 },
+      used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured',
+      cost: 'not measured',
+    },
     commands: [...commands],
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
@@ -859,7 +1298,10 @@ test('the Decide section copies its commands and runs none: a button per command
   }
   for (const { command } of commands) assert.ok(html.includes(`>${command}</code>`), command);
   // The once-more line's words, without the command it is followed by on the line below.
-  assert.match(html, />implement: succeeded · BLOCKED\. Continue its session, told what happened {2}\(--fresh, or --model &lt;m&gt;, for a new session\)</);
+  assert.match(
+    html,
+    />implement: succeeded · BLOCKED\. Continue its session, told what happened {2}\(--fresh, or --model &lt;m&gt;, for a new session\)</,
+  );
   // The run's total, in `wf decide`'s words: never a 0 for what nobody measured.
   assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>turns not measured · 34 tool calls/);
   assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>not measured<\/dd>/);
@@ -870,15 +1312,35 @@ test('the Decide section copies its commands and runs none: a button per command
 test("the inspector's Details say what a step used and what it cost beside its attempts — `not measured`, never 0", () => {
   const run = runWith(null);
   const rows = (step: RunDetail['steps'][number]) =>
-    [...renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
-      .map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
+    [
+      ...renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} })).matchAll(
+        /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
+      ),
+    ].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
   const labels = rows(run.steps[0]!);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
-  assert.deepEqual(labels.slice(at('latest took'), at('latest took') + 3).map(([l, v]) => [l, l === 'latest took' ? '…' : v]), [['latest took', '…'], ['used', 'not measured'], ['cost', 'not measured']]);
+  assert.deepEqual(
+    labels.slice(at('latest took'), at('latest took') + 3).map(([l, v]) => [l, l === 'latest took' ? '…' : v]),
+    [
+      ['latest took', '…'],
+      ['used', 'not measured'],
+      ['cost', 'not measured'],
+    ],
+  );
 
-  const measured = { ...run.steps[0]!, used: { usage: { turns: 12, costUsd: 0.004 }, used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: '$0.004' } };
+  const measured = {
+    ...run.steps[0]!,
+    used: {
+      usage: { turns: 12, costUsd: 0.004 },
+      used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+      cost: '$0.004',
+    },
+  };
   const said = Object.fromEntries(rows(measured));
-  assert.deepEqual([said.used, said.cost], ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004']);
+  assert.deepEqual(
+    [said.used, said.cost],
+    ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
+  );
   // A step not filed has run nothing: said once, never a table of dashes — and what its spec says still below (none, on this fixture).
   const unfiledStep = { ...run.steps[0]!, taskId: null, used: null };
   const unfiled = Object.fromEntries(rows(unfiledStep));
@@ -887,7 +1349,13 @@ test("the inspector's Details say what a step used and what it cost beside its a
   assert.match(html, /<p data-unfiled="true"[^>]*>not filed yet<\/p>/);
   assert.match(html, /data-unfiled="true"[^>]*>not filed yet<\/p><p[^>]*>No spec:/);
   // At its gate: said so (the brief above it, which reads the run's decision, is the e2e's: waiting on nobody here draws none).
-  const gated = renderToStaticMarkup(createElement(StepInspector, { run: { ...run, waitingOnYou: [] }, step: { ...unfiledStep, approve: 'approve implement' }, onClose: () => {} }));
+  const gated = renderToStaticMarkup(
+    createElement(StepInspector, {
+      run: { ...run, waitingOnYou: [] },
+      step: { ...unfiledStep, approve: 'approve implement' },
+      onClose: () => {},
+    }),
+  );
   assert.match(gated, /<p data-unfiled="true"[^>]*>not filed yet: it waits at its gate<\/p>/);
 });
 
@@ -902,28 +1370,66 @@ type StepSpec = import('../src/lib/api.ts').StepSpec;
 type StepFiled = import('../src/lib/api.ts').StepFiled;
 
 /** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
-const textsOf = (html: string): string[] => html.split(/<[^>]+>/).map((text) => unescaped(text).trim()).filter(Boolean);
+const textsOf = (html: string): string[] =>
+  html
+    .split(/<[^>]+>/)
+    .map((text) => unescaped(text).trim())
+    .filter(Boolean);
 
 const tookAt = '2026-09-13T00:12:30.000Z';
 const ranOnce = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: tookAt, reason: 'harness' } };
 const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
-  outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, schema: {}, raw: { outcome: 'done', summary }, ...more,
+  outcome: 'done',
+  summary,
+  needs: null,
+  artifacts: [],
+  output: {},
+  missing: [],
+  replies: null,
+  schema: {},
+  raw: { outcome: 'done', summary },
+  ...more,
 });
 
 /** implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by review's loop. */
 const threeTries: StepTry[] = [
   {
-    try: 1, round: 1, then: 'retries', current: false, taskId: 'r-1-implement', note: null, status: 'succeeded', attempts: ranOnce,
-    check: { command: 'npm test', taskId: 'r-1-implement-check', verdict: 'exit 1', refused: { exit: 'exit 1', stdout: null, stderr: { lines: [], truncated: false }, unreadable: null } },
+    try: 1,
+    round: 1,
+    then: 'retries',
+    current: false,
+    taskId: 'r-1-implement',
+    note: null,
+    status: 'succeeded',
+    attempts: ranOnce,
+    check: {
+      command: 'npm test',
+      taskId: 'r-1-implement-check',
+      verdict: 'exit 1',
+      refused: { exit: 'exit 1', stdout: null, stderr: { lines: [], truncated: false }, unreadable: null },
+    },
     closeout: closeoutSaying('Added the cache.'),
   },
   {
-    try: 2, round: 1, then: 'round', current: false, taskId: 'r-1-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: ranOnce,
+    try: 2,
+    round: 1,
+    then: 'round',
+    current: false,
+    taskId: 'r-1-implement-try2',
+    note: 'try 2, by retries: 1',
+    status: 'succeeded',
+    attempts: ranOnce,
     check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: 'passed', refused: null },
     closeout: closeoutSaying('Fixed the failing test.'),
   },
   {
-    try: 3, round: 2, then: null, current: true, taskId: 'r-1-implement-try3', note: 'round 2 of 3', status: 'running (working)',
+    try: 3,
+    round: 2,
+    then: null,
+    current: true,
+    taskId: 'r-1-implement-try3',
+    note: 'round 2 of 3',
+    status: 'running (working)',
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
     check: { command: 'npm test', taskId: null, verdict: null, refused: null },
     closeout: null,
@@ -936,7 +1442,11 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
   const section = /<section aria-label="Rounds"[\s\S]*?<\/section>/.exec(html)?.[0];
   assert.ok(section, `a Rounds section: ${html}`);
-  const rows = [...section.matchAll(/<li data-try="(\d+)"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /aria-current="true"/.test(m[2]!), textsOf(m[3]!)]);
+  const rows = [...section.matchAll(/<li data-try="(\d+)"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => [
+    m[1],
+    /aria-current="true"/.test(m[2]!),
+    textsOf(m[3]!),
+  ]);
   assert.deepEqual(rows, [
     ['1', false, ['round 1 · try 1', 'closeout', 'r-1-implement', '#1 · 12m 30s', 'check', 'exit 1']],
     ['2', false, ['round 1 · try 2 (retries)', 'closeout', 'r-1-implement-try2', '#1 · 12m 30s', 'check', 'passed']],
@@ -945,11 +1455,18 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   ]);
   assert.deepEqual(
     [...section.matchAll(/<button type="button" aria-label="([^"]+)"/g)].map((m) => m[1]),
-    ['Show the closeout of round 1 · try 1', 'Show the closeout of round 1 · try 2 (retries)', 'Show the closeout of round 2 · try 3 (round)'],
+    [
+      'Show the closeout of round 1 · try 1',
+      'Show the closeout of round 1 · try 2 (retries)',
+      'Show the closeout of round 2 · try 3 (round)',
+    ],
   );
   // The attempts above it are the current try's, and say which try that is.
   const facts = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]);
-  assert.deepEqual(facts.slice(0, 2), [['try', 'round 2 · try 3 (round)'], ['attempts', '2']]);
+  assert.deepEqual(facts.slice(0, 2), [
+    ['try', 'round 2 · try 3 (round)'],
+    ['attempts', '2'],
+  ]);
 
   // One try: no Rounds, and no `try` above the attempts.
   const once = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
@@ -962,15 +1479,23 @@ test("the Output tab opens on the outcome and who said it, then draws each field
     { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'Once per layer, on purpose.' },
   ];
-  const findings = [{ file: 'src/cache.ts', line: 12, what: 'It never **expires**.' }, { file: 'test/cache.test.ts', line: null, what: 'No test waits out the TTL.' }];
+  const findings = [
+    { file: 'src/cache.ts', line: 12, what: 'It never **expires**.' },
+    { file: 'test/cache.test.ts', line: null, what: 'No test waits out the TTL.' },
+  ];
   const schema = {
-    findings: { type: 'array', items: { type: 'object', properties: { file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } } } },
+    findings: {
+      type: 'array',
+      items: { type: 'object', properties: { file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } } },
+    },
     again: { type: 'boolean', description: 'true when a finding is worth another round.' },
     matrix: { type: 'array' },
     notes: { type: 'string' },
   };
   const output = { findings, again: false, matrix: [[1, 2], [3]] };
-  const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output, missing: ['notes'], schema }) } : t));
+  const tries = threeTries.map((t) =>
+    t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output, missing: ['notes'], schema }) } : t,
+  );
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
 
@@ -980,35 +1505,73 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   assert.match(html, /<label for="[^"]+"[^>]*>Raw<\/label>/, 'the Raw switch, named by a label of its own');
 
   // Each field under its name, drawn as its shape says, in the schema's order, then the replies.
-  assert.deepEqual([...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]), [
-    ['findings', 'findings'], ['again', 'yesno'], ['matrix', 'json'], ['replies', 'replies'],
-  ]);
+  assert.deepEqual(
+    [...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['findings', 'findings'],
+      ['again', 'yesno'],
+      ['matrix', 'json'],
+      ['replies', 'replies'],
+    ],
+  );
   const table = /<table data-kind="findings"[\s\S]*?<\/table>/.exec(html)![0];
-  assert.deepEqual([...table.matchAll(/<th scope="row" data-place="true"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['src/cache.ts:12', 'test/cache.test.ts'], 'a null line is the file alone');
-  assert.match(table, /<td[^>]*><div data-cell="what"><div data-markdown="true"[^>]*><p[^>]*>It never <strong>expires<\/strong>\.<\/p>/, 'its text is markdown, unnamed: the one field beside the place');
-  assert.deepEqual(textsOf(/<section data-field="again"[\s\S]*?<\/section>/.exec(html)![0]), ['again', 'no', '— true when a finding is worth another round.']);
+  assert.deepEqual(
+    [...table.matchAll(/<th scope="row" data-place="true"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]),
+    ['src/cache.ts:12', 'test/cache.test.ts'],
+    'a null line is the file alone',
+  );
+  assert.match(
+    table,
+    /<td[^>]*><div data-cell="what"><div data-markdown="true"[^>]*><p[^>]*>It never <strong>expires<\/strong>\.<\/p>/,
+    'its text is markdown, unnamed: the one field beside the place',
+  );
+  assert.deepEqual(textsOf(/<section data-field="again"[\s\S]*?<\/section>/.exec(html)![0]), [
+    'again',
+    'no',
+    '— true when a finding is worth another round.',
+  ]);
   assert.match(/<section data-field="matrix"[\s\S]*?<\/section>/.exec(html)![0], /<pre[^>]*>\[\n {2}\[\n {4}1,/);
   assert.match(html, /<p data-missing="true"[^>]*>declared and not given: notes<\/p>/);
 
   // Replies read as they did, `finding → answer · why`, each text markdown, and the answer a badge.
-  assert.deepEqual([...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')), [
-    'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
-    "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
-  ]);
-  assert.match(html, /<li data-answer="fixed"[^>]*><div data-markdown="true"[^>]*><p[^>]*><code[^>]*>src\/cache\.ts:12<\/code> — the cache never expires<\/p><\/div>/);
-  assert.match(html, /→ <span data-slot="badge"[^>]*emerald[^>]*>fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/);
+  assert.deepEqual(
+    [...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')),
+    [
+      'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
+      "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
+    ],
+  );
+  assert.match(
+    html,
+    /<li data-answer="fixed"[^>]*><div data-markdown="true"[^>]*><p[^>]*><code[^>]*>src\/cache\.ts:12<\/code> — the cache never expires<\/p><\/div>/,
+  );
+  assert.match(
+    html,
+    /→ <span data-slot="badge"[^>]*emerald[^>]*>fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/,
+  );
   assert.match(html, /<span data-slot="badge"[^>]*>won&#x27;t fix<\/span>/);
 
   // The others, latest first, each folded: its summary is inside its fold, and the fold is closed.
-  const folds = (markup: string) => [...markup.matchAll(/<details data-try="(\d+)"([^>]*)><summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => [m[1], /\bopen\b/.test(m[2]!), textsOf(m[3]!).join('')]);
-  assert.deepEqual(folds(html), [['2', false, 'round 1 · try 2 (retries) — done'], ['1', false, 'round 1 · try 1 — done']]);
+  const folds = (markup: string) =>
+    [...markup.matchAll(/<details data-try="(\d+)"([^>]*)><summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => [
+      m[1],
+      /\bopen\b/.test(m[2]!),
+      textsOf(m[3]!).join(''),
+    ]);
+  assert.deepEqual(folds(html), [
+    ['2', false, 'round 1 · try 2 (retries) — done'],
+    ['1', false, 'round 1 · try 1 — done'],
+  ]);
   assert.ok(html.indexOf('Fixed the failing test.') > html.indexOf('<details data-try="2"'), 'an earlier summary is in its fold');
   assert.ok(html.indexOf('Answered the review.') < html.indexOf('<details'), "the selected try's summary is above the folds");
 
   // An earlier try selected: its closeout on top, and the current one folded with the rest.
   const earlier = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="1"[^>]*>[\s\S]*?<\/p>/.exec(earlier)![0]), ['round 1 · try 1']);
-  assert.deepEqual(folds(earlier), [['3', false, 'round 2 · try 3 (round) · current — done'], ['2', false, 'round 1 · try 2 (retries) — done']]);
+  assert.deepEqual(folds(earlier), [
+    ['3', false, 'round 2 · try 3 (round) · current — done'],
+    ['2', false, 'round 1 · try 2 (retries) — done'],
+  ]);
   assert.ok(earlier.indexOf('Added the cache.') < earlier.indexOf('<details'), earlier);
 
   // A try still running says what it was told to, by nobody; a step on its first try has no folds and no label.
@@ -1021,38 +1584,77 @@ test("the Output tab opens on the outcome and who said it, then draws each field
 
 test("a plan's files are a table, its path over its change; its steps a list; a long approach markdown; a screenshot a field names, the image", () => {
   const shot = '/wf/runs/r-1/artifacts/implement/runs-light.png';
-  const artifacts = [{ path: shot, name: 'runs-light.png', url: '/api/runs/r-1/steps/implement/artifacts/runs-light.png', kind: 'image' as const, size: 2048 }];
+  const artifacts = [
+    {
+      path: shot,
+      name: 'runs-light.png',
+      url: '/api/runs/r-1/steps/implement/artifacts/runs-light.png',
+      kind: 'image' as const,
+      size: 2048,
+    },
+  ];
   const approach = `Cache it.\n\nThen **expire** it: ${'a reason '.repeat(10)}`;
   const output = { approach, files: [{ path: 'src/cache.ts', change: 'New.' }], steps: ['Write it.', 'Test it.'], screenshots: [shot] };
   const tries = [{ ...threeTries[2]!, attempts: ranOnce, closeout: closeoutSaying('A plan.', { output, artifacts }) }];
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: '-' }));
-  assert.deepEqual([...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]), [
-    ['approach', 'markdown'], ['files', 'table'], ['steps', 'list'], ['screenshots', 'list'],
-  ]);
+  assert.deepEqual(
+    [...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['approach', 'markdown'],
+      ['files', 'table'],
+      ['steps', 'list'],
+      ['screenshots', 'list'],
+    ],
+  );
   assert.match(html, /<th scope="row" data-place="true"[^>]*>src\/cache\.ts<\/th><td[^>]*><div data-cell="change">/);
   assert.match(html, /<p[^>]*>Then <strong>expire<\/strong> it:/);
   const screenshots = /<section data-field="screenshots"[\s\S]*?<\/section>/.exec(html)![0];
-  assert.match(screenshots, /<figure data-artifact="image"[\s\S]*<img src="\/api\/runs\/r-1\/steps\/implement\/artifacts\/runs-light\.png" alt="runs-light\.png"/);
+  assert.match(
+    screenshots,
+    /<figure data-artifact="image"[\s\S]*<img src="\/api\/runs\/r-1\/steps\/implement\/artifacts\/runs-light\.png" alt="runs-light\.png"/,
+  );
 });
 
 test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
   const unsigned = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
   const tries = threeTries.map((t) => (t.try === 1 ? { ...t, attempts: unsigned, closeout: null } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
-  assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['unsigned', 'no statement: the machine’s reason']);
-  assert.match(html, /<p data-reason="true"[^>]*>The session ended without the closing statement it was asked for\. It may have finished; it did not say so\.<\/p>/);
-  assert.doesNotMatch(html.slice(0, html.indexOf('<section aria-label="Other tries"')), /data-closeout|Raw/, 'no statement, so nothing to draw nor show raw');
+  assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [
+    'unsigned',
+    'no statement: the machine’s reason',
+  ]);
+  assert.match(
+    html,
+    /<p data-reason="true"[^>]*>The session ended without the closing statement it was asked for\. It may have finished; it did not say so\.<\/p>/,
+  );
+  assert.doesNotMatch(
+    html.slice(0, html.indexOf('<section aria-label="Other tries"')),
+    /data-closeout|Raw/,
+    'no statement, so nothing to draw nor show raw',
+  );
   const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unsigned<\/summary>/);
 });
 
-test("a try whose statement could not be read says so, why, and shows it whole as it came — its fold says `unreadable`", () => {
+test('a try whose statement could not be read says so, why, and shows it whole as it came — its fold says `unreadable`', () => {
   const said = '{"outcome": "done", "summary": "Cut off';
-  const tries = threeTries.map((t) => (t.try === 1 ? { ...t, closeout: null, unreadable: { error: 'unparseable: Unterminated string in JSON', raw: said } } : t));
+  const tries = threeTries.map((t) =>
+    t.try === 1 ? { ...t, closeout: null, unreadable: { error: 'unparseable: Unterminated string in JSON', raw: said } } : t,
+  );
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
-  assert.deepEqual(textsOf(/<p data-outcome="unreadable" data-by="unreadable"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['unreadable', 'said by the agent, not readable']);
-  assert.match(html, /<p data-reason="true"[^>]*>It gave a closing statement that could not be read \(unparseable: Unterminated string in JSON\)\. Here it is as it came\.<\/p>/);
-  assert.match(html, /<section aria-label="As it came"[^>]*>[\s\S]*?<pre data-raw="true"[^>]*>\{&quot;outcome&quot;: &quot;done&quot;, &quot;summary&quot;: &quot;Cut off<\/pre>/, 'the statement, untouched');
+  assert.deepEqual(textsOf(/<p data-outcome="unreadable" data-by="unreadable"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [
+    'unreadable',
+    'said by the agent, not readable',
+  ]);
+  assert.match(
+    html,
+    /<p data-reason="true"[^>]*>It gave a closing statement that could not be read \(unparseable: Unterminated string in JSON\)\. Here it is as it came\.<\/p>/,
+  );
+  assert.match(
+    html,
+    /<section aria-label="As it came"[^>]*>[\s\S]*?<pre data-raw="true"[^>]*>\{&quot;outcome&quot;: &quot;done&quot;, &quot;summary&quot;: &quot;Cut off<\/pre>/,
+    'the statement, untouched',
+  );
   const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unreadable<\/summary>/);
 });
@@ -1060,18 +1662,24 @@ test("a try whose statement could not be read says so, why, and shows it whole a
 test("a closeout's image is drawn inline, its name its alt, opening full-size in a new tab; a text file is a link, anything else a link with its size, and a bare path the path", () => {
   const url = (name: string) => `/api/runs/r-1/steps/shoot/artifacts/${name}`;
   const dir = '/wf/runs/r-1/artifacts/shoot';
-  const html = renderToStaticMarkup(createElement(Artifacts, {
-    artifacts: [
-      { path: `${dir}/shot.png`, name: 'shot.png', url: url('shot.png'), kind: 'image', size: 48_213 },
-      { path: `${dir}/notes.txt`, name: 'notes.txt', url: url('notes.txt'), kind: 'text', size: 13 },
-      { path: `${dir}/trace.zip`, name: 'trace.zip', url: url('trace.zip'), kind: 'other', size: 2_400_000 },
-      { path: 'RESPONSE.md' },
-    ],
-  }));
+  const html = renderToStaticMarkup(
+    createElement(Artifacts, {
+      artifacts: [
+        { path: `${dir}/shot.png`, name: 'shot.png', url: url('shot.png'), kind: 'image', size: 48_213 },
+        { path: `${dir}/notes.txt`, name: 'notes.txt', url: url('notes.txt'), kind: 'text', size: 13 },
+        { path: `${dir}/trace.zip`, name: 'trace.zip', url: url('trace.zip'), kind: 'other', size: 2_400_000 },
+        { path: 'RESPONSE.md' },
+      ],
+    }),
+  );
   const [image, text, other, bare] = html.split('<li ').slice(1);
   assert.match(image!, /data-artifact="image"/);
   assert.ok(image!.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
-  assert.match(image!, /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt="shot\.png"/, 'the image inside the link that opens it');
+  assert.match(
+    image!,
+    /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt="shot\.png"/,
+    'the image inside the link that opens it',
+  );
   assert.match(image!, />shot\.png · 47\.1 KB<\/figcaption>/);
   assert.ok(text!.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
   assert.match(text!, />notes\.txt<\/a><\/span>/, 'a link, and nothing after it');
@@ -1085,9 +1693,11 @@ test("a closeout's image is drawn inline, its name its alt, opening full-size in
 test("a closeout's file `wf prune --artifacts` removed is its path and when it went, in the form the run's pruned row gives that moment — no link, no image, and not a bare path that reads as never made", () => {
   const at = '2026-09-28T09:00:00.000Z';
   const said = `its files were removed at ${at} (wf prune --artifacts)`;
-  const html = renderToStaticMarkup(createElement(Artifacts, {
-    artifacts: [{ path: '/wf/runs/r-1/artifacts/shoot/shot.png', pruned: said, prunedAt: at }, { path: 'RESPONSE.md' }],
-  }));
+  const html = renderToStaticMarkup(
+    createElement(Artifacts, {
+      artifacts: [{ path: '/wf/runs/r-1/artifacts/shoot/shot.png', pruned: said, prunedAt: at }, { path: 'RESPONSE.md' }],
+    }),
+  );
   const [pruned, bare] = html.split('<li ').slice(1);
   assert.match(pruned!, /data-artifact="pruned"/);
   assert.ok(pruned!.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
@@ -1099,34 +1709,95 @@ test("a closeout's file `wf prune --artifacts` removed is its path and when it w
 });
 
 test("the spec says what a step runs with: the workflow's word where it sets one, the engine's marked `default` where it does not, and a dash for a step not filed", () => {
-  const rowsOf = (spec: StepSpec, filed: StepFiled | null) => Object.fromEntries(
-    [...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
-      .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
-  );
+  const rowsOf = (spec: StepSpec, filed: StepFiled | null) =>
+    Object.fromEntries(
+      [
+        ...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(
+          /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
+        ),
+      ].map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+    );
   const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline];
-  const unset: StepSpec = { harness: 'claude', model: null, effort: null, context: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: null, rounds: null };
+  const unset: StepSpec = {
+    harness: 'claude',
+    model: null,
+    effort: null,
+    context: null,
+    after: [],
+    resume: null,
+    permissionMode: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
+  };
 
   // Filed as a step that sets none of them is, on a harness the api could not ask: nothing said.
-  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, remote: null };
-  assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default']);
-  const given: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, remote: null,
+  const bare: StepFiled = {
+    model: null,
+    askedModel: null,
+    effort: null,
+    contextTokens: null,
+    permissionMode: null,
+    runsIn: null,
+    tools: null,
+    deadlineSeconds: null,
+    remote: null,
   };
-  assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default']);
+  assert.deepEqual(ranWith(rowsOf(unset, bare)), [
+    "harness's own · default",
+    "harness's own · default",
+    "harness's own · default",
+    "harness's own · default",
+    'no limit · default',
+  ]);
+  const given: StepFiled = {
+    model: 'opus',
+    askedModel: null,
+    effort: 'high',
+    contextTokens: null,
+    permissionMode: 'auto',
+    runsIn: { mode: 'auto', by: 'filed' },
+    tools: ['Read', 'Grep'],
+    deadlineSeconds: 3600,
+    remote: null,
+  };
+  assert.deepEqual(ranWith(rowsOf(unset, given)), [
+    'opus · default',
+    'high · default',
+    'auto · default',
+    'Read, Grep · default',
+    '3600 s · default',
+  ]);
 
   // The mode the session runs in, as its harness decides it: Claude Code's `auto` for a task filed with none — never "the harness's own",
   // which reads as Claude Code's prompting default — Codex's `workspace-write`, and a Codex sandbox its tools narrowed, whatever was named.
   assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'auto', by: 'default' } })['permission mode'], 'auto · default');
-  assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'], 'workspace-write · default');
+  assert.equal(
+    rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'],
+    'workspace-write · default',
+  );
   // A codex step's fence is its `sandbox:`, which the engine's task files as its permission mode: its row is called `sandbox`, and none `permission mode`.
   const reviewer: StepSpec = { ...unset, harness: 'codex', sandbox: 'workspace-write', tools: ['Read', 'Grep'] };
-  const narrowed: StepFiled = { ...bare, permissionMode: 'workspace-write', tools: ['Read', 'Grep'], runsIn: { mode: 'read-only', by: 'tools' } };
+  const narrowed: StepFiled = {
+    ...bare,
+    permissionMode: 'workspace-write',
+    tools: ['Read', 'Grep'],
+    runsIn: { mode: 'read-only', by: 'tools' },
+  };
   assert.equal(rowsOf(reviewer, narrowed).sandbox, 'read-only · by tools');
   assert.equal(rowsOf(reviewer, narrowed)['permission mode'], undefined);
   assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, permissionMode: null }).sandbox, 'read-only · by tools');
   const readOnly: StepSpec = { ...unset, harness: 'codex', sandbox: 'read-only' };
-  assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only', "the workflow's word, as filed");
-  assert.equal(rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox, 'workspace-write · this try');
+  assert.equal(
+    rowsOf(readOnly, { ...bare, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    'read-only',
+    "the workflow's word, as filed",
+  );
+  assert.equal(
+    rowsOf(readOnly, { ...bare, permissionMode: 'workspace-write', runsIn: { mode: 'workspace-write', by: 'filed' } }).sandbox,
+    'workspace-write · this try',
+  );
   assert.equal(rowsOf(readOnly, null).sandbox, 'read-only', 'and a step not filed yet says what its workflow says');
   // A codex run frozen before 2026-09-23 with `permissionMode: bypassPermissions` reads as `sandbox: danger-full-access`, and its tries were
   // filed with the former word: the same fence, which Codex ran as `-s danger-full-access`, so no try of its own — as run, or where the api
@@ -1135,19 +1806,42 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const former: StepFiled = { ...bare, permissionMode: 'bypassPermissions', runsIn: { mode: 'danger-full-access', by: 'filed' } };
   assert.equal(rowsOf(widest, former).sandbox, 'danger-full-access');
   assert.equal(rowsOf(widest, { ...former, runsIn: null }).sandbox, 'danger-full-access');
-  assert.equal(rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox, 'read-only · this try', 'another sandbox is still a try of its own');
+  assert.equal(
+    rowsOf(widest, { ...former, permissionMode: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,
+    'read-only · this try',
+    'another sandbox is still a try of its own',
+  );
 
   // A model a person's `wf retry --model` asked for is this try's, and not a default, where the workflow names none.
   assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
 
   // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
-  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', context: 200_000, permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600 };
+  const set: StepSpec = {
+    ...unset,
+    model: 'opus',
+    effort: 'high',
+    context: 200_000,
+    permissionMode: 'dontAsk',
+    tools: [],
+    deadlineSeconds: 600,
+  };
   const asSet: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, remote: null,
+    model: 'opus',
+    askedModel: null,
+    effort: 'high',
+    contextTokens: 200_000,
+    permissionMode: 'dontAsk',
+    runsIn: { mode: 'dontAsk', by: 'filed' },
+    tools: [],
+    deadlineSeconds: 600,
+    remote: null,
   };
   assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s']);
   // No count of attempts: the runtime makes one per start, and a step that says a count is refused (stage 4a part 2).
-  assert.equal(['max attempts', 'attempts'].some((row) => row in rowsOf(set, asSet) || row in rowsOf(unset, bare) || row in rowsOf(unset, null)), false);
+  assert.equal(
+    ['max attempts', 'attempts'].some((row) => row in rowsOf(set, asSet) || row in rowsOf(unset, bare) || row in rowsOf(unset, null)),
+    false,
+  );
   assert.doesNotMatch(renderToStaticMarkup(createElement(Facts, { rows: specRows(set, asSet) })), /data-mark/);
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet' }).model, 'sonnet · this try');
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
@@ -1166,15 +1860,48 @@ test("the spec says what a step runs with: the workflow's word where it sets one
 });
 
 test('a step on a remote A2A agent says the agent and its address, and no model, effort, context, fence or tools the run never chose', () => {
-  const rowsOf = (spec: StepSpec, filed: StepFiled | null) => Object.fromEntries(
-    [...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
-      .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
-  );
-  const spec: StepSpec = { harness: 'a2a:reviewer', model: null, effort: null, context: null, after: ['draft'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null };
-  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, remote: { name: 'reviewer', address: 'https://agents.example.com/reviewer' } };
+  const rowsOf = (spec: StepSpec, filed: StepFiled | null) =>
+    Object.fromEntries(
+      [
+        ...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(
+          /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
+        ),
+      ].map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+    );
+  const spec: StepSpec = {
+    harness: 'a2a:reviewer',
+    model: null,
+    effort: null,
+    context: null,
+    after: ['draft'],
+    workspace: null,
+    resume: null,
+    permissionMode: null,
+    sandbox: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
+  };
+  const bare: StepFiled = {
+    model: null,
+    askedModel: null,
+    effort: null,
+    contextTokens: null,
+    permissionMode: null,
+    runsIn: null,
+    tools: null,
+    deadlineSeconds: null,
+    remote: { name: 'reviewer', address: 'https://agents.example.com/reviewer' },
+  };
   const rows = rowsOf(spec, bare);
   assert.deepEqual(Object.keys(rows), ['harness', 'agent', 'after', 'deadline']);
-  assert.deepEqual(rows, { harness: 'a2a:reviewer', agent: 'https://agents.example.com/reviewer', after: 'draft', deadline: 'no limit · default' });
+  assert.deepEqual(rows, {
+    harness: 'a2a:reviewer',
+    agent: 'https://agents.example.com/reviewer',
+    after: 'draft',
+    deadline: 'no limit · default',
+  });
   // A name the store's file no longer declares, or reads as refused: the name is on the harness row, and the address is said to be gone.
   assert.equal(rowsOf(spec, { ...bare, remote: { name: 'reviewer', address: null } }).agent, 'no longer in a2a-agents.json');
   // Not filed yet, the harness alone says it is remote: the same rows, the address not known.
@@ -1185,7 +1912,6 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
   assert.ok('model' in rowsOf({ ...spec, harness: 'claude' }, { ...bare, remote: null }));
 });
 
-
 // ─── what a step needs, and the answer ──────────────────────────────────────
 
 const Answering = await import('../src/components/Decide.tsx');
@@ -1195,15 +1921,25 @@ const Closeouts = await import('../src/components/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 type Offer = import('../src/lib/asks.ts').Offer;
 
-const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
+const LOGIN =
+  'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
 
 /** What the harness says a blocked session waits for, as the api gives it: the words a card or a node says, and what a person does about it. */
 const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-1/1' };
 
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
-function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+function needing(
+  status: string,
+  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>,
+  over: { waitingOnYou: string[]; cancelledAt?: string | null },
+): RunDetail {
   const run = runOf(status, over);
-  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs }] };
+  return {
+    ...run,
+    steps: [
+      { ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs },
+    ],
+  };
 }
 
 test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
@@ -1237,14 +1973,22 @@ test("a step's node says how many calls its current try was denied, whole, and w
   const html = nodeMarkup(needing('unverified · done', { denied: two }, { waitingOnYou: [] }));
   assert.ok(html.includes(`<p data-denied="true" title="${two.words}" class="truncate `), html);
   assert.ok(html.includes('>denied 2 calls</p>'), html);
-  const one = nodeMarkup(needing('unverified · done', { denied: { words: 'denied: Edit(/a/very/long/path/to/a/file.ts)', calls: ['Edit(/a/very/long/path/to/a/file.ts)'] } }, { waitingOnYou: [] }));
+  const one = nodeMarkup(
+    needing(
+      'unverified · done',
+      { denied: { words: 'denied: Edit(/a/very/long/path/to/a/file.ts)', calls: ['Edit(/a/very/long/path/to/a/file.ts)'] } },
+      { waitingOnYou: [] },
+    ),
+  );
   assert.ok(one.includes('>denied 1 call</p>'), one);
   assert.doesNotMatch(nodeMarkup(needing('unverified · done', {}, { waitingOnYou: [] })), /data-denied/);
 });
 
 /** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */
 const offersMarkup = (offers: Offer[]) =>
-  renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })));
+  renderToStaticMarkup(
+    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })),
+  );
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
   const html = offersMarkup([
@@ -1255,15 +1999,33 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--nudge, with your answer) — the next tick files it' },
   ]);
   assert.match(html, /^<section aria-label="Answer"/);
-  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, { kind: m[1]!, html: m[3]! }]));
-  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [
-    ['implement', 'answer'], ['theme', 'try-again'], ['lint', 'try-again'], ['docs', 'try-again'], ['plan', 'asked'],
-  ]);
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+      m[2]!,
+      { kind: m[1]!, html: m[3]! },
+    ]),
+  );
+  assert.deepEqual(
+    [...rows].map(([name, { kind }]) => [name, kind]),
+    [
+      ['implement', 'answer'],
+      ['theme', 'try-again'],
+      ['lint', 'try-again'],
+      ['docs', 'try-again'],
+      ['plan', 'asked'],
+    ],
+  );
   // What the row says a step needs: a question as its markdown, under `asks:`, and any other need as a sentence.
   const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]!).join(' ');
-  const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  const buttons = (name: string) =>
+    [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [
+      m[1],
+      Boolean(m[2]),
+      m[3],
+    ]);
   // A server render writes `checked` before `value`.
-  const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  const radios = (name: string) =>
+    [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
   const boxes = (name: string) => [...rows.get(name)!.html.matchAll(/<textarea /g)].length;
   const closed = (name: string) => /<textarea [^>]*\bdisabled=""/.test(rows.get(name)!.html);
 
@@ -1271,21 +2033,35 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.equal(said('implement'), 'implement asks: Which database?');
   assert.equal(boxes('implement'), 1);
   assert.deepEqual(buttons('implement'), [['submit', true, 'Answer and continue']]);
-  assert.deepEqual(radios('implement'), [['nudge', true], ['fresh', false]]);
+  assert.deepEqual(radios('implement'), [
+    ['nudge', true],
+    ['fresh', false],
+  ]);
   assert.match(rows.get('implement')!.html, /<label for="[^"]+" class="sr-only">Your answer to implement<\/label>/);
 
   // A refused check: something to tell it if you like, and its check again; the check first where it did not finish.
   assert.equal(said('theme'), 'theme was refused by its check');
   assert.equal(boxes('theme'), 1);
   assert.deepEqual(buttons('theme'), [['submit', false, 'Try again']]);
-  assert.deepEqual(radios('theme'), [['nudge', true], ['fresh', false], ['recheck', false]]);
-  assert.deepEqual(radios('lint'), [['nudge', false], ['fresh', false], ['recheck', true]]);
+  assert.deepEqual(radios('theme'), [
+    ['nudge', true],
+    ['fresh', false],
+    ['recheck', false],
+  ]);
+  assert.deepEqual(radios('lint'), [
+    ['nudge', false],
+    ['fresh', false],
+    ['recheck', true],
+  ]);
   // A recheck files no session, so a message on it is refused (`messageRefusal`): its box is closed while it is chosen, and says why.
   assert.equal(closed('lint'), true, rows.get('lint')!.html);
   assert.match(rows.get('lint')!.html, /placeholder="A recheck runs the check again and files no session: there is nobody to tell\."/);
   assert.deepEqual([closed('implement'), closed('theme'), closed('docs')], [false, false, false]);
   assert.equal(said('docs'), 'docs ended without the closeout it was asked for');
-  assert.deepEqual(radios('docs'), [['nudge', true], ['fresh', false]]);
+  assert.deepEqual(radios('docs'), [
+    ['nudge', true],
+    ['fresh', false],
+  ]);
 
   // Asked: what `wf ls` says of it, and nothing to press.
   assert.deepEqual(textsOf(rows.get('plan')!.html), ['plan', 'try 2 asked (--nudge, with your answer) — the next tick files it']);
@@ -1294,42 +2070,82 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.doesNotMatch(html, /data-refused/);
 });
 
-test("a step `denials: fail` stopped is offered Try again with a new session first, as `wf decide` offers it, and its row names the calls it was denied", () => {
-  const html = offersMarkup([{ step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' }, { step: 'bare', kind: 'denied', calls: null }]);
-  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
+test('a step `denials: fail` stopped is offered Try again with a new session first, as `wf decide` offers it, and its row names the calls it was denied', () => {
+  const html = offersMarkup([
+    { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
+    { step: 'bare', kind: 'denied', calls: null },
+  ]);
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]),
+  );
   const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]!).join(' ');
-  assert.equal(said('notes'), "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it");
-  assert.equal(said('bare'), "bare signed off having been denied a call, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it");
-  const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
-  assert.deepEqual(radios, [['fresh', true], ['nudge', false]], 'a new session first, and no recheck: no check of it ran');
+  assert.equal(
+    said('notes'),
+    "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
+  );
+  assert.equal(
+    said('bare'),
+    "bare signed off having been denied a call, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
+  );
+  const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
+    m[2],
+    Boolean(m[1]),
+  ]);
+  assert.deepEqual(
+    radios,
+    [
+      ['fresh', true],
+      ['nudge', false],
+    ],
+    'a new session first, and no recheck: no check of it ran',
+  );
   assert.match(rows.get('notes')!, /<form aria-label="Try notes again"/);
   assert.match(rows.get('notes')!, /<button type="submit"[^>]*>Try again<\/button>/);
 });
 
 test('the Decide section puts the answers first, before what there is to decide, and its commands still only copy', () => {
   const decision = {
-    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    touched: [],
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    sensitive: [],
+    used: {},
     total: { usage: null, used: 'not measured', cost: 'not measured' },
     commands: [{ label: 'ship it' as const, command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
   };
-  const offers = createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?' }] }));
+  const offers = createElement(
+    QueryClientProvider,
+    { client: new QueryClient() },
+    createElement(Answering.Offers, { runId: 'r-1', offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?' }] }),
+  );
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision, offers }));
   assert.ok(html.indexOf('aria-label="Answer"') < html.indexOf('data-lesson'), html);
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
-  assert.deepEqual([...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
+  assert.deepEqual(
+    [...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])),
+    [true],
+  );
   assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
 test("the Decide section's accept row takes a reason and presses it; every other row still only copies", () => {
   const decision = {
-    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    touched: [],
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    sensitive: [],
+    used: {},
     total: { usage: null, used: 'not measured', cost: 'not measured' },
     commands: [
       { label: 'once more' as const, command: 'wf round r-1 review', said: null },
-      { label: 'accept' as const, command: 'wf accept r-1 review --message "<why>"', said: 'review: enough — go on with what is there:  wf accept r-1 review --message "<why>"' },
+      {
+        label: 'accept' as const,
+        command: 'wf accept r-1 review --message "<why>"',
+        said: 'review: enough — go on with what is there:  wf accept r-1 review --message "<why>"',
+      },
     ],
   };
-  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision })));
+  const html = renderToStaticMarkup(
+    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision })),
+  );
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
   assert.match(row, /data-step="review"/);
@@ -1340,19 +2156,43 @@ test("the Decide section's accept row takes a reason and presses it; every other
   assert.match(row, new RegExp(`<textarea id="${label[1]}"`));
   // Blank, the button waits for a reason, as `wf accept` waits for `--message`.
   assert.match(row, /<button type="submit" disabled=""[^>]*>Accept as it stands<\/button>/);
-  assert.deepEqual([.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
+  assert.deepEqual(
+    [.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) =>
+      /data-copy="true"/.test(m[0]),
+    ),
+    [true],
+  );
 });
 
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
   const answer = 'Postgres, the one in docker-compose.yml.';
   const answered = threeTries.map((t) => ({ ...t, answer: t.try === 2 ? answer : null }));
   const rounds = renderToStaticMarkup(createElement(Closeouts.Rounds, { tries: answered, selected: 3, onSelect: () => {} }));
-  assert.deepEqual([...rounds.matchAll(/<li data-try="(\d+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /data-your-answer/.test(m[2]!)]), [['1', false], ['2', true], ['3', false]]);
-  assert.ok(rounds.includes(`<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-neutral-500">your answer </span>${answer}</p>`), rounds);
+  assert.deepEqual(
+    [...rounds.matchAll(/<li data-try="(\d+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /data-your-answer/.test(m[2]!)]),
+    [
+      ['1', false],
+      ['2', true],
+      ['3', false],
+    ],
+  );
+  assert.ok(
+    rounds.includes(
+      `<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-neutral-500">your answer </span>${answer}</p>`,
+    ),
+    rounds,
+  );
 
-  const selected = renderToStaticMarkup(createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[1]!, none: 'No closeout yet.' }));
-  assert.ok(selected.indexOf('your answer:') >= 0 && selected.indexOf('your answer:') < selected.indexOf('Fixed the failing test.'), selected);
-  const folded = renderToStaticMarkup(createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[2]!, none: 'No closeout yet.' }));
+  const selected = renderToStaticMarkup(
+    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[1]!, none: 'No closeout yet.' }),
+  );
+  assert.ok(
+    selected.indexOf('your answer:') >= 0 && selected.indexOf('your answer:') < selected.indexOf('Fixed the failing test.'),
+    selected,
+  );
+  const folded = renderToStaticMarkup(
+    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[2]!, none: 'No closeout yet.' }),
+  );
   const fold = /<details data-try="2"[\s\S]*?<\/details>/.exec(folded)![0];
   assert.ok(fold.indexOf('your answer:') >= 0 && fold.indexOf('your answer:') < fold.indexOf('Fixed the failing test.'), fold);
   assert.doesNotMatch(/<details data-try="1"[\s\S]*?<\/details>/.exec(folded)![0], /your answer/);
@@ -1364,7 +2204,16 @@ const bannerMarkup = (run: RunDetail) =>
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
   const base = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
-  const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, waitingFor: null, lastLine: null };
+  const asks = {
+    ...base.steps[0]!,
+    name: 'implement',
+    taskId: 't-2',
+    status: 'succeeded · BLOCKED',
+    needs: 'Which database?',
+    blockedByHarness: false,
+    waitingFor: null,
+    lastLine: null,
+  };
   const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]!] };
   const html = bannerMarkup(run);
 
@@ -1378,8 +2227,14 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   // For the session the harness blocked, after what it said last: a form that asks, its box optional, and one button, enabled with nothing written.
   const review = items.get('review')!;
   // Under the wait, where a person answers it — and this board does not: Continue below asks the tick for another try, and nothing else.
-  assert.match(review, /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-xs">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/);
-  assert.deepEqual([...review.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]), [['submit', false, 'Continue']]);
+  assert.match(
+    review,
+    /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-xs">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/,
+  );
+  assert.deepEqual(
+    [...review.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]),
+    [['submit', false, 'Continue']],
+  );
   assert.match(review, /<label for="[^"]+" class="sr-only">What to tell review, if anything<\/label>/);
   assert.match(review, /<textarea [^>]*placeholder="Anything to tell it \(optional\): the next try is told it\."/);
   assert.ok(textsOf(review).includes('wf retry r-1 review'), review);
@@ -1418,15 +2273,30 @@ const Gates = await import('../src/components/Gate.tsx');
 const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}): RunDetail => {
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
-    ...base, onYou: ['approve review'], gates: ['review'], ...run,
-    steps: [{ ...base.steps[0]!, needs: null, blockedByHarness: false, lastLine: null, asked: null, approve: 'approve review', gate: { awaiting: true, approval: null }, ...over }],
+    ...base,
+    onYou: ['approve review'],
+    gates: ['review'],
+    ...run,
+    steps: [
+      {
+        ...base.steps[0]!,
+        needs: null,
+        blockedByHarness: false,
+        lastLine: null,
+        asked: null,
+        approve: 'approve review',
+        gate: { awaiting: true, approval: null },
+        ...over,
+      },
+    ],
   };
 };
 
 /** A component rendered inside the query client its writes are made with. */
-const withClient = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
+const withClient = (element: ReturnType<typeof createElement>) =>
+  renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
 
-test("a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not", () => {
+test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
   assert.match(html, /border-amber-500/);
@@ -1434,7 +2304,10 @@ test("a step at its gate is a human gate on the canvas, and its node says what i
   const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
   assert.ok(footer, html);
   // What approving does, in a line that names the step as `wf ls` does: a step that ran hands on; an ending not filed runs.
-  assert.equal(footer[2], '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>');
+  assert.equal(
+    footer[2],
+    '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>',
+  );
   const spec = { ...atGate().steps[0]!.spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } as RunDetail['steps'][number]['attempts'] }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/);
@@ -1448,25 +2321,49 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
   const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
   const both = bannerMarkup({ ...run, steps: [run.steps[0]!, theme] });
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
-  assert.equal(textsOf(line).join(''), `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1`);
-  assert.match(line, /<strong><a href="#step-review" data-approve="review" class="underline underline-offset-2">approve review<\/a>, theme<\/strong>/);
+  assert.equal(
+    textsOf(line).join(''),
+    `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1`,
+  );
+  assert.match(
+    line,
+    /<strong><a href="#step-review" data-approve="review" class="underline underline-offset-2">approve review<\/a>, theme<\/strong>/,
+  );
   // The need is the banner's line: no question to list under it, and nothing to press in the banner.
   assert.doesNotMatch(both, /<li |<form|<button/);
 });
 
-test("the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one", () => {
+test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
   assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1]!, m[2]!]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
-  const buttons = (form: string) => [...forms.get(form)!.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  const buttons = (form: string) =>
+    [...forms.get(form)!.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
   assert.deepEqual(buttons('Approve plan'), [['submit', false, 'Approve']], 'Approve is enabled with no words: an approval needs none');
-  assert.deepEqual(buttons('Send plan back'), [['submit', true, 'Send back']], 'Send back waits for an objection: the package refuses one with none');
-  assert.match(forms.get('Approve plan')!, /<label for="[^"]+" class="sr-only">Words to approve plan with, if any<\/label><textarea [^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/);
+  assert.deepEqual(
+    buttons('Send plan back'),
+    [['submit', true, 'Send back']],
+    'Send back waits for an objection: the package refuses one with none',
+  );
+  assert.match(
+    forms.get('Approve plan')!,
+    /<label for="[^"]+" class="sr-only">Words to approve plan with, if any<\/label><textarea [^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/,
+  );
   assert.ok(textsOf(forms.get('Approve plan')!).includes('wf approve r-1 plan'));
   assert.match(forms.get('Send plan back')!, /<label for="[^"]+" class="sr-only">What to change, sent back to plan<\/label>/);
-  const radios = [...forms.get('Send plan back')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
-  assert.deepEqual(radios, [['nudge', true], ['fresh', false]], 'no recheck: a gate held nothing a check refused');
+  const radios = [...forms.get('Send plan back')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
+    m[2],
+    Boolean(m[1]),
+  ]);
+  assert.deepEqual(
+    radios,
+    [
+      ['nudge', true],
+      ['fresh', false],
+    ],
+    'no recheck: a gate held nothing a check refused',
+  );
   assert.doesNotMatch(html, /data-refused/);
 });
 
@@ -1476,19 +2373,32 @@ test('the approval under a step: the try, when, and the words as they were writt
   assert.match(html, /^<section aria-label="The approval of plan" data-approval="2"/);
   assert.ok(textsOf(html).includes('Approved'), html);
   assert.match(html, new RegExp(`try 2, <time dateTime="${at}">`));
-  assert.match(html, /<p data-words="true" class="whitespace-pre-wrap break-words">Ship the second reading\.\nKeep the flag &lt;b&gt;off&lt;\/b&gt; by default\.<\/p>/, 'as text, never as markup');
+  assert.match(
+    html,
+    /<p data-words="true" class="whitespace-pre-wrap break-words">Ship the second reading\.\nKeep the flag &lt;b&gt;off&lt;\/b&gt; by default\.<\/p>/,
+    'as text, never as markup',
+  );
   const none = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 1, at, message: null } }));
   assert.match(none, /<p data-words="none"[^>]*>with no words<\/p>/);
   // §6's gate lets what follows through; an ending's approval files the step itself, and the words are the terms it acts on.
   assert.ok(textsOf(html).join(' ').includes('every step after the gate is handed these words'), html);
   assert.ok(textsOf(none).join(' ').includes('every step after the gate is handed the approval'), none);
-  const ending = renderToStaticMarkup(createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: words }, ends: true }));
-  assert.ok(textsOf(ending).join(' ').includes('your approval filed it, and the step is handed these words as the terms it acts on'), ending);
+  const ending = renderToStaticMarkup(
+    createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: words }, ends: true }),
+  );
+  assert.ok(
+    textsOf(ending).join(' ').includes('your approval filed it, and the step is handed these words as the terms it acts on'),
+    ending,
+  );
   const bare = renderToStaticMarkup(createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: null }, ends: true }));
   assert.ok(textsOf(bare).join(' ').includes('your approval filed it, and the step is handed it as the terms it acts on'), bare);
   assert.doesNotMatch(ending, /every step after the gate/);
   assert.deepEqual(
-    [Gates.gateWord({ awaiting: true, approval: null }), Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }), Gates.gateWord({ awaiting: false, approval: null })],
+    [
+      Gates.gateWord({ awaiting: true, approval: null }),
+      Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }),
+      Gates.gateWord({ awaiting: false, approval: null }),
+    ],
     ['awaiting approval', 'approved, try 1', 'holds once it has signed off'],
   );
 });
@@ -1497,7 +2407,13 @@ test('the approval under a step: the try, when, and the words as they were writt
 
 /** What `wf ls` says of a run at its ending's gate, as the api gives it (`RunToDecide`). */
 const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
-const toShip = { kind: 'approve' as const, step: 'ship', says: SHIPS, said: `${SHIPS} — wf approve r-1 ship`, command: 'wf approve r-1 ship' };
+const toShip = {
+  kind: 'approve' as const,
+  step: 'ship',
+  says: SHIPS,
+  said: `${SHIPS} — wf approve r-1 ship`,
+  command: 'wf approve r-1 ship',
+};
 
 /**
  * A run of implement → ship whose ship is the workflow's ending, at its gate: implement signed off with a summary and a file, ship is
@@ -1507,24 +2423,65 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
   const run = runWith(null);
   const base = run.steps[0]!;
   const implement = {
-    ...base, name: 'implement', taskId: 't-1', status: 'unverified · done', branch: 'wf/r-1/implement', gate: null, approve: null,
+    ...base,
+    name: 'implement',
+    taskId: 't-1',
+    status: 'unverified · done',
+    branch: 'wf/r-1/implement',
+    gate: null,
+    approve: null,
     closeout: closeoutSaying('## What changed\n\n- the cap on runs in flight', { artifacts: [{ path: 'RESPONSE.md' }] }),
   };
   const ship = {
-    ...base, name: 'ship', taskId: null, status: 'awaiting approval', branch: null, body: `${SHIPS}\n\nLook at the checkout first.`,
-    closeout: null, approve: 'approve ship', gate: { awaiting: true, approval: null },
+    ...base,
+    name: 'ship',
+    taskId: null,
+    status: 'awaiting approval',
+    branch: null,
+    body: `${SHIPS}\n\nLook at the checkout first.`,
+    closeout: null,
+    approve: 'approve ship',
+    gate: { awaiting: true, approval: null },
     // What the board tells an ending's gate from §6's by, off the workflow the run froze.
-    spec: { harness: 'claude', model: null, effort: null, after: ['review'], workspace: 'main', resume: null, permissionMode: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
+    spec: {
+      harness: 'claude',
+      model: null,
+      effort: null,
+      after: ['review'],
+      workspace: 'main',
+      resume: null,
+      permissionMode: null,
+      tools: null,
+      deadlineSeconds: null,
+      loop: null,
+      rounds: null,
+    },
   };
   return {
-    ...run, status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: toShip, gates: ['ship'],
+    ...run,
+    status: 'failed',
+    waitingOnYou: ['ship'],
+    onYou: ['approve ship'],
+    toDecide: toShip,
+    gates: ['ship'],
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
-    steps: [implement, ship], ...over,
+    steps: [implement, ship],
+    ...over,
   };
 }
 
 /** The run's decision as the api gives it, cut to what the panel reads: where the result branch stands, and how much it changed. */
-const decidedAs = (standings: unknown[]) => ({ standings, touched: [], lesson: { said: '', state: 'nothing' }, sensitive: [], used: {}, total: {}, cost: null, overBudget: null, commands: [] });
+const decidedAs = (standings: unknown[]) => ({
+  standings,
+  touched: [],
+  lesson: { said: '', state: 'nothing' },
+  sensitive: [],
+  used: {},
+  total: {},
+  cost: null,
+  overBudget: null,
+  commands: [],
+});
 
 /** A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run. */
 function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
@@ -1541,14 +2498,23 @@ test("the to-decide banner says what `wf ls` says after `→ to decide:`, and li
   assert.match(html, /<a href="#step-ship" data-approve="ship" class="underline underline-offset-2">/);
 
   // A branch nobody merged names no step to link to: the words, and the command in them.
-  const branch = { kind: 'git' as const, branches: ['wf/r-1/implement'], said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1', command: 'wf decide r-1' };
+  const branch = {
+    kind: 'git' as const,
+    branches: ['wf/r-1/implement'],
+    said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1',
+    command: 'wf decide r-1',
+  };
   const ahead = withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: branch } }));
   assert.match(ahead, /data-to-decide="git"/);
   assert.deepEqual(textsOf(ahead), ['To decide:', branch.said]);
   assert.doesNotMatch(ahead, /<a /);
 
   assert.equal(withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: null } })), '', 'nothing to decide: no banner');
-  assert.equal(withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: undefined as unknown as null } })), '', 'and none from an api that carries none');
+  assert.equal(
+    withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: undefined as unknown as null } })),
+    '',
+    'and none from an api that carries none',
+  );
 });
 
 test("the ending step's own gate is not asked for twice: the to-decide banner says it, and the banner below has nothing left to say", () => {
@@ -1559,12 +2525,15 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
   assert.match(both, /^<section aria-label="Waiting on you"/);
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
-  assert.equal(textsOf(line).join(''), 'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1');
+  assert.equal(
+    textsOf(line).join(''),
+    'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1',
+  );
 });
 
-test("the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off", async () => {
+test('the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off', async () => {
   const [implement, ship] = endingRun().steps;
-  assert.equal(Gates.endsTheRun(ship!), true, 'it works in the repository\'s own checkout');
+  assert.equal(Gates.endsTheRun(ship!), true, "it works in the repository's own checkout");
   assert.equal(Gates.endsTheRun(implement!), false, 'the work does not');
   assert.equal(Gates.endsTheRun({ spec: null }), false, 'nor a step nothing defines any more');
   assert.equal(Gates.endsTheRun({ spec: { ...ship!.spec!, workspace: null } }), false, 'nor one in a worktree of the run');
@@ -1575,20 +2544,29 @@ test("the step that ends the run in the checkout is known by its `workspace`, an
   assert.equal(Gates.gateWord(held), 'holds once it has signed off', "§6's gate, which holds what its step handed on");
   // At it, and approved, both gates read the same: the word is the run's state, not the step's kind.
   assert.deepEqual(
-    [Gates.gateWord({ awaiting: true, approval: null }, true), Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }, true)],
+    [
+      Gates.gateWord({ awaiting: true, approval: null }, true),
+      Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }, true),
+    ],
     ['awaiting approval', 'approved, try 1'],
   );
 });
 
 test("what an ending step would act on, beside its gate: the branch's standing and diff stat, and each work step's closeout with its files", () => {
   const run = endingRun();
-  const standing = { branch: 'wf/r-1/implement', where: 'ahead', commits: 3, said: 'wf/r-1/implement is ahead of main by 3 commits', stat: '4 files changed, 456 insertions(+), 2 deletions(-)' };
+  const standing = {
+    branch: 'wf/r-1/implement',
+    where: 'ahead',
+    commits: 3,
+    said: 'wf/r-1/implement is ahead of main by 3 commits',
+    stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+  };
   const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1]! }));
   assert.match(html, /^<section aria-label="What ship would act on"/);
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
   assert.ok(texts.includes(standing.said), html);
-  assert.ok(texts.includes(standing.stat), 'git\'s own --shortstat, as `wf decide` prints it');
+  assert.ok(texts.includes(standing.stat), "git's own --shortstat, as `wf decide` prints it");
   // The work it waits on, off the graph: its closeout rendered as the markdown it is, and the files it named.
   assert.ok(texts.includes('implement'), html);
   assert.match(html, /<h4[^>]*>What changed<\/h4>/);
@@ -1601,10 +2579,13 @@ test("what an ending step would act on, beside its gate: the branch's standing a
   assert.ok(textsOf(none).includes('No result branch of its own: the work is on the base branch.'), none);
 });
 
-test("the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses", () => {
+test('the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement'], acts: true }));
   const texts = textsOf(html).join(' ');
-  assert.match(texts, /ship waits at its gate: nothing of it runs until you approve it — your approval is what files it — or you send implement back\./);
+  assert.match(
+    texts,
+    /ship waits at its gate: nothing of it runs until you approve it — your approval is what files it — or you send implement back\./,
+  );
   assert.ok(texts.includes('wf approve r-1 ship'), html);
   assert.match(texts, /the next tick files it(?! what)/);
   const forms = [...html.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
@@ -1612,22 +2593,40 @@ test("the gate of an ending step says approving is what files it, and its send-b
   assert.match(html, /What to change, sent back to implement<\/label>/);
   // Several work steps: the objection picks one, since one is enough to hold the gate again.
   const wide = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement', 'docs'], acts: true }));
-  assert.deepEqual([...wide.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]), ['Approve ship', 'Send the work back']);
+  assert.deepEqual(
+    [...wide.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
+    ['Approve ship', 'Send the work back'],
+  );
   const to = [...wide.matchAll(/<input type="radio" name="[^"]*-to"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
-  assert.deepEqual(to, [['implement', true], ['docs', false]]);
+  assert.deepEqual(to, [
+    ['implement', true],
+    ['docs', false],
+  ]);
   // §6's gate is unchanged: it holds what its step handed on, and the send-back is the step's own.
   const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
-  assert.match(textsOf(held).join(' '), /plan waits at its gate: nothing after it is filed until you approve what it handed on, or send it back\./);
+  assert.match(
+    textsOf(held).join(' '),
+    /plan waits at its gate: nothing after it is filed until you approve what it handed on, or send it back\./,
+  );
   assert.doesNotMatch(held, /name="[^"]*-to"/);
 });
 
 test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {
   const [implement, ship] = endingRun().steps;
   const rowsOf = (step: RunDetail['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
-  assert.ok(rowsOf(ship!).some(([key]) => key === 'workspace'), JSON.stringify(rowsOf(ship!)));
+  assert.ok(
+    rowsOf(ship!).some(([key]) => key === 'workspace'),
+    JSON.stringify(rowsOf(ship!)),
+  );
   assert.equal(rowsOf(ship!).find(([key]) => key === 'workspace')![1], 'set');
-  assert.ok(!rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: null } }).some(([key]) => key === 'workspace'), 'a step in a worktree says nothing');
-  assert.ok(!rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: undefined as unknown as null } }).some(([key]) => key === 'workspace'), 'nor a detail from an api without the key');
+  assert.ok(
+    !rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: null } }).some(([key]) => key === 'workspace'),
+    'a step in a worktree says nothing',
+  );
+  assert.ok(
+    !rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: undefined as unknown as null } }).some(([key]) => key === 'workspace'),
+    'nor a detail from an api without the key',
+  );
   assert.ok(!implement!.spec, 'and the work of this fixture has no spec at all, which is not a row either');
 });
 
@@ -1640,22 +2639,25 @@ test("the gate's own words at an ending: the approval's box says the step is han
 
   // The panel shown the moment a word is taken: an approval is the gated step's, and files it where nothing follows it.
   assert.deepEqual(Gates.takenOf({ approved: 1 }, 'ship', true), { named: 'ship', said: 'approved try 1 — the next tick files it' });
-  assert.deepEqual(Gates.takenOf({ approved: 2 }, 'plan', false), { named: 'plan', said: 'approved try 2 — the next tick files what waits on it' });
+  assert.deepEqual(Gates.takenOf({ approved: 2 }, 'plan', false), {
+    named: 'plan',
+    said: 'approved try 2 — the next tick files what waits on it',
+  });
   // A send-back is about the step its try was asked for — the work at an ending's gate, never the step at the gate.
-  assert.deepEqual(
-    Gates.takenOf({ asked: { try: 2, stopFirst: false }, step: 'review' }, 'ship', true),
-    { named: 'review', said: 'try 2 asked — the next tick files it' },
-  );
-  assert.deepEqual(
-    Gates.takenOf({ asked: { try: 3, stopFirst: false }, step: 'plan' }, 'plan', false),
-    { named: 'plan', said: 'try 3 asked — the next tick files it' },
-  );
+  assert.deepEqual(Gates.takenOf({ asked: { try: 2, stopFirst: false }, step: 'review' }, 'ship', true), {
+    named: 'review',
+    said: 'try 2 asked — the next tick files it',
+  });
+  assert.deepEqual(Gates.takenOf({ asked: { try: 3, stopFirst: false }, step: 'plan' }, 'plan', false), {
+    named: 'plan',
+    said: 'try 3 asked — the next tick files it',
+  });
 });
 
 test('REFUSED: an ending that waits on nothing is offered no send-back, since a try of the unfiled step is refused — the approval is the only word there is', () => {
   const alone = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: [], acts: true }));
   const forms = [...alone.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(forms, ['Approve ship'], 'the approval alone, as `wf ls`\'s gate note prints it for such a step');
+  assert.deepEqual(forms, ['Approve ship'], "the approval alone, as `wf ls`'s gate note prints it for such a step");
   assert.doesNotMatch(alone, /Send back|What to change/);
   assert.ok(
     textsOf(alone).join(' ').includes('ship waits at its gate: nothing of it runs until you approve it — your approval is what files it.'),
@@ -1663,13 +2665,22 @@ test('REFUSED: an ending that waits on nothing is offered no send-back, since a 
   );
   // And with work to send back to, both are offered.
   const withWork = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['review'], acts: true }));
-  assert.deepEqual([...withWork.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]), ['Approve ship', 'Send review back']);
+  assert.deepEqual(
+    [...withWork.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
+    ['Approve ship', 'Send review back'],
+  );
 });
 
 test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {
-  const legendOf = (cards: boolean) => withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
+  const legendOf = (cards: boolean) =>
+    withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
   const itemsOf = (html: string) =>
-    new Map(html.split('<span class="flex items-center gap-1">').slice(1).map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]));
+    new Map(
+      html
+        .split('<span class="flex items-center gap-1">')
+        .slice(1)
+        .map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
+    );
   assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
   const items = itemsOf(legendOf(true));
   // And the ring round a card whose result nobody has decided, which only the Factory draws.
@@ -1684,15 +2695,59 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 
 test('the edges between cards are drawn as every edge is: from a run into each card that waits on it, dashed until its run starts, solid once it has, and moving never', () => {
   const card = (id: string, after: string[], filed: boolean) => ({
-    id, after, steps: [{ name: 'implement', taskId: filed ? `t-${id}` : null, branch: null, status: filed ? 'running (working)' : 'waiting', note: null, needs: null, blockedByHarness: false }],
+    id,
+    after,
+    steps: [
+      {
+        name: 'implement',
+        taskId: filed ? `t-${id}` : null,
+        branch: null,
+        status: filed ? 'running (working)' : 'waiting',
+        note: null,
+        needs: null,
+        blockedByHarness: false,
+      },
+    ],
   });
   const edges = afterEdges([card('a', [], true), card('b', ['a'], true), card('d', ['a', 'b'], false)]);
-  const shape = ({ id, source, target, type, sourceHandle, targetHandle, data }: StateFlowEdge) => ({ id, source, target, type, sourceHandle, targetHandle, data });
+  const shape = ({ id, source, target, type, sourceHandle, targetHandle, data }: StateFlowEdge) => ({
+    id,
+    source,
+    target,
+    type,
+    sourceHandle,
+    targetHandle,
+    data,
+  });
   assert.deepEqual(edges.map(shape), [
     // Out of a card's one source handle, on its right, and into its one target handle, on the left: no handle named.
-    { id: 'after:a->b', source: 'a', target: 'b', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'done', loop: false } },
-    { id: 'after:a->d', source: 'a', target: 'd', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'to-come', loop: false } },
-    { id: 'after:b->d', source: 'b', target: 'd', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'to-come', loop: false } },
+    {
+      id: 'after:a->b',
+      source: 'a',
+      target: 'b',
+      type: 'state',
+      sourceHandle: undefined,
+      targetHandle: undefined,
+      data: { state: 'done', loop: false },
+    },
+    {
+      id: 'after:a->d',
+      source: 'a',
+      target: 'd',
+      type: 'state',
+      sourceHandle: undefined,
+      targetHandle: undefined,
+      data: { state: 'to-come', loop: false },
+    },
+    {
+      id: 'after:b->d',
+      source: 'b',
+      target: 'd',
+      type: 'state',
+      sourceHandle: undefined,
+      targetHandle: undefined,
+      data: { state: 'to-come', loop: false },
+    },
   ]);
   const [done, toCome] = [edgeMarkup(edges[0]!), edgeMarkup(edges[1]!)];
   assert.match(toCome, /data-state="to-come"[^>]*stroke-dasharray:5 4|stroke-dasharray:5 4[^>]*data-state="to-come"/);
@@ -1708,61 +2763,146 @@ test("the run page's timeline: a row per try's session and per check, in the api
   type TaskSpan = import('../src/lib/api.ts').TaskSpan;
   type TimelineTotal = import('../src/lib/api.ts').TimelineTotal;
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
-  const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan =>
-    ({ taskId, at, filedAt: null, spawnedAt: null, endedAt: null, attempts: 1, queuedMs: null, ranMs: null, queued, ran, ...times });
-  const total = (round: number | null, queued: string, ran: string, wall: string, loop: string | null = round === null ? null : 'review'): TimelineTotal =>
-    ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
+  const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan => ({
+    taskId,
+    at,
+    filedAt: null,
+    spawnedAt: null,
+    endedAt: null,
+    attempts: 1,
+    queuedMs: null,
+    ranMs: null,
+    queued,
+    ran,
+    ...times,
+  });
+  const total = (
+    round: number | null,
+    queued: string,
+    ran: string,
+    wall: string,
+    loop: string | null = round === null ? null : 'review',
+  ): TimelineTotal => ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
   const base = runWith(null);
-  const used = { usage: { turns: 54 }, used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: 'not measured' };
+  const used = {
+    usage: { turns: 54 },
+    used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+    cost: 'not measured',
+  };
   const run: RunDetail = {
     ...base,
     steps: [
       {
-        ...base.steps[0]!, name: 'implement',
+        ...base.steps[0]!,
+        name: 'implement',
         timeline: [
-          { try: 1, round: 1, sessionOf: null, used, session: span('t-1', 'ended', '12s', '19m42s', { filedAt: T(0), spawnedAt: T(0, 12), endedAt: T(19, 54) }), check: span('c-1', 'ended', '1s', '58s', { filedAt: T(19, 56) }) },
+          {
+            try: 1,
+            round: 1,
+            sessionOf: null,
+            used,
+            session: span('t-1', 'ended', '12s', '19m42s', { filedAt: T(0), spawnedAt: T(0, 12), endedAt: T(19, 54) }),
+            check: span('c-1', 'ended', '1s', '58s', { filedAt: T(19, 56) }),
+          },
           // Rechecked: no session of its own, and its check still running.
-          { try: 2, round: 1, sessionOf: 1, used: null, session: null, check: span('c-2', 'running', '1s', 'still running, no end yet', { filedAt: T(30), spawnedAt: T(30, 1) }) },
+          {
+            try: 2,
+            round: 1,
+            sessionOf: 1,
+            used: null,
+            session: null,
+            check: span('c-2', 'running', '1s', 'still running, no end yet', { filedAt: T(30), spawnedAt: T(30, 1) }),
+          },
         ],
       },
-      { ...base.steps[0]!, name: 'review', timeline: [{ try: 1, round: 1, sessionOf: null, used: null, session: span('t-lost', 'unknown', 'not on the record', 'not on the record'), check: null }] },
+      {
+        ...base.steps[0]!,
+        name: 'review',
+        timeline: [
+          {
+            try: 1,
+            round: 1,
+            sessionOf: null,
+            used: null,
+            session: span('t-lost', 'unknown', 'not on the record', 'not on the record'),
+            check: null,
+          },
+        ],
+      },
       { ...base.steps[0]!, name: 'respond', timeline: [] },
     ],
     timeline: { rounds: [total(1, '14s', '20m40s', 'still going')], run: total(null, '14s', '20m40s, 1 still running', 'still going') },
   };
   const html = renderToStaticMarkup(createElement(Timeline, { run }));
-  const rows = [...html.matchAll(/<tr data-step="([^"]+)"(?: data-try="\d+")? data-task="(\w+)" data-at="(\w+)"/g)].map((m) => [m[1], m[2], m[3]]);
-  assert.deepEqual(rows, [['implement', 'session', 'ended'], ['implement', 'check', 'ended'], ['implement', 'session', 'rechecked'], ['implement', 'check', 'running'], ['review', 'session', 'unknown']], html);
+  const rows = [...html.matchAll(/<tr data-step="([^"]+)"(?: data-try="\d+")? data-task="(\w+)" data-at="(\w+)"/g)].map((m) => [
+    m[1],
+    m[2],
+    m[3],
+  ]);
+  assert.deepEqual(
+    rows,
+    [
+      ['implement', 'session', 'ended'],
+      ['implement', 'check', 'ended'],
+      ['implement', 'session', 'rechecked'],
+      ['implement', 'check', 'running'],
+      ['review', 'session', 'unknown'],
+    ],
+    html,
+  );
   const cell = (name: string) => [...html.matchAll(new RegExp(`data-cell="${name}"[^>]*>([^<]*)<`, 'g'))].map((m) => unescaped(m[1]!));
   assert.deepEqual(cell('queued'), ['12s', '1s', '1s', '14s']);
   assert.deepEqual(cell('ran'), ['19m42s', '58s', 'still running, no end yet', '20m40s, 1 still running']);
-  assert.ok(html.includes(`<time dateTime="${T(0, 12)}"`) || html.includes(`datetime="${T(0, 12)}"`), 'each instant as the engine wrote it, on its <time>');
+  assert.ok(
+    html.includes(`<time dateTime="${T(0, 12)}"`) || html.includes(`datetime="${T(0, 12)}"`),
+    'each instant as the engine wrote it, on its <time>',
+  );
   assert.match(unescaped(html), /try 2<\/td><td colSpan="7"[^>]*>its session is try 1's, checked again/i);
   assert.match(html, /the engine has no record of t-lost/);
   assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');
   assert.doesNotMatch(html, /data-step="respond"/, 'a step not filed has no row');
   // One round: the run's total alone, its wall in the api's words.
-  assert.deepEqual([...html.matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]), ['run']);
+  assert.deepEqual(
+    [...html.matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]),
+    ['run'],
+  );
   assert.match(html, /data-cell="wall"[^>]*>wall still going</);
 
   // A loop that went round: each round's total, then the run's.
-  const looped = { ...run, timeline: { rounds: [total(1, '30s', '13m30s', '15m00s'), total(2, '1m10s', '6m50s', '9m00s')], run: total(null, '1m40s', '20m20s', '25m00s') } };
-  assert.deepEqual([...renderToStaticMarkup(createElement(Timeline, { run: looped })).matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]), ['round-1', 'round-2', 'run']);
+  const looped = {
+    ...run,
+    timeline: {
+      rounds: [total(1, '30s', '13m30s', '15m00s'), total(2, '1m10s', '6m50s', '9m00s')],
+      run: total(null, '1m40s', '20m20s', '25m00s'),
+    },
+  };
+  assert.deepEqual(
+    [...renderToStaticMarkup(createElement(Timeline, { run: looped })).matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]),
+    ['round-1', 'round-2', 'run'],
+  );
   // Two loops that went round, and a third that did not: each round of the two, named by its looping step; none of the third's.
   const twoLoops = {
     ...run,
     timeline: {
       rounds: [
-        total(1, '0s', '1m00s', '1m00s'), total(2, '0s', '1m00s', '1m00s'),
-        total(1, '0s', '2m00s', '2m00s', 'proofread'), total(2, '0s', '2m00s', '2m00s', 'proofread'), total(1, '0s', '3m00s', '3m00s', 'lint'),
+        total(1, '0s', '1m00s', '1m00s'),
+        total(2, '0s', '1m00s', '1m00s'),
+        total(1, '0s', '2m00s', '2m00s', 'proofread'),
+        total(2, '0s', '2m00s', '2m00s', 'proofread'),
+        total(1, '0s', '3m00s', '3m00s', 'lint'),
       ],
       run: total(null, '0s', '9m00s', '9m00s'),
     },
   };
-  const labels = [...renderToStaticMarkup(createElement(Timeline, { run: twoLoops })).matchAll(/<tr data-total="round-\d+"[^>]*><td[^>]*>([^<]+)</g)].map((m) => m[1]);
+  const labels = [
+    ...renderToStaticMarkup(createElement(Timeline, { run: twoLoops })).matchAll(/<tr data-total="round-\d+"[^>]*><td[^>]*>([^<]+)</g),
+  ].map((m) => m[1]);
   assert.deepEqual(labels, ['review round 1', 'review round 2', 'proofread round 1', 'proofread round 2']);
   // Nothing filed: no timeline at all.
-  assert.equal(renderToStaticMarkup(createElement(Timeline, { run: { ...run, steps: run.steps.map((step) => ({ ...step, timeline: [] })) } })), '');
+  assert.equal(
+    renderToStaticMarkup(createElement(Timeline, { run: { ...run, steps: run.steps.map((step) => ({ ...step, timeline: [] })) } })),
+    '',
+  );
 });
 
 // ─── what a step and a run cost ─────────────────────────────────────────────
@@ -1777,7 +2917,12 @@ const priced = (spent: number | null, cap: number | null, over = false) => ({
 });
 
 /** `run`, its one step priced as `cost` says, with the word and who waits on it. */
-const pricedRun = (status: string, cost: ReturnType<typeof priced>, waitingOnYou: string[] = [], cancelledAt: string | null = null): RunDetail => {
+const pricedRun = (
+  status: string,
+  cost: ReturnType<typeof priced>,
+  waitingOnYou: string[] = [],
+  cancelledAt: string | null = null,
+): RunDetail => {
   const run = runOf(status, { waitingOnYou, cancelledAt });
   return { ...run, steps: [{ ...run.steps[0]!, ...cost }] };
 };
@@ -1789,32 +2934,48 @@ test("a step's node says what its tries cost, of its cap where it has one — re
   assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
   assert.match(className!, /\btext-red-700\b/);
   assert.equal(gateDrawn(over), true, 'over budget waits on you: a human gate');
-  assert.equal(gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))), true, 'and so does a session ended at its cap');
+  assert.equal(
+    gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))),
+    true,
+    'and so does a session ended at its cap',
+  );
 
   const within = costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, 3))));
   assert.deepEqual([within?.[1], within?.[3], /\btext-red-700\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
   assert.equal(costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, null))))?.[3], '$1.20', 'no cap: what its tries cost');
-  assert.equal(costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3], 'budget $3', 'a cap, and nothing measured yet: the cap alone, never $0');
+  assert.equal(
+    costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3],
+    'budget $3',
+    'a cap, and nothing measured yet: the cap alone, never $0',
+  );
   assert.doesNotMatch(nodeMarkup(pricedRun('verified ✓', priced(null, null))), /data-cost/, 'nothing measured and no cap: no cost row');
 
   // A job its harness ended a little past its cap, which finished: red, and nothing waits on a raise — said of a job, not of a --bg session.
   const past = nodeMarkup(pricedRun('verified ✓', priced(3.02, 3, true)));
   assert.equal(costOf(past)?.[1], 'over');
-  assert.match(past, /<p data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/);
+  assert.match(
+    past,
+    /<p data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/,
+  );
   assert.doesNotMatch(past, /--bg/);
   assert.equal(gateDrawn(past), false, 'a finished step past its cap holds nothing');
 });
 
 test('REFUSED: a step past its budget is no gate where the api does not say it waits on you, nor on a run called off', () => {
   assert.equal(gateDrawn(nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), []))), false);
-  assert.equal(gateDrawn(nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review'], '2026-09-15T07:00:00.000Z'))), false);
+  assert.equal(
+    gateDrawn(nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review'], '2026-09-15T07:00:00.000Z'))),
+    false,
+  );
 });
 
 test("the inspector's Details say what every try cost of its cap — `spent`, red once past it — and add nothing for a step on its one try with no cap", () => {
   const run = runWith(null);
   const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
   const rows = (step: RunDetail['steps'][number]) =>
-    Object.fromEntries([...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]));
+    Object.fromEntries(
+      [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]),
+    );
   const step = run.steps[0]!;
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal(rows(over).spent, '$4.25 of $3');
@@ -1824,27 +2985,56 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
   // One try and no cap: its `cost` is all of it, and there is no `spent` row.
   assert.equal(Object.hasOwn(rows({ ...step, ...priced(1.2, null) }), 'spent'), false);
   // Tried twice with no cap: every try's cost together — or, for a filed step nobody priced, `not measured`, never $0.
-  const twice = { ...step, tries: [{ ...step.tries[0]!, current: false }, { ...step.tries[0]!, try: 2 }] };
+  const twice = {
+    ...step,
+    tries: [
+      { ...step.tries[0]!, current: false },
+      { ...step.tries[0]!, try: 2 },
+    ],
+  };
   assert.equal(rows({ ...twice, ...priced(2.95, null) }).spent, '$2.95');
   assert.equal(rows({ ...twice, ...priced(null, null) }).spent, 'not measured');
 });
 
 test("the timeline has a cost column: what each session cost, `not measured` where nobody priced it, nothing for a check — and each total its sessions', never $0", () => {
-  const span = (taskId: string) => ({ taskId, at: 'ended' as const, filedAt: at, spawnedAt: at, endedAt: at, attempts: 1, queuedMs: 0, ranMs: 0, queued: '0s', ran: '0s' });
-  const used = (cost: number | null) => ({ usage: null, used: 'not measured', cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`, costUsd: cost, apiMs: null, toolMs: null });
+  const span = (taskId: string) => ({
+    taskId,
+    at: 'ended' as const,
+    filedAt: at,
+    spawnedAt: at,
+    endedAt: at,
+    attempts: 1,
+    queuedMs: 0,
+    ranMs: 0,
+    queued: '0s',
+    ran: '0s',
+  });
+  const used = (cost: number | null) => ({
+    usage: null,
+    used: 'not measured',
+    cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`,
+    costUsd: cost,
+    apiMs: null,
+    toolMs: null,
+  });
   const base = runWith(null);
   const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
   const run: RunDetail = {
     ...base,
-    steps: [{
-      ...base.steps[0]!,
-      timeline: [
-        { try: 1, round: 1, session: span('t-1'), sessionOf: null, check: span('t-1-check'), used: used(1.75) },
-        { try: 2, round: 2, session: span('t-2'), sessionOf: null, check: null, used: used(null) },
-      ],
-    }],
+    steps: [
+      {
+        ...base.steps[0]!,
+        timeline: [
+          { try: 1, round: 1, session: span('t-1'), sessionOf: null, check: span('t-1-check'), used: used(1.75) },
+          { try: 2, round: 2, session: span('t-2'), sessionOf: null, check: null, used: used(null) },
+        ],
+      },
+    ],
     timeline: {
-      rounds: [{ ...total, round: 1, cost: { usd: 1.75, measured: 1, unmeasured: 0, said: '$1.75' } }, { ...total, round: 2, cost: null }],
+      rounds: [
+        { ...total, round: 1, cost: { usd: 1.75, measured: 1, unmeasured: 0, said: '$1.75' } },
+        { ...total, round: 2, cost: null },
+      ],
       run: { ...base.timeline.run, cost: { usd: 1.75, measured: 1, unmeasured: 1, said: '≥$1.75' } },
     },
   };
@@ -1855,72 +3045,178 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
     /data-task="(\w+)"/.exec(m[1]!)?.[1] ?? /data-total="([^"]+)"/.exec(m[1]!)?.[1],
     /<td data-cell="cost"[^>]*>([^<]*)<\/td>/.exec(m[2]!)?.[1],
   ]);
-  assert.deepEqual(rows, [['session', '$1.75'], ['check', ''], ['session', 'not measured'], ['round-1', '$1.75'], ['round-2', 'not measured'], ['run', '≥$1.75']]);
+  assert.deepEqual(rows, [
+    ['session', '$1.75'],
+    ['check', ''],
+    ['session', 'not measured'],
+    ['round-1', '$1.75'],
+    ['round-2', 'not measured'],
+    ['run', '≥$1.75'],
+  ]);
   // What a `≥` leaves out, on hover.
-  assert.match(html, /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this"/);
+  assert.match(
+    html,
+    /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this"/,
+  );
 });
 
 test("the Decide section says why a step past its budget is held — `wf decide`'s OVER BUDGET line — and what every try of the run cost", () => {
   const line = 'OVER BUDGET, waiting on you: tokens ($4.25 of $3)  — the run files nothing more for it on its own; nothing after it ran';
   const decision = {
-    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    touched: [],
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    sensitive: [],
+    used: {},
     total: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
-    cost: 'run $6.35 measured · 2 attempts not measured', overBudget: line, commands: [],
+    cost: 'run $6.35 measured · 2 attempts not measured',
+    overBudget: line,
+    commands: [],
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
-  assert.match(html, /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/);
+  assert.match(
+    html,
+    /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/,
+  );
   assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 attempts not measured<\/dd>/);
-  const none = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }));
+  const none = renderToStaticMarkup(
+    createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }),
+  );
   assert.doesNotMatch(none, /data-over-budget/, 'no step held on a budget: no line');
   assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
 });
 
-test("what sessions read, by price: beside the cost, the peak marked at a cap or past 200k, a rebuilt cache said beneath — and no row where nothing measured it", () => {
+test('what sessions read, by price: beside the cost, the peak marked at a cap or past 200k, a rebuilt cache said beneath — and no row where nothing measured it', () => {
   const { Read, readRows } = facts;
   const markup = (node: unknown) => renderToStaticMarkup(node as Parameters<typeof renderToStaticMarkup>[0]);
-  const used = (read: string | null, peak: 'cap' | 'large' | null = null, rebuilt = 0) => ({ usage: null, used: '', cost: '$3.01', costUsd: 3.01, apiMs: null, toolMs: null, read, peak, rebuilt });
+  const used = (read: string | null, peak: 'cap' | 'large' | null = null, rebuilt = 0) => ({
+    usage: null,
+    used: '',
+    cost: '$3.01',
+    costUsd: 3.01,
+    apiMs: null,
+    toolMs: null,
+    read,
+    peak,
+    rebuilt,
+  });
 
-  assert.deepEqual(readRows(used(null)), [], "a runner that counted its input as one number: no row, not 0");
+  assert.deepEqual(readRows(used(null)), [], 'a runner that counted its input as one number: no row, not 0');
   assert.deepEqual(readRows(null), []);
 
   const plain = markup(createElement(Read, { said: 'read 21.4M · wrote 412k · peak 167k', peak: null, rebuilt: 0 }));
-  assert.match(plain, /<span class="font-mono text-xs"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/);
+  assert.match(
+    plain,
+    /<span class="font-mono text-xs"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/,
+  );
   assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
 
-  const capped = markup(createElement(Read, { said: 'read 4.4M · wrote 355k · peak 174k, compacted twice at its 200k cap · a resumed session wrote its context to the cache again instead of reading it', peak: 'cap', rebuilt: 1 }));
-  assert.match(capped, /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/);
+  const capped = markup(
+    createElement(Read, {
+      said: 'read 4.4M · wrote 355k · peak 174k, compacted twice at its 200k cap · a resumed session wrote its context to the cache again instead of reading it',
+      peak: 'cap',
+      rebuilt: 1,
+    }),
+  );
+  assert.match(
+    capped,
+    /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/,
+  );
   const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
-  assert.match(unpeaked, /<span data-peak="cap"[^>]*>compacted at its 100k cap<\/span>/, 'no peak measured: the compaction is where it stands, and not dropped');
-  assert.match(capped, /<span data-rebuilt="1" class="block text-xs [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/);
+  assert.match(
+    unpeaked,
+    /<span data-peak="cap"[^>]*>compacted at its 100k cap<\/span>/,
+    'no peak measured: the compaction is where it stands, and not dropped',
+  );
+  assert.match(
+    capped,
+    /<span data-rebuilt="1" class="block text-xs [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/,
+  );
 
-  const large = markup(createElement(Read, { said: 'read 2.9M · wrote 100k · peak 250k, past 200k with no cap', peak: 'large', rebuilt: 0 }));
+  const large = markup(
+    createElement(Read, { said: 'read 2.9M · wrote 100k · peak 250k, past 200k with no cap', peak: 'large', rebuilt: 0 }),
+  );
   assert.match(large, /<span data-peak="large"[^>]*>peak 250k, past 200k with no cap<\/span>/);
 
   // On the Decide section, beside the total's cost.
   const decision = {
-    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
-    total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'), cost: 'run $6.80', overBudget: null, commands: [],
+    touched: [],
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    sensitive: [],
+    used: {},
+    total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'),
+    cost: 'run $6.80',
+    overBudget: null,
+    commands: [],
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
-  assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/);
+  assert.match(
+    html,
+    /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/,
+  );
 });
 
 test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {
   type RetryMode = import('../src/lib/api.ts').RetryMode;
-  const checkRaise = { by: 'retry' as const, above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'] as RetryMode[], own: 'failed (check)', needs: null, unfinished: false };
+  const checkRaise = {
+    by: 'retry' as const,
+    above: 4.25,
+    said: '$4.25',
+    modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+    own: 'failed (check)',
+    needs: null,
+    unfinished: false,
+  };
   const html = offersMarkup([
     { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', ...checkRaise },
     {
-      step: 'palette', kind: 'raise', status: 'over budget $1.50 of $1', by: 'retry', above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'], own: 'blocked',
-      needs: 'Warm colours, or cool ones?', unfinished: false,
+      step: 'palette',
+      kind: 'raise',
+      status: 'over budget $1.50 of $1',
+      by: 'retry',
+      above: 1.5,
+      said: '$1.50',
+      modes: ['nudge', 'fresh'],
+      own: 'blocked',
+      needs: 'Warm colours, or cool ones?',
+      unfinished: false,
     },
     { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
-    { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', by: 'round', above: 2.1, said: '$2.10', modes: [], own: null, needs: null, unfinished: false },
+    {
+      step: 'review',
+      kind: 'raise',
+      status: 'over budget — implement $2.10 of $2',
+      by: 'round',
+      above: 2.1,
+      said: '$2.10',
+      modes: [],
+      own: null,
+      needs: null,
+      unfinished: false,
+    },
   ]);
-  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, { kind: m[1]!, html: m[3]! }]));
-  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [['tokens', 'raise'], ['palette', 'raise'], ['types', 'raise'], ['review', 'raise']]);
-  const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
-  const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+      m[2]!,
+      { kind: m[1]!, html: m[3]! },
+    ]),
+  );
+  assert.deepEqual(
+    [...rows].map(([name, { kind }]) => [name, kind]),
+    [
+      ['tokens', 'raise'],
+      ['palette', 'raise'],
+      ['types', 'raise'],
+      ['review', 'raise'],
+    ],
+  );
+  const buttons = (name: string) =>
+    [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [
+      m[1],
+      Boolean(m[2]),
+      m[3],
+    ]);
+  const radios = (name: string) =>
+    [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
   // The number box, and the amount it starts at, whatever order a server render writes its attributes in — and whether it is closed.
   const input = (name: string) => /<input [^>]*type="number"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
   const box = (name: string) => /\bvalue="([^"]*)"/.exec(input(name))?.[1];
@@ -1932,11 +3228,18 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   };
 
   const tokens = textsOf(rows.get('tokens')!.html);
-  assert.ok(tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'), tokens.join(' | '));
+  assert.ok(
+    tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'),
+    tokens.join(' | '),
+  );
   assert.equal(box('tokens'), '5');
   assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
   // Its check refused: its check again is a way on, which needs no raise, and a nudge is first.
-  assert.deepEqual(radios('tokens'), [['nudge', true], ['fresh', false], ['recheck', false]]);
+  assert.deepEqual(radios('tokens'), [
+    ['nudge', true],
+    ['fresh', false],
+    ['recheck', false],
+  ]);
   assert.ok(rows.get('tokens')!.html.includes('Its check again costs nothing, and needs no raise.'), rows.get('tokens')!.html);
   assert.deepEqual(said('tokens'), ['What to tell tokens, if anything', false]);
   assert.equal(boxClosed('tokens'), false);
@@ -1945,16 +3248,27 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   // Signed off blocked past its budget: its question, and the answer with the raise — the button waits for the answer, as an answer row's does.
   const palette = textsOf(rows.get('palette')!.html);
   assert.ok(palette.join(' ').includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
-  assert.match(rows.get('palette')!.html, /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/, 'the question as markdown, in a box that scrolls');
+  assert.match(
+    rows.get('palette')!.html,
+    /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/,
+    'the question as markdown, in a box that scrolls',
+  );
   assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
   assert.equal(box('palette'), '2');
   assert.deepEqual(said('palette'), ['Your answer to palette', false]);
   assert.deepEqual(buttons('palette'), [['submit', true, 'Raise the budget and answer']]);
-  assert.deepEqual(radios('palette'), [['nudge', true], ['fresh', false]]);
+  assert.deepEqual(radios('palette'), [
+    ['nudge', true],
+    ['fresh', false],
+  ]);
   assert.doesNotMatch(rows.get('tokens')!.html, /data-asks/, 'a step that asked nothing has no question on its row');
 
   // A check that did not finish past its budget: its check again first, which files no session — so no amount, and nobody to tell.
-  assert.deepEqual(radios('types'), [['nudge', false], ['fresh', false], ['recheck', true]]);
+  assert.deepEqual(radios('types'), [
+    ['nudge', false],
+    ['fresh', false],
+    ['recheck', true],
+  ]);
   assert.deepEqual(buttons('types'), [['submit', false, 'Run its check again']]);
   assert.equal(boxClosed('types'), true);
   assert.deepEqual(said('types'), ['What to tell types, if anything', true]);
@@ -1973,41 +3287,73 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
 /** `READ_ONLY_COMMANDS` as the api serves it, cut to a few. */
 const READ_ONLY: ReadOnlyCommands = {
-  harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15', source: "B9's last review", measured: ['cat', 'grep'], documented: ['find', 'git'],
+  harness: 'Claude Code',
+  version: '2.1.272',
+  measuredAt: '2026-09-15',
+  source: "B9's last review",
+  measured: ['cat', 'grep'],
+  documented: ['find', 'git'],
   docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
 };
 /** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not — and what denies what asks there: dontAsk, a job, or nothing. */
 const allowedTo = (dontAsk: boolean, askDenier: StepReach['allowed']['askDenier'] = dontAsk ? 'dontAsk' : null): StepReach['allowed'] => ({
-  rules: ['Bash(npm test)'], takenBack: [], asked: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }], exceptions: [], dontAsk, askDenier, why: null,
+  rules: ['Bash(npm test)'],
+  takenBack: [],
+  asked: [],
+  unused: [],
+  bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }],
+  exceptions: [],
+  dontAsk,
+  askDenier,
+  why: null,
 });
 /** The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api gives as the rule that denies it too. */
-const readOnlyReach = (denied: Record<string, string> = {}, asks: Record<string, string> = {}, dontAsk = false): NonNullable<StepReach['readOnly']> => [
-  ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
-  ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
-].map((c) => {
-  const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command]!, source: '.claude/settings.json' } : null);
-  return { ...c, denied: rule(denied) ?? (dontAsk ? rule(asks) : null), asks: rule(asks) };
-});
+const readOnlyReach = (
+  denied: Record<string, string> = {},
+  asks: Record<string, string> = {},
+  dontAsk = false,
+): NonNullable<StepReach['readOnly']> =>
+  [
+    ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
+    ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
+  ].map((c) => {
+    const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command]!, source: '.claude/settings.json' } : null);
+    return { ...c, denied: rule(denied) ?? (dontAsk ? rule(asks) : null), asks: rule(asks) };
+  });
 const allowedMarkup = (allowed: StepReach['allowed'], readOnly: StepReach['readOnly']) =>
   renderToStaticMarkup(createElement(AllowedReach, { allowed, readOnly, commands: READ_ONLY }));
 /** Each read-only command drawn, as `command[:documented][:denied rule][:asks rule]`. */
 const readOnlyChips = (html: string) =>
-  [...html.matchAll(/<code data-read-only="([^"]+)"( data-documented="true")?(?: data-denied="([^"]+)")?(?: data-asks="([^"]+)")?/g)].map(([, c, documented, denied, asks]) =>
-    [c, documented ? ':documented' : '', denied ? `:${unescaped(denied)}` : '', asks ? `:asks ${unescaped(asks)}` : ''].join(''));
+  [...html.matchAll(/<code data-read-only="([^"]+)"( data-documented="true")?(?: data-denied="([^"]+)")?(?: data-asks="([^"]+)")?/g)].map(
+    ([, c, documented, denied, asks]) =>
+      [c, documented ? ':documented' : '', denied ? `:${unescaped(denied)}` : '', asks ? `:asks ${unescaped(asks)}` : ''].join(''),
+  );
 
 test("in dontAsk, a step with Bash is not told that every command no rule allows is denied: Claude Code's read-only commands ask for none, measured apart from documented, dated — then what the settings allow of what asks", () => {
   const html = allowedMarkup(allowedTo(true), readOnlyReach());
   const texts = textsOf(html);
   assert.ok(texts.includes('Bash it may run'), texts.join(' | '));
   assert.doesNotMatch(html, /a command no rule allows is denied/, 'the sentence B9 left, which a read-only command makes false');
-  assert.ok(texts.includes("In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:"), texts.join(' | '));
+  assert.ok(
+    texts.includes(
+      "In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:",
+    ),
+    texts.join(' | '),
+  );
   assert.deepEqual(readOnlyChips(html), ['cat', 'grep', 'find:documented', 'git:documented']);
   // The measurement is of its day: the words say so, and claim nothing of the settings or the harness today.
   assert.ok(
-    textsOf(html).some((t) => t.startsWith("The solid ones were measured on 2026-09-15 with 2.1.272 (B9's last review): that day, under that day's settings, they ran with no rule allowing them. The dashed ones are named by its docs")),
+    textsOf(html).some((t) =>
+      t.startsWith(
+        "The solid ones were measured on 2026-09-15 with 2.1.272 (B9's last review): that day, under that day's settings, they ran with no rule allowing them. The dashed ones are named by its docs",
+      ),
+    ),
     textsOf(html).join(' | '),
   );
-  assert.match(html, /<code data-read-only="cat" title="Measured on 2026-09-15, Claude Code 2\.1\.272: it ran with no rule allowing it, under that day&#x27;s settings"/);
+  assert.match(
+    html,
+    /<code data-read-only="cat" title="Measured on 2026-09-15, Claude Code 2\.1\.272: it ran with no rule allowing it, under that day&#x27;s settings"/,
+  );
   assert.ok(texts.includes('Of the commands that ask, the settings allow it:'), texts.join(' | '));
   assert.match(html, /<code data-bash="npm test"/);
   assert.doesNotMatch(html, /No Bash command at all/, 'a step whose settings allow no command still runs the read-only ones');
@@ -2018,7 +3364,10 @@ test("in dontAsk, a step with Bash is not told that every command no rule allows
 test('REFUSED: a read-only command a deny covers is drawn struck, with the deny — and a step with no Bash, or in no Claude Code, is drawn none', () => {
   const html = allowedMarkup(allowedTo(true), readOnlyReach({ cat: 'Bash(cat:*)', git: 'Bash(git:*)' }));
   assert.deepEqual(readOnlyChips(html), ['cat:Bash(cat:*)', 'grep', 'find:documented', 'git:documented:Bash(git:*)']);
-  assert.match(html, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" title="Denied by Bash\(cat:\*\) \(.claude\/settings.json\)[^"]*" class="[^"]*line-through/);
+  assert.match(
+    html,
+    /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" title="Denied by Bash\(cat:\*\) \(.claude\/settings.json\)[^"]*" class="[^"]*line-through/,
+  );
   const why = 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
   const shut = allowedMarkup({ ...allowedTo(true), rules: [], bash: [], why }, []);
   assert.deepEqual(readOnlyChips(shut), []);
@@ -2030,24 +3379,43 @@ test('REFUSED: a read-only command an ask rule covers is drawn asking, with the 
   // The finding: `ask: ["Bash(cat:*)"]` on a dontAsk step drew cat solid under "do not ask", and its cat is denied.
   const html = allowedMarkup(allowedTo(true), readOnlyReach({}, { cat: 'Bash(cat:*)' }, true));
   assert.deepEqual(readOnlyChips(html), ['cat:Bash(cat:*):asks Bash(cat:*)', 'grep', 'find:documented', 'git:documented']);
-  assert.match(html, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave, and dontAsk denies what asks" class="[^"]*line-through/);
+  assert.match(
+    html,
+    /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave, and dontAsk denies what asks" class="[^"]*line-through/,
+  );
   assert.ok(textsOf(html).includes('cat asks, by Bash(cat:*) (.claude/settings.json), which dontAsk denies.'), textsOf(html).join(' | '));
 
   // On a job, which asks nobody in any mode, it is struck too, and the words name the job rather than a mode.
   const job = allowedMarkup(allowedTo(false, 'a job'), readOnlyReach({}, { cat: 'Bash(cat:*)' }, true));
   assert.deepEqual(readOnlyChips(job), ['cat:Bash(cat:*):asks Bash(cat:*)', 'grep', 'find:documented', 'git:documented']);
-  assert.match(job, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="[^"]*, and a job denies what asks" class="[^"]*line-through/);
+  assert.match(
+    job,
+    /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="[^"]*, and a job denies what asks" class="[^"]*line-through/,
+  );
   assert.ok(textsOf(job).includes('cat asks, by Bash(cat:*) (.claude/settings.json), which a job denies.'), textsOf(job).join(' | '));
   const jobNone = allowedMarkup({ ...allowedTo(false, 'a job'), rules: [], bash: [] }, readOnlyReach());
-  assert.ok(textsOf(jobNone).some((t) => t.endsWith('and what would still ask is denied: a job asks nobody.')), textsOf(jobNone).join(' | '));
+  assert.ok(
+    textsOf(jobNone).some((t) => t.endsWith('and what would still ask is denied: a job asks nobody.')),
+    textsOf(jobNone).join(' | '),
+  );
 
   // On a background session, outside dontAsk, it asks: not struck, and not drawn as running.
   const asking = allowedMarkup(allowedTo(false), readOnlyReach({ find: 'Bash(find:*)' }, { cat: 'Bash(cat:*)', git: 'Bash(git:*)' }));
-  assert.deepEqual(readOnlyChips(asking), ['cat:asks Bash(cat:*)', 'grep', 'find:documented:Bash(find:*)', 'git:documented:asks Bash(git:*)']);
-  assert.match(asking, /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-amber-50/);
+  assert.deepEqual(readOnlyChips(asking), [
+    'cat:asks Bash(cat:*)',
+    'grep',
+    'find:documented:Bash(find:*)',
+    'git:documented:asks Bash(git:*)',
+  ]);
+  assert.match(
+    asking,
+    /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-amber-50/,
+  );
   assert.doesNotMatch(asking.match(/<code data-read-only="cat"[^>]*>/)![0], /line-through|emerald/);
   assert.ok(
-    textsOf(asking).includes("cat asks, by Bash(cat:*) (.claude/settings.json); find is denied, by Bash(find:*) (.claude/settings.json); read-only git asks, by Bash(git:*) (.claude/settings.json)."),
+    textsOf(asking).includes(
+      'cat asks, by Bash(cat:*) (.claude/settings.json); find is denied, by Bash(find:*) (.claude/settings.json); read-only git asks, by Bash(git:*) (.claude/settings.json).',
+    ),
     textsOf(asking).join(' | '),
   );
 
@@ -2066,19 +3434,35 @@ test('REFUSED: an allow an ask rule takes back is drawn apart, with the rule —
     asked: [{ rule: 'Bash(git diff:*)', by: settings('Bash(git:*)') }],
     bash: [
       { rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] },
-      { rule: 'Bash(npx turbo run test:*)', command: 'npx turbo run test:*', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] },
+      {
+        rule: 'Bash(npx turbo run test:*)',
+        command: 'npx turbo run test:*',
+        except: ['Bash(npx turbo run test e2e)'],
+        asks: ['Bash(npx turbo run test build)'],
+      },
     ],
-    exceptions: [{ rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] }],
+    exceptions: [
+      { rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] },
+    ],
   });
   const shut = allowedMarkup(allowed(true), readOnlyReach());
-  assert.ok(textsOf(shut).includes('Taken back by an ask rule, which beats an allow, and dontAsk denies what asks:'), textsOf(shut).join(' | '));
-  assert.match(shut, /<code data-asked="Bash\(git diff:\*\)" title="Asks by Bash\(git:\*\) \(.claude\/settings.json\)" class="[^"]*line-through/);
+  assert.ok(
+    textsOf(shut).includes('Taken back by an ask rule, which beats an allow, and dontAsk denies what asks:'),
+    textsOf(shut).join(' | '),
+  );
+  assert.match(
+    shut,
+    /<code data-asked="Bash\(git diff:\*\)" title="Asks by Bash\(git:\*\) \(.claude\/settings.json\)" class="[^"]*line-through/,
+  );
   assert.doesNotMatch(shut, /data-bash="git diff/, 'not drawn among what it may run');
   assert.match(shut, /data-asks="npx turbo run test:\*"[^>]*>and asks for Bash\(npx turbo run test build\), which dontAsk denies</);
   assert.doesNotMatch(shut, /data-asks="npm test"/);
 
   const job = allowedMarkup({ ...allowed(false), askDenier: 'a job' }, readOnlyReach());
-  assert.ok(textsOf(job).includes('Taken back by an ask rule, which beats an allow, and a job denies what asks:'), textsOf(job).join(' | '));
+  assert.ok(
+    textsOf(job).includes('Taken back by an ask rule, which beats an allow, and a job denies what asks:'),
+    textsOf(job).join(' | '),
+  );
   assert.match(job, /<code data-asked="Bash\(git diff:\*\)"[^>]*class="[^"]*line-through/);
   assert.match(job, /data-asks="Bash\(npx turbo run test:\*\)"[^>]*>and asks for Bash\(npx turbo run test build\), which a job denies</);
 
@@ -2102,19 +3486,25 @@ test("outside dontAsk the settings' allow rules are listed, and the read-only co
 });
 
 /** The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder again. */
-async function refusedMarkup(message: string, steps: string[], status: number | null): Promise<{ head: string; reread: boolean; said: string }> {
+async function refusedMarkup(
+  message: string,
+  steps: string[],
+  status: number | null,
+): Promise<{ head: string; reread: boolean; said: string }> {
   const { SaveRefused } = await import('../src/components/WorkflowBuilder.tsx');
   const { BuildRefusal } = await import('../src/lib/api.ts');
-  const html = renderToStaticMarkup(createElement(SaveRefused, {
-    refusal: new BuildRefusal(message, steps, status),
-    rereading: false,
-    onReread: () => {},
-  }));
+  const html = renderToStaticMarkup(
+    createElement(SaveRefused, {
+      refusal: new BuildRefusal(message, steps, status),
+      rereading: false,
+      onReread: () => {},
+    }),
+  );
   const texts = textsOf(html);
   return { head: texts[0]!, reread: /Read the folder again/.test(html), said: texts[1]! };
 }
 
-test("a save the api refused — a 4xx — says nothing was written, and only a 409 offers to read the folder again", async () => {
+test('a save the api refused — a 4xx — says nothing was written, and only a 409 offers to read the folder again', async () => {
   const refused = await refusedMarkup('review: waits on "x", which is not a step here', ['review'], 422);
   assert.equal(refused.head, 'Not saved, and nothing written. The api refused it, for review:');
   assert.equal(refused.said, 'review: waits on "x", which is not a step here');
@@ -2129,16 +3519,20 @@ test("a save the api refused — a 4xx — says nothing was written, and only a 
   assert.equal(stale.reread, true);
 });
 
-test("REFUSED at shipped defaults: a save the api broke off — a 500 — does not say nothing was written; it says the folder may have been, and offers to read it again", async () => {
+test('REFUSED at shipped defaults: a save the api broke off — a 500 — does not say nothing was written; it says the folder may have been, and offers to read it again', async () => {
   const broke = await refusedMarkup("EACCES: permission denied, open '/w/plan.md'", [], 500);
-  assert.equal(broke.head, 'Not saved. The folder may have been written all the same: the api broke off (500), and what the folder holds is what is on disk:');
+  assert.equal(
+    broke.head,
+    'Not saved. The folder may have been written all the same: the api broke off (500), and what the folder holds is what is on disk:',
+  );
   assert.doesNotMatch(broke.head, /nothing written/, 'a 500 is a write that broke off partway, and the api cannot say what it wrote');
   assert.equal(broke.said, "EACCES: permission denied, open '/w/plan.md'");
   assert.equal(broke.reread, true);
 });
 
-test("REFUSED at shipped defaults: a save with no status — a fetch that never landed, and an answer without what it wrote — does not say nothing was written; it says the folder may have been, names no status, and offers to read it again", async () => {
-  const said = 'Not saved. The folder may have been written all the same: the api did not say what it wrote, and what the folder holds is what is on disk:';
+test('REFUSED at shipped defaults: a save with no status — a fetch that never landed, and an answer without what it wrote — does not say nothing was written; it says the folder may have been, names no status, and offers to read it again', async () => {
+  const said =
+    'Not saved. The folder may have been written all the same: the api did not say what it wrote, and what the folder holds is what is on disk:';
   const lost = await refusedMarkup('Failed to fetch', [], null);
   assert.equal(lost.head, said);
   assert.doesNotMatch(lost.head, /nothing written/, 'the api may have carried the write out and died before answering');
@@ -2147,7 +3541,11 @@ test("REFUSED at shipped defaults: a save with no status — a fetch that never 
 
   // The other refusal with no status of its own (`build` in lib/api.ts): the api answered, and not with what it wrote. The head says what it
   // did not say, not that it said nothing, which its own message would contradict on the line below.
-  const shapeless = await refusedMarkup('PUT /api/workflows/yours/mine answered 200 OK without what it wrote, so the api and this board disagree about what a write answers.', [], null);
+  const shapeless = await refusedMarkup(
+    'PUT /api/workflows/yours/mine answered 200 OK without what it wrote, so the api and this board disagree about what a write answers.',
+    [],
+    null,
+  );
   assert.equal(shapeless.head, said);
   assert.doesNotMatch(shapeless.head, /did not answer/, 'it answered: 200, without what it wrote');
   assert.equal(shapeless.reread, true);
@@ -2161,17 +3559,31 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
   const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
   const { StartRun } = await import('../src/components/StartRun.tsx');
   const workflow = {
-    name: 'note', from: 'yours' as const, dir: '/home/me/.agent-workflows/workflows/note', description: null,
-    steps: [], graph: { roots: [], edges: [] }, schemas: [], folderTeam, version: '0', error: null,
+    name: 'note',
+    from: 'yours' as const,
+    dir: '/home/me/.agent-workflows/workflows/note',
+    description: null,
+    steps: [],
+    graph: { roots: [], edges: [] },
+    schemas: [],
+    folderTeam,
+    version: '0',
+    error: null,
   };
-  return renderToStaticMarkup(createElement(
-    QueryClientProvider,
-    { client: new QueryClient() },
-    createElement(StartRun, { workflow, card: { name: 'a-note-on-the-tides', body: 'Why the tides come twice a day.' }, ...(repo ? { repo } : {}) }),
-  ));
+  return renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(StartRun, {
+        workflow,
+        card: { name: 'a-note-on-the-tides', body: 'Why the tides come twice a day.' },
+        ...(repo ? { repo } : {}),
+      }),
+    ),
+  );
 }
 
-test("a card that names a repository, started on a team that works in folders: the form says the repository is not looked at, and names it", async () => {
+test('a card that names a repository, started on a team that works in folders: the form says the repository is not looked at, and names it', async () => {
   const html = await startMarkup(true, '/code/app');
   const said = textsOf(html).find((text) => text.startsWith("The card's repo:"));
   assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
@@ -2187,8 +3599,12 @@ test('REFUSED at shipped defaults: no such note on a team that works on a reposi
 // ─── a run a person holds ────────────────────────────────────────────────────
 
 const HOLDING = {
-  at: '2026-09-23T07:00:00.000Z', runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], shipped: false }],
-  word: 'held until p-1 ships', advice: 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has shipped; to go on before then: wf hold r-1 --off', onYou: false,
+  at: '2026-09-23T07:00:00.000Z',
+  runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], shipped: false }],
+  word: 'held until p-1 ships',
+  advice:
+    'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has shipped; to go on before then: wf hold r-1 --off',
+  onYou: false,
 };
 
 test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — in its own words, and a step at work is drawn at work', () => {
@@ -2201,11 +3617,21 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
     // The same step on the run unheld is its gate's state, not held: the hold is the one fact that differs.
     assert.doesNotMatch(nodeMarkup(runOf(status, { waitingOnYou: [] })), /data-state="held"/, status);
   }
-  assert.match(nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] }), /data-state="working"/);
+  assert.match(
+    nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] }),
+    /data-state="working"/,
+  );
 });
 
 test("a held run's rail draws its gate and the steps not filed held, and its work at work", () => {
-  const held = { ...summaryRun(), waitingOnYou: [], onYou: [], toDecide: null, heldUntil: ['p-1'], holding: HOLDING } as unknown as RunSummary;
+  const held = {
+    ...summaryRun(),
+    waitingOnYou: [],
+    onYou: [],
+    toDecide: null,
+    heldUntil: ['p-1'],
+    holding: HOLDING,
+  } as unknown as RunSummary;
   const html = railMarkup(held);
   const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
@@ -2213,12 +3639,18 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
 
 test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed', () => {
   const card = (id: string, heldUntil: string[]) => ({
-    id, after: [], heldUntil, steps: [{ name: 'plan', taskId: `t-${id}`, branch: null, status: 'awaiting approval', note: null, needs: null, blockedByHarness: false }],
+    id,
+    after: [],
+    heldUntil,
+    steps: [
+      { name: 'plan', taskId: `t-${id}`, branch: null, status: 'awaiting approval', note: null, needs: null, blockedByHarness: false },
+    ],
   });
   const edges = afterEdges([card('p', []), card('h', ['p'])]);
-  assert.deepEqual(edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })), [
-    { id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } },
-  ]);
+  assert.deepEqual(
+    edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
+    [{ id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } }],
+  );
   assert.match(edgeMarkup(edges[0]!), /stroke-dasharray:5 4/);
 });
 
@@ -2227,7 +3659,13 @@ const { Gate } = await import('../src/components/Gate.tsx');
 
 /** A plan's closeout as the api gives it, its fields in the order its schema declares them: files long enough to fold, risks not. */
 const planCloseout: StepCloseout = {
-  outcome: 'done', summary: 'Parse the flag, then store it.', needs: null, artifacts: [], replies: null, missing: [], raw: {},
+  outcome: 'done',
+  summary: 'Parse the flag, then store it.',
+  needs: null,
+  artifacts: [],
+  replies: null,
+  missing: [],
+  raw: {},
   output: {
     approach: 'Parse `--flag` in cli.ts and store it on the run record.',
     files: ['cli.ts', 'run.ts', 'store.ts', 'README.md'].map((path) => ({ path, change: `edit ${path}` })),
@@ -2246,7 +3684,17 @@ const planCloseout: StepCloseout = {
 function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): RunDetail {
   const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
   const [step] = run.steps;
-  return { ...run, steps: [{ ...step!, approve: closeout ? 'approve review' : null, closeout, tries: [{ ...step!.tries[0]!, closeout }] } as RunDetail['steps'][number]] };
+  return {
+    ...run,
+    steps: [
+      {
+        ...step!,
+        approve: closeout ? 'approve review' : null,
+        closeout,
+        tries: [{ ...step!.tries[0]!, closeout }],
+      } as RunDetail['steps'][number],
+    ],
+  };
 }
 
 const tabSelected = (html: string): string | undefined => /aria-selected="true"[^>]*>([A-Za-z]+)</.exec(html)?.[1];
@@ -2259,7 +3707,11 @@ test('the inspector opens on Output for a step that has a closeout — at its ga
   assert.match(atGate, /data-answer-at="Details"[^>]*>review waits at its gate on you/, 'and says the answer is under Details');
   const done = inspect(gatedRun({ ...planCloseout, output: {}, schema: {} }, 'succeeded'));
   assert.equal(tabSelected(done), 'Output');
-  assert.doesNotMatch(inspect({ ...gatedRun(planCloseout, 'succeeded'), waitingOnYou: [] }), /data-answer-at/, 'a step at no gate is not said to wait at one');
+  assert.doesNotMatch(
+    inspect({ ...gatedRun(planCloseout, 'succeeded'), waitingOnYou: [] }),
+    /data-answer-at/,
+    'a step at no gate is not said to wait at one',
+  );
   const running = inspect(gatedRun(null, 'running'));
   assert.equal(tabSelected(running), 'Details');
   assert.doesNotMatch(running, /data-closeout/);
@@ -2269,10 +3721,18 @@ test("what a gate approves is its summary and each field declared, a plan's appr
   const html = renderToStaticMarkup(createElement(HandedOn, { closeout: planCloseout }));
   assert.ok(html.indexOf('Parse the flag, then store it.') < html.indexOf('data-field="approach"'), 'the summary first');
   assert.match(html, /<h4[^>]*>approach<\/h4>/, 'the approach under its name, never folded');
-  assert.match(html, /<details data-fold="files"[^>]*><summary[^>]*><span[^>]*>files<\/span> · 4<\/summary><\/details>/, 'four files folded, and nothing drawn in the fold');
+  assert.match(
+    html,
+    /<details data-fold="files"[^>]*><summary[^>]*><span[^>]*>files<\/span> · 4<\/summary><\/details>/,
+    'four files folded, and nothing drawn in the fold',
+  );
   assert.doesNotMatch(html, /store\.ts/, 'no file of the four is in the markup while the fold is shut');
   assert.doesNotMatch(html, /data-fold="(steps|risks)"/, 'two steps and one risk are read at a glance');
-  assert.match(html, /data-field="steps"[\s\S]*Store it[\s\S]*data-field="risks"[\s\S]*An old record has no flag/, 'steps then risks, in the order declared');
+  assert.match(
+    html,
+    /data-field="steps"[\s\S]*Store it[\s\S]*data-field="risks"[\s\S]*An old record has no flag/,
+    'steps then risks, in the order declared',
+  );
   assert.doesNotMatch(html, /Raw/, 'no Raw switch: the statement whole is the Output tab');
   const summaryAlone = renderToStaticMarkup(createElement(HandedOn, { closeout: { ...planCloseout, output: {}, schema: {} } }));
   assert.doesNotMatch(summaryAlone, /data-field/, 'a step that declared nothing hands on its summary alone');
@@ -2293,20 +3753,44 @@ test("the run page's gate draws what is being approved beside Approve and Send b
 test("an agent's form shows its card read-only, generated from its skills: an entry each, no field to edit it, and the package's refusal where none can be made", async () => {
   const { AgentForm } = await import('../src/components/AgentForm.tsx');
   const agent = {
-    name: 'scribe', from: 'yours' as const, dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read, Skill' }, body: 'Write.\n',
-    schema: null, skills: 'write-a-note, file-it', systemPrompt: null, given: [], source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null,
+    name: 'scribe',
+    from: 'yours' as const,
+    dir: '/store/agents',
+    file: '/store/agents/scribe.md',
+    description: 'Writes notes.',
+    keys: { tools: 'Read, Skill' },
+    body: 'Write.\n',
+    schema: null,
+    skills: 'write-a-note, file-it',
+    systemPrompt: null,
+    given: [],
+    source: '',
+    version: 'v1',
+    usedBy: [],
+    error: null,
+    untried: null,
+    cardError: null,
     card: [
       { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'] },
       { id: 'file-it', name: 'File it away', description: 'Files a note where it belongs.', tags: ['file-it'] },
     ],
   };
-  const form = (listing: typeof agent | null) => withClient(createElement(AgentForm, { listing, keyForm: undefined, saving: false, refusal: null, onSave: () => {} }));
+  const form = (listing: typeof agent | null) =>
+    withClient(createElement(AgentForm, { listing, keyForm: undefined, saving: false, refusal: null, onSave: () => {} }));
   const html = form(agent);
-  assert.deepEqual([...html.matchAll(/data-agent-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'file-it'], 'an entry for each skill, in its order');
+  assert.deepEqual(
+    [...html.matchAll(/data-agent-skill="([^"]+)"/g)].map((m) => m[1]),
+    ['write-a-note', 'file-it'],
+    'an entry for each skill, in its order',
+  );
   assert.ok(textsOf(html).includes('Write a note') && textsOf(html).includes('Files a note where it belongs.'));
   assert.doesNotMatch(html, /Card file|Its card|skills\.json/, 'no field edits it, and no card file is named');
   assert.match(html, /Generated from its skills/);
-  const refused = form({ ...agent, card: null, cardError: 'agents/scribe.md gives the skill `file-it`, and no skills folder has it' } as never);
+  const refused = form({
+    ...agent,
+    card: null,
+    cardError: 'agents/scribe.md gives the skill `file-it`, and no skills folder has it',
+  } as never);
   assert.match(refused, /data-card-error/);
   assert.ok(textsOf(refused).some((t) => t.startsWith('agents/scribe.md gives the skill `file-it`, and no skills folder has it')));
   assert.doesNotMatch(refused, /data-agent-skill/);
@@ -2314,13 +3798,51 @@ test("an agent's form shows its card read-only, generated from its skills: an en
 });
 
 const PLACES = [
-  { from: 'yours', dir: '/store/workflows/skills', skills: [
-    { name: 'write-a-note', from: 'yours', dir: '/store/workflows/skills/write-a-note', entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }, error: null, preload: false, cost: { preload: false, listed: 12, body: 340, perTurn: 12 }, usedBy: ['scribe'], found: null },
-  ] },
-  { from: 'repo', dir: '/repo/.claude/skills', skills: [
-    { name: 'scratch', from: 'repo', dir: '/repo/.claude/skills/scratch', entry: null, error: '/repo/.claude/skills/scratch/SKILL.md has no frontmatter', preload: false, cost: { preload: false, listed: 3, body: 9, perTurn: 3 }, usedBy: [], found: null },
-    { name: 'ask-first', from: 'repo', dir: '/repo/.claude/skills/ask-first', entry: { id: 'ask-first', name: 'Ask first', description: 'Asks before it acts.', tags: ['ask-first'] }, error: null, preload: true, cost: { preload: true, listed: 8, body: 1200, perTurn: 1208 }, usedBy: [], found: null },
-  ] },
+  {
+    from: 'yours',
+    dir: '/store/workflows/skills',
+    skills: [
+      {
+        name: 'write-a-note',
+        from: 'yours',
+        dir: '/store/workflows/skills/write-a-note',
+        entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] },
+        error: null,
+        preload: false,
+        cost: { preload: false, listed: 12, body: 340, perTurn: 12 },
+        usedBy: ['scribe'],
+        found: null,
+      },
+    ],
+  },
+  {
+    from: 'repo',
+    dir: '/repo/.claude/skills',
+    skills: [
+      {
+        name: 'scratch',
+        from: 'repo',
+        dir: '/repo/.claude/skills/scratch',
+        entry: null,
+        error: '/repo/.claude/skills/scratch/SKILL.md has no frontmatter',
+        preload: false,
+        cost: { preload: false, listed: 3, body: 9, perTurn: 3 },
+        usedBy: [],
+        found: null,
+      },
+      {
+        name: 'ask-first',
+        from: 'repo',
+        dir: '/repo/.claude/skills/ask-first',
+        entry: { id: 'ask-first', name: 'Ask first', description: 'Asks before it acts.', tags: ['ask-first'] },
+        error: null,
+        preload: true,
+        cost: { preload: true, listed: 8, body: 1200, perTurn: 1208 },
+        usedBy: [],
+        found: null,
+      },
+    ],
+  },
   { from: 'shipped', dir: '/hkb/workflows/skills', skills: [] },
 ];
 
@@ -2331,64 +3853,153 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const client = new QueryClient();
   client.setQueryData(['skills'], PLACES);
-  const form = createElement(AgentForm, { listing: listing as never, keyForm: undefined, readOnly, saving: false, refusal: null, onSave: () => {} });
-  return renderToStaticMarkup(createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, form)));
+  const form = createElement(AgentForm, {
+    listing: listing as never,
+    keyForm: undefined,
+    readOnly,
+    saving: false,
+    refusal: null,
+    onSave: () => {},
+  });
+  return renderToStaticMarkup(
+    createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, form)),
+  );
 }
 
 const composing = {
-  name: 'scribe', from: 'yours', dir: '/store/agents', file: '/store/agents/scribe.md', description: 'Writes notes.', keys: { tools: 'Read' }, body: 'Write.\n',
-  schema: null, skills: 'write-a-note, ask-first, gone', systemPrompt: null, source: '', version: 'v1', usedBy: [], error: null, untried: null, cardError: null, card: null,
-  given: [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.', preload: false, cost: null }],
+  name: 'scribe',
+  from: 'yours',
+  dir: '/store/agents',
+  file: '/store/agents/scribe.md',
+  description: 'Writes notes.',
+  keys: { tools: 'Read' },
+  body: 'Write.\n',
+  schema: null,
+  skills: 'write-a-note, ask-first, gone',
+  systemPrompt: null,
+  source: '',
+  version: 'v1',
+  usedBy: [],
+  error: null,
+  untried: null,
+  cardError: null,
+  card: null,
+  given: [
+    {
+      name: 'gone',
+      from: null,
+      entry: null,
+      error: 'No skills folder has `gone` — looked in /store/workflows/skills, /repo/.claude/skills.',
+      preload: false,
+      cost: null,
+    },
+  ],
 };
 
-test("an agent of yours lists the skills it gives, each with where it is found and what it costs a turn, and a Remove each; one found nowhere says so", async () => {
+test('an agent of yours lists the skills it gives, each with where it is found and what it costs a turn, and a Remove each; one found nowhere says so', async () => {
   const html = await agentFormWith(composing);
-  assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note', 'ask-first', 'gone'], 'in the order its line gives them');
-  assert.deepEqual([...html.matchAll(/data-skill-from="([^"]+)"/g)].map((m) => m[1]), ['yours', 'repo', 'none']);
   assert.deepEqual(
-    [...html.matchAll(/href="([^"]+)"[^>]*data-skill-link="([^"]+)"|data-skill-link="([^"]+)"[^>]*href="([^"]+)"/g)].map((m) => m[1] ?? m[4]),
+    [...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]),
+    ['write-a-note', 'ask-first', 'gone'],
+    'in the order its line gives them',
+  );
+  assert.deepEqual(
+    [...html.matchAll(/data-skill-from="([^"]+)"/g)].map((m) => m[1]),
+    ['yours', 'repo', 'none'],
+  );
+  assert.deepEqual(
+    [...html.matchAll(/href="([^"]+)"[^>]*data-skill-link="([^"]+)"|data-skill-link="([^"]+)"[^>]*href="([^"]+)"/g)].map(
+      (m) => m[1] ?? m[4],
+    ),
     ['/agents/skills/yours/write-a-note', '/agents/skills/repo/ask-first'],
     'each found skill links to its page, where it is found; the one found nowhere has no page',
   );
   const texts = textsOf(html);
   assert.ok(texts.includes('named — about 12 tokens a turn, and about 340 more in a turn that loads it'), texts.join(' | '));
   assert.ok(texts.includes('loaded every turn — about 1,208 tokens (cached)'), 'a preloaded skill costs its body every turn');
-  assert.ok(texts.some((t) => t.startsWith('No skills folder has `gone`')), 'the one found nowhere says why, in the api\'s words');
+  assert.ok(
+    texts.some((t) => t.startsWith('No skills folder has `gone`')),
+    "the one found nowhere says why, in the api's words",
+  );
   assert.equal([...html.matchAll(/aria-label="Remove [^"]+"/g)].length, 3);
   assert.match(html, />Add a skill</);
   assert.doesNotMatch(html, /aria-label="Skills"|placeholder="review-a-change/, 'no field to type the names in');
 });
 
-test("an agent whose tools leave out Skill is told so before a save is refused, with the one press that puts it right; one with no tools set is not", async () => {
+test('an agent whose tools leave out Skill is told so before a save is refused, with the one press that puts it right; one with no tools set is not', async () => {
   assert.match(await agentFormWith(composing), /data-skill-tool-note[\s\S]*Add Skill to its tools/);
   assert.doesNotMatch(await agentFormWith({ ...composing, keys: { tools: 'Read, Skill' } }), /data-skill-tool-note/);
-  assert.doesNotMatch(await agentFormWith({ ...composing, keys: {} }), /data-skill-tool-note/, 'unset, the harness decides, and Skill is among what it allows');
+  assert.doesNotMatch(
+    await agentFormWith({ ...composing, keys: {} }),
+    /data-skill-tool-note/,
+    'unset, the harness decides, and Skill is among what it allows',
+  );
   assert.match(await agentFormWith({ ...composing, keys: { disallowedTools: 'Skill' } }), /Take Skill off its denied tools/);
-  assert.doesNotMatch(await agentFormWith({ ...composing, skills: null, given: [] }), /data-skill-tool-note/, 'nor one that gives no skills');
+  assert.doesNotMatch(
+    await agentFormWith({ ...composing, skills: null, given: [] }),
+    /data-skill-tool-note/,
+    'nor one that gives no skills',
+  );
 });
 
-test("the system prompt is a choice of what the agent does, the default drawn chosen when unset, and Only my instructions kept behind For experts", async () => {
+test('the system prompt is a choice of what the agent does, the default drawn chosen when unset, and Only my instructions kept behind For experts', async () => {
   const unset = await agentFormWith({ ...composing, skills: null, given: [] });
-  assert.match(unset, /data-system-prompt="default"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="default"/, 'unset reads as the default');
+  assert.match(
+    unset,
+    /data-system-prompt="default"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="default"/,
+    'unset reads as the default',
+  );
   assert.match(unset, /Works on code or files/);
   assert.match(unset, /Doesn&#x27;t write code/);
   assert.match(unset, /For experts/);
   assert.doesNotMatch(unset, /Only my instructions/, 'the expert choice is not drawn while its fold is shut');
   const own = await agentFormWith({ ...composing, systemPrompt: 'own' });
-  assert.match(own, /data-system-prompt="own"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="own"/, 'an agent that says own opens the fold, chosen');
+  assert.match(
+    own,
+    /data-system-prompt="own"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="own"/,
+    'an agent that says own opens the fold, chosen',
+  );
   assert.match(await agentFormWith({ ...composing, systemPrompt: 'terse' }), /systemPrompt: terse<\/code>, which is none of these/);
 });
 
 test("the repository's agent lists the skills it gives read-only: no Remove, no Add, and no list read for it", async () => {
-  const html = await agentFormWith({ ...composing, from: 'repo', given: [{ name: 'write-a-note', from: 'repo', entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes.', tags: [] }, error: null, preload: false, cost: { preload: false, listed: 5, body: 7, perTurn: 5 } }], skills: 'write-a-note' }, true);
-  assert.deepEqual([...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]), ['write-a-note']);
+  const html = await agentFormWith(
+    {
+      ...composing,
+      from: 'repo',
+      given: [
+        {
+          name: 'write-a-note',
+          from: 'repo',
+          entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes.', tags: [] },
+          error: null,
+          preload: false,
+          cost: { preload: false, listed: 5, body: 7, perTurn: 5 },
+        },
+      ],
+      skills: 'write-a-note',
+    },
+    true,
+  );
+  assert.deepEqual(
+    [...html.matchAll(/data-given-skill="([^"]+)"/g)].map((m) => m[1]),
+    ['write-a-note'],
+  );
   assert.doesNotMatch(html, /aria-label="Remove |Add a skill|data-skill-tool-note/);
 });
 
 const SKILL_DETAIL = {
   skill: PLACES[0]!.skills[0],
   version: 'v1',
-  draft: { name: 'write-a-note', title: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'], examples: ['Write the notes'], preload: false, body: 'Write them.\n' },
+  draft: {
+    name: 'write-a-note',
+    title: 'Write a note',
+    description: 'Writes the notes of a change.',
+    tags: ['note'],
+    examples: ['Write the notes'],
+    preload: false,
+    body: 'Write them.\n',
+  },
   body: 'Write them.\n',
   users: [{ from: 'yours', name: 'scribe' }],
   copyHint: "mkdir -p '/repo/.claude/skills' && cp -r '/store/workflows/skills/write-a-note' '/repo/.claude/skills/'",
@@ -2402,7 +4013,8 @@ async function skillForm(props: Record<string, unknown>): Promise<string> {
 test("a new skill's form takes its name, title, description, tags, examples and instructions, and creates it", async () => {
   const html = await skillForm({ detail: null });
   assert.match(html, /aria-label="New skill"/);
-  for (const label of ['Name', 'Title', 'Description', 'Tags', 'Examples', 'Instructions']) assert.match(html, new RegExp(`>${label}</label>`), label);
+  for (const label of ['Name', 'Title', 'Description', 'Tags', 'Examples', 'Instructions'])
+    assert.match(html, new RegExp(`>${label}</label>`), label);
   assert.doesNotMatch(html, /readonly=""/i, 'every field is to be typed in');
   assert.match(html, />Create skill</);
 });
@@ -2427,40 +4039,73 @@ async function routedWith(element: ReturnType<typeof createElement>, data: Array
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const client = new QueryClient();
   for (const [key, value] of data) client.setQueryData(key, value);
-  return renderToStaticMarkup(createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, element)));
+  return renderToStaticMarkup(
+    createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, element)),
+  );
 }
 
-const tried = (id: string, fields: Record<string, unknown> = {}) => ({ id, try: { agent: 'scribe' }, createdAt: at, moving: false, ...fields });
+const tried = (id: string, fields: Record<string, unknown> = {}) => ({
+  id,
+  try: { agent: 'scribe' },
+  createdAt: at,
+  moving: false,
+  ...fields,
+});
 
 /** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
 function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
   const run = runWith(null);
   return {
-    ...run, id: 'r-t', repo: null, place: 'folder', status: 'succeeded', try: { agent: 'scribe' }, holding: null, cancelledAt: null,
-    steps: [{
-      ...run.steps[0]!, name: 'try', status: 'done', taskId: 't-t', filesError: null,
-      files: [{ path: 'note.md', name: 'note.md', url: '/api/runs/r-t/steps/try/files/note.md', kind: 'text', size: 120 }],
-      spent: { said: '$0.12', usd: 0.12, measured: 1, unmeasured: 0 },
-      budget: { usd: 1, said: '$1', of: '$0.12 of $1', over: false },
-    }],
+    ...run,
+    id: 'r-t',
+    repo: null,
+    place: 'folder',
+    status: 'succeeded',
+    try: { agent: 'scribe' },
+    holding: null,
+    cancelledAt: null,
+    steps: [
+      {
+        ...run.steps[0]!,
+        name: 'try',
+        status: 'done',
+        taskId: 't-t',
+        filesError: null,
+        files: [{ path: 'note.md', name: 'note.md', url: '/api/runs/r-t/steps/try/files/note.md', kind: 'text', size: 120 }],
+        spent: { said: '$0.12', usd: 0.12, measured: 1, unmeasured: 0 },
+        budget: { usd: 1, said: '$1', of: '$0.12 of $1', over: false },
+      },
+    ],
     ...fields,
   } as never;
 }
 
-test("an agent of yours is tried from its page: the fence said in one line, and Try it held until there is a brief", async () => {
+test('an agent of yours is tried from its page: the fence said in one line, and Try it held until there is a brief', async () => {
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [[['runs'], []]]);
   const texts = textsOf(html);
-  assert.ok(texts.includes("A rehearsal fenced to its own folder, not the agent's own permissions: dontAsk, allowed Edit(**) in its folder, $1 to spend."), texts.join(' | '));
+  assert.ok(
+    texts.includes(
+      "A rehearsal fenced to its own folder, not the agent's own permissions: dontAsk, allowed Edit(**) in its folder, $1 to spend.",
+    ),
+    texts.join(' | '),
+  );
   assert.match(html, /<button type="submit" disabled=""[^>]*>Try it<\/button>/, 'no brief, no try');
   assert.match(html, /data-try-held[^>]*>Write a brief to try it on\./);
   assert.doesNotMatch(html, /data-try=/, 'an agent never tried shows no try');
 });
 
-test("REFUSED: a second try while one moves — the button is held, and the latest try is drawn: its state, its spend of the dollar, its files and its run", async () => {
+test('REFUSED: a second try while one moves — the button is held, and the latest try is drawn: its state, its spend of the dollar, its files and its run', async () => {
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
-  const runs = [tried('r-old', { createdAt: '2026-09-01T00:00:00.000Z' }), tried('r-t', { moving: true, createdAt: '2026-09-25T00:00:00.000Z' }), { ...tried('r-x'), try: null }];
-  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [[['runs'], runs], [['runs', 'r-t'], tryDetail({ status: 'running' })]]);
+  const runs = [
+    tried('r-old', { createdAt: '2026-09-01T00:00:00.000Z' }),
+    tried('r-t', { moving: true, createdAt: '2026-09-25T00:00:00.000Z' }),
+    { ...tried('r-x'), try: null },
+  ];
+  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
+    [['runs'], runs],
+    [['runs', 'r-t'], tryDetail({ status: 'running' })],
+  ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
   assert.match(html, /<button type="submit" disabled=""/);
   assert.match(html, /data-try="r-t"/, 'the newest try of this agent, not the older one');
@@ -2470,7 +4115,7 @@ test("REFUSED: a second try while one moves — the button is held, and the late
   assert.match(html, /data-try-files[\s\S]*note\.md/);
 });
 
-test("a try not filed yet says so in place of its files", async () => {
+test('a try not filed yet says so in place of its files', async () => {
   const { TryRun } = await import('../src/components/TryAgent.tsx');
   const unfiled = tryDetail();
   (unfiled.steps[0] as { taskId: string | null }).taskId = null;
@@ -2483,7 +4128,9 @@ test("the repository's agent is not tried: its page says to copy it to yours, wi
   const { TryYours } = await import('../src/components/TryAgent.tsx');
   const copy = "mkdir -p '/tmp/e2e-store/workflows/agents' && cp '/repo/workflows/agents/critic.md' '/tmp/e2e-store/workflows/agents/'";
   const untried = { why: 'Only an agent of yours can be tried — a try runs with no repository. Copy it to yours to try it.', copy };
-  const html = renderToStaticMarkup(createElement(TryYours, { agent: { ...composing, from: 'repo', file: '/repo/workflows/agents/critic.md', untried } as never }));
+  const html = renderToStaticMarkup(
+    createElement(TryYours, { agent: { ...composing, from: 'repo', file: '/repo/workflows/agents/critic.md', untried } as never }),
+  );
   assert.match(html, /data-try-yours/);
   assert.match(html, /Copy it to yours to try it/);
   assert.ok(textsOf(html).includes(copy), `the copy as the api words it, into its own store: ${textsOf(html).join(' | ')}`);
@@ -2493,8 +4140,12 @@ test("the repository's agent is not tried: its page says to copy it to yours, wi
 
 test("REFUSED: an agent of yours the try's fence does not reach says why in place of the Try it button", async () => {
   const { TryAgent } = await import('../src/components/TryAgent.tsx');
-  const why = "coder runs on `codex`, and a try is fenced by Claude Code's permission mode — `dontAsk` with `Edit(**)`, in a folder of its own — which codex does not take.";
-  const html = await routedWith(createElement(TryAgent, { agent: { ...composing, name: 'coder', keys: { harness: 'codex' }, untried: { why, copy: null } } as never }), [[['runs'], []]]);
+  const why =
+    "coder runs on `codex`, and a try is fenced by Claude Code's permission mode — `dontAsk` with `Edit(**)`, in a folder of its own — which codex does not take.";
+  const html = await routedWith(
+    createElement(TryAgent, { agent: { ...composing, name: 'coder', keys: { harness: 'codex' }, untried: { why, copy: null } } as never }),
+    [[['runs'], []]],
+  );
   assert.ok(textsOf(html).includes(why), textsOf(html).join(' | '));
   assert.match(html, /data-try-untried/);
   assert.doesNotMatch(html, /data-try-yours/, 'it is yours: nothing to copy');

@@ -1,9 +1,9 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 /* React Flow's stylesheet, imported once, below the utilities so a class on a canvas element wins. */
-@import "@xyflow/react/dist/style.css" layer(base);
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import '@xyflow/react/dist/style.css' layer(base);
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
 
 /*
  * Dark follows the system, as React Flow's `colorMode="system"` does below. The CLI declares `dark`

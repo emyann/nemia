@@ -31,8 +31,8 @@ function NewAgentPage() {
       <header className="space-y-1">
         <h1 className="text-base font-semibold">New agent</h1>
         <p className="text-sm text-neutral-500">
-          Written to <code className="font-mono text-xs">~/.agent-workflows/workflows/agents/&lt;name&gt;.md</code>, beside your workflows. A node
-          of one of them takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
+          Written to <code className="font-mono text-xs">~/.agent-workflows/workflows/agents/&lt;name&gt;.md</code>, beside your workflows.
+          A node of one of them takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
         </p>
       </header>
       <AgentForm
@@ -48,7 +48,10 @@ function NewAgentPage() {
 
 export function BackToAgents() {
   return (
-    <RouteLink to="/agents" className="rounded-sm text-sm text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
+    <RouteLink
+      to="/agents"
+      className="rounded-sm text-sm text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100"
+    >
       ← Agents
     </RouteLink>
   );

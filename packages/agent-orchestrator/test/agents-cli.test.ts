@@ -25,18 +25,31 @@ type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => voi
 const printedBy = async (t: Mock, ...argv: string[]): Promise<{ out: string; err: string }> => {
   const out: string[] = [];
   const err: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.join(' ')); });
-  const warn = t.mock.method(console, 'error', (...args: unknown[]) => { err.push(args.join(' ')); });
-  try { await main(argv, NO_ENGINE); } finally { log.mock.restore(); warn.mock.restore(); }
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+    out.push(args.join(' '));
+  });
+  const warn = t.mock.method(console, 'error', (...args: unknown[]) => {
+    err.push(args.join(' '));
+  });
+  try {
+    await main(argv, NO_ENGINE);
+  } finally {
+    log.mock.restore();
+    warn.mock.restore();
+  }
   return { out: out.join('\n'), err: err.join('\n') };
 };
 
-const SKILL = '---\nname: read-a-thing\ntitle: Read a thing\ndescription: Reads it.\ntags: ["note"]\nexamples: ["Use this when something must be read."]\n---\nRead it.\n';
+const SKILL =
+  '---\nname: read-a-thing\ntitle: Read a thing\ndescription: Reads it.\ntags: ["note"]\nexamples: ["Use this when something must be read."]\n---\nRead it.\n';
 
 /** An agent in a `<workflows>/agents`, composed from one skill in the `<workflows>/skills` beside it. */
 const anAgent = (at: string, name: string, description: string, skill = SKILL) => {
   fs.mkdirSync(at, { recursive: true });
-  fs.writeFileSync(path.join(at, `${name}.md`), `---\ndescription: ${description}\nskills: read-a-thing\ntools: Read, Skill\n---\nDo the thing.\n`);
+  fs.writeFileSync(
+    path.join(at, `${name}.md`),
+    `---\ndescription: ${description}\nskills: read-a-thing\ntools: Read, Skill\n---\nDo the thing.\n`,
+  );
   fs.mkdirSync(path.join(at, '..', 'skills', 'read-a-thing'), { recursive: true });
   fs.writeFileSync(path.join(at, '..', 'skills', 'read-a-thing', 'SKILL.md'), skill);
 };
@@ -77,7 +90,10 @@ test('wf agents card prints the card alone on stdout, and what it is not on stde
   const { out, err } = await printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo);
   const card = JSON.parse(out) as { name: string; skills: Array<{ id: string }>; capabilities: Record<string, boolean>; version: string };
   assert.equal(card.name, 'scribe');
-  assert.deepEqual(card.skills.map((s) => s.id), ['read-a-thing']);
+  assert.deepEqual(
+    card.skills.map((s) => s.id),
+    ['read-a-thing'],
+  );
   assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
   assert.match(card.version, /^[0-9a-f]{16}$/);
   // Not a field of the card: the honesty about it is a word to the person, not data a reader would take for the protocol's.
@@ -89,18 +105,30 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
   const repo = repoAt('refused');
   anAgent(path.join(repo, 'workflows', 'agents'), 'twin', 'The repository’s.');
   const refused = async (pattern: RegExp, ...argv: string[]) => {
-    await assert.rejects(() => printedBy(t as Mock, ...argv), (err: Error & { exitCode?: number }) => {
-      assert.match(err.message, pattern);
-      return true;
-    });
+    await assert.rejects(
+      () => printedBy(t as Mock, ...argv),
+      (err: Error & { exitCode?: number }) => {
+        assert.match(err.message, pattern);
+        return true;
+      },
+    );
   };
   await refused(/^no agent named ghost\. Looked in .*wf agents lists them\.$/s, 'agents', 'card', 'ghost', '--repo', repo);
   await refused(/^wf agents --from takes repo or yours, not elsewhere:/, 'agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere');
 
   anAgent(YOURS, 'twin', 'Yours.');
-  await refused(/^twin is an agent in both places — .* and .*\. Say which: --from repo or --from yours\.$/, 'agents', 'card', 'twin', '--repo', repo);
+  await refused(
+    /^twin is an agent in both places — .* and .*\. Say which: --from repo or --from yours\.$/,
+    'agents',
+    'card',
+    'twin',
+    '--repo',
+    repo,
+  );
   // Said which, each place answers for its own.
-  const mine = JSON.parse((await printedBy(t as Mock, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as { description: string };
+  const mine = JSON.parse((await printedBy(t as Mock, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as {
+    description: string;
+  };
   assert.equal(mine.description, 'Yours.');
   fs.rmSync(path.join(YOURS, 'twin.md'));
 });
@@ -108,14 +136,23 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
 test('REFUSED at shipped defaults: a card for an agent whose skill says no description, or that no place has, in the reader’s own words', async (t) => {
   const repo = repoAt('broken');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.', '---\nname: read-a-thing\n---\nRead it.\n');
-  await assert.rejects(() => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo), (err: Error) => {
-    assert.match(err.message, /read-a-thing\/SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
-    return true;
-  });
+  await assert.rejects(
+    () => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo),
+    (err: Error) => {
+      assert.match(err.message, /read-a-thing\/SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
+      return true;
+    },
+  );
   // Your place has a `read-a-thing` of its own by now, so the skill that is nowhere is another.
-  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'scribe.md'), '---\ndescription: Writes it down.\nskills: gone-away\ntools: Read, Skill\n---\nDo it.\n');
-  await assert.rejects(() => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo), (err: Error) => {
-    assert.match(err.message, /gives the skill `gone-away`, and no skills folder has it — looked in /);
-    return true;
-  });
+  fs.writeFileSync(
+    path.join(repo, 'workflows', 'agents', 'scribe.md'),
+    '---\ndescription: Writes it down.\nskills: gone-away\ntools: Read, Skill\n---\nDo it.\n',
+  );
+  await assert.rejects(
+    () => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo),
+    (err: Error) => {
+      assert.match(err.message, /gives the skill `gone-away`, and no skills folder has it — looked in /);
+      return true;
+    },
+  );
 });

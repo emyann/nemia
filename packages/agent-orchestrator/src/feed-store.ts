@@ -23,8 +23,10 @@ const feedMemo: FeedMemo = freshMemo();
  * written. `now` is every run the pass read: one the feed still names that is not in it is gone, and gets its `removed`. `memo` is for a
  * test, which starts one afresh to be a restarted daemon.
  */
-export const recordFeed = (now: ReadonlyMap<string, FeedWords>, { at = new Date().toISOString(), memo = feedMemo }: { at?: string; memo?: FeedMemo } = {}): FeedLine[] =>
-  within('act', () => recordFeedFile(feedFile(), now, at, memo));
+export const recordFeed = (
+  now: ReadonlyMap<string, FeedWords>,
+  { at = new Date().toISOString(), memo = feedMemo }: { at?: string; memo?: FeedMemo } = {},
+): FeedLine[] => within('act', () => recordFeedFile(feedFile(), now, at, memo));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -60,7 +62,8 @@ function byteAt(file: string, at: number): number {
  * since truncated or replaced, and nothing after it means what the reader thinks.
  */
 function cursorRefusalAt(file: string, after: number): string | undefined {
-  if (!Number.isSafeInteger(after) || after < 0) return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
+  if (!Number.isSafeInteger(after) || after < 0)
+    return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
   const size = statOf(file)?.size ?? 0;
   if (after > size) {
     return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: wf feed 0`;
@@ -76,7 +79,9 @@ function parseLine(text: string): FeedLine[] {
   if (!text) return [];
   try {
     const l = JSON.parse(text) as Partial<FeedLine>;
-    return typeof l === 'object' && l !== null && typeof l.at === 'string' && typeof l.run === 'string' && typeof l.word === 'string' ? [l as FeedLine] : [];
+    return typeof l === 'object' && l !== null && typeof l.at === 'string' && typeof l.run === 'string' && typeof l.word === 'string'
+      ? [l as FeedLine]
+      : [];
   } catch {
     return [];
   }
@@ -141,7 +146,8 @@ function readEnds(file: string, after: number): { lines: FeedLine[]; ends: numbe
 function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>, at: string, memo: FeedMemo): FeedLine[] {
   const stat = statOf(file);
   const size = stat?.size ?? 0;
-  if ((memo.ino !== undefined && stat?.ino !== memo.ino) || cursorRefusalAt(file, memo.cursor) !== undefined) Object.assign(memo, freshMemo());
+  if ((memo.ino !== undefined && stat?.ino !== memo.ino) || cursorRefusalAt(file, memo.cursor) !== undefined)
+    Object.assign(memo, freshMemo());
   const read = linesFrom(file, memo.cursor, size);
   foldFeed(memo.fold, read.lines);
   memo.cursor = read.cursor;
@@ -165,7 +171,8 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
   const from = `reading the feed there is now from its start — a line said before may be said again`;
   if (!stat) return `the feed was deleted under this watch at cursor ${cursor} (${file}): ${from}`;
   if (ino !== undefined && stat.ino !== ino) return `the feed was replaced under this watch at cursor ${cursor} (${file}): ${from}`;
-  if (cursorRefusalAt(file, cursor) !== undefined) return `the feed was truncated under this watch at cursor ${cursor}, and is ${stat.size} bytes now (${file}): ${from}`;
+  if (cursorRefusalAt(file, cursor) !== undefined)
+    return `the feed was truncated under this watch at cursor ${cursor}, and is ${stat.size} bytes now (${file}): ${from}`;
   return undefined;
 }
 
@@ -192,15 +199,25 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
  * already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's stream
  * does, and a reader opens it again from the feed it has now.
  */
-function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onError, onRead, onCut }: {
-  from?: number;
-  onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
-  intervalMs?: number;
-  onError?: (e: unknown) => void;
-  onRead?: () => void | Promise<void>;
-  /** The feed was cut under the watch, in words (`feedCut`): the watch reads on from 0, the start of the feed there is now. */
-  onCut?: (said: string) => void | Promise<void>;
-}): { stop(): void } {
+function watchFeedFile(
+  file: string,
+  {
+    from = 0,
+    onLine,
+    intervalMs = 1_000,
+    onError,
+    onRead,
+    onCut,
+  }: {
+    from?: number;
+    onLine: (line: FeedLine, cursor: number) => void | Promise<void>;
+    intervalMs?: number;
+    onError?: (e: unknown) => void;
+    onRead?: () => void | Promise<void>;
+    /** The feed was cut under the watch, in words (`feedCut`): the watch reads on from 0, the start of the feed there is now. */
+    onCut?: (said: string) => void | Promise<void>;
+  },
+): { stop(): void } {
   const refusal = cursorRefusalAt(file, from);
   if (refusal) throw refused(refusal);
   let cursor = from;
@@ -255,8 +272,12 @@ function watchFeedFile(file: string, { from = 0, onLine, intervalMs = 1_000, onE
   let watcher: fs.FSWatcher | undefined;
   try {
     fs.mkdirSync(dir, { recursive: true });
-    watcher = fs.watch(dir, (_event, changed) => { if (!changed || changed === name) void drain(); });
-  } catch { /* the timer alone, then */ }
+    watcher = fs.watch(dir, (_event, changed) => {
+      if (!changed || changed === name) void drain();
+    });
+  } catch {
+    /* the timer alone, then */
+  }
   // Not unref'd: a watch is what keeps `wf watch` alive, as the engine's timer keeps `ae watch`.
   const timer = setInterval(() => void drain(), intervalMs);
   void drain();

@@ -1,14 +1,7 @@
 import { useCallback, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
-import {
-  BuildRefusal,
-  keyFormQuery,
-  saveWorkflow,
-  workflowsQuery,
-  type WorkflowListing,
-  type WorkflowSaved,
-} from '../lib/api';
+import { BuildRefusal, keyFormQuery, saveWorkflow, workflowsQuery, type WorkflowListing, type WorkflowSaved } from '../lib/api';
 import {
   addStep,
   connect,
@@ -151,12 +144,19 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       type: 'builder',
       ...(loop ? { sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : {}),
       markerEnd: { type: MarkerType.ArrowClosed, color: edgeStroke('to-come', loop), width: 20, height: 20, markerUnits: 'userSpaceOnUse' },
-      data: { loop, said: loop ? `${edge.from}'s loop back to ${edge.to}` : `the edge ${edge.from} → ${edge.to}`, remove: () => update((all) => disconnect(all, id)) },
+      data: {
+        loop,
+        said: loop ? `${edge.from}'s loop back to ${edge.to}` : `the edge ${edge.from} → ${edge.to}`,
+        remove: () => update((all) => disconnect(all, id)),
+      },
       selectable: false,
       focusable: false,
     };
   });
-  const height = Math.min(Math.max(extentOf(at).height + (cycle || graph.edges.some((e) => e.kind === 'loop') ? UNDER_ROOM : 0) + 60, 260), 460);
+  const height = Math.min(
+    Math.max(extentOf(at).height + (cycle || graph.edges.some((e) => e.kind === 'loop') ? UNDER_ROOM : 0) + 60, 260),
+    460,
+  );
   const step = steps.find((s) => s.name === selected) ?? null;
 
   return (
@@ -165,7 +165,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
         <span
           data-unsaved={dirty || undefined}
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-            dirty ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+            dirty
+              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
           }`}
         >
           {dirty ? 'Unsaved changes' : 'Saved'}
@@ -233,7 +235,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
             elementsSelectable={false}
             nodesFocusable={false}
             edgesFocusable={false}
-            onConnect={(connection: Connection) => update((all) => connect(all, connection.source, connection.target, connection.sourceHandle === LOOP_SOURCE))}
+            onConnect={(connection: Connection) =>
+              update((all) => connect(all, connection.source, connection.target, connection.sourceHandle === LOOP_SOURCE))
+            }
             connectionRadius={30}
             onNodeClick={(_, node) => setSelected(node.id)}
             zoomOnScroll={false}
@@ -267,8 +271,8 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
             />
           ) : (
             <p className="text-xs text-neutral-500">
-              Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the violet dot
-              underneath, to loop back.
+              Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the
+              violet dot underneath, to loop back.
             </p>
           )}
         </aside>
@@ -299,8 +303,9 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
           </>
         ) : (
           <>
-            Not saved. The folder may have been written all the same: {refusal.status === null ? 'the api did not say what it wrote' : `the api broke off (${refusal.status})`},
-            and what the folder holds is what is on disk:
+            Not saved. The folder may have been written all the same:{' '}
+            {refusal.status === null ? 'the api did not say what it wrote' : `the api broke off (${refusal.status})`}, and what the folder
+            holds is what is on disk:
           </>
         )}
       </p>
@@ -328,7 +333,15 @@ function fileLine({ written, kept, removed }: WorkflowSaved): string {
 }
 
 /** A block added: a name — its file's, without .md — and what it is told. */
-function AddStep({ steps, onAdd, onCancel }: { steps: readonly DraftStep[]; onAdd: (name: string, body: string) => void; onCancel: () => void }) {
+function AddStep({
+  steps,
+  onAdd,
+  onCancel,
+}: {
+  steps: readonly DraftStep[];
+  onAdd: (name: string, body: string) => void;
+  onCancel: () => void;
+}) {
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
   const nameId = useId();
@@ -349,7 +362,13 @@ function AddStep({ steps, onAdd, onCancel }: { steps: readonly DraftStep[]; onAd
           <label htmlFor={nameId} className="block text-xs font-medium">
             Step name
           </label>
-          <input id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="review" className={`${INPUT} font-mono`} />
+          <input
+            id={nameId}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="review"
+            className={`${INPUT} font-mono`}
+          />
           {refused && <p className="text-xs text-red-700 dark:text-red-400">{refused}</p>}
         </div>
         <div className="space-y-1">

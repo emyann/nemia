@@ -32,7 +32,11 @@ const { app } = await import('../src/app.ts');
 const { mergesOnto } = await import('../src/merge.ts');
 
 const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
+  execFileSync(
+    'git',
+    ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+    { cwd: repo, encoding: 'utf8' },
+  );
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -62,20 +66,36 @@ const at = '2026-09-17T09:00:00.000Z';
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 
 /** A step's task that ran once and signed off done. */
-const signedOff = (taskId: string, cwd: string) => write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), jsonl([
-  { kind: 'filed', at, brief: 'Do it.', cwd, maxAttempts: 1, harness: 'codex' },
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] } },
-  { kind: 'settled', at, outcome: 'succeeded' },
-]));
+const signedOff = (taskId: string, cwd: string) =>
+  write(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    jsonl([
+      { kind: 'filed', at, brief: 'Do it.', cwd, maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${taskId}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]),
+  );
 
 /** A step's task filed and spawned, still going. */
-const running = (taskId: string, cwd: string) => write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), jsonl([
-  { kind: 'filed', at, brief: 'Do it.', cwd, maxAttempts: 1, harness: 'codex' },
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-]));
+const running = (taskId: string, cwd: string) =>
+  write(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    jsonl([
+      { kind: 'filed', at, brief: 'Do it.', cwd, maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+    ]),
+  );
 
 /** What `ship.md` says first, which is what a person is deciding on: `toDecide.says`, and the whole of `wf ls`'s line with it. */
 const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
@@ -90,23 +110,59 @@ const ENDING = [
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
 function writeRun(run: { id: string; repo: string; baseRef: string } & Record<string, unknown>) {
-  write(path.join(root, 'runs', `${run.id}.json`), JSON.stringify({
-    workspace: run.repo, branch: 'main', isolate: true, brief: 'Decide it', createdAt: at,
-    workflowDir: path.join(root, 'no-such-workflow'), ...run,
-  }, null, 2));
+  write(
+    path.join(root, 'runs', `${run.id}.json`),
+    JSON.stringify(
+      {
+        workspace: run.repo,
+        branch: 'main',
+        isolate: true,
+        brief: 'Decide it',
+        createdAt: at,
+        workflowDir: path.join(root, 'no-such-workflow'),
+        ...run,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
-const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as {
-  status: string; waitingOnYou: string[]; onYou: string[]; toDecide: { kind: string; step?: string; says?: string | null; back?: string[]; onto?: string; branches?: string[]; said: string; command: string } | null;
-  steps: Array<{ name: string; status: string; spec: { workspace: string | null } | null }>;
-};
-const listedOf = async (id: string) => ((await (await app.request('/api/runs')).json()) as Array<{ id: string }>).find((r) => r.id === id) as Awaited<ReturnType<typeof detailOf>>;
-const decisionOf = async (id: string) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as {
-  standings?: Array<{ branch: string; where: string; commits?: number; said: string; stat: string | null; merge: Record<string, unknown> | null }>;
-  commands?: Array<{ label: string; command: string }>;
-  nothing?: string;
-  running?: true;
-};
+const detailOf = async (id: string) =>
+  (await (await app.request(`/api/runs/${id}`)).json()) as {
+    status: string;
+    waitingOnYou: string[];
+    onYou: string[];
+    toDecide: {
+      kind: string;
+      step?: string;
+      says?: string | null;
+      back?: string[];
+      onto?: string;
+      branches?: string[];
+      said: string;
+      command: string;
+    } | null;
+    steps: Array<{ name: string; status: string; spec: { workspace: string | null } | null }>;
+  };
+const listedOf = async (id: string) =>
+  ((await (await app.request('/api/runs')).json()) as Array<{ id: string }>).find((r) => r.id === id) as Awaited<
+    ReturnType<typeof detailOf>
+  >;
+const decisionOf = async (id: string) =>
+  (await (await app.request(`/api/runs/${id}/decision`)).json()) as {
+    standings?: Array<{
+      branch: string;
+      where: string;
+      commits?: number;
+      said: string;
+      stat: string | null;
+      merge: Record<string, unknown> | null;
+    }>;
+    commands?: Array<{ label: string; command: string }>;
+    nothing?: string;
+    running?: true;
+  };
 
 const { repo, base } = aRepo();
 
@@ -115,21 +171,39 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
   branchOff(repo, `wf/${id}/implement`, 'src/a.ts', 'export const a = 1;\n');
   signedOff(`${id}-implement`, repo);
   writeRun({
-    id, repo, baseRef: base, workflow: ENDING,
+    id,
+    repo,
+    baseRef: base,
+    workflow: ENDING,
     steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, ship: { taskId: null } },
   });
 
   const before = gitCount();
   const detail = await detailOf(id);
-  assert.deepEqual(detail.steps.map((s) => [s.name, s.status]), [['implement', 'unverified · done'], ['ship', 'awaiting approval']]);
+  assert.deepEqual(
+    detail.steps.map((s) => [s.name, s.status]),
+    [
+      ['implement', 'unverified · done'],
+      ['ship', 'awaiting approval'],
+    ],
+  );
   assert.deepEqual([detail.waitingOnYou, detail.onYou], [['ship'], ['approve ship']]);
   // And the key the board tells this gate from §6's by: the step runs in the repository's own checkout, and the work does not.
-  assert.deepEqual(detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]), [['implement', null], ['ship', 'main']]);
+  assert.deepEqual(
+    detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
+    [
+      ['implement', null],
+      ['ship', 'main'],
+    ],
+  );
   // The ending has not run, so what there is to decide is what it would do, in the folder's own first line — and the command that runs it.
   assert.deepEqual(detail.toDecide, {
-    kind: 'approve', step: 'ship', says: SHIPS,
+    kind: 'approve',
+    step: 'ship',
+    says: SHIPS,
     // What the card answers it with: a send-back goes to the work, which ship waits on (`sendBackTo`), and the result is on its way to main.
-    back: ['implement'], onto: 'main',
+    back: ['implement'],
+    onto: 'main',
     said: `${SHIPS} — wf approve ${id} ship`,
     command: `wf approve ${id} ship`,
   });
@@ -142,17 +216,29 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
 
 test("the decision of a run at its ending's gate offers the approval and the send-back, and never `git merge` by hand: its ending is what merges", async () => {
   const { commands, standings } = await decisionOf('r-ending');
-  assert.deepEqual(commands?.map((c) => c.label), ['approve', 'send back']);
-  assert.deepEqual(commands?.map((c) => c.command), [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`]);
+  assert.deepEqual(
+    commands?.map((c) => c.label),
+    ['approve', 'send back'],
+  );
+  assert.deepEqual(
+    commands?.map((c) => c.command),
+    [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`],
+  );
   // The result it would act on is the work's branch, not the ending step's own — which has none, working in the repository's checkout
   // (`resultSteps`). Read for the facts under the run, whatever the list is spared.
-  assert.deepEqual(standings?.map((b) => [b.branch, b.where]), [['wf/r-ending/implement', 'ahead']]);
+  assert.deepEqual(
+    standings?.map((b) => [b.branch, b.where]),
+    [['wf/r-ending/implement', 'ahead']],
+  );
 });
 
-test("whether the result still merges onto the base, as the base is now: clean, then the file it conflicts in once main has moved under it — and read on the decision, never on the list", async () => {
+test('whether the result still merges onto the base, as the base is now: clean, then the file it conflicts in once main has moved under it — and read on the decision, never on the list', async () => {
   const id = 'r-ending';
   const clean = await decisionOf(id);
-  assert.deepEqual(clean.standings?.map((s) => s.merge), [{ clean: true, said: 'merges cleanly onto main' }]);
+  assert.deepEqual(
+    clean.standings?.map((s) => s.merge),
+    [{ clean: true, said: 'merges cleanly onto main' }],
+  );
 
   // main moves under the branch: the same file, written otherwise. The branch is as it was; what it would find is not.
   const tip = git(repo, 'rev-parse', 'HEAD').trim();
@@ -163,9 +249,16 @@ test("whether the result still merges onto the base, as the base is now: clean, 
     const before = gitCount();
     await listedOf(id);
     const listed = fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).slice(before);
-    assert.deepEqual(listed.filter((call) => call.startsWith('merge-tree')), [], 'the list the Factory polls asks git no merge');
+    assert.deepEqual(
+      listed.filter((call) => call.startsWith('merge-tree')),
+      [],
+      'the list the Factory polls asks git no merge',
+    );
     const conflicted = await decisionOf(id);
-    assert.deepEqual(conflicted.standings?.map((s) => s.merge), [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }]);
+    assert.deepEqual(
+      conflicted.standings?.map((s) => s.merge),
+      [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }],
+    );
     // A trial in git's object store alone: the checkout, its index and main are as they were.
     assert.equal(git(repo, 'status', '--porcelain'), '');
     assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
@@ -189,7 +282,10 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   signedOff(`${fan}-implement`, repo);
   signedOff(`${fan}-docs`, repo);
   writeRun({
-    id: fan, repo, baseRef: base, workflow: wide,
+    id: fan,
+    repo,
+    baseRef: base,
+    workflow: wide,
     steps: {
       implement: { taskId: `${fan}-implement`, branch: `wf/${fan}/implement` },
       docs: { taskId: `${fan}-docs`, branch: `wf/${fan}/implement` },
@@ -197,57 +293,107 @@ test("an ending that waits on several steps offers a send-back to each, and one 
     },
   });
   const wideGate = await decisionOf(fan);
-  assert.deepEqual(wideGate.commands?.map((c) => c.label), ['approve', 'send back', 'send back'], 'a send-back for each step the objection could be about');
-  assert.deepEqual(wideGate.commands?.map((c) => c.command), [
-    `wf approve ${fan} ship`,
-    `wf retry ${fan} implement --message "<objection>"`,
-    `wf retry ${fan} docs --message "<objection>"`,
-  ]);
+  assert.deepEqual(
+    wideGate.commands?.map((c) => c.label),
+    ['approve', 'send back', 'send back'],
+    'a send-back for each step the objection could be about',
+  );
+  assert.deepEqual(
+    wideGate.commands?.map((c) => c.command),
+    [`wf approve ${fan} ship`, `wf retry ${fan} implement --message "<objection>"`, `wf retry ${fan} docs --message "<objection>"`],
+  );
 
   // And an ending that waits on nothing: a workflow of one step in the checkout, which the loader allows too. There is no work to send
   // back, so the approval is the only command — and it is there.
   const alone = 'r-alone';
   writeRun({
-    id: alone, repo, baseRef: base,
+    id: alone,
+    repo,
+    baseRef: base,
     workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true }],
     steps: { ship: { taskId: null } },
   });
   const lone = await decisionOf(alone);
-  assert.deepEqual(lone.commands?.map((c) => [c.label, c.command]), [['approve', `wf approve ${alone} ship`]]);
+  assert.deepEqual(
+    lone.commands?.map((c) => [c.label, c.command]),
+    [['approve', `wf approve ${alone} ship`]],
+  );
   // Neither is handed `git merge` by hand: the ending step is what merges.
   for (const { commands } of [wideGate, lone]) {
-    assert.deepEqual(commands?.filter((c) => c.label === 'ship it' || c.label === 'drop it'), []);
+    assert.deepEqual(
+      commands?.filter((c) => c.label === 'ship it' || c.label === 'drop it'),
+      [],
+    );
   }
 });
 
-test("an ending that ran on its approval and stopped on the base branch offers both ways on: ship again, and a send-back through the loop with its words", async () => {
+test('an ending that ran on its approval and stopped on the base branch offers both ways on: ship again, and a send-back through the loop with its words', async () => {
   const id = 'r-stopped';
   const loop = [
     { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-    { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex', loop: 'implement', rounds: 3, output: { file: 'review.json', schema: {
-      type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false,
-    } } },
+    {
+      name: 'review',
+      after: ['implement'],
+      body: 'Review it.',
+      harness: 'codex',
+      loop: 'implement',
+      rounds: 3,
+      output: {
+        file: 'review.json',
+        schema: {
+          type: 'object',
+          properties: { again: { type: 'boolean' } },
+          required: ['again'],
+          additionalProperties: false,
+        },
+      },
+    },
     { name: 'ship', after: ['review'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
   ];
   branchOff(repo, `wf/${id}/implement`, 'src/stopped.ts', 'export const stopped = 1;\n');
   signedOff(`${id}-implement`, repo);
   // Review handed on: `again: false`, flat beside the outcome as a harness writes it.
-  write(path.join(root, 'engine', 'tasks', `${id}-review.jsonl`), jsonl([
-    { kind: 'filed', at, brief: 'Review it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at, attempt: 1, sessionId: `ae/${id}-review/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Holds.', needs: null, artifacts: [], again: false } },
-    { kind: 'settled', at, outcome: 'succeeded' },
-  ]));
-  write(path.join(root, 'engine', 'tasks', `${id}-ship.jsonl`), jsonl([
-    { kind: 'filed', at, brief: 'Ship it.', cwd: repo, maxAttempts: 1, harness: 'claude' },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at, attempt: 1, sessionId: `ae/${id}-ship/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'blocked', summary: 'The trial merge conflicts.', needs: 'the branch has to take main', artifacts: [] } },
-    { kind: 'settled', at, outcome: 'succeeded' },
-  ]));
+  write(
+    path.join(root, 'engine', 'tasks', `${id}-review.jsonl`),
+    jsonl([
+      { kind: 'filed', at, brief: 'Review it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${id}-review/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Holds.', needs: null, artifacts: [], again: false },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]),
+  );
+  write(
+    path.join(root, 'engine', 'tasks', `${id}-ship.jsonl`),
+    jsonl([
+      { kind: 'filed', at, brief: 'Ship it.', cwd: repo, maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${id}-ship/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'blocked', summary: 'The trial merge conflicts.', needs: 'the branch has to take main', artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]),
+  );
   writeRun({
-    id, repo, baseRef: base, workflow: loop,
+    id,
+    repo,
+    baseRef: base,
+    workflow: loop,
     steps: {
       implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` },
       review: { taskId: `${id}-review`, branch: `wf/${id}/implement` },
@@ -255,10 +401,13 @@ test("an ending that ran on its approval and stopped on the base branch offers b
     },
   });
   const { commands } = await decisionOf(id);
-  assert.deepEqual(commands?.map((c) => [c.label, c.command]), [
-    ['send back', `wf retry ${id} review --message "<objection>"`],
-    ['once more', `wf retry ${id} ship`],
-  ]);
+  assert.deepEqual(
+    commands?.map((c) => [c.label, c.command]),
+    [
+      ['send back', `wf retry ${id} review --message "<objection>"`],
+      ['once more', `wf retry ${id} ship`],
+    ],
+  );
 });
 
 test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `wf decide`', async () => {
@@ -272,7 +421,8 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   assert.equal(detail.status, 'succeeded');
   assert.deepEqual(detail.waitingOnYou, [], 'no step waits on you: the run finished');
   assert.deepEqual(detail.toDecide, {
-    kind: 'git', branches: [branch],
+    kind: 'git',
+    branches: [branch],
     said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
     command: `wf decide ${id}`,
   });
@@ -280,13 +430,21 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
 
   // The facts under the result, as `wf decide` prints them: where the branch stands, and how much it changed.
   const { standings, commands } = await decisionOf(id);
-  assert.deepEqual(standings, [{
-    branch, where: 'ahead', commits: 1, said: `${branch} is ahead of main by 1 commit`,
-    stat: '1 file changed, 1 insertion(+)',
-    merge: { clean: true, said: 'merges cleanly onto main' },
-  }]);
+  assert.deepEqual(standings, [
+    {
+      branch,
+      where: 'ahead',
+      commits: 1,
+      said: `${branch} is ahead of main by 1 commit`,
+      stat: '1 file changed, 1 insertion(+)',
+      merge: { clean: true, said: 'merges cleanly onto main' },
+    },
+  ]);
   // And the commands a person runs by hand, which this folder leaves to them.
-  assert.deepEqual(commands?.map((c) => c.label), ['ship it', 'drop it']);
+  assert.deepEqual(
+    commands?.map((c) => c.label),
+    ['ship it', 'drop it'],
+  );
 });
 
 test('level-triggered: a branch merged by hand stops being one to decide on the next read, with nobody telling the run', async () => {
@@ -311,7 +469,10 @@ test('an approved ending that has run leaves nothing to decide: the folder answe
   signedOff(`${id}-implement`, repo);
   signedOff(`${id}-ship`, repo);
   writeRun({
-    id, repo, baseRef: base, workflow: ENDING,
+    id,
+    repo,
+    baseRef: base,
+    workflow: ENDING,
     steps: { implement: { taskId: `${id}-implement`, branch }, ship: { taskId: `${id}-ship`, workspace: repo } },
   });
   // The approval as `wf approve` writes one, with no words: a `message` it does not hold, which the package refuses read as null.
@@ -319,7 +480,10 @@ test('an approved ending that has run leaves nothing to decide: the folder answe
   git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
 
   const detail = await detailOf(id);
-  assert.deepEqual(detail.steps.map((s) => s.status), ['unverified · done', 'unverified · done']);
+  assert.deepEqual(
+    detail.steps.map((s) => s.status),
+    ['unverified · done', 'unverified · done'],
+  );
   assert.deepEqual([detail.status, detail.waitingOnYou], ['succeeded', []]);
   assert.equal(detail.toDecide, null, 'its ending merged it: nobody is handed the branch');
   assert.equal((await listedOf(id)).toDecide, null);
@@ -345,7 +509,9 @@ test("a branch already on the base is asked about once: the list's later polls r
 
   // And it is remembered against the work the run had filed: a try of a finished step can commit to that branch, so the next read asks git
   // again. A run whose branch had nothing on it past its base reads `on` too, and this is the way that one grows.
-  const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as { steps: Record<string, { taskId: string; tries?: unknown[] }> };
+  const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
+    steps: Record<string, { taskId: string; tries?: unknown[] }>;
+  };
   tried.steps.implement = { taskId: `${id}-implement-2`, branch, tries: [{ taskId: `${id}-implement`, then: 'nudge' }] } as never;
   signedOff(`${id}-implement-2`, repo);
   write(path.join(root, 'runs', `${id}.json`), JSON.stringify(tried, null, 2));
@@ -357,7 +523,13 @@ test("a branch already on the base is asked about once: the list's later polls r
   const ahead = 'wf/r-memo-ahead/implement';
   branchOff(repo, ahead, 'src/ahead.ts', 'export const ahead = 2;\n');
   signedOff('r-memo-ahead-implement', repo);
-  writeRun({ id: 'r-memo-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-memo-ahead-implement', branch: ahead } } });
+  writeRun({
+    id: 'r-memo-ahead',
+    repo,
+    baseRef: base,
+    workflow: PLAIN,
+    steps: { implement: { taskId: 'r-memo-ahead-implement', branch: ahead } },
+  });
   for (const poll of [1, 2]) {
     const before = gitCount();
     assert.equal((await listedOf('r-memo-ahead')).toDecide?.kind, 'git', `poll ${poll} says the branch is there to decide`);
@@ -371,7 +543,13 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   running('r-running-implement', repo);
   writeRun({ id: 'r-running', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-running-implement', branch } } });
 
-  writeRun({ id: 'r-off', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-plain-implement', branch: 'wf/r-plain/implement' } } });
+  writeRun({
+    id: 'r-off',
+    repo,
+    baseRef: base,
+    workflow: PLAIN,
+    steps: { implement: { taskId: 'r-plain-implement', branch: 'wf/r-plain/implement' } },
+  });
   fs.writeFileSync(path.join(root, 'runs', 'r-off.cancelled'), at);
 
   const before = gitCount();

@@ -13,7 +13,8 @@ import { SECONDARY, useApprove } from './Gate';
 export type Taken = { said: string; stamp: string; next?: string };
 
 export const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
-export const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
+export const POPOVER =
+  'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
 
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in a row (`gateCardLine`), cut short where the names are
@@ -25,7 +26,13 @@ export const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white 
  * Clicks inside are the card's own: they neither toggle the card's steps nor drag it (`nodrag`), and the popovers, which React draws
  * outside the card, bubble through it as React does, so the stop is on the wrapper.
  */
-export function CardGate({ runId, gate, title, stamp, onTaken }: {
+export function CardGate({
+  runId,
+  gate,
+  title,
+  stamp,
+  onTaken,
+}: {
   runId: string;
   gate: GateAsk;
   /** The gate's words in full, on hover under the line: the folder's own for an ending, `wf ls`'s for a step's hand-off. */
@@ -41,9 +48,19 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
 
   return (
     // The stop keeps a press on the gate, or in its popovers, from toggling the card, which listens to clicks anywhere on it.
-    <div role="presentation" className="nodrag space-y-1.5 px-3" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+    <div
+      role="presentation"
+      className="nodrag space-y-1.5 px-3"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
       {/* One row whatever the names: a card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`). */}
-      <p data-to-decide={gate.ends ? 'approve' : undefined} data-gate-line={gate.step} title={`${line}\n${title}`} className="truncate text-[11px] text-amber-800 dark:text-amber-300">
+      <p
+        data-to-decide={gate.ends ? 'approve' : undefined}
+        data-gate-line={gate.step}
+        title={`${line}\n${title}`}
+        className="truncate text-[11px] text-amber-800 dark:text-amber-300"
+      >
         {line}
       </p>
       <div className="flex items-center gap-1.5">
@@ -60,7 +77,8 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
                     close();
                     onTaken({ said: takenLine({ approved: true }, gate), stamp });
                   },
-                })}
+                })
+              }
             />
           )}
         </Answer>
@@ -75,12 +93,16 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
                 error={sendBack.isError ? sendBack.error : null}
                 onCancel={close}
                 onSend={(message) =>
-                  sendBack.mutate({ mode: 'nudge', message, step: to }, {
-                    onSuccess: (asked) => {
-                      close();
-                      onTaken({ said: takenLine({ asked, to }, gate), stamp });
+                  sendBack.mutate(
+                    { mode: 'nudge', message, step: to },
+                    {
+                      onSuccess: (asked) => {
+                        close();
+                        onTaken({ said: takenLine({ asked, to }, gate), stamp });
+                      },
                     },
-                  })}
+                  )
+                }
               />
             )}
           </Answer>
@@ -101,7 +123,17 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
 }
 
 /** A button on the card that opens its popover, where the answer is given: its dialog is named for what it does (`Approve ship`). */
-function Answer({ label, name, primary = false, children }: { label: string; name: string; primary?: boolean; children: (close: () => void) => ReactNode }) {
+function Answer({
+  label,
+  name,
+  primary = false,
+  children,
+}: {
+  label: string;
+  name: string;
+  primary?: boolean;
+  children: (close: () => void) => ReactNode;
+}) {
   return (
     <DialogTrigger>
       <AriaButton
@@ -128,8 +160,18 @@ function Answer({ label, name, primary = false, children }: { label: string; nam
  * The approval, confirmed: the words to go with it, if any, and the press that sends it. An ending's is `Run <step> now`, under what
  * running it does, since nothing of it can be taken back.
  */
-function ApproveForm({ gate, pending, error, onCancel, onApprove }: {
-  gate: GateAsk; pending: boolean; error: Error | null; onCancel: () => void; onApprove: (words: string) => void;
+function ApproveForm({
+  gate,
+  pending,
+  error,
+  onCancel,
+  onApprove,
+}: {
+  gate: GateAsk;
+  pending: boolean;
+  error: Error | null;
+  onCancel: () => void;
+  onApprove: (words: string) => void;
 }) {
   const [words, setWords] = useState('');
   const field = useId();
@@ -148,7 +190,14 @@ function ApproveForm({ gate, pending, error, onCancel, onApprove }: {
           : `What waits on ${gate.step} is filed next, handed what it handed on.`}
       </p>
       <label htmlFor={field} className="sr-only">{`Words to approve ${gate.step} with, if any`}</label>
-      <textarea id={field} value={words} onChange={(e) => setWords(e.target.value)} rows={2} placeholder="Your words (optional)" className={TEXTAREA} />
+      <textarea
+        id={field}
+        value={words}
+        onChange={(e) => setWords(e.target.value)}
+        rows={2}
+        placeholder="Your words (optional)"
+        className={TEXTAREA}
+      />
       <div className="flex items-center gap-2">
         <button type="submit" disabled={pending} className={cn(BUTTON, 'px-2.5 py-1 text-xs')}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
@@ -163,8 +212,22 @@ function ApproveForm({ gate, pending, error, onCancel, onApprove }: {
 }
 
 /** The send-back: the words it needs, and which step it goes to where the ending waits on several. It continues that step's session. */
-function SendBackForm({ gate, to, onTo, pending, error, onCancel, onSend }: {
-  gate: GateAsk; to: string; onTo: (step: string) => void; pending: boolean; error: Error | null; onCancel: () => void; onSend: (message: string) => void;
+function SendBackForm({
+  gate,
+  to,
+  onTo,
+  pending,
+  error,
+  onCancel,
+  onSend,
+}: {
+  gate: GateAsk;
+  to: string;
+  onTo: (step: string) => void;
+  pending: boolean;
+  error: Error | null;
+  onCancel: () => void;
+  onSend: (message: string) => void;
 }) {
   const [message, setMessage] = useState('');
   const field = useId();
@@ -182,7 +245,14 @@ function SendBackForm({ gate, to, onTo, pending, error, onCancel, onSend }: {
         {`Its next try is told your words, and ${gate.step} waits at its gate again once it signs off.`}
       </p>
       <label htmlFor={field} className="sr-only">{`What to change, sent back to ${name}`}</label>
-      <textarea id={field} value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="What to change (needed)" className={TEXTAREA} />
+      <textarea
+        id={field}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        rows={3}
+        placeholder="What to change (needed)"
+        className={TEXTAREA}
+      />
       {gate.ends && gate.back.length > 1 && (
         <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           <legend className="sr-only">Which step to send back</legend>

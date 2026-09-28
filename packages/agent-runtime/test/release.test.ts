@@ -38,7 +38,9 @@ const fakeClaude = () => {
   const costOnStop = path.join(bin, 'cost-on-stop');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(calls, '');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
@@ -62,14 +64,21 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now(), cwd: process.cwd() });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   return {
     bin,
     rows: () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[],
     setRows: (rows: Row[]) => fs.writeFileSync(registry, JSON.stringify(rows)),
     /** The calls that let a session go, in order, with the short id each was given. */
-    releases: () => fs.readFileSync(calls, 'utf8').split('\n').filter(Boolean)
-      .map((l) => JSON.parse(l) as string[]).filter((a) => a[0] === 'stop' || a[0] === 'rm'),
+    releases: () =>
+      fs
+        .readFileSync(calls, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l) as string[])
+        .filter((a) => a[0] === 'stop' || a[0] === 'rm'),
     rmFails: (fails: boolean) => (fails ? fs.writeFileSync(rmFails, '') : fs.rmSync(rmFails, { force: true })),
     /** From now on, `stop` writes these totals into the session's transcript as a `cost-state` pair. */
     costOnStop: (totals: object) => fs.writeFileSync(costOnStop, JSON.stringify(totals)),
@@ -79,7 +88,11 @@ if (args[0] === '--bg') {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /** The session's transcript, in which it called StructuredOutput just now: where the runner reads a statement. */
@@ -87,10 +100,29 @@ const said = (row: Row, payload: object) => {
   const dir = path.join(config, 'projects', 'fake-project');
   fs.mkdirSync(dir, { recursive: true });
   const at = new Date().toISOString();
-  fs.writeFileSync(path.join(dir, `${row.sessionId}.jsonl`), [
-    { type: 'user', uuid: 'u-1', parentUuid: null, sessionId: row.sessionId, timestamp: at, message: { role: 'user', content: 'the prompt' } },
-    { type: 'assistant', uuid: 'a-1', parentUuid: 'u-1', sessionId: row.sessionId, timestamp: at, message: { id: 'msg_1', role: 'assistant', content: [{ type: 'tool_use', id: 'tu_1', name: 'StructuredOutput', input: payload }] } },
-  ].map((e) => JSON.stringify(e)).join('\n') + '\n');
+  fs.writeFileSync(
+    path.join(dir, `${row.sessionId}.jsonl`),
+    [
+      {
+        type: 'user',
+        uuid: 'u-1',
+        parentUuid: null,
+        sessionId: row.sessionId,
+        timestamp: at,
+        message: { role: 'user', content: 'the prompt' },
+      },
+      {
+        type: 'assistant',
+        uuid: 'a-1',
+        parentUuid: 'u-1',
+        sessionId: row.sessionId,
+        timestamp: at,
+        message: { id: 'msg_1', role: 'assistant', content: [{ type: 'tool_use', id: 'tu_1', name: 'StructuredOutput', input: payload }] },
+      },
+    ]
+      .map((e) => JSON.stringify(e))
+      .join('\n') + '\n',
+  );
 };
 
 const short = (row: Row) => row.sessionId.split('-')[0]!;
@@ -100,7 +132,14 @@ const wrote = (row: Row, ago: number) => {
   const dir = path.join(config, 'projects', 'fake-project');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${row.sessionId}.jsonl`);
-  const entry = { type: 'user', uuid: 'u-1', parentUuid: null, sessionId: row.sessionId, timestamp: new Date().toISOString(), message: { role: 'user', content: 'the prompt' } };
+  const entry = {
+    type: 'user',
+    uuid: 'u-1',
+    parentUuid: null,
+    sessionId: row.sessionId,
+    timestamp: new Date().toISOString(),
+    message: { role: 'user', content: 'the prompt' },
+  };
   fs.writeFileSync(file, `${JSON.stringify(entry)}\n`);
   const at = new Date(Date.now() - ago);
   fs.utimesSync(file, at, at);
@@ -110,7 +149,12 @@ test('a task that gave its closeout settles, and its session is stopped and remo
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
+    const id = await engine.file({
+      config: { background: true },
+      brief: 'the prompt',
+      cwd: tmp('cwd'),
+      closeoutSchema: { type: 'object' },
+    });
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
@@ -120,7 +164,14 @@ test('a task that gave its closeout settles, and its session is stopped and remo
 
     await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');
-    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped, since it still ran, then removed');
+    assert.deepEqual(
+      claude.releases(),
+      [
+        ['stop', short(row!)],
+        ['rm', short(row!)],
+      ],
+      'stopped, since it still ran, then removed',
+    );
     assert.deepEqual(claude.rows(), [], 'gone from claude agents');
 
     await engine.tick();
@@ -140,7 +191,12 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
     claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, config: { background: true, ...(worktree ? { worktree: true } : {}) } });
+      const id = await engine.file({
+        brief: 'the prompt',
+        cwd: tmp('cwd'),
+        closeoutSchema: { type: 'object' },
+        config: { background: true, ...(worktree ? { worktree: true } : {}) },
+      });
       await engine.tick();
       const [row] = claude.rows();
       await sleep(10);
@@ -152,10 +208,26 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
       assert.equal(state.settled, 'succeeded', at);
       const entries = (await engine.feed(0)).entries.filter((e) => e.taskId === id).map((e) => e.event);
       const ended = entries.find((e) => e.kind === 'ended');
-      assert.equal(ended?.kind === 'ended' ? ended.usage?.costUsd : 'no end', undefined, `${at}: its end was read while its process ran, with no cost in it`);
-      assert.equal(entries.filter((e) => e.kind === 'measured').length, 1, `${at}: measured once over three passes, though a worktree task's session stays listed`);
-      assert.deepEqual(state.attempts[0]?.usage, { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 }, `${at}: on the attempt`);
-      assert.deepEqual(claude.releases().map((c) => c[0]), worktree ? ['stop'] : ['stop', 'rm'], `${at}: released as before`);
+      assert.equal(
+        ended?.kind === 'ended' ? ended.usage?.costUsd : 'no end',
+        undefined,
+        `${at}: its end was read while its process ran, with no cost in it`,
+      );
+      assert.equal(
+        entries.filter((e) => e.kind === 'measured').length,
+        1,
+        `${at}: measured once over three passes, though a worktree task's session stays listed`,
+      );
+      assert.deepEqual(
+        state.attempts[0]?.usage,
+        { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 },
+        `${at}: on the attempt`,
+      );
+      assert.deepEqual(
+        claude.releases().map((c) => c[0]),
+        worktree ? ['stop'] : ['stop', 'rm'],
+        `${at}: released as before`,
+      );
     });
   }
 });
@@ -176,7 +248,14 @@ test('a session listed done whose process still runs is stopped before it goes �
     await engine.tick();
     const { state } = await engine.view(id);
     assert.equal(state.settled, 'succeeded');
-    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped, since its process ran, then removed');
+    assert.deepEqual(
+      claude.releases(),
+      [
+        ['stop', short(row!)],
+        ['rm', short(row!)],
+      ],
+      'stopped, since its process ran, then removed',
+    );
     assert.equal(state.attempts[0]?.usage?.costUsd, 0.0143, 'and what it cost read in between');
   });
 });
@@ -185,7 +264,12 @@ test('a task that asked for a worktree has its session stopped and never removed
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { background: true, worktree: true }, closeoutSchema: { type: 'object' } });
+    const id = await engine.file({
+      brief: 'the prompt',
+      cwd: tmp('cwd'),
+      config: { background: true, worktree: true },
+      closeoutSchema: { type: 'object' },
+    });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
@@ -194,7 +278,11 @@ test('a task that asked for a worktree has its session stopped and never removed
     for (let i = 0; i < 3; i++) await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');
     assert.deepEqual(claude.releases(), [['stop', short(row!)]], 'stopped once, and no rm on any pass');
-    assert.deepEqual(claude.rows().map((r) => r.state), ['stopped'], 'still listed');
+    assert.deepEqual(
+      claude.rows().map((r) => r.state),
+      ['stopped'],
+      'still listed',
+    );
   });
 });
 
@@ -205,7 +293,11 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
       const engine = createEngine({ root: tmp('root') });
-      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), config: { background: true, ...(worktree ? { worktree: true } : {}) } });
+      const id = await engine.file({
+        brief: 'the prompt',
+        cwd: tmp('cwd'),
+        config: { background: true, ...(worktree ? { worktree: true } : {}) },
+      });
       await engine.tick();
       const [row] = claude.rows();
       wrote(row!, 10 * 60_000);
@@ -215,8 +307,21 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
       for (let i = 0; i < 3; i++) await engine.tick();
       const at = `worktree: ${worktree}`;
       assert.equal((await engine.view(id)).state.attempts[0]?.ended, 'done', `${at}: ended by quiet, with no statement`);
-      assert.deepEqual(claude.releases(), worktree ? [['stop', short(row!)]] : [['stop', short(row!)], ['rm', short(row!)]], `${at}: stopped first`);
-      assert.deepEqual(claude.rows().map((r) => r.state), worktree ? ['stopped'] : [], at);
+      assert.deepEqual(
+        claude.releases(),
+        worktree
+          ? [['stop', short(row!)]]
+          : [
+              ['stop', short(row!)],
+              ['rm', short(row!)],
+            ],
+        `${at}: stopped first`,
+      );
+      assert.deepEqual(
+        claude.rows().map((r) => r.state),
+        worktree ? ['stopped'] : [],
+        at,
+      );
     });
   }
 });
@@ -239,9 +344,20 @@ test('no session is released while its attempt runs; one a person stopped is rel
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'stopped');
-    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.reason], ['stopped', 'operator'], 'ended, saying why it has no statement');
+    assert.deepEqual(
+      [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
+      ['stopped', 'operator'],
+      'ended, saying why it has no statement',
+    );
     assert.equal(v.state.attempts[0]?.nativeId, row!.sessionId, 'its session id, recorded as it ended');
-    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], "the person's stop, then — stopped by then — only rm");
+    assert.deepEqual(
+      claude.releases(),
+      [
+        ['stop', short(row!)],
+        ['rm', short(row!)],
+      ],
+      "the person's stop, then — stopped by then — only rm",
+    );
     assert.deepEqual(claude.rows(), []);
     assert.equal(v.sessionId, row!.sessionId);
     assert.match(await engine.logs(id), /the prompt/, 'and ae logs still reads it');
@@ -259,8 +375,19 @@ test('a session stopped at its deadline is released once its task settles, as on
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'failed');
-    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.reason], ['failed', 'deadline'], 'ended, saying why it has no statement');
-    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped by the deadline, then removed');
+    assert.deepEqual(
+      [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
+      ['failed', 'deadline'],
+      'ended, saying why it has no statement',
+    );
+    assert.deepEqual(
+      claude.releases(),
+      [
+        ['stop', short(row!)],
+        ['rm', short(row!)],
+      ],
+      'stopped by the deadline, then removed',
+    );
   });
 });
 
@@ -286,16 +413,27 @@ test("a task settled before its session's id was recorded keeps that session lis
     after: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator', nativeId: recorded }),
   };
   const journal: PromiseJournal = {
-    async append(id, e) { (tasks[id] ??= []).push(e); },
-    async read(id) { return [...(tasks[id] ?? [])]; },
-    async list() { return Object.keys(tasks); },
-    async feed() { return { entries: [], cursor: 0 }; },
+    async append(id, e) {
+      (tasks[id] ??= []).push(e);
+    },
+    async read(id) {
+      return [...(tasks[id] ?? [])];
+    },
+    async list() {
+      return Object.keys(tasks);
+    },
+    async feed() {
+      return { entries: [], cursor: 0 };
+    },
   };
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root'), journal });
     for (let i = 0; i < 2; i++) await engine.tick();
     assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]!]], 'the session whose id is on the record, and only it');
-    assert.deepEqual(claude.rows().map((r) => r.name), ['ae/before/1']);
+    assert.deepEqual(
+      claude.rows().map((r) => r.name),
+      ['ae/before/1'],
+    );
   });
 });
 
@@ -314,10 +452,21 @@ test('a release the harness refuses fails nothing else in the pass, and is asked
     assert.equal((await engine.view(next)).state.attempts.length, 1, 'the other task was still started');
     await engine.tick();
     const row = claude.rows().find((r) => r.name === `ae/${done}/1`)!;
-    assert.deepEqual(claude.releases(), [['rm', short(row)], ['rm', short(row)]], 'it had exited, so no stop; removal asked on each pass');
+    assert.deepEqual(
+      claude.releases(),
+      [
+        ['rm', short(row)],
+        ['rm', short(row)],
+      ],
+      'it had exited, so no stop; removal asked on each pass',
+    );
 
     claude.rmFails(false);
     await engine.tick();
-    assert.equal(claude.rows().some((r) => r.name === `ae/${done}/1`), false, 'and removed once the harness allows it');
+    assert.equal(
+      claude.rows().some((r) => r.name === `ae/${done}/1`),
+      false,
+      'and removed once the harness allows it',
+    );
   });
 });

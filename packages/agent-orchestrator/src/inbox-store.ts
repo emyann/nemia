@@ -8,7 +8,20 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, parseInboxCard, queueOrder, queuedText, queueRefusal, type InboxCard, type InboxListing, type QueueTry } from './inbox.ts';
+import {
+  ideaCard,
+  inboxListing,
+  inboxNameOf,
+  inboxNameRefusal,
+  noCardLine,
+  parseInboxCard,
+  queueOrder,
+  queuedText,
+  queueRefusal,
+  type InboxCard,
+  type InboxListing,
+  type QueueTry,
+} from './inbox.ts';
 import { workRoot } from './places.ts';
 import { isFolderTeam, WorkflowError, type Workflow } from './workflow.ts';
 import { loadWorkflows, workflowFolder } from './workflow-store.ts';
@@ -17,16 +30,27 @@ import { HOME, inboxDir, isDirectory, listRuns, runId, runsDir } from './store.t
 /** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */
 export function inboxFiles(): Array<{ file: string; text: string }> {
   let names: string[];
-  try { names = fs.readdirSync(inboxDir()); } catch { return []; }
+  try {
+    names = fs.readdirSync(inboxDir());
+  } catch {
+    return [];
+  }
   return names.map((name) => {
     const at = path.join(inboxDir(), name);
     if (isDirectory(at)) return { file: `${name}/`, text: '' };
-    try { return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' }; } catch { return { file: name, text: '' }; }
+    try {
+      return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
+    } catch {
+      return { file: name, text: '' };
+    }
   });
 }
 
 /** The names of the inbox's cards, as `wf inbox` lists them. */
-export const inboxCards = (): string[] => inboxListing(inboxFiles(), [], () => true).filter((l) => l.file.endsWith('.md')).map((l) => l.name);
+export const inboxCards = (): string[] =>
+  inboxListing(inboxFiles(), [], () => true)
+    .filter((l) => l.file.endsWith('.md'))
+    .map((l) => l.name);
 
 /**
  * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
@@ -39,14 +63,26 @@ export const queueDir = (): string => path.join(HOME, 'queue');
 export function queueTries(): Map<string, QueueTry> {
   const tries = new Map<string, QueueTry>();
   let names: string[];
-  try { names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json')); } catch { return tries; }
+  try {
+    names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json'));
+  } catch {
+    return tries;
+  }
   for (const file of names) {
     try {
       const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueTry>;
-      if (typeof r.at === 'string' && typeof r.text === 'string' && typeof r.repo === 'string' && typeof r.why === 'string' && typeof r.refused === 'boolean') {
+      if (
+        typeof r.at === 'string' &&
+        typeof r.text === 'string' &&
+        typeof r.repo === 'string' &&
+        typeof r.why === 'string' &&
+        typeof r.refused === 'boolean'
+      ) {
         tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
       }
-    } catch { /* torn, or removed since the listing */ }
+    } catch {
+      /* torn, or removed since the listing */
+    }
   }
   return tries;
 }
@@ -80,8 +116,10 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
     return null;
   }
   if (!isFolderTeam(steps)) return null;
-  return `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
-    + `File the card without a repository, or name a workflow whose steps work on one.`;
+  return (
+    `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
+    `File the card without a repository, or name a workflow whose steps work on one.`
+  );
 }
 
 /**
@@ -90,7 +128,10 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
  * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
  * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
-export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
+export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): {
+  card: InboxCard;
+  file: string;
+} {
   const refusedRepo = cardRepoRefusal(opts);
   if (refusedRepo) throw new WorkflowError(refusedRepo);
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
@@ -131,7 +172,9 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new WorkflowError(`${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`);
+    throw new WorkflowError(
+      `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
+    );
   }
   // Taken back whatever its `repo:` names: a card whose repository is gone leaves the queue as any card does, and is listed with why.
   const exists = how.off ? () => true : isDirectory;
@@ -139,7 +182,13 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
   if (!how.off) {
     const listing = readInbox();
-    const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
+    const why = queueRefusal(
+      card,
+      file,
+      listing.find((l) => l.name === name)?.startedAs ?? [],
+      listing.find((l) => l.name === name)?.queued?.place ?? null,
+      how.workflow,
+    );
     if (why) throw new WorkflowError(why);
   }
   // `--workflow` writes that key over the card's own — queued or taken off the queue, `queuedText` below writes it either way — which
@@ -185,7 +234,12 @@ export function dropFromInbox(name: string): InboxDropped {
     fs.rmSync(file);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { removed: false, cards: inboxCards() };
-    throw Object.assign(new Error(`wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`), { exitCode: 1 });
+    throw Object.assign(
+      new Error(
+        `wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
+      ),
+      { exitCode: 1 },
+    );
   }
   return { removed: true, file };
 }
@@ -196,7 +250,13 @@ export function dropFromInbox(name: string): InboxDropped {
  * not there is still a card's path, refused by name at start.
  */
 export function inboxNameAt(given: string): string | null {
-  const real = (at: string): string => { try { return fs.realpathSync(at); } catch { return at; } };
+  const real = (at: string): string => {
+    try {
+      return fs.realpathSync(at);
+    } catch {
+      return at;
+    }
+  };
   const at = path.resolve(given);
   return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxDir()));
 }

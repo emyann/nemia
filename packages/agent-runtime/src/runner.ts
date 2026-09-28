@@ -27,7 +27,13 @@ import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionState, Sighting, Usage } from './domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
-import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './runner-claude-transcript.ts';
+import {
+  claudeTranscriptEvents,
+  lastStructuredOutput,
+  renderTranscript,
+  transcriptFile,
+  transcriptUsage,
+} from './runner-claude-transcript.ts';
 import { claudeFlagsOf, worktreeName } from './runner-claude-vocabulary.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
@@ -191,12 +197,15 @@ export type RunnerOps = {
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
   /** Any implementation becomes a Layer. This is the only way a runner reaches the engine. */
-  static layer = (ops: RunnerOps) => Layer.succeed(Runner)(Runner.of({
-    ...ops,
-    // The harness arguments are the adapter's, so what no adapter could use is refused on the adapter's side of the seam:
-    // here, beneath every runner, and so at the Effect door as at `createEngine().file()`.
-    refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
-  }));
+  static layer = (ops: RunnerOps) =>
+    Layer.succeed(Runner)(
+      Runner.of({
+        ...ops,
+        // The harness arguments are the adapter's, so what no adapter could use is refused on the adapter's side of the seam:
+        // here, beneath every runner, and so at the Effect door as at `createEngine().file()`.
+        refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
+      }),
+    );
 
   static claude = (options?: ClaudeOptions) => Runner.layer(claudeOps(options));
 
@@ -249,11 +258,16 @@ export const AUTH_WAIT = /\b(?:auth|authenticat(?:e|es|ed|ing|ion)|log[ -]?in|si
  */
 export const claudeStateOf = (word: string, waitingFor?: string): SessionState => {
   switch (word) {
-    case 'working': return 'working';
-    case 'blocked': return waitingFor !== undefined && AUTH_WAIT.test(waitingFor) ? 'auth-required' : 'input-required';
-    case 'done': return 'completed';
-    case 'stopped': return 'canceled';
-    default: return 'failed';
+    case 'working':
+      return 'working';
+    case 'blocked':
+      return waitingFor !== undefined && AUTH_WAIT.test(waitingFor) ? 'auth-required' : 'input-required';
+    case 'done':
+      return 'completed';
+    case 'stopped':
+      return 'canceled';
+    default:
+      return 'failed';
   }
 };
 
@@ -320,19 +334,37 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
   /** A task's MCP config, kept outside the workspace: a file in a step's worktree travels down its branch. */
   const mcpFile = (name: string) => path.join(root, 'mcp', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
-  const transcriptTime = options.transcriptTime ?? (async (sessionId: string) => {
-    try { return (await getSessionInfo(sessionId))?.lastModified; } catch { return undefined; }
-  });
-  const closeoutFrom = options.closeoutFrom ?? (async (sessionId: string) => {
-    const file = transcriptFile(sessionId);
-    if (!file) return undefined;
-    try { return lastStructuredOutput(await readTextAsync(file)); } catch { return undefined; }
-  });
-  const usageFrom = options.usageFrom ?? (async (sessionId: string, since: number) => {
-    const file = transcriptFile(sessionId);
-    if (!file) return undefined;
-    try { return transcriptUsage(await readTextAsync(file), since); } catch { return undefined; }
-  });
+  const transcriptTime =
+    options.transcriptTime ??
+    (async (sessionId: string) => {
+      try {
+        return (await getSessionInfo(sessionId))?.lastModified;
+      } catch {
+        return undefined;
+      }
+    });
+  const closeoutFrom =
+    options.closeoutFrom ??
+    (async (sessionId: string) => {
+      const file = transcriptFile(sessionId);
+      if (!file) return undefined;
+      try {
+        return lastStructuredOutput(await readTextAsync(file));
+      } catch {
+        return undefined;
+      }
+    });
+  const usageFrom =
+    options.usageFrom ??
+    (async (sessionId: string, since: number) => {
+      const file = transcriptFile(sessionId);
+      if (!file) return undefined;
+      try {
+        return transcriptUsage(await readTextAsync(file), since);
+      } catch {
+        return undefined;
+      }
+    });
 
   /**
    * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
@@ -359,8 +391,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const keptUsage = new Map<string, Kept<Usage | undefined>>();
   const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
   const keptRead = async <T>(
-    kept: Map<string, Kept<T>>, attempt: string, keep: boolean,
-    writtenAt: () => Promise<number | undefined>, read: () => Promise<T>,
+    kept: Map<string, Kept<T>>,
+    attempt: string,
+    keep: boolean,
+    writtenAt: () => Promise<number | undefined>,
+    read: () => Promise<T>,
   ): Promise<T> => {
     if (!keep) return read();
     const pin = kept.get(attempt);
@@ -379,8 +414,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * No start in the registry, no usage — without one, a resumed session's inherited conversation
    * cannot be told from its own, and a wrong count is worse than none.
    */
-  const usageOf = async (attempt: string, s: Sighting, since: number | undefined, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
-    since === undefined ? undefined : keptRead(keptUsage, attempt, keep, writtenAt, () => usageFrom(s.sessionId, since));
+  const usageOf = async (
+    attempt: string,
+    s: Sighting,
+    since: number | undefined,
+    writtenAt: () => Promise<number | undefined>,
+    keep = FINAL.has(s.state),
+  ) => (since === undefined ? undefined : keptRead(keptUsage, attempt, keep, writtenAt, () => usageFrom(s.sessionId, since)));
 
   /**
    * Each of our sessions' state as `claude agents` itself last listed it: what `release` stops on, whatever
@@ -398,79 +438,105 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   /** When `claude agents` last listed each of our sessions as started, by session id: what `release` reads usage from. */
   const starts = new Map<string, number>();
 
-  return ({
-    spawn: (r) => Effect.try({
-      // Found and written before the CLI runs, so whatever throws here started nothing.
-      try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.config?.mcp)]),
-      catch: (cause) => new RunnerError({ verb: 'spawn', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`, refused: true }),
-    }).pipe(Effect.flatMap((mcpArgs) => sh('claude', [
-      '--bg',
-      '--name', r.name,
-      // The fence. `--tools`, not `--allowedTools`: a tool the session does not have beats one it
-      // may not use, and `--allowedTools` only pre-approves. VARIADIC — directly before the prompt
-      // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
-      // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
-      ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
-      // The deny list, the other half of the fence: a tool the session has, or a command it may run, that it
-      // must not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny
-      // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
-      // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
-      ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
-      // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
-      // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
-      // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
-      // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
-      // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
-      // lists above are, and a deny still beats it.
-      ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
-      // The caller's own flags (`config.claude`), after the variadic lists and before the mode. Remote Control among them, only
-      // when the task asks (`claude.remoteControl`): the session bridged to claude.ai and listed in its agents view, where it can be
-      // driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag (measured on
-      // 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt taken as its name — and here
-      // the `--permission-mode` that always follows cannot be taken for one.
-      ...claudeFlagsOf(r.config?.claude),
-      // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
-      // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
-      // session that wants to run its own tests stops and waits for a person who is not there.
-      // `auto` approves everything with background safety checks, which the docs recommend for
-      // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
-      '--permission-mode', r.config?.permissionMode ?? 'auto',
-      // MCP servers: the ones named here and no others. Without `--strict-mcp-config` a session loads
-      // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
-      // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
-      // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
-      // Claude in Chrome is not in any config and survives strict, so `--no-chrome` goes with it.
-      ...mcpArgs,
-      ...(r.config?.model ? ['--model', r.config?.model] : []),
-      ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
-      // The context window: past about it, the session compacts its conversation and carries on — on `--bg` too, and it still
-      // signs off (measured on 2.1.278, open issue 26). Takes a required value, so it can neither swallow the prompt nor be taken
-      // for a `--tools` entry, which the `--permission-mode` above has ended. The same window on every attempt: a resumed
-      // copy keeps only the flags it is given, so a continuation given none would run on the model's whole window again.
-      ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
-      // `--resume` continues that conversation in the background. The NAME is still ours and
-      // still new, so a resumed attempt is a distinct row on the board from the one it continues.
-      ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
-      // The harness cuts and cleans the worktree; the engine only declares that it wants one.
-      // This is the Pod/volume split: a workload asks for storage, the kubelet provisions it.
-      //
-      // ALWAYS with a name, even when the task did not choose one. `--worktree [name]` takes an
-      // OPTIONAL value, so a bare `--worktree` immediately before the prompt eats the prompt as
-      // the worktree's name and the session runs with nothing to do. Measured, not theorised.
-      ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
-      // The closing statement's shape. Claude Code gives the session a StructuredOutput tool for
-      // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
-      // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
-      ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
-      // The spend cap, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this harness
-      // (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
-      ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
-      r.brief,
-    ], { cwd: r.cwd, verb: 'spawn' }))).pipe(Effect.asVoid),
+  return {
+    spawn: (r) =>
+      Effect.try({
+        // Found and written before the CLI runs, so whatever throws here started nothing.
+        try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.config?.mcp)]),
+        catch: (cause) =>
+          new RunnerError({
+            verb: 'spawn',
+            message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`,
+            refused: true,
+          }),
+      })
+        .pipe(
+          Effect.flatMap((mcpArgs) =>
+            sh(
+              'claude',
+              [
+                '--bg',
+                '--name',
+                r.name,
+                // The fence. `--tools`, not `--allowedTools`: a tool the session does not have beats one it
+                // may not use, and `--allowedTools` only pre-approves. VARIADIC — directly before the prompt
+                // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
+                // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
+                ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
+                // The deny list, the other half of the fence: a tool the session has, or a command it may run, that it
+                // must not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny
+                // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
+                // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
+                ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
+                // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
+                // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
+                // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
+                // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
+                // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
+                // lists above are, and a deny still beats it.
+                ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+                // The caller's own flags (`config.claude`), after the variadic lists and before the mode. Remote Control among them, only
+                // when the task asks (`claude.remoteControl`): the session bridged to claude.ai and listed in its agents view, where it can be
+                // driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag (measured on
+                // 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt taken as its name — and here
+                // the `--permission-mode` that always follows cannot be taken for one.
+                ...claudeFlagsOf(r.config?.claude),
+                // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
+                // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
+                // session that wants to run its own tests stops and waits for a person who is not there.
+                // `auto` approves everything with background safety checks, which the docs recommend for
+                // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
+                '--permission-mode',
+                r.config?.permissionMode ?? 'auto',
+                // MCP servers: the ones named here and no others. Without `--strict-mcp-config` a session loads
+                // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
+                // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
+                // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
+                // Claude in Chrome is not in any config and survives strict, so `--no-chrome` goes with it.
+                ...mcpArgs,
+                ...(r.config?.model ? ['--model', r.config?.model] : []),
+                ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
+                // The context window: past about it, the session compacts its conversation and carries on — on `--bg` too, and it still
+                // signs off (measured on 2.1.278, open issue 26). Takes a required value, so it can neither swallow the prompt nor be taken
+                // for a `--tools` entry, which the `--permission-mode` above has ended. The same window on every attempt: a resumed
+                // copy keeps only the flags it is given, so a continuation given none would run on the model's whole window again.
+                ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
+                // `--resume` continues that conversation in the background. The NAME is still ours and
+                // still new, so a resumed attempt is a distinct row on the board from the one it continues.
+                ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
+                // The harness cuts and cleans the worktree; the engine only declares that it wants one.
+                // This is the Pod/volume split: a workload asks for storage, the kubelet provisions it.
+                //
+                // ALWAYS with a name, even when the task did not choose one. `--worktree [name]` takes an
+                // OPTIONAL value, so a bare `--worktree` immediately before the prompt eats the prompt as
+                // the worktree's name and the session runs with nothing to do. Measured, not theorised.
+                ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
+                // The closing statement's shape. Claude Code gives the session a StructuredOutput tool for
+                // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
+                // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
+                ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
+                // The spend cap, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this harness
+                // (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
+                ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
+                r.brief,
+              ],
+              { cwd: r.cwd, verb: 'spawn' },
+            ),
+          ),
+        )
+        .pipe(Effect.asVoid),
 
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {
-        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; waitingFor?: unknown; startedAt?: unknown; pid?: unknown }>;
+        const rows = JSON.parse(out) as Array<{
+          sessionId?: string;
+          name?: string;
+          state?: string;
+          status?: string;
+          waitingFor?: unknown;
+          startedAt?: unknown;
+          pid?: unknown;
+        }>;
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
         listed.clear();
         pids.clear();
@@ -495,7 +561,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
             if (Number.isInteger(row.pid) && (row.pid as number) > 0) pids.set(row.sessionId, row.pid as number);
             if (typeof row.startedAt === 'number') starts.set(row.sessionId, row.startedAt);
             m.set(row.name, {
-              sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId, ...(waitingFor ? { waitingFor } : {}) },
+              sighting: {
+                sessionId: row.sessionId,
+                state,
+                busy: row.status === 'busy',
+                nativeId: row.sessionId,
+                ...(waitingFor ? { waitingFor } : {}),
+              },
               // When THIS session started, as the harness recorded it: what usage is counted from.
               startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
             });
@@ -558,7 +630,10 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                 if (!said?.lastWord || said.at < startedAt) return [name, sighting] as const;
                 // Over, so what it consumed is final too — read here as it is for any session that has stopped.
                 const used = await usageOf(attempt, sighting, startedAt, writtenAt, true);
-                return [name, { ...sighting, closeout: { payload: said.payload, at: said.at }, ...(used ? { usage: used } : {}), quietMs: quiet }] as const;
+                return [
+                  name,
+                  { ...sighting, closeout: { payload: said.payload, at: said.at }, ...(used ? { usage: used } : {}), quietMs: quiet },
+                ] as const;
               }
               // What the workload SAID, if it said anything — reported with when it was said.
               // Whether it belongs to this attempt is the engine's call, not ours: a resumed
@@ -567,7 +642,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
               const said = await statementOf(attempt, sighting, writtenAt);
               // And what it has consumed since its own start — reported as measured, or not at all.
               const used = await usageOf(attempt, sighting, startedAt, writtenAt);
-              const reported: Sighting = { ...sighting, ...(said ? { closeout: { payload: said.payload, at: said.at } } : {}), ...(used ? { usage: used } : {}) };
+              const reported: Sighting = {
+                ...sighting,
+                ...(said ? { closeout: { payload: said.payload, at: said.at } } : {}),
+                ...(used ? { usage: used } : {}),
+              };
               if (reported.state !== 'working') return [name, reported] as const;
               // The floor underneath, statement or not: how long it has been quiet, once that is long
               // enough to be stopped rather than paused — reported, not concluded (`decide` says what it
@@ -575,8 +654,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
               // upstream.
               const quiet = await quietFor();
               return quiet !== undefined && quiet >= quiescentAfterMs
-                ? [name, { ...reported, quietMs: quiet }] as const
-                : [name, reported] as const;
+                ? ([name, { ...reported, quietMs: quiet }] as const)
+                : ([name, reported] as const);
             }),
           { concurrency: 'unbounded' },
         ).pipe(Effect.map((entries) => new Map(entries)));
@@ -589,13 +668,15 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * registration on the machine this was measured on named the same session, under the same name, as `claude agents`
      * listed for its pid.
      */
-    find: (name) => Effect.tryPromise({
-      try: async () => {
-        const found = await claudeRegistered(sessionsDir, name);
-        return found && { sessionId: found.sessionId };
-      },
-      catch: (cause) => new RunnerError({ verb: 'find', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
-    }),
+    find: (name) =>
+      Effect.tryPromise({
+        try: async () => {
+          const found = await claudeRegistered(sessionsDir, name);
+          return found && { sessionId: found.sessionId };
+        },
+        catch: (cause) =>
+          new RunnerError({ verb: 'find', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
+      }),
 
     // `claude stop` takes the short id, which is the uuid's first block.
     stop: (sessionId) => sh('claude', ['stop', short(sessionId)], { verb: 'stop' }).pipe(Effect.asVoid),
@@ -614,27 +695,29 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * transcript only as the process exits, and `claude stop` returns once it has (measured on 2.1.272: 0.6 s, both
      * `cost-state` lines there as it returned). The end on the record was read before that, with no cost in it.
      */
-    release: (session, task) => Effect.gen(function* () {
-      // The registry's word, not the sighting's: a session whose end is on the record — quiet, or idle
-      // after its closeout — is still running (found in review, when quiet was reported `done`). A session
-      // this runner has not listed — no `observe` made here — has only its sighting to go by. A process listed
-      // for it runs whatever its state says: a session `done` keeps its process until it is stopped (2.1.272).
-      const running = listed.get(session.sessionId) ?? session.state;
-      const alive = running === 'working' || running === 'input-required' || running === 'auth-required' || pids.has(session.sessionId);
-      if (alive) {
-        // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
-        yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
-          Effect.catchTag('RunnerError', () => Effect.succeed('')),
-        );
-      }
-      // Read before `rm`: one that fails leaves the session listed, and the next pass's sighting carries the same read.
-      const since = starts.get(session.sessionId);
-      const measured = alive && since !== undefined
-        ? yield* Effect.promise(() => usageFrom(session.sessionId, since).catch(() => undefined))
-        : undefined;
-      if (!task.worktree) yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });
-      return measured;
-    }),
+    release: (session, task) =>
+      Effect.gen(function* () {
+        // The registry's word, not the sighting's: a session whose end is on the record — quiet, or idle
+        // after its closeout — is still running (found in review, when quiet was reported `done`). A session
+        // this runner has not listed — no `observe` made here — has only its sighting to go by. A process listed
+        // for it runs whatever its state says: a session `done` keeps its process until it is stopped (2.1.272).
+        const running = listed.get(session.sessionId) ?? session.state;
+        const alive = running === 'working' || running === 'input-required' || running === 'auth-required' || pids.has(session.sessionId);
+        if (alive) {
+          // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
+          yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
+            Effect.catchTag('RunnerError', () => Effect.succeed('')),
+          );
+        }
+        // Read before `rm`: one that fails leaves the session listed, and the next pass's sighting carries the same read.
+        const since = starts.get(session.sessionId);
+        const measured =
+          alive && since !== undefined
+            ? yield* Effect.promise(() => usageFrom(session.sessionId, since).catch(() => undefined))
+            : undefined;
+        if (!task.worktree) yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });
+        return measured;
+      }),
 
     // The one verb where the Agent SDK is simply better than the CLI: `getSessionMessages` reads
     // the stored transcript as TYPED messages, and it works on sessions it never started — the
@@ -672,13 +755,16 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         try: async () => {
           const pid = pids.get(session.sessionId);
           if (pid === undefined) {
-            throw new Error(`\`claude agents\` lists no process for ${session.name} (${session.sessionId}): it has exited, or this runner has not observed it.`);
+            throw new Error(
+              `\`claude agents\` lists no process for ${session.name} (${session.sessionId}): it has exited, or this runner has not observed it.`,
+            );
           }
           await claudeInboxPost(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text));
         },
-        catch: (cause) => new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
+        catch: (cause) =>
+          new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),
-  });
+  };
 };
 
 /** A harness that costs nothing: sessions are a map, and a test moves them by hand. */
@@ -688,13 +774,15 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
   const spawned = control?.spawned ?? [];
   let n = 0;
   return {
-      spawn: (r) => Effect.sync(() => {
+    spawn: (r) =>
+      Effect.sync(() => {
         const id = `fake-${++n}`;
         sessions.set(r.name, { sessionId: id, state: 'working', nativeId: id });
         spawned.push(r);
       }),
-      observe: Effect.sync(() => new Map(sessions)),
-      stop: (id) => Effect.sync(() => {
+    observe: Effect.sync(() => new Map(sessions)),
+    stop: (id) =>
+      Effect.sync(() => {
         for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled' });
       }),
     logs: () => Effect.succeed('(fake runner: no logs)'),
@@ -707,15 +795,20 @@ const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
     countSpawn();
     const child = execFile(cmd, args, { cwd: o.cwd, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resume(err
-        ? Effect.fail(new RunnerError({
-            verb: o.verb, message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
-            // The OS never created the process — no binary, no cwd — so nothing ran and nothing
-            // started. Any other failure ran the command, and whether it registered a session first
-            // is not something its exit code says.
-            ...((err as NodeJS.ErrnoException).syscall?.startsWith('spawn') ? { refused: true } : {}),
-          }))
-        : Effect.succeed(stdout));
+      resume(
+        err
+          ? Effect.fail(
+              new RunnerError({
+                verb: o.verb,
+                message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
+                // The OS never created the process — no binary, no cwd — so nothing ran and nothing
+                // started. Any other failure ran the command, and whether it registered a session first
+                // is not something its exit code says.
+                ...((err as NodeJS.ErrnoException).syscall?.startsWith('spawn') ? { refused: true } : {}),
+              }),
+            )
+          : Effect.succeed(stdout),
+      );
     });
     return Effect.sync(() => child.kill());
   });

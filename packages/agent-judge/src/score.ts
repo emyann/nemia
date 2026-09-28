@@ -81,12 +81,12 @@ export type Table = {
   readonly recall: number | null;
 };
 
-export const confusion = (
-  rows: readonly Row[],
-  predict: (row: Row) => Verdict | undefined,
-  truth: (row: Row) => boolean,
-): Table => {
-  let yesYes = 0, yesNo = 0, noYes = 0, noNo = 0, unsure = 0;
+export const confusion = (rows: readonly Row[], predict: (row: Row) => Verdict | undefined, truth: (row: Row) => boolean): Table => {
+  let yesYes = 0,
+    yesNo = 0,
+    noYes = 0,
+    noNo = 0,
+    unsure = 0;
   for (const row of rows) {
     const p = predict(row);
     if (p === undefined) continue;
@@ -100,7 +100,13 @@ export const confusion = (
   }
   const decided = yesYes + yesNo + noYes + noNo;
   return {
-    yesYes, yesNo, noYes, noNo, unsure, decided, right: yesYes + noNo,
+    yesYes,
+    yesNo,
+    noYes,
+    noNo,
+    unsure,
+    decided,
+    right: yesYes + noNo,
     precision: yesYes + yesNo > 0 ? yesYes / (yesYes + yesNo) : null,
     recall: yesYes + noYes > 0 ? yesYes / (yesYes + noYes) : null,
   };
@@ -110,7 +116,10 @@ export const confusion = (
 export type Agreement = { readonly same: number; readonly differ: number; readonly inbox: number; readonly of: number };
 
 export const agreement = (rows: readonly Row[], guess: (row: Row) => string | null | undefined): Agreement => {
-  let same = 0, differ = 0, inbox = 0, of = 0;
+  let same = 0,
+    differ = 0,
+    inbox = 0,
+    of = 0;
   for (const row of rows) {
     const g = guess(row);
     if (g === undefined) continue;
@@ -147,10 +156,15 @@ export const disagreements = (rows: readonly Row[]): Disagreement[] => {
     const d = dispatchOf(row);
     if (d === undefined || ('folder' in d && d.folder === row.folder)) continue;
     out.push({
-      id: row.id, first: row.first, folder: row.folder,
-      judge: 'folder' in d ? d.folder : `the inbox: ${d.inbox}`, inbox: !('folder' in d),
+      id: row.id,
+      first: row.first,
+      folder: row.folder,
+      judge: 'folder' in d ? d.folder : `the inbox: ${d.inbox}`,
+      inbox: !('folder' in d),
       probabilities: {
-        web: shown(row.answers!.web), plan: shown(row.answers!.plan), clear: shown(row.answers!.clear),
+        web: shown(row.answers!.web),
+        plan: shown(row.answers!.plan),
+        clear: shown(row.answers!.clear),
       },
       also: shared.get(row.id) ?? [],
     });
@@ -189,7 +203,10 @@ const WHAT: Record<Property, string> = {
 };
 
 const row = (cells: readonly string[], widths: readonly number[]) =>
-  cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]!) : c.padStart(widths[i]!))).join('').trimEnd();
+  cells
+    .map((c, i) => (i === 0 ? c.padEnd(widths[i]!) : c.padStart(widths[i]!)))
+    .join('')
+    .trimEnd();
 
 const WIDTHS = [10, 11, 10, 10];
 const WIDE = WIDTHS.reduce((a, b) => a + b, 0);
@@ -209,7 +226,8 @@ const table = (name: string, t: Table, unsure: boolean): string[] => {
 /** The answers that did not come, by kind, most first: a failure of any kind reads `unsure` through `decide`. */
 export const failures = (rows: readonly Row[]): { kind: string; count: number }[] => {
   const by = new Map<string, number>();
-  for (const r of rows) for (const j of Object.values(r.answers ?? {})) if (j.status === 'failed') by.set(j.kind, (by.get(j.kind) ?? 0) + 1);
+  for (const r of rows)
+    for (const j of Object.values(r.answers ?? {})) if (j.status === 'failed') by.set(j.kind, (by.get(j.kind) ?? 0) + 1);
   return [...by].map(([kind, count]) => ({ kind, count })).sort((x, y) => y.count - x.count || x.kind.localeCompare(y.kind));
 };
 
@@ -232,7 +250,9 @@ export const lines = (report: Report): string[] => {
   const failed = failures(rows);
   if (failed.length > 0) {
     const total = failed.reduce((n, f) => n + f.count, 0);
-    out.push(`  FAILED  ${total} of ${rows.length * 4} answers did not come — ${failed.map((f) => `${f.kind} ${f.count}`).join(', ')} — and read \`unsure\` below.`);
+    out.push(
+      `  FAILED  ${total} of ${rows.length * 4} answers did not come — ${failed.map((f) => `${f.kind} ${f.count}`).join(', ')} — and read \`unsure\` below.`,
+    );
     out.push('    fix the cause, then run again with --reask: only the failed questions are asked again.');
   }
   if (rows.length === 0) {
@@ -244,19 +264,39 @@ export const lines = (report: Report): string[] => {
     out.push('');
     out.push(`${property} · ${WHAT[property]}`);
     const truth = (r: Row) => r[property];
-    if (on) out.push(...table('judge', confusion(rows, (r) => verdictOf(r, property), truth), true));
-    out.push(...table('rival', confusion(rows, (r) => (r.rival[property] ? 'yes' : 'no'), truth), false));
+    if (on)
+      out.push(
+        ...table(
+          'judge',
+          confusion(rows, (r) => verdictOf(r, property), truth),
+          true,
+        ),
+      );
+    out.push(
+      ...table(
+        'rival',
+        confusion(rows, (r) => (r.rival[property] ? 'yes' : 'no'), truth),
+        false,
+      ),
+    );
   }
   out.push('');
   out.push('the whole folder');
   const say = (name: string, a: Agreement) =>
     `  ${name.padEnd(8)}${a.same} of ${a.of} agree · ${a.differ} differ${name === 'judge' ? ` · ${a.inbox} stayed in the inbox, counted apart` : ''}`;
   if (on) out.push(say('judge', agreement(rows, judgeFolder)));
-  out.push(say('rival', agreement(rows, (r) => r.rival.folder)));
+  out.push(
+    say(
+      'rival',
+      agreement(rows, (r) => r.rival.folder),
+    ),
+  );
   if (on) {
     const differ = disagreements(rows);
     out.push('');
-    out.push(`where the judge and the person differ · ${differ.length} of ${rows.length}; the person's choice is not always right (pivot §2.4)`);
+    out.push(
+      `where the judge and the person differ · ${differ.length} of ${rows.length}; the person's choice is not always right (pivot §2.4)`,
+    );
     for (const d of differ) {
       out.push(`  ${d.id}${d.also.length > 0 ? ` · the same brief was dispatched as ${d.also.join(', ')}` : ''}`);
       out.push(`    ${d.folder} → ${d.judge}`);
@@ -279,8 +319,20 @@ export const lines = (report: Report): string[] => {
 export const document = (report: Report) => {
   const on = report.off === undefined;
   const property = (p: Property) => ({
-    ...(on ? { judge: confusion(report.rows, (r) => verdictOf(r, p), (r) => r[p]) } : {}),
-    rival: confusion(report.rows, (r) => (r.rival[p] ? 'yes' : 'no'), (r) => r[p]),
+    ...(on
+      ? {
+          judge: confusion(
+            report.rows,
+            (r) => verdictOf(r, p),
+            (r) => r[p],
+          ),
+        }
+      : {}),
+    rival: confusion(
+      report.rows,
+      (r) => (r.rival[p] ? 'yes' : 'no'),
+      (r) => r[p],
+    ),
   });
   return {
     v: 1,
@@ -303,12 +355,18 @@ export const document = (report: Report) => {
     },
     disagreements: on ? disagreements(report.rows) : [],
     runs: report.rows.map((r) => ({
-      id: r.id, first: r.first, folder: r.folder, label: { web: r.web, plan: r.plan },
+      id: r.id,
+      first: r.first,
+      folder: r.folder,
+      label: { web: r.web, plan: r.plan },
       rival: r.rival,
       judge: r.answers
         ? {
-            folder: judgeFolder(r), web: verdictOf(r, 'web'), plan: verdictOf(r, 'plan'),
-            clear: decide(r.answers.clear, THRESHOLDS.clear), answers: r.answers,
+            folder: judgeFolder(r),
+            web: verdictOf(r, 'web'),
+            plan: verdictOf(r, 'plan'),
+            clear: decide(r.answers.clear, THRESHOLDS.clear),
+            answers: r.answers,
           }
         : null,
     })),

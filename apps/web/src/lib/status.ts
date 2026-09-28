@@ -41,7 +41,14 @@ export function stepState(status: string, runCancelled: boolean, runHeld: boolea
 }
 
 /** What a hold makes `held`: a step not filed yet, and one at a human gate (`isGate`), whose answer is refused while the hold stands. */
-const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['waiting', 'blocked', 'awaiting-approval', 'exhausted', 'over-budget', 'budget-exhausted']);
+const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
+  'waiting',
+  'blocked',
+  'awaiting-approval',
+  'exhausted',
+  'over-budget',
+  'budget-exhausted',
+]);
 
 /** A step's state from its word alone, and whether the run was called off. */
 function wordState(status: string, runCancelled: boolean): StepState {
@@ -94,7 +101,12 @@ export const satisfiesAfter = (state: StepState): boolean => state === 'verified
  * answer any more.
  */
 export const isGate = (state: StepState, runCancelled: boolean): boolean =>
-  (state === 'blocked' || state === 'awaiting-approval' || state === 'exhausted' || state === 'over-budget' || state === 'budget-exhausted') && !runCancelled;
+  (state === 'blocked' ||
+    state === 'awaiting-approval' ||
+    state === 'exhausted' ||
+    state === 'over-budget' ||
+    state === 'budget-exhausted') &&
+  !runCancelled;
 
 /** What each state means, for a person who hovers over a chip. */
 export const stateMeaning: Record<StepState, string> = {
@@ -104,12 +116,17 @@ export const stateMeaning: Record<StepState, string> = {
   verified: 'verified: its check exited 0',
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
-  'awaiting-approval': 'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
-  exhausted: 'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
-  'over-budget': 'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
-  'budget-exhausted': 'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
+  'awaiting-approval':
+    'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
+  exhausted:
+    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
+  'over-budget':
+    'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
+  'budget-exhausted':
+    'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
-  denied: "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
+  denied:
+    "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',
@@ -124,7 +141,8 @@ export const stateClass: Record<StepState, string> = {
   checking: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
   verified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
   // Neutral, not green: nothing checked it. `StatusChip` marks it too, so it does not pass for a step still to do.
-  unverified: 'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
+  unverified:
+    'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
   blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   // Waiting on a person, as `blocked` is: the work is signed off, and a person's word is what files what follows.
   'awaiting-approval': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
@@ -137,7 +155,8 @@ export const stateClass: Record<StepState, string> = {
   // As `unsigned`: work to try again, not a question — it signed off, and what it did without the call is a person's to weigh.
   denied: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-  'failed-check': 'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
+  'failed-check':
+    'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
   // Nobody is asked, as with `waiting`, and not grey: a person's word stops it, not the order of the steps.
   held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',

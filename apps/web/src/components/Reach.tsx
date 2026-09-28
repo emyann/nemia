@@ -27,7 +27,15 @@ export function Reach({ label, children }: { label: string; children: ReactNode 
  * other mode, what asks is the mode's to decide, and on a job, which asks nobody, what would still ask is denied (`askDenier`). Then the allows a
  * deny takes back, those an ask rule takes back, and those of a tool the step does not have.
  */
-export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepReach['allowed']; readOnly: StepReach['readOnly']; commands: ReadOnlyCommands }) {
+export function AllowedReach({
+  allowed,
+  readOnly,
+  commands,
+}: {
+  allowed: StepReach['allowed'];
+  readOnly: StepReach['readOnly'];
+  commands: ReadOnlyCommands;
+}) {
   const exceptionOf = (rule: string) => allowed.exceptions.find((e) => e.rule === rule) ?? { except: [], asks: [] };
   const runsReadOnly = readOnly !== null && readOnly.length > 0;
   const { askDenier } = allowed;
@@ -36,7 +44,9 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
     <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
       {allowed.dontAsk ? (
         allowed.why ? (
-          <p data-no-bash className="text-xs text-neutral-500">{allowed.why}</p>
+          <p data-no-bash className="text-xs text-neutral-500">
+            {allowed.why}
+          </p>
         ) : (
           <>
             <p className="text-xs text-neutral-500">
@@ -49,13 +59,17 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
               <span className="flex flex-wrap gap-x-3 gap-y-1">
                 {allowed.bash.map((b) => (
                   <span key={b.rule} className="inline-flex flex-wrap items-center gap-1">
-                    <code data-bash={b.command} className={`${CHIP} ${RUNS}`}>{b.command}</code>
+                    <code data-bash={b.command} className={`${CHIP} ${RUNS}`}>
+                      {b.command}
+                    </code>
                     <Exceptions of={b.command} except={b.except} asks={b.asks} askDenier={askDenier} />
                   </span>
                 ))}
               </span>
             ) : (
-              <p data-none-allowed className="text-xs text-neutral-500">None.</p>
+              <p data-none-allowed className="text-xs text-neutral-500">
+                None.
+              </p>
             )}
           </>
         )
@@ -65,7 +79,9 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
             <span className="flex flex-wrap gap-x-3 gap-y-1">
               {allowed.rules.map((rule) => (
                 <span key={rule} className="inline-flex flex-wrap items-center gap-1">
-                  <code data-allowed={rule} className={`${CHIP} ${PLAIN}`}>{rule}</code>
+                  <code data-allowed={rule} className={`${CHIP} ${PLAIN}`}>
+                    {rule}
+                  </code>
                   <Exceptions of={rule} {...exceptionOf(rule)} askDenier={askDenier} />
                 </span>
               ))}
@@ -78,7 +94,9 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
           )}
           {runsReadOnly && (
             <>
-              <p className="text-xs text-neutral-500">And, in every mode, {commands.harness}&apos;s read-only commands, which ask for no rule:</p>
+              <p className="text-xs text-neutral-500">
+                And, in every mode, {commands.harness}&apos;s read-only commands, which ask for no rule:
+              </p>
               <ReadOnly readOnly={readOnly} commands={commands} askDenier={askDenier} />
             </>
           )}
@@ -88,22 +106,37 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
         <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
           Taken back by a deny, which beats an allow:
           {allowed.takenBack.map(({ rule, by }) => (
-            <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>{rule}</code>
+            <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>
+              {rule}
+            </code>
           ))}
         </p>
       )}
       {allowed.asked.length > 0 && (
         <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
-          {askDenier ? `Taken back by an ask rule, which beats an allow, and ${askDenier} denies what asks:` : 'Taken back by an ask rule, which beats an allow: these ask.'}
+          {askDenier
+            ? `Taken back by an ask rule, which beats an allow, and ${askDenier} denies what asks:`
+            : 'Taken back by an ask rule, which beats an allow: these ask.'}
           {allowed.asked.map(({ rule, by }) => (
-            <code key={rule} data-asked={rule} title={`Asks by ${by.rule} (${by.source})`} className={`${CHIP} ${askDenier ? STRUCK : ASKS}`}>{rule}</code>
+            <code
+              key={rule}
+              data-asked={rule}
+              title={`Asks by ${by.rule} (${by.source})`}
+              className={`${CHIP} ${askDenier ? STRUCK : ASKS}`}
+            >
+              {rule}
+            </code>
           ))}
         </p>
       )}
       {allowed.unused.length > 0 && (
         <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
           Of a tool its tools: do not have:
-          {allowed.unused.map((rule) => <code key={rule} data-unused={rule} className={`${CHIP} ${PLAIN} opacity-60`}>{rule}</code>)}
+          {allowed.unused.map((rule) => (
+            <code key={rule} data-unused={rule} className={`${CHIP} ${PLAIN} opacity-60`}>
+              {rule}
+            </code>
+          ))}
         </p>
       )}
     </Reach>
@@ -111,13 +144,28 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
 }
 
 /** After an allow that stands, what of it a narrower deny still refuses, and what a narrower ask rule still makes ask — in dontAsk, or on a job, denied. */
-function Exceptions({ of, except, asks, askDenier }: { of: string; except: readonly string[]; asks: readonly string[]; askDenier: string | null }) {
+function Exceptions({
+  of,
+  except,
+  asks,
+  askDenier,
+}: {
+  of: string;
+  except: readonly string[];
+  asks: readonly string[];
+  askDenier: string | null;
+}) {
   return (
     <>
-      {except.length > 0 && <span data-except={of} className="text-[11px] text-neutral-500">except {except.join(', ')}</span>}
+      {except.length > 0 && (
+        <span data-except={of} className="text-[11px] text-neutral-500">
+          except {except.join(', ')}
+        </span>
+      )}
       {asks.length > 0 && (
         <span data-asks={of} className="text-[11px] text-neutral-500">
-          {except.length > 0 ? 'and ' : ''}asks for {asks.join(', ')}{askDenier ? `, which ${askDenier} denies` : ''}
+          {except.length > 0 ? 'and ' : ''}asks for {asks.join(', ')}
+          {askDenier ? `, which ${askDenier} denies` : ''}
         </span>
       )}
     </>
@@ -132,7 +180,15 @@ const named = (command: string) => (command === 'git' ? 'read-only git' : comman
  * so, amber where an ask rule makes one ask, struck where a deny refuses the whole command or, in dontAsk or on a job, an ask rule does — each said
  * with its rule — then the day and the version it was measured on, and where that is recorded: a measurement of that day, never claimed current.
  */
-function ReadOnly({ readOnly, commands, askDenier }: { readOnly: NonNullable<StepReach['readOnly']>; commands: ReadOnlyCommands; askDenier: string | null }) {
+function ReadOnly({
+  readOnly,
+  commands,
+  askDenier,
+}: {
+  readOnly: NonNullable<StepReach['readOnly']>;
+  commands: ReadOnlyCommands;
+  askDenier: string | null;
+}) {
   const taken = readOnly.filter((c) => c.denied || c.asks);
   return (
     <>
@@ -161,18 +217,21 @@ function ReadOnly({ readOnly, commands, askDenier }: { readOnly: NonNullable<Ste
       </span>
       {taken.length > 0 && (
         <p data-read-only-taken className="text-xs text-neutral-500">
-          {taken.map(({ command, denied, asks }) =>
-            asks
-              ? `${named(command)} asks, by ${asks.rule} (${asks.source})${askDenier ? `, which ${askDenier} denies` : ''}`
-              : `${named(command)} is denied, by ${denied!.rule} (${denied!.source})`,
-          ).join('; ')}.
+          {taken
+            .map(({ command, denied, asks }) =>
+              asks
+                ? `${named(command)} asks, by ${asks.rule} (${asks.source})${askDenier ? `, which ${askDenier} denies` : ''}`
+                : `${named(command)} is denied, by ${denied!.rule} (${denied!.source})`,
+            )
+            .join('; ')}
+          .
         </p>
       )}
       <p data-read-only-measured={commands.measuredAt} className="text-xs text-neutral-500">
-        The solid ones were measured on {commands.measuredAt} with {commands.version} ({commands.source}): that day, under that day&apos;s settings, they
-        ran with no rule allowing them. The dashed ones are named by its docs ({commands.docs}), which say the set includes them, not that it is all
-        of it; git is its read-only forms. A deny covering one
-        still refuses it, and an ask rule covering one makes it ask{askDenier ? `, which ${askDenier} denies` : ''}. Not asked again: a later version may run others.
+        The solid ones were measured on {commands.measuredAt} with {commands.version} ({commands.source}): that day, under that day&apos;s
+        settings, they ran with no rule allowing them. The dashed ones are named by its docs ({commands.docs}), which say the set includes
+        them, not that it is all of it; git is its read-only forms. A deny covering one still refuses it, and an ask rule covering one makes
+        it ask{askDenier ? `, which ${askDenier} denies` : ''}. Not asked again: a later version may run others.
       </p>
     </>
   );

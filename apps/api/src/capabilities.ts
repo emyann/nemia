@@ -86,35 +86,53 @@ export async function capabilitiesOf(
   const allow = stringsAt(settings, ['permissions', 'allow'], warnings);
   const enabled = enabledBy(settings, warnings);
   const declared = declaredServers(jsonAt(repo, MCP_JSON, warnings, 'no MCP server is listed from it'), warnings);
-  const mcp = await Promise.all(declared.map(async (server): Promise<McpServer> => {
-    const entry = {
-      name: server.name, source: MCP_JSON, type: server.type, command: server.command, args: server.args, url: server.url,
-      enabled: enabled(server.name), tools: null, error: server.invalid, notAsked: null, checkedAt: null,
-    };
-    if (server.invalid) return entry;
-    if (!server.command) return { ...entry, notAsked: `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.` };
-    // A GET does not run a command the person has not turned on: that is what enabling a project server is for.
-    if (!entry.enabled) {
-      return { ...entry, notAsked: `Not enabled by ${SETTINGS}, so the api does not start it. Add "${server.name}" to enabledMcpjsonServers there to list its tools.` };
-    }
-    const stdio = { ...server, command: server.command };
-    const launch = launchOf(repo, stdio, env);
-    if ('missing' in launch) {
-      const [them, each] = launch.missing.length > 1 ? ['them', 'each'] : ['it', 'it'];
-      const named = launch.missing.map((name) => `\`\${${name}}\``).join(' and ');
+  const mcp = await Promise.all(
+    declared.map(async (server): Promise<McpServer> => {
+      const entry = {
+        name: server.name,
+        source: MCP_JSON,
+        type: server.type,
+        command: server.command,
+        args: server.args,
+        url: server.url,
+        enabled: enabled(server.name),
+        tools: null,
+        error: server.invalid,
+        notAsked: null,
+        checkedAt: null,
+      };
+      if (server.invalid) return entry;
+      if (!server.command)
+        return {
+          ...entry,
+          notAsked: `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
+        };
+      // A GET does not run a command the person has not turned on: that is what enabling a project server is for.
+      if (!entry.enabled) {
+        return {
+          ...entry,
+          notAsked: `Not enabled by ${SETTINGS}, so the api does not start it. Add "${server.name}" to enabledMcpjsonServers there to list its tools.`,
+        };
+      }
+      const stdio = { ...server, command: server.command };
+      const launch = launchOf(repo, stdio, env);
+      if ('missing' in launch) {
+        const [them, each] = launch.missing.length > 1 ? ['them', 'each'] : ['it', 'it'];
+        const named = launch.missing.map((name) => `\`\${${name}}\``).join(' and ');
+        return {
+          ...entry,
+          error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
+        };
+      }
+      const answer = await answerOf(repo, stdio, launch, deadlineMs);
       return {
         ...entry,
-        error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
+        tools: answer.tools?.map((tool) => ({ ...tool, denied: denyingRule(deny, server.name, tool.name) })) ?? null,
+        error: answer.error,
+        checkedAt: answer.checkedAt,
       };
-    }
-    const answer = await answerOf(repo, stdio, launch, deadlineMs);
-    return {
-      ...entry,
-      tools: answer.tools?.map((tool) => ({ ...tool, denied: denyingRule(deny, server.name, tool.name) })) ?? null,
-      error: answer.error,
-      checkedAt: answer.checkedAt,
-    };
-  }));
+    }),
+  );
   return {
     repo,
     skills: skillsOf(repo, warnings),
@@ -143,13 +161,17 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
   const day = at !== null && !Number.isNaN(at.getTime()) && at.toISOString().startsWith(measuredAt as string);
   const wrong = [
     ...(said(harness) ? [] : ['no `harness`']),
-    ...(said(version) && /^\d+\.\d+\.\d+$/.test(version) ? [] : [`no \`version\` numbered as 2.1.272 (${JSON.stringify(version ?? null)})`]),
+    ...(said(version) && /^\d+\.\d+\.\d+$/.test(version)
+      ? []
+      : [`no \`version\` numbered as 2.1.272 (${JSON.stringify(version ?? null)})`]),
     ...(day ? [] : [`no \`measuredAt\` day written as 2026-09-15 (${JSON.stringify(measuredAt ?? null)})`]),
     ...(said(source) ? [] : ['no `source`']),
   ];
   if (wrong.length === 0) return measurement;
   throw Object.assign(
-    new Error(`${name} has ${wrong.join(', ')}. A measurement is data of one day and one version: give it the day it was taken, the version it was taken on, and where that is recorded.`),
+    new Error(
+      `${name} has ${wrong.join(', ')}. A measurement is data of one day and one version: give it the day it was taken, the version it was taken on, and where that is recorded.`,
+    ),
     { exitCode: 2 },
   );
 }
@@ -158,9 +180,13 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
  * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with none
  * listed twice and none both measured and documented, and `docs` saying when the docs were read.
  */
-export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(name: string, commands: T): T {
+export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
+  name: string,
+  commands: T,
+): T {
   dated(name, commands);
-  const listed = (value: unknown): value is readonly string[] => Array.isArray(value) && value.every((c) => typeof c === 'string' && /^[a-z][\w-]*$/.test(c));
+  const listed = (value: unknown): value is readonly string[] =>
+    Array.isArray(value) && value.every((c) => typeof c === 'string' && /^[a-z][\w-]*$/.test(c));
   const { measured, documented, docs } = commands as Partial<T>;
   const all = [...(listed(measured) ? measured : []), ...(listed(documented) ? documented : [])];
   const twice = [...new Set(all.filter((c, i) => all.indexOf(c) !== i))];
@@ -168,14 +194,17 @@ export function readOnlyCommands<T extends Dated & { measured: readonly string[]
     ...(listed(measured) && measured.length > 0 ? [] : ['no `measured` list of commands, one word each']),
     ...(listed(documented) ? [] : ['no `documented` list of commands, one word each']),
     ...(twice.length === 0 ? [] : [`${twice.join(', ')} listed twice`]),
-    ...(typeof docs === 'string' && /read \d{4}-\d{2}-\d{2}$/.test(docs) ? [] : ['no `docs` ending in the day they were read ("read 2026-09-16")']),
+    ...(typeof docs === 'string' && /read \d{4}-\d{2}-\d{2}$/.test(docs)
+      ? []
+      : ['no `docs` ending in the day they were read ("read 2026-09-16")']),
   ];
   if (wrong.length === 0) return commands;
   throw Object.assign(new Error(`${name} has ${wrong.join(', ')}. Fix the list where it is declared.`), { exitCode: 2 });
 }
 
 /** Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it. */
-const ON_THE_FENCED = "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
+const ON_THE_FENCED =
+  "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
 /** Why Edit and Write are taken to be in it: nothing measured names them. */
 const EDITS_WITH = 'Not named by any measurement. Every implement step of this repository, filed with no `tools:`, changes files with it.';
 
@@ -196,7 +225,19 @@ export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
   version: '2.1.270',
   measuredAt: '2026-09-14',
   source: 'docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"',
-  tools: ['Agent', 'Cron*', 'Monitor', 'NotebookEdit', 'RemoteTrigger', 'ScheduleWakeup', 'SendMessage', 'Task*', 'WebFetch', 'WebSearch', 'Workflow'],
+  tools: [
+    'Agent',
+    'Cron*',
+    'Monitor',
+    'NotebookEdit',
+    'RemoteTrigger',
+    'ScheduleWakeup',
+    'SendMessage',
+    'Task*',
+    'WebFetch',
+    'WebSearch',
+    'Workflow',
+  ],
   inferred: [
     { name: 'Bash', why: ON_THE_FENCED },
     { name: 'Glob', why: ON_THE_FENCED },
@@ -350,7 +391,9 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
     if (isObject(value)) return value;
     warnings.push(`${file} is not a JSON object, so ${leftOut}. Make it one: \`{ … }\`.`);
   } catch (err) {
-    warnings.push(`${file} does not parse as JSON (${messageOf(err)}), so ${leftOut}. Fix the file; the page reads it again on the next visit.`);
+    warnings.push(
+      `${file} does not parse as JSON (${messageOf(err)}), so ${leftOut}. Fix the file; the page reads it again on the next visit.`,
+    );
   }
   return null;
 }
@@ -387,23 +430,38 @@ type Declared = {
 function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
   if (!mcpJson) return [];
   if (!isObject(mcpJson.mcpServers)) {
-    warnings.push(`${MCP_JSON} has no \`mcpServers\` object, so no MCP server is listed from it. Declare them as \`{ "mcpServers": { "<name>": { "command": "…" } } }\`.`);
+    warnings.push(
+      `${MCP_JSON} has no \`mcpServers\` object, so no MCP server is listed from it. Declare them as \`{ "mcpServers": { "<name>": { "command": "…" } } }\`.`,
+    );
     return [];
   }
   return Object.entries(mcpJson.mcpServers).map(([name, spec]): Declared => {
     const bare: Declared = { name, type: 'stdio', command: null, args: [], env: {}, url: null, invalid: null };
-    if (!isObject(spec)) return { ...bare, invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.` };
+    if (!isObject(spec))
+      return { ...bare, invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.` };
     const command = typeof spec.command === 'string' && spec.command ? spec.command : null;
     const url = typeof spec.url === 'string' && spec.url ? spec.url : null;
     const args = Array.isArray(spec.args) && spec.args.every((arg) => typeof arg === 'string') ? spec.args : null;
-    const env = isObject(spec.env) && Object.values(spec.env).every((value) => typeof value === 'string') ? (spec.env as Record<string, string>) : null;
-    const declared = { ...bare, type: typeof spec.type === 'string' ? spec.type : command ? 'stdio' : 'unknown', command, url, args: args ?? [], env: env ?? {} };
+    const env =
+      isObject(spec.env) && Object.values(spec.env).every((value) => typeof value === 'string')
+        ? (spec.env as Record<string, string>)
+        : null;
+    const declared = {
+      ...bare,
+      type: typeof spec.type === 'string' ? spec.type : command ? 'stdio' : 'unknown',
+      command,
+      url,
+      args: args ?? [],
+      env: env ?? {},
+    };
     const wrong = [
       ...(command || url ? [] : ['neither a `command` nor a `url`']),
       ...(spec.args === undefined || args ? [] : ['`args` that are not a list of strings']),
       ...(spec.env === undefined || env ? [] : ['an `env` whose values are not all strings']),
     ];
-    return wrong.length ? { ...declared, invalid: `${MCP_JSON} gives ${name} ${wrong.join(' and ')}, so it is not started. Fix its entry.` } : declared;
+    return wrong.length
+      ? { ...declared, invalid: `${MCP_JSON} gives ${name} ${wrong.join(' and ')}, so it is not started. Fix its entry.` }
+      : declared;
   });
 }
 

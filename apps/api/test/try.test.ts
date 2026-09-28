@@ -23,15 +23,26 @@ const TRIES = path.join(root, 'tries');
 const RUNS = path.join(root, 'runs');
 
 fs.mkdirSync(YOURS, { recursive: true });
-const SCRIBE = '---\ndescription: Use this when a change needs its notes written.\nmodel: sonnet\neffort: low\npermissionMode: acceptEdits\noutput: scribe.schema.json\n---\nWrite the notes.\n';
+const SCRIBE =
+  '---\ndescription: Use this when a change needs its notes written.\nmodel: sonnet\neffort: low\npermissionMode: acceptEdits\noutput: scribe.schema.json\n---\nWrite the notes.\n';
 fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE);
-fs.writeFileSync(path.join(YOURS, 'scribe.schema.json'), JSON.stringify({ type: 'object', additionalProperties: false, required: ['notes'], properties: { notes: { type: 'string' } } }));
+fs.writeFileSync(
+  path.join(YOURS, 'scribe.schema.json'),
+  JSON.stringify({ type: 'object', additionalProperties: false, required: ['notes'], properties: { notes: { type: 'string' } } }),
+);
 // An agent of yours that gives a skill only the repository's .claude/skills has.
-fs.writeFileSync(path.join(YOURS, 'borrower.md'), '---\ndescription: Use this to borrow.\ntools: Read, Skill\nskills: theirs\n---\nBorrow it.\n');
+fs.writeFileSync(
+  path.join(YOURS, 'borrower.md'),
+  '---\ndescription: Use this to borrow.\ntools: Read, Skill\nskills: theirs\n---\nBorrow it.\n',
+);
 fs.mkdirSync(path.join(repo, '.claude', 'skills', 'theirs'), { recursive: true });
-fs.writeFileSync(path.join(repo, '.claude', 'skills', 'theirs', 'SKILL.md'), '---\nname: theirs\ndescription: The repository\'s own.\n---\nDo it their way.\n');
+fs.writeFileSync(
+  path.join(repo, '.claude', 'skills', 'theirs', 'SKILL.md'),
+  "---\nname: theirs\ndescription: The repository's own.\n---\nDo it their way.\n",
+);
 // Agents whose names a try's folder cannot take.
-for (const name of ['agents', 'skills']) fs.writeFileSync(path.join(YOURS, `${name}.md`), `---\ndescription: Use this as ${name}.\n---\nDo it.\n`);
+for (const name of ['agents', 'skills'])
+  fs.writeFileSync(path.join(YOURS, `${name}.md`), `---\ndescription: Use this as ${name}.\n---\nDo it.\n`);
 // Agents of yours a try's fence does not reach: one on codex, a remote A2A agent, and one bridged to claude.ai.
 fs.writeFileSync(path.join(YOURS, 'coder.md'), '---\ndescription: Use this to code.\nharness: codex\n---\nCode it.\n');
 fs.writeFileSync(path.join(YOURS, 'faraway.md'), '---\ndescription: Use this far away.\nharness: a2a:faraway\n---\nDo it there.\n');
@@ -39,12 +50,21 @@ fs.writeFileSync(path.join(YOURS, 'bridged.md'), '---\ndescription: Use this fro
 // The repository's own agents, one with a result schema beside it.
 fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'critic.md'), '---\ndescription: Use this to criticise.\n---\nCriticise it.\n');
-fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'grader.md'), '---\ndescription: Use this to grade.\noutput: grader.schema.json\n---\nGrade it.\n');
-fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'grader.schema.json'), JSON.stringify({ type: 'object', properties: { grade: { type: 'string' } } }));
+fs.writeFileSync(
+  path.join(repo, 'workflows', 'agents', 'grader.md'),
+  '---\ndescription: Use this to grade.\noutput: grader.schema.json\n---\nGrade it.\n',
+);
+fs.writeFileSync(
+  path.join(repo, 'workflows', 'agents', 'grader.schema.json'),
+  JSON.stringify({ type: 'object', properties: { grade: { type: 'string' } } }),
+);
 // And a run that is no try, to hold the two apart.
 const other = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(other, { recursive: true });
-fs.writeFileSync(path.join(other, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n');
+fs.writeFileSync(
+  path.join(other, 'write.md'),
+  '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n',
+);
 
 const { app } = await import('../src/app.ts');
 const { start } = await import('agent-orchestrator');
@@ -54,9 +74,16 @@ type RunDetail = import('../src/detail.ts').RunDetail;
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
   app.request(`/api/agents/${from}/${name}/try`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
-const remove = (id: string, headers: Record<string, string> = json) => app.request(`/api/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
+const remove = (id: string, headers: Record<string, string> = json) =>
+  app.request(`/api/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
 
-const records = (): string[] => (fs.existsSync(RUNS) ? fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).sort() : []);
+const records = (): string[] =>
+  fs.existsSync(RUNS)
+    ? fs
+        .readdirSync(RUNS)
+        .filter((f) => f.endsWith('.json'))
+        .sort()
+    : [];
 
 /** A request refused with `status` and words `pattern` matches, with no run written and the tries as they were. */
 async function refused(res: Promise<Response>, status: number, pattern: RegExp): Promise<string> {
@@ -75,13 +102,26 @@ async function refused(res: Promise<Response>, status: number, pattern: RegExp):
 function signedOff(taskId: string, cwd: string): void {
   const at = '2026-09-26T00:10:00.000Z';
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), [
-    { kind: 'filed', at, brief: 'Write it.', cwd, maxAttempts: 1, harness: 'claude' },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] } },
-    { kind: 'settled', at, outcome: 'succeeded' },
-  ].map((e) => `${JSON.stringify(e)}\n`).join(''));
+  fs.writeFileSync(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    [
+      { kind: 'filed', at, brief: 'Write it.', cwd, maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${taskId}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]
+      .map((e) => `${JSON.stringify(e)}\n`)
+      .join(''),
+  );
 }
 
 const listed = async (): Promise<RunSummary[]> => (await (await app.request('/api/runs')).json()) as RunSummary[];
@@ -134,7 +174,7 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   assert.deepEqual(step.allowedTools, ['Edit(**)']);
   assert.equal(step.budget, 1);
   assert.equal(step.model, 'sonnet', "the agent's own keys");
-  assert.ok(step.output, "its result schema, found beside the agent from a folder under tries/");
+  assert.ok(step.output, 'its result schema, found beside the agent from a folder under tries/');
 
   const summary = (await listed()).find((r) => r.id === first)!;
   assert.deepEqual(summary.try, { agent: 'scribe' });
@@ -198,7 +238,7 @@ test('a try still in flight is not removed: the package says to cancel it first'
   assert.equal((await remove(id)).status, 200);
 });
 
-test("the board removes a try: its record and the folders it worked in", async () => {
+test('the board removes a try: its record and the folders it worked in', async () => {
   const workspace = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8')).workspace;
   assert.ok(fs.existsSync(workspace));
   const res = await remove(first);
@@ -211,7 +251,7 @@ test("the board removes a try: its record and the folders it worked in", async (
   assert.equal(gone.status, 404);
 });
 
-test("a removal is guarded as every write is", async () => {
+test('a removal is guarded as every write is', async () => {
   const id = await idOf(await tryIt('scribe', { brief: 'Kept.' }));
   ended(id);
   try {
@@ -224,25 +264,40 @@ test("a removal is guarded as every write is", async () => {
   }
 });
 
-test("a repository agent is refused: copy it to yours — the store this api reads — to try it, its schema with it", async () => {
+test('a repository agent is refused: copy it to yours — the store this api reads — to try it, its schema with it', async () => {
   const error = await refused(tryIt('critic', { brief: 'Criticise it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
-  assert.ok(error.includes(`mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`), `with the copy to make: ${error}`);
+  assert.ok(
+    error.includes(`mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`),
+    `with the copy to make: ${error}`,
+  );
   const graded = await refused(tryIt('grader', { brief: 'Grade it.' }, 'repo'), 403, /[Cc]opy it to yours to try it/);
   const theirs = path.join(repo, 'workflows', 'agents');
-  assert.ok(graded.includes(`cp '${path.join(theirs, 'grader.md')}' '${path.join(theirs, 'grader.schema.json')}' '${YOURS}/'`), `the schema its output names copied too: ${graded}`);
+  assert.ok(
+    graded.includes(`cp '${path.join(theirs, 'grader.md')}' '${path.join(theirs, 'grader.schema.json')}' '${YOURS}/'`),
+    `the schema its output names copied too: ${graded}`,
+  );
 });
 
 test("an agent a try's fence does not reach is refused before anything is written: codex, a remote agent, and one bridged to claude.ai", async () => {
   assert.equal(fs.existsSync(path.join(TRIES, 'coder')), false);
-  const codex = await refused(tryIt('coder', { brief: 'Code it.' }), 422, /runs on `codex`, and a try is fenced by Claude Code's permission mode/);
+  const codex = await refused(
+    tryIt('coder', { brief: 'Code it.' }),
+    422,
+    /runs on `codex`, and a try is fenced by Claude Code's permission mode/,
+  );
   assert.match(codex, /Only an agent on Claude Code is tried here/);
   await refused(tryIt('faraway', { brief: 'Do it there.' }), 422, /is a remote agent \(`harness: a2a:faraway`\)/);
   await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`.*a try runs as a job/);
-  for (const name of ['coder', 'faraway', 'bridged']) assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
+  for (const name of ['coder', 'faraway', 'bridged'])
+    assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
 });
 
 test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {
-  const agents = (await (await app.request('/api/agents')).json()) as Array<{ from: string; name: string; untried: { why: string; copy: string | null } | null }>;
+  const agents = (await (await app.request('/api/agents')).json()) as Array<{
+    from: string;
+    name: string;
+    untried: { why: string; copy: string | null } | null;
+  }>;
   const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
   assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
   assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);
@@ -251,7 +306,10 @@ test('the listing says why an agent cannot be tried, in the words the try refuse
   assert.match(of('yours', 'bridged').untried!.why, /remote: true/);
   assert.match(of('yours', 'agents').untried!.why, /cannot be tried from the board/);
   assert.ok(of('repo', 'grader').untried!.copy!.includes('grader.schema.json'), JSON.stringify(of('repo', 'grader')));
-  assert.equal(of('repo', 'critic').untried!.copy, `mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`);
+  assert.equal(
+    of('repo', 'critic').untried!.copy,
+    `mkdir -p '${YOURS}' && cp '${path.join(repo, 'workflows', 'agents', 'critic.md')}' '${YOURS}/'`,
+  );
 });
 
 test('an empty brief is refused, and a brief that is no string', async () => {

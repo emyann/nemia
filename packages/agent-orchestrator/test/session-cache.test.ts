@@ -52,7 +52,10 @@ function chainDifferences(filed: readonly Filed[]): string[] {
   for (const f of filed) {
     if (!f.resumeFrom) continue;
     const from = byId.get(f.resumeFrom.replace(/^native-/, ''));
-    if (!from) { out.push(`${f.id}: continues ${f.resumeFrom}, which no task here was`); continue; }
+    if (!from) {
+      out.push(`${f.id}: continues ${f.resumeFrom}, which no task here was`);
+      continue;
+    }
     for (const key of CACHED) {
       if (JSON.stringify(cachedOf(f, key)) !== JSON.stringify(cachedOf(from, key))) out.push(`${f.id}: ${key} is not ${from.id}'s`);
     }
@@ -63,7 +66,8 @@ function chainDifferences(filed: readonly Filed[]): string[] {
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   return repo;
@@ -77,18 +81,41 @@ const board = () => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
-        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        id,
+        phase: t?.phase ?? 'pending',
+        sessionId: t ? 's' : null,
         state: {
-          brief: (t?.spec.brief as string | undefined) ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null, reason: t.reason }],
+          brief: (t?.spec.brief as string | undefined) ?? '',
+          closeoutSchema: t?.spec.closeoutSchema,
+          settled,
+          stopRequested: false,
+          said: [],
+          attempts:
+            !t || t.phase === 'pending'
+              ? []
+              : [
+                  {
+                    n: 1,
+                    ended: null,
+                    nativeId: `native-${id}`,
+                    closeout: t.closeout,
+                    exitCode: t.exitCode ?? null,
+                    usage: null,
+                    reason: t.reason,
+                  },
+                ],
         },
       };
     },
-    file: async (spec: Filed) => { tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    file: async (spec: Filed) => {
+      tasks.set(spec.id, { spec, phase: 'pending' });
+      return spec.id;
+    },
     stop: async () => {},
     logs: async () => '',
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) =>
+    Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
   return { e, tasks, settle };
 };
 
@@ -111,14 +138,18 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  * A run of `dir` through a loop's first try, a nudge, an answer to its blocked try, round 2 and round 3, every other step signing off with
  * what its schema asks for — and the tasks it filed, in order. `first` is how try 2 is asked for: a nudge, or a new session on a model.
  */
-async function walk(dir: string, first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' }): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
+async function walk(
+  dir: string,
+  first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' },
+): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
   const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir });
   const steps = stepsOf(run);
   const looping = steps.find((s) => s.loop)!;
   const target = looping.loop!;
   const b = board();
   const order: string[] = [];
-  const tryOfId = (id: string, step: string) => (id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN));
+  const tryOfId = (id: string, step: string) =>
+    id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN);
 
   for (let pass = 0; pass < 60; pass++) {
     const p = await advance(b.e, readRun(run.id));
@@ -126,19 +157,37 @@ async function walk(dir: string, first: { mode: 'nudge' | 'fresh'; model?: strin
     if (!pending.length && !p.looped.length && !p.tried.length) break;
     for (const [id, t] of pending) {
       order.push(id);
-      if (id.endsWith('-check')) { b.settle(id, 'succeeded', undefined, 0); continue; }
+      if (id.endsWith('-check')) {
+        b.settle(id, 'succeeded', undefined, 0);
+        continue;
+      }
       const schema = t.spec.closeoutSchema as { properties: Record<string, Record<string, unknown>> } | undefined;
-      const said: Record<string, unknown> = { ...SIGNED, ...(schema ? valueOf({ ...schema, properties: Object.fromEntries(Object.entries(schema.properties).filter(([k]) => !(k in SIGNED))) }) as object : {}) };
+      const said: Record<string, unknown> = {
+        ...SIGNED,
+        ...(schema
+          ? (valueOf({
+              ...schema,
+              properties: Object.fromEntries(Object.entries(schema.properties).filter(([k]) => !(k in SIGNED))),
+            }) as object)
+          : {}),
+      };
       const n = tryOfId(id, target);
-      if (n === 1) { b.settle(id, 'succeeded'); continue; }                                        // unsigned: a nudge follows
-      if (n === 2) { b.settle(id, 'succeeded', { ...said, outcome: 'blocked', needs: 'which flag?' }); continue; }   // blocked: an answer follows
-      if (n === 3) said.replies = [];                                                              // round 1: handed nothing
+      if (n === 1) {
+        b.settle(id, 'succeeded');
+        continue;
+      } // unsigned: a nudge follows
+      if (n === 2) {
+        b.settle(id, 'succeeded', { ...said, outcome: 'blocked', needs: 'which flag?' });
+        continue;
+      } // blocked: an answer follows
+      if (n === 3) said.replies = []; // round 1: handed nothing
       const r = tryOfId(id, looping.name);
-      if (r) said.again = r < 3;                                                                   // rounds 1 and 2 ask again; 3 is done
+      if (r) said.again = r < 3; // rounds 1 and 2 ask again; 3 is done
       b.settle(id, 'succeeded', said);
     }
     if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, first);
-    if (pending.some(([id]) => tryOfId(id, target) === 2)) await retry(b.e, run.id, target, { mode: 'nudge', message: 'the --dry-run flag' });
+    if (pending.some(([id]) => tryOfId(id, target) === 2))
+      await retry(b.e, run.id, target, { mode: 'nudge', message: 'the --dry-run flag' });
   }
   return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
 }
@@ -148,12 +197,28 @@ for (const name of LOOPED) {
     const { id, filed, target, looping, steps } = await walk(path.join(SHIPPED, name));
     const resumed = filed.filter((f) => f.resumeFrom).map((f) => f.id.slice(id.length + 1));
     // The walk reached what it claims to: a nudge (try 2), an answer (try 3), round 2 (try 4), round 3 (try 5), and review's third round.
-    assert.deepEqual(resumed, [2, 3, 4, 5].map((n) => `${target}-try${n}`), filed.map((f) => f.id).join('\n'));
-    assert.ok(filed.some((f) => f.id.endsWith(`-${looping}-try3`)), 'round 3 was reviewed');
+    assert.deepEqual(
+      resumed,
+      [2, 3, 4, 5].map((n) => `${target}-try${n}`),
+      filed.map((f) => f.id).join('\n'),
+    );
+    assert.ok(
+      filed.some((f) => f.id.endsWith(`-${looping}-try3`)),
+      'round 3 was reviewed',
+    );
     assert.deepEqual(chainDifferences(filed), []);
     // And the chain is the one the frozen workflow gives the target, `replies` and all, from its first try.
     for (const f of filed.filter((x) => x.id.includes(`-${target}`) && !x.id.endsWith('-check'))) {
-      assert.equal(JSON.stringify(f.closeoutSchema), JSON.stringify(closeoutSchemaOf(steps.find((s) => s.name === target)!, steps)), f.id);
+      assert.equal(
+        JSON.stringify(f.closeoutSchema),
+        JSON.stringify(
+          closeoutSchemaOf(
+            steps.find((s) => s.name === target)!,
+            steps,
+          ),
+        ),
+        f.id,
+      );
       assert.ok((f.closeoutSchema as { required: string[] }).required.includes('replies'), f.id);
     }
   });
@@ -163,7 +228,15 @@ test("REFUSED before the fix, now kept: a `wf retry --model` session is continue
   // Try 2 a new session on sonnet (`--model sonnet`), blocked; try 3 answers it, continuing sonnet's session; round 2 continues try 3's.
   const { id, filed, target } = await walk(path.join(SHIPPED, 'dev'), { mode: 'fresh', model: 'sonnet' });
   const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
-  assert.deepEqual([2, 3, 4, 5].map((n) => [of(n).config?.model, Boolean(of(n).resumeFrom)]), [['sonnet', false], ['sonnet', true], ['sonnet', true], ['sonnet', true]]);
+  assert.deepEqual(
+    [2, 3, 4, 5].map((n) => [of(n).config?.model, Boolean(of(n).resumeFrom)]),
+    [
+      ['sonnet', false],
+      ['sonnet', true],
+      ['sonnet', true],
+      ['sonnet', true],
+    ],
+  );
   assert.equal(filed.find((f) => f.id === `${id}-${target}`)!.config?.model, 'opus', "the first try on the step's model");
   assert.deepEqual(chainDifferences(filed), []);
 });
@@ -174,15 +247,23 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
   const looping = {
     type: 'object',
     properties: { findings: { type: 'array', items: { type: 'string' } }, again: { type: 'boolean' } },
-    required: ['findings', 'again'], additionalProperties: false,
+    required: ['findings', 'again'],
+    additionalProperties: false,
   };
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(
+    path.join(dir, 'implement.md'),
+    '---\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n',
+  );
   fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(notes));
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
   const { filed } = await walk(dir);
   assert.deepEqual(chainDifferences(filed), []);
-  assert.deepEqual((filed[0]!.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'], 'the first try');
+  assert.deepEqual(
+    (filed[0]!.closeoutSchema as { required: string[] }).required,
+    ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'],
+    'the first try',
+  );
 });
 
 test("a loop's target with a context window keeps it on every try — a nudge, an answer, a `--model` session and the rounds after it", async () => {
@@ -190,18 +271,29 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
   const looping = {
     type: 'object',
     properties: { findings: { type: 'array', items: { type: 'string' } }, again: { type: 'boolean' } },
-    required: ['findings', 'again'], additionalProperties: false,
+    required: ['findings', 'again'],
+    additionalProperties: false,
   };
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\nmodel: opus\ncontext: 200k\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
+  fs.writeFileSync(
+    path.join(dir, 'review.md'),
+    '---\nafter: implement\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
+  );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
   for (const first of [{ mode: 'nudge' as const }, { mode: 'fresh' as const, model: 'sonnet' }]) {
     const { id, filed, target } = await walk(dir, first);
     assert.deepEqual(chainDifferences(filed), [], first.mode);
     const tries = filed.filter((f) => f.id.startsWith(`${id}-${target}`) && !f.id.endsWith('-check'));
-    assert.deepEqual(tries.map((f) => f.config?.contextTokens), tries.map(() => 200_000), `${first.mode}: ${tries.map((f) => f.id).join(', ')}`);
+    assert.deepEqual(
+      tries.map((f) => f.config?.contextTokens),
+      tries.map(() => 200_000),
+      `${first.mode}: ${tries.map((f) => f.id).join(', ')}`,
+    );
     assert.ok(tries.length >= 5, 'a first try, a nudge or a new session, an answer, and two rounds');
-    assert.ok(filed.filter((f) => f.id.includes('-review')).every((f) => f.config?.contextTokens === 150_000), "the reviewer's sessions on its own window");
+    assert.ok(
+      filed.filter((f) => f.id.includes('-review')).every((f) => f.config?.contextTokens === 150_000),
+      "the reviewer's sessions on its own window",
+    );
   }
 });
 
@@ -212,20 +304,61 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
   const was = { ...closeoutSchemaOf(target, steps), properties: CLOSEOUT_SCHEMA.properties, required: CLOSEOUT_SCHEMA.required };
   const chain: Filed[] = [
     { id: 'r-implement', closeoutSchema: was, config: { model: 'opus', effort: 'high' } },
-    { id: 'r-implement-try2', resumeFrom: 'native-r-implement', closeoutSchema: closeoutSchemaOf(target, steps), config: { model: 'opus', effort: 'high' } },
+    {
+      id: 'r-implement-try2',
+      resumeFrom: 'native-r-implement',
+      closeoutSchema: closeoutSchemaOf(target, steps),
+      config: { model: 'opus', effort: 'high' },
+    },
   ];
   assert.deepEqual(chainDifferences(chain), ["r-implement-try2: closeoutSchema is not r-implement's"]);
   // Byte for byte: the same fields in another order is another tool.
   const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
-  assert.deepEqual(chainDifferences([{ ...chain[1]!, id: 'r-implement' }, { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' }]), ["r-implement-try2: closeoutSchema is not r-implement's"]);
+  assert.deepEqual(
+    chainDifferences([
+      { ...chain[1]!, id: 'r-implement' },
+      { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' },
+    ]),
+    ["r-implement-try2: closeoutSchema is not r-implement's"],
+  );
 
-  const args = { model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk', contextTokens: 200_000 };
+  const args = {
+    model: 'opus',
+    effort: 'high',
+    tools: ['Read'],
+    disallowedTools: ['SendMessage'],
+    permissionMode: 'dontAsk',
+    contextTokens: 200_000,
+  };
   const same = { closeoutSchema: CLOSEOUT_SCHEMA, config: args };
-  for (const [key, value] of [['model', 'sonnet'], ['effort', 'medium'], ['tools', ['Read', 'Bash']], ['disallowedTools', []], ['permissionMode', 'auto'], ['contextTokens', 150_000], ['contextTokens', undefined]] as const) {
-    assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same, config: { ...args, [key]: value } }]), [`a-try2: ${key} is not a's`], key);
+  for (const [key, value] of [
+    ['model', 'sonnet'],
+    ['effort', 'medium'],
+    ['tools', ['Read', 'Bash']],
+    ['disallowedTools', []],
+    ['permissionMode', 'auto'],
+    ['contextTokens', 150_000],
+    ['contextTokens', undefined],
+  ] as const) {
+    assert.deepEqual(
+      chainDifferences([
+        { id: 'a', ...same },
+        { id: 'a-try2', resumeFrom: 'native-a', ...same, config: { ...args, [key]: value } },
+      ]),
+      [`a-try2: ${key} is not a's`],
+      key,
+    );
   }
-  assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), ['a-try2: continues native-a, which no task here was']);
-  assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same }]), []);
+  assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), [
+    'a-try2: continues native-a, which no task here was',
+  ]);
+  assert.deepEqual(
+    chainDifferences([
+      { id: 'a', ...same },
+      { id: 'a-try2', resumeFrom: 'native-a', ...same },
+    ]),
+    [],
+  );
 });
 
 for (const name of LOOPED) {
@@ -244,7 +377,13 @@ for (const name of LOOPED) {
         if (id.endsWith('-check')) b.settle(id, 'succeeded', undefined, 0);
         // The target ends as the engine records a session that never called StructuredOutput: failed, its last attempt `unsigned`.
         else if (id === first) b.settle(id, 'failed', undefined, undefined, 'unsigned');
-        else b.settle(id, 'succeeded', { ...SIGNED, ...(valueOf(t.spec.closeoutSchema as Record<string, unknown>) as object), outcome: 'done', needs: null });
+        else
+          b.settle(id, 'succeeded', {
+            ...SIGNED,
+            ...(valueOf(t.spec.closeoutSchema as Record<string, unknown>) as object),
+            outcome: 'done',
+            needs: null,
+          });
       }
     }
     assert.ok(b.tasks.has(nudge), `the run filed ${nudge} itself: ${[...b.tasks.keys()].join(', ')}`);

@@ -38,8 +38,10 @@ const HISTORY = [
 
 /** Whether a file is under one entry of `HISTORY`: the whole path, never a part of it. */
 const under = (entry: string, file: string): boolean =>
-  entry.endsWith('/') ? file.startsWith(entry)
-    : entry.includes('*') ? new RegExp(`^${entry.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(file)
+  entry.endsWith('/')
+    ? file.startsWith(entry)
+    : entry.includes('*')
+      ? new RegExp(`^${entry.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(file)
       : file === entry;
 
 const inHistory = (file: string): boolean => HISTORY.some((entry) => under(entry, file));
@@ -57,31 +59,52 @@ const asksForNote = (file: string): boolean => file.endsWith('.md') && inHistory
 /** Whether a history file that names a former package says, near its top, that it keeps the old names: `undefined` when it does. */
 function unnoted(text: string): string | undefined {
   if (!text.match(NAME)) return undefined;
-  if (text.split('\n').slice(0, NOTE_WITHIN).some((line) => line.includes(MARK) && line.includes(NOTE))) return undefined;
+  if (
+    text
+      .split('\n')
+      .slice(0, NOTE_WITHIN)
+      .some((line) => line.includes(MARK) && line.includes(NOTE))
+  )
+    return undefined;
   return `names a former package and has no line in its first ${NOTE_WITHIN} with "${MARK}" and "${NOTE}"`;
 }
 
 /** Each line of `text` that names a former package, as `<line>: <text>`, where it is not allowed. */
 function formerNames(text: string): string[] {
-  return text.split('\n').flatMap((line, i) => (!line.includes(MARK) && line.match(NAME) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
+  return text
+    .split('\n')
+    .flatMap((line, i) => (!line.includes(MARK) && line.match(NAME) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 
 test('no live file names a package by its former name', () => {
-  const found = files().filter((f) => !inHistory(f)).flatMap((f) => {
-    const text = textOf(f);
-    return text === undefined ? [] : formerNames(text).map((l) => `${f}:${l}`);
-  });
-  assert.deepEqual(found, [], `these name agent-runtime or agent-orchestrator by the names they had until 2026-09-23:\n${found.join('\n')}`);
+  const found = files()
+    .filter((f) => !inHistory(f))
+    .flatMap((f) => {
+      const text = textOf(f);
+      return text === undefined ? [] : formerNames(text).map((l) => `${f}:${l}`);
+    });
+  assert.deepEqual(
+    found,
+    [],
+    `these name agent-runtime or agent-orchestrator by the names they had until 2026-09-23:\n${found.join('\n')}`,
+  );
 });
 
 test('every history file that names a former package says so at its top', () => {
-  const found = files().filter(asksForNote).flatMap((f) => {
-    const text = textOf(f);
-    const why = text === undefined ? undefined : unnoted(text);
-    return why ? [`${f} ${why}`] : [];
-  });
+  const found = files()
+    .filter(asksForNote)
+    .flatMap((f) => {
+      const text = textOf(f);
+      const why = text === undefined ? undefined : unnoted(text);
+      return why ? [`${f} ${why}`] : [];
+    });
   assert.deepEqual(found, []);
-  assert.ok(files().filter(asksForNote).some((f) => textOf(f)?.match(NAME)), 'and some history names one: the rule reads something');
+  assert.ok(
+    files()
+      .filter(asksForNote)
+      .some((f) => textOf(f)?.match(NAME)),
+    'and some history names one: the rule reads something',
+  );
 });
 
 test('REFUSED: history with no note, a note too far down, and a note that is not the one', () => {
@@ -94,7 +117,11 @@ test('REFUSED: history with no note, a note too far down, and a note that is not
   late.splice(8, 0, note);
   assert.equal(late.indexOf(note) + 1, 9);
   assert.equal(unnoted([...late, `the ${engine} had issue 24`].join('\n')), refused, 'the note on line 9');
-  assert.equal(unnoted(['# Night run', '', `> The packages were ${MARK}.`, `the ${engine} had issue 24`].join('\n')), refused, 'the mark without the note');
+  assert.equal(
+    unnoted(['# Night run', '', `> The packages were ${MARK}.`, `the ${engine} had issue 24`].join('\n')),
+    refused,
+    'the mark without the note',
+  );
   assert.equal(unnoted(['# Night run', '', note, `the ${engine} had issue 24`].join('\n')), undefined, 'and the note on line 3 passes');
   assert.equal(unnoted('# A plan\n\nnothing old here'), undefined, 'and history that names no former package needs none');
   assert.equal(asksForNote('docs/night-2026-09-22.md'), true);
@@ -105,7 +132,11 @@ test('REFUSED: history with no note, a note too far down, and a note that is not
 
 test('every entry on the history list is there: a moved file never widens what is allowed', () => {
   const all = files();
-  for (const entry of HISTORY) assert.ok(all.some((f) => under(entry, f)), `${entry} is on a history list and holds no file`);
+  for (const entry of HISTORY)
+    assert.ok(
+      all.some((f) => under(entry, f)),
+      `${entry} is on a history list and holds no file`,
+    );
 });
 
 test('REFUSED: a former name in an import, a path, a sentence or a dependency', () => {
@@ -118,7 +149,8 @@ test('REFUSED: a former name in an import, a path, a sentence or a dependency', 
     `the ${engine}'s open issue 24`,
     `  "${engine}": "*"`,
     workflows,
-  ]) assert.deepEqual(formerNames(line), [`1: ${line.trim()}`], line);
+  ])
+    assert.deepEqual(formerNames(line), [`1: ${line.trim()}`], line);
   assert.deepEqual(formerNames(`one\ntwo ${engine}\nthree`), [`2: two ${engine}`], 'the line is named');
 });
 
@@ -130,7 +162,8 @@ test('a store path, a new name and a marked line pass; a word that only contains
     `import { tick } from 'agent-orchestrator/run'; // and agent-runtime`,
     `'packages/${engine}': 'packages/agent-runtime', // ${MARK}`,
     `my${engine}s and ${workflows}2`,
-  ]) assert.deepEqual(formerNames(line), [], line);
+  ])
+    assert.deepEqual(formerNames(line), [], line);
 });
 
 test('REFUSED: a file beside history is live, and history is matched whole', () => {
@@ -138,7 +171,14 @@ test('REFUSED: a file beside history is live, and history is matched whole', () 
   assert.equal(inHistory('docs/pivot-2026-09-18/experiments/cost/tx.py'), true);
   assert.equal(inHistory('packages/agent-orchestrator/test/fixtures/resolved-before.json'), true);
   for (const live of [
-    'docs/night-2026-09-22.md.bak', 'docs/night/notes.md', 'docs/pivot-2026-09-18.md.orig', 'docs/pivot-2026-09-18-later.md',
-    'docs/plan-multi-repo.md', 'docs/eval-sqlite-store.md', 'packages/agent-orchestrator/test/fixtures/git-runs-before.json', 'CLAUDE.md',
-  ]) assert.equal(inHistory(live), false, live);
+    'docs/night-2026-09-22.md.bak',
+    'docs/night/notes.md',
+    'docs/pivot-2026-09-18.md.orig',
+    'docs/pivot-2026-09-18-later.md',
+    'docs/plan-multi-repo.md',
+    'docs/eval-sqlite-store.md',
+    'packages/agent-orchestrator/test/fixtures/git-runs-before.json',
+    'CLAUDE.md',
+  ])
+    assert.equal(inHistory(live), false, live);
 });

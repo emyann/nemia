@@ -19,8 +19,12 @@ test('PORT unset or empty is 8787, 0 is any free port, and a number is that port
 
 test('a PORT that is not a port is refused with the fix, not read as 8787', () => {
   for (const value of ['abc', '80a', '-1', '65536', '1e3', '0x50', '8787.0', '100000']) {
-    assert.throws(() => portOf(value), (err: Error & { exitCode?: number }) =>
-      err.exitCode === 2 && err.message.startsWith(`PORT=${value} is not a port.`) && /0 for any free port/.test(err.message), value);
+    assert.throws(
+      () => portOf(value),
+      (err: Error & { exitCode?: number }) =>
+        err.exitCode === 2 && err.message.startsWith(`PORT=${value} is not a port.`) && /0 for any free port/.test(err.message),
+      value,
+    );
   }
 });
 
@@ -36,9 +40,17 @@ function startApi(port: string) {
     new Promise<RegExpMatchArray>((resolve, reject) => {
       const timer = setInterval(() => {
         const m = pattern.exec(output);
-        if (m) { clearInterval(timer); resolve(m); }
+        if (m) {
+          clearInterval(timer);
+          resolve(m);
+        }
       }, 20);
-      void ended.then(() => { clearInterval(timer); const m = pattern.exec(output); if (m) resolve(m); else reject(new Error(`exited without ${pattern}:\n${output}`)); });
+      void ended.then(() => {
+        clearInterval(timer);
+        const m = pattern.exec(output);
+        if (m) resolve(m);
+        else reject(new Error(`exited without ${pattern}:\n${output}`));
+      });
     });
   return { child, ended, said, output: () => output };
 }
@@ -55,7 +67,9 @@ test('PORT=0 starts the api on a free port, and it prints the port it got', asyn
 
 test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this machine's other addresses, where anyone on the network could start a run", async (t) => {
   // Before it listened on loopback alone, a text/plain POST /api/runs to this address answered 201 and wrote a run.
-  const outward = Object.values(os.networkInterfaces()).flat().find((a) => a?.family === 'IPv4' && !a.internal)?.address;
+  const outward = Object.values(os.networkInterfaces())
+    .flat()
+    .find((a) => a?.family === 'IPv4' && !a.internal)?.address;
   const api = startApi('0');
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);

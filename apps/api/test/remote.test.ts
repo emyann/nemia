@@ -25,19 +25,32 @@ const write = (file: string, text: string): void => {
 const at = (s: number) => new Date(Date.parse('2026-09-25T06:00:00.000Z') + s * 1000).toISOString();
 
 /** A task on `harness` that ran once and completed: what a remote agent's Task that answered with no data part leaves. */
-const completed = (taskId: string, harness: string) => write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), [
-  { kind: 'filed', at: at(0), brief: 'Ask it.', cwd: path.join(root, 'runs', 'x', 'work', 'ask'), harness },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(1), attempt: 1 },
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ctx-1', observed: 'done', reason: 'harness' },
-  { kind: 'settled', at: at(9), outcome: 'succeeded' },
-].map((line) => `${JSON.stringify(line)}\n`).join(''));
+const completed = (taskId: string, harness: string) =>
+  write(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    [
+      { kind: 'filed', at: at(0), brief: 'Ask it.', cwd: path.join(root, 'runs', 'x', 'work', 'ask'), harness },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(1), attempt: 1 },
+      { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ctx-1', observed: 'done', reason: 'harness' },
+      { kind: 'settled', at: at(9), outcome: 'succeeded' },
+    ]
+      .map((line) => `${JSON.stringify(line)}\n`)
+      .join(''),
+  );
 
 /** A run of one step, `ask`, on `harness`, whose task is `taskId`. */
 const oneStep = (id: string, harness: string, taskId: string): Run => {
   const run = {
-    id, repo: root, workspace: root, baseRef: null, branch: null, isolate: false, brief: 'a note on tides',
-    workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
+    id,
+    repo: root,
+    workspace: root,
+    baseRef: null,
+    branch: null,
+    isolate: false,
+    brief: 'a note on tides',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
     workflow: [{ name: 'ask', after: [], body: 'Ask it.', harness, workspace: 'folder' }],
     steps: { ask: { taskId } },
   };
@@ -54,12 +67,18 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   const text = await res.text();
   const [ask] = JSON.parse(text).steps;
   assert.deepEqual(ask.filed.remote, { name: 'reviewer', address: 'https://agents.example.com/reviewer' });
-  assert.equal(ask.filed.runsIn, null, 'no mode: the agent runs under its own party\'s fence');
+  assert.equal(ask.filed.runsIn, null, "no mode: the agent runs under its own party's fence");
   assert.equal(text.includes('s3cret'), false, 'the query string, which can carry a key, is on no answer');
 
   // An agent given by its card is addressed by the card's first interface.
-  write(path.join(root, 'a2a-agents.json'), JSON.stringify({ reviewer: { card: { supportedInterfaces: [{ url: 'https://a2a.example.org/rpc', protocolBinding: 'JSONRPC' }] } } }));
-  assert.deepEqual((await (await app.request('/api/runs/r-remote')).json()).steps[0].filed.remote, { name: 'reviewer', address: 'https://a2a.example.org/rpc' });
+  write(
+    path.join(root, 'a2a-agents.json'),
+    JSON.stringify({ reviewer: { card: { supportedInterfaces: [{ url: 'https://a2a.example.org/rpc', protocolBinding: 'JSONRPC' }] } } }),
+  );
+  assert.deepEqual((await (await app.request('/api/runs/r-remote')).json()).steps[0].filed.remote, {
+    name: 'reviewer',
+    address: 'https://a2a.example.org/rpc',
+  });
 
   // Taken out of the file since, or the file refused as it stands: the name, which is on the task, and no address.
   completed('t-gone', 'a2a:critic');
@@ -73,10 +92,38 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
 });
 
 test('a remote step whose Task waits on its caller is answered with wf say, and its question read with wf logs — not in Claude Code', () => {
-  const view = (harness: string): TaskView => ({
-    id: 't-asks', phase: 'needs-human', waitingFor: 'input', sessionId: 'ctx-1',
-    state: { taskId: 't-asks', brief: 'Ask it.', cwd: root, harness, attempts: [{ n: 1, startedAt: at(1), spawnedAt: at(1), ended: null, endedAt: null, reason: null, nativeId: 'ctx-1', usage: null, exitCode: null }], said: [], inputs: [], closed: false, stopRequested: false, settled: null, filedAt: at(0) },
-  } as unknown as TaskView);
+  const view = (harness: string): TaskView =>
+    ({
+      id: 't-asks',
+      phase: 'needs-human',
+      waitingFor: 'input',
+      sessionId: 'ctx-1',
+      state: {
+        taskId: 't-asks',
+        brief: 'Ask it.',
+        cwd: root,
+        harness,
+        attempts: [
+          {
+            n: 1,
+            startedAt: at(1),
+            spawnedAt: at(1),
+            ended: null,
+            endedAt: null,
+            reason: null,
+            nativeId: 'ctx-1',
+            usage: null,
+            exitCode: null,
+          },
+        ],
+        said: [],
+        inputs: [],
+        closed: false,
+        stopRequested: false,
+        settled: null,
+        filedAt: at(0),
+      },
+    }) as unknown as TaskView;
   const run = oneStep('r-asks', 'a2a:reviewer', 't-asks');
   const judged = { words: new Map([['ask', 'needs-human']]), waitingOnYou: [] as string[] };
   assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {
@@ -84,5 +131,8 @@ test('a remote step whose Task waits on its caller is answered with wf say, and 
     advice: 'read its question with wf logs r-asks ask, and answer it with wf say r-asks ask "<your answer>"',
   });
   // The same wait on a harness of ours is answered where it runs.
-  assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice, 'answer it in Claude Code: claude agents, session ae/t-asks/1');
+  assert.deepEqual(
+    needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice,
+    'answer it in Claude Code: claude agents, session ae/t-asks/1',
+  );
 });

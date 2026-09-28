@@ -24,7 +24,8 @@ const heading = (level: keyof typeof SHIFTED) =>
     return <Tag className={cn('mt-4 mb-1.5 font-semibold leading-snug', HEADING[level], className)} {...props} />;
   };
 
-const LINK = 'font-medium text-neutral-900 underline underline-offset-2 break-words hover:text-neutral-600 dark:text-neutral-100 dark:hover:text-neutral-300';
+const LINK =
+  'font-medium text-neutral-900 underline underline-offset-2 break-words hover:text-neutral-600 dark:text-neutral-100 dark:hover:text-neutral-300';
 
 /**
  * How each element of a text is drawn: the board's type in both themes, and three rules.
@@ -66,7 +67,10 @@ const COMPONENTS: Components = {
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px]" />;
   },
   code: ({ node: _node, className, ...props }) => (
-    <code className={cn('box-decoration-clone rounded bg-neutral-100 px-1 py-px font-mono text-[0.9em] dark:bg-neutral-800', className)} {...props} />
+    <code
+      className={cn('box-decoration-clone rounded bg-neutral-100 px-1 py-px font-mono text-[0.9em] dark:bg-neutral-800', className)}
+      {...props}
+    />
   ),
   h1: heading('h1'),
   h2: heading('h2'),
@@ -95,7 +99,9 @@ const COMPONENTS: Components = {
       {...props}
     />
   ),
-  hr: ({ node: _node, className, ...props }) => <hr className={cn('my-4 border-neutral-200 dark:border-neutral-800', className)} {...props} />,
+  hr: ({ node: _node, className, ...props }) => (
+    <hr className={cn('my-4 border-neutral-200 dark:border-neutral-800', className)} {...props} />
+  ),
   table: ({ node: _node, className, ...props }) => (
     <div className="my-3 max-w-full overflow-x-auto">
       <table className={cn('w-max border-collapse text-left text-[0.95em]', className)} {...props} />

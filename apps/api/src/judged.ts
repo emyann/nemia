@@ -2,8 +2,58 @@
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
  */
-import { answerIn, type BranchReader, branchReader, type BranchStanding, branchStandings, closeoutAsked, closeoutOf, closeoutReader, deniedOf, deniedWords, exitVerdicts, harnessBlocked, holdAdvice, holdsOf, holdWord, merges, nameFor, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, resultSteps, type Retry, type RetryAsk, runSpend, saidCount, sendBackTo, type Spend, type SpendOf, spendReader, spentWord, toDecideWords, type Wait, waitAdvice, waitingWords, waitWord, wordOfView } from 'agent-orchestrator';
-import { assess, type Assessment, gated, inFlight, isGitRun, listing, onYouWords, type Run, type ToDecide, waitsOf } from 'agent-orchestrator/run';
+import {
+  answerIn,
+  type BranchReader,
+  branchReader,
+  type BranchStanding,
+  branchStandings,
+  closeoutAsked,
+  closeoutOf,
+  closeoutReader,
+  deniedOf,
+  deniedWords,
+  exitVerdicts,
+  harnessBlocked,
+  holdAdvice,
+  holdsOf,
+  holdWord,
+  merges,
+  nameFor,
+  parentOf,
+  type ParentRun,
+  phaseOfView,
+  readAnswers,
+  readAsks,
+  resultSteps,
+  type Retry,
+  type RetryAsk,
+  runSpend,
+  saidCount,
+  sendBackTo,
+  type Spend,
+  type SpendOf,
+  spendReader,
+  spentWord,
+  toDecideWords,
+  type Wait,
+  waitAdvice,
+  waitingWords,
+  waitWord,
+  wordOfView,
+} from 'agent-orchestrator';
+import {
+  assess,
+  type Assessment,
+  gated,
+  inFlight,
+  isGitRun,
+  listing,
+  onYouWords,
+  type Run,
+  type ToDecide,
+  waitsOf,
+} from 'agent-orchestrator/run';
 import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
 import { bare, e, judgedSteps, type Views } from './store.ts';
 
@@ -169,14 +219,21 @@ export async function holdsIn(run: Run, reader: typeof e, git: BranchReader = br
  * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli.ts). Not `neverShips` above, which reads any reason a `Wait`
  * carries as one it may never ship for: a hold's `shipped` is the opposite.
  */
-const holdNeedsYou = (holds: readonly Wait[]): boolean => !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
+const holdNeedsYou = (holds: readonly Wait[]): boolean =>
+  !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
 
 /** A person's hold on a run (`RunHolding`), in the package's words; null for a run nobody holds, and one called off. */
 export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
   if (!run.hold || run.cancelledAt) return null;
   return {
     at: run.hold.at,
-    runs: holds.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [], shipped: Boolean(w.shipped) })),
+    runs: holds.map((w) => ({
+      run: w.run,
+      missing: Boolean(w.missing),
+      cancelledAt: w.cancelledAt ?? null,
+      gone: w.gone ?? [],
+      shipped: Boolean(w.shipped),
+    })),
     word: holdWord(holds),
     advice: holdAdvice(run, holds),
     onYou: holdNeedsYou(holds),
@@ -188,7 +245,10 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
  * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
  * and `succeeded` for a task held open that was closed after it signed, which it calls `between attempts` until its next pass settles it.
  */
-export const wordOf = (views: Views) => (taskId: string): string => wordOfView(views.get(taskId));
+export const wordOf =
+  (views: Views) =>
+  (taskId: string): string =>
+    wordOfView(views.get(taskId));
 
 /** What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it still moves. */
 type Judged = {
@@ -221,9 +281,15 @@ type Judged = {
  * merges answers for its own branch. Pure, and off the record alone: what `standingsOf` asks git about, and nothing more.
  */
 const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatus): string[] =>
-  (run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
+  run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
     ? []
-    : [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))]);
+    : [
+        ...new Set(
+          resultSteps(steps)
+            .map((s) => run.steps[s.name]?.branch)
+            .filter((b): b is string => Boolean(b)),
+        ),
+      ];
 
 /**
  * Result branches this process has seen on their base branch, as `<run>/<branch>` — a run id has no slash, so the pair is unambiguous —
@@ -248,7 +314,9 @@ const onTheBase = new Map<string, string>();
  * or a round, files a task of its own, so this changes exactly when the work that could grow a result branch has been done again.
  */
 const workFiled = (run: Run, steps: readonly Workflow[]): string =>
-  resultSteps(steps).map((s) => `${s.name}:${run.steps[s.name]?.taskId ?? ''}:${run.steps[s.name]?.tries?.length ?? 0}`).join(' ');
+  resultSteps(steps)
+    .map((s) => `${s.name}:${run.steps[s.name]?.taskId ?? ''}:${run.steps[s.name]?.tries?.length ?? 0}`)
+    .join(' ');
 
 /**
  * Where each of a run's result branches stands against the base branch, as git says it now (`branchStandings`): what says a finished run
@@ -266,7 +334,13 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  * what git was asked of — the branches it did not find on the base, and whether git answered — which is what the list's memo of runs at
  * rest watches (`resting.ts`).
  */
-export function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus, git: BranchReader = branchReader(), asked?: Asked): BranchStanding[] {
+export function standingsOf(
+  run: Run,
+  steps: readonly Workflow[],
+  status: RunStatus,
+  git: BranchReader = branchReader(),
+  asked?: Asked,
+): BranchStanding[] {
   // A folder run has no branch to stand anywhere.
   if (!isGitRun(run)) return [];
   const filed = workFiled(run, steps);
@@ -343,12 +417,28 @@ export function judge(
   // And the harness's word, as the tick has it (`harnessBlocked`): a person's try of a step whose session the harness blocked is due, the
   // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
   // And the cost, as the tick has it: a step over its budget is not tried, nor its loop sent round, on the run's word, so it does not move.
-  const judgedOf = (on: Run) => assess(steps, on, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  const judgedOf = (on: Run) =>
+    assess(steps, on, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   const { status, ready, check, retry, round } = judgedOf(run);
   // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
   // inputs as `assess`, so the words and the judgement are the package's single reading.
   const standings = readStandings(status, steps);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings);
+  const said = listing(
+    shown,
+    run,
+    wordOf(views),
+    (name) => closeoutOf(views, run, name),
+    asked,
+    verdicts,
+    asks,
+    rounds,
+    answers,
+    waits,
+    saidCount(views, run),
+    spendOf,
+    undefined,
+    standings,
+  );
   const waiting = waitingOf(run, said.waiting);
   const holding = holdingOf(run, holds);
   // What the tick files once the hold lifts, for a hold that lifts on its own: the run as it stands without it. A held run has nothing due.
@@ -371,7 +461,9 @@ export function judge(
     // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
     // Roots `assess` makes ready on a run waiting on runs are filed once those ship (`runReady`), which never happens on its own for a
     // run that never ships: the gate is the tick's, and `assess` does not know it. A held run's due is what it files once the hold lifts (`due`).
-    moving: inFlight(run, phase).length > 0 || (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
+    moving:
+      inFlight(run, phase).length > 0 ||
+      (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
@@ -400,7 +492,15 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
-    waitingFor: word ? { words: waitingWords(word), advice: answerIn(attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt), isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined) } : null,
+    waitingFor: word
+      ? {
+          words: waitingWords(word),
+          advice: answerIn(
+            attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt),
+            isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined,
+          ),
+        }
+      : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
     denied: calls.length ? { words: deniedWords(calls), calls } : null,
   };

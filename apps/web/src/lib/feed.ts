@@ -43,7 +43,8 @@ export function keysOf(event: FeedEvent, run: string): QueryKey[] {
  * and the cap — and whether a daemon ticks the store (`daemonQuery`), which every event reads again but none can say is gone.
  */
 export const polled = (key: QueryKey): boolean =>
-  (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings' || key[0] === 'daemon')) || (key.length === 2 && key[0] === 'runs' && typeof key[1] === 'string');
+  (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings' || key[0] === 'daemon')) ||
+  (key.length === 2 && key[0] === 'runs' && typeof key[1] === 'string');
 
 // Whether the feed's stream is open now: one stream a page, so one flag, set by `followFeed` alone.
 let live = false;
@@ -54,7 +55,10 @@ export const pace = (fast: number): number => (live ? FALLBACK_MS : fast);
 /** What `followFeed` tells the page: the queries to read again, and whether it follows. */
 export type FeedSink = { invalidate: (keys: QueryKey[]) => void; status: (status: FeedStatus) => void };
 
-export type Timers = { set: (f: () => void, ms: number) => ReturnType<typeof setTimeout>; clear: (t: ReturnType<typeof setTimeout>) => void };
+export type Timers = {
+  set: (f: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clear: (t: ReturnType<typeof setTimeout>) => void;
+};
 
 const browserTimers: Timers = { set: (f, ms) => setTimeout(f, ms), clear: (t) => clearTimeout(t) };
 
@@ -75,7 +79,12 @@ const CLOSED = 2;
  *
  * Returns what stops following.
  */
-export function followFeed(open: (after?: string) => StreamLike, sink: FeedSink, frames: Frames, timers: Timers = browserTimers): () => void {
+export function followFeed(
+  open: (after?: string) => StreamLike,
+  sink: FeedSink,
+  frames: Frames,
+  timers: Timers = browserTimers,
+): () => void {
   let stream: StreamLike;
   let stopped = false;
   // The id of the last event read: the cursor a stream opened again resumes from.

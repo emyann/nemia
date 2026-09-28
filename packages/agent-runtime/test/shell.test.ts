@@ -36,7 +36,9 @@ const fakeClaude = () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
   fs.writeFileSync(registry, '[]');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -53,7 +55,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now() });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -66,7 +70,11 @@ if (args[0] === '--bg') {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /**
@@ -88,9 +96,18 @@ const prompt = (content: string) => ({ type: 'user', message: { role: 'user', co
 const says = (id: string, text: string) => ({ type: 'assistant', message: { id, role: 'assistant', content: [{ type: 'text', text }] } });
 /** A closing turn as Claude Code writes one: the call, its attachment, its result, and the turn's duration. */
 const closingTurn = (id: string, payload: object) => [
-  { type: 'assistant', message: { id, role: 'assistant', content: [{ type: 'tool_use', id: `tu_${id}`, name: 'StructuredOutput', input: payload }] } },
+  {
+    type: 'assistant',
+    message: { id, role: 'assistant', content: [{ type: 'tool_use', id: `tu_${id}`, name: 'StructuredOutput', input: payload }] },
+  },
   { attachment: { type: 'structured_output', data: payload } },
-  { type: 'user', message: { role: 'user', content: [{ tool_use_id: `tu_${id}`, type: 'tool_result', content: 'Structured output provided successfully' }] } },
+  {
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [{ tool_use_id: `tu_${id}`, type: 'tool_result', content: 'Structured output provided successfully' }],
+    },
+  },
   { type: 'system', subtype: 'turn_duration', durationMs: 11_545 },
 ];
 
@@ -110,7 +127,11 @@ test('a session held busy by a background shell, its closeout the last word in i
 
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' }, 'the closeout on the record, seventy minutes earlier than a person could have read it');
+    assert.deepEqual(
+      v.state.attempts[0]?.closeout,
+      { outcome: 'done' },
+      'the closeout on the record, seventy minutes earlier than a person could have read it',
+    );
     assert.equal(v.state.attempts[0]?.reason, 'harness');
     assert.deepEqual(claude.rows(), [], 'and the session let go, which is what ends the shell');
   });

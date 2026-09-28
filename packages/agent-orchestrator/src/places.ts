@@ -74,10 +74,13 @@ function ownGiven(workspace: string): void {
   const found = fs.lstatSync(at, { throwIfNoEntry: false });
   if (!found || (found.isDirectory() && !found.isSymbolicLink())) return;
   const what = found.isSymbolicLink() ? 'a link' : 'not a directory';
-  throw Object.assign(new Error(
-    `${at} is ${what}, and \`${GIVEN}/\` in a step's folder is the run's own: it is emptied and written each time the step is filed, so it is never followed. ` +
-    `Remove or rename it — the step's own work belongs outside \`${GIVEN}/\` — and the next tick files the step.`,
-  ), { exitCode: 2 });
+  throw Object.assign(
+    new Error(
+      `${at} is ${what}, and \`${GIVEN}/\` in a step's folder is the run's own: it is emptied and written each time the step is filed, so it is never followed. ` +
+        `Remove or rename it — the step's own work belongs outside \`${GIVEN}/\` — and the next tick files the step.`,
+    ),
+    { exitCode: 2 },
+  );
 }
 
 /**

@@ -46,13 +46,24 @@ test('each word wf ls prints reads as the state a person acts on', () => {
   for (const [status, state] of cases) assert.equal(stepState(status, false, false), state, status);
 });
 
-test('a session that ended is not work that was done: the engine\'s `succeeded` alone is never verified', () => {
+test("a session that ended is not work that was done: the engine's `succeeded` alone is never verified", () => {
   assert.equal(stepState('succeeded', false, false), 'unverified');
   assert.equal(stepState('succeeded · done', false, false), 'unverified');
 });
 
 test('only verified and unverified are work done; a refused check, a failed session and an unsigned step are not', () => {
-  const notDone = ['failed ✗ check (exit 1)', 'failed · done', 'unsigned', 'denied', 'succeeded · BLOCKED', 'rounds exhausted', 'checking', 'running (working)', 'waiting', 'unknown'];
+  const notDone = [
+    'failed ✗ check (exit 1)',
+    'failed · done',
+    'unsigned',
+    'denied',
+    'succeeded · BLOCKED',
+    'rounds exhausted',
+    'checking',
+    'running (working)',
+    'waiting',
+    'unknown',
+  ];
   for (const status of notDone) assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
   for (const status of ['verified ✓', 'unverified · done']) assert.equal(satisfiesAfter(stepState(status, false, false)), true, status);
   // A refused check is its own state, not a session that failed: the colour says which to read, the check's output or the log.
@@ -91,7 +102,15 @@ test('a loop out of rounds waits on a person, in amber like a step that signed o
 test('a word the board does not know reads as working, on purpose: never as done, and never as waiting on you', () => {
   // What `rounds exhausted` read as before the board knew it. A word `wf ls` gains after this was written is shown
   // as still going until the board is taught it, rather than as a verdict the run never gave.
-  for (const status of ['a word wf ls has gained since', 'rounds exhausted, and more', 'exhausted', 'over budgetary', 'budget', 'budget exhaustedness', 'over budget']) {
+  for (const status of [
+    'a word wf ls has gained since',
+    'rounds exhausted, and more',
+    'exhausted',
+    'over budgetary',
+    'budget',
+    'budget exhaustedness',
+    'over budget',
+  ]) {
     assert.equal(stepState(status, false, false), 'working', status);
     assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
   }
@@ -110,13 +129,33 @@ test('a step past its budget waits on a person in amber, as a loop out of rounds
 });
 
 test('a human gate is a step a person decides: signed off blocked, a loop out of rounds, or a step past its budget — and on a cancelled run, none', () => {
-  for (const status of ['succeeded · BLOCKED', 'rounds exhausted', 'over budget $4.20 of $3', 'over budget — implement $4.25 of $3', 'budget exhausted $3.02 of $3']) {
+  for (const status of [
+    'succeeded · BLOCKED',
+    'rounds exhausted',
+    'over budget $4.20 of $3',
+    'over budget — implement $4.25 of $3',
+    'budget exhausted $3.02 of $3',
+  ]) {
     assert.equal(isGate(stepState(status, false, false), false), true, status);
     // Nobody waits for the answer on a run somebody called off.
     assert.equal(isGate(stepState(status, true, false), true), false, `${status}, on a cancelled run`);
   }
   // Waiting on you too, but work to try again, not a decision; and every state that waits on nobody.
-  const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'denied', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
+  const notGates = [
+    'failed ✗ check (exit 1)',
+    'failed ✗ check (unfinished)',
+    'unsigned',
+    'denied',
+    'verified ✓',
+    'unverified · done',
+    'checking',
+    'running (working)',
+    'needs-human',
+    'failed',
+    'stopped',
+    'waiting',
+    'unknown',
+  ];
   for (const status of notGates) assert.equal(isGate(stepState(status, false, false), false), false, status);
 });
 
@@ -129,13 +168,21 @@ test('a step waiting at its gate waits on a person in amber, as a step signed of
   assert.equal(stateClass['awaiting-approval'], stateClass.blocked);
   assert.equal(isGate('awaiting-approval', false), true);
   assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
-  assert.match(stateMeaning['awaiting-approval'], /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message$/);
+  assert.match(
+    stateMeaning['awaiting-approval'],
+    /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message$/,
+  );
   // Not a word that merely starts like it: before the board knew the word, it read as working, and a spinner drew on a step nobody runs.
   assert.equal(stepState('awaiting approvals', false, false), 'working');
 });
 
 test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting — whatever runs it names, and why — and cancelled on a run called off', () => {
-  for (const word of ['waiting on a-1x2y', 'waiting on a-1x2y (cancelled), b-3z4w', 'waiting on a-1x2y (no such run)', 'waiting on a-1x2y (wf/a-1x2y/implement gone)']) {
+  for (const word of [
+    'waiting on a-1x2y',
+    'waiting on a-1x2y (cancelled), b-3z4w',
+    'waiting on a-1x2y (no such run)',
+    'waiting on a-1x2y (wf/a-1x2y/implement gone)',
+  ]) {
     assert.equal(stepState(word, false, false), 'waiting', word);
     assert.equal(stepState(word, true, false), 'cancelled', word);
   }
@@ -144,7 +191,17 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
 });
 
 test('on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves', () => {
-  const held = ['waiting', 'pending', 'waiting on a-1x2y', 'succeeded · BLOCKED', 'input-required · BLOCKED', 'awaiting approval', 'rounds exhausted', 'over budget $4.20 of $3', 'budget exhausted $3.02 of $3'];
+  const held = [
+    'waiting',
+    'pending',
+    'waiting on a-1x2y',
+    'succeeded · BLOCKED',
+    'input-required · BLOCKED',
+    'awaiting approval',
+    'rounds exhausted',
+    'over budget $4.20 of $3',
+    'budget exhausted $3.02 of $3',
+  ];
   for (const status of held) {
     assert.equal(stepState(status, false, true), 'held', status);
     // Nobody is asked while the hold stands: every verb that would answer the gate is refused.

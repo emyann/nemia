@@ -31,8 +31,10 @@ export const sha256 = (text: string) => crypto.createHash('sha256').update(text)
  */
 export const pinnedModel = (model: unknown): string => {
   if (typeof model !== 'string' || !/^[a-z][\w-]*-\d+(?:\.\d+)+$/.test(model)) {
-    refuse(`judge: the model must be pinned to one version, such as \`jev-1.13.0\`; ${JSON.stringify(model)} is not. ` +
-      'An alias such as `jev-latest` moves under your thresholds without a word.');
+    refuse(
+      `judge: the model must be pinned to one version, such as \`jev-1.13.0\`; ${JSON.stringify(model)} is not. ` +
+        'An alias such as `jev-latest` moves under your thresholds without a word.',
+    );
   }
   return model as string;
 };

@@ -84,7 +84,10 @@ export function skillFormOf(detail: Pick<SkillDetail, 'skill' | 'draft' | 'body'
 }
 
 const lines = (text: string): string[] | null => {
-  const each = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const each = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
   return each.length ? each : null;
 };
 

@@ -4,7 +4,141 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { addPass, breakdownLines, lastPassCost, summaryDue, summaryLine, type Interval, AGENT_FACING, CHECK_AFFECTING, LESSON, accept, feedCursorRefusal, feedLineWords, readFeed, watchFeed, prune, pruneLines, pruningBytes, prunedKept, prunedWords, sizeOf, type Pruning, approve, approvedFirst, hold, holdAdvice, holdWord, unhold, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, ignoredRepoLine, refusalLines, runSlots, slotWord, HOME, beat, daemonLine, daemonStanding, everyOf, passed, releaseStore, stillHeld, storeRefusal, takeStore, takenFromLine, takeoverLine, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchReader, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type AgentPlace, agentPlaces, agentSkillsFound, cardSkills, findAgent, formerKeyLines, listAgents, type ForgetHow, type RetryHow, type RetryMode, agentVersion, viewedOnce, workflowFolder } from './runner.ts';
+import {
+  addPass,
+  breakdownLines,
+  lastPassCost,
+  summaryDue,
+  summaryLine,
+  type Interval,
+  AGENT_FACING,
+  CHECK_AFFECTING,
+  LESSON,
+  accept,
+  feedCursorRefusal,
+  feedLineWords,
+  readFeed,
+  watchFeed,
+  prune,
+  pruneLines,
+  pruningBytes,
+  prunedKept,
+  prunedWords,
+  sizeOf,
+  type Pruning,
+  approve,
+  approvedFirst,
+  hold,
+  holdAdvice,
+  holdWord,
+  unhold,
+  branchWord,
+  checkoutLine,
+  endingSteps,
+  merges,
+  sendBackTo,
+  toDecideWords,
+  approvalWordsRefusal,
+  ceilingLines,
+  ceilings,
+  queueInInbox,
+  queueLine,
+  ignoredRepoLine,
+  refusalLines,
+  runSlots,
+  slotWord,
+  HOME,
+  beat,
+  daemonLine,
+  daemonStanding,
+  everyOf,
+  passed,
+  releaseStore,
+  stillHeld,
+  storeRefusal,
+  takeStore,
+  takenFromLine,
+  takeoverLine,
+  addToInbox,
+  dropFromInbox,
+  fromNote,
+  gatesOf,
+  inboxDir,
+  inboxLines,
+  inboxNameAt,
+  noCardLine,
+  onYouWords,
+  readInbox,
+  startFromInbox,
+  workflowAt,
+  artifactFiles,
+  budgetRefusal,
+  budgetWord,
+  artifactLines,
+  artifacts,
+  artifactsDir,
+  branchReader,
+  branchesToRead,
+  cancel,
+  cardToStart,
+  decide,
+  diffStat,
+  dueNote,
+  engine,
+  forget,
+  forgetLine,
+  inFullLines,
+  inputsDir,
+  isGitRun,
+  inputsNote,
+  lessonLine,
+  list,
+  listRuns,
+  messageRefusal,
+  missingArtifacts,
+  namesInOrder,
+  outputLines,
+  owedFields,
+  parseGlobs,
+  planLines,
+  planStopped,
+  readArtifact,
+  readRun,
+  resultBranches,
+  retry,
+  round,
+  roundDueNote,
+  saidLines,
+  say,
+  signoffsSpent,
+  sensitiveDiff,
+  start,
+  startPlan,
+  stepsOf,
+  tick,
+  timelineLines,
+  timelineTotalLines,
+  touchedBy,
+  touchedLines,
+  tryNote,
+  usedLines,
+  verdictWord,
+  waitAdvice,
+  waitWord,
+  type AgentPlace,
+  agentPlaces,
+  agentSkillsFound,
+  cardSkills,
+  findAgent,
+  formerKeyLines,
+  listAgents,
+  type ForgetHow,
+  type RetryHow,
+  type RetryMode,
+  agentVersion,
+  viewedOnce,
+  workflowFolder,
+} from './runner.ts';
 import { agentCard, dollarsOf } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -174,7 +308,9 @@ a run's task ids carry the run and the step, so its output already names the wor
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
-const usage = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
+const usage = (message: string): never => {
+  throw Object.assign(new Error(message), { exitCode: 2 });
+};
 
 const PLAN_HELP = `wf plan <folder> [--repo .]
 
@@ -278,11 +414,15 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
   let sensitive: string[] | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg !== '--sensitive') usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
+    if (arg !== '--sensitive')
+      usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
     if (sensitive) usage('wf decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
     const value = argv[++i];
     const globs = value === undefined || value.startsWith('--') ? [] : parseGlobs(value);
-    if (!globs.length) usage('--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".');
+    if (!globs.length)
+      usage(
+        '--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".',
+      );
     sensitive = globs;
   }
   return { sensitive };
@@ -311,7 +451,10 @@ function readFlags(argv: string[], rules: FlagRules): { values: Record<string, s
   const switches: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (rules.switches?.includes(arg)) { switches.push(arg); continue; }
+    if (rules.switches?.includes(arg)) {
+      switches.push(arg);
+      continue;
+    }
     const joined = arg.startsWith('--') && arg.includes('=');
     const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
     if (rules.refuses && Object.hasOwn(rules.refuses, name)) usage(rules.refuses[name]!);
@@ -332,8 +475,10 @@ const START_TAKES = {
   '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
   '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
   '--input': "a file to hand the run's steps: wf start <brief> --input <file> [--input <file> ...]",
-  '--gate': 'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
-  '--brief': "what the run is asked to do in place of an inbox card's body, as text or a file: wf start <inbox>/<name>.md --brief \"<brief>\"",
+  '--gate':
+    'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
+  '--brief':
+    'what the run is asked to do in place of an inbox card\'s body, as text or a file: wf start <inbox>/<name>.md --brief "<brief>"',
 } as const;
 
 /**
@@ -345,13 +490,20 @@ function startHow(argv: string[]): StartHow {
     takes: START_TAKES,
     switches: ['--no-worktree'],
     repeats: ['--after', '--input', '--gate'],
-    unknown: (arg) => (arg.startsWith('-')
-      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>".`
-      : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`),
-    twice: (flag) => `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>".`
+        : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`,
+    twice: (flag) =>
+      `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
   });
   return {
-    workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [], inputs: values['--input'] ?? [], gates: values['--gate'] ?? [],
+    workflows: values['--workflows']?.[0],
+    repo: values['--repo']?.[0],
+    isolate: !switches.length,
+    after: values['--after'] ?? [],
+    inputs: values['--input'] ?? [],
+    gates: values['--gate'] ?? [],
     ...(values['--brief'] ? { brief: values['--brief'][0] } : {}),
   };
 }
@@ -364,15 +516,21 @@ function planHow(argv: string[]): { repo?: string } {
   const { values } = readFlags(argv, {
     takes: { '--repo': 'the repository the plan works on: wf plan <folder> --repo <r>' },
     refuses: {
-      '--after': 'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
-      '--workflows': 'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
-      '--input': "wf plan does not take --input: a card's inputs are not a thing yet. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.",
-      '--gate': "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
-    '--no-worktree': 'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
+      '--after':
+        'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
+      '--workflows':
+        'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
+      '--input':
+        "wf plan does not take --input: a card's inputs are not a thing yet. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.",
+      '--gate':
+        "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
+      '--no-worktree':
+        'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
     },
-    unknown: (arg) => (arg.startsWith('-')
-      ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r>.`
-      : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`),
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r>.`
+        : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`,
     twice: () => 'wf plan takes --repo once: a plan works on one repository.',
   });
   return { repo: values['--repo']?.[0] };
@@ -385,13 +543,15 @@ function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } {
       '--repo': 'the repository whose workflows/agents to read: wf agents --repo <r>',
       '--from': 'which place the agent is in: wf agents card <name> --from repo|yours',
     },
-    unknown: (arg) => (arg.startsWith('-')
-      ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-      : `wf agents takes no argument but card <name>: wf agents, or wf agents card ${arg}.`),
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
+        : `wf agents takes no argument but card <name>: wf agents, or wf agents card ${arg}.`,
     twice: (flag) => `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
   });
   const from = values['--from']?.[0];
-  if (from !== undefined && from !== 'repo' && from !== 'yours') usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
+  if (from !== undefined && from !== 'repo' && from !== 'yours')
+    usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
   return { repo: values['--repo']?.[0], ...(from === 'repo' || from === 'yours' ? { from } : {}) };
 }
 
@@ -400,13 +560,15 @@ function inboxQueueHow(argv: string[]): { workflow?: string; off: boolean } {
   const { values, switches } = readFlags(argv, {
     takes: { '--workflow': 'the workflow the card starts on, by name or as a path: wf inbox queue <name> --workflow <w>' },
     switches: ['--off'],
-    unknown: (arg) => (arg.startsWith('-')
-      ? `wf inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
-      : `wf inbox queue queues one card, and ${arg} is a second: wf inbox queue <name>, once per card.`),
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
+        : `wf inbox queue queues one card, and ${arg} is a second: wf inbox queue <name>, once per card.`,
     twice: () => 'wf inbox queue takes --workflow once: a card starts on one workflow.',
   });
   const workflow = values['--workflow']?.[0];
-  if (switches.length && workflow !== undefined) usage('--off takes the card out of the queue, and --workflow writes what starts it: give one of them.');
+  if (switches.length && workflow !== undefined)
+    usage('--off takes the card out of the queue, and --workflow writes what starts it: give one of them.');
   return { ...(workflow !== undefined ? { workflow } : {}), off: switches.length > 0 };
 }
 
@@ -417,9 +579,10 @@ function inboxAddHow(argv: string[]): { workflow?: string; repo?: string } {
       '--workflow': 'the workflow to start the card on, by name or as a path: wf inbox add "<idea>" --workflow <name>',
       '--repo': 'the repository the idea is about: wf inbox add "<idea>" --repo <path>',
     },
-    unknown: (arg) => (arg.startsWith('-')
-      ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name> and --repo <path>.`
-      : `wf inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — wf inbox add "<idea>" — or give it as a file: wf inbox add ./idea.md.`),
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name> and --repo <path>.`
+        : `wf inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — wf inbox add "<idea>" — or give it as a file: wf inbox add ./idea.md.`,
     twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
   });
   return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
@@ -435,11 +598,16 @@ function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
   for (const arg of argv) {
     if (arg === '--delete-branches') how.deleteBranches = true;
     else if (arg === '--force-unmerged') how.forceUnmerged = true;
-    else if (arg.startsWith('-')) usage(`wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]].`);
+    else if (arg.startsWith('-'))
+      usage(
+        `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]].`,
+      );
     else if (!ids.includes(arg)) ids.push(arg);
   }
   if (how.forceUnmerged && !how.deleteBranches) {
-    usage('--force-unmerged forces --delete-branches to delete a branch not merged into its run\'s base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.');
+    usage(
+      "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.",
+    );
   }
   if (!ids.length && argv.length) usage('wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.');
   return { ids, how };
@@ -455,7 +623,10 @@ function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: bool
     if (arg === '--unmerged') unmerged = true;
     else if (arg === '--yes') yes = true;
     else if (arg === '--artifacts') artifacts = true;
-    else if (arg.startsWith('-')) usage(`wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`);
+    else if (arg.startsWith('-'))
+      usage(
+        `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
+      );
     else if (!ids.includes(arg)) ids.push(arg);
   }
   return { ids, unmerged, yes, artifacts };
@@ -513,22 +684,37 @@ function retryHow(argv: string[]): RetryHow {
       if (!model || model.startsWith('--')) usage('--model takes the model to run the new session on: wf retry <runId> <step> --model <m>');
       given.push({ mode: 'fresh', model });
     } else if (arg === '--message' || arg.startsWith('--message=')) {
-      if (message !== undefined) usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
+      if (message !== undefined)
+        usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
       // The next argument is the answer, whatever it starts with: an answer about a flag names it ("--flag stays"). Only one of this verb's own
       // flags, alone, is read as the answer left out — and `--message=<answer>` carries even that.
       const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
       if (text === undefined) return usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
       if (arg === '--message' && RETRY_FLAGS.includes(text)) {
-        usage(`--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`);
+        usage(
+          `--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`,
+        );
       }
       message = text;
     } else if (arg === '--budget' || arg.startsWith('--budget=')) {
-      if (budget !== undefined) usage('wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.');
-      budget = amountOf(arg === '--budget' ? argv[++i] : arg.slice('--budget='.length), "the most the step's tries may cost together, in dollars, above what they have cost", 'wf retry <runId> <step> --budget <amount>');
-    } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`);
+      if (budget !== undefined)
+        usage('wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.');
+      budget = amountOf(
+        arg === '--budget' ? argv[++i] : arg.slice('--budget='.length),
+        "the most the step's tries may cost together, in dollars, above what they have cost",
+        'wf retry <runId> <step> --budget <amount>',
+      );
+    } else
+      usage(
+        `wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
+      );
   }
   if (given.length > 1) usage('wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.');
-  const how: RetryHow = { ...(given[0] ?? { mode: 'nudge' }), ...(message !== undefined ? { message } : {}), ...(budget !== undefined ? { budget } : {}) };
+  const how: RetryHow = {
+    ...(given[0] ?? { mode: 'nudge' }),
+    ...(message !== undefined ? { message } : {}),
+    ...(budget !== undefined ? { budget } : {}),
+  };
   const wrong = messageRefusal(how) ?? budgetRefusal(how);
   if (wrong) usage(wrong);
   return how;
@@ -544,11 +730,15 @@ function approveHow(argv: string[]): string | undefined {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg !== '--message' && !arg.startsWith('--message=')) {
-      usage(`wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`);
+      usage(
+        `wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`,
+      );
     }
-    if (message !== undefined) usage('wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".');
+    if (message !== undefined)
+      usage('wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".');
     const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
-    if (text === undefined) usage('--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".');
+    if (text === undefined)
+      usage('--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".');
     message = text;
   }
   const wrong = approvalWordsRefusal(message);
@@ -559,7 +749,10 @@ function approveHow(argv: string[]): string | undefined {
 /** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
 function amountOf(text: string | undefined, takes: string, form: string): number {
   const amount = text === undefined ? undefined : dollarsOf(text);
-  if (amount === undefined) usage(`--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`);
+  if (amount === undefined)
+    usage(
+      `--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
+    );
   return amount!;
 }
 
@@ -570,10 +763,19 @@ function roundHow(argv: string[]): { stepName?: string; budget?: number } {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--budget' || arg.startsWith('--budget=')) {
-      if (budget !== undefined) usage('wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.');
-      budget = amountOf(arg === '--budget' ? argv[++i] : arg.slice('--budget='.length), 'the most a step of the loop may cost together, in dollars, above what it has cost', 'wf round <runId> [<step>] --budget <amount>');
+      if (budget !== undefined)
+        usage(
+          'wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.',
+        );
+      budget = amountOf(
+        arg === '--budget' ? argv[++i] : arg.slice('--budget='.length),
+        'the most a step of the loop may cost together, in dollars, above what it has cost',
+        'wf round <runId> [<step>] --budget <amount>',
+      );
     } else if (arg.startsWith('--') || stepName !== undefined) {
-      usage('wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.');
+      usage(
+        'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
+      );
     } else stepName = arg;
   }
   return { ...(stepName !== undefined ? { stepName } : {}), ...(budget !== undefined ? { budget } : {}) };
@@ -590,12 +792,16 @@ function acceptHow(argv: string[]): { stepName?: string; message?: string } {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--message' || arg.startsWith('--message=')) {
-      if (message !== undefined) usage('wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".');
+      if (message !== undefined)
+        usage('wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".');
       const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
-      if (text === undefined) usage('--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".');
+      if (text === undefined)
+        usage('--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".');
       message = text;
     } else if (arg.startsWith('--') || stepName !== undefined) {
-      usage('wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".');
+      usage(
+        'wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".',
+      );
     } else stepName = arg;
   }
   return { ...(stepName !== undefined ? { stepName } : {}), ...(message !== undefined ? { message } : {}) };
@@ -607,7 +813,9 @@ function acceptHow(argv: string[]): { stepName?: string; message?: string } {
  */
 function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
   if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) {
-    usage(`wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`);
+    usage(
+      `wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`,
+    );
   }
   return argv[0] === undefined ? 0 : Number(argv[0]);
 }
@@ -622,7 +830,8 @@ function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
 export function watchPrinted(from: number): { stop(): void } {
   // A feed cut under the watch is said once, and followed from the start of the feed there is now (`watchFeedFile`).
   const watch = watchFeed({
-    from, onLine: (line) => console.log(feedLineWords(line)),
+    from,
+    onLine: (line) => console.log(feedLineWords(line)),
     onCut: (said) => console.error(`wf watch: ${said}`),
     onError: (err) => console.error(`wf watch: ${(err as Error).message ?? String(err)}`),
   });
@@ -642,17 +851,30 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const printStarted = (run: ReturnType<typeof start>, from?: string) => {
         const steps = stepsOf(run);
         // Each node with what is attached to it: `review (reviewer)`. A node with no agent is its name alone.
-        console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.agent ? `${s.name} (${s.agent.name})` : s.name).join(' → ')}`);
+        console.log(
+          `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
+        );
         if (from) console.log(from);
-        console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
+        console.log(
+          `workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
+        );
         if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
-        if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
+        if (run.after?.length)
+          console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
         const gates = gatesOf(steps, run);
         // An ending step in the repository's checkout is held before it is filed, not after it signs off: its approval is what runs it.
-        const ends = endingSteps(steps, run).filter((s) => approvedFirst(s, run)).map((s) => s.name);
+        const ends = endingSteps(steps, run)
+          .filter((s) => approvedFirst(s, run))
+          .map((s) => s.name);
         const held = gates.filter((name) => !ends.includes(name));
-        if (held.length) console.log(`gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`);
-        if (ends.length) console.log(`ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`);
+        if (held.length)
+          console.log(
+            `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`,
+          );
+        if (ends.length)
+          console.log(
+            `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
+          );
         console.log(`run 'wf tick' (or 'wf up') to start it`);
         // A folder written before a key was renamed runs as written, and is told the key's name now.
         for (const line of formerKeyLines(run.workflowDir)) console.log(line);
@@ -660,7 +882,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // A card of the inbox starts out of it, and leaves it. Its brief is its body, or --brief; its workflow and repository are the flags', else its own.
       const inboxName = inboxNameAt(arg);
       if (inboxName !== null) {
-        const brief = how.brief === undefined ? undefined : fs.statSync(how.brief, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(how.brief, 'utf8') : how.brief;
+        const brief =
+          how.brief === undefined
+            ? undefined
+            : fs.statSync(how.brief, { throwIfNoEntry: false })?.isFile()
+              ? fs.readFileSync(how.brief, 'utf8')
+              : how.brief;
         const started = startFromInbox({
           name: inboxName,
           ...(brief !== undefined ? { brief } : {}),
@@ -672,28 +899,35 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           inputs: how.inputs,
           gates: how.gates,
         });
-        printStarted(started.run, started.removed
-          ? `${fromNote(started.run)} — removed from the inbox`
-          : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`);
+        printStarted(
+          started.run,
+          started.removed
+            ? `${fromNote(started.run)} — removed from the inbox`
+            : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`,
+        );
         // A card filed with a repository, started as a team that works in folders: the path is on the card and nothing reads it.
         if (started.ignoredRepo) console.log(ignoredRepoLine(started.ignoredRepo));
         return;
       }
-      if (how.brief !== undefined) usage(`wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`);
+      if (how.brief !== undefined)
+        usage(
+          `wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`,
+        );
       const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
       // A card of a plan — what `wf plan` prints `wf start <card>` for — starts its body. Any other file is the brief whole, frontmatter and all.
       const card = text === undefined ? null : cardToStart(arg, text, how.after);
       const repo = path.resolve(how.repo ?? '.');
       const run = start({
-        brief: card ? card.body : text?.trim() ?? arg,
+        brief: card ? card.body : (text?.trim() ?? arg),
         repo,
         // Named or not matters to a team that says `workspace: folder`, which works on no repository and refuses one named.
         repoNamed: how.repo !== undefined,
         // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev. Without the flag, a card's
         // `workflow:`, found from its plan folder as `wf plan` finds it.
-        workflowDir: how.workflows === undefined && card?.workflow !== undefined
-          ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
-          : workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
+        workflowDir:
+          how.workflows === undefined && card?.workflow !== undefined
+            ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
+            : workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
         isolate: how.isolate,
         after: how.after,
         inputs: how.inputs,
@@ -727,15 +961,23 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const listing = readInbox();
         if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
         for (const line of inboxLines(listing)) console.log(line);
-        console.log(`\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`);
+        console.log(
+          `\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
+        );
         return;
       }
       if (sub === 'add') {
         const idea = args[0];
-        if (idea === undefined || idea.startsWith('--')) usage('wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>], or a file: wf inbox add ./idea.md. Nothing was filed.');
+        if (idea === undefined || idea.startsWith('--'))
+          usage(
+            'wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>], or a file: wf inbox add ./idea.md. Nothing was filed.',
+          );
         const how = inboxAddHow(args.slice(1));
         const at = fs.statSync(idea!, { throwIfNoEntry: false });
-        if (at?.isDirectory()) usage(`${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`);
+        if (at?.isDirectory())
+          usage(
+            `${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`,
+          );
         // A workflow given as a path is kept absolute, so it names the same folder from the inbox; a name stays a name, found in the repository at
         // start. The flag's is read from here; a file's own `workflow:`, from the file's folder.
         const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
@@ -745,41 +987,62 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           ...(workflow !== undefined ? { workflow } : {}),
           ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
         });
-        console.log(`${card.name}  ${card.body.split('\n')[0]!.slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}`);
+        console.log(
+          `${card.name}  ${card.body.split('\n')[0]!.slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}`,
+        );
         console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
         return;
       }
       if (sub === 'queue') {
         const [name, ...more] = args;
-        if (name === undefined || name.startsWith('--')) usage('wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].');
+        if (name === undefined || name.startsWith('--'))
+          usage(
+            'wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].',
+          );
         const how = inboxQueueHow(more);
         // A workflow given as a path is kept absolute, as `wf inbox add` keeps it.
         const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
         const queued = queueInInbox(name!, { off: how.off, ...(workflow !== undefined ? { workflow } : {}) });
         if (queued.was === 'not queued') return console.log(`${name}  not queued — nothing to take back`);
-        if (queued.was === 'taken back') return console.log(`${name}  taken back: it no longer starts on its own — start it with wf start ${queued.file}`);
-        console.log(`${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}`);
-        console.log(`the tick starts it on its own once its turn comes and a run slot is free${queued.card.repo ? '' : ", on the repository wf up runs in"} — take it back with wf inbox queue ${name} --off`);
+        if (queued.was === 'taken back')
+          return console.log(`${name}  taken back: it no longer starts on its own — start it with wf start ${queued.file}`);
+        console.log(
+          `${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}`,
+        );
+        console.log(
+          `the tick starts it on its own once its turn comes and a run slot is free${queued.card.repo ? '' : ', on the repository wf up runs in'} — take it back with wf inbox queue ${name} --off`,
+        );
         return;
       }
       if (sub === 'rm') {
         const [name, ...more] = args;
-        if (name === undefined || name.startsWith('--')) usage('wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.');
+        if (name === undefined || name.startsWith('--'))
+          usage('wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.');
         if (more.length) usage(`wf inbox rm drops one card, and ${more[0]} is a second: wf inbox rm <name>, once per card.`);
         const dropped = dropFromInbox(name!);
-        return console.log(dropped.removed ? `${name}  dropped, and nothing started — ${dropped.file} removed` : `${noCardLine(name!, dropped.cards)} Nothing to drop.`);
+        return console.log(
+          dropped.removed
+            ? `${name}  dropped, and nothing started — ${dropped.file} removed`
+            : `${noCardLine(name!, dropped.cards)} Nothing to drop.`,
+        );
       }
-      return usage(`wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name> (wf inbox --help).`);
+      return usage(
+        `wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name> (wf inbox --help).`,
+      );
     }
 
     case 'tick': {
       // A second writer beside a daemon that ticks the store: refused, with no force — the daemon runs this same pass within its interval.
       const stats = rest.includes('--stats');
       const other = rest.find((a) => a !== '--stats');
-      if (other !== undefined) usage(`wf tick takes no ${other}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`);
+      if (other !== undefined)
+        usage(`wf tick takes no ${other}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`);
       const held = storeRefusal('tick');
       // The pass's cost is on disk all the same, written by the daemon's last pass: said where to read it, with no second writer.
-      if (held) throw Object.assign(new Error(stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held), { exitCode: 2 });
+      if (held)
+        throw Object.assign(new Error(stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held), {
+          exitCode: 2,
+        });
       // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
       const { runs: results, queue, feedError, cost, refused } = await tick(e, { repo: path.resolve('.') });
       if (feedError) console.error(feedError);
@@ -805,12 +1068,22 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // What the last pass cost, read off the store: no pass, no store taken, so it is asked beside a daemon that holds it.
       if (rest.includes('--stats')) {
         const other = rest.find((a) => a !== '--stats');
-        if (other !== undefined) usage(`wf up --stats reads what the last pass cost and ticks nothing, so it takes no ${other}: wf up --stats alone, or wf up ${other} to tick.`);
+        if (other !== undefined)
+          usage(
+            `wf up --stats reads what the last pass cost and ticks nothing, so it takes no ${other}: wf up --stats alone, or wf up ${other} to tick.`,
+          );
         const cost = lastPassCost();
         const daemon = storeRefusal('tick') !== undefined;
-        if (!cost) return console.log(`no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the wf up that holds this store writes it after its next pass' : 'no wf up holds this store: run wf tick --stats, or start wf up'}`);
+        if (!cost)
+          return console.log(
+            `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the wf up that holds this store writes it after its next pass' : 'no wf up holds this store: run wf tick --stats, or start wf up'}`,
+          );
         for (const line of breakdownLines(cost)) console.log(line);
-        return console.log(daemon ? 'written by the wf up that holds this store, after its last pass' : 'no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost');
+        return console.log(
+          daemon
+            ? 'written by the wf up that holds this store, after its last pass'
+            : 'no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
+        );
       }
       // An interval the file cannot hold is refused before anything: a daemon whose file does not read holds nothing.
       const asked = everyOf(rest[0]);
@@ -822,12 +1095,23 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       console.log(`up — every ${every}ms, ^C to stop`);
       // Both ceilings, in words, before the first pass: what the daemon holds work to.
       for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
-      console.log(`   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`);
+      console.log(
+        `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+      );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
       // Stopped by a signal, the store is let go on the way out, so it reads free at once. A crash leaves the file, read as gone.
-      const stops = ([['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]] as const).map(([signal, code]) => {
-        const stop = () => { releaseStore(held); process.exit(code); };
+      const stops = (
+        [
+          ['SIGINT', 130],
+          ['SIGTERM', 143],
+          ['SIGHUP', 129],
+        ] as const
+      ).map(([signal, code]) => {
+        const stop = () => {
+          releaseStore(held);
+          process.exit(code);
+        };
         process.once(signal, stop);
         return [signal, stop] as const;
       });
@@ -901,14 +1185,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const refusal = feedCursorRefusal(from);
       if (refusal) usage(refusal);
       // For ever: the watch holds the process open until ^C, as \`wf up\` does.
-      return new Promise<void>(() => { watchPrinted(from); });
+      return new Promise<void>(() => {
+        watchPrinted(from);
+      });
     }
 
     case 'ls': {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
       // Last, on every path: whether a daemon ticks the store, and when its last pass was — or `waiting` could mean nothing ticks at all.
       const ticking = () => console.log(daemonLine(daemonStanding(), Date.now()));
-      if (!runs.length) { console.log('no runs'); return ticking(); }
+      if (!runs.length) {
+        console.log('no runs');
+        return ticking();
+      }
       // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
       // One read of each task and one question to git of each branch for the whole listing: a task a run waits on is viewed once, and git
       // lists each repository's branches once, with their distance from every base the runs name (`viewedOnce`, `branchReader`).
@@ -936,16 +1225,21 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // The step a person has to act on, and where to act. Said here and not left to the result
         // line, because a run blocked on its first step has no result branch yet. A step at its gate is named with what is asked: approve plan.
         // The ending step's own gate is the line above, and is not said twice.
-        const onYou = onYouWords({ steps, waitingOnYou }).filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
+        const onYou = onYouWords({ steps, waitingOnYou }).filter(
+          (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
+        );
         if (onYou.length) console.log(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
         // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
-        if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
+        if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length))
+          console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
         // A held run asks nothing of anyone while its hold stands (`listing` offers nothing): what holds it, in place of what it would ask —
         // and, for a run named that never ships, or a hold that names none, how it is let go.
         if (holding) {
           const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
           const lifting = holding.length > 0 && holding.every((w) => w.shipped);
-          console.log(`   → ${holdWord(holding)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`);
+          console.log(
+            `   → ${holdWord(holding)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
+          );
         }
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
@@ -964,7 +1258,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (plan.kind === 'finished') return console.log(`${run.id}  already ${plan.status} — nothing to stop`);
 
       console.log(plan.kind === 'already-cancelled' ? `${run.id}  already cancelled at ${plan.at}` : `${run.id}  cancelled`);
-      if (plan.stop.length) console.log(`   asked to stop: ${plan.stop.map((s) => s.name).join(', ')}  (the engine stops it on its next tick)`);
+      if (plan.stop.length)
+        console.log(`   asked to stop: ${plan.stop.map((s) => s.name).join(', ')}  (the engine stops it on its next tick)`);
       else if (plan.kind === 'cancel') console.log(`   nothing was in flight — no further steps will be filed`);
       return;
     }
@@ -988,7 +1283,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
       }
       if (notForgotten.length) {
-        throw Object.assign(new Error(`wf rm: ${notForgotten.join(', ')} not forgotten — ${notForgotten.length > 1 ? 'each' : 'its'} line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
+        throw Object.assign(
+          new Error(
+            `wf rm: ${notForgotten.join(', ')} not forgotten — ${notForgotten.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
+          ),
+          { exitCode: failed ? 1 : 2 },
+        );
       }
       return;
     }
@@ -1017,21 +1317,32 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const line of pruneLines(p)) console.log(line);
         if (named && p.kind === 'refused') notPruned.push(p.id);
       }
-      if (running.length) console.log(`${running.length} run${running.length > 1 ? 's' : ''} not over, not pruned: ${running.map((p) => p.id).join(', ')}`);
+      if (running.length)
+        console.log(`${running.length} run${running.length > 1 ? 's' : ''} not over, not pruned: ${running.map((p) => p.id).join(', ')}`);
       const prunable = found.filter((p) => p.kind === 'prunable');
       const refusedNamed = () => {
         if (notPruned.length) {
-          throw Object.assign(new Error(`wf prune: ${notPruned.join(', ')} not pruned — ${notPruned.length > 1 ? 'each' : 'its'} line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
+          throw Object.assign(
+            new Error(
+              `wf prune: ${notPruned.join(', ')} not pruned — ${notPruned.length > 1 ? 'each' : 'its'} line above says why, and what to do.`,
+            ),
+            { exitCode: failed ? 1 : 2 },
+          );
         }
       };
       if (!prunable.length) {
-        if (!found.some((p) => p.kind === 'refused')) console.log(named ? 'nothing to prune' : `nothing to prune: no run that is over has a worktree${artifacts ? ' or files' : ''} left`);
+        if (!found.some((p) => p.kind === 'refused'))
+          console.log(
+            named ? 'nothing to prune' : `nothing to prune: no run that is over has a worktree${artifacts ? ' or files' : ''} left`,
+          );
         return refusedNamed();
       }
       const total = sizeOf(prunable.reduce((sum, p) => sum + pruningBytes(p), 0));
       console.log(`${prunable.length} run${prunable.length > 1 ? 's' : ''} to prune, ${total} in all`);
       if (!yes && !(await confirmed('remove them? [y/N] '))) {
-        console.log(`nothing removed: wf prune ${[...(named ? prunable.map((p) => p.id) : []), ...(unmerged ? ['--unmerged'] : []), ...(artifacts ? ['--artifacts'] : []), '--yes'].join(' ')} removes them`);
+        console.log(
+          `nothing removed: wf prune ${[...(named ? prunable.map((p) => p.id) : []), ...(unmerged ? ['--unmerged'] : []), ...(artifacts ? ['--artifacts'] : []), '--yes'].join(' ')} removes them`,
+        );
         return refusedNamed();
       }
       for (const p of prunable) {
@@ -1051,14 +1362,17 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
     // A person's word that a run waits for others to ship, given after it started: its own file (`runs/<id>.hold`), which the tick lifts.
     case 'hold': {
-      if (!rest[0] || rest[0].startsWith('-')) usage('wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.');
+      if (!rest[0] || rest[0].startsWith('-'))
+        usage('wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.');
       const { until, off } = holdHow(rest.slice(1));
       if (off) {
         const { run } = unhold(rest[0]);
         return console.log(`${run.id}  hold lifted — the next tick goes on, and what its steps ask is asked`);
       }
       const { run } = await hold(e, rest[0], until);
-      return console.log(`${run.id}  ${holdWord(until.map((u) => ({ run: u })))} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`);
+      return console.log(
+        `${run.id}  ${holdWord(until.map((u) => ({ run: u })))} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+      );
     }
 
     // The run does not end by going quiet. A review and a reply are two opinions and something
@@ -1070,9 +1384,36 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!rest[0]) return console.log(HELP);
       // Read before the run is: a mistyped flag is refused, not a screen quietly printed without it — and
       // so is a flag before the run, which would otherwise be the general help and exit 0.
-      if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
+      if (rest[0].startsWith('--'))
+        usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, accepted, waiting, holding, waitingOn, denied, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
+      const {
+        run,
+        decision,
+        closeouts,
+        checks,
+        retrying,
+        rounding,
+        offers,
+        overBudgetLine,
+        used,
+        costs,
+        runCost,
+        answers,
+        answering,
+        gates,
+        accepted,
+        waiting,
+        holding,
+        waitingOn,
+        denied,
+        said,
+        timeline,
+        held,
+        checkout,
+        standings,
+        toDecide,
+      } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -1087,7 +1428,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // A hold beside the wait is said too: lifting it is not enough to start the run, and the line says so.
       if (waiting.length) {
         const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
-        const alsoHeld = run.hold ? `\n  ${holdWord(holding)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}` : '';
+        const alsoHeld = run.hold
+          ? `\n  ${holdWord(holding)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}`
+          : '';
         return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
       }
       // Nor while a person holds it (wf hold): what is in flight finishes, and what its steps ask is asked once the hold lifts — so the hold,
@@ -1099,7 +1442,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         return console.log(`  ${holdAdvice(run, holding)}`);
       }
       // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
-      if (held) return console.log(`${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`);
+      if (held)
+        return console.log(
+          `${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
+        );
       // An ending a person's word would file, waiting for the repository's own checkout: which run's step is in it, and what frees this one.
       // Said on either screen — a run whose ending has not run is still running, and one whose ending ended blocked is waiting on a person.
       const ending = steps.find((s) => s.workspace === 'main');
@@ -1111,7 +1457,14 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is — unless the checkout holds
         // it, which the line below says instead: the next tick files nothing of it.
-        for (const r of retrying.filter((r) => !(heldOut && r.step === ending?.name))) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
+        for (const r of retrying.filter((r) => !(heldOut && r.step === ending?.name)))
+          console.log(
+            `  ${r.step}: ${dueNote(
+              steps.find((s) => s.name === r.step)!,
+              run,
+              r,
+            )}`,
+          );
         // So is a loop going round again.
         for (const r of rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
         if (heldOut) console.log(heldOut);
@@ -1121,7 +1474,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // An ending that never ran, on a run git reads as shipped: its result was merged without it, and its line on `wf ls` still sits at its
         // gate — said here too, with the one command there still is, so the two screens do not disagree about who is waited on.
         const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
-        const never = unrun ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${run.id}` : '';
+        const never = unrun
+          ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${run.id}`
+          : '';
         return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}${never}`);
       }
 
@@ -1130,29 +1485,54 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // (`prunedRefusal`). How each step ended is still said; that it waits on you is not.
       const onYou = run.pruned ? '' : ', waiting on you';
       // The run's own verdicts first: they decide how much of the rest is worth reading.
-      if (decision.failedCheck.length) console.log(`  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`);
-      if (decision.unfinishedCheck.length) console.log(`  CHECK DID NOT FINISH: ${decision.unfinishedCheck.join(', ')}  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran`);
+      if (decision.failedCheck.length)
+        console.log(
+          `  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`,
+        );
+      if (decision.unfinishedCheck.length)
+        console.log(
+          `  CHECK DID NOT FINISH: ${decision.unfinishedCheck.join(', ')}  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran`,
+        );
       // A step the run already nudged to sign off, once this round, says so: the nudge is spent, and what is left is yours.
-      if (decision.unsigned.length) console.log(`  UNSIGNED: ${decision.unsigned.map((n) => signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran`);
-      if (decision.unverified.length) console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
+      if (decision.unsigned.length)
+        console.log(
+          `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran`,
+        );
+      if (decision.unverified.length)
+        console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
       if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
       // A step that stopped itself and said why is a different thing from one that broke, and the
       // difference decides whether you read a summary or a log.
       if (decision.stuck.length) console.log(`  BLOCKED${onYou}: ${decision.stuck.join(', ')}`);
       // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
-      if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
+      if (decision.exhausted.length)
+        console.log(
+          `  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
+        );
       // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
-      if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      if (decision.budgetExhausted.length)
+        console.log(
+          `  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
+        );
       // A call denied is a person's to weigh: whether the work stands without it, or the folder's allowedTools: grows for a new run.
-      if (decision.denied.length) console.log(`  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`);
+      if (decision.denied.length)
+        console.log(
+          `  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
+        );
       // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
       // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
       const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);
       const unrun = decision.awaitingApproval.filter((name) => !run.steps[name]?.taskId);
-      if (handedOn.length) console.log(`  AWAITING APPROVAL${onYou}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`);
-      if (unrun.length) console.log(`  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`);
+      if (handedOn.length)
+        console.log(
+          `  AWAITING APPROVAL${onYou}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
+        );
+      if (unrun.length)
+        console.log(
+          `  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
+        );
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // And the checkout, where a try of the ending waits for it: the ask stands, and the tick files it once that step settles.
       if (heldOut) console.log(heldOut);
@@ -1167,15 +1547,21 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
       // A folder run has no branch, and nothing here to read: what its steps made is in their artifacts.
       const git = isGitRun(run) ? run : undefined;
-      const touched = !git ? [] : branchesToRead(decision.branches, namesInOrder(git, steps).map((name) => git.steps[name]!.branch), git.isolate ? git.branch : undefined)
-        .map((branch) => ({ branch, radius: touchedBy(git, branch) }));
+      const touched = !git
+        ? []
+        : branchesToRead(
+            decision.branches,
+            namesInOrder(git, steps).map((name) => git.steps[name]!.branch),
+            git.isolate ? git.branch : undefined,
+          ).map((branch) => ({ branch, radius: touchedBy(git, branch) }));
       if (touched.length) {
         console.log();
         for (const line of touchedLines(touched)) console.log(`  ${line}`);
         console.log(`  ${lessonLine(touched)}`);
         for (const t of touched) {
           console.log();
-          for (const line of inFullLines(t, sensitive, sensitiveDiff(git!, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
+          for (const line of inFullLines(t, sensitive, sensitiveDiff(git!, t, sensitive ?? CHECK_AFFECTING), touched.length > 1))
+            console.log(`  ${line}`);
         }
       }
 
@@ -1207,7 +1593,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
           // For a check that refused, the last of each stream, labelled: which pipe a line came from
           // is the difference between a runner's progress noise and its summary.
-          for (const [stream, text] of [['stdout', check.stdout], ['stderr', check.stderr]] as const) {
+          for (const [stream, text] of [
+            ['stdout', check.stdout],
+            ['stderr', check.stderr],
+          ] as const) {
             if (!check.passed && text) console.log(`      ${stream}:\n        ${text.split('\n').join('\n        ')}`);
           }
         }
@@ -1225,7 +1614,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // the reviewer's to weigh, not the step's to claim.
         for (const line of saidLines(said[name] ?? []).flatMap((l) => l.split('\n'))) console.log(`    ${line}`);
         if (!c) continue;
-        if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
+        if ('error' in c) {
+          console.log(`    closeout unreadable — ${c.error}`);
+          continue;
+        }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
         // What it declared — and, for a loop's target past its first round, its replies to the findings.
         for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
@@ -1279,7 +1671,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // folder's own words, since approving is what runs it; for a gated step that has, nothing but the word — its closeout is above.
       if (toDecide?.kind === 'approve') {
         const step = steps.find((s) => s.name === toDecide.step)!;
-        console.log(`\n  to decide  ${step.name}${toDecide.says === null ? ' has signed off and waits for your word' : " has not run: this workflow's ending, and your approval is what runs it"}:`);
+        console.log(
+          `\n  to decide  ${step.name}${toDecide.says === null ? ' has signed off and waits for your word' : " has not run: this workflow's ending, and your approval is what runs it"}:`,
+        );
         if (toDecide.says !== null) for (const line of step.body.split(/\n[ \t]*\n/)[0]!.split('\n')) console.log(`    ${line}`);
         console.log(`\n  approve it    wf approve ${run.id} ${step.name} [--message "<words>"]`);
         for (const back of sendBackTo(step, run)) console.log(`  send it back  wf retry ${run.id} ${back} --message "<objection>"`);
@@ -1307,8 +1701,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // A step whose session its harness blocked is taken too: the tick stops that session, then files the try.
       const { ask, file, stopFirst } = await retry(e, runId, stepName, retryHow(rest.slice(2)), { stopBlocked: true });
       const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
-      const then = stopFirst ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped' : 'the next tick files it, once';
-      console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
+      const then = stopFirst
+        ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
+        : 'the next tick files it, once';
+      console.log(
+        `${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
+      );
       console.log(`   ${file}`);
       return;
     }
@@ -1323,7 +1721,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const after = readRun(runId);
       const waited = stepsOf(after).some((s) => s.after.includes(stepName));
       const files = !after.steps[stepName]?.taskId;
-      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${files ? `the next tick files ${stepName}` : waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
+      console.log(
+        `${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${files ? `the next tick files ${stepName}` : waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
+      );
       console.log(`   ${file}`);
       return;
     }
@@ -1334,7 +1734,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!runId || runId.startsWith('--')) return console.log(HELP);
       const { stepName, budget } = roundHow(more);
       const { ask, file } = await round(e, runId, stepName, budget);
-      console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop${ask.budget !== undefined ? `, its cap raised to ${budgetWord(ask.budget)}` : ''} — the next tick files it, once`);
+      console.log(
+        `${runId}  asked: round ${ask.round} of ${ask.step}'s loop${ask.budget !== undefined ? `, its cap raised to ${budgetWord(ask.budget)}` : ''} — the next tick files it, once`,
+      );
       console.log(`   ${file}`);
       return;
     }
@@ -1349,7 +1751,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // What the acceptance lets happen: what waits on the looping step is filed on the next tick — or, with nothing waiting, the run is
       // finished and there is something to decide.
       const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(acceptance.step));
-      console.log(`${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
+      console.log(
+        `${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
+      );
       console.log(`   ${file}`);
       return;
     }
@@ -1361,8 +1765,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       const told = await say(e, runId, stepName, words.join(' '));
       const { at, attempt, text } = told.said;
-      console.log(`${runId}  said to ${stepName}, try ${told.try}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${told.taskId}: wf decide ${runId} prints it under the step`);
-      for (const line of saidLines([{ at, attempt, text, try: told.try }]).slice(1).flatMap((l) => l.split('\n'))) console.log(`   ${line}`);
+      console.log(
+        `${runId}  said to ${stepName}, try ${told.try}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${told.taskId}: wf decide ${runId} prints it under the step`,
+      );
+      for (const line of saidLines([{ at, attempt, text, try: told.try }])
+        .slice(1)
+        .flatMap((l) => l.split('\n')))
+        console.log(`   ${line}`);
       return;
     }
 
@@ -1395,19 +1804,31 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const version = agentVersion(dir, name, found)!;
         // The card alone on stdout, so `wf agents card <name> | jq` reads it; what it is not goes to stderr.
         console.log(JSON.stringify(agentCard(agent, version, cardSkills(agent, found)), null, 2));
-        console.error(`${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`);
+        console.error(
+          `${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`,
+        );
         return;
       }
       if (sub !== undefined && sub !== '--repo' && sub !== '--from') return console.log(HELP);
       const how = agentsHow(rest);
       const agents = listAgents(how.repo ?? '.');
-      if (!agents.length) return console.log(`no agents — an agent is a file in <workflows>/agents: ${agentPlaces(path.resolve(how.repo ?? '.')).map((p) => p.dir).join(' or ')}`);
+      if (!agents.length)
+        return console.log(
+          `no agents — an agent is a file in <workflows>/agents: ${agentPlaces(path.resolve(how.repo ?? '.'))
+            .map((p) => p.dir)
+            .join(' or ')}`,
+        );
       for (const { from, dir, name, agent } of agents) {
-        if (agent instanceof Error) { console.log(`${name}  ${from}  does not read: ${agent.message.split('\n')[0]}`); continue; }
+        if (agent instanceof Error) {
+          console.log(`${name}  ${from}  does not read: ${agent.message.split('\n')[0]}`);
+          continue;
+        }
         console.log(`${name}  ${from}  ${agent.description ?? 'no description:'}`);
         // What its card says it can do, generated from its skills (or its description, given none): the entries, or why there is no card.
         let card: Array<{ id: string; name: string; description: string }>;
-        try { card = cardSkills(agent, agentSkillsFound(dir, how.repo ?? '.')); } catch (err) {
+        try {
+          card = cardSkills(agent, agentSkillsFound(dir, how.repo ?? '.'));
+        } catch (err) {
           console.log(`   says nothing it can do — ${(err as Error).message.split('\n')[0]}`);
           card = [];
         }

@@ -58,7 +58,8 @@ test('REFUSED: each name, in a sentence, a link, a comment, a quote or another c
     `"quote": "the approver is a file. ${cap(kanban)} runs a decomposer in the dispatcher every tick"`,
     `the reviewer answers with \`${tool}request_changes\``,
     kanban.toUpperCase(),
-  ]) assert.deepEqual(othersNamed(line), [`1: ${line.trim()}`], line);
+  ])
+    assert.deepEqual(othersNamed(line), [`1: ${line.trim()}`], line);
   assert.deepEqual(othersNamed(`one\ntwo ${cap(runtime)}\nthree`), [`2: two ${cap(runtime)}`], 'the line is named');
 });
 
@@ -70,16 +71,27 @@ test('a description, what we integrate and what is compared by name pass', () =>
     "Claude Code, Codex, A2A and `@a2a-js/sdk`; TypeSafe's Jev; Tekton, Argo, n8n, Kubernetes",
     'The harness kanban board, rebuilt on the two libraries that replaced its core. `.kanban/` and `kb-*` worktrees',
     'const max = Math.max(ax, 1); // a word that only contains a short name',
-  ]) assert.deepEqual(othersNamed(line), [], line);
+  ])
+    assert.deepEqual(othersNamed(line), [], line);
 });
 
 test('REFUSED: only the lockfile and the vendored skill are left unread, matched whole', () => {
   assert.equal(ours('package-lock.json'), false);
   assert.equal(ours('.claude/skills/shadcn/SKILL.md'), false);
   for (const read of [
-    'packages/agent-orchestrator/package-lock.json', 'package-lock.json.bak', '.claude/skills/shadcn-notes.md', '.claude/skills/look/SKILL.md',
-    'docs/eval-2026-09-12/REPORT.md', 'docs/pivot-2026-09-18/experiments/README.md', 'CLAUDE.md',
-  ]) assert.equal(ours(read), true, read);
+    'packages/agent-orchestrator/package-lock.json',
+    'package-lock.json.bak',
+    '.claude/skills/shadcn-notes.md',
+    '.claude/skills/look/SKILL.md',
+    'docs/eval-2026-09-12/REPORT.md',
+    'docs/pivot-2026-09-18/experiments/README.md',
+    'CLAUDE.md',
+  ])
+    assert.equal(ours(read), true, read);
   const all = files();
-  for (const entry of NOT_OURS) assert.ok(all.some((f) => !ours(f) && (f === entry || f.startsWith(entry))), `${entry} is left unread and holds no file`);
+  for (const entry of NOT_OURS)
+    assert.ok(
+      all.some((f) => !ours(f) && (f === entry || f.startsWith(entry))),
+      `${entry} is left unread and holds no file`,
+    );
 });

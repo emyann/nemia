@@ -16,7 +16,12 @@ import { stateClass, stateMeaning, stepState } from '../lib/status';
  * No wider than where it is put: a root's `waiting on <run> (cancelled)` names a run by its id, and on a card it is cut short, whole in
  * the card's own line of what the run waits on.
  */
-export function StatusChip({ status, runCancelled, runHeld, note = null }: {
+export function StatusChip({
+  status,
+  runCancelled,
+  runHeld,
+  note = null,
+}: {
   status: string;
   runCancelled: boolean;
   runHeld: boolean;

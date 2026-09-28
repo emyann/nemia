@@ -67,7 +67,11 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
 
 /** A run's steps as its flow reads them, off the list's record of it: each one's name, its state and its note. */
 export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
-  run.steps.map((step) => ({ name: step.name, state: stepState(step.status, run.cancelledAt !== null, run.holding != null), note: step.note }));
+  run.steps.map((step) => ({
+    name: step.name,
+    state: stepState(step.status, run.cancelledAt !== null, run.holding != null),
+    note: step.note,
+  }));
 
 /**
  * The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. The same for a run listed with no
@@ -84,7 +88,7 @@ export function columnsOf(names: readonly string[], graph: RunGraph): { columns:
 }
 
 /** What a card says of a run the api listed without its graph: which way its steps go is not known here, and a restart tells it. */
-export const UNGRAPHED = 'Listed without its steps\' graph by an api older than this board: restart the api, then reload the page.';
+export const UNGRAPHED = "Listed without its steps' graph by an api older than this board: restart the api, then reload the page.";
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
 export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
@@ -134,7 +138,13 @@ export function railOf(names: readonly string[], graph: RunGraph, steps: readonl
 export function tilesOf(names: readonly string[], graph: RunGraph, steps: readonly EdgeStep[], cancelled: boolean): Flow {
   const { columns, error } = columnsOf(names, graph);
   const boxOf = boxer(stateReader(steps), cancelled);
-  return arrange(columns.map((column) => column.map((name) => boxOf('step', [name]))), TILE, graph, steps, error);
+  return arrange(
+    columns.map((column) => column.map((name) => boxOf('step', [name]))),
+    TILE,
+    graph,
+    steps,
+    error,
+  );
 }
 
 const stateReader = (steps: readonly EdgeStep[]) => {
@@ -142,28 +152,46 @@ const stateReader = (steps: readonly EdgeStep[]) => {
   return (name: string): StepState => of.get(name) ?? 'unknown';
 };
 
-const boxer = (stateOf: (name: string) => StepState, cancelled: boolean) => (kind: Box['kind'], names: string[]): Box => {
-  const done = names.every((name) => satisfiesAfter(stateOf(name)));
-  return {
-    id: `${kind}:${names[0]}`,
-    kind,
-    names,
-    label: kind === 'step' ? names[0]! : kind === 'more' ? `+${names.length}` : `${names.length} ${done ? 'done' : names.length === 1 ? 'step' : 'steps'}`,
-    state: kind === 'step' ? stateOf(names[0]!) : null,
-    live: names.some((name) => isLiveStep(stateOf(name), cancelled)),
-    done,
+const boxer =
+  (stateOf: (name: string) => StepState, cancelled: boolean) =>
+  (kind: Box['kind'], names: string[]): Box => {
+    const done = names.every((name) => satisfiesAfter(stateOf(name)));
+    return {
+      id: `${kind}:${names[0]}`,
+      kind,
+      names,
+      label:
+        kind === 'step'
+          ? names[0]!
+          : kind === 'more'
+            ? `+${names.length}`
+            : `${names.length} ${done ? 'done' : names.length === 1 ? 'step' : 'steps'}`,
+      state: kind === 'step' ? stateOf(names[0]!) : null,
+      live: names.some((name) => isLiveStep(stateOf(name), cancelled)),
+      done,
+    };
   };
-};
 
 /**
  * A column of the rail: its steps, or past `RAIL_LANES` the first of them and a pill counting the rest — the live ones first, so the
  * step the run is at is never the one counted, each in the layering's order.
  */
-function capped(column: readonly string[], boxOf: ReturnType<typeof boxer>, stateOf: (name: string) => StepState, cancelled: boolean): Box[] {
+function capped(
+  column: readonly string[],
+  boxOf: ReturnType<typeof boxer>,
+  stateOf: (name: string) => StepState,
+  cancelled: boolean,
+): Box[] {
   if (column.length <= RAIL_LANES) return column.map((name) => boxOf('step', [name]));
   const rank = (name: string) => (isLiveStep(stateOf(name), cancelled) ? 0 : 1);
   const shown = new Set([...column].sort((a, b) => rank(a) - rank(b) || column.indexOf(a) - column.indexOf(b)).slice(0, RAIL_LANES - 1));
-  return [...column.filter((name) => shown.has(name)).map((name) => boxOf('step', [name])), boxOf('more', column.filter((name) => !shown.has(name)))];
+  return [
+    ...column.filter((name) => shown.has(name)).map((name) => boxOf('step', [name])),
+    boxOf(
+      'more',
+      column.filter((name) => !shown.has(name)),
+    ),
+  ];
 }
 
 /**
@@ -182,7 +210,14 @@ function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: r
       const loop = edge.kind === 'loop';
       if (!from || !to || from.box === to.box || (loop && (from.box.kind !== 'step' || to.box.kind !== 'step'))) continue;
       const id = `${loop ? 'loop:' : ''}${from.box.id}->${to.box.id}`;
-      const one = joined.get(id) ?? { from: from.box, to: to.box, loop, states: [], skip: !loop && to.slot - from.slot > 1, label: edge.label };
+      const one = joined.get(id) ?? {
+        from: from.box,
+        to: to.box,
+        loop,
+        states: [],
+        skip: !loop && to.slot - from.slot > 1,
+        label: edge.label,
+      };
       one.states.push(edge.state);
       joined.set(id, one);
     }
@@ -193,7 +228,13 @@ function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: r
   const band = lanes * size.height + (lanes - 1) * size.lane;
   const pills = slots.flatMap((slot, s) => {
     const top = over + (band - (slot.length * size.height + (slot.length - 1) * size.lane)) / 2;
-    return slot.map((box, lane): Pill => ({ ...box, x: s * (size.width + size.gap), y: top + lane * (size.height + size.lane), width: size.width, height: size.height }));
+    return slot.map((box, lane): Pill => ({
+      ...box,
+      x: s * (size.width + size.gap),
+      y: top + lane * (size.height + size.lane),
+      width: size.width,
+      height: size.height,
+    }));
   });
   const at = new Map(pills.map((pill) => [pill.id, pill]));
   const arrows = [...joined].map(([id, { from, to, loop, states, skip, label }]): Arrow => {
@@ -235,7 +276,10 @@ function overCurve(a: Pill, b: Pill, peak: number): Curve {
 
 /** Under the row, from under the looping step to under the one it runs again (`loopPath`), its middle at `bottom`. */
 function loopCurve(a: Pill, b: Pill, bottom: number): Curve {
-  const [source, target] = [{ x: a.x + a.width / 2, y: a.y + a.height }, { x: b.x + b.width / 2, y: b.y + b.height }];
+  const [source, target] = [
+    { x: a.x + a.width / 2, y: a.y + a.height },
+    { x: b.x + b.width / 2, y: b.y + b.height },
+  ];
   const { path } = loopPath(source, target, bottom - Math.max(source.y, target.y));
   // Its last control point, as `loopPath` puts it: straight under the target, so the head points up into it.
   return { path, end: target, toward: { x: target.x, y: (bottom - (source.y + target.y) / 8) / 0.75 } };

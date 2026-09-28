@@ -1,6 +1,14 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { approveStep, decisionQuery, type RetryMode, type RunDetail, type StepApproval, type StepCloseout, type StepGate } from '../lib/api';
+import {
+  approveStep,
+  decisionQuery,
+  type RetryMode,
+  type RunDetail,
+  type StepApproval,
+  type StepCloseout,
+  type StepGate,
+} from '../lib/api';
 import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { cn } from '../lib/utils';
@@ -29,7 +37,14 @@ import { when } from './Facts';
  * the Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the
  * one thing a person must read before either. The inspector's gate has none: its Output tab is where the closeout is.
  */
-export function Gate({ runId, step, back = [step], acts = false, framed = true, closeout = null }: {
+export function Gate({
+  runId,
+  step,
+  back = [step],
+  acts = false,
+  framed = true,
+  closeout = null,
+}: {
   runId: string;
   step: string;
   back?: readonly string[];
@@ -54,10 +69,16 @@ export function Gate({ runId, step, back = [step], acts = false, framed = true, 
   // What the gate says the moment either word is taken (`takenOf`), until the run is read again and the step says it itself.
   const taken = approval.isSuccess
     ? takenOf({ approved: approval.data.try }, step, acts)
-    : sendBack.isSuccess ? takenOf({ asked: sendBack.data, step: to }, step, acts) : null;
+    : sendBack.isSuccess
+      ? takenOf({ asked: sendBack.data, step: to }, step, acts)
+      : null;
   if (taken) {
     return (
-      <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+      <section
+        aria-label={`The gate of ${step}`}
+        data-gate="taken"
+        className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+      >
         <strong>{taken.named}</strong>{' '}
         <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
           {taken.said}
@@ -70,7 +91,10 @@ export function Gate({ runId, step, back = [step], acts = false, framed = true, 
     <section
       aria-label={`The gate of ${step}`}
       data-gate="awaiting"
-      className={cn('space-y-4 text-sm', framed && 'rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30')}
+      className={cn(
+        'space-y-4 text-sm',
+        framed && 'rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30',
+      )}
     >
       {framed && (
         <p className="break-words">
@@ -113,9 +137,11 @@ export function Gate({ runId, step, back = [step], acts = false, framed = true, 
               value={words}
               onChange={(event) => setWords(event.target.value)}
               rows={2}
-              placeholder={acts
-                ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
-                : 'Your words (optional): every step after the gate is handed them, under “Approved”.'}
+              placeholder={
+                acts
+                  ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
+                  : 'Your words (optional): every step after the gate is handed them, under “Approved”.'
+              }
               className={TEXTAREA}
             />
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -211,9 +237,9 @@ export const takenOf = (
   step: string,
   acts: boolean,
 ): { named: string; said: string } =>
-  ('approved' in taken
+  'approved' in taken
     ? { named: step, said: `approved try ${taken.approved} — the next tick files ${acts ? 'it' : 'what waits on it'}` }
-    : { named: taken.step, said: askedSaid(taken.asked) });
+    : { named: taken.step, said: askedSaid(taken.asked) };
 
 /**
  * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `approvedFirst` in
@@ -242,14 +268,21 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
   return (
-    <section aria-label={`What ${step.name} would act on`} className="min-w-0 space-y-3 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+    <section
+      aria-label={`What ${step.name} would act on`}
+      className="min-w-0 space-y-3 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800"
+    >
       <div className="space-y-1">
         <h3 className="text-xs font-medium text-neutral-500">The result it would act on</h3>
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
             <span className="font-mono text-xs">{s.said}</span>
             {/* Git's own `--shortstat`, as `wf decide` prints it beside the branch. */}
-            {s.stat && <span data-stat className="block font-mono text-xs text-neutral-500">{s.stat}</span>}
+            {s.stat && (
+              <span data-stat className="block font-mono text-xs text-neutral-500">
+                {s.stat}
+              </span>
+            )}
           </p>
         ))}
         {!standings.length && (
@@ -268,7 +301,11 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
           <h3 className="text-xs font-medium text-neutral-500">
             What <span className="font-semibold text-neutral-700 dark:text-neutral-300">{one.name}</span> handed on
           </h3>
-          {one.closeout ? <Markdown>{one.closeout.summary}</Markdown> : <p className="text-xs text-neutral-500">It signed off with nothing to read.</p>}
+          {one.closeout ? (
+            <Markdown>{one.closeout.summary}</Markdown>
+          ) : (
+            <p className="text-xs text-neutral-500">It signed off with nothing to read.</p>
+          )}
           {one.closeout && (
             <div aria-label={`Artifacts of ${one.name}`} className="text-xs text-neutral-500">
               Artifacts:
@@ -287,10 +324,13 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
  * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
  */
 export const gateWord = (gate: StepGate, ends = false): string =>
-  (gate.approval ? `approved, try ${gate.approval.try}`
-    : gate.awaiting ? 'awaiting approval'
-    : ends ? 'holds once the work has handed on, and your approval files it'
-    : 'holds once it has signed off');
+  gate.approval
+    ? `approved, try ${gate.approval.try}`
+    : gate.awaiting
+      ? 'awaiting approval'
+      : ends
+        ? 'holds once the work has handed on, and your approval files it'
+        : 'holds once it has signed off';
 
 /**
  * A gated step's approval, under the step: the try approved, when, and the words given with it, as the person wrote them — what every step

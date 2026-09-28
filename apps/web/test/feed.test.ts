@@ -98,11 +98,14 @@ test('each event names the queries it can change, and no other: a step its run a
   assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
   // Never a decision: it is keyed by the run's state, and read again under a key of its own when the record moves.
   for (const event of ['step', 'run', 'removed'] as const) {
-    assert.ok(keysOf(event, 'r-1').every((key) => key.length <= 2), `${event} names no decision`);
+    assert.ok(
+      keysOf(event, 'r-1').every((key) => key.length <= 2),
+      `${event} names no decision`,
+    );
   }
 });
 
-test("a run removed has its record read again, exactly: the read that finds none is how a page open on it learns it is gone", () => {
+test('a run removed has its record read again, exactly: the read that finds none is how a page open on it learns it is gone', () => {
   const f = followed();
   f.stream().opens();
   f.stream().send('removed', line('r-1'), '10');
@@ -110,25 +113,47 @@ test("a run removed has its record read again, exactly: the read that finds none
   const keys = f.invalidated[0]!.map((k) => JSON.stringify(k));
   assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
   // Its record, and never its decision or another run's: invalidated exactly, a key of two.
-  assert.deepEqual(keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1), [['runs', 'r-1']]);
+  assert.deepEqual(
+    keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1),
+    [['runs', 'r-1']],
+  );
   f.stop();
 });
 
 test('every event reads again whether a daemon ticks, exactly: a line on the feed is written by a tick', () => {
   const f = followed();
   f.stream().opens();
-  for (const [event, id] of [['step', '10'], ['run', '20'], ['removed', '30']] as const) {
-    assert.deepEqual(keysOf(event, 'r-1').filter((key) => key[0] === 'daemon'), [['daemon']], `${event} reads ['daemon'], and nothing under it`);
+  for (const [event, id] of [
+    ['step', '10'],
+    ['run', '20'],
+    ['removed', '30'],
+  ] as const) {
+    assert.deepEqual(
+      keysOf(event, 'r-1').filter((key) => key[0] === 'daemon'),
+      [['daemon']],
+      `${event} reads ['daemon'], and nothing under it`,
+    );
     f.stream().send(event, line('r-1', event === 'step' ? 'plan' : undefined), id);
     f.frame();
-    assert.ok(f.invalidated.at(-1)!.some((k) => JSON.stringify(k) === JSON.stringify(['daemon'])), `a ${event} event alone reads the daemon again`);
+    assert.ok(
+      f.invalidated.at(-1)!.some((k) => JSON.stringify(k) === JSON.stringify(['daemon'])),
+      `a ${event} event alone reads the daemon again`,
+    );
   }
   f.stop();
 });
 
 test('the polled queries are the runs, a run, the cap, and whether a daemon ticks — never a decision, the inbox, or anything else', () => {
   for (const key of [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]) assert.equal(polled(key), true, JSON.stringify(key));
-  for (const key of [['runs', 'r-1', 'decision', 'stamp'], ['inbox'], ['inbox', 'card'], ['quota'], ['workflows'], ['ceilings', 'x'], ['daemon', 'x']]) {
+  for (const key of [
+    ['runs', 'r-1', 'decision', 'stamp'],
+    ['inbox'],
+    ['inbox', 'card'],
+    ['quota'],
+    ['workflows'],
+    ['ceilings', 'x'],
+    ['daemon', 'x'],
+  ]) {
     assert.equal(polled(key), false, JSON.stringify(key));
   }
 });
@@ -143,7 +168,10 @@ test('the events that arrive together are read again once a frame, each key once
   assert.deepEqual(f.invalidated, [], 'nothing before the frame');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
-  assert.deepEqual(new Set(f.invalidated[0]!.map((k) => JSON.stringify(k))), new Set([['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))));
+  assert.deepEqual(
+    new Set(f.invalidated[0]!.map((k) => JSON.stringify(k))),
+    new Set([['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))),
+  );
   assert.equal(f.invalidated[0]!.length, 6, 'each key once');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
@@ -201,7 +229,10 @@ test('a cut feed whose response never ends is closed after the grace, and opened
   assert.equal(cut.readyState, 1, 'given its grace');
   f.pass(1);
   assert.equal(cut.readyState, 2);
-  assert.deepEqual(f.streams.map((s) => s.after), [undefined, undefined]);
+  assert.deepEqual(
+    f.streams.map((s) => s.after),
+    [undefined, undefined],
+  );
   f.stop();
 });
 
@@ -216,16 +247,26 @@ test('a stream the api refused is opened again after a while from the last event
   f.pass(REOPEN_MS - 1);
   assert.equal(f.streams.length, 1, 'not at once');
   f.pass(1);
-  assert.deepEqual(f.streams.map((s) => s.after), [undefined, '42'], 'from the last event read');
+  assert.deepEqual(
+    f.streams.map((s) => s.after),
+    [undefined, '42'],
+    'from the last event read',
+  );
 
   // Refused again before it opened: the cursor may be what is refused (a 400 reads as a proxy's 5xx does), so the next goes from the start.
   f.stream().refused();
   f.pass(REOPEN_MS);
-  assert.deepEqual(f.streams.map((s) => s.after), [undefined, '42', undefined]);
+  assert.deepEqual(
+    f.streams.map((s) => s.after),
+    [undefined, '42', undefined],
+  );
   // And one from the start refused too — the api is not there yet — is tried again from the start.
   f.stream().refused();
   f.pass(REOPEN_MS);
-  assert.deepEqual(f.streams.map((s) => s.after), [undefined, '42', undefined, undefined]);
+  assert.deepEqual(
+    f.streams.map((s) => s.after),
+    [undefined, '42', undefined, undefined],
+  );
   f.stream().opens();
   assert.equal(f.statuses.at(-1), 'open');
   f.stop();

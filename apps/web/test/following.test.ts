@@ -18,8 +18,13 @@ class Stream extends EventTarget {
   }
 }
 
-const said = (id: string, second: number, text: string): TranscriptEvent =>
-  ({ id, at: new Date(Date.UTC(2026, 8, 14, 9, 0, second)).toISOString(), role: 'assistant', kind: 'text', text });
+const said = (id: string, second: number, text: string): TranscriptEvent => ({
+  id,
+  at: new Date(Date.UTC(2026, 8, 14, 9, 0, second)).toISOString(),
+  role: 'assistant',
+  kind: 'text',
+  text,
+});
 
 /** The api ends a stream's response: the EventSource fires `error` as it would before reconnecting. */
 const endsResponse = (stream: Stream): void => {
@@ -31,9 +36,13 @@ const endsResponse = (stream: Stream): void => {
 function followed() {
   let state: Following = { events: [], live: true, loading: false, error: null };
   const stream = new Stream();
-  const stop = follow(stream, (change) => {
-    state = change(state);
-  }, { request: (flush) => (flush(), 0), cancel: () => {} });
+  const stop = follow(
+    stream,
+    (change) => {
+      state = change(state);
+    },
+    { request: (flush) => (flush(), 0), cancel: () => {} },
+  );
   return { stream, now: () => state, stop };
 }
 
@@ -53,7 +62,10 @@ test('a stream that errors, then opens again with events, shows no error — the
   stream.dispatchEvent(new Event('open'));
   stream.send('transcript', said('e2', 2, 'Back at it.'));
   assert.equal(now().error, null);
-  assert.deepEqual(now().events.map((e) => e.id), ['e1', 'e2']);
+  assert.deepEqual(
+    now().events.map((e) => e.id),
+    ['e1', 'e2'],
+  );
   assert.equal(now().live, true);
 
   // A read that fails on the new stream is said again.
@@ -108,17 +120,24 @@ test("REFUSED: the page's frames are the browser's own functions, called as the 
 
   let state: Following = { events: [], live: true, loading: false, error: null };
   const stream = new Stream();
-  follow(stream, (change) => {
-    state = change(state);
-  }, animationFrames);
+  follow(
+    stream,
+    (change) => {
+      state = change(state);
+    },
+    animationFrames,
+  );
   stream.send('transcript', said('e1', 1, 'Said while it ran.'));
   stream.send('transcript', said('e2', 2, 'And again.'));
   assert.equal(flushes.length, 1, 'the two events wait for one frame');
   flushes[0]!();
-  assert.deepEqual(state.events.map((e) => e.id), ['e1', 'e2']);
+  assert.deepEqual(
+    state.events.map((e) => e.id),
+    ['e1', 'e2'],
+  );
 });
 
-test("REFUSED: a stream that said it is over is not closed while the rest of its response is on its way — which the browser reports as a request aborted — but once the api has ended it, before the EventSource reconnects; and after the grace, all the same", (t) => {
+test('REFUSED: a stream that said it is over is not closed while the rest of its response is on its way — which the browser reports as a request aborted — but once the api has ended it, before the EventSource reconnects; and after the grace, all the same', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
 
   // Settled: the page stops following at once, and the stream is left to end.

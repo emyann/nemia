@@ -31,7 +31,9 @@ export default {
     };
     try {
       await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota Claude Code answered with');
-      const { rate_limits: limits } = (JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }).response.response;
+      const { rate_limits: limits } = (
+        JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }
+      ).response.response;
       // The resets as the browser says a time where it is, to the minute, with the weekday when the reset falls on another day than
       // today (`clockWord`) — which is read here rather than assumed: the week resets three days out and always reads with one, and the
       // five-hour window's reset crosses midnight for the two hours before it, when a run in the evening read `resets 00:02` as wrong.
@@ -44,23 +46,50 @@ export default {
         }, iso);
       const fiveResets = await clock(limits.five_hour.resets_at);
       const weekResets = await clock(limits.seven_day.resets_at);
-      await expectTexts(line.locator('[data-quota-window="five_hour"]'), [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`], 'the five-hour window, used and when it resets, in the browser’s time');
-      await expectTexts(line.locator('[data-quota-window="seven_day"]'), [`week ${QUOTA.week.used}% · resets ${weekResets}`], 'the week, with the weekday it resets on');
+      await expectTexts(
+        line.locator('[data-quota-window="five_hour"]'),
+        [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`],
+        'the five-hour window, used and when it resets, in the browser’s time',
+      );
+      await expectTexts(
+        line.locator('[data-quota-window="seven_day"]'),
+        [`week ${QUOTA.week.used}% · resets ${weekResets}`],
+        'the week, with the weekday it resets on',
+      );
       // Whatever the browser's locale writes a short weekday as — `Mon`, `dim.`, `Mo.`, `月` — it is not a number, and a bare time begins with one.
-      if (/^\p{N}/u.test(weekResets)) throw new Refused(`three days out, the week's reset says the weekday it is on — this read ${JSON.stringify(weekResets)}, a time alone`);
+      if (/^\p{N}/u.test(weekResets))
+        throw new Refused(
+          `three days out, the week's reset says the weekday it is on — this read ${JSON.stringify(weekResets)}, a time alone`,
+        );
       await expectCount(line.locator('[data-quota-window="seven_day"][data-marked]'), 1, `the week, ${QUOTA.week.used}% used, is marked`);
-      await expectCount(line.locator('[data-quota-window="five_hour"][data-marked]'), 0, `the five-hour window, ${QUOTA.fiveHour.used}% used, is not`);
+      await expectCount(
+        line.locator('[data-quota-window="five_hour"][data-marked]'),
+        0,
+        `the five-hour window, ${QUOTA.fiveHour.used}% used, is not`,
+      );
       await expectVisible(line.locator('[data-quota-age]').filter({ hasText: /^read just now$/ }), 'and how old the answer is');
       await shoot('fresh');
 
       fs.writeFileSync(file, recordedUsage('no-plan'));
-      await said('no-plan', /^No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription/, 'Claude Code with no subscription says how to sign in');
+      await said(
+        'no-plan',
+        /^No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription/,
+        'Claude Code with no subscription says how to sign in',
+      );
 
       fs.writeFileSync(file, recordedUsage('unsupported'));
-      await said('unknown', /^Claude Code answered the usage request in a shape this board does not read: it refused the request \(Unsupported control request subtype/, 'a Claude Code without get_usage says what it answered');
+      await said(
+        'unknown',
+        /^Claude Code answered the usage request in a shape this board does not read: it refused the request \(Unsupported control request subtype/,
+        'a Claude Code without get_usage says what it answered',
+      );
 
       fs.rmSync(file);
-      await said('failed', /^Claude Code stopped before it answered the usage request \(exit 1: claude: not signed in, the e2e took its answer away\)\. Run claude -p/, 'a claude that ends before it answers says how it ended');
+      await said(
+        'failed',
+        /^Claude Code stopped before it answered the usage request \(exit 1: claude: not signed in, the e2e took its answer away\)\. Run claude -p/,
+        'a claude that ends before it answers says how it ended',
+      );
     } finally {
       fs.writeFileSync(file, written);
     }

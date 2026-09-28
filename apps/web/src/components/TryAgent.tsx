@@ -103,7 +103,12 @@ export function TryRun({ id }: { id: string }) {
       </p>
     );
   }
-  if (!run) return <p className="text-xs text-neutral-500">{error instanceof Error ? `Could not read the try ${id}: ${error.message}` : 'Reading the try…'}</p>;
+  if (!run)
+    return (
+      <p className="text-xs text-neutral-500">
+        {error instanceof Error ? `Could not read the try ${id}: ${error.message}` : 'Reading the try…'}
+      </p>
+    );
   const step = run.steps[0];
   const spent = step ? costText(step) : null;
   return (
@@ -130,7 +135,9 @@ export function TryRun({ id }: { id: string }) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-neutral-500">Not filed yet: nothing is filed until {code('wf tick')} or {code('wf up')} runs.</p>
+        <p className="text-xs text-neutral-500">
+          Not filed yet: nothing is filed until {code('wf tick')} or {code('wf up')} runs.
+        </p>
       )}
     </div>
   );
@@ -142,7 +149,12 @@ export function TryRun({ id }: { id: string }) {
  */
 function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing['untried']>; yours?: boolean }) {
   return (
-    <section aria-label="Try it" data-try-yours={yours ? '' : undefined} data-try-untried className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+    <section
+      aria-label="Try it"
+      data-try-yours={yours ? '' : undefined}
+      data-try-untried
+      className="space-y-1 border-t border-neutral-200 pt-4 dark:border-neutral-800"
+    >
       <h2 className="text-sm font-semibold">Try it</h2>
       <p className="text-xs text-neutral-600 dark:text-neutral-400">{untried.why}</p>
       {untried.copy && (
@@ -157,5 +169,7 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
 
 /** What a repository agent's page says in place of the Try panel: only yours are tried, and the copy, from the api, that makes one of yours. */
 export function TryYours({ agent }: { agent: AgentListing }) {
-  return <Untried yours untried={agent.untried ?? { why: 'Only an agent of yours can be tried. Copy it to yours to try it.', copy: null }} />;
+  return (
+    <Untried yours untried={agent.untried ?? { why: 'Only an agent of yours can be tried. Copy it to yours to try it.', copy: null }} />
+  );
 }

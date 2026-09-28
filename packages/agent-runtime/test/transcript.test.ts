@@ -52,18 +52,112 @@ const writeClaude = (sessionId: string, text: string) => {
  * result — and a system line. Chained by `parentUuid`, as the SDK's reader (`logs`) follows them.
  */
 const claudeLines = (sessionId: string): object[] => {
-  const line = { sessionId, isSidechain: false, userType: 'external', entrypoint: 'cli', cwd: '/repo', version: '2.1.270', gitBranch: 'main' };
+  const line = {
+    sessionId,
+    isSidechain: false,
+    userType: 'external',
+    entrypoint: 'cli',
+    cwd: '/repo',
+    version: '2.1.270',
+    gitBranch: 'main',
+  };
   return [
     { type: 'custom-title', customTitle: 'ae/t/1', sessionId },
-    { ...line, type: 'user', uuid: 'u-1', parentUuid: null, timestamp: at(0), message: { role: 'user', content: 'Write the word to WORD.txt, then give your closeout.' } },
+    {
+      ...line,
+      type: 'user',
+      uuid: 'u-1',
+      parentUuid: null,
+      timestamp: at(0),
+      message: { role: 'user', content: 'Write the word to WORD.txt, then give your closeout.' },
+    },
     { ...line, type: 'attachment', uuid: 'att-1', parentUuid: 'u-1', timestamp: at(0), attachment: { type: 'environment' } },
-    { ...line, type: 'assistant', uuid: 'a-1', parentUuid: 'u-1', timestamp: at(1), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'thinking', thinking: 'The word goes in a file.', signature: 'sig' }] } },
-    { ...line, type: 'assistant', uuid: 'a-2', parentUuid: 'a-1', timestamp: at(2), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'text', text: 'Writing it now.' }] } },
-    { ...line, type: 'assistant', uuid: 'a-3', parentUuid: 'a-2', timestamp: at(3), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_bash', name: 'Bash', input: { command: 'echo word > WORD.txt' } }] } },
-    { ...line, type: 'user', uuid: 'u-2', parentUuid: 'a-3', timestamp: at(5), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_bash', content: 'WORD.txt: Permission denied', is_error: true }] } },
-    { ...line, type: 'assistant', uuid: 'a-4', parentUuid: 'u-2', timestamp: at(6), message: { id: 'msg_2', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_closeout', name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } }] } },
-    { ...line, type: 'user', uuid: 'u-3', parentUuid: 'a-4', timestamp: at(7), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_closeout', content: [{ type: 'text', text: 'Structured output provided successfully' }] }] } },
-    { ...line, type: 'system', uuid: 's-1', parentUuid: 'u-3', subtype: 'informational', content: 'Background session idle', level: 'info', timestamp: at(8), isMeta: false },
+    {
+      ...line,
+      type: 'assistant',
+      uuid: 'a-1',
+      parentUuid: 'u-1',
+      timestamp: at(1),
+      message: { id: 'msg_1', role: 'assistant', content: [{ type: 'thinking', thinking: 'The word goes in a file.', signature: 'sig' }] },
+    },
+    {
+      ...line,
+      type: 'assistant',
+      uuid: 'a-2',
+      parentUuid: 'a-1',
+      timestamp: at(2),
+      message: { id: 'msg_1', role: 'assistant', content: [{ type: 'text', text: 'Writing it now.' }] },
+    },
+    {
+      ...line,
+      type: 'assistant',
+      uuid: 'a-3',
+      parentUuid: 'a-2',
+      timestamp: at(3),
+      message: {
+        id: 'msg_1',
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'toolu_bash', name: 'Bash', input: { command: 'echo word > WORD.txt' } }],
+      },
+    },
+    {
+      ...line,
+      type: 'user',
+      uuid: 'u-2',
+      parentUuid: 'a-3',
+      timestamp: at(5),
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_bash', content: 'WORD.txt: Permission denied', is_error: true }],
+      },
+    },
+    {
+      ...line,
+      type: 'assistant',
+      uuid: 'a-4',
+      parentUuid: 'u-2',
+      timestamp: at(6),
+      message: {
+        id: 'msg_2',
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_closeout',
+            name: 'StructuredOutput',
+            input: { outcome: 'blocked', summary: 'WORD.txt is not writable' },
+          },
+        ],
+      },
+    },
+    {
+      ...line,
+      type: 'user',
+      uuid: 'u-3',
+      parentUuid: 'a-4',
+      timestamp: at(7),
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_closeout',
+            content: [{ type: 'text', text: 'Structured output provided successfully' }],
+          },
+        ],
+      },
+    },
+    {
+      ...line,
+      type: 'system',
+      uuid: 's-1',
+      parentUuid: 'u-3',
+      subtype: 'informational',
+      content: 'Background session idle',
+      level: 'info',
+      timestamp: at(8),
+      isMeta: false,
+    },
   ];
 };
 
@@ -74,8 +168,20 @@ const CLAUDE_EVENTS: TranscriptEvent[] = [
   { id: 'a-2:0', at: at(2), role: 'assistant', kind: 'text', text: 'Writing it now.' },
   { id: 'toolu_bash', at: at(3), role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'echo word > WORD.txt' } } },
   { id: 'toolu_bash', at: at(5), role: 'user', kind: 'tool_result', result: { text: 'WORD.txt: Permission denied', isError: true } },
-  { id: 'toolu_closeout', at: at(6), role: 'assistant', kind: 'tool_use', tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } } },
-  { id: 'toolu_closeout', at: at(7), role: 'user', kind: 'tool_result', result: { text: 'Structured output provided successfully', isError: false } },
+  {
+    id: 'toolu_closeout',
+    at: at(6),
+    role: 'assistant',
+    kind: 'tool_use',
+    tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } },
+  },
+  {
+    id: 'toolu_closeout',
+    at: at(7),
+    role: 'user',
+    kind: 'tool_result',
+    result: { text: 'Structured output provided successfully', isError: false },
+  },
   { id: 's-1', at: at(8), role: 'system', kind: 'system', text: 'Background session idle' },
 ];
 
@@ -97,9 +203,16 @@ test("the Claude runner reads a session's conversation from its transcript: date
   const { events } = await claudeRead(sessionId);
   assert.deepEqual(events, CLAUDE_EVENTS);
   datedWithRoles(events);
-  assert.ok(events.every((e) => Date.parse(e.at) < Date.now() - 3_000_000), "each at the transcript's own time, an hour ago, not the read's");
+  assert.ok(
+    events.every((e) => Date.parse(e.at) < Date.now() - 3_000_000),
+    "each at the transcript's own time, an hour ago, not the read's",
+  );
   const calls = events.filter((e) => e.kind === 'tool_use');
-  assert.deepEqual(events.filter((e) => e.kind === 'tool_result').map((e) => e.id), calls.map((e) => e.id), 'each result carries its call\'s id');
+  assert.deepEqual(
+    events.filter((e) => e.kind === 'tool_result').map((e) => e.id),
+    calls.map((e) => e.id),
+    "each result carries its call's id",
+  );
   assert.deepEqual(
     calls.find((e) => e.tool?.name === 'StructuredOutput')?.tool?.input,
     { outcome: 'blocked', summary: 'WORD.txt is not writable' },
@@ -110,41 +223,106 @@ test("the Claude runner reads a session's conversation from its transcript: date
 test('a line of a Claude transcript: the harness speaking is system, a subagent is left to its own, a block not read is named, a line with no time gives nothing', () => {
   const base = { sessionId: 's', timestamp: at(0) };
   assert.deepEqual(
-    claudeTranscriptEvents({ ...base, type: 'user', uuid: 'm', isMeta: true, message: { content: [{ type: 'text', text: 'Continue from where you left off.' }] } }, 0),
+    claudeTranscriptEvents(
+      {
+        ...base,
+        type: 'user',
+        uuid: 'm',
+        isMeta: true,
+        message: { content: [{ type: 'text', text: 'Continue from where you left off.' }] },
+      },
+      0,
+    ),
     [{ id: 'm:0', at: at(0), role: 'system', kind: 'system', text: 'Continue from where you left off.' }],
   );
-  assert.deepEqual(claudeTranscriptEvents({ ...base, type: 'assistant', uuid: 'x', isSidechain: true, message: { content: [{ type: 'text', text: 'a subagent' }] } }, 0), []);
   assert.deepEqual(
-    claudeTranscriptEvents({ ...base, type: 'user', uuid: 'i', message: { content: [{ type: 'image', source: {} }, { type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'shot' }, { type: 'image' }] }] } }, 0),
+    claudeTranscriptEvents(
+      { ...base, type: 'assistant', uuid: 'x', isSidechain: true, message: { content: [{ type: 'text', text: 'a subagent' }] } },
+      0,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents(
+      {
+        ...base,
+        type: 'user',
+        uuid: 'i',
+        message: {
+          content: [
+            { type: 'image', source: {} },
+            { type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'shot' }, { type: 'image' }] },
+          ],
+        },
+      },
+      0,
+    ),
     [
       { id: 'i:0', at: at(0), role: 'user', kind: 'text', text: '[image]' },
       { id: 't', at: at(0), role: 'user', kind: 'tool_result', result: { text: 'shot\n[image]', isError: false } },
     ],
   );
   assert.deepEqual(
-    claudeTranscriptEvents({ ...base, type: 'assistant', uuid: 'r', message: { content: [{ type: 'thinking', thinking: '', signature: 'sig' }] } }, 0),
+    claudeTranscriptEvents(
+      { ...base, type: 'assistant', uuid: 'r', message: { content: [{ type: 'thinking', thinking: '', signature: 'sig' }] } },
+      0,
+    ),
     [{ id: 'r:0', at: at(0), role: 'assistant', kind: 'thinking' }],
     'thinking written with no text is a thinking event with no text, not an invented one',
   );
-  assert.deepEqual(claudeTranscriptEvents({ type: 'assistant', uuid: 'n', message: { content: [{ type: 'text', text: 'when?' }] } }, 0), [], 'no time, no event');
-  assert.deepEqual(claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120), [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }], 'no uuid: its place in the file');
+  assert.deepEqual(
+    claudeTranscriptEvents({ type: 'assistant', uuid: 'n', message: { content: [{ type: 'text', text: 'when?' }] } }, 0),
+    [],
+    'no time, no event',
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120),
+    [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }],
+    'no uuid: its place in the file',
+  );
 });
 
 test('words another process sent a working session — a peer, or `say` — are a system event with those words; any other attachment gives nothing', () => {
   // As 2.1.270 wrote it into a `--bg` session's transcript, when a line was posted to its inbox while it worked.
   const line = {
-    parentUuid: 'p', isSidechain: false, type: 'attachment', uuid: 'att-peer', timestamp: at(0), sessionId: 's',
+    parentUuid: 'p',
+    isSidechain: false,
+    type: 'attachment',
+    uuid: 'att-peer',
+    timestamp: at(0),
+    sessionId: 's',
     attachment: {
-      type: 'queued_command', prompt: 'The file to write is SAID-bc11750e.txt', source_uuid: 'src', commandMode: 'prompt',
-      origin: { kind: 'peer', from: 'unknown', verifiedPeerPid: 4165162, verifiedPeerProcStart: '13623112' }, timestamp: at(0), isMeta: true,
+      type: 'queued_command',
+      prompt: 'The file to write is SAID-bc11750e.txt',
+      source_uuid: 'src',
+      commandMode: 'prompt',
+      origin: { kind: 'peer', from: 'unknown', verifiedPeerPid: 4165162, verifiedPeerProcStart: '13623112' },
+      timestamp: at(0),
+      isMeta: true,
     },
   };
-  assert.deepEqual(claudeTranscriptEvents(line, 0), [{ id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' }]);
-  assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0), [], 'a queued command of any other origin is not read as words sent in');
+  assert.deepEqual(claudeTranscriptEvents(line, 0), [
+    { id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' },
+  ]);
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0),
+    [],
+    'a queued command of any other origin is not read as words sent in',
+  );
   assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { type: 'environment' } }, 0), [], 'nor is any other attachment');
   // Arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is.
   assert.deepEqual(
-    claudeTranscriptEvents({ type: 'user', uuid: 'idle', timestamp: at(1), isMeta: true, origin: { kind: 'peer', from: 'unknown' }, message: { role: 'user', content: 'Another Claude session sent a message:\nIdle check' } }, 0),
+    claudeTranscriptEvents(
+      {
+        type: 'user',
+        uuid: 'idle',
+        timestamp: at(1),
+        isMeta: true,
+        origin: { kind: 'peer', from: 'unknown' },
+        message: { role: 'user', content: 'Another Claude session sent a message:\nIdle check' },
+      },
+      0,
+    ),
     [{ id: 'idle:0', at: at(1), role: 'system', kind: 'system', text: 'Another Claude session sent a message:\nIdle check' }],
   );
 });
@@ -152,16 +330,38 @@ test('words another process sent a working session — a peer, or `say` — are 
 test("words the session's own user said while it worked — typed into it, or a job's next line on its stdin — are the user's; a notice of a background task is nothing", () => {
   // As 2.1.280 wrote it into a `claude -p --input-format stream-json` job's transcript, for a user line on its stdin mid-turn.
   const line = {
-    parentUuid: 'p', isSidechain: false, type: 'attachment', uuid: 'att-stdin', timestamp: at(0), sessionId: 's', entrypoint: 'sdk-cli',
-    attachment: { type: 'queued_command', prompt: 'The file to write is SAID-fcfc71ec.txt', source_uuid: 'src', commandMode: 'prompt', timestamp: at(0) },
+    parentUuid: 'p',
+    isSidechain: false,
+    type: 'attachment',
+    uuid: 'att-stdin',
+    timestamp: at(0),
+    sessionId: 's',
+    entrypoint: 'sdk-cli',
+    attachment: {
+      type: 'queued_command',
+      prompt: 'The file to write is SAID-fcfc71ec.txt',
+      source_uuid: 'src',
+      commandMode: 'prompt',
+      timestamp: at(0),
+    },
   };
   const theirs = [{ id: 'att-stdin', at: at(0), role: 'user', kind: 'text', text: 'The file to write is SAID-fcfc71ec.txt' }];
-  assert.deepEqual(claudeTranscriptEvents(line, 0), theirs, 'no origin: the job\'s own user');
-  assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'human' } } }, 0), theirs, 'a person typing into it');
+  assert.deepEqual(claudeTranscriptEvents(line, 0), theirs, "no origin: the job's own user");
   assert.deepEqual(
-    claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, commandMode: 'task-notification', prompt: '<task-notification>done</task-notification>' } }, 0),
+    claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'human' } } }, 0),
+    theirs,
+    'a person typing into it',
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents(
+      {
+        ...line,
+        attachment: { ...line.attachment, commandMode: 'task-notification', prompt: '<task-notification>done</task-notification>' },
+      },
+      0,
+    ),
     [],
-    'Claude Code\'s notice that a background task ended is not anyone\'s words',
+    "Claude Code's notice that a background task ended is not anyone's words",
   );
 });
 
@@ -191,7 +391,10 @@ test('read in two pieces, cut at any byte, a transcript gives what it gives read
   const text = jsonl(claudeLines(sessionId));
   // Every line boundary, and a cut inside every line.
   const cuts = new Set<number>();
-  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) { cuts.add(i + 1); cuts.add(i - 7); }
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) {
+    cuts.add(i + 1);
+    cuts.add(i - 7);
+  }
   for (const cut of cuts) {
     writeClaude(sessionId, text.slice(0, cut));
     const first = await claudeRead(sessionId);
@@ -220,7 +423,11 @@ test('a cursor past the end of a file that shrank reads again from the start; so
   assert.equal(replaced.events[0]?.id, 'u-1:0', 'read from the start');
   assert.equal(replaced.events.length, CLAUDE_EVENTS.length * 2);
 
-  assert.deepEqual(await claudeRead(randomUUID(), whole.cursor), { events: [], cursor: (await claudeRead(randomUUID())).cursor }, 'no transcript at all: nothing, from the start');
+  assert.deepEqual(
+    await claudeRead(randomUUID(), whole.cursor),
+    { events: [], cursor: (await claudeRead(randomUUID())).cursor },
+    'no transcript at all: nothing, from the start',
+  );
 });
 
 test('a cursor no read gave is refused, naming it', async () => {
@@ -256,24 +463,132 @@ const runFile = (root: string, harness: string, name: string, run: object) => {
  * change, an item of a type not measured, the final answer — and the task's end.
  */
 const rolloutLines = (thread: string): object[] => [
-  { timestamp: at(0), type: 'session_meta', payload: { id: thread, session_id: thread, cwd: '/repo', cli_version: '0.154.0', base_instructions: { text: 'You are Codex.' } } },
+  {
+    timestamp: at(0),
+    type: 'session_meta',
+    payload: { id: thread, session_id: thread, cwd: '/repo', cli_version: '0.154.0', base_instructions: { text: 'You are Codex.' } },
+  },
   { timestamp: at(0), type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
-  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions>' }] } },
-  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>' }] } },
-  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Review the change.' }] } },
-  { timestamp: at(1), type: 'event_msg', payload: { type: 'item_completed', thread_id: thread, turn_id: 'turn-1', item: { type: 'UserMessage', id: 'user-1', content: [{ type: 'text', text: 'Review the change.', text_elements: [] }] } } },
-  { timestamp: at(2), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'Reasoning', id: 'rs_1', summary_text: [], raw_content: [] } } },
+  {
+    timestamp: at(1),
+    type: 'response_item',
+    payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions>' }] },
+  },
+  {
+    timestamp: at(1),
+    type: 'response_item',
+    payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>' }] },
+  },
+  {
+    timestamp: at(1),
+    type: 'response_item',
+    payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Review the change.' }] },
+  },
+  {
+    timestamp: at(1),
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      thread_id: thread,
+      turn_id: 'turn-1',
+      item: { type: 'UserMessage', id: 'user-1', content: [{ type: 'text', text: 'Review the change.', text_elements: [] }] },
+    },
+  },
+  {
+    timestamp: at(2),
+    type: 'event_msg',
+    payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'Reasoning', id: 'rs_1', summary_text: [], raw_content: [] } },
+  },
   { timestamp: at(2), type: 'response_item', payload: { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'gAAAA' } },
-  { timestamp: at(3), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'AgentMessage', id: 'msg_1', content: [{ type: 'Text', text: 'I will run the tests.' }], phase: 'commentary' } } },
-  { timestamp: at(3), type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text: 'I will run the tests.' }] } },
-  { timestamp: at(4), type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'call_1', name: 'exec', input: 'text((await tools.exec_command({cmd:"npm test"})).output)' } },
-  { timestamp: at(9), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'CommandExecution', id: 'exec-1', command: ['/bin/bash', '-lc', 'npm test'], cwd: 'file:///repo', status: 'failed', exit_code: 1, aggregated_output: '1 failing', stdout: '1 failing', stderr: '' } } },
-  { timestamp: at(9), type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: [{ type: 'input_text', text: 'Script completed\n' }] } },
+  {
+    timestamp: at(3),
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      turn_id: 'turn-1',
+      item: { type: 'AgentMessage', id: 'msg_1', content: [{ type: 'Text', text: 'I will run the tests.' }], phase: 'commentary' },
+    },
+  },
+  {
+    timestamp: at(3),
+    type: 'response_item',
+    payload: { type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text: 'I will run the tests.' }] },
+  },
+  {
+    timestamp: at(4),
+    type: 'response_item',
+    payload: {
+      type: 'custom_tool_call',
+      call_id: 'call_1',
+      name: 'exec',
+      input: 'text((await tools.exec_command({cmd:"npm test"})).output)',
+    },
+  },
+  {
+    timestamp: at(9),
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      turn_id: 'turn-1',
+      item: {
+        type: 'CommandExecution',
+        id: 'exec-1',
+        command: ['/bin/bash', '-lc', 'npm test'],
+        cwd: 'file:///repo',
+        status: 'failed',
+        exit_code: 1,
+        aggregated_output: '1 failing',
+        stdout: '1 failing',
+        stderr: '',
+      },
+    },
+  },
+  {
+    timestamp: at(9),
+    type: 'response_item',
+    payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: [{ type: 'input_text', text: 'Script completed\n' }] },
+  },
   { timestamp: at(10), type: 'event_msg', payload: { type: 'token_count', info: null } },
-  { timestamp: at(11), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'FileChange', id: 'exec-2', changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } }, status: 'completed', stdout: 'Success. Updated the following files:\nA /repo/REVIEW.md', stderr: '' } } },
-  { timestamp: at(12), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'NotMeasuredYet', id: 'item-9' } } },
-  { timestamp: at(13), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'AgentMessage', id: 'msg_2', content: [{ type: 'Text', text: '{"outcome":"done","summary":"one finding"}' }], phase: 'final_answer' } } },
-  { timestamp: at(14), type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: '{"outcome":"done","summary":"one finding"}', error: null } },
+  {
+    timestamp: at(11),
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      turn_id: 'turn-1',
+      item: {
+        type: 'FileChange',
+        id: 'exec-2',
+        changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } },
+        status: 'completed',
+        stdout: 'Success. Updated the following files:\nA /repo/REVIEW.md',
+        stderr: '',
+      },
+    },
+  },
+  {
+    timestamp: at(12),
+    type: 'event_msg',
+    payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'NotMeasuredYet', id: 'item-9' } },
+  },
+  {
+    timestamp: at(13),
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      turn_id: 'turn-1',
+      item: {
+        type: 'AgentMessage',
+        id: 'msg_2',
+        content: [{ type: 'Text', text: '{"outcome":"done","summary":"one finding"}' }],
+        phase: 'final_answer',
+      },
+    },
+  },
+  {
+    timestamp: at(14),
+    type: 'event_msg',
+    payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: '{"outcome":"done","summary":"one finding"}', error: null },
+  },
 ];
 
 /** What that rollout says, as events: the same shape as Claude Code's, as far as the records allow. */
@@ -281,16 +596,35 @@ const CODEX_EVENTS: TranscriptEvent[] = [
   { id: 'user-1', at: at(1), role: 'user', kind: 'text', text: 'Review the change.' },
   { id: 'rs_1', at: at(2), role: 'assistant', kind: 'thinking' },
   { id: 'msg_1', at: at(3), role: 'assistant', kind: 'text', text: 'I will run the tests.' },
-  { id: 'exec-1', at: at(9), role: 'assistant', kind: 'tool_use', tool: { name: 'CommandExecution', input: { command: ['/bin/bash', '-lc', 'npm test'], cwd: 'file:///repo' } } },
+  {
+    id: 'exec-1',
+    at: at(9),
+    role: 'assistant',
+    kind: 'tool_use',
+    tool: { name: 'CommandExecution', input: { command: ['/bin/bash', '-lc', 'npm test'], cwd: 'file:///repo' } },
+  },
   { id: 'exec-1', at: at(9), role: 'user', kind: 'tool_result', result: { text: '1 failing', isError: true } },
-  { id: 'exec-2', at: at(11), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } } } } },
-  { id: 'exec-2', at: at(11), role: 'user', kind: 'tool_result', result: { text: 'Success. Updated the following files:\nA /repo/REVIEW.md', isError: false } },
+  {
+    id: 'exec-2',
+    at: at(11),
+    role: 'assistant',
+    kind: 'tool_use',
+    tool: { name: 'FileChange', input: { changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } } } },
+  },
+  {
+    id: 'exec-2',
+    at: at(11),
+    role: 'user',
+    kind: 'tool_result',
+    result: { text: 'Success. Updated the following files:\nA /repo/REVIEW.md', isError: false },
+  },
   { id: 'item-9', at: at(12), role: 'system', kind: 'system', text: '[NotMeasuredYet]' },
   { id: 'msg_2', at: at(13), role: 'assistant', kind: 'text', text: '{"outcome":"done","summary":"one finding"}' },
   { id: 'turn-1:complete', at: at(14), role: 'system', kind: 'system', text: 'task_complete' },
 ];
 
-const detachedRead = (ops: ReturnType<typeof detachedOps>, sessionId: string, after?: string) => Effect.runPromise(ops.transcript!(sessionId, after));
+const detachedRead = (ops: ReturnType<typeof detachedOps>, sessionId: string, after?: string) =>
+  Effect.runPromise(ops.transcript!(sessionId, after));
 
 test("the Codex runner reads a thread's conversation from its rollout, found by the thread id its worker kept — the same shape as Claude Code's", async () => {
   const root = tmp('root');
@@ -334,15 +668,46 @@ test('read again with its cursor, a rollout gives only what was appended, cut at
 
 test("a Codex record: a failed task's end is its error; a command that exited 0 is no error; a record with no time gives nothing", () => {
   assert.deepEqual(
-    codexRolloutEvents({ timestamp: at(0), type: 'event_msg', payload: { type: 'task_complete', turn_id: 't', error: { message: 'Invalid value: banana' } } }, 0),
+    codexRolloutEvents(
+      {
+        timestamp: at(0),
+        type: 'event_msg',
+        payload: { type: 'task_complete', turn_id: 't', error: { message: 'Invalid value: banana' } },
+      },
+      0,
+    ),
     [{ id: 't:complete', at: at(0), role: 'system', kind: 'system', text: 'Invalid value: banana' }],
   );
   assert.deepEqual(
-    codexRolloutEvents({ timestamp: at(0), type: 'event_msg', payload: { type: 'item_completed', item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: 0, aggregated_output: 'a' } } }, 0)[1]?.result,
+    codexRolloutEvents(
+      {
+        timestamp: at(0),
+        type: 'event_msg',
+        payload: {
+          type: 'item_completed',
+          item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: 0, aggregated_output: 'a' },
+        },
+      },
+      0,
+    )[1]?.result,
     { text: 'a', isError: false },
   );
-  assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: [] } } }, 0), []);
-  assert.deepEqual(codexRolloutEvents({ timestamp: at(0), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'context' }] } }, 0), [], 'the model-facing copy is not read');
+  assert.deepEqual(
+    codexRolloutEvents({ type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: [] } } }, 0),
+    [],
+  );
+  assert.deepEqual(
+    codexRolloutEvents(
+      {
+        timestamp: at(0),
+        type: 'response_item',
+        payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'context' }] },
+      },
+      0,
+    ),
+    [],
+    'the model-facing copy is not read',
+  );
 });
 
 test("claude-detached reads the transcript `claude --bg` would, once its run has the session's id; a spec that keeps no record has no transcript", async () => {
@@ -366,7 +731,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /**
@@ -381,7 +750,9 @@ const fakeClaude = () => {
   const agentsFails = path.join(bin, 'agents-fails');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(calls, '');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
@@ -392,16 +763,23 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   type Row = { name: string; sessionId: string; state: string };
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
     rows,
-    set: (name: string, change: Partial<Row>) => fs.writeFileSync(registry, JSON.stringify(rows().map((r) => (r.name === name ? { ...r, ...change } : r)))),
+    set: (name: string, change: Partial<Row>) =>
+      fs.writeFileSync(registry, JSON.stringify(rows().map((r) => (r.name === name ? { ...r, ...change } : r)))),
     agentsFail: (fails: boolean) => (fails ? fs.writeFileSync(agentsFails, '') : fs.rmSync(agentsFails, { force: true })),
     /** How many times `claude agents` has been run. */
-    agentsCalls: () => fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('["agents"')).length,
+    agentsCalls: () =>
+      fs
+        .readFileSync(calls, 'utf8')
+        .split('\n')
+        .filter((l) => l.startsWith('["agents"')).length,
   };
 };
 
@@ -409,7 +787,11 @@ if (args[0] === '--bg') {
 const fakeCodex = (thread: string) => {
   const bin = tmp('bin');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; fi\n`, { mode: 0o755 });
-  fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\necho '{"type":"thread.started","thread_id":"${thread}"}'\necho '{"type":"turn.started"}'\n`, { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(bin, 'codex'),
+    `#!/bin/sh\necho '{"type":"thread.started","thread_id":"${thread}"}'\necho '{"type":"turn.started"}'\n`,
+    { mode: 0o755 },
+  );
   return bin;
 };
 
@@ -417,7 +799,11 @@ test("at shipped defaults, a Claude background session's transcript is its sessi
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd'), config: { background: true } });
+    const id = await engine.file({
+      brief: 'Write the word to WORD.txt, then give your closeout.',
+      cwd: tmp('cwd'),
+      config: { background: true },
+    });
 
     const before = await engine.transcript(id);
     assert.deepEqual(before.events, [], 'no session yet: nothing to read');
@@ -432,22 +818,33 @@ test("at shipped defaults, a Claude background session's transcript is its sessi
     assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 5), 'from the start, with the cursor a read of nothing gave');
     datedWithRoles(first.events);
     const started = Date.parse((await engine.view(id)).state.attempts[0]!.startedAt);
-    assert.ok(first.events.every((e) => Date.parse(e.at) < started), 'turns older than the attempt keep their own times: the caller decides what to show');
+    assert.ok(
+      first.events.every((e) => Date.parse(e.at) < started),
+      'turns older than the attempt keep their own times: the caller decides what to show',
+    );
 
     fs.appendFileSync(claudeFile(row!.sessionId), jsonl(lines.slice(7)));
     const second = await engine.transcript(id, first.cursor);
     assert.deepEqual(second.events, CLAUDE_EVENTS.slice(5), 'only what was appended');
-    assert.deepEqual(await engine.transcript(id, second.cursor), { events: [], cursor: second.cursor }, 'and then nothing, from the same cursor');
+    assert.deepEqual(
+      await engine.transcript(id, second.cursor),
+      { events: [], cursor: second.cursor },
+      'and then nothing, from the same cursor',
+    );
 
-    assert.equal(await engine.logs(id), [
-      'user      Write the word to WORD.txt, then give your closeout.',
-      'assistant [thinking]',
-      'assistant Writing it now.',
-      'assistant [Bash]',
-      'user      [tool_result]',
-      'assistant [StructuredOutput]',
-      'user      [tool_result]',
-    ].join('\n'), "logs: the SDK's reading of the same transcript, flattened to text, as it was");
+    assert.equal(
+      await engine.logs(id),
+      [
+        'user      Write the word to WORD.txt, then give your closeout.',
+        'assistant [thinking]',
+        'assistant Writing it now.',
+        'assistant [Bash]',
+        'user      [tool_result]',
+        'assistant [StructuredOutput]',
+        'user      [tool_result]',
+      ].join('\n'),
+      "logs: the SDK's reading of the same transcript, flattened to text, as it was",
+    );
   });
 });
 
@@ -464,7 +861,8 @@ test("at shipped defaults, a Codex task's transcript is read from its rollout, b
     assert.deepEqual(read.events, CODEX_EVENTS);
     // The worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after: wait for that too.
     let logs = await engine.logs(id);
-    for (const until = Date.now() + 15_000; !/"thread\.started"/.test(logs) && Date.now() < until; logs = await engine.logs(id)) await sleep(50);
+    for (const until = Date.now() + 15_000; !/"thread\.started"/.test(logs) && Date.now() < until; logs = await engine.logs(id))
+      await sleep(50);
     assert.match(logs, /"thread\.started"/);
   });
 });
@@ -475,9 +873,15 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    await assert.rejects(engine.transcript('t-nope'), refusal(/^transcript: `t-nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/));
+    await assert.rejects(
+      engine.transcript('t-nope'),
+      refusal(/^transcript: `t-nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/),
+    );
     const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
-    await assert.rejects(engine.transcript(id, 'from-the-top'), refusal(/^transcript: `from-the-top` is not a cursor a transcript read gave\. Pass the `cursor`/));
+    await assert.rejects(
+      engine.transcript(id, 'from-the-top'),
+      refusal(/^transcript: `from-the-top` is not a cursor a transcript read gave\. Pass the `cursor`/),
+    );
     assert.deepEqual((await engine.transcript(id)).events, [], 'the same task, asked without one, is read');
     // A HarnessSpec's reader is the engine's too, and refuses the same.
     const codexId = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' });
@@ -487,29 +891,46 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
   // A harness brought as a PromiseRunner with no `transcript`, and a HarnessSpec with none.
   const sessions = new Map<string, Sighting>();
   const plain: PromiseRunner = {
-    async spawn(r) { sessions.set(r.name, { sessionId: 's-1', state: 'working' }); },
-    async observe() { return new Map(sessions); },
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: 's-1', state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
     async stop() {},
-    async logs() { return 'what it printed'; },
+    async logs() {
+      return 'what it printed';
+    },
   };
   const own = createEngine({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' });
   const ownId = await own.file({ brief: 'the prompt', cwd: '/repo' });
-  await assert.rejects(own.transcript(ownId), refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/));
+  await assert.rejects(
+    own.transcript(ownId),
+    refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/),
+  );
   const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
-  await assert.rejects(sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })), refusal(/^transcript: the `sh` harness keeps no conversation/));
-
+  await assert.rejects(
+    sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })),
+    refusal(/^transcript: the `sh` harness keeps no conversation/),
+  );
 });
 
 test("a PromiseRunner's cursor is its own: passed through as it gave it, and never replaced by the engine's", async () => {
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, string | undefined]> = [];
-  const said = (n: number) => ({ id: `e-${n}`, at: at(n), role: 'assistant', kind: 'text', text: `line ${n}` } as const);
+  const said = (n: number) => ({ id: `e-${n}`, at: at(n), role: 'assistant', kind: 'text', text: `line ${n}` }) as const;
   // Pages, in a shape no file reader gives.
   const talking: PromiseRunner = {
-    async spawn(r) { sessions.set(r.name, { sessionId: 's-1', state: 'working' }); },
-    async observe() { return new Map(sessions); },
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: 's-1', state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
     async stop() {},
-    async logs() { return 'what it printed'; },
+    async logs() {
+      return 'what it printed';
+    },
     async transcript(sessionId, after) {
       asked.push([sessionId, after]);
       const page = after === undefined ? 1 : Number(after.replace('page-', ''));
@@ -521,21 +942,32 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
 
   const nothing = await engine.transcript(id);
   assert.deepEqual(nothing.events, [], 'no session yet: not asked');
-  assert.deepEqual(await engine.transcript(id, 'page-9'), { events: [], cursor: 'page-9' }, 'no session yet, asked with its own cursor: that cursor back');
+  assert.deepEqual(
+    await engine.transcript(id, 'page-9'),
+    { events: [], cursor: 'page-9' },
+    'no session yet, asked with its own cursor: that cursor back',
+  );
 
   await engine.tick();
   const first = await engine.transcript(id, nothing.cursor);
   assert.deepEqual(first, { events: [said(1)], cursor: 'page-2' }, "the engine's start is asked as no cursor");
   const second = await engine.transcript(id, first.cursor);
   assert.deepEqual(second, { events: [said(2)], cursor: 'page-3' }, 'its own cursor, not refused');
-  assert.deepEqual(asked, [['s-1', undefined], ['s-1', 'page-2']]);
+  assert.deepEqual(asked, [
+    ['s-1', undefined],
+    ['s-1', 'page-2'],
+  ]);
 });
 
 test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd'), config: { background: true } });
+    const id = await engine.file({
+      brief: 'Write the word to WORD.txt, then give your closeout.',
+      cwd: tmp('cwd'),
+      config: { background: true },
+    });
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
@@ -544,7 +976,11 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
     assert.deepEqual(first.events, CLAUDE_EVENTS, 'in flight, found by observing its harness');
 
     claude.agentsFail(true);
-    assert.deepEqual(await engine.transcript(id, first.cursor), { events: [], cursor: first.cursor }, 'in flight, registry unread: nothing new, and the cursor given back — not a rejection');
+    assert.deepEqual(
+      await engine.transcript(id, first.cursor),
+      { events: [], cursor: first.cursor },
+      'in flight, registry unread: nothing new, and the cursor given back — not a rejection',
+    );
     assert.deepEqual((await engine.transcript(id)).events, [], 'and from the start, nothing observed either');
 
     claude.agentsFail(false);

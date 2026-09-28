@@ -18,15 +18,37 @@ export const REPOSITORY = {
   'packages/agent-runtime': 'runs one agent session to completion, durably; no user interface',
   'packages/agent-orchestrator': 'sequences engine tasks into runs of steps; the wf command line; no user interface',
   'apps/api': 'a Node server that puts the workflows behind HTTP; the web app and its end-to-end test run against it',
-  'apps/web': 'the React web app people look at: the Factory, a run\'s page, the inbox, the workflows and agents pages',
+  'apps/web': "the React web app people look at: the Factory, a run's page, the inbox, the workflows and agents pages",
   'workflows/': 'folders of markdown that say which agents do a piece of work and in what order',
 };
 
 export const QUESTIONS = {
-  web: noul('Would doing what `card` asks change the source of the web app (apps/web) or of the api it runs against (apps/api)? `repository` says what each part is.', { true: 'Something a person sees on the board, or the api behind it, has to change.', false: 'The work stays in the packages, the workflow folders, tests or documents; nothing the browser loads changes.' }),
-  plan: noul('Should someone read the code and propose a plan before anyone changes anything, because `card` leaves real design decisions open or changes several parts of the system together?', { true: 'What to build, where, or how is not settled by the card\'s words, or the change spans several parts that must agree.', false: 'The card names a bounded change whose design is settled; an engineer could start directly.' }),
-  clear: score('How well does `card` say what done looks like?', ['It does not say what is wanted', 'It names a goal and leaves what to build open', 'It says what to build but not how to check it', 'It says what to build and how to tell it is done']),
-  size: score('How large is the work `card` asks for?', ['A line or two in one file', 'A small change in one part of the system, an hour or two', 'A feature in one part, or a change across two parts', 'A change across three or more parts of the system']),
+  web: noul(
+    'Would doing what `card` asks change the source of the web app (apps/web) or of the api it runs against (apps/api)? `repository` says what each part is.',
+    {
+      true: 'Something a person sees on the board, or the api behind it, has to change.',
+      false: 'The work stays in the packages, the workflow folders, tests or documents; nothing the browser loads changes.',
+    },
+  ),
+  plan: noul(
+    'Should someone read the code and propose a plan before anyone changes anything, because `card` leaves real design decisions open or changes several parts of the system together?',
+    {
+      true: "What to build, where, or how is not settled by the card's words, or the change spans several parts that must agree.",
+      false: 'The card names a bounded change whose design is settled; an engineer could start directly.',
+    },
+  ),
+  clear: score('How well does `card` say what done looks like?', [
+    'It does not say what is wanted',
+    'It names a goal and leaves what to build open',
+    'It says what to build but not how to check it',
+    'It says what to build and how to tell it is done',
+  ]),
+  size: score('How large is the work `card` asks for?', [
+    'A line or two in one file',
+    'A small change in one part of the system, an hour or two',
+    'A feature in one part, or a change across two parts',
+    'A change across three or more parts of the system',
+  ]),
 };
 
 export type CardAnswers = Asked<typeof QUESTIONS>['answers'];
@@ -87,7 +109,9 @@ const shown = (j: Judgment) => {
 export const report = (source: string, sent: number, record: string, asked: Asked<typeof QUESTIONS>): string[] => {
   const ids = Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[];
   // `sent` only when a request was made: with the judge off, or every answer on record, the card's text went nowhere.
-  const lines = [`judge card: ${source} · ${sent} characters${asked.requests > 0 ? ' sent' : ', not sent'}, frontmatter stripped · ${MODEL}`];
+  const lines = [
+    `judge card: ${source} · ${sent} characters${asked.requests > 0 ? ' sent' : ', not sent'}, frontmatter stripped · ${MODEL}`,
+  ];
   for (const id of ids) {
     const j = asked.answers[id];
     lines.push(`  ${id.padEnd(6)} ${shown(j).padEnd(16)} ${verdictOf(id, j).padEnd(7)} ${WHAT[id]}`);
@@ -96,13 +120,22 @@ export const report = (source: string, sent: number, record: string, asked: Aske
   for (const kind of new Set(failed.map((j) => (j.status === 'failed' ? j.kind : '')))) {
     const j = failed.find((f) => f.status === 'failed' && f.kind === kind)!;
     // A missing key is not on record: the judge is off, and the next run with a key asks as if for the first time.
-    const next = kind === 'in-flight' ? '' : kind === 'no-key' ? ' — the judge is off; set the key and run again' : ' — once that is fixed, run again with --reask';
+    const next =
+      kind === 'in-flight'
+        ? ''
+        : kind === 'no-key'
+          ? ' — the judge is off; set the key and run again'
+          : ' — once that is fixed, run again with --reask';
     lines.push(`  ${why(j)}${next}`);
   }
   const off = failed.some((j) => j.status === 'failed' && j.kind === 'no-key');
-  lines.push(asked.requests > 0
-    ? `1 request · ${asked.sent} questions · ${asked.usage ? `${asked.usage.input_tokens} input tokens` : 'no answer'} · ${asked.ms} ms`
-    : asked.ms === undefined && !off ? 'all on record · 0 requests' : '0 requests');
+  lines.push(
+    asked.requests > 0
+      ? `1 request · ${asked.sent} questions · ${asked.usage ? `${asked.usage.input_tokens} input tokens` : 'no answer'} · ${asked.ms} ms`
+      : asked.ms === undefined && !off
+        ? 'all on record · 0 requests'
+        : '0 requests',
+  );
   lines.push(`record: ${record}`);
   const d = dispatch(asked.answers);
   lines.push('folder' in d ? `→ ${d.folder}` : `→ stays in the inbox: ${d.inbox}`);

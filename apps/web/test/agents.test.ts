@@ -1,7 +1,33 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, deniedWithoutSkill, draftOf, edited, formKeyOf, formOf, hasKey, keptAfterCopy, keptAfterSave, latestTryOf, settleSave, tryHeld, KEY_LABELS, pickSystemPrompt, ROLE_KEYS, schemaFileFor, skillLine, skillList, skillToolGap, SYSTEM_PROMPT_CHOICES, SYSTEM_PROMPTS, systemPromptShown, toolsWithSkill, withoutSkill, withSkill } from '../src/lib/agents.ts';
+import {
+  choicesOf,
+  deniedWithoutSkill,
+  draftOf,
+  edited,
+  formKeyOf,
+  formOf,
+  hasKey,
+  keptAfterCopy,
+  keptAfterSave,
+  latestTryOf,
+  settleSave,
+  tryHeld,
+  KEY_LABELS,
+  pickSystemPrompt,
+  ROLE_KEYS,
+  schemaFileFor,
+  skillLine,
+  skillList,
+  skillToolGap,
+  SYSTEM_PROMPT_CHOICES,
+  SYSTEM_PROMPTS,
+  systemPromptShown,
+  toolsWithSkill,
+  withoutSkill,
+  withSkill,
+} from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -95,7 +121,13 @@ test("each harness has its own fence on the form: Claude Code a permission mode,
     defaultHarness: 'claude',
     keys: [
       { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'claude-detached'], byHarness: null },
-      { key: 'permissionMode', meaning: '', kind: 'harness-word', choices: null, byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] } },
+      {
+        key: 'permissionMode',
+        meaning: '',
+        kind: 'harness-word',
+        choices: null,
+        byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] },
+      },
       { key: 'sandbox', meaning: '', kind: 'harness-word', choices: null, byHarness: { codex: ['read-only', 'workspace-write'] } },
       { key: 'remote', meaning: '', kind: 'choice', choices: ['true', 'false'], byHarness: null },
     ],
@@ -103,20 +135,35 @@ test("each harness has its own fence on the form: Claude Code a permission mode,
     agents: {},
   } as unknown as KeyForm;
   assert.deepEqual([hasKey(form, 'sandbox', 'codex'), hasKey(form, 'permissionMode', 'codex')], [true, false]);
-  assert.deepEqual([hasKey(form, 'sandbox', ''), hasKey(form, 'permissionMode', '')], [false, true], 'an agent that names no harness runs on the default, Claude Code');
+  assert.deepEqual(
+    [hasKey(form, 'sandbox', ''), hasKey(form, 'permissionMode', '')],
+    [false, true],
+    'an agent that names no harness runs on the default, Claude Code',
+  );
   assert.deepEqual([hasKey(form, 'sandbox', 'claude-detached'), hasKey(form, 'permissionMode', 'claude-detached')], [false, true]);
-  assert.equal(hasKey(form, 'remote', 'codex'), true, 'a key that is not a harness word is every harness\'s');
+  assert.equal(hasKey(form, 'remote', 'codex'), true, "a key that is not a harness word is every harness's");
   assert.equal(hasKey(form, 'sandbox', 'nowhere'), true, 'a harness the form does not know is judged on save, not here');
   assert.equal(hasKey(undefined, 'sandbox', 'claude'), true, 'and nothing is hidden before the form is read');
   // An agent on a remote A2A agent has none of the keys the package refuses there.
   const remote = { ...form, remote: { prefix: 'a2a:', refuses: ['permissionMode', 'sandbox', 'remote'] } } as unknown as KeyForm;
-  assert.deepEqual([hasKey(remote, 'permissionMode', 'a2a:reviewer'), hasKey(remote, 'sandbox', 'a2a:reviewer'), hasKey(remote, 'remote', 'a2a:reviewer')], [false, false, false]);
-  assert.deepEqual([hasKey(remote, 'permissionMode', 'claude'), hasKey(remote, 'remote', 'codex')], [true, true], 'a harness of ours keeps them');
+  assert.deepEqual(
+    [hasKey(remote, 'permissionMode', 'a2a:reviewer'), hasKey(remote, 'sandbox', 'a2a:reviewer'), hasKey(remote, 'remote', 'a2a:reviewer')],
+    [false, false, false],
+  );
+  assert.deepEqual(
+    [hasKey(remote, 'permissionMode', 'claude'), hasKey(remote, 'remote', 'codex')],
+    [true, true],
+    'a harness of ours keeps them',
+  );
   assert.deepEqual(choicesOf(form, 'sandbox', 'codex'), ['read-only', 'workspace-write']);
   assert.ok(ROLE_KEYS.includes('sandbox') && KEY_LABELS.sandbox === 'Sandbox');
 });
 
-const saying = () => listing({ skills: 'write-a-note', card: [{ id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }] });
+const saying = () =>
+  listing({
+    skills: 'write-a-note',
+    card: [{ id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }],
+  });
 
 test("an agent's card is generated, never sent: no draft carries it, or any name a card file travelled under, and it is no edit of the form", () => {
   const draft = draftOf(formOf(saying()));
@@ -126,7 +173,7 @@ test("an agent's card is generated, never sent: no draft carries it, or any name
   assert.equal(edited(formOf(saying()), { ...saying(), card: [] }), false, 'a card generated otherwise since is not something typed');
 });
 
-test("the skills an agent gives and its system prompt are its own lines: read as written, sent trimmed, and emptied sent unset", () => {
+test('the skills an agent gives and its system prompt are its own lines: read as written, sent trimmed, and emptied sent unset', () => {
   const read = listing({ skills: 'review-a-change, write-a-note', systemPrompt: 'no-coding', keys: { tools: 'Read, Skill' } });
   const form = formOf(read);
   assert.equal(form.skills, 'review-a-change, write-a-note');
@@ -149,7 +196,7 @@ test('no key that describes the agent itself is a role key the form sends among 
   assert.deepEqual(SYSTEM_PROMPTS, ['default', 'no-coding', 'own']);
 });
 
-test("the skills line is edited as a list and sent as the line the package reads: in its order, each once, trimmed", () => {
+test('the skills line is edited as a list and sent as the line the package reads: in its order, each once, trimmed', () => {
   assert.deepEqual(skillList(' review-a-change,, write-a-note ,'), ['review-a-change', 'write-a-note']);
   assert.equal(skillLine(['a', 'b']), 'a, b');
   assert.equal(withSkill('', 'write-a-note'), 'write-a-note');
@@ -166,10 +213,17 @@ test("the skills line is edited as a list and sent as the line the package reads
   assert.equal(edited(form, listing()), false);
 });
 
-test("REFUSED before the save is: skills given with tools that leave out Skill, or deny it, as the package reads a tool list", () => {
-  const form = (skills: string, tools = '', disallowedTools = '') => ({ skills, keys: { ...formOf(listing()).keys, tools, disallowedTools } });
+test('REFUSED before the save is: skills given with tools that leave out Skill, or deny it, as the package reads a tool list', () => {
+  const form = (skills: string, tools = '', disallowedTools = '') => ({
+    skills,
+    keys: { ...formOf(listing()).keys, tools, disallowedTools },
+  });
   assert.equal(skillToolGap(form('write-a-note', 'Read, Grep')), 'tools');
-  assert.equal(skillToolGap(form('write-a-note', 'Read, Skill(look)')), 'tools', 'a Skill rule is not the Skill tool: the package wants the entry itself');
+  assert.equal(
+    skillToolGap(form('write-a-note', 'Read, Skill(look)')),
+    'tools',
+    'a Skill rule is not the Skill tool: the package wants the entry itself',
+  );
   assert.equal(skillToolGap(form('write-a-note', '', 'Bash, Skill')), 'disallowedTools');
   assert.equal(skillToolGap(form('write-a-note', 'Read, Skill')), null);
   assert.equal(skillToolGap(form('write-a-note')), null, 'tools unset: the harness decides');
@@ -178,9 +232,17 @@ test("REFUSED before the save is: skills given with tools that leave out Skill, 
   assert.equal(deniedWithoutSkill('Bash, Skill'), 'Bash');
 });
 
-test("the system prompt drawn unset is the default, and picking the default writes it only where the file said it", () => {
-  assert.deepEqual(SYSTEM_PROMPT_CHOICES.map((c) => c.value), [...SYSTEM_PROMPTS], "one choice for each word, in the package's order");
-  assert.deepEqual(SYSTEM_PROMPT_CHOICES.filter((c) => c.expert).map((c) => c.value), ['own'], 'only the one that drops the safety rules is for experts');
+test('the system prompt drawn unset is the default, and picking the default writes it only where the file said it', () => {
+  assert.deepEqual(
+    SYSTEM_PROMPT_CHOICES.map((c) => c.value),
+    [...SYSTEM_PROMPTS],
+    "one choice for each word, in the package's order",
+  );
+  assert.deepEqual(
+    SYSTEM_PROMPT_CHOICES.filter((c) => c.expert).map((c) => c.value),
+    ['own'],
+    'only the one that drops the safety rules is for experts',
+  );
   assert.equal(systemPromptShown(''), 'default');
   assert.equal(systemPromptShown('no-coding'), 'no-coding');
   assert.equal(pickSystemPrompt('no-coding', ''), 'no-coding');
@@ -206,15 +268,27 @@ test("a copy that moves only the version keeps the form's key for that version a
 
 test("REFUSED to keep the draft over a copy: the agent's file or its schema changed meanwhile, as another writer's edit would", () => {
   const was = listing({ source: 'scribe file', version: 'v1', schema: { type: 'object' } });
-  assert.equal(keptAfterCopy(was, { ...was, source: 'edited elsewhere', version: 'v2' }, 'v1'), null, 'the file changed: the form is read again');
-  assert.equal(keptAfterCopy(was, { ...was, schema: { type: 'string' }, version: 'v2' }, 'v1'), null, 'the schema changed: the form is read again');
+  assert.equal(
+    keptAfterCopy(was, { ...was, source: 'edited elsewhere', version: 'v2' }, 'v1'),
+    null,
+    'the file changed: the form is read again',
+  );
+  assert.equal(
+    keptAfterCopy(was, { ...was, schema: { type: 'string' }, version: 'v2' }, 'v1'),
+    null,
+    'the schema changed: the form is read again',
+  );
   assert.equal(keptAfterCopy(was, { ...was, schema: null, version: 'v2' }, 'v1'), null, 'the schema went: the form is read again');
 });
 
-test('a save lets the form a copy kept go only once the agent reads at the save\'s version, and keeps it where that read has not landed', () => {
+test("a save lets the form a copy kept go only once the agent reads at the save's version, and keeps it where that read has not landed", () => {
   const kept = { key: 'v1', version: 'v2' };
-  assert.equal(keptAfterSave(kept, 'v3'), null, 'read back at the save\'s version: drawn from the file as saved');
-  assert.deepEqual(keptAfterSave(kept, 'v2'), kept, 'still the version the copy moved to — the read failed, or has not landed — the typed form stays');
+  assert.equal(keptAfterSave(kept, 'v3'), null, "read back at the save's version: drawn from the file as saved");
+  assert.deepEqual(
+    keptAfterSave(kept, 'v2'),
+    kept,
+    'still the version the copy moved to — the read failed, or has not landed — the typed form stays',
+  );
   assert.deepEqual(keptAfterSave(kept, undefined), kept, 'nothing read: the form stays');
   assert.equal(keptAfterSave(null, 'v3'), null);
   // What the key is meanwhile: the form the person typed in, and after the read the saved version's.
@@ -226,9 +300,20 @@ test('REFUSED to let the kept form go before the reads a save changes are read a
   const said: string[] = [];
   let read!: () => void;
   const settled = settleSave({
-    rename: async () => { said.push('rename'); },
-    invalidate: () => new Promise<void>((resolve) => { said.push('invalidate'); read = () => { said.push('read'); resolve(); }; }),
-    release: () => { said.push('release'); },
+    rename: async () => {
+      said.push('rename');
+    },
+    invalidate: () =>
+      new Promise<void>((resolve) => {
+        said.push('invalidate');
+        read = () => {
+          said.push('read');
+          resolve();
+        };
+      }),
+    release: () => {
+      said.push('release');
+    },
   });
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.deepEqual(said, ['rename', 'invalidate'], 'nothing is let go while the read is out');
@@ -236,22 +321,38 @@ test('REFUSED to let the kept form go before the reads a save changes are read a
   await settled;
   assert.deepEqual(said, ['rename', 'invalidate', 'read', 'release']);
   const alone: string[] = [];
-  await settleSave({ invalidate: async () => { alone.push('invalidate'); }, release: () => { alone.push('release'); } });
+  await settleSave({
+    invalidate: async () => {
+      alone.push('invalidate');
+    },
+    release: () => {
+      alone.push('release');
+    },
+  });
   assert.deepEqual(alone, ['invalidate', 'release'], 'not renamed: no move');
 });
 
 test("an agent's latest try is the newest run that tried it, whatever the list's order; an agent never tried has none", () => {
   const run = (id: string, agent: string | null, createdAt: string) => ({ id, try: agent ? { agent } : null, createdAt });
-  const runs = [run('new', 'scribe', '2026-09-25T10:00:00.000Z'), run('other', 'critic', '2026-09-25T11:00:00.000Z'), run('plain', null, '2026-09-25T12:00:00.000Z'), run('old', 'scribe', '2026-09-24T10:00:00.000Z')];
+  const runs = [
+    run('new', 'scribe', '2026-09-25T10:00:00.000Z'),
+    run('other', 'critic', '2026-09-25T11:00:00.000Z'),
+    run('plain', null, '2026-09-25T12:00:00.000Z'),
+    run('old', 'scribe', '2026-09-24T10:00:00.000Z'),
+  ];
   assert.equal(latestTryOf(runs, 'scribe')?.id, 'new');
   assert.equal(latestTryOf([...runs].reverse(), 'scribe')?.id, 'new', 'not the first or the last listed');
   assert.equal(latestTryOf(runs, 'reader'), undefined);
 });
 
-test("REFUSED: Try it is held on an empty brief and while a try moves, as the api refuses both, and not otherwise", () => {
+test('REFUSED: Try it is held on an empty brief and while a try moves, as the api refuses both, and not otherwise', () => {
   assert.equal(tryHeld('  \n', undefined), 'Write a brief to try it on.');
   assert.equal(tryHeld('Write a note', { id: 'r-1', moving: true }), 'A try is still running (r-1): one at a time.');
-  assert.equal(tryHeld('', { id: 'r-1', moving: true }), 'A try is still running (r-1): one at a time.', 'the running try said first: a brief will not free it');
+  assert.equal(
+    tryHeld('', { id: 'r-1', moving: true }),
+    'A try is still running (r-1): one at a time.',
+    'the running try said first: a brief will not free it',
+  );
   assert.equal(tryHeld('Write a note', { id: 'r-1', moving: false }), null);
   assert.equal(tryHeld('Write a note', undefined), null);
 });

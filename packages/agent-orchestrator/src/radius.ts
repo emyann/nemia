@@ -21,7 +21,10 @@ export type Change = { path: string; from?: string; added: number | null; remove
 export type Group = { name: string; files: number; added: number; removed: number; binary: number };
 
 export type Radius = {
-  changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[];
+  changes: Change[];
+  groups: Group[];
+  agentFacing: string[];
+  checkAffecting: string[];
   /** The changes to a file where the next agent reads (`isLesson`), for the lesson line. */
   lessons: Change[];
   /**
@@ -35,14 +38,29 @@ export type Radius = {
 export type Touched = { branch: string; radius: Radius | { error: string } };
 
 /** Files an agent reads as instructions before it reads the brief. A change to one changes every step after it. */
-export const AGENT_FACING: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', '**/.claude/', '**/.codex/', '**/.mcp.json', '**/README.md'];
+export const AGENT_FACING: readonly string[] = [
+  '**/CLAUDE.md',
+  '**/AGENTS.md',
+  '**/.claude/',
+  '**/.codex/',
+  '**/.mcp.json',
+  '**/README.md',
+];
 
 /**
  * Files that decide what a check means: its scripts, its dependencies, its compiler, and its tests. A
  * change could edit one of these to make its check pass, so they are the default `--sensitive` list,
  * and their whole diff is on the screen.
  */
-export const CHECK_AFFECTING: readonly string[] = ['**/package.json', '**/package-lock.json', '**/tsconfig*.json', '**/turbo.json', '**/*.test.*', '**/test/', '**/.e2e/'];
+export const CHECK_AFFECTING: readonly string[] = [
+  '**/package.json',
+  '**/package-lock.json',
+  '**/tsconfig*.json',
+  '**/turbo.json',
+  '**/*.test.*',
+  '**/test/',
+  '**/.e2e/',
+];
 
 /**
  * Where the next agent reads what this one learned (CLAUDE.md's "When you miss"): these, and the `docs/` of
@@ -70,8 +88,13 @@ export const deepWorkspaces = (workspaces: readonly string[]): string[] => works
  * `packages/**`, that glob would take a `docs/` inside a package's source too — `packages/x/src/docs/`, product code — so a `**` glob's
  * packages are read one file at a time instead (`isLesson`).
  */
-export const lessonGlobs = (workspaces: readonly string[]): string[] =>
-  [...LESSON, ...workspaces.map(workspaceGlob).filter((w) => !w.includes('**')).map((w) => `${w}/docs/`)];
+export const lessonGlobs = (workspaces: readonly string[]): string[] => [
+  ...LESSON,
+  ...workspaces
+    .map(workspaceGlob)
+    .filter((w) => !w.includes('**'))
+    .map((w) => `${w}/docs/`),
+];
 
 /** The group of a file in no directory. */
 export const ROOT_GROUP = '(root)';
@@ -80,9 +103,13 @@ export function globRegExp(glob: string): RegExp {
   const g = glob.endsWith('/') ? `${glob}**` : glob;
   let re = '';
   for (let i = 0; i < g.length; i++) {
-    if (g.startsWith('**/', i)) { re += '(?:.*/)?'; i += 2; }
-    else if (g.startsWith('**', i)) { re += '.*'; i += 1; }
-    else if (g[i] === '*') re += '[^/]*';
+    if (g.startsWith('**/', i)) {
+      re += '(?:.*/)?';
+      i += 2;
+    } else if (g.startsWith('**', i)) {
+      re += '.*';
+      i += 1;
+    } else if (g[i] === '*') re += '[^/]*';
     else if (g[i] === '?') re += '[^/]';
     else re += g[i]!.replace(/[.+^${}()|[\]\\]/g, '\\$&');
   }
@@ -112,7 +139,11 @@ function unquote(s: string): string {
     }
     // Git writes each byte of a name it quotes as three octal digits.
     const octal = /^[0-3][0-7]{2}/.exec(body.slice(i + 1));
-    if (octal) { bytes.push(parseInt(octal[0], 8)); i += 3; continue; }
+    if (octal) {
+      bytes.push(parseInt(octal[0], 8));
+      i += 3;
+      continue;
+    }
     const next = body[++i] ?? '';
     bytes.push(...utf8.encode(ESCAPED[next] ?? next));
   }
@@ -136,12 +167,15 @@ function renamed(spec: string): { path: string; from?: string } {
  * radius that drops a file it did not understand under-reports exactly what it exists to report.
  */
 export function parseNumstat(numstat: string): Change[] {
-  return numstat.split('\n').filter((line) => line.trim()).map((line) => {
-    const m = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(line);
-    if (!m) throw new Error(`not a line of git diff --numstat: ${JSON.stringify(line)}`);
-    const count = (n: string) => (n === '-' ? null : Number(n));
-    return { ...renamed(m[3]!), added: count(m[1]!), removed: count(m[2]!) };
-  });
+  return numstat
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => {
+      const m = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(line);
+      if (!m) throw new Error(`not a line of git diff --numstat: ${JSON.stringify(line)}`);
+      const count = (n: string) => (n === '-' ? null : Number(n));
+      return { ...renamed(m[3]!), added: count(m[1]!), removed: count(m[2]!) };
+    });
 }
 
 /**
@@ -190,7 +224,10 @@ export function radius(numstat: string, workspaces: readonly string[] = []): Rad
       const g = groups.get(name) ?? { name, files: 0, added: 0, removed: 0, binary: 0 };
       g.files++;
       if (c.added === null || c.removed === null) g.binary++;
-      else { g.added += c.added; g.removed += c.removed; }
+      else {
+        g.added += c.added;
+        g.removed += c.removed;
+      }
       groups.set(name, g);
     }
   }
@@ -215,7 +252,9 @@ export function radiusLines(r: Radius): string[] {
   const files = Math.max(...r.groups.map((g) => `${g.files}`.length));
   const groups = r.groups.map((g) => {
     const counted = g.files - g.binary;
-    const lines = [counted ? `+${g.added} −${g.removed}` : '', g.binary ? (counted ? `${g.binary} binary` : 'binary') : ''].filter(Boolean).join(' · ');
+    const lines = [counted ? `+${g.added} −${g.removed}` : '', g.binary ? (counted ? `${g.binary} binary` : 'binary') : '']
+      .filter(Boolean)
+      .join(' · ');
     return `${g.name.padEnd(width)}  ${`${g.files}`.padStart(files)} file${g.files === 1 ? ' ' : 's'}  ${lines}`;
   });
   return [
@@ -223,7 +262,9 @@ export function radiusLines(r: Radius): string[] {
     ...(r.agentFacing.length ? [`agent-facing     ${r.agentFacing.join(', ')}`] : []),
     ...(r.checkAffecting.length ? [`check-affecting  ${r.checkAffecting.join(', ')}`] : []),
     ...(r.deepWorkspaces?.length
-      ? [`workspaces       ${r.deepWorkspaces.join(', ')} in the base's package.json ${r.deepWorkspaces.length > 1 ? 'cross' : 'crosses'} directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/`]
+      ? [
+          `workspaces       ${r.deepWorkspaces.join(', ')} in the base's package.json ${r.deepWorkspaces.length > 1 ? 'cross' : 'crosses'} directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/`,
+        ]
       : []),
   ];
 }
@@ -249,7 +290,11 @@ export const sensitivePaths = (changes: readonly Change[], globs: readonly strin
   changes.filter((c) => pathsOf(c).some((p) => matches(p, globs))).flatMap(pathsOf);
 
 /** `--sensitive a,b` read into globs; empty entries dropped. */
-export const parseGlobs = (arg: string): string[] => arg.split(',').map((g) => g.trim()).filter(Boolean);
+export const parseGlobs = (arg: string): string[] =>
+  arg
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
 
 /** The heading over the files printed in full, saying why they are. */
 export const sensitiveHeading = (globs: readonly string[] | undefined): string =>
@@ -259,9 +304,9 @@ export const sensitiveHeading = (globs: readonly string[] | undefined): string =
 
 /** What each branch touched, for a person: the branch, then its radius beneath it. */
 export const touchedLines = (touched: readonly Touched[]): string[] =>
-  touched.flatMap(({ branch, radius: r }) => ('error' in r
-    ? [`touched  ${branch}  —  not read: ${r.error}`]
-    : [`touched  ${branch}`, ...radiusLines(r).map((line) => `  ${line}`)]));
+  touched.flatMap(({ branch, radius: r }) =>
+    'error' in r ? [`touched  ${branch}  —  not read: ${r.error}`] : [`touched  ${branch}`, ...radiusLines(r).map((line) => `  ${line}`)],
+  );
 
 /**
  * The files printed in full on one branch, under a heading that says why: the diff git gave, `none`
@@ -270,10 +315,14 @@ export const touchedLines = (touched: readonly Touched[]): string[] =>
  */
 export function inFullLines(t: Touched, globs: readonly string[] | undefined, diff: string | undefined, many = false): string[] {
   const heading = `${sensitiveHeading(globs)}${many ? `, on ${t.branch}` : ''}`;
-  const body = 'error' in t.radius ? [`not read: ${t.radius.error}`]
-    : diff === undefined ? [`not read: git could not diff ${t.branch}`]
-    : diff.trim() ? diff.replace(/\n+$/, '').split('\n')
-    : ['none'];
+  const body =
+    'error' in t.radius
+      ? [`not read: ${t.radius.error}`]
+      : diff === undefined
+        ? [`not read: git could not diff ${t.branch}`]
+        : diff.trim()
+          ? diff.replace(/\n+$/, '').split('\n')
+          : ['none'];
   return [`── ${heading} ${'─'.repeat(Math.max(3, 64 - heading.length))}`, ...body];
 }
 
@@ -284,8 +333,9 @@ export function inFullLines(t: Touched, globs: readonly string[] | undefined, di
 export function lessonLine(touched: readonly Touched[]): string {
   const unread = touched.filter((t) => 'error' in t.radius).map((t) => t.branch);
   if (unread.length) return `lesson  not known — ${unread.join(', ')} could not be read`;
-  const written = touched.flatMap(({ branch, radius: r }) => (r as Radius).lessons
-    .map((c) => `${nameOf(c)} ${linesOf(c)}${touched.length > 1 ? ` (${branch})` : ''}`));
+  const written = touched.flatMap(({ branch, radius: r }) =>
+    (r as Radius).lessons.map((c) => `${nameOf(c)} ${linesOf(c)}${touched.length > 1 ? ` (${branch})` : ''}`),
+  );
   return `lesson  ${written.length ? written.join(' · ') : 'nothing written where the next agent reads'}`;
 }
 
@@ -294,16 +344,25 @@ export function lessonLine(touched: readonly Touched[]): string {
  * figure, and `apiMs` and `toolMs` the time it counted waiting on the model and running tools — each read once a session has ended.
  */
 export type Consumed = {
-  turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number;
+  turns?: number;
+  toolCalls?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+  apiMs?: number;
+  toolMs?: number;
   /** The input in its three classes, which sum to `inputTokens` where the runner saw them: read from the cache, written to it, neither. */
-  cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  uncachedTokens?: number;
   /** The largest context one response read. Of several attempts, the largest of theirs: a peak does not add up. */
   peakContextTokens?: number;
   /**
    * One attempt's first response: the context it read and what of it was written to the cache (`rebuiltCache`). Not summed: several
    * attempts have no one first response.
    */
-  firstContextTokens?: number; firstCacheWriteTokens?: number;
+  firstContextTokens?: number;
+  firstCacheWriteTokens?: number;
   /** How many times its sessions compacted their conversation, which a session does short of its window. Absent where none was seen. */
   compactions?: number;
   /**
@@ -313,7 +372,18 @@ export type Consumed = {
   rebuiltCaches?: number;
 };
 
-const FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd', 'apiMs', 'toolMs', 'cacheReadTokens', 'cacheWriteTokens', 'uncachedTokens'] as const;
+const FIELDS = [
+  'turns',
+  'toolCalls',
+  'inputTokens',
+  'outputTokens',
+  'costUsd',
+  'apiMs',
+  'toolMs',
+  'cacheReadTokens',
+  'cacheWriteTokens',
+  'uncachedTokens',
+] as const;
 
 /**
  * Several attempts' usage as one. A count is the sum only when every attempt measured it: a sum over
@@ -326,7 +396,8 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
   for (const field of FIELDS) {
     if (usages.every((u) => u?.[field] !== undefined)) sum[field] = usages.reduce((n, u) => n + u![field]!, 0);
   }
-  if (usages.every((u) => u?.peakContextTokens !== undefined)) sum.peakContextTokens = Math.max(...usages.map((u) => u!.peakContextTokens!));
+  if (usages.every((u) => u?.peakContextTokens !== undefined))
+    sum.peakContextTokens = Math.max(...usages.map((u) => u!.peakContextTokens!));
   const rebuilt = usages.reduce((n, u) => n + (u?.rebuiltCaches ?? 0), 0);
   if (rebuilt) sum.rebuiltCaches = rebuilt;
   const compactions = usages.reduce((n, u) => n + (u?.compactions ?? 0), 0);
@@ -343,7 +414,10 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
  * its first response.
  */
 export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): boolean =>
-  resumed && u?.firstCacheWriteTokens !== undefined && u.firstContextTokens !== undefined && u.firstCacheWriteTokens > u.firstContextTokens / 2;
+  resumed &&
+  u?.firstCacheWriteTokens !== undefined &&
+  u.firstContextTokens !== undefined &&
+  u.firstCacheWriteTokens > u.firstContextTokens / 2;
 
 /** Past this a context is large, cap or no cap: the median worker of 2026-09-18 peaked at 173k, the largest at 831k. */
 export const LARGE_CONTEXT = 200_000;
@@ -376,9 +450,8 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
     ...(mark === 'large' ? [`past ${count(LARGE_CONTEXT)} with no cap`] : []),
   ].join(', ');
   const reached = mark === 'cap' ? `${u.compactions ? `${where} ` : ''}at its ${count(cap!)} cap` : where;
-  const peak = u.peakContextTokens !== undefined
-    ? `peak ${count(u.peakContextTokens)}${reached ? `, ${reached}` : ''}`
-    : reached || undefined;
+  const peak =
+    u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}${reached ? `, ${reached}` : ''}` : reached || undefined;
   const rebuilt = u.rebuiltCaches
     ? u.rebuiltCaches > 1
       ? `${u.rebuiltCaches} resumed sessions wrote their context to the cache again instead of reading it`
@@ -403,7 +476,11 @@ export const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${
 
 /** A count for a person, to three figures: 112000 → 112k, 6350000 → 6.35M. */
 export function count(n: number): string {
-  for (const [of, unit] of [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']] as const) {
+  for (const [of, unit] of [
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'k'],
+  ] as const) {
     if (n >= of * 0.9995) return `${Number((n / of).toPrecision(3))}${unit}`;
   }
   return String(n);
@@ -432,9 +509,11 @@ export function usedLines(u: Consumed | undefined): string[] {
   const read = readWords(u);
   const cost = `cost  ${u?.costUsd !== undefined ? dollars(u.costUsd) : 'not measured'}${read ? ` · ${read}` : ''}`;
   if (!u) return ['used  not measured', cost];
-  const said = (n: number | undefined, what: string, unmeasured: string) => (n === undefined ? `${unmeasured} not measured` : `${count(n)} ${what}`);
+  const said = (n: number | undefined, what: string, unmeasured: string) =>
+    n === undefined ? `${unmeasured} not measured` : `${count(n)} ${what}`;
   // A measured moment is not nothing: under a second reads `<1s`, never `0s`.
-  const took = (ms: number | undefined, what: string) => (ms === undefined ? `${what} not measured` : `${what} ${ms > 0 && ms < 1000 ? '<1s' : durationWord(ms)}`);
+  const took = (ms: number | undefined, what: string) =>
+    ms === undefined ? `${what} not measured` : `${what} ${ms > 0 && ms < 1000 ? '<1s' : durationWord(ms)}`;
   const timed = u.apiMs !== undefined || u.toolMs !== undefined ? [took(u.apiMs, 'api'), took(u.toolMs, 'tools')] : [];
   return [
     `used  ${[

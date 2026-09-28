@@ -20,9 +20,23 @@
 import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { AgentCard, Role, TaskState, type Artifact, type Message, type Part, type SecurityRequirement, type SecurityScheme } from '@a2a-js/sdk';
 import {
-  AgentEvent, DefaultRequestHandler, InMemoryTaskStore, type AgentExecutor, type ExecutionEventBus, type RequestContext,
+  AgentCard,
+  Role,
+  TaskState,
+  type Artifact,
+  type Message,
+  type Part,
+  type SecurityRequirement,
+  type SecurityScheme,
+} from '@a2a-js/sdk';
+import {
+  AgentEvent,
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  type AgentExecutor,
+  type ExecutionEventBus,
+  type RequestContext,
 } from '@a2a-js/sdk/server';
 import { jsonRpcHandler, restHandler, UserBuilder } from '@a2a-js/sdk/server/express';
 
@@ -37,7 +51,15 @@ export type StateWord = 'working' | 'input-required' | 'auth-required' | 'comple
  * A turn's first step with `after` is taken that many milliseconds late, and nothing of the turn is answered before it:
  * an agent slow to answer a message. With `until`, it is taken once that promise settles: an agent held until the test says.
  */
-export type Step = { state?: StateWord; words?: string; data?: unknown; text?: string; reply?: string; after?: number; until?: Promise<unknown> };
+export type Step = {
+  state?: StateWord;
+  words?: string;
+  data?: unknown;
+  text?: string;
+  reply?: string;
+  after?: number;
+  until?: Promise<unknown>;
+};
 
 /** A message the agent was sent, as its script is handed it: the turn is 1 for the message that made the task, then 2, 3… */
 export type Turn = { taskId: string; contextId: string; text: string; turn: number; metadata: Record<string, unknown> | undefined };
@@ -104,7 +126,12 @@ const STATES: Record<StateWord, TaskState> = {
 /** A step after which the turn is over: the task ended, or waits on its caller. */
 const endsTurn = (s: Step) => s.state !== undefined && s.state !== 'working';
 
-const textPart = (text: string): Part => ({ content: { $case: 'text', value: text }, metadata: undefined, filename: '', mediaType: 'text/plain' });
+const textPart = (text: string): Part => ({
+  content: { $case: 'text', value: text },
+  metadata: undefined,
+  filename: '',
+  mediaType: 'text/plain',
+});
 
 /** A card's bearer scheme named `token`, and a check of the header it asks for. */
 export const bearer = (token: string): Security => ({
@@ -154,18 +181,41 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const publish = (bus: ExecutionEventBus, taskId: string, contextId: string, s: Step) => {
     if (s.data !== undefined || s.text !== undefined) {
       const artifact: Artifact = {
-        artifactId: `a-${Math.random().toString(36).slice(2)}`, name: 'result', description: '',
-        parts: [s.data !== undefined ? { content: { $case: 'data', value: s.data }, metadata: undefined, filename: '', mediaType: '' } : textPart(s.text!)],
-        metadata: undefined, extensions: [],
+        artifactId: `a-${Math.random().toString(36).slice(2)}`,
+        name: 'result',
+        description: '',
+        parts: [
+          s.data !== undefined
+            ? { content: { $case: 'data', value: s.data }, metadata: undefined, filename: '', mediaType: '' }
+            : textPart(s.text!),
+        ],
+        metadata: undefined,
+        extensions: [],
       };
       bus.publish(AgentEvent.artifactUpdate({ taskId, contextId, artifact, append: false, lastChunk: true, metadata: undefined }));
     }
     if (s.state) {
-      const message: Message | undefined = s.words === undefined ? undefined : {
-        messageId: `m-${Math.random().toString(36).slice(2)}`, contextId, taskId, role: Role.ROLE_AGENT,
-        parts: [textPart(s.words)], metadata: undefined, extensions: [], referenceTaskIds: [],
-      };
-      bus.publish(AgentEvent.statusUpdate({ taskId, contextId, status: { state: STATES[s.state], message, timestamp: new Date().toISOString() }, metadata: undefined }));
+      const message: Message | undefined =
+        s.words === undefined
+          ? undefined
+          : {
+              messageId: `m-${Math.random().toString(36).slice(2)}`,
+              contextId,
+              taskId,
+              role: Role.ROLE_AGENT,
+              parts: [textPart(s.words)],
+              metadata: undefined,
+              extensions: [],
+              referenceTaskIds: [],
+            };
+      bus.publish(
+        AgentEvent.statusUpdate({
+          taskId,
+          contextId,
+          status: { state: STATES[s.state], message, timestamp: new Date().toISOString() },
+          metadata: undefined,
+        }),
+      );
     }
   };
 
@@ -175,7 +225,10 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       const turn = (turns.get(taskId) ?? 0) + 1;
       const part = ctx.userMessage.parts.find((p) => p.content?.$case === 'text');
       let steps: Step[] | 'cancelled' = script({
-        taskId, contextId, turn, metadata: ctx.userMessage.metadata,
+        taskId,
+        contextId,
+        turn,
+        metadata: ctx.userMessage.metadata,
         text: part?.content?.$case === 'text' ? part.content.value : '',
       });
       const late = steps[0]?.after;
@@ -185,19 +238,42 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       if (reply !== undefined) {
         const first = steps[0]!;
         replied++;
-        bus.publish(AgentEvent.message({
-          messageId: `m-${Math.random().toString(36).slice(2)}`, contextId, taskId: '', role: Role.ROLE_AGENT,
-          parts: [textPart(reply), ...(first.data !== undefined ? [{ content: { $case: 'data' as const, value: first.data as Record<string, unknown> }, metadata: undefined, filename: '', mediaType: '' }] : [])],
-          metadata: undefined, extensions: [], referenceTaskIds: [],
-        }));
+        bus.publish(
+          AgentEvent.message({
+            messageId: `m-${Math.random().toString(36).slice(2)}`,
+            contextId,
+            taskId: '',
+            role: Role.ROLE_AGENT,
+            parts: [
+              textPart(reply),
+              ...(first.data !== undefined
+                ? [
+                    {
+                      content: { $case: 'data' as const, value: first.data as Record<string, unknown> },
+                      metadata: undefined,
+                      filename: '',
+                      mediaType: '',
+                    },
+                  ]
+                : []),
+            ],
+            metadata: undefined,
+            extensions: [],
+            referenceTaskIds: [],
+          }),
+        );
         return;
       }
       turns.set(taskId, turn);
       if (turn === 1) made.push(taskId);
       const working = { state: TaskState.TASK_STATE_WORKING, message: undefined, timestamp: new Date().toISOString() };
-      bus.publish(AgentEvent.task(ctx.task
-        ? { ...ctx.task, status: working }
-        : { id: taskId, contextId, status: working, artifacts: [], history: [ctx.userMessage], metadata: undefined }));
+      bus.publish(
+        AgentEvent.task(
+          ctx.task
+            ? { ...ctx.task, status: working }
+            : { id: taskId, contextId, status: working, artifacts: [], history: [ctx.userMessage], metadata: undefined },
+        ),
+      );
       for (;;) {
         if (steps === 'cancelled') return;
         for (const s of steps) {
@@ -208,10 +284,14 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       }
     },
     cancelTask: async (taskId: string, bus: ExecutionEventBus) => {
-      bus.publish(AgentEvent.statusUpdate({
-        taskId, contextId: '', metadata: undefined,
-        status: { state: TaskState.TASK_STATE_CANCELED, message: undefined, timestamp: new Date().toISOString() },
-      }));
+      bus.publish(
+        AgentEvent.statusUpdate({
+          taskId,
+          contextId: '',
+          metadata: undefined,
+          status: { state: TaskState.TASK_STATE_CANCELED, message: undefined, timestamp: new Date().toISOString() },
+        }),
+      );
       const wake = waiting.get(taskId);
       waiting.delete(taskId);
       wake?.('cancelled');
@@ -219,15 +299,25 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   };
 
   const card = (): AgentCard => ({
-    name: 'test agent', description: 'A remote A2A agent a test started.', version: '1.0.0',
+    name: 'test agent',
+    description: 'A remote A2A agent a test started.',
+    version: '1.0.0',
     supportedInterfaces: bindings.map((b) => ({
       url: `${o.interfacesAt ?? `${base}${prefix}`}${b === 'JSONRPC' ? '/a2a/jsonrpc' : b === 'HTTP+JSON' ? '/a2a/rest' : '/a2a/grpc'}`,
-      protocolBinding: b, tenant: '', protocolVersion: '1.0',
+      protocolBinding: b,
+      tenant: '',
+      protocolVersion: '1.0',
     })),
-    provider: undefined, documentationUrl: undefined, iconUrl: undefined,
+    provider: undefined,
+    documentationUrl: undefined,
+    iconUrl: undefined,
     capabilities: { streaming: false, pushNotifications: false, extensions: [], extendedAgentCard: false },
-    securitySchemes: o.security?.schemes ?? {}, securityRequirements: o.security?.requirements ?? [],
-    defaultInputModes: ['text/plain'], defaultOutputModes: ['text/plain', 'application/json'], skills: [], signatures: [],
+    securitySchemes: o.security?.schemes ?? {},
+    securityRequirements: o.security?.requirements ?? [],
+    defaultInputModes: ['text/plain'],
+    defaultOutputModes: ['text/plain', 'application/json'],
+    skills: [],
+    signatures: [],
   });
 
   const handler = new DefaultRequestHandler(card(), new InMemoryTaskStore(), executor);
@@ -264,15 +354,23 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
     }
     go();
   });
-  if (bindings.includes('JSONRPC')) app.use(`${prefix}/a2a/jsonrpc`, jsonRpcHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
-  if (bindings.includes('HTTP+JSON')) app.use(`${prefix}/a2a/rest`, restHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
+  if (bindings.includes('JSONRPC'))
+    app.use(`${prefix}/a2a/jsonrpc`, jsonRpcHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
+  if (bindings.includes('HTTP+JSON'))
+    app.use(`${prefix}/a2a/rest`, restHandler({ requestHandler: counted, userBuilder: UserBuilder.noAuthentication }));
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
   return {
-    url: `${base}${prefix}`, counts, sent, headers, paths, cards, hanging,
+    url: `${base}${prefix}`,
+    counts,
+    sent,
+    headers,
+    paths,
+    cards,
+    hanging,
     tasks: () => [...made],
     replies: () => replied,
     move: (taskId, ...steps) => {

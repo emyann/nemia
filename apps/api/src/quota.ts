@@ -55,8 +55,16 @@ export const QUOTA_MARK_PERCENT = 80;
  * without these: no transcript and no child process, but the skills' manifest written again on every ask.
  */
 export const USAGE_ARGS = [
-  '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
-  '--no-session-persistence', '--strict-mcp-config', '--setting-sources', '',
+  '-p',
+  '--input-format',
+  'stream-json',
+  '--output-format',
+  'stream-json',
+  '--verbose',
+  '--no-session-persistence',
+  '--strict-mcp-config',
+  '--setting-sources',
+  '',
 ];
 
 /**
@@ -112,7 +120,12 @@ export type Quota = {
   said: string | null;
 };
 
-const LABELS: Record<string, string> = { five_hour: '5-hour', seven_day: 'week', seven_day_sonnet: 'week, Sonnet', seven_day_opus: 'week, Opus' };
+const LABELS: Record<string, string> = {
+  five_hour: '5-hour',
+  seven_day: 'week',
+  seven_day_sonnet: 'week, Sonnet',
+  seven_day_opus: 'week, Opus',
+};
 /**
  * The windows the board shows, in this order: the plan's own. Claude Code's answer holds many more keys, most null and some named for no one
  * (`nimbus_quill`, at 0% and no reset, on the owner's plan), so a key it does not know is not shown.
@@ -141,24 +154,30 @@ function windowsOf(limits: Record<string, unknown>, now: number): QuotaWindow[] 
     if (!isObject(w) || typeof w.utilization !== 'number' || !Number.isFinite(w.utilization)) return [];
     const at = typeof w.resets_at === 'string' ? Date.parse(w.resets_at) : NaN;
     const resetsAt = Number.isFinite(at) ? new Date(at).toISOString() : null;
-    return [{
-      key,
-      label: LABELS[key]!,
-      usedPercentage: w.utilization,
-      resetsAt,
-      reset: resetsAt !== null && at <= now,
-      marked: w.utilization >= QUOTA_MARK_PERCENT,
-    }];
+    return [
+      {
+        key,
+        label: LABELS[key]!,
+        usedPercentage: w.utilization,
+        resetsAt,
+        reset: resetsAt !== null && at <= now,
+        marked: w.utilization >= QUOTA_MARK_PERCENT,
+      },
+    ];
   });
 }
 
-const subscriptionOf = (usage: Record<string, unknown>): string | null => typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
+const subscriptionOf = (usage: Record<string, unknown>): string | null =>
+  typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
 
 /**
  * What an answer says: the plan's windows and its subscription, no plan, a plan the usage service gave nothing for, or why it cannot be read.
  * Pure, and judged at `now` for the windows' resets.
  */
-export function answerOf(response: unknown, now: number):
+export function answerOf(
+  response: unknown,
+  now: number,
+):
   | { kind: 'windows'; windows: QuotaWindow[]; subscription: string | null }
   | { kind: 'no-plan' }
   | { kind: 'unanswered'; subscription: string | null }
@@ -167,7 +186,8 @@ export function answerOf(response: unknown, now: number):
   if (response.subtype === 'error') {
     return { kind: 'unknown', what: `it refused the request (${typeof response.error === 'string' ? response.error : 'no error given'})` };
   }
-  if (response.subtype !== 'success' || !isObject(response.response)) return { kind: 'unknown', what: 'its response is neither a success nor an error' };
+  if (response.subtype !== 'success' || !isObject(response.response))
+    return { kind: 'unknown', what: 'its response is neither a success nor an error' };
   const usage = response.response;
   if (usage.rate_limits_available === false) return { kind: 'no-plan' };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
@@ -253,7 +273,11 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
         };
       }
       if (read.kind === 'unknown') {
-        return { ...base, state: 'unknown', said: `Claude Code answered the usage request in a shape this board does not read: ${read.what}. ${SEE}. ${again}` };
+        return {
+          ...base,
+          state: 'unknown',
+          said: `Claude Code answered the usage request in a shape this board does not read: ${read.what}. ${SEE}. ${again}`,
+        };
       }
       return { ...base, last: null, subscription: read.subscription, windows: read.windows, state: 'fresh', said: null };
     }
@@ -294,7 +318,11 @@ const END_MS = 2_000;
  * an id of its own, and read its stdout for the control_response with that id. Then close its stdin, on which it ends of its own; killed
  * if it has not in `END_MS`. Never rejects: every way it can go is an `Asked`.
  */
-export function askUsage({ command = 'claude', timeoutMs = QUOTA_TIMEOUT_MS, env = process.env }: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): Promise<Asked> {
+export function askUsage({
+  command = 'claude',
+  timeoutMs = QUOTA_TIMEOUT_MS,
+  env = process.env,
+}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): Promise<Asked> {
   const id = `usage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return new Promise((resolve) => {
     let done = false;
@@ -317,10 +345,13 @@ export function askUsage({ command = 'claude', timeoutMs = QUOTA_TIMEOUT_MS, env
     };
     const timer = setTimeout(() => settle({ kind: 'timeout', ms: timeoutMs }, 'SIGTERM'), timeoutMs);
     child.on('error', (e: NodeJS.ErrnoException) =>
-      settle(e.code === 'ENOENT' ? { kind: 'no-claude' } : { kind: 'failed', code: null, signal: null, said: e.message }));
+      settle(e.code === 'ENOENT' ? { kind: 'no-claude' } : { kind: 'failed', code: null, signal: null, said: e.message }),
+    );
     // A process that ends before it reads its request closes the pipe under the write.
     child.stdin.on('error', () => {});
-    child.stderr.on('data', (d: Buffer) => { err = (err + d.toString()).slice(-4_000); });
+    child.stderr.on('data', (d: Buffer) => {
+      err = (err + d.toString()).slice(-4_000);
+    });
     child.stdout.on('data', (d: Buffer) => {
       out += d.toString();
       const lines = out.split('\n');
@@ -342,7 +373,9 @@ export function askUsage({ command = 'claude', timeoutMs = QUOTA_TIMEOUT_MS, env
       const said = err.trim().split('\n').pop()?.trim() ?? '';
       settle({ kind: 'failed', code, signal, said });
     });
-    child.stdin.write(`${JSON.stringify({ type: 'control_request', request_id: id, request: { subtype: 'get_usage', skip_behaviors: true } })}\n`);
+    child.stdin.write(
+      `${JSON.stringify({ type: 'control_request', request_id: id, request: { subtype: 'get_usage', skip_behaviors: true } })}\n`,
+    );
   });
 }
 
@@ -373,25 +406,42 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
  * The quota as this request should say it: from what is held while it is younger than its keep — the keep, or an `unanswered` outcome's
  * wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that.
  */
-export async function readQuota({ waitMs = QUOTA_WAIT_MS, timeoutMs = QUOTA_TIMEOUT_MS, env = process.env, now = () => Date.now() }: {
-  waitMs?: number; timeoutMs?: number; env?: NodeJS.ProcessEnv; now?: () => number;
+export async function readQuota({
+  waitMs = QUOTA_WAIT_MS,
+  timeoutMs = QUOTA_TIMEOUT_MS,
+  env = process.env,
+  now = () => Date.now(),
+}: {
+  waitMs?: number;
+  timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
+  now?: () => number;
 } = {}): Promise<Quota> {
   const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
   const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
   const current = () => held !== null && now() - held.at < (held.keptMs ?? keepMs);
   if (!current()) {
     const started = now();
-    inFlight ??= askUsage({ timeoutMs, env }).then((asked) => {
-      const at = Math.max(started, now());
-      const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
-      // A good reading begins the backoff again; another failure between two `unanswered` answers neither ends it nor adds to it.
-      if (read === 'windows') unanswered = 0;
-      if (read === 'unanswered') unanswered += 1;
-      held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
-      if (read === 'windows') good = held;
-    }).finally(() => { inFlight = null; });
+    inFlight ??= askUsage({ timeoutMs, env })
+      .then((asked) => {
+        const at = Math.max(started, now());
+        const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
+        // A good reading begins the backoff again; another failure between two `unanswered` answers neither ends it nor adds to it.
+        if (read === 'windows') unanswered = 0;
+        if (read === 'unanswered') unanswered += 1;
+        held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
+        if (read === 'windows') good = held;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
     let wait: NodeJS.Timeout | undefined;
-    await Promise.race([inFlight, new Promise((r) => { wait = setTimeout(r, waitMs); })]);
+    await Promise.race([
+      inFlight,
+      new Promise((r) => {
+        wait = setTimeout(r, waitMs);
+      }),
+    ]);
     clearTimeout(wait);
     // An answer that came in the wait is this request's, however short the keep.
     if (inFlight !== null || held === null || held.at < started) return quotaOf(null, good, now(), keepMs);

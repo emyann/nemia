@@ -9,7 +9,12 @@ export const NAV = [
   { to: '/inbox', label: 'Inbox', icon: Inbox, active: (path: string) => path === '/inbox' || path.startsWith('/inbox/') },
   { to: '/', label: 'Factory', icon: Factory, active: (path: string) => path === '/' },
   { to: '/runs', label: 'Runs', icon: List, active: (path: string) => path === '/runs' || path.startsWith('/runs/') },
-  { to: '/workflows', label: 'Workflows', icon: Waypoints, active: (path: string) => path === '/workflows' || path.startsWith('/workflows/') },
+  {
+    to: '/workflows',
+    label: 'Workflows',
+    icon: Waypoints,
+    active: (path: string) => path === '/workflows' || path.startsWith('/workflows/'),
+  },
   { to: '/agents', label: 'Agents', icon: Bot, active: (path: string) => path === '/agents' || path.startsWith('/agents/') },
   { to: '/capabilities', label: 'Capabilities', icon: Blocks, active: (path: string) => path === '/capabilities' },
 ] as const;

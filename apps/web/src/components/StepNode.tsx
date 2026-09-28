@@ -13,7 +13,13 @@ import { StatusChip } from './StatusChip';
  * `index` is the step's place in the run's order, which is the order `wf ls` lists it in. `waitingOnYou` is whether the
  * run's `waitingOnYou` names the step: the api's word, which leaves out a step a person has already asked something of.
  */
-export type StepNodeData = { step: RunDetail['steps'][number]; index: number; runCancelled: boolean; runHeld: boolean; waitingOnYou: boolean };
+export type StepNodeData = {
+  step: RunDetail['steps'][number];
+  index: number;
+  runCancelled: boolean;
+  runHeld: boolean;
+  waitingOnYou: boolean;
+};
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
 /**
@@ -77,9 +83,7 @@ export function StepNode({
         <p className="mt-0.5 truncate text-sm font-semibold" title={step.name}>
           {step.name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-          {spec ? runsOn(spec) : 'no spec'}
-        </p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{spec ? runsOn(spec) : 'no spec'}</p>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
@@ -92,7 +96,11 @@ export function StepNode({
       {cost && (
         <p
           data-cost={over ? 'over' : 'within'}
-          title={step.budget ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}` : 'What its tries have cost'}
+          title={
+            step.budget
+              ? `What its tries have cost of its ${step.budget.said} budget${over ? (held ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ': the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise') : ''}`
+              : 'What its tries have cost'
+          }
           className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-red-700 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400'}`}
         >
           <span className="font-sans font-normal">cost </span>
@@ -164,7 +172,12 @@ const runsOn = (spec: { agent?: string | null; harness: string | null; model: st
  * builder has it (`WorkflowBuilder`): whether it has changes not saved, whether the last save was refused for it, and whether it is the one
  * its form shows.
  */
-export type SpecNodeData = { name: string; index: number; spec: WorkflowStepSpec; build?: { unsaved: boolean; refused: boolean; selected: boolean } };
+export type SpecNodeData = {
+  name: string;
+  index: number;
+  spec: WorkflowStepSpec;
+  build?: { unsaved: boolean; refused: boolean; selected: boolean };
+};
 export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 
 /** The most tools a node writes out. Past it the node counts them, and the names are the line's title: a list of four runs long. */
@@ -202,9 +215,24 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
  * and where a run's step has its status and its attempt, what the step is set to do (`specLines`). No status and no
  * attempt: nothing has happened to it.
  */
-export function SpecNode({ data: { name, index, spec, build }, sourcePosition = Position.Right, targetPosition = Position.Left }: NodeProps<SpecFlowNode>) {
+export function SpecNode({
+  data: { name, index, spec, build },
+  sourcePosition = Position.Right,
+  targetPosition = Position.Left,
+}: NodeProps<SpecFlowNode>) {
   const lines = specLines(spec);
-  if (build) return <BuildingNode name={name} index={index} lines={lines} spec={spec} build={build} sourcePosition={sourcePosition} targetPosition={targetPosition} />;
+  if (build)
+    return (
+      <BuildingNode
+        name={name}
+        index={index}
+        lines={lines}
+        spec={spec}
+        build={build}
+        sourcePosition={sourcePosition}
+        targetPosition={targetPosition}
+      />
+    );
 
   return (
     <div
@@ -227,7 +255,9 @@ export function SpecNode({ data: { name, index, spec, build }, sourcePosition = 
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-neutral-500">{label}</dt>
               {/* Wrapped rather than cut to one line: a check is a command a person reads whole. Three lines, then the title. */}
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>{value}</dd>
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>
+                {value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -250,9 +280,22 @@ const HANDLE = '!size-3 !border-2 !border-white dark:!border-neutral-900';
  * step again (`loop:`). The dot a loop comes into sits beside it, and takes no drag of its own. A step not saved says so under its name, and a
  * step the last save was refused for is drawn in red.
  */
-function BuildingNode({ name, index, lines, spec, build, sourcePosition, targetPosition }: {
-  name: string; index: number; lines: ReturnType<typeof specLines>; spec: WorkflowStepSpec; build: NonNullable<SpecNodeData['build']>;
-  sourcePosition: Position; targetPosition: Position;
+function BuildingNode({
+  name,
+  index,
+  lines,
+  spec,
+  build,
+  sourcePosition,
+  targetPosition,
+}: {
+  name: string;
+  index: number;
+  lines: ReturnType<typeof specLines>;
+  spec: WorkflowStepSpec;
+  build: NonNullable<SpecNodeData['build']>;
+  sourcePosition: Position;
+  targetPosition: Position;
 }) {
   return (
     <div
@@ -278,7 +321,9 @@ function BuildingNode({ name, index, lines, spec, build, sourcePosition, targetP
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">{stepLabel(index)}</span>
           {build.unsaved && (
-            <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">unsaved</span>
+            <span className="rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+              unsaved
+            </span>
           )}
         </div>
         <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
@@ -292,7 +337,9 @@ function BuildingNode({ name, index, lines, spec, build, sourcePosition, targetP
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-neutral-500">{label}</dt>
-              <dd className="line-clamp-2 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>{value}</dd>
+              <dd className="line-clamp-2 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>
+                {value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -330,4 +377,6 @@ function BuildingNode({ name, index, lines, spec, build, sourcePosition, targetP
  * whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
  */
 const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
-  (need.kind === 'approve' ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'main' && step.taskId === null }) : needText(need));
+  need.kind === 'approve'
+    ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'main' && step.taskId === null })
+    : needText(need);

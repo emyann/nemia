@@ -37,10 +37,14 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
   };
 
   /** A spawn on a harness this engine does not have, refused: nothing is started, and the attempt ends in these words. */
-  const notHere = (asked: string) => Effect.fail(new RunnerError({
-    verb: 'spawn', refused: true,
-    message: `\`harness: ${asked}\` is not a harness this engine has, so nothing was started: the task was filed by an engine that had it. Its harnesses are: ${Object.keys(harnesses).join(', ')}. Give the engine that harness again, then ask for the task again.`,
-  }));
+  const notHere = (asked: string) =>
+    Effect.fail(
+      new RunnerError({
+        verb: 'spawn',
+        refused: true,
+        message: `\`harness: ${asked}\` is not a harness this engine has, so nothing was started: the task was filed by an engine that had it. Its harnesses are: ${Object.keys(harnesses).join(', ')}. Give the engine that harness again, then ask for the task again.`,
+      }),
+    );
 
   /**
    * Every harness observed at once, each by `look`, and merged: what `observe` and `observeFor` both are. A harness whose look
@@ -48,30 +52,33 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
    * blinds the engine neither to the others nor to the fact that it could not look (2026-09-25; before, a failed look was an
    * empty listing, and the pass read each session on it gone).
    */
-  const observeAll = (look: (name: string, ops: RunnerOps) => { read: Effect.Effect<Observation, RunnerError>; expected: readonly string[] }) => Effect.forEach(
-    Object.entries(harnesses),
-    ([name, ops]) => {
-      const { read, expected } = look(name, ops);
-      return read.pipe(
-        Effect.map((o) => [name, o] as const),
-        Effect.catchCause(() => Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected) }] as const)),
-      );
-    },
-    { concurrency: 'unbounded' },
-  ).pipe(
-    Effect.map((results): Observation => {
-      const seen = new Map<string, Sighting>();
-      const unread = new Set<string>();
-      for (const [harness, o] of results) {
-        for (const [sessionName, sighting] of o.seen) {
-          seen.set(sessionName, sighting);
-          owner.set(sighting.sessionId, harness);
+  const observeAll = (
+    look: (name: string, ops: RunnerOps) => { read: Effect.Effect<Observation, RunnerError>; expected: readonly string[] },
+  ) =>
+    Effect.forEach(
+      Object.entries(harnesses),
+      ([name, ops]) => {
+        const { read, expected } = look(name, ops);
+        return read.pipe(
+          Effect.map((o) => [name, o] as const),
+          Effect.catchCause(() => Effect.succeed([name, { seen: new Map<string, Sighting>(), unread: new Set(expected) }] as const)),
+        );
+      },
+      { concurrency: 'unbounded' },
+    ).pipe(
+      Effect.map((results): Observation => {
+        const seen = new Map<string, Sighting>();
+        const unread = new Set<string>();
+        for (const [harness, o] of results) {
+          for (const [sessionName, sighting] of o.seen) {
+            seen.set(sessionName, sighting);
+            owner.set(sighting.sessionId, harness);
+          }
+          for (const name of o.unread) unread.add(name);
         }
-        for (const name of o.unread) unread.add(name);
-      }
-      return { seen, unread };
-    }),
-  );
+        return { seen, unread };
+      }),
+    );
 
   /** A harness's full listing as an observation that expected nothing, so it leaves nothing unread. */
   const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
@@ -99,13 +106,16 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     // A harness that could not be read leaves every name routed to it unread, whichever verb it was read by, and a harness this
     // engine does not have is one nobody can read: its names are neither there nor gone, so none is spawned again or ended
     // `lost` until the harness is back.
-    observeFor: (expected) => observeAll((name, ops) => {
-      const mine = expected.filter((e) => routeOf(e.harness) === name);
-      return { read: ops.observeFor ? ops.observeFor(mine) : listing(ops), expected: mine.map((e) => e.name) };
-    }).pipe(Effect.map((o): Observation => {
-      const nowhere = expected.filter((e) => routeOf(e.harness) === undefined);
-      return nowhere.length ? { seen: o.seen, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
-    })),
+    observeFor: (expected) =>
+      observeAll((name, ops) => {
+        const mine = expected.filter((e) => routeOf(e.harness) === name);
+        return { read: ops.observeFor ? ops.observeFor(mine) : listing(ops), expected: mine.map((e) => e.name) };
+      }).pipe(
+        Effect.map((o): Observation => {
+          const nowhere = expected.filter((e) => routeOf(e.harness) === undefined);
+          return nowhere.length ? { seen: o.seen, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
+        }),
+      ),
 
     stop: (sessionId) => pick(owner.get(sessionId)).stop(sessionId),
 

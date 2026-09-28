@@ -13,8 +13,7 @@ export const Route = createFileRoute('/workflows')({
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
-      Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running
-      (<code>npm run dev</code>)?
+      Could not load the workflows: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });
@@ -32,19 +31,24 @@ function WorkflowsPage() {
     <article className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
-          A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its
-          record as <code className="font-mono text-xs">wf start</code> does, and files nothing: <code className="font-mono text-xs">wf up</code> files its steps.
-          Yours are built here too.
+          A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its record as{' '}
+          <code className="font-mono text-xs">wf start</code> does, and files nothing: <code className="font-mono text-xs">wf up</code>{' '}
+          files its steps. Yours are built here too.
         </p>
         <NewWorkflow onCreated={setMade} />
       </div>
       {workflows.length ? (
         workflows.map((workflow) => (
-          <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} building={workflow.from === 'yours' && workflow.name === made} />
+          <WorkflowCard
+            key={`${workflow.from}:${workflow.name}`}
+            workflow={workflow}
+            building={workflow.from === 'yours' && workflow.name === made}
+          />
         ))
       ) : (
         <p className="text-sm text-neutral-500">
-          No workflows. Add a folder of steps under {where} in the repository — <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under {yours}.
+          No workflows. Add a folder of steps under {where} in the repository —{' '}
+          <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under {yours}.
         </p>
       )}
     </article>
@@ -100,8 +104,8 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
         <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
         {from === 'repo' && (
           <p data-no-builder className="text-xs text-neutral-500">
-            No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into {yours}, build it there,
-            and copy it back into the repository by hand.
+            No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into {yours}, build it
+            there, and copy it back into the repository by hand.
           </p>
         )}
         {from === 'yours' && error && (

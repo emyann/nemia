@@ -113,7 +113,17 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
       </div>
 
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
-        {tab === 'Details' && <Details run={run} step={step} state={state} runCancelled={runCancelled} current={current} selected={selected} onSelect={select} />}
+        {tab === 'Details' && (
+          <Details
+            run={run}
+            step={step}
+            state={state}
+            runCancelled={runCancelled}
+            current={current}
+            selected={selected}
+            onSelect={select}
+          />
+        )}
         {tab === 'Output' && (
           <>
             {/* Opened here at a gate, the answer is a tab away: said first, so the plan read is not a dead end. */}
@@ -136,7 +146,15 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
   );
 }
 
-type DetailsProps = { run: RunDetail; step: Step; state: StepState; runCancelled: boolean; current: StepTry; selected: StepTry; onSelect: (n: number) => void };
+type DetailsProps = {
+  run: RunDetail;
+  step: Step;
+  state: StepState;
+  runCancelled: boolean;
+  current: StepTry;
+  selected: StepTry;
+  onSelect: (n: number) => void;
+};
 
 function Details({ run, step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
   const { spec, attempts, tries } = step;
@@ -163,7 +181,15 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
             ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
             ['attempts', attempts.count],
             ['latest began', latest && when(latest.startedAt)],
-            ['latest ended', latest && (latest.ended ? <Ended key="latest ended" at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
+            [
+              'latest ended',
+              latest &&
+                (latest.ended ? (
+                  <Ended key="latest ended" at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} />
+                ) : isLive(state) ? (
+                  'still running'
+                ) : null),
+            ],
             // Only with an end on the record: one from before the engine kept it says how, and not when.
             ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
             // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.
@@ -187,8 +213,8 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         </section>
       ) : (
         <p className="text-neutral-500">
-          No spec: the workflow the run is judged by does not have this step — the one it froze at <code>wf start</code>, or on
-          a record from before runs froze one, its folder.
+          No spec: the workflow the run is judged by does not have this step — the one it froze at <code>wf start</code>, or on a record
+          from before runs froze one, its folder.
         </p>
       )}
       {step.told && <Told told={step.told} filed={step.taskId !== null} />}
@@ -255,7 +281,9 @@ function Activity({ run, step }: { run: RunDetail; step: Step }) {
             <Conversation turns={tail} live={following.live} density="compact" className="min-h-0 flex-1" />
           </Suspense>
         ) : (
-          !following.error && <p className="text-neutral-500">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+          !following.error && (
+            <p className="text-neutral-500">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+          )
         ))}
     </>
   );

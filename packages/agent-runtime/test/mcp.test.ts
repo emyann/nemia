@@ -30,7 +30,9 @@ const fakeBin = () => {
     const out = path.join(bin, `${name}.argv`);
     // `claude agents` is the registry, and nobody is running. Written, then moved, so no reader sees half.
     const agents = name === 'claude' ? `if [ "$1" = agents ]; then echo '[]'; exit 0; fi\n` : '';
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${agents}printf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${agents}printf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
+      mode: 0o755,
+    });
   }
   return bin;
 };
@@ -38,7 +40,11 @@ const fakeBin = () => {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 const argvIn = (file: string) => fs.readFileSync(file, 'utf8').replace(/\n$/, '').split('\n');
@@ -65,7 +71,8 @@ const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-h
     if (attempt?.reason !== 'unstartable') while (!fs.existsSync(file) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
     return { root, attempt, args: fs.existsSync(file) ? argvIn(file) : undefined };
   }).finally(() => {
-    if (prevHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = prevHome;
   });
 };
 
@@ -142,7 +149,11 @@ test("a task's mcp is written outside the workspace and named after the checkout
     const { configs, next } = mcpConfigsOf(args);
     assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
     assert.equal(configs[0], path.join(cwd, '.mcp.json'), `${harness}: the repository's servers first`);
-    assert.deepEqual(JSON.parse(fs.readFileSync(configs[1]!, 'utf8')), { mcpServers: MCP }, `${harness}: the task's servers, exactly, and no other`);
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(configs[1]!, 'utf8')),
+      { mcpServers: MCP },
+      `${harness}: the task's servers, exactly, and no other`,
+    );
     assert.ok(path.relative(cwd, configs[1]!).startsWith('..'), `${harness}: written outside the workspace`);
     assert.equal(fs.statSync(configs[1]!).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
     assert.equal(next, '--strict-mcp-config', harness);
@@ -166,7 +177,13 @@ test('a spawn whose task names no servers clears a config left under its name �
   });
 
   let given: HarnessIO | undefined;
-  const spy: HarnessSpec = { name: 'sh', command: (_r, io) => { given = io; return { cmd: 'sh', args: ['-c', 'exit 0'] }; } };
+  const spy: HarnessSpec = {
+    name: 'sh',
+    command: (_r, io) => {
+      given = io;
+      return { cmd: 'sh', args: ['-c', 'exit 0'] };
+    },
+  };
   const detached = detachedOps(spy, root);
   await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { mcp: { a: { command: 'x' } } } }));
   const written = given?.mcpConfigFile;
@@ -189,19 +206,29 @@ test("codex is given a task's servers as one mcp_servers override, and a task wi
 
   const plain = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex' });
   assert.ok(plain.args, 'codex was spawned');
-  assert.equal(plain.args.some((a) => a.startsWith('mcp_servers')), false, 'no map, no override');
+  assert.equal(
+    plain.args.some((a) => a.startsWith('mcp_servers')),
+    false,
+    'no map, no override',
+  );
 });
 
 test('codex quotes every name and value as TOML, and the override comes before `resume`', () => {
   // One value, names quoted: a dotted `-c` key is split on every dot, quotes or none. Read back by
   // codex-cli 0.154.0 (`codex mcp get --json`) as exactly these arguments.
   const args = codex.command({
-    name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', resumeFrom: 'abc',
+    name: 'ae/t/2',
+    brief: 'the prompt',
+    cwd: '/wt',
+    resumeFrom: 'abc',
     config: { mcp: { 'a-b_c': { command: '/bin/x', args: ['say "hi"', 'back\\slash', 'two\nlines'], env: { 'K-1': 'v' } } } },
   }).args;
   const at = args.findIndex((a) => a.startsWith('mcp_servers='));
   assert.equal(args[at - 1], '-c');
-  assert.equal(args[at], 'mcp_servers={"a-b_c"={"command"="/bin/x","args"=["say \\"hi\\"","back\\\\slash","two\\nlines"],"env"={"K-1"="v"}}}');
+  assert.equal(
+    args[at],
+    'mcp_servers={"a-b_c"={"command"="/bin/x","args"=["say \\"hi\\"","back\\\\slash","two\\nlines"],"env"={"K-1"="v"}}}',
+  );
   assert.ok(at < args.indexOf('resume'), 'before resume, which rejects flags after its id');
   assert.equal(args.at(-1), 'the prompt');
 });
@@ -214,39 +241,69 @@ test('a relative cwd or root still names each config by an absolute path — Cla
     const here = process.cwd();
     fs.mkdirSync('repo');
     fs.writeFileSync(path.join('repo', '.mcp.json'), '{"mcpServers":{}}');
-    await onPath(bin, () => Effect.runPromise(
-      claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', config: { mcp: { a: { command: 'x' } } } }),
-    ));
+    await onPath(bin, () =>
+      Effect.runPromise(
+        claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', config: { mcp: { a: { command: 'x' } } } }),
+      ),
+    );
     const { configs } = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv')));
     assert.deepEqual(configs, [path.join(here, 'repo', '.mcp.json'), path.join(here, 'board', 'mcp', 'ae_t_1.json')]);
     // What Claude Code does with each: resolve it from inside the session's cwd.
     for (const c of configs) assert.ok(fs.existsSync(path.resolve(here, 'repo', c)), `${c} is found from inside repo`);
-  } finally { process.chdir(was); }
+  } finally {
+    process.chdir(was);
+  }
 });
 
 test("a task's server named like one in the operator's Codex config is refused at spawn — Codex would merge the two", async () => {
   // As `codex mcp add` writes them. Measured on 0.154.0: a task's `docs` would run the task's command
   // with the operator's SECRET, and a task's `browser` would not load beside the operator's url.
   const home = tmp('codex-home');
-  fs.writeFileSync(path.join(home, 'config.toml'), [
-    '[mcp_servers.browser]', 'url = "https://operator.example/mcp"', '',
-    '[mcp_servers.docs]', 'command = "operator-docs"', '', '[mcp_servers.docs.env]', 'SECRET = "operator"', '',
-  ].join('\n'));
+  fs.writeFileSync(
+    path.join(home, 'config.toml'),
+    [
+      '[mcp_servers.browser]',
+      'url = "https://operator.example/mcp"',
+      '',
+      '[mcp_servers.docs]',
+      'command = "operator-docs"',
+      '',
+      '[mcp_servers.docs.env]',
+      'SECRET = "operator"',
+      '',
+    ].join('\n'),
+  );
 
   const clash = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } }, home);
   assert.equal(clash.args, undefined, 'codex never ran');
   assert.equal(clash.attempt?.reason, 'unstartable');
-  assert.match(clash.attempt?.error ?? '', /`mcp.browser`, `mcp.docs`: .*config\.toml already has a server by that name.*Give the task's server another name/);
+  assert.match(
+    clash.attempt?.error ?? '',
+    /`mcp.browser`, `mcp.docs`: .*config\.toml already has a server by that name.*Give the task's server another name/,
+  );
 
   const apart = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: { mine: { command: 'x' } } } }, home);
-  assert.ok(apart.args?.some((a) => a.startsWith('mcp_servers={"mine"')), 'a name the operator does not use is given to codex');
+  assert.ok(
+    apart.args?.some((a) => a.startsWith('mcp_servers={"mine"')),
+    'a name the operator does not use is given to codex',
+  );
 });
 
 test('the MCP server names a Codex config gives are read the way codex mcp add writes them, and only those', () => {
   const toml = [
-    '[mcp_servers.probe]', 'command = "echo"', '', '[mcp_servers.probe.env]', 'K = "v"', '',
-    '[mcp_servers."quoted-name"]', 'url = "https://e.example/mcp"', '',
-    '[projects."/r"]', 'trust_level = "trusted"', '[mcp_servers_extra.nope]', 'x = 1',
+    '[mcp_servers.probe]',
+    'command = "echo"',
+    '',
+    '[mcp_servers.probe.env]',
+    'K = "v"',
+    '',
+    '[mcp_servers."quoted-name"]',
+    'url = "https://e.example/mcp"',
+    '',
+    '[projects."/r"]',
+    'trust_level = "trusted"',
+    '[mcp_servers_extra.nope]',
+    'x = 1',
   ].join('\n');
   assert.deepEqual([...codexMcpServerNames(toml)].sort(), ['probe', 'quoted-name']);
 });

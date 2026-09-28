@@ -54,10 +54,16 @@ test('an attempt that runs counts its time; one that is over says when it starte
   const now = Date.parse('2026-09-13T01:00:00.000Z');
   const startedAt = '2026-09-13T00:47:56.000Z';
   assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#2 · 12m 04s');
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(
+    attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now),
+    '#1 · started 12m 04s ago',
+  );
   // No end on the record, but no session going either (stopped before the engine saw it end):
   // counting on would claim it is still at work.
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(
+    attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null } }, false, now),
+    '#1 · started 12m 04s ago',
+  );
   assert.equal(attemptLine({ count: 0, latest: null }, false, now), null);
 });
 
@@ -71,41 +77,68 @@ test('an attempt that is over says how long it took, once the record keeps when 
   // Still running: the time counts, whatever the record says of an end it has not got.
   assert.equal(attemptLine({ count: 3, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#3 · 30m 00s');
   // An old record, over and with no end: no clock to stop, so it says when it started.
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 30m 00s ago');
+  assert.equal(
+    attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now),
+    '#1 · started 30m 00s ago',
+  );
 });
 
 test('an edge is done only when the work at both of its ends is done: verified, or on its own word', () => {
-  const edges = edgesOf(graphOf(after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('implement', 'gate'), after('review', 'deploy')), [
-    step('implement', 'verified'),
-    step('review', 'unverified'),
-    step('respond', 'working'),
-    // Signed off blocked: not done, so the edge into it is not complete.
-    step('gate', 'blocked'),
-    // Refused by its check: the session ended, and the work is not done.
-    step('deploy', 'failed-check'),
-  ]);
-  assert.deepEqual(edges.map((e) => [e.source, e.target, e.state]), [
-    ['implement', 'review', 'done'],
-    // Into a step at work: not done, and moving.
-    ['review', 'respond', 'running'],
-    ['implement', 'respond', 'running'],
-    ['implement', 'gate', 'to-come'],
-    ['review', 'deploy', 'to-come'],
-  ]);
+  const edges = edgesOf(
+    graphOf(
+      after('implement', 'review'),
+      after('review', 'respond'),
+      after('implement', 'respond'),
+      after('implement', 'gate'),
+      after('review', 'deploy'),
+    ),
+    [
+      step('implement', 'verified'),
+      step('review', 'unverified'),
+      step('respond', 'working'),
+      // Signed off blocked: not done, so the edge into it is not complete.
+      step('gate', 'blocked'),
+      // Refused by its check: the session ended, and the work is not done.
+      step('deploy', 'failed-check'),
+    ],
+  );
+  assert.deepEqual(
+    edges.map((e) => [e.source, e.target, e.state]),
+    [
+      ['implement', 'review', 'done'],
+      // Into a step at work: not done, and moving.
+      ['review', 'respond', 'running'],
+      ['implement', 'respond', 'running'],
+      ['implement', 'gate', 'to-come'],
+      ['review', 'deploy', 'to-come'],
+    ],
+  );
 });
 
 test('an edge naming a step the run does not have draws nothing, and an edge given twice is drawn once', () => {
-  assert.deepEqual(edgesOf(graphOf(after('gone', 'review'), after('gone', 'review'), loop('review', 'gone')), [step('review', 'waiting')]), []);
-  assert.deepEqual(edgesOf(graphOf(after('a', 'b'), after('a', 'b')), [step('a', 'verified'), step('b', 'waiting')]).map((e) => e.id), ['a->b']);
+  assert.deepEqual(
+    edgesOf(graphOf(after('gone', 'review'), after('gone', 'review'), loop('review', 'gone')), [step('review', 'waiting')]),
+    [],
+  );
+  assert.deepEqual(
+    edgesOf(graphOf(after('a', 'b'), after('a', 'b')), [step('a', 'verified'), step('b', 'waiting')]).map((e) => e.id),
+    ['a->b'],
+  );
 });
 
 test("a loop's edge goes from the looping step back to its target, beside the `after` edge it returns along, and is never done", () => {
-  const edges = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement')), [step('implement', 'verified'), step('review', 'verified')]);
-  assert.deepEqual(edges.map(({ id, source, target, kind, state }) => ({ id, source, target, kind, state })), [
-    { id: 'implement->review', source: 'implement', target: 'review', kind: 'after', state: 'done' },
-    // A round that may yet come: to come whatever its ends say.
-    { id: 'loop:review->implement', source: 'review', target: 'implement', kind: 'loop', state: 'to-come' },
+  const edges = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement')), [
+    step('implement', 'verified'),
+    step('review', 'verified'),
   ]);
+  assert.deepEqual(
+    edges.map(({ id, source, target, kind, state }) => ({ id, source, target, kind, state })),
+    [
+      { id: 'implement->review', source: 'implement', target: 'review', kind: 'after', state: 'done' },
+      // A round that may yet come: to come whatever its ends say.
+      { id: 'loop:review->implement', source: 'review', target: 'implement', kind: 'loop', state: 'to-come' },
+    ],
+  );
 });
 
 test("a loop's edge is labelled with the round it is on past the first — the looping step's note first, then its target's", () => {
@@ -124,16 +157,24 @@ test("a loop's edge is labelled with the round it is on past the first — the l
     ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', 3, 'round 4 of 3'],
   ];
   for (const [review, implement, rounds, label] of cases) {
-    const [, back] = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement', rounds)), [step('implement', 'unverified', implement), step('review', 'unverified', review)]);
+    const [, back] = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement', rounds)), [
+      step('implement', 'unverified', implement),
+      step('review', 'unverified', review),
+    ]);
     assert.equal(back!.label, label, `review: ${review}; implement: ${implement}`);
     assert.equal(loopLabel([review, implement], rounds), label);
   }
 });
 
-test("an edge runs while work moves along it — into a step at work or at its check, or back round a loop whose next round is due — and not otherwise", () => {
+test('an edge runs while work moves along it — into a step at work or at its check, or back round a loop whose next round is due — and not otherwise', () => {
   const loopState = (review: string | null, implement: string | null = null) =>
-    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]!.state;
-  assert.equal(loopState('round 2 of 3 due — review asked again, and the next tick files implement'), 'running', 'asked again with rounds left');
+    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]!
+      .state;
+  assert.equal(
+    loopState('round 2 of 3 due — review asked again, and the next tick files implement'),
+    'running',
+    'asked again with rounds left',
+  );
   assert.equal(loopState('round 4 asked (wf round) — the next tick files implement'), 'running', 'a person sent it round');
   const still: Array<[string | null, string | null]> = [
     [null, null],
@@ -143,19 +184,35 @@ test("an edge runs while work moves along it — into a step at work or at its c
     ['try 2 due — retries: 1, 0 spent', null],
     [null, 'round 2 of 3 due — review asked again, and the next tick files implement'],
   ];
-  for (const [review, implement] of still) assert.equal(loopState(review, implement), 'to-come', `review: ${review}; implement: ${implement}`);
+  for (const [review, implement] of still)
+    assert.equal(loopState(review, implement), 'to-come', `review: ${review}; implement: ${implement}`);
 
-  const into = (state: StepState, from: StepState = 'verified') => edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0]!.state;
+  const into = (state: StepState, from: StepState = 'verified') =>
+    edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0]!.state;
   assert.equal(into('working'), 'running', 'its session is at work');
   assert.equal(into('checking'), 'running', 'its check is running');
   // Nothing is moving into a human gate, a refused check, a step asking a person, one that ended badly, or one not filed.
-  const stillInto = ['blocked', 'exhausted', 'failed-check', 'needs-human', 'unsigned', 'denied', 'failed', 'unknown', 'cancelled', 'waiting'] as const;
+  const stillInto = [
+    'blocked',
+    'exhausted',
+    'failed-check',
+    'needs-human',
+    'unsigned',
+    'denied',
+    'failed',
+    'unknown',
+    'cancelled',
+    'waiting',
+  ] as const;
   for (const state of stillInto) assert.equal(into(state), 'to-come', state);
   for (const state of ['verified', 'unverified'] as const) assert.equal(into(state), 'done', state);
   assert.equal(into('waiting', 'working'), 'to-come', 'out of a step at work, nothing has reached the next one yet');
 
   // A card's edge has no step at its start: it reads its root alone.
-  assert.deepEqual([edgeState(true, 'working'), edgeState(true, 'checking'), edgeState(true, 'unverified'), edgeState(true, 'blocked')], ['running', 'running', 'done', 'to-come']);
+  assert.deepEqual(
+    [edgeState(true, 'working'), edgeState(true, 'checking'), edgeState(true, 'unverified'), edgeState(true, 'blocked')],
+    ['running', 'running', 'done', 'to-come'],
+  );
 });
 
 test("an edge is drawn from what it says: in the running colour while it moves, a loop's own colour at rest, dashed while still to come", () => {
@@ -163,7 +220,11 @@ test("an edge is drawn from what it says: in the running colour while it moves, 
     [edgeStroke('to-come', false), edgeStroke('done', false), edgeStroke('running', false), edgeStroke('to-come', true)],
     ['var(--edge-to-come)', 'var(--edge-done)', 'var(--edge-running)', 'var(--edge-loop)'],
   );
-  assert.equal(edgeStroke('running', true), 'var(--edge-running)', 'a loop whose round is due moves as a running edge does, and is told apart by the same colour');
+  assert.equal(
+    edgeStroke('running', true),
+    'var(--edge-running)',
+    'a loop whose round is due moves as a running edge does, and is told apart by the same colour',
+  );
 
   assert.deepEqual(edgeLine('to-come', false), { strokeWidth: 1.5, strokeDasharray: '5 4' });
   assert.deepEqual(edgeLine('done', false), { strokeWidth: 1.5 });
@@ -173,7 +234,7 @@ test("an edge is drawn from what it says: in the running colour while it moves, 
   assert.deepEqual(edgeLine('running', true), { strokeWidth: 2, strokeDasharray: '5 4' });
 });
 
-test("every edge colour is given in both themes — a colour named and never given draws no line at all", () => {
+test('every edge colour is given in both themes — a colour named and never given draws no line at all', () => {
   const css = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'src', 'styles.css'), 'utf8');
   // React Flow in the board's palette: its block for the light theme, then its block again under the dark query.
   const blocks = [...css.matchAll(/\.react-flow \{([^}]*)\}/g)];
@@ -190,7 +251,10 @@ test("every edge colour is given in both themes — a colour named and never giv
 });
 
 test("a loop's path runs from under the looping step, beneath both, and up into its target, its label at the lowest point", () => {
-  const [review, implement] = [{ x: 524, y: 110 }, { x: 112, y: 110 }];
+  const [review, implement] = [
+    { x: 524, y: 110 },
+    { x: 112, y: 110 },
+  ];
   const { path, labelX, labelY } = loopPath(review, implement);
   const m = /^M ([\d.-]+),([\d.-]+) C ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)$/.exec(path);
   assert.ok(m, path);
@@ -210,8 +274,14 @@ test("a loop's path runs from under the looping step, beneath both, and up into 
 });
 
 test('a step goes where a person left it, and a step they never moved where the layering puts it', () => {
-  const computed = new Map([['implement', { x: 0, y: 0 }], ['review', { x: 0, y: 150 }]]);
-  const saved = new Map([['implement', { x: 40, y: -20 }], ['removed-since', { x: 9, y: 9 }]]);
+  const computed = new Map([
+    ['implement', { x: 0, y: 0 }],
+    ['review', { x: 0, y: 150 }],
+  ]);
+  const saved = new Map([
+    ['implement', { x: 40, y: -20 }],
+    ['removed-since', { x: 9, y: 9 }],
+  ]);
   assert.deepEqual(Object.fromEntries(place(['implement', 'review'], computed, saved)), {
     implement: { x: 40, y: -20 },
     review: { x: 0, y: 150 },
@@ -220,7 +290,18 @@ test('a step goes where a person left it, and a step they never moved where the 
 });
 
 test('a saved layout is refused unless it is an object of finite points', () => {
-  const refused = [null, '', 'not json', 'null', '[]', '3', '{"a":null}', '{"a":{"x":1}}', '{"a":{"x":"1","y":2}}', '{"a":{"x":1e999,"y":0}}'];
+  const refused = [
+    null,
+    '',
+    'not json',
+    'null',
+    '[]',
+    '3',
+    '{"a":null}',
+    '{"a":{"x":1}}',
+    '{"a":{"x":"1","y":2}}',
+    '{"a":{"x":1e999,"y":0}}',
+  ];
   for (const raw of refused) assert.equal(parseLayout(raw), null, String(raw));
   assert.deepEqual(Object.fromEntries(parseLayout('{"a":{"x":1,"y":-2.5}}')!), { a: { x: 1, y: -2.5 } });
   assert.deepEqual(parseLayout('{}'), new Map());

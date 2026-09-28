@@ -1,5 +1,27 @@
 /** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands. */
-import { branchesToRead, type BranchStanding, branchStandings, branchWord, CHECK_AFFECTING, closeoutAsked, closeoutReader, consumption, diffStat, exitVerdicts, harnessBlocked, isShipped, lessonLine, merges, phaseOfView, readAsks, resultSteps, runCostLines, sendBackTo, sensitiveDiff, touchedBy } from 'agent-orchestrator';
+import {
+  branchesToRead,
+  type BranchStanding,
+  branchStandings,
+  branchWord,
+  CHECK_AFFECTING,
+  closeoutAsked,
+  closeoutReader,
+  consumption,
+  diffStat,
+  exitVerdicts,
+  harnessBlocked,
+  isShipped,
+  lessonLine,
+  merges,
+  phaseOfView,
+  readAsks,
+  resultSteps,
+  runCostLines,
+  sendBackTo,
+  sensitiveDiff,
+  touchedBy,
+} from 'agent-orchestrator';
 import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
 import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from './judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
@@ -40,7 +62,11 @@ export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
  * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
  * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
  */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
+export type DecideCommand = {
+  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
+  command: string;
+  said: string | null;
+};
 
 /**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
@@ -84,7 +110,12 @@ export type Decidable = {
  * git asked. `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
  * what there is to decide.
  */
-export type RunDecision = { waiting: RunWaiting; holding?: RunHolding } | { holding: RunHolding } | { running: true } | { nothing: string } | Decidable;
+export type RunDecision =
+  | { waiting: RunWaiting; holding?: RunHolding }
+  | { holding: RunHolding }
+  | { running: true }
+  | { nothing: string }
+  | Decidable;
 
 /** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
 export const DIFF_LINES = 400;
@@ -105,10 +136,17 @@ export function diffFiles(diff: string): DiffFile[] {
 function diffPath(lines: readonly string[]): string {
   const hunk = lines.findIndex((line) => line.startsWith('@@'));
   const head = hunk < 0 ? lines : lines.slice(0, hunk);
-  const after = (prefix: string) => head.find((line) => line.startsWith(prefix))?.slice(prefix.length).replace(/\t$/, '');
+  const after = (prefix: string) =>
+    head
+      .find((line) => line.startsWith(prefix))
+      ?.slice(prefix.length)
+      .replace(/\t$/, '');
   const [from, to] = [after('rename from '), after('rename to ')];
   if (from && to) return `${from} → ${to}`;
-  for (const [prefix, side] of [['+++ ', 'b/'], ['--- ', 'a/']] as const) {
+  for (const [prefix, side] of [
+    ['+++ ', 'b/'],
+    ['--- ', 'a/'],
+  ] as const) {
     const named = after(prefix);
     if (named && named !== '/dev/null') return named.startsWith(side) ? named.slice(side.length) : named;
   }
@@ -171,7 +209,13 @@ type AtGate = { step: string; back: string[] };
  * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
  * decides it (cli.ts, `!merges(steps)`).
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: readonly AtGate[] = [], endingMerges = false): DecideCommand[] {
+function commandsOf(
+  run: Run,
+  d: Decision,
+  offers: readonly string[],
+  gates: readonly AtGate[] = [],
+  endingMerges = false,
+): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
     ...offers.map((said): DecideCommand => {
@@ -183,13 +227,18 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: rea
       const approve = `wf approve ${run.id} ${step}`;
       return [
         { label: 'approve', command: approve, said: `${step} waits at its gate — with words: ${approve} --message "<words>"` },
-        ...back.map((name): DecideCommand => ({ label: 'send back', command: `wf retry ${run.id} ${name} --message "<objection>"`, said: null })),
+        ...back.map((name): DecideCommand => ({
+          label: 'send back',
+          command: `wf retry ${run.id} ${name} --message "<objection>"`,
+          said: null,
+        })),
       ];
     }),
   ];
   // A folder run has no branch to ship or drop: its work stays where it is until a person is done with it, and forgetting it is the one
   // command `wf decide` prints (cli.ts, `!git`).
-  if (!isGitRun(run)) return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
+  if (!isGitRun(run))
+    return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
@@ -198,10 +247,10 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: rea
   return [
     ...once,
     ...(first
-      ? [
+      ? ([
           { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
           { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
-        ] satisfies DecideCommand[]
+        ] satisfies DecideCommand[])
       : []),
   ];
 }
@@ -245,22 +294,50 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
   // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too. And what each
   // task's sessions cost (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
   const { spendOf } = judged;
-  const d = decision(steps, run, phase, (branch) => isGitRun(run) && isShipped(run, branch), reader, asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  const d = decision(
+    steps,
+    run,
+    phase,
+    (branch) => isGitRun(run) && isShipped(run, branch),
+    reader,
+    asked,
+    verdicts,
+    asks,
+    rounds,
+    harnessBlocked(views),
+    spendOf,
+  );
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
   // Still running with a step waiting on you: the result steps' branches, as `decision` reads them once it is not (`resultSteps`) —
   // the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose work it acts on.
-  const results = [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))];
+  const results = [
+    ...new Set(
+      resultSteps(steps)
+        .map((s) => run.steps[s.name]?.branch)
+        .filter((b): b is string => Boolean(b)),
+    ),
+  ];
   const result = d.kind === 'awaiting' ? d.branches : results;
   // None of it for a folder run, which has no repository to ask: what its steps made is in their artifacts.
   const git = isGitRun(run) ? run : undefined;
-  const touched: Touched[] = !git ? [] : branchesToRead(result, Object.values(git.steps).map((s) => s.branch), git.isolate ? git.branch : undefined)
-    .map((branch) => ({ branch, radius: touchedBy(git, branch) }));
+  const touched: Touched[] = !git
+    ? []
+    : branchesToRead(
+        result,
+        Object.values(git.steps).map((s) => s.branch),
+        git.isolate ? git.branch : undefined,
+      ).map((branch) => ({ branch, radius: touchedBy(git, branch) }));
   // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run — none for a run
   // that worked on its base branch itself, whose standing would read `main is on main` and whose own line says so instead.
   const standings: Standing[] = git?.isolate
-    ? branchStandings(git, results).map((s) => ({ ...s, said: branchWord(git, s), stat: diffStat(git, s.branch).trim() || null, merge: mergeOf(git, s) }))
+    ? branchStandings(git, results).map((s) => ({
+        ...s,
+        said: branchWord(git, s),
+        stat: diffStat(git, s.branch).trim() || null,
+        merge: mergeOf(git, s),
+      }))
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
@@ -277,7 +354,10 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
     lesson: lessonOf(touched),
     sensitive: git ? touched.map((t) => sensitiveOf(git, t)) : [],
     used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name], steps.find((s) => s.name === name)?.context)])),
-    total: totalOf(steps, filed.map((name) => [name, consumed[name]] as const)),
+    total: totalOf(
+      steps,
+      filed.map((name) => [name, consumed[name]] as const),
+    ),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers, gates, merges(steps)),

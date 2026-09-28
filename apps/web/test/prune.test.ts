@@ -13,10 +13,13 @@ const keys = (run: Prunable, awaiting: Awaiting | null) => pruneOffer(run, await
 
 test('a run nobody waits on — shipped, or called off — is offered its worktrees, or its files too, and nothing about merging', () => {
   const offer = pruneOffer(finished, null)!;
-  assert.deepEqual(offer.choices.map((c) => [c.key, c.how, c.unavailable]), [
-    ['worktrees', { artifacts: false, unmerged: false }, null],
-    ['files', { artifacts: true, unmerged: false }, null],
-  ]);
+  assert.deepEqual(
+    offer.choices.map((c) => [c.key, c.how, c.unavailable]),
+    [
+      ['worktrees', { artifacts: false, unmerged: false }, null],
+      ['files', { artifacts: true, unmerged: false }, null],
+    ],
+  );
   assert.equal(offer.warning, null);
   assert.equal(firstChoice(offer).key, 'worktrees');
   assert.equal(pruneQuestion('r-1', firstChoice(offer), offer), 'Prune r-1: its worktrees? This cannot be undone.');
@@ -24,28 +27,46 @@ test('a run nobody waits on — shipped, or called off — is offered its worktr
 
 test('a run nobody merged is offered the third choice alone, and told its branch becomes the only copy of its work', () => {
   const offer = pruneOffer(finished, unmerged)!;
-  assert.deepEqual(offer.choices.map((c) => c.key), ['worktrees', 'files', 'unmerged']);
+  assert.deepEqual(
+    offer.choices.map((c) => c.key),
+    ['worktrees', 'files', 'unmerged'],
+  );
   // The first two would be refused by the package: each says why, and neither is chosen first.
-  assert.deepEqual(offer.choices.map((c) => c.unavailable), ['Nobody merged it: only the last choice prunes it.', 'Nobody merged it: only the last choice prunes it.', null]);
+  assert.deepEqual(
+    offer.choices.map((c) => c.unavailable),
+    ['Nobody merged it: only the last choice prunes it.', 'Nobody merged it: only the last choice prunes it.', null],
+  );
   const third = firstChoice(offer);
   assert.equal(third.key, 'unmerged');
   assert.equal(third.label, 'Its worktrees and its files, though nobody merged it');
   assert.deepEqual(third.how, { artifacts: true, unmerged: true });
-  assert.match(third.says, /^Its work was never merged: once pruned, wf\/r-1\/implement is the only copy of it\. No branch is ever deleted/);
+  assert.match(
+    third.says,
+    /^Its work was never merged: once pruned, wf\/r-1\/implement is the only copy of it\. No branch is ever deleted/,
+  );
   // Asked twice: the second question says it again.
   const asked = pruneQuestion('r-1', third, offer);
-  assert.match(asked, /^Prune r-1: its worktrees and its files, though nobody merged it\? This cannot be undone\. Its work was never merged/);
+  assert.match(
+    asked,
+    /^Prune r-1: its worktrees and its files, though nobody merged it\? This cannot be undone\. Its work was never merged/,
+  );
   // Two result branches are both named.
-  assert.match(pruneOffer(finished, { branches: ['wf/r-1/a', 'wf/r-1/b'], direct: false })!.warning!, /once pruned, wf\/r-1\/a, wf\/r-1\/b are the only copy of it/);
+  assert.match(
+    pruneOffer(finished, { branches: ['wf/r-1/a', 'wf/r-1/b'], direct: false })!.warning!,
+    /once pruned, wf\/r-1\/a, wf\/r-1\/b are the only copy of it/,
+  );
 });
 
 test('a run that succeeded on its base branch itself (--no-worktree) is offered the third choice, which the package asks for, and told what its decision loses', () => {
   // Succeeded, and nothing on the list says it waits (`toDecide` is never said of such a run): the decision says it does, as `wf prune` reads it.
   const offer = pruneOffer({ ...finished, onDisk: { worktrees: false, files: true } }, direct)!;
-  assert.deepEqual(offer.choices.map((c) => [c.key, c.label, c.unavailable]), [
-    ['files', 'Its files', 'It waits on your decision: only the last choice prunes it.'],
-    ['unmerged', 'Its files, though nobody decided it', null],
-  ]);
+  assert.deepEqual(
+    offer.choices.map((c) => [c.key, c.label, c.unavailable]),
+    [
+      ['files', 'Its files', 'It waits on your decision: only the last choice prunes it.'],
+      ['unmerged', 'Its files, though nobody decided it', null],
+    ],
+  );
   assert.equal(firstChoice(offer).key, 'unmerged');
   assert.deepEqual(firstChoice(offer).how, { artifacts: true, unmerged: true });
   assert.match(offer.warning!, /^It worked on main itself and nobody has decided it/);
@@ -57,14 +78,30 @@ test('a failed run whose branch a person merged by hand shipped, as the package 
   const shippedByHand = { nothing: 'shipped — wf/r-1/implement is already on main' };
   const failed = { ...finished, status: 'failed' as const };
   const offer = pruneOffer(failed, awaitingOf(shippedByHand))!;
-  assert.deepEqual(offer.choices.map((c) => [c.key, c.unavailable]), [['worktrees', null], ['files', null]]);
+  assert.deepEqual(
+    offer.choices.map((c) => [c.key, c.unavailable]),
+    [
+      ['worktrees', null],
+      ['files', null],
+    ],
+  );
   assert.equal(offer.warning, null);
   assert.equal(firstChoice(offer).key, 'worktrees');
   assert.equal(firstChoice(pruneOffer(failed, unmerged)!).key, 'unmerged');
 });
 
-test("the decision is read for its `awaiting` alone: null for every answer but a decidable one, and for an api older than the field", () => {
-  const decidable = { standings: [], touched: [], lesson: { said: '', state: 'nothing' as const }, sensitive: [], used: {}, total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null }, cost: null, overBudget: null, commands: [] };
+test('the decision is read for its `awaiting` alone: null for every answer but a decidable one, and for an api older than the field', () => {
+  const decidable = {
+    standings: [],
+    touched: [],
+    lesson: { said: '', state: 'nothing' as const },
+    sensitive: [],
+    used: {},
+    total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null },
+    cost: null,
+    overBudget: null,
+    commands: [],
+  };
   assert.deepEqual(awaitingOf({ ...decidable, awaiting: unmerged }), unmerged);
   assert.equal(awaitingOf({ ...decidable, awaiting: null }), null);
   assert.equal(awaitingOf(decidable as never), null);
@@ -73,7 +110,9 @@ test("the decision is read for its `awaiting` alone: null for every answer but a
 });
 
 test('only what is on disk is offered: its files alone once its worktrees are gone, its worktrees alone with no files, and nothing once both are', () => {
-  assert.deepEqual(keys({ ...finished, onDisk: { worktrees: false, files: true } }, null), [['files', 'Its files', { artifacts: true, unmerged: false }]]);
+  assert.deepEqual(keys({ ...finished, onDisk: { worktrees: false, files: true } }, null), [
+    ['files', 'Its files', { artifacts: true, unmerged: false }],
+  ]);
   assert.deepEqual(keys({ ...finished, onDisk: { worktrees: false, files: true } }, unmerged), [
     ['files', 'Its files', { artifacts: true, unmerged: false }],
     ['unmerged', 'Its files, though nobody merged it', { artifacts: true, unmerged: true }],
@@ -88,7 +127,11 @@ test('only what is on disk is offered: its files alone once its worktrees are go
 });
 
 test('nothing is offered of a folder run, a run still running, or one with something still moving', () => {
-  for (const run of [{ ...finished, place: 'folder' as const }, { ...finished, status: 'running' as const }, { ...finished, moving: true }]) {
+  for (const run of [
+    { ...finished, place: 'folder' as const },
+    { ...finished, status: 'running' as const },
+    { ...finished, moving: true },
+  ]) {
     assert.equal(prunable(run), false, JSON.stringify(run));
     assert.equal(pruneOffer(run, unmerged), null, JSON.stringify(run));
   }

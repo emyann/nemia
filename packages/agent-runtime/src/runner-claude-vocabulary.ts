@@ -13,7 +13,15 @@ import type { SpawnRequest } from './runner.ts';
  * arguments, and still takes `default`, which its help no longer lists. `file()` asks before a task
  * is journalled. Refused at spawn instead, a bad mode failed the whole tick, on every pass.
  */
-export const CLAUDE_PERMISSION_MODES: readonly string[] = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
+export const CLAUDE_PERMISSION_MODES: readonly string[] = [
+  'acceptEdits',
+  'auto',
+  'bypassPermissions',
+  'default',
+  'dontAsk',
+  'manual',
+  'plan',
+];
 
 /**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
@@ -64,10 +72,34 @@ export type ClaudeFlags = {
  * every Claude Code spawn is held to this list (`test/claude-code.test.ts`), so a flag the runtime starts giving is added.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
-  'print', 'p', 'bg', 'name', 'inputFormat', 'outputFormat', 'verbose', 'resume', 'continue', 'sessionId', 'forkSession',
-  'permissionPrompts', 'permissionMode', 'dangerouslySkipPermissions', 'allowDangerouslySkipPermissions',
-  'model', 'effort', 'tools', 'disallowedTools', 'allowedTools', 'mcpConfig', 'strictMcpConfig', 'noChrome', 'chrome',
-  'autocompact', 'jsonSchema', 'worktree', 'maxBudgetUsd',
+  'print',
+  'p',
+  'bg',
+  'name',
+  'inputFormat',
+  'outputFormat',
+  'verbose',
+  'resume',
+  'continue',
+  'sessionId',
+  'forkSession',
+  'permissionPrompts',
+  'permissionMode',
+  'dangerouslySkipPermissions',
+  'allowDangerouslySkipPermissions',
+  'model',
+  'effort',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'mcpConfig',
+  'strictMcpConfig',
+  'noChrome',
+  'chrome',
+  'autocompact',
+  'jsonSchema',
+  'worktree',
+  'maxBudgetUsd',
   // Every job reads its checkout's settings and not the operator's (`claudePrintFlags`); a background session is not given it.
   'settingSources',
 ];
@@ -112,9 +144,11 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
  * which only a background session opens, and which `claudeFlagsOf` would otherwise spell onto a prompt that runs and exits. The
  * engine's own door words it with the harnesses that do bridge (`harnessRefusalOf` in `facade.ts`); this is the Effect door's.
  */
-export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task) ?? (bridgeAsked(task)
-  ? '`claude.remoteControl` asks for a session bridged to claude.ai, and `claude -p` runs a prompt and exits: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
-  : undefined);
+export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
+  claudeRefuses(task) ??
+  (bridgeAsked(task)
+    ? '`claude.remoteControl` asks for a session bridged to claude.ai, and `claude -p` runs a prompt and exits: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
+    : undefined);
 
 /**
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
@@ -122,8 +156,11 @@ export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | u
  * and a `--bg` session given a $0.01 cap read a file 42 times, spent $0.19 and ended `done` (measured on 2.1.272, and by
  * `test/live.test.ts`). A cap that caps nothing is refused rather than carried; `claude -p` keeps one.
  */
-export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task) ?? (task.config?.budgetUsd === undefined ? undefined
-  : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
+export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
+  claudeRefuses(task) ??
+  (task.config?.budgetUsd === undefined
+    ? undefined
+    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
 
 /**
  * What Claude Code cannot be asked for as the engine runs it by default, in the mode the task chose. A job (`claude -p`, the
@@ -135,7 +172,8 @@ export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | un
   const refused = claudeRefuses(task);
   if (refused) return refused;
   if (task.config?.background) {
-    return task.config?.budgetUsd === undefined ? undefined
+    return task.config?.budgetUsd === undefined
+      ? undefined
       : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). Leave \`config.background\` off to run the task as a job (\`claude -p\`), which ends the session at its cap, or leave \`budgetUsd\` off.`;
   }
   return bridgeAsked(task)

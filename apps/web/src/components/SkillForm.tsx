@@ -10,7 +10,15 @@ import { Field } from './AgentForm';
  * words. `readOnly` draws a skill the board does not write: the repository's, or one HKB ships. `between` draws what sits between the card and
  * the instructions — the page's switch — told whether the form holds unsaved words, and `onChanged` tells the page the same.
  */
-export function SkillForm({ detail, readOnly = false, saving, refusal, onSave, between, onChanged }: {
+export function SkillForm({
+  detail,
+  readOnly = false,
+  saving,
+  refusal,
+  onSave,
+  between,
+  onChanged,
+}: {
   detail: SkillDetail | null;
   readOnly?: boolean;
   saving: boolean;
@@ -111,7 +119,8 @@ export function SkillForm({ detail, readOnly = false, saving, refusal, onSave, b
             </Button>
           )}
           <p className="text-xs text-muted-foreground">
-            A save changes every agent that gives it, from what a later <code>wf start</code> freezes. A run already started keeps what it froze.
+            A save changes every agent that gives it, from what a later <code>wf start</code> freezes. A run already started keeps what it
+            froze.
           </p>
         </div>
       )}

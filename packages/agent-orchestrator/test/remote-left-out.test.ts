@@ -24,7 +24,8 @@ delete process.env.WF_MAX_RUNS;
 process.env.WF_MAX_CONCURRENT = '10';
 const BIN = scratch('wf-remote-left-out-bin-');
 const CALLS = path.join(BIN, 'calls.log');
-for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
+for (const name of ['claude', 'codex'])
+  fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const { main } = await import('../src/cli.ts');
 
@@ -35,14 +36,23 @@ async function said(argv: string[]): Promise<string> {
   const err: string[] = [];
   const { log, error } = console;
   console.log = () => {};
-  console.error = (...args: unknown[]) => { err.push(args.join(' ')); };
-  try { await main(argv); } finally { Object.assign(console, { log, error }); }
+  console.error = (...args: unknown[]) => {
+    err.push(args.join(' '));
+  };
+  try {
+    await main(argv);
+  } finally {
+    Object.assign(console, { log, error });
+  }
   return err.join('\n');
 }
 
 const DIR = path.join(ROOT, 'workflows', 'remote');
 fs.mkdirSync(DIR, { recursive: true });
-fs.writeFileSync(path.join(DIR, 'work.md'), '---\nworkspace: folder\nharness: a2a:reviewer\n---\nRead the note and say whether it is right.\n');
+fs.writeFileSync(
+  path.join(DIR, 'work.md'),
+  '---\nworkspace: folder\nharness: a2a:reviewer\n---\nRead the note and say whether it is right.\n',
+);
 
 /** `wf start` of the remote team, from the store, and the run's id. */
 async function started(): Promise<string> {
@@ -50,7 +60,9 @@ async function started(): Promise<string> {
   process.chdir(ROOT);
   const out: string[] = [];
   const { log } = console;
-  console.log = (...args: unknown[]) => { out.push(args.join(' ')); };
+  console.log = (...args: unknown[]) => {
+    out.push(args.join(' '));
+  };
   try {
     await main(['start', 'a note on tides', '--workflows', DIR]);
     return out.join('\n').split(/\s+/)[0]!;
@@ -63,7 +75,13 @@ async function started(): Promise<string> {
 /** The engine's journal of a run's step, as it stands on disk. */
 const journal = (run: string): Array<Record<string, unknown>> => {
   const file = path.join(ROOT, 'engine', 'tasks', `${run}-work.jsonl`);
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line)) : [];
+  return fs.existsSync(file)
+    ? fs
+        .readFileSync(file, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+    : [];
 };
 const ended = (run: string) => journal(run).filter((e) => e.kind === 'ended');
 
@@ -85,7 +103,10 @@ for (const [what, text] of [
       }
       const queued = await started();
       await said(['tick']);
-      assert.ok(journal(queued).some((e) => e.kind === 'filed'), 'the second step is filed, queued, before the file changes');
+      assert.ok(
+        journal(queued).some((e) => e.kind === 'filed'),
+        'the second step is filed, queued, before the file changes',
+      );
       assert.equal(ended(away).length, 0, 'the first is at work on the agent');
 
       fs.writeFileSync(FILE, text);
@@ -94,9 +115,17 @@ for (const [what, text] of [
         await said(['tick']);
         await said(['ls']);
       }
-      assert.equal(fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '', '', 'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session');
+      assert.equal(
+        fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8') : '',
+        '',
+        'Claude Code was asked nothing: no job spawned, and no listing looked in for a remote session',
+      );
       assert.equal(ended(away).length, 0, `the step at work is held, neither there nor gone: ${JSON.stringify(journal(away))}`);
-      assert.equal(journal(queued).some((e) => e.kind === 'spawned'), false, `the queued step was never spawned: ${JSON.stringify(journal(queued))}`);
+      assert.equal(
+        journal(queued).some((e) => e.kind === 'spawned'),
+        false,
+        `the queued step was never spawned: ${JSON.stringify(journal(queued))}`,
+      );
       const refused = ended(queued);
       assert.equal(refused.length, 1, JSON.stringify(journal(queued)));
       assert.equal(refused[0]!.reason, 'unstartable');

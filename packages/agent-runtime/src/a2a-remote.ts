@@ -44,10 +44,21 @@
  */
 import { Effect } from 'effect';
 import { AgentCard, type AgentInterface, type Message, type SecurityScheme, type Task } from '@a2a-js/sdk';
-import { Client, ClientFactory, createAuthenticatingFetchWithRetry, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
 import {
-  ContentTypeNotSupportedError, ExtensionSupportRequiredError, RequestMalformedError, TaskNotCancelableError,
-  TaskNotFoundError, UnsupportedOperationError, VersionNotSupportedError,
+  Client,
+  ClientFactory,
+  createAuthenticatingFetchWithRetry,
+  JsonRpcTransportFactory,
+  RestTransportFactory,
+} from '@a2a-js/sdk/client';
+import {
+  ContentTypeNotSupportedError,
+  ExtensionSupportRequiredError,
+  RequestMalformedError,
+  TaskNotCancelableError,
+  TaskNotFoundError,
+  UnsupportedOperationError,
+  VersionNotSupportedError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -135,19 +146,25 @@ export const remoteConfigRefusal = (harness: string, agent: Record<string, unkno
     return `the \`${harness}\` harness's \`card\` is not an agent card: give the JSON object the agent serves at \`/.well-known/agent-card.json\`, or its \`url\`.`;
   }
   const interfaces = (card as { supportedInterfaces?: unknown }).supportedInterfaces;
-  if (!Array.isArray(interfaces) || !interfaces.length || interfaces.some((i) => typeof i?.url !== 'string' || typeof i?.protocolBinding !== 'string')) {
+  if (
+    !Array.isArray(interfaces) ||
+    !interfaces.length ||
+    interfaces.some((i) => typeof i?.url !== 'string' || typeof i?.protocolBinding !== 'string')
+  ) {
     return `the \`${harness}\` harness's \`card\` lists no interface to reach the agent by: its \`supportedInterfaces\` must give each a \`url\` and a \`protocolBinding\`.`;
   }
   return undefined;
 };
 
 /** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
-export const remoteRefuses = (harness: string) => (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-  const keys = Object.keys(task.config ?? {});
-  return keys.length
-    ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
-    : undefined;
-};
+export const remoteRefuses =
+  (harness: string) =>
+  (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+    const keys = Object.keys(task.config ?? {});
+    return keys.length
+      ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
+      : undefined;
+  };
 
 /**
  * A card as JSON, read into the SDK's objects. A card that follows the specification is proto JSON (`AgentCard.toJSON`),
@@ -172,7 +189,12 @@ const originOf = (url: string): string | undefined => (URL.canParse(url) ? new U
 type Auth = { headers: Record<string, string> } | { refusal: string };
 
 /** One scheme's header, or why it cannot be sent. */
-const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () => string | undefined, missing: () => string | undefined): [string, string] | string => {
+const headerOf = (
+  name: string,
+  scheme: SecurityScheme | undefined,
+  secret: () => string | undefined,
+  missing: () => string | undefined,
+): [string, string] | string => {
   const s = scheme?.scheme;
   if (!s) return `\`${name}\` is not a scheme the card declares`;
   const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
@@ -202,14 +224,25 @@ const headerOf = (name: string, scheme: SecurityScheme | undefined, secret: () =
 };
 
 /** What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met. */
-const authOf = (card: AgentCard, agentUrl: string, harness: string, credentials: Credentials | undefined, missing?: MissingCredential): Auth => {
+const authOf = (
+  card: AgentCard,
+  agentUrl: string,
+  harness: string,
+  credentials: Credentials | undefined,
+  missing?: MissingCredential,
+): Auth => {
   if (!card.securityRequirements.length) return { headers: {} };
   const why: string[] = [];
   for (const requirement of card.securityRequirements) {
     const headers: Record<string, string> = {};
     const unmet: string[] = [];
     for (const name of Object.keys(requirement.schemes)) {
-      const h = headerOf(name, card.securitySchemes[name], () => credentials?.(name, agentUrl, harness), () => missing?.(name, agentUrl, harness));
+      const h = headerOf(
+        name,
+        card.securitySchemes[name],
+        () => credentials?.(name, agentUrl, harness),
+        () => missing?.(name, agentUrl, harness),
+      );
       if (typeof h === 'string') unmet.push(h);
       else headers[h[0]] = h[1];
     }
@@ -236,8 +269,12 @@ class Late extends Error {}
 
 /** An A2A error an agent answers before it has done anything with a message: the send was refused, not lost. */
 const REFUSALS = [
-  ContentTypeNotSupportedError, ExtensionSupportRequiredError, RequestMalformedError, UnsupportedOperationError,
-  VersionNotSupportedError, TaskNotFoundError,
+  ContentTypeNotSupportedError,
+  ExtensionSupportRequiredError,
+  RequestMalformedError,
+  UnsupportedOperationError,
+  VersionNotSupportedError,
+  TaskNotFoundError,
 ];
 
 const untaken = (e: unknown): boolean => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
@@ -278,7 +315,12 @@ type Answer = { task: Task } | { message: Message } | { refused: string } | { fa
 
 /** Whether a process lives: one this user cannot signal lives too. */
 const alive = (pid: number): boolean => {
-  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';
+  }
 };
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
@@ -292,7 +334,8 @@ const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'can
 const upgraded = (e: Entry): Entry => {
   const seen = e.seen as (Omit<Sighting, 'state'> & { state: string }) | undefined;
   if (!seen || isSessionState(seen.state)) return e;
-  const state = seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : formerStateOf(seen.state) ?? 'failed';
+  const state =
+    seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : (formerStateOf(seen.state) ?? 'failed');
   return { ...e, seen: { ...seen, state } };
 };
 
@@ -305,7 +348,12 @@ export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCred
  * which `sendMs` bounds; `spawnWaitMs` is how long a spawn waits in the pass for its answer.
  */
 export const remoteOps = (
-  harness: string, agent: RemoteAgent, root: string, credentials?: Credentials, requestMs = REQUEST_MS, o: RemoteOptions = {},
+  harness: string,
+  agent: RemoteAgent,
+  root: string,
+  credentials?: Credentials,
+  requestMs = REQUEST_MS,
+  o: RemoteOptions = {},
 ): RunnerOps => {
   const sendMs = o.sendMs ?? SEND_MS;
   const spawnWaitMs = o.spawnWaitMs ?? SPAWN_WAIT_MS;
@@ -313,14 +361,18 @@ export const remoteOps = (
   const inFlight = new Map<string, AbortController>();
   /** An entry whose send is under way in a process that lives, and has not reached its bound. */
   const sendingLive = (e: Entry): boolean =>
-    e.sending !== undefined && e.taskId === undefined && Date.parse(e.sending.until) > Date.now()
-    && (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
+    e.sending !== undefined &&
+    e.taskId === undefined &&
+    Date.parse(e.sending.until) > Date.now() &&
+    (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
   const dir = path.join(root, 'remote');
   const done = path.join(dir, 'done');
   const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
 
   const readEntry = (file: string): Entry | undefined => {
-    try { return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry); } catch (e) {
+    try {
+      return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry);
+    } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw e;
     }
@@ -334,14 +386,18 @@ export const remoteOps = (
   /** This harness's open entries: those at the top of the registry, sent through it. */
   const open = (): Entry[] => {
     let names: string[];
-    try { names = fs.readdirSync(dir); } catch (e) {
+    try {
+      names = fs.readdirSync(dir);
+    } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw e;
     }
-    return names.filter((f) => f.endsWith('.json')).flatMap((f) => {
-      const e = readEntry(path.join(dir, f));
-      return e && e.agent === harness ? [e] : [];
-    });
+    return names
+      .filter((f) => f.endsWith('.json'))
+      .flatMap((f) => {
+        const e = readEntry(path.join(dir, f));
+        return e && e.agent === harness ? [e] : [];
+      });
   };
   /**
    * The entry of the session under `sessionId`, open or let go of. A settled task's view names its session by the id
@@ -352,14 +408,23 @@ export const remoteOps = (
     const all: Entry[] = [];
     for (const under of [dir, done]) {
       let names: string[] = [];
-      try { names = fs.readdirSync(under); } catch { /* none yet */ }
+      try {
+        names = fs.readdirSync(under);
+      } catch {
+        /* none yet */
+      }
       for (const f of names.filter((n) => n.endsWith('.json'))) {
         const e = readEntry(path.join(under, f));
         if (e?.agent === harness) all.push(e);
       }
     }
-    return all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId)
-      ?? all.filter((e) => e.contextId === sessionId && e.taskId).sort((a, b) => a.sentAt.localeCompare(b.sentAt)).at(-1);
+    return (
+      all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??
+      all
+        .filter((e) => e.contextId === sessionId && e.taskId)
+        .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
+        .at(-1)
+    );
   };
 
   // ─── the agent, as the client knows it: a view, dropped on failure ────────
@@ -385,12 +450,20 @@ export const remoteOps = (
     const at = cardUrlOf(address);
     let response: Response;
     // The card carries no secret, so a redirect to it is followed: what it names is held to the address's origin below.
-    try { response = await bounded(at, { headers: { accept: 'application/json' } }); } catch (e) {
-      throw new Refusal(`the agent's card could not be read at ${shownUrl(at)} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`);
+    try {
+      response = await bounded(at, { headers: { accept: 'application/json' } });
+    } catch (e) {
+      throw new Refusal(
+        `the agent's card could not be read at ${shownUrl(at)} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`,
+      );
     }
-    if (!response.ok) throw new Refusal(`the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`);
+    if (!response.ok)
+      throw new Refusal(
+        `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`,
+      );
     const json = await response.json().catch(() => undefined);
-    if (typeof json !== 'object' || json === null) throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
+    if (typeof json !== 'object' || json === null)
+      throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
     return cardOfJson(json as Record<string, unknown>);
   };
 
@@ -399,27 +472,41 @@ export const remoteOps = (
     const spoken = spokenOf(card);
     const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
     if (!chosen && spoken.length) {
-      throw new Refusal(`the agent's card names ${spoken.map((i) => i.url).join(', ')}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`);
+      throw new Refusal(
+        `the agent's card names ${spoken.map((i) => i.url).join(', ')}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
+      );
     }
     if (!chosen) {
       const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);
-      throw new Refusal(`the agent's card offers ${offered.length ? offered.join(', ') : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`);
+      throw new Refusal(
+        `the agent's card offers ${offered.length ? offered.join(', ') : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`,
+      );
     }
     const agentUrl = address ?? chosen.url;
     // Asked on every request, so a secret that changes is sent as it is now; a refusal here was said before the send.
-    const fetchImpl = createAuthenticatingFetchWithRetry(async (input, init) => {
-      const response = await bounded(input, { ...init, redirect: 'manual' });
-      if (response.status >= 300 && response.status < 400) {
-        throw new Redirected(`the agent answered ${response.status} to ${response.headers.get('location') ?? 'nowhere it named'}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`);
-      }
-      if (response.status === 401 || response.status === 403) {
-        throw new AuthRefused(`the agent refused the request's authentication (${response.status} ${response.statusText}): check what \`credentials\` gives for the schemes its card declares.`);
-      }
-      return response;
-    }, {
-      headers: async () => { const a = authOf(card, agentUrl, harness, credentials); return 'headers' in a ? a.headers : {}; },
-      shouldRetryWithHeaders: async () => undefined,
-    });
+    const fetchImpl = createAuthenticatingFetchWithRetry(
+      async (input, init) => {
+        const response = await bounded(input, { ...init, redirect: 'manual' });
+        if (response.status >= 300 && response.status < 400) {
+          throw new Redirected(
+            `the agent answered ${response.status} to ${response.headers.get('location') ?? 'nowhere it named'}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`,
+          );
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new AuthRefused(
+            `the agent refused the request's authentication (${response.status} ${response.statusText}): check what \`credentials\` gives for the schemes its card declares.`,
+          );
+        }
+        return response;
+      },
+      {
+        headers: async () => {
+          const a = authOf(card, agentUrl, harness, credentials);
+          return 'headers' in a ? a.headers : {};
+        },
+        shouldRetryWithHeaders: async () => undefined,
+      },
+    );
     // The card handed over already read, with only the interface chosen: the factory takes it as it is.
     const only: AgentCard = { ...card, supportedInterfaces: [chosen] };
     const factory = new ClientFactory({
@@ -431,18 +518,32 @@ export const remoteOps = (
 
   const client = async () => {
     seam ??= connect();
-    try { return await seam; } catch (e) { seam = undefined; throw e; }
+    try {
+      return await seam;
+    } catch (e) {
+      seam = undefined;
+      throw e;
+    }
   };
   /** A call to the agent; a failure drops what the client knew, and the next call reads the card again. */
   const ask = async <A>(f: (c: Client) => Promise<A>): Promise<A> => {
     const { client: c } = await client();
-    try { return await f(c); } catch (e) { seam = undefined; throw e; }
+    try {
+      return await f(c);
+    } catch (e) {
+      seam = undefined;
+      throw e;
+    }
   };
 
-  const failure = (verb: string) => (cause: unknown): RunnerError =>
-    cause instanceof RunnerError ? cause
-      : cause instanceof Refusal ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
-      : new RunnerError({ verb, message: `the \`${harness}\` harness: ${messageOf(cause)}` });
+  const failure =
+    (verb: string) =>
+    (cause: unknown): RunnerError =>
+      cause instanceof RunnerError
+        ? cause
+        : cause instanceof Refusal
+          ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
+          : new RunnerError({ verb, message: `the \`${harness}\` harness: ${messageOf(cause)}` });
 
   // ─── the verbs ────────────────────────────────────────────────────────────
 
@@ -451,10 +552,17 @@ export const remoteOps = (
     const signal = AbortSignal.any([stop]);
     sends.add(signal);
     try {
-      const answer = await ask((c) => c.sendMessage({
-        tenant: '', message: remoteMessageOf(r, intent.messageId), metadata: undefined,
-        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-      }, { signal }));
+      const answer = await ask((c) =>
+        c.sendMessage(
+          {
+            tenant: '',
+            message: remoteMessageOf(r, intent.messageId),
+            metadata: undefined,
+            configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+          },
+          { signal },
+        ),
+      );
       return 'status' in answer ? { task: answer } : { message: answer };
     } catch (e) {
       if (stop.aborted) return { canceled: true };
@@ -465,9 +573,10 @@ export const remoteOps = (
   };
 
   /** Why a send's answer is not known, in words: the agent may be at work on it. */
-  const doubtOf = (name: string, e: unknown): string => late(e)
-    ? `the agent did not answer the send of \`${name}\` within ${sendMs / 1000} s`
-    : `the send of \`${name}\` failed on the way (${messageOf(e)})`;
+  const doubtOf = (name: string, e: unknown): string =>
+    late(e)
+      ? `the agent did not answer the send of \`${name}\` within ${sendMs / 1000} s`
+      : `the send of \`${name}\` failed on the way (${messageOf(e)})`;
   const NOT_TWICE = 'whether the agent made a Task of it is not known, and it is not sent twice.';
 
   /**
@@ -492,12 +601,20 @@ export const remoteOps = (
     if ('message' in answer) {
       // Answered with a Message: the agent made no Task, and what it said is the session, ended.
       const m = answer.message;
-      const text = m.parts.map((p) => (p.content?.$case === 'text' ? p.content.value : p.content?.$case === 'data' ? JSON.stringify(p.content.value) : '')).join('\n');
+      const text = m.parts
+        .map((p) => (p.content?.$case === 'text' ? p.content.value : p.content?.$case === 'data' ? JSON.stringify(p.content.value) : ''))
+        .join('\n');
       const data = m.parts.find((p) => p.content?.$case === 'data');
       write({
-        ...sent, taskId: m.messageId, contextId: m.contextId, reply: text, ended: true,
+        ...sent,
+        taskId: m.messageId,
+        contextId: m.contextId,
+        reply: text,
+        ended: true,
         seen: {
-          sessionId: m.messageId, state: 'completed', ...(m.contextId ? { nativeId: m.contextId } : {}),
+          sessionId: m.messageId,
+          state: 'completed',
+          ...(m.contextId ? { nativeId: m.contextId } : {}),
           ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
         },
       });
@@ -509,7 +626,13 @@ export const remoteOps = (
         fs.rmSync(fileOf(intent.name), { force: true });
         throw new Refusal(answer.refused);
       }
-      write({ ...sent, taskId: intent.messageId, ended: true, refused: answer.refused, seen: { sessionId: intent.messageId, state: 'rejected' } });
+      write({
+        ...sent,
+        taskId: intent.messageId,
+        ended: true,
+        refused: answer.refused,
+        seen: { sessionId: intent.messageId, state: 'rejected' },
+      });
       return;
     }
     if ('canceled' in answer) {
@@ -522,40 +645,61 @@ export const remoteOps = (
     if (inPass) throw new Error(`${doubt}: ${NOT_TWICE}`, { cause: answer.failed });
   };
 
-  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> => Effect.tryPromise({
-    catch: failure('spawn'),
-    try: async () => {
-      const recorded = readEntry(fileOf(r.name));
-      if (recorded?.taskId) return; // Sent before, and answered: the Task is adopted, and nothing is sent again.
-      if (recorded && sendingLive(recorded)) return; // Being sent by a process that lives: read `submitted` until it answers.
-      if (recorded) {
-        throw new Error(`\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since ${recorded.doubt ?? 'the process sending it stopped first'}: ${NOT_TWICE}`);
-      }
-      const { card, agentUrl } = await client();
-      const auth = authOf(card, agentUrl, harness, credentials, o.missingCredential);
-      if ('refusal' in auth) throw new Refusal(auth.refusal);
-      const sentAt = new Date();
-      const intent: Entry = {
-        name: r.name, agent: harness, messageId: randomUUID(), ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}), sentAt: sentAt.toISOString(),
-        sending: { pid: process.pid, until: new Date(sentAt.getTime() + sendMs).toISOString() },
-      };
-      write(intent);
-      const stop = new AbortController();
-      inFlight.set(r.name, stop);
-      const answered = sendOf(r, intent, stop.signal);
-      let timer: NodeJS.Timeout | undefined;
-      const waited = new Promise<'waited'>((resolve) => { timer = setTimeout(() => resolve('waited'), spawnWaitMs); });
-      const first = await Promise.race([answered, waited]);
-      clearTimeout(timer);
-      if (first === 'waited') {
-        // Not answered yet: the pass goes on, and the answer is written when it comes. A root removed meanwhile has no
-        // entry to write, and nothing reads one.
-        void answered.then((a) => { try { record(intent, a, false); } catch { /* the registry is gone */ } finally { inFlight.delete(r.name); } });
-        return;
-      }
-      try { record(intent, first, true); } finally { inFlight.delete(r.name); }
-    },
-  });
+  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
+    Effect.tryPromise({
+      catch: failure('spawn'),
+      try: async () => {
+        const recorded = readEntry(fileOf(r.name));
+        if (recorded?.taskId) return; // Sent before, and answered: the Task is adopted, and nothing is sent again.
+        if (recorded && sendingLive(recorded)) return; // Being sent by a process that lives: read `submitted` until it answers.
+        if (recorded) {
+          throw new Error(
+            `\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since ${recorded.doubt ?? 'the process sending it stopped first'}: ${NOT_TWICE}`,
+          );
+        }
+        const { card, agentUrl } = await client();
+        const auth = authOf(card, agentUrl, harness, credentials, o.missingCredential);
+        if ('refusal' in auth) throw new Refusal(auth.refusal);
+        const sentAt = new Date();
+        const intent: Entry = {
+          name: r.name,
+          agent: harness,
+          messageId: randomUUID(),
+          ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}),
+          sentAt: sentAt.toISOString(),
+          sending: { pid: process.pid, until: new Date(sentAt.getTime() + sendMs).toISOString() },
+        };
+        write(intent);
+        const stop = new AbortController();
+        inFlight.set(r.name, stop);
+        const answered = sendOf(r, intent, stop.signal);
+        let timer: NodeJS.Timeout | undefined;
+        const waited = new Promise<'waited'>((resolve) => {
+          timer = setTimeout(() => resolve('waited'), spawnWaitMs);
+        });
+        const first = await Promise.race([answered, waited]);
+        clearTimeout(timer);
+        if (first === 'waited') {
+          // Not answered yet: the pass goes on, and the answer is written when it comes. A root removed meanwhile has no
+          // entry to write, and nothing reads one.
+          void answered.then((a) => {
+            try {
+              record(intent, a, false);
+            } catch {
+              /* the registry is gone */
+            } finally {
+              inFlight.delete(r.name);
+            }
+          });
+          return;
+        }
+        try {
+          record(intent, first, true);
+        } finally {
+          inFlight.delete(r.name);
+        }
+      },
+    });
 
   /** One open entry, as seen now: from the registry once ended, else asked of the agent. */
   const sightingOf = async (e: Entry & { taskId: string }): Promise<Sighting | undefined> => {
@@ -575,7 +719,11 @@ export const remoteOps = (
   };
 
   /** A send under way, as a pass reads it: a Task the agent has, as far as anyone can tell, and has not started. */
-  const submittedOf = (e: Entry): Sighting => ({ sessionId: e.messageId, state: 'submitted', ...(e.contextId ? { nativeId: e.contextId } : {}) });
+  const submittedOf = (e: Entry): Sighting => ({
+    sessionId: e.messageId,
+    state: 'submitted',
+    ...(e.contextId ? { nativeId: e.contextId } : {}),
+  });
 
   const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.tryPromise({
     catch: failure('observe'),
@@ -589,80 +737,95 @@ export const remoteOps = (
   });
 
   /** Cancel the Task; one that has ended, or that the agent no longer has, has nothing to stop. */
-  const cancel = (taskId: string) => ask((c) => c.cancelTask({ tenant: '', id: taskId, metadata: undefined })).then(
-    () => undefined,
-    (e) => { if (e instanceof TaskNotCancelableError || e instanceof TaskNotFoundError) return undefined; throw e; },
-  );
+  const cancel = (taskId: string) =>
+    ask((c) => c.cancelTask({ tenant: '', id: taskId, metadata: undefined })).then(
+      () => undefined,
+      (e) => {
+        if (e instanceof TaskNotCancelableError || e instanceof TaskNotFoundError) return undefined;
+        throw e;
+      },
+    );
 
-  const stop = (sessionId: string): Effect.Effect<void, RunnerError> => Effect.tryPromise({
-    catch: failure('stop'),
-    try: async () => {
-      const e = bySession(sessionId);
-      if (e?.reply !== undefined || e?.refused !== undefined) return; // A reply, or a refusal, is no Task: nothing runs.
-      if (e && e.taskId === undefined) {
-        // Still being sent: cut the send, if this process makes it. One another process makes is its to answer, and a
-        // Task it brings back is cancelled on the next stop.
-        inFlight.get(e.name)?.abort();
-        return;
-      }
-      await cancel(e?.taskId ?? sessionId);
-    },
-  });
+  const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>
+    Effect.tryPromise({
+      catch: failure('stop'),
+      try: async () => {
+        const e = bySession(sessionId);
+        if (e?.reply !== undefined || e?.refused !== undefined) return; // A reply, or a refusal, is no Task: nothing runs.
+        if (e && e.taskId === undefined) {
+          // Still being sent: cut the send, if this process makes it. One another process makes is its to answer, and a
+          // Task it brings back is cancelled on the next stop.
+          inFlight.get(e.name)?.abort();
+          return;
+        }
+        await cancel(e?.taskId ?? sessionId);
+      },
+    });
 
-  const logs = (sessionId: string): Effect.Effect<string, RunnerError> => Effect.tryPromise({
-    catch: failure('logs'),
-    try: async () => {
-      const e = bySession(sessionId);
-      if (e?.reply !== undefined) return `agent: ${e.reply}`;
-      if (e?.refused !== undefined) return `REJECTED — ${e.refused}`;
-      if (e && e.seen?.state === 'canceled' && e.taskId === e.messageId) return `CANCELED — stopped while it was being sent, before the agent answered`;
-      if (e && e.taskId === undefined) {
-        return sendingLive(e) ? `SUBMITTED — sent at ${e.sentAt}; the agent has not answered yet` : `sent at ${e.sentAt}, and its answer was never recorded${e.doubt ? `: ${e.doubt}` : ''}`;
-      }
-      const taskId = e?.taskId ?? sessionId;
-      try {
-        return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined })));
-      } catch (err) {
-        if (err instanceof TaskNotFoundError) return `(the agent no longer has the Task \`${taskId}\`)`;
-        throw err;
-      }
-    },
-  });
+  const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
+    Effect.tryPromise({
+      catch: failure('logs'),
+      try: async () => {
+        const e = bySession(sessionId);
+        if (e?.reply !== undefined) return `agent: ${e.reply}`;
+        if (e?.refused !== undefined) return `REJECTED — ${e.refused}`;
+        if (e && e.seen?.state === 'canceled' && e.taskId === e.messageId)
+          return `CANCELED — stopped while it was being sent, before the agent answered`;
+        if (e && e.taskId === undefined) {
+          return sendingLive(e)
+            ? `SUBMITTED — sent at ${e.sentAt}; the agent has not answered yet`
+            : `sent at ${e.sentAt}, and its answer was never recorded${e.doubt ? `: ${e.doubt}` : ''}`;
+        }
+        const taskId = e?.taskId ?? sessionId;
+        try {
+          return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined })));
+        } catch (err) {
+          if (err instanceof TaskNotFoundError) return `(the agent no longer has the Task \`${taskId}\`)`;
+          throw err;
+        }
+      },
+    });
 
-  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> => Effect.try({
-    catch: failure('find'),
-    try: () => {
-      const e = readEntry(fileOf(name)) ?? readEntry(fileOf(name, done));
-      return e?.agent === harness && e.taskId ? { sessionId: e.taskId } : undefined;
-    },
-  });
+  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
+    Effect.try({
+      catch: failure('find'),
+      try: () => {
+        const e = readEntry(fileOf(name)) ?? readEntry(fileOf(name, done));
+        return e?.agent === harness && e.taskId ? { sessionId: e.taskId } : undefined;
+      },
+    });
 
   // The engine has written the attempt's end: a Task still running is cancelled — an attempt ends so only on its deadline or
   // a stop — and the entry leaves the open registry, so no later pass asks the agent about it.
-  const release = (session: Sighting): Effect.Effect<void, RunnerError> => Effect.tryPromise({
-    catch: failure('release'),
-    try: async () => {
-      const e = open().find((o) => o.taskId === session.sessionId || (o.taskId === undefined && o.messageId === session.sessionId));
-      if (!e) return;
-      if (e.taskId === undefined) inFlight.get(e.name)?.abort(); // Still being sent: cut, and whatever answers is let go of.
-      else if (!e.ended && e.reply === undefined && e.refused === undefined) await cancel(session.sessionId);
-      fs.mkdirSync(done, { recursive: true });
-      fs.renameSync(fileOf(e.name), fileOf(e.name, done));
-    },
-  });
+  const release = (session: Sighting): Effect.Effect<void, RunnerError> =>
+    Effect.tryPromise({
+      catch: failure('release'),
+      try: async () => {
+        const e = open().find((o) => o.taskId === session.sessionId || (o.taskId === undefined && o.messageId === session.sessionId));
+        if (!e) return;
+        if (e.taskId === undefined) inFlight.get(e.name)?.abort(); // Still being sent: cut, and whatever answers is let go of.
+        else if (!e.ended && e.reply === undefined && e.refused === undefined) await cancel(session.sessionId);
+        fs.mkdirSync(done, { recursive: true });
+        fs.renameSync(fileOf(e.name), fileOf(e.name, done));
+      },
+    });
 
   // Words for a Task that waits on its caller, as A2A's follow-up on it (the facade refuses them to a Task at work).
-  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> => Effect.tryPromise({
-    catch: failure('say'),
-    try: async () => {
-      const e = readEntry(fileOf(session.name));
-      await ask((c) => c.sendMessage({
-        tenant: '', message: remoteFollowUpOf(session.sessionId, e?.contextId ?? '', text, randomUUID()), metadata: undefined,
-        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-      }));
-    },
-  });
+  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> =>
+    Effect.tryPromise({
+      catch: failure('say'),
+      try: async () => {
+        const e = readEntry(fileOf(session.name));
+        await ask((c) =>
+          c.sendMessage({
+            tenant: '',
+            message: remoteFollowUpOf(session.sessionId, e?.contextId ?? '', text, randomUUID()),
+            metadata: undefined,
+            configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+          }),
+        );
+      },
+    });
 
   return { spawn, observe, find, stop, logs, release, say, refuses: remoteRefuses(harness) };
 };
-

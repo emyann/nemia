@@ -8,7 +8,26 @@
 import { Context, Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { admissionOf, atWorkState, awaitsAdmission, decide, fold, nameFor, needsHuman, phaseWordOf, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Input, type SessionState, type Sighting, type State, type Usage } from './domain.ts';
+import {
+  admissionOf,
+  atWorkState,
+  awaitsAdmission,
+  decide,
+  fold,
+  nameFor,
+  needsHuman,
+  phaseWordOf,
+  settledQuiet,
+  spawnRefused,
+  turnOf,
+  waitsForInput,
+  type Action,
+  type Input,
+  type SessionState,
+  type Sighting,
+  type State,
+  type Usage,
+} from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner, type ExpectedSession } from './runner.ts';
@@ -27,7 +46,6 @@ export const GRACE_MS = 30_000;
 /** A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled` are not. */
 export const LIVE: ReadonlySet<SessionState> = new Set(['submitted', 'working', 'input-required', 'auth-required']);
 
-
 /** A move the lifecycle refused in a pass: which task, and the state and event it had no edge for (`Refusal`). */
 export type RefusedMove = { taskId: string } & Refusal;
 
@@ -36,7 +54,9 @@ export const refusedText = (m: RefusedMove): string =>
   `${m.taskId}  stalled: its lifecycle has no edge from ${m.state} on ${m.event}, so nothing is done; it is asked again each pass`;
 
 export type TaskView = {
-  id: string; state: State; phase: string;
+  id: string;
+  state: State;
+  phase: string;
   /** The session as its harness lists it — or, once the harness has let it go, its own id as recorded. */
   sessionId: string | null;
   /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
@@ -61,9 +81,14 @@ export type TaskView = {
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
-  brief: string; cwd: string;
-  harness?: string; config?: HarnessArgs; deadlineSeconds?: number; resumeFrom?: string;
-  closeoutSchema?: object; id?: string;
+  brief: string;
+  cwd: string;
+  harness?: string;
+  config?: HarnessArgs;
+  deadlineSeconds?: number;
+  resumeFrom?: string;
+  closeoutSchema?: object;
+  id?: string;
   /** Wait for a person when an attempt signs, rather than settle (R1): `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
   /** Wait for `admit` before each turn starts, rather than start on the next pass (stage 4c). See the `filed` event. */
@@ -81,12 +106,13 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
  * nobody keeps. The words say where trying again went. Shared with `ae`'s brief (`retiredBriefKey` in `cli.ts`).
  */
 export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
-  maxAttempts: 'the runtime makes one attempt per start, and trying again is the caller\'s',
+  maxAttempts: "the runtime makes one attempt per start, and trying again is the caller's",
   resume: 'the runtime makes one attempt per start, so there is no later attempt for a policy to continue or not',
 };
 
 /** What to do instead of a retired key: file the task again, or, in a workflow, let the orchestrator try again. */
-export const RETIRED_INSTEAD = 'To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for a try with `wf retry <run> <step>` (`--nudge` continues the last try\'s session, `--fresh` starts clean).';
+export const RETIRED_INSTEAD =
+  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for a try with `wf retry <run> <step>` (`--nudge` continues the last try's session, `--fresh` starts clean).";
 
 /** Why a key a task no longer takes is refused, and what to do instead. */
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
@@ -96,7 +122,8 @@ export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\`
  * chooses what starts, and when. Shared by every refusal of them — `priority` here, the pass's arguments, `createEngine`'s
  * `maxConcurrent` and a harness's `pool` (`facade.ts`), and `AE_MAX_CONCURRENT` (`cli.ts`).
  */
-export const ADMIT_INSTEAD = 'File tasks `queued: true` and `admit` each when it may start (`ae admit <id>`); in a workflow the orchestrator admits by pool under `WF_MAX_CONCURRENT`.';
+export const ADMIT_INSTEAD =
+  'File tasks `queued: true` and `admit` each when it may start (`ae admit <id>`); in a workflow the orchestrator admits by pool under `WF_MAX_CONCURRENT`.';
 
 /** Why a task filed with `priority`, at any value, is refused: the runtime chooses no order since it keeps no slots. */
 export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order. ${ADMIT_INSTEAD}`;
@@ -148,10 +175,16 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
   yield* journal.append(id, {
-    kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
-    harness: spec.harness, config: spec.config,
-    deadlineSeconds: spec.deadlineSeconds, resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema, holdOpen: spec.holdOpen,
+    kind: 'filed',
+    at: new Date().toISOString(),
+    brief: spec.brief,
+    cwd: spec.cwd,
+    harness: spec.harness,
+    config: spec.config,
+    deadlineSeconds: spec.deadlineSeconds,
+    resumeFrom: spec.resumeFrom,
+    closeoutSchema: spec.closeoutSchema,
+    holdOpen: spec.holdOpen,
     // Always written, `false` too: a filing with no key is from before stage 4c, and reads as queued.
     queued: spec.queued === true,
   });
@@ -166,7 +199,8 @@ export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefus
 /** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
 export const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
-  if (state.settled) return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (state.settled)
+    return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
   return undefined;
 };
 
@@ -214,9 +248,12 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
-  if (!state.holdOpen) return `\`${taskId}\` was not filed to be held open, so it settles when an attempt signs and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
-  if (state.settled) return `\`${taskId}\` has settled (${state.settled}): it waits for nothing. File a task that continues its session (\`resumeFrom\`) to go on.`;
-  if (state.closed) return `\`${taskId}\` has been closed: the next pass settles it. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (!state.holdOpen)
+    return `\`${taskId}\` was not filed to be held open, so it settles when an attempt signs and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
+  if (state.settled)
+    return `\`${taskId}\` has settled (${state.settled}): it waits for nothing. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (state.closed)
+    return `\`${taskId}\` has been closed: the next pass settles it. File a task that continues its session (\`resumeFrom\`) to go on.`;
   if (state.stopRequested) return `\`${taskId}\` has been asked to stop: the next pass settles it.`;
   const last = state.attempts.at(-1);
   if (waitsForInput(state)) {
@@ -228,7 +265,8 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   if (last.ended === null) {
     return `\`${taskId}\`'s attempt ${last.n} is running.${verb === 'answer' ? ' `say` tells a running session something;' : ' `stop` ends it now;'} ask again once \`ae ls\` says \`input-required\`.`;
   }
-  if ((last.turn ?? 0) < state.inputs.length) return `\`${taskId}\` has been answered already, and its next turn starts on the next pass. Ask again once \`ae ls\` says \`input-required\`.`;
+  if ((last.turn ?? 0) < state.inputs.length)
+    return `\`${taskId}\` has been answered already, and its next turn starts on the next pass. Ask again once \`ae ls\` says \`input-required\`.`;
   return `\`${taskId}\`'s attempt ${last.n} ended \`${last.ended}\`, and the task is between attempts, not waiting for an answer. Ask again once \`ae ls\` says \`input-required\`, or \`stop\` it.`;
 };
 
@@ -252,8 +290,7 @@ export const answer = Effect.fn('answer')(function* (taskId: string, text: strin
   const events = yield* journal.read(taskId);
   const state = events.length ? fold(taskId, events) : undefined;
   const runner = yield* Runner;
-  const refused = answerRefusalOf(taskId, state, text, config)
-    ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
+  const refused = answerRefusalOf(taskId, state, text, config) ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
   if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
   const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
   yield* journal.append(taskId, { kind: 'input', ...input });
@@ -271,7 +308,10 @@ export const close = Effect.fn('close')(function* (taskId: string) {
 
 /** The task as it was filed, with a turn's own configuration laid over its own: what a harness is asked of an answer's. */
 export const filingOf = (state: State, turn?: HarnessArgs): Filing => ({
-  brief: state.brief, cwd: state.cwd, harness: state.harness, config: configForTurn(state.config, turn),
+  brief: state.brief,
+  cwd: state.cwd,
+  harness: state.harness,
+  config: configForTurn(state.config, turn),
 });
 
 /**
@@ -339,7 +379,8 @@ export class StepRefused extends Schema.TaggedError<StepRefused>()('StepRefused'
  * argument was the ceiling's `slots`, and a caller built against that door would have had it dropped without a word.
  */
 export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
-  extra.length === 0 ? undefined
+  extra.length === 0
+    ? undefined
     : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
 /**
@@ -347,16 +388,14 @@ export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
  * ceiling's `slots` until stage 4c part 2, and a `{ used, max }` in `maxSteps`'s place compares false and settles nothing.
  */
 export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
-  Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0 ? undefined
+  Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0
+    ? undefined
     : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps as string | number | bigint | boolean | symbol | undefined)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
 /** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */
 const ALL_READ: ReadonlySet<string> = new Set();
 
-export const step = Effect.fn('step')(function* (
-  taskId: string,
-  observed: ReadonlyMap<string, Sighting>,
-) {
+export const step = Effect.fn('step')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   // Typed to take two, and asked all the same: a caller built against the old door still passes the ceiling's slots.
   const refused = stepRefusalOf([...arguments].slice(2));
   if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
@@ -364,11 +403,7 @@ export const step = Effect.fn('step')(function* (
 });
 
 /** A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not take. */
-const stepOn = Effect.fn('stepOn')(function* (
-  taskId: string,
-  observed: ReadonlyMap<string, Sighting>,
-  unread: ReadonlySet<string>,
-) {
+const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
   const journal = yield* Journal;
   const runner = yield* Runner;
 
@@ -389,7 +424,13 @@ const stepOn = Effect.fn('stepOn')(function* (
       // `resumeFrom` is journalled with it, and what a continued session is told in place of the brief (a later turn's
       // answer), so what an attempt was told to continue, and what it was told, are facts on the record rather than
       // re-derived later.
-      yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge });
+      yield* journal.append(taskId, {
+        kind: 'starting',
+        at: at(),
+        attempt: action.attempt,
+        resumeFrom: action.resumeFrom,
+        nudge: action.nudge,
+      });
       break;
 
     case 'spawn': {
@@ -407,21 +448,35 @@ const stepOn = Effect.fn('stepOn')(function* (
       // What it continues and what it is told are taken from the journal rather than recomputed: the decision was
       // made when the attempt was started, possibly by an engine that has since died.
       const attempt = state.attempts.find((a) => a.n === action.attempt);
-      const failed = yield* runner.spawn({
-        name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd, harness: state.harness,
-        // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's. An
-        // answer may give its turn its own (`answer`), laid over the filing's without being read; a task never answered has the filing's.
-        config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
-        closeoutSchema: state.closeoutSchema, resumeFrom: attempt?.resumeFrom,
-      }).pipe(
-        Effect.as(undefined),
-        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
-      );
+      const failed = yield* runner
+        .spawn({
+          name: action.name,
+          brief: attempt?.nudge ?? state.brief,
+          cwd: state.cwd,
+          harness: state.harness,
+          // The harness's arguments, handed on unopened: the runner's to read (`harness-args.ts`), never this loop's. An
+          // answer may give its turn its own (`answer`), laid over the filing's without being read; a task never answered has the filing's.
+          config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),
+          closeoutSchema: state.closeoutSchema,
+          resumeFrom: attempt?.resumeFrom,
+        })
+        .pipe(
+          Effect.as(undefined),
+          Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+        );
       if (failed?.refused) {
         // The lifecycle's edge for it, as for every other move: the attempt's `unstartable` end, or its refusal.
         const end = spawnRefused(state, action.attempt, failed.message, move);
         if (end.do !== 'record-end') return end;
-        yield* journal.append(taskId, { kind: 'ended', at: at(), attempt: end.attempt, sessionId: end.sessionId, observed: end.observed, reason: end.reason, error: end.error });
+        yield* journal.append(taskId, {
+          kind: 'ended',
+          at: at(),
+          attempt: end.attempt,
+          sessionId: end.sessionId,
+          observed: end.observed,
+          reason: end.reason,
+          error: end.error,
+        });
       } else {
         yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
       }
@@ -433,9 +488,19 @@ const stepOn = Effect.fn('stepOn')(function* (
       // read off the same sighting the ending came from, and written beside it. Facts for the record; `decide` sees none of them.
       const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
-        kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
-        observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout, ...(action.stated !== undefined ? { stated: action.stated } : {}), usage: seen?.usage, exitCode: seen?.exitCode, denials: seen?.denials, limit: seen?.limit,
+        kind: 'ended',
+        at: at(),
+        attempt: action.attempt,
+        sessionId: action.sessionId,
+        observed: action.observed,
+        reason: action.reason,
+        nativeId: action.nativeId,
+        closeout: action.closeout,
+        ...(action.stated !== undefined ? { stated: action.stated } : {}),
+        usage: seen?.usage,
+        exitCode: seen?.exitCode,
+        denials: seen?.denials,
+        limit: seen?.limit,
       });
       break;
     }
@@ -451,7 +516,13 @@ const stepOn = Effect.fn('stepOn')(function* (
       // from before settles over an open one; kept for the task that journal is replayed into.
       const last = state.attempts.at(-1);
       const open = last && last.ended === null ? observed.get(nameFor(taskId, last.n))?.nativeId : undefined;
-      yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note, ...(open ? { nativeId: open } : {}) });
+      yield* journal.append(taskId, {
+        kind: 'settled',
+        at: at(),
+        outcome: action.outcome,
+        note: action.note,
+        ...(open ? { nativeId: open } : {}),
+      });
       break;
     }
   }
@@ -469,11 +540,7 @@ const stepOn = Effect.fn('stepOn')(function* (
  */
 const PROGRESSES = new Set(['start', 'spawn', 'record-end', 'settle']);
 
-export const settleTask = Effect.fn('settleTask')(function* (
-  taskId: string,
-  observed: ReadonlyMap<string, Sighting>,
-  maxSteps = 8,
-) {
+export const settleTask = Effect.fn('settleTask')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, maxSteps = 8) {
   const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
   if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
   return yield* settleOn(taskId, observed, ALL_READ, maxSteps);
@@ -519,7 +586,11 @@ const settleOn = Effect.fn('settleOn')(function* (
  * session whose harness could not be read this pass (`unread`) counts as listed, released nothing: it may still be there, and
  * before 2026-09-25 one failed read dropped it from the memo's look, so a release the harness had refused was never asked again.
  */
-const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
+const releaseFinished = Effect.fn('releaseFinished')(function* (
+  state: Releasable,
+  observed: ReadonlyMap<string, Sighting>,
+  unread: ReadonlySet<string>,
+) {
   const runner = yield* Runner;
   const journal = yield* Journal;
   let wrote = false;
@@ -535,13 +606,16 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: Releasabl
     }
     listed = true;
     // The task's harness arguments, unopened: the runner reads there whether it cut a worktree it must keep.
-    const released = yield* runner.release(session, state.config ?? {}).pipe(
-      Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
-    );
+    const released = yield* runner
+      .release(session, state.config ?? {})
+      .pipe(Effect.catchTag('RunnerError', () => Effect.succeed(undefined)));
     const measured = typeof released === 'object' ? released : session.usage;
     // By value, not by key: `{ costUsd: undefined }` measured nothing, and a journal that writes JSON drops the key, so
     // asked by key it was new on every pass (found in review).
-    if (measured && (Object.keys(measured) as Array<keyof Usage>).some((key) => measured[key] !== undefined && attempt.usage?.[key] === undefined)) {
+    if (
+      measured &&
+      (Object.keys(measured) as Array<keyof Usage>).some((key) => measured[key] !== undefined && attempt.usage?.[key] === undefined)
+    ) {
       yield* journal.append(state.taskId, { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
       wrote = true;
     }
@@ -559,7 +633,8 @@ export class TickRefused extends Schema.TaggedError<TickRefused>()('TickRefused'
  * pools it counted in, and an untyped caller still passing `tick(3)` would have had its ceiling dropped without a word.
  */
 export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
-  args.length === 0 ? undefined
+  args.length === 0
+    ? undefined
     : `the pass takes no arguments, and was handed ${args.length}: it has no ceiling and no pools since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
 /**
@@ -584,7 +659,9 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
  * first pass after it.
  */
-const expectedOf = (states: Iterable<Pick<State, 'taskId' | 'harness'> & { attempts: ReadonlyArray<{ n: number }> }>): ExpectedSession[] => {
+const expectedOf = (
+  states: Iterable<Pick<State, 'taskId' | 'harness'> & { attempts: ReadonlyArray<{ n: number }> }>,
+): ExpectedSession[] => {
   const expected: ExpectedSession[] = [];
   for (const state of states) for (const a of state.attempts) expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness });
   return expected;
@@ -604,7 +681,11 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  * The memo's proof, in `verify` alone: a skipped task folded all the same, and decided, as the pass would have without the
  * memo. A difference fails the pass, naming the task, rather than being mended quietly.
  */
-const verifyKept = Effect.fn('verifyKept')(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
+const verifyKept = Effect.fn('verifyKept')(function* (
+  kept: Releasable,
+  observed: ReadonlyMap<string, Sighting>,
+  unread: ReadonlySet<string>,
+) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
   const decided = decide(fresh, closedOut(fresh, observed), { at: new Date(), graceMs: GRACE_MS, unread }, yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
@@ -651,9 +732,9 @@ export const tick = Effect.fn('tick')(function* () {
   const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
   // What a harness could not read is said (`unread`), and neither decided on nor let go of as gone. A runner that cannot be
   // told what to look for lists everything, and fails the pass when it cannot.
-  const { seen: observed, unread } = yield* (runner.observeFor
+  const { seen: observed, unread } = yield* runner.observeFor
     ? runner.observeFor(expectedOf(lookedFor))
-    : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ }))));
+    : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ })));
 
   const taken: Action[] = [];
   const views: TaskView[] = [];
@@ -725,8 +806,13 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
   for (const id of new Set(taskIds)) states.push(fold(id, yield* journal.read(id)));
   const open = states.filter((state) => !state.settled && state.attempts.length);
   const observed = open.length
-    ? yield* (runner.observeFor ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) })))).pipe(Effect.map((o) => o.seen)) : runner.observe).pipe(
-      Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
+    ? yield* (
+        runner.observeFor
+          ? runner
+              .observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) }))))
+              .pipe(Effect.map((o) => o.seen))
+          : runner.observe
+      ).pipe(Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
     : new Map<string, Sighting>();
   return states.map((state) => viewOfState(state, observed));
 });
@@ -740,22 +826,36 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const live = last && last.ended === null && sighting ? phaseWordOf(sighting.state) : undefined;
   const phase = state.settled
     ? state.settled
-    // Held open (R1), signed and waiting for a person's answer or close: A2A's TASK_STATE_INPUT_REQUIRED, and nothing running.
-    : waitsForInput(state) ? 'input-required'
-    : needsHuman(state, observed) ? 'needs-human'
-    // `working` and not busy: it believes it has work and is computing nothing. Said out loud,
-    // because it is indistinguishable from progress in every other view and it is what a stalled
-    // step looks like from outside.
-    : live === 'working' && sighting?.busy === false ? 'working (quiescent)'
-    : live ? `running (${live})`
-    // Spawned but not yet in the harness's registry: the grace window, not a gap between attempts.
-    : last?.ended === null ? 'starting'
-    : last ? 'between attempts'
-    : 'pending';
+    : // Held open (R1), signed and waiting for a person's answer or close: A2A's TASK_STATE_INPUT_REQUIRED, and nothing running.
+      waitsForInput(state)
+      ? 'input-required'
+      : needsHuman(state, observed)
+        ? 'needs-human'
+        : // `working` and not busy: it believes it has work and is computing nothing. Said out loud,
+          // because it is indistinguishable from progress in every other view and it is what a stalled
+          // step looks like from outside.
+          live === 'working' && sighting?.busy === false
+          ? 'working (quiescent)'
+          : live
+            ? `running (${live})`
+            : // Spawned but not yet in the harness's registry: the grace window, not a gap between attempts.
+              last?.ended === null
+              ? 'starting'
+              : last
+                ? 'between attempts'
+                : 'pending';
   // A released session is in no observation; the id its end was recorded with is what `logs` reads then.
   // Only where the phase this pass computed is `needs-human`: the word answers "waiting for what?", and there is no
   // question to answer about a session nobody is waiting on. Carried, not judged — `decide` never saw it.
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage, ...(waitingFor ? { waitingFor } : {}), ...(admission ? { admission } : {}) };
+  return {
+    id: taskId,
+    state,
+    phase,
+    sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
+    usage: sighting?.usage,
+    ...(waitingFor ? { waitingFor } : {}),
+    ...(admission ? { admission } : {}),
+  };
 }

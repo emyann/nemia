@@ -76,7 +76,9 @@ test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness
   // one that names no harness argument (`limit === 'budget'`).
   const BUDGET = /budget/i;
   for (const file of CORE) {
-    const lines = codeOf(fs.readFileSync(file, 'utf8')).split('\n').flatMap((line, i) => (BUDGET.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+    const lines = codeOf(fs.readFileSync(file, 'utf8'))
+      .split('\n')
+      .flatMap((line, i) => (BUDGET.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
     assert.deepEqual(lines, [], `${file} judges a budget`);
   }
   for (const line of ["if (sighting.limit === 'budget') return settle('failed');", 'budgetSpent?: boolean;', "reason: 'budget',"]) {

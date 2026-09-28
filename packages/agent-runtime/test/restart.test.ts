@@ -18,10 +18,18 @@ import type { RunnerOps } from '../src/runner.ts';
 const world = (o: { spawnHangs?: boolean } = {}) => {
   const tasks = new Map<string, Event[]>();
   const journal: PromiseJournal = {
-    async append(taskId, event) { tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); },
-    async read(taskId) { return [...(tasks.get(taskId) ?? [])]; },
-    async list() { return [...tasks.keys()].sort(); },
-    async feed() { return { entries: [], cursor: 0 }; },
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+    },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed() {
+      return { entries: [], cursor: 0 };
+    },
   };
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, unknown]> = [];
@@ -34,12 +42,17 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
       // The runtime dies with the session registered and the spawn not yet answered.
       if (o.spawnHangs) await new Promise(() => {});
     },
-    async observe() { asked.push(['observe', undefined]); return new Map(sessions); },
+    async observe() {
+      asked.push(['observe', undefined]);
+      return new Map(sessions);
+    },
     async stop(sessionId) {
       asked.push(['stop', sessionId]);
       for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
-    async logs() { return ''; },
+    async logs() {
+      return '';
+    },
   } satisfies PromiseRunner;
   /** A runtime's process, started on what outlives it. */
   const runtime = () => createEngine({ journal, harnesses: { fake } });
@@ -56,7 +69,16 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
 
 const filing = { id: 't-r', brief: 'keep at it', cwd: '/repo', harness: 'fake' };
 /** Listed by the session's context: the id its harness gave it, `s-1`, which a new process learns only from the harness. */
-const listing = { tenant: '', contextId: 's-1', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: 50, pageToken: '', historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false };
+const listing = {
+  tenant: '',
+  contextId: 's-1',
+  status: TaskState.TASK_STATE_UNSPECIFIED,
+  pageSize: 50,
+  pageToken: '',
+  historyLength: undefined,
+  statusTimestampAfter: undefined,
+  includeArtifacts: false,
+};
 
 test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async () => {
   const w = world();
@@ -72,14 +94,21 @@ test('a restarted runtime answers for a session it never started, then stops it 
   assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING);
   assert.deepEqual(sightingOf(task), w.sessions.get('ae/t-r/1'));
   const listed = await fresh.listTasks(listing);
-  assert.deepEqual(listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]), [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]]);
+  assert.deepEqual(
+    listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]),
+    [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]],
+  );
 
   // Stopped by the second runtime: its tick cancels the session through its agent, which stops it on the harness.
   await b.stop(id);
   w.asked.length = 0;
   await b.tick();
   // The pass observes; then the agent asked to cancel observes to find the session, and stops it: the seam's path.
-  assert.deepEqual(w.asked, [['observe', undefined], ['observe', undefined], ['stop', 's-1']]);
+  assert.deepEqual(w.asked, [
+    ['observe', undefined],
+    ['observe', undefined],
+    ['stop', 's-1'],
+  ]);
   assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
   await b.tick();
   assert.equal((await b.view(id)).phase, 'stopped');
@@ -98,14 +127,24 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
   // Never answered: the session exists, and the journal says only that its attempt was starting.
   void a.tick();
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(w.asked.filter(([verb]) => verb === 'spawn'), [['spawn', 'ae/t-r/1']]);
-  assert.deepEqual((await w.journal.read(id)).map((e) => e.kind), ['filed', 'starting']);
+  assert.deepEqual(
+    w.asked.filter(([verb]) => verb === 'spawn'),
+    [['spawn', 'ae/t-r/1']],
+  );
+  assert.deepEqual(
+    (await w.journal.read(id)).map((e) => e.kind),
+    ['filed', 'starting'],
+  );
 
   const b = w.runtime();
   const task = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
   assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING, 'the agent answers off the harness before any tick');
   await b.tick();
-  assert.deepEqual(w.asked.filter(([verb]) => verb === 'spawn'), [['spawn', 'ae/t-r/1']], 'adopted, not spawned again');
+  assert.deepEqual(
+    w.asked.filter(([verb]) => verb === 'spawn'),
+    [['spawn', 'ae/t-r/1']],
+    'adopted, not spawned again',
+  );
   assert.equal((await b.view(id)).phase, 'running (working)');
 
   w.sessions.set('ae/t-r/1', { ...w.sessions.get('ae/t-r/1')!, state: 'completed', busy: false });

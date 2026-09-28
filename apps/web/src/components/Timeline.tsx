@@ -20,27 +20,45 @@ export function Timeline({ run }: { run: RunDetail }) {
     <section aria-label="Timeline" className="space-y-2">
       <h2 className="text-sm font-medium">Timeline</h2>
       <p className="text-xs text-neutral-500">
-        Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more than
-        its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each session at,
-        once it ended; a check costs nothing.
+        Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more
+        than its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each
+        session at, once it ended; a check costs nothing.
       </p>
       <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
         <table className="w-full text-left text-xs tabular-nums">
           <thead className="bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
             <tr>
               {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
-                <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">{heading}</th>
+                <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">
+                  {heading}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-900">
-            {steps.flatMap((step) => step.timeline.flatMap((t) => [
-              <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
-              ...(t.check ? [<SpanRow key={`${step.name}/${t.try}/check`} step={step.name} label={`try ${t.try} check`} task="check" span={t.check} used={null} cost={null} />] : []),
-            ]))}
+            {steps.flatMap((step) =>
+              step.timeline.flatMap((t) => [
+                <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
+                ...(t.check
+                  ? [
+                      <SpanRow
+                        key={`${step.name}/${t.try}/check`}
+                        step={step.name}
+                        label={`try ${t.try} check`}
+                        task="check"
+                        span={t.check}
+                        used={null}
+                        cost={null}
+                      />,
+                    ]
+                  : []),
+              ]),
+            )}
           </tbody>
           <tfoot className="border-t border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-            {totals.map((total) => <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />)}
+            {totals.map((total) => (
+              <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />
+            ))}
           </tfoot>
         </table>
       </div>
@@ -54,35 +72,69 @@ const CELL = 'px-2 py-1 whitespace-nowrap';
 const tryLabel = (t: StepTimelineTry) => `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
 
 function TryRow({ step, t }: { step: string; t: StepTimelineTry }) {
-  if (t.session) return <SpanRow step={step} label={tryLabel(t)} task="session" span={t.session} used={t.used?.used ?? null} cost={t.used?.cost ?? null} />;
+  if (t.session)
+    return (
+      <SpanRow step={step} label={tryLabel(t)} task="session" span={t.session} used={t.used?.used ?? null} cost={t.used?.cost ?? null} />
+    );
   return (
     <tr data-step={step} data-try={t.try} data-task="session" data-at="rechecked">
       <td className={`${CELL} font-medium`}>{step}</td>
       <td className={`${CELL} font-mono`}>{tryLabel(t)}</td>
-      <td colSpan={7} className={`${CELL} text-neutral-500`}>its session is try {t.sessionOf}'s, checked again</td>
+      <td colSpan={7} className={`${CELL} text-neutral-500`}>
+        its session is try {t.sessionOf}'s, checked again
+      </td>
     </tr>
   );
 }
 
 /** A task's row: its instants and times, and for a session what it used and what it cost, in `wf decide`'s words — `not measured`, never $0. */
-function SpanRow({ step, label, task, span, used, cost }: { step: string; label: string; task: 'session' | 'check'; span: TaskSpan; used: string | null; cost: string | null }) {
+function SpanRow({
+  step,
+  label,
+  task,
+  span,
+  used,
+  cost,
+}: {
+  step: string;
+  label: string;
+  task: 'session' | 'check';
+  span: TaskSpan;
+  used: string | null;
+  cost: string | null;
+}) {
   const lost = span.at === 'unknown';
   return (
-    <tr data-step={step} data-task={task} data-at={span.at} className={task === 'check' ? 'text-neutral-600 dark:text-neutral-400' : undefined}>
+    <tr
+      data-step={step}
+      data-task={task}
+      data-at={span.at}
+      className={task === 'check' ? 'text-neutral-600 dark:text-neutral-400' : undefined}
+    >
       <td className={`${CELL} font-medium`}>{task === 'session' ? step : ''}</td>
       <td className={`${CELL} font-mono`}>{label}</td>
       {lost ? (
-        <td colSpan={7} data-cell="lost" className={`${CELL} text-neutral-500`}>the engine has no record of {span.taskId}</td>
+        <td colSpan={7} data-cell="lost" className={`${CELL} text-neutral-500`}>
+          the engine has no record of {span.taskId}
+        </td>
       ) : (
         <>
           <td className={CELL}>{instant(span.filedAt, 'not known')}</td>
           <td className={CELL}>{instant(span.spawnedAt, span.at === 'queued' || span.at === 'starting' ? 'not yet' : '—')}</td>
           <td className={CELL}>{instant(span.endedAt, span.at === 'running' ? 'no end yet' : '—')}</td>
-          <td data-cell="queued" className={`${CELL} font-mono`}>{span.queued}</td>
-          <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>{span.ran}</td>
+          <td data-cell="queued" className={`${CELL} font-mono`}>
+            {span.queued}
+          </td>
+          <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>
+            {span.ran}
+          </td>
           {/* Before what it used, which runs long: a cost is a few characters, and in view without scrolling the table. */}
-          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>{cost ?? ''}</td>
-          <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>{used ?? ''}</td>
+          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>
+            {cost ?? ''}
+          </td>
+          <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>
+            {used ?? ''}
+          </td>
         </>
       )}
     </tr>
@@ -94,14 +146,26 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
   const what = total.round === null ? "the run's tries" : `round ${total.round}'s sessions`;
   return (
     <tr data-total={total.round === null ? 'run' : `round-${total.round}`} data-loop={total.loop ?? undefined} className="font-medium">
-      <td colSpan={2} className={CELL}>{total.round === null ? 'run' : `${named ? `${total.loop} ` : ''}round ${total.round}`}</td>
-      <td colSpan={3} data-cell="wall" className={`${CELL} font-mono`}>wall {total.wall}</td>
-      <td data-cell="queued" className={`${CELL} font-mono`}>{total.queued}</td>
-      <td data-cell="ran" className={`${CELL} font-mono`}>{total.ran}</td>
+      <td colSpan={2} className={CELL}>
+        {total.round === null ? 'run' : `${named ? `${total.loop} ` : ''}round ${total.round}`}
+      </td>
+      <td colSpan={3} data-cell="wall" className={`${CELL} font-mono`}>
+        wall {total.wall}
+      </td>
+      <td data-cell="queued" className={`${CELL} font-mono`}>
+        {total.queued}
+      </td>
+      <td data-cell="ran" className={`${CELL} font-mono`}>
+        {total.ran}
+      </td>
       {total.cost ? (
-        <td data-cell="cost" title={spentTitle(total.cost, what)} className={`${CELL} font-mono`}>{total.cost.said}</td>
+        <td data-cell="cost" title={spentTitle(total.cost, what)} className={`${CELL} font-mono`}>
+          {total.cost.said}
+        </td>
       ) : (
-        <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>not measured</td>
+        <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>
+          not measured
+        </td>
       )}
       {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- the run's row has no `used` of its own: an empty cell */}
       <td className={CELL} />
@@ -113,5 +177,9 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
 function instant(at: string | null, none: string): ReactNode {
   if (at === null) return <span className="text-neutral-500">{none}</span>;
   const date = new Date(at);
-  return <time dateTime={at} title={date.toLocaleString()} className="font-mono">{date.toLocaleTimeString()}</time>;
+  return (
+    <time dateTime={at} title={date.toLocaleString()} className="font-mono">
+      {date.toLocaleTimeString()}
+    </time>
+  );
 }

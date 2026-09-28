@@ -26,7 +26,9 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * settles, a try filed (a new task) all move it.
  */
 export const decisionStamp = (
-  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>> },
+  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
+    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>>;
+  },
 ): string =>
   JSON.stringify([
     run.status,

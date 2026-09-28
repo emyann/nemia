@@ -25,10 +25,13 @@ const REPO = path.join(import.meta.dirname, '..', '..', '..');
  * read as a run frozen then is read (`asNamed`, in `readRun`). Nothing else of it is touched.
  */
 const FORMER_PACKAGE = 'packages/agent-workflows/'; // renamed on 2026-09-23
-const atToday = (folder: string) => (folder.startsWith(FORMER_PACKAGE) ? `packages/agent-orchestrator/${folder.slice(FORMER_PACKAGE.length)}` : folder);
-const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(Object.entries(
-  JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Workflow[]>,
-).map(([folder, steps]) => [atToday(folder), steps.map(asNamed) as unknown as Array<Record<string, unknown>>]));
+const atToday = (folder: string) =>
+  folder.startsWith(FORMER_PACKAGE) ? `packages/agent-orchestrator/${folder.slice(FORMER_PACKAGE.length)}` : folder;
+const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(
+  Object.entries(
+    JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Workflow[]>,
+  ).map(([folder, steps]) => [atToday(folder), steps.map(asNamed) as unknown as Array<Record<string, unknown>>]),
+);
 
 /**
  * The steps whose resolved body is not the one it had, as `<folder>/<step>`: the implementer's and the shipper's, reworded so one file
@@ -70,7 +73,11 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
  * on the list already, so the list is the same; the note folder's two, which also moved, are not in the snapshot.
  */
 const BODIES_REWORDED: string[] = [
-  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/review`, `workflows/${folder}/ship`]),
+  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
+    `workflows/${folder}/implement`,
+    `workflows/${folder}/review`,
+    `workflows/${folder}/ship`,
+  ]),
   'workflows/ui/implement',
   'workflows/ui/review',
   'packages/agent-orchestrator/workflows/ui/implement',
@@ -92,9 +99,13 @@ const NOTES: Record<string, string> = {
 
 /** The agent each shipped step names, by `<folder>/<step>`: the steps of the dev folders and ui. The supervisor and the codex folder name none. */
 const AGENTS: Record<string, string> = {
-  ...Object.fromEntries(['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
-    [`workflows/${folder}/implement`, 'implementer'], [`workflows/${folder}/review`, 'reviewer'], [`workflows/${folder}/ship`, 'shipper'],
-  ])),
+  ...Object.fromEntries(
+    ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
+      [`workflows/${folder}/implement`, 'implementer'],
+      [`workflows/${folder}/review`, 'reviewer'],
+      [`workflows/${folder}/ship`, 'shipper'],
+    ]),
+  ),
   'workflows/dev-planned/plan': 'planner',
   'workflows/dev-planned-build/plan': 'planner',
   'workflows/ui/implement': 'ui-implementer',
@@ -134,16 +145,33 @@ const STEPS_ADDED: Record<string, string> = {
  * given none now runs Claude Code's default. The model they ran is written where the role is, as the modes were.
  */
 const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allowedTools!;
-const SHIPPER_OUTPUT = { file: 'shipper.schema.json', schema: JSON.parse(fs.readFileSync(path.join(REPO, 'workflows', 'agents', 'shipper.schema.json'), 'utf8')) };
+const SHIPPER_OUTPUT = {
+  file: 'shipper.schema.json',
+  schema: JSON.parse(fs.readFileSync(path.join(REPO, 'workflows', 'agents', 'shipper.schema.json'), 'utf8')),
+};
 const checkOf = (folder: string) => loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'implement')!.check!;
 const KEYS_ADDED: Record<string, Record<string, unknown>> = {
   'workflows/supervisor/supervise': { context: 200_000, background: true, permissionMode: 'dontAsk', allowedTools: SUPERVISOR_ALLOW },
-  ...Object.fromEntries(Object.entries(AGENTS).filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent)).map(([at, agent]) => {
-    const folder = at.slice('workflows/'.length, at.lastIndexOf('/'));
-    return [at, agent === 'shipper' ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT }
-      : agent === 'ui-implementer' ? { permissionMode: 'auto', model: 'opus' } : { permissionMode: 'auto' }];
-  })),
-  ...Object.fromEntries(Object.entries(AGENTS).filter(([, agent]) => agent === 'ui-reviewer').map(([at]) => [at, { model: 'opus' }])),
+  ...Object.fromEntries(
+    Object.entries(AGENTS)
+      .filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent))
+      .map(([at, agent]) => {
+        const folder = at.slice('workflows/'.length, at.lastIndexOf('/'));
+        return [
+          at,
+          agent === 'shipper'
+            ? { permissionMode: 'auto', check: checkOf(folder), output: SHIPPER_OUTPUT }
+            : agent === 'ui-implementer'
+              ? { permissionMode: 'auto', model: 'opus' }
+              : { permissionMode: 'auto' },
+        ];
+      }),
+  ),
+  ...Object.fromEntries(
+    Object.entries(AGENTS)
+      .filter(([, agent]) => agent === 'ui-reviewer')
+      .map(([at]) => [at, { model: 'opus' }]),
+  ),
 };
 
 /**
@@ -162,8 +190,12 @@ const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).fin
 const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
   'workflows/dev/implement': { check: DEV_CHECK },
   'workflows/dev-planned/implement': { check: DEV_CHECK },
-  ...Object.fromEntries(['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui']
-    .map((folder) => [`${folder}/implement`, { check: BUILD_CHECK }])),
+  ...Object.fromEntries(
+    ['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui'].map((folder) => [
+      `${folder}/implement`,
+      { check: BUILD_CHECK },
+    ]),
+  ),
 };
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
@@ -177,12 +209,18 @@ function lineDiff(before: string, after: string): string {
   const a = before.split('\n');
   const b = after.split('\n');
   const lcs: number[][] = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0));
-  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+  for (let i = a.length - 1; i >= 0; i--)
+    for (let j = b.length - 1; j >= 0; j--)
+      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
   const out: string[] = [];
   let i = 0;
   let j = 0;
   while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && a[i] === b[j]) { i++; j++; continue; }
+    if (i < a.length && j < b.length && a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
     if (j < b.length && (i === a.length || lcs[i]![j + 1]! >= lcs[i + 1]![j]!)) out.push(`+ ${b[j++]}`);
     else out.push(`- ${a[i++]}`);
   }
@@ -200,25 +238,41 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     for (const step of loaded.filter((s) => !after.includes(s))) {
       const at = `${folder}/${String(step.name)}`;
       const from = STEPS_ADDED[at]!;
-      const copied = loadWorkflows(path.join(REPO, from.slice(0, from.lastIndexOf('/')))).find((s) => s.name === step.name) as unknown as Record<string, unknown>;
+      const copied = loadWorkflows(path.join(REPO, from.slice(0, from.lastIndexOf('/')))).find(
+        (s) => s.name === step.name,
+      ) as unknown as Record<string, unknown>;
       assert.ok(copied, `${at}: ${from} is there to copy`);
       assert.deepEqual(keysOf(step), keysOf(copied), `${at}: every key as ${from} resolves`);
       assert.equal(step.body, copied.body, `${at}: the body of ${from}`);
       assert.deepEqual(step.agent, copied.agent, `${at}: the agent of ${from}, and its note`);
       named[at] = (step.agent as { name: string }).name;
     }
-    assert.deepEqual(after.map((s) => s.name), before.map((s) => s.name), `${folder}: the same steps, in the same order`);
+    assert.deepEqual(
+      after.map((s) => s.name),
+      before.map((s) => s.name),
+      `${folder}: the same steps, in the same order`,
+    );
     for (const [i, step] of after.entries()) {
       const was = before[i]!;
-      assert.deepEqual(keysOf(step), { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`], ...KEYS_CHANGED[`${folder}/${String(step.name)}`] }, `${folder}/${String(step.name)}: every key as it resolved before`);
+      assert.deepEqual(
+        keysOf(step),
+        { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`], ...KEYS_CHANGED[`${folder}/${String(step.name)}`] },
+        `${folder}/${String(step.name)}: every key as it resolved before`,
+      );
       const agent = step.agent as { name: string; body: string } | undefined;
       if (agent) {
         named[`${folder}/${String(step.name)}`] = agent.name;
         const note = NOTES[`${folder}/${String(step.name)}`];
         if (note === undefined) assert.equal(agent.body, '', `${folder}/${String(step.name)}: keeps no words of its own`);
         else {
-          assert.ok(agent.body.replace(/\s+/g, ' ').includes(note), `${folder}/${String(step.name)}: its note says ${note}\n\n${agent.body}`);
-          assert.ok(String(step.body).endsWith(`\n\n${agent.body}`), `${folder}/${String(step.name)}: its note comes after the agent's instructions`);
+          assert.ok(
+            agent.body.replace(/\s+/g, ' ').includes(note),
+            `${folder}/${String(step.name)}: its note says ${note}\n\n${agent.body}`,
+          );
+          assert.ok(
+            String(step.body).endsWith(`\n\n${agent.body}`),
+            `${folder}/${String(step.name)}: its note comes after the agent's instructions`,
+          );
         }
       }
       if (step.body !== was.body) {
@@ -230,7 +284,11 @@ test('every shipped folder resolves to the keys it had before agents, and only t
   // Each step added is one the snapshot did not have.
   for (const at of Object.keys(STEPS_ADDED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
-    assert.equal(BEFORE[folder]!.some((s) => s.name === name), false, `${at} was in the snapshot`);
+    assert.equal(
+      BEFORE[folder]!.some((s) => s.name === name),
+      false,
+      `${at} was in the snapshot`,
+    );
   }
   // Each key added is one the snapshot did not have: a key that moved is never passed off as one added.
   for (const [at, keys] of Object.entries(KEYS_ADDED)) {

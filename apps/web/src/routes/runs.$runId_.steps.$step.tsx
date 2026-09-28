@@ -95,19 +95,26 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         {following.error && <p className="text-sm text-red-600">{following.error}</p>}
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
-        {!step.taskId
-          ? quiet('Not filed yet, so there is no session to show.')
-          : following.loading
-            ? quiet('Reading the conversation…')
-            : turns.length
-              ? <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />
-              : !following.error && quiet(following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.')}
+        {!step.taskId ? (
+          quiet('Not filed yet, so there is no session to show.')
+        ) : following.loading ? (
+          quiet('Reading the conversation…')
+        ) : turns.length ? (
+          <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />
+        ) : (
+          !following.error &&
+          quiet(
+            following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.',
+          )
+        )}
       </div>
       <PromptBox
         runId={run.id}
         step={step.name}
         sayable={sayable(run, step)}
-        onSaid={(entry) => setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))}
+        onSaid={(entry) =>
+          setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))
+        }
       />
     </div>
   );

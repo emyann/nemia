@@ -2,8 +2,21 @@
 
 /** Mirrors `Usage` in apps/api/src/usage.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
-  turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number;
-  cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number; peakContextTokens?: number; firstContextTokens?: number; firstCacheWriteTokens?: number; compactions?: number; rebuiltCaches?: number;
+  turns?: number;
+  toolCalls?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+  apiMs?: number;
+  toolMs?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  uncachedTokens?: number;
+  peakContextTokens?: number;
+  firstContextTokens?: number;
+  firstCacheWriteTokens?: number;
+  compactions?: number;
+  rebuiltCaches?: number;
 };
 
 /** Where a peak context stands: at the step's `context:` cap, or past 200k on a step with none. */
@@ -16,8 +29,15 @@ export type PeakMark = 'cap' | 'large' | null;
  * `rebuilt` how many resumed sessions wrote their context to the cache again.
  */
 export type StepUsed = {
-  usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null;
-  read: string | null; peak: PeakMark; rebuilt: number;
+  usage: Usage | null;
+  used: string;
+  cost: string;
+  costUsd: number | null;
+  apiMs: number | null;
+  toolMs: number | null;
+  read: string | null;
+  peak: PeakMark;
+  rebuilt: number;
 };
 
 /** Mirrors `RunRead` in apps/api/src/usage.ts: what a run's sessions read, by price, in words, where its peak stands, and how many rebuilt their cache. */

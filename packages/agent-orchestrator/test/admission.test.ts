@@ -14,11 +14,16 @@ import { MOMENTUM } from '../src/run.ts';
 const T0 = Date.parse('2026-09-25T10:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
-const queued = (id: string, filed: number, harness = 'claude'): AdmissionView => ({ id, phase: 'pending', admission: 'queued', state: { harness, filedAt: at(filed) } });
+const queued = (id: string, filed: number, harness = 'claude'): AdmissionView => ({
+  id,
+  phase: 'pending',
+  admission: 'queued',
+  state: { harness, filedAt: at(filed) },
+});
 const live = (id: string, phase: string, harness = 'claude'): AdmissionView => ({ id, phase, state: { harness, filedAt: at(0) } });
 const none = () => 0;
 
-test('POOLS: Claude Code\'s job and background session share one pool; codex and check are their own; an unlisted harness is its own', () => {
+test("POOLS: Claude Code's job and background session share one pool; codex and check are their own; an unlisted harness is its own", () => {
   assert.deepEqual(POOLS, { claude: 'claude', 'claude-detached': 'claude', codex: 'codex', check: 'check' });
   assert.equal(poolOf('claude-detached'), 'claude');
   assert.equal(poolOf('codex'), 'codex');
@@ -29,16 +34,29 @@ test('POOLS: Claude Code\'s job and background session share one pool; codex and
   assert.equal(poolOf('toString'), 'toString');
 });
 
-test('a claude-detached session counts against claude\'s ceiling, and a detached task waits on claude\'s', () => {
+test("a claude-detached session counts against claude's ceiling, and a detached task waits on claude's", () => {
   // Detached first, so a pool keyed by the harness name alone would read two pools of one.
-  const views = [live('d-1', 'running (working)', 'claude-detached'), live('c-1', 'running (working)'), queued('c-2', 1), queued('d-2', 2, 'claude-detached')];
+  const views = [
+    live('d-1', 'running (working)', 'claude-detached'),
+    live('c-1', 'running (working)'),
+    queued('c-2', 1),
+    queued('d-2', 2, 'claude-detached'),
+  ];
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 2 }), []);
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 3 }), ['c-2']);
 });
 
-test('the ceiling is counted per pool: codex does not fill claude\'s slots, nor check codex\'s', () => {
-  const views = [live('x-1', 'running (working)', 'codex'), live('x-2', 'running (working)', 'codex'), live('k-1', 'running (working)', 'check'),
-    queued('c-1', 1), queued('x-3', 2, 'codex'), queued('k-2', 3, 'check'), queued('k-3', 4, 'check'), queued('f-1', 5, 'fake')];
+test("the ceiling is counted per pool: codex does not fill claude's slots, nor check codex's", () => {
+  const views = [
+    live('x-1', 'running (working)', 'codex'),
+    live('x-2', 'running (working)', 'codex'),
+    live('k-1', 'running (working)', 'check'),
+    queued('c-1', 1),
+    queued('x-3', 2, 'codex'),
+    queued('k-2', 3, 'check'),
+    queued('k-3', 4, 'check'),
+    queued('f-1', 5, 'fake'),
+  ];
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 2 }), ['c-1', 'k-2', 'f-1']);
 });
 
@@ -61,7 +79,8 @@ test('holdsSlot: a session at work, one starting, and one admitted and not yet s
 });
 
 test('holdsSlot: a blocked session, one held for an answer, one between attempts and a settled task hold none', () => {
-  for (const phase of ['needs-human', 'input-required', 'between attempts', 'succeeded', 'failed', 'stopped']) assert.equal(holdsSlot({ phase }), false, phase);
+  for (const phase of ['needs-human', 'input-required', 'between attempts', 'succeeded', 'failed', 'stopped'])
+    assert.equal(holdsSlot({ phase }), false, phase);
 });
 
 test('a starting session and an admitted task fill the pool as a working one does', () => {
@@ -94,7 +113,7 @@ test('a filing time that does not parse goes last', () => {
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 1 }), ['c-b']);
 });
 
-test('momentum goes before the filing: a run in flight keeps its slot over a newer run\'s first step', () => {
+test("momentum goes before the filing: a run in flight keeps its slot over a newer run's first step", () => {
   // The first step filed first, the after-step later: filing order alone takes the first step.
   const views = [queued('first', 1), queued('after', 9)];
   const momentum = (id: string) => (id === 'after' ? MOMENTUM : 0);
@@ -103,16 +122,27 @@ test('momentum goes before the filing: a run in flight keeps its slot over a new
 });
 
 test('a task already admitted or not queued is never admitted again', () => {
-  const views = [{ ...queued('c-1', 1), admission: 'admitted' as const }, { ...queued('c-2', 2), admission: undefined }];
+  const views = [
+    { ...queued('c-1', 1), admission: 'admitted' as const },
+    { ...queued('c-2', 2), admission: undefined },
+  ];
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 5 }), []);
 });
 
 test('momentumOf: each task a run names reads as tick.ts filed it, and an id no run names is 0', () => {
-  const steps = [{ name: 'plan', after: [] }, { name: 'implement', after: ['plan'] }, { name: 'review', after: ['implement'] }];
+  const steps = [
+    { name: 'plan', after: [] },
+    { name: 'implement', after: ['plan'] },
+    { name: 'review', after: ['implement'] },
+  ];
   const run = {
     steps: {
       // A first step on its second try: the first try is the step's first filing, its later try and every check are MOMENTUM.
-      plan: { taskId: 'plan-2', check: { taskId: 'plan-2-check' }, tries: [{ taskId: 'plan-1', check: { taskId: 'plan-1-check' }, then: 'retries' as const }] },
+      plan: {
+        taskId: 'plan-2',
+        check: { taskId: 'plan-2-check' },
+        tries: [{ taskId: 'plan-1', check: { taskId: 'plan-1-check' }, then: 'retries' as const }],
+      },
       // A step after another, its first filing.
       implement: { taskId: 'impl-1' },
       // A round of the review: its round's task is a later filing of the step.
@@ -120,18 +150,21 @@ test('momentumOf: each task a run names reads as tick.ts filed it, and an id no 
     },
   };
   const m = momentumOf([{ run, steps }]);
-  assert.equal(m('plan-1'), 0, 'a first step\'s first task');
+  assert.equal(m('plan-1'), 0, "a first step's first task");
   assert.equal(m('plan-2'), MOMENTUM, 'a try');
-  assert.equal(m('plan-1-check'), MOMENTUM, 'an earlier try\'s check');
+  assert.equal(m('plan-1-check'), MOMENTUM, "an earlier try's check");
   assert.equal(m('plan-2-check'), MOMENTUM, 'a check');
   assert.equal(m('impl-1'), MOMENTUM, 'an after-step');
-  assert.equal(m('review-1'), MOMENTUM, 'an after-step\'s first task');
+  assert.equal(m('review-1'), MOMENTUM, "an after-step's first task");
   assert.equal(m('review-2'), MOMENTUM, 'a round');
   assert.equal(m('nobody'), 0, 'an id no run names');
 });
 
 test('momentumOf: a first step with no try is 0, a step not yet filed names nothing, and a step no longer in the workflow is skipped', () => {
-  const steps = [{ name: 'a', after: [] }, { name: 'b', after: ['a'] }];
+  const steps = [
+    { name: 'a', after: [] },
+    { name: 'b', after: ['a'] },
+  ];
   const run = { steps: { a: { taskId: 'a-1' }, b: { taskId: null }, gone: { taskId: 'gone-1' } } };
   const m = momentumOf([{ run, steps }]);
   assert.equal(m('a-1'), 0);

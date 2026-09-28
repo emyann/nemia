@@ -21,7 +21,10 @@ export type KeyField = {
  * A2A agent — `harness: <prefix><name>` — with the keys such a step may not set (`remote`), which the form leaves off it (`takes`).
  */
 export type KeyForm = {
-  keys: KeyField[]; defaultHarness: string; roleKeys: Array<keyof WorkflowStepSpec>; agents: Record<string, Partial<WorkflowStepSpec>>;
+  keys: KeyField[];
+  defaultHarness: string;
+  roleKeys: Array<keyof WorkflowStepSpec>;
+  agents: Record<string, Partial<WorkflowStepSpec>>;
   remote: { prefix: string; refuses: Array<keyof WorkflowStepSpec> };
 };
 
@@ -51,7 +54,12 @@ export class BuildRefusal extends Error {
 }
 
 /** A builder's write, sent as `application/json`, which the api requires of every write: resolved with what it answered, or its refusal. */
-async function build<T>(method: 'PUT' | 'POST', route: string, body: unknown, ok: (answer: Record<string, unknown>) => boolean): Promise<T> {
+async function build<T>(
+  method: 'PUT' | 'POST',
+  route: string,
+  body: unknown,
+  ok: (answer: Record<string, unknown>) => boolean,
+): Promise<T> {
   const res = await fetch(route, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
   if (res.ok && answer && ok(answer)) return answer as T;
@@ -63,10 +71,15 @@ async function build<T>(method: 'PUT' | 'POST', route: string, body: unknown, ok
     );
   }
   const steps = Array.isArray(answer?.steps) ? answer.steps.filter((s): s is string => typeof s === 'string') : [];
-  throw new BuildRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`, steps, res.status);
+  throw new BuildRefusal(
+    typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`,
+    steps,
+    res.status,
+  );
 }
 
-const isSaved = (answer: Record<string, unknown>): boolean => typeof answer.workflow === 'object' && answer.workflow !== null && Array.isArray(answer.written);
+const isSaved = (answer: Record<string, unknown>): boolean =>
+  typeof answer.workflow === 'object' && answer.workflow !== null && Array.isArray(answer.written);
 
 /** A schema pasted for a step's `output:`, written beside the steps by the save that carries it. */
 export type SchemaFile = { file: string; text: string };
@@ -76,8 +89,16 @@ export type SchemaFile = { file: string; text: string };
  * package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects with a
  * `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about the request.
  */
-export const saveWorkflow = (name: string, save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] }): Promise<WorkflowSaved> =>
-  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, { version: save.version, steps: save.steps, ...(save.schemas.length ? { schemas: save.schemas } : {}) }, isSaved);
+export const saveWorkflow = (
+  name: string,
+  save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] },
+): Promise<WorkflowSaved> =>
+  build(
+    'PUT',
+    `/api/workflows/yours/${encodeURIComponent(name)}`,
+    { version: save.version, steps: save.steps, ...(save.schemas.length ? { schemas: save.schemas } : {}) },
+    isSaved,
+  );
 
 /** Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses. */
 export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>

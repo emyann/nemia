@@ -14,7 +14,9 @@ import { createEngine, type PromiseRunner } from '../src/facade.ts';
 import { scratch } from './scratch.ts';
 
 const refusing: PromiseRunner = {
-  spawn: async () => { throw Object.assign(new Error('not today'), { refused: true }); },
+  spawn: async () => {
+    throw Object.assign(new Error('not today'), { refused: true });
+  },
   observe: async () => new Map(),
   stop: async () => {},
   logs: async () => '',
@@ -37,7 +39,8 @@ const settledStore = async () => {
 };
 
 const sizeOf = (file: string) => fs.statSync(file).size;
-const journalsOf = (root: string) => fs.readdirSync(path.join(root, 'tasks')).reduce((sum, f) => sum + sizeOf(path.join(root, 'tasks', f)), 0);
+const journalsOf = (root: string) =>
+  fs.readdirSync(path.join(root, 'tasks')).reduce((sum, f) => sum + sizeOf(path.join(root, 'tasks', f)), 0);
 
 test('a pass over settled tasks nothing has written to reads no journal, and nothing of a feed with nothing new', async () => {
   const { engine } = await settledStore();
@@ -50,7 +53,7 @@ test('a pass over settled tasks nothing has written to reads no journal, and not
   assert.equal(after.reads - before.reads, 0, 'no read made');
 });
 
-test('a pass after an entry is appended to one settled task reads the feed\'s new bytes and that one journal, and the pass after it nothing', async () => {
+test("a pass after an entry is appended to one settled task reads the feed's new bytes and that one journal, and the pass after it nothing", async () => {
   const { root, engine, ids } = await settledStore();
   const feed = path.join(root, 'feed.jsonl');
   const feed0 = sizeOf(feed);
@@ -63,7 +66,11 @@ test('a pass after an entry is appended to one settled task reads the feed\'s ne
   await engine.tick();
   const after = engine.io();
   // The feed's new bytes, then the one journal named: folded, and read again by its step, whose decision is nothing.
-  assert.equal(after.bytesRead - before.bytesRead, grown + 2 * journal, `read ${after.bytesRead - before.bytesRead}; the feed grew ${grown} and the journal is ${journal}`);
+  assert.equal(
+    after.bytesRead - before.bytesRead,
+    grown + 2 * journal,
+    `read ${after.bytesRead - before.bytesRead}; the feed grew ${grown} and the journal is ${journal}`,
+  );
   assert.equal(after.reads - before.reads, 3);
 
   const again = engine.io();
@@ -71,7 +78,7 @@ test('a pass after an entry is appended to one settled task reads the feed\'s ne
   assert.equal(engine.io().bytesRead - again.bytesRead, 0, 'folded, it is skipped again');
 });
 
-test('a task filed again under a settled task\'s id is folded again on the next pass', async () => {
+test("a task filed again under a settled task's id is folded again on the next pass", async () => {
   const { root, cwd, engine, ids } = await settledStore();
   await engine.file({ id: ids[3]!, brief: 'again', cwd });
   const before = engine.io();

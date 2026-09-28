@@ -39,8 +39,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SHIPPED, forgetLines, pin } from './git-runs-pin.ts';
 
-const BEFORE: { folders: Record<string, unknown>; forget: string[] } =
-  JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'git-runs-before.json'), 'utf8'));
+const BEFORE: { folders: Record<string, unknown>; forget: string[] } = JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'git-runs-before.json'), 'utf8'),
+);
 
 test('the fixture holds every shipped folder, and nothing else', () => {
   assert.deepEqual(Object.keys(BEFORE.folders).sort(), [...SHIPPED].sort());

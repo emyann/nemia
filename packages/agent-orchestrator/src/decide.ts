@@ -5,13 +5,59 @@
  * (`runtime-client.ts`).
  */
 import { nameFor, type Engine, type Usage } from './runtime-client.ts';
-import { acceptedLines, answerLines, assess, costLine, decision, deniedWords, gateLines, harnessWaitLine, hasStarted, holdsOf, listing, overBudgetLine, retriesDue, retryLines, roundLines, roundsDue, runCostLines, waitsOf, type BranchStanding, type CheckoutHold, type Decision, type Listing, type Round, type Run, type RunSlot, type SaidTo, type ToDecide, type Wait } from './run.ts';
+import {
+  acceptedLines,
+  answerLines,
+  assess,
+  costLine,
+  decision,
+  deniedWords,
+  gateLines,
+  harnessWaitLine,
+  hasStarted,
+  holdsOf,
+  listing,
+  overBudgetLine,
+  retriesDue,
+  retryLines,
+  roundLines,
+  roundsDue,
+  runCostLines,
+  waitsOf,
+  type BranchStanding,
+  type CheckoutHold,
+  type Decision,
+  type Listing,
+  type Round,
+  type Run,
+  type RunSlot,
+  type SaidTo,
+  type ToDecide,
+  type Wait,
+} from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
 import { answerOf, type Retry } from './retry.ts';
 import { timeline, type Timeline } from './timeline.ts';
 import { readAnswers, readAsks, readRun, stepsOf } from './store.ts';
 import { branchReader, shippedOf, standingsOf, type BranchReader } from './branches.ts';
-import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, engineWord, harnessBlocked, parentsOf, saidCount, saidIn, spendReader, taskPhases, viewedOnce, waitingOf, type CheckReport } from './views.ts';
+import {
+  checkReports,
+  closeoutAsked,
+  closeoutOf,
+  closeoutReader,
+  consumption,
+  deniedOf,
+  engineWord,
+  harnessBlocked,
+  parentsOf,
+  saidCount,
+  saidIn,
+  spendReader,
+  taskPhases,
+  viewedOnce,
+  waitingOf,
+  type CheckReport,
+} from './views.ts';
 import { checkoutHold, runSlots } from './tick.ts';
 import { isRemoteHarness } from './workflow.ts';
 
@@ -32,7 +78,26 @@ export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReade
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
   const parent = await parentsOf(e, run, git);
-  return listing(steps, run, engineWord(views), (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, parent), saidCount(views, run), spendReader(views), slot, standings, checkout, waitingOf(views), deniedOf(views), holdsOf(run, parent));
+  return listing(
+    steps,
+    run,
+    engineWord(views),
+    (name) => closeoutOf(views, run, name),
+    closeoutAsked(views),
+    (name) => refused.get(name)?.verdict,
+    asks,
+    rounds,
+    readAnswers(run.id),
+    waitsOf(run, parent),
+    saidCount(views, run),
+    spendReader(views),
+    slot,
+    standings,
+    checkout,
+    waitingOf(views),
+    deniedOf(views),
+    holdsOf(run, parent),
+  );
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
@@ -42,7 +107,10 @@ export type Answered = { try: number; message: string; needs?: string };
  * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
  * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both.
  */
-export async function decide(engine: Engine, id: string): Promise<{
+export async function decide(
+  engine: Engine,
+  id: string,
+): Promise<{
   run: Run;
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
@@ -110,7 +178,9 @@ export async function decide(engine: Engine, id: string): Promise<{
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
-  const checks = Object.fromEntries(await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'));
+  const checks = Object.fromEntries(
+    await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'),
+  );
   const { asks, rounds } = readAsks(id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
@@ -132,7 +202,7 @@ export async function decide(engine: Engine, id: string): Promise<{
     const answer = answerOf(run, name, given);
     if (!answer) continue;
     const before = run.steps[name]!.tries!.at(-1)!.taskId;
-    const closeout = (views.get(before) ?? await e.view(before)).state.attempts.at(-1)?.closeout;
+    const closeout = (views.get(before) ?? (await e.view(before))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
@@ -160,8 +230,20 @@ export async function decide(engine: Engine, id: string): Promise<{
   // engine's feed says the same of every task ever filed, and was read whole for one run — 15 MB of the live store's, on 2026-09-25.
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const used = consumption(views, run);
-  const costs = Object.fromEntries(Object.entries(run.steps).filter(([, record]) => record.taskId || record.tries?.length)
-    .map(([name]) => [name, costLine(steps.find((s) => s.name === name), run, name, used[name], spendOf)]));
+  const costs = Object.fromEntries(
+    Object.entries(run.steps)
+      .filter(([, record]) => record.taskId || record.tries?.length)
+      .map(([name]) => [
+        name,
+        costLine(
+          steps.find((s) => s.name === name),
+          run,
+          name,
+          used[name],
+          spendOf,
+        ),
+      ]),
+  );
   // What each blocked session's harness says it waits for, and the session a person answers it in: the engine's name for the task's
   // current attempt, which is the name `claude agents` lists it under. Level-triggered like the phase beside it — read this pass, kept
   // nowhere — so a step that stops waiting says nothing here on the next.
@@ -188,7 +270,10 @@ export async function decide(engine: Engine, id: string): Promise<{
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
   const parent = await parentsOf(e, run, git);
   return {
-    run, decision: d, closeouts, checks,
+    run,
+    decision: d,
+    closeouts,
+    checks,
     retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
     rounding: over ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
     offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],

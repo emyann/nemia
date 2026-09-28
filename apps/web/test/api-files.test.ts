@@ -15,7 +15,9 @@ const ALLOWED = new Set(['@tanstack/react-query', '../feed.ts', './read.ts']);
 
 /** The specifiers `text` imports or re-exports values from: every `import`/`export … from` but `import type` and `export type`. */
 export function valueImports(text: string): string[] {
-  return [...text.matchAll(/^(import|export)\s+(type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?|\w+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm)]
+  return [
+    ...text.matchAll(/^(import|export)\s+(type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?|\w+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm),
+  ]
     .filter((m) => !m[2])
     .map((m) => m[3]!);
 }
@@ -28,7 +30,10 @@ test('REFUSED: a value import of the re-exporting file or of a sibling is found;
     "export * from './steps.ts';",
     "export type { Said } from './asks.ts';",
   ].join('\n');
-  assert.deepEqual(valueImports(text).filter((s) => !ALLOWED.has(s)), ['../api.ts', './runs.ts', './steps.ts']);
+  assert.deepEqual(
+    valueImports(text).filter((s) => !ALLOWED.has(s)),
+    ['../api.ts', './runs.ts', './steps.ts'],
+  );
 });
 
 test('the files under src/lib/api/ import values from react-query, the feed and read.ts alone, and read.ts from nothing', () => {
@@ -39,5 +44,5 @@ test('the files under src/lib/api/ import values from react-query, the feed and 
     const values = valueImports(text);
     return (f === 'read.ts' ? values : values.filter((s) => !ALLOWED.has(s))).map((s) => `${f} imports ${s}`);
   });
-  assert.deepEqual(found, [], 'import a sibling\'s type with `import type`; a value two of them need goes in read.ts');
+  assert.deepEqual(found, [], "import a sibling's type with `import type`; a value two of them need goes in read.ts");
 });

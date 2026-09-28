@@ -70,10 +70,14 @@ function shippedBy(within: Within, run: GitRun, branch: string): Shipped {
  * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
  */
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
-export const standingsOf = (run: Run, git: BranchReader = oneByOne): BranchStanding[] => (isGitRun(run) ? branchStandings(run, resultBranches(run), git) : []);
+export const standingsOf = (run: Run, git: BranchReader = oneByOne): BranchStanding[] =>
+  isGitRun(run) ? branchStandings(run, resultBranches(run), git) : [];
 
 /** Whether a branch of the run is on its base (`isShipped`): never, for a folder run, which has no branch to ask about. */
-export const shippedOf = (run: Run, git: BranchReader = oneByOne) => (branch: string): Shipped => (isGitRun(run) ? git.shipped(run, branch) : false);
+export const shippedOf =
+  (run: Run, git: BranchReader = oneByOne) =>
+  (branch: string): Shipped =>
+    isGitRun(run) ? git.shipped(run, branch) : false;
 
 export function branchStandings(run: GitRun, branches: readonly string[], git: BranchReader = oneByOne): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
@@ -134,10 +138,13 @@ export function branchReader(): BranchReader {
    * For each repository: each branch's commit (`null` where git would not list them), each branch's distance ahead of each base listed
    * (`null` for a base git would not list), and every question answered, by the commit and the base asked about.
    */
-  const repos = new Map<string, { heads?: Map<string, string> | null; ahead: Map<string, Map<string, number> | null>; asked: Map<string, ReturnType<Within>> }>();
+  const repos = new Map<
+    string,
+    { heads?: Map<string, string> | null; ahead: Map<string, Map<string, number> | null>; asked: Map<string, ReturnType<Within>> }
+  >();
   const of = (repo: string) => {
     let r = repos.get(repo);
-    if (!r) repos.set(repo, r = { ahead: new Map(), asked: new Map() });
+    if (!r) repos.set(repo, (r = { ahead: new Map(), asked: new Map() }));
     return r;
   };
 
@@ -150,7 +157,10 @@ export function branchReader(): BranchReader {
     for (const line of listed.split('\n')) {
       const words = line.split(' ');
       if (words.length < 2 + bases.length * 2) continue;
-      const branch = words.slice(1 + bases.length * 2).join(' ').replace(/^refs\/heads\//, '');
+      const branch = words
+        .slice(1 + bases.length * 2)
+        .join(' ')
+        .replace(/^refs\/heads\//, '');
       heads.set(branch, words[0]!);
       bases.forEach((_, k) => each[k]!.set(branch, Number(words[1 + k * 2])));
     }
@@ -174,7 +184,7 @@ export function branchReader(): BranchReader {
       for (const c of commits) if (!readable.has(c)) r.ahead.set(c, null);
       const without = fresh.filter((b) => !isCommitName(b) || readable.has(b));
       // Every commit readable, the listing would be refused again: the base it cannot read is a branch.
-      if (without.length < fresh.length) listed = listing(repo, fresh = without);
+      if (without.length < fresh.length) listed = listing(repo, (fresh = without));
     }
     if (!listed && fresh.length) {
       // A base branch the repository does not have: the branches alone, and again with the bases among them.
@@ -214,10 +224,15 @@ export function branchReader(): BranchReader {
     if (known) return known;
     if (!r.ahead.has(base) && !isCommitName(base)) list(repo, [base]);
     const listed = r.ahead.get(base)?.get(commit);
-    const said: ReturnType<Within> = listed !== undefined ? (listed === 0 ? 'yes' : 'no')
-      // A commit is within itself: a branch still at the commit the run was cut at.
-      : commit === base || r.heads?.get(commit) === base ? 'yes'
-      : askGit(repo, commit, base);
+    const said: ReturnType<Within> =
+      listed !== undefined
+        ? listed === 0
+          ? 'yes'
+          : 'no'
+        : // A commit is within itself: a branch still at the commit the run was cut at.
+          commit === base || r.heads?.get(commit) === base
+          ? 'yes'
+          : askGit(repo, commit, base);
     r.asked.set(key, said);
     return said;
   };
@@ -243,7 +258,7 @@ export function branchReader(): BranchReader {
       for (const run of runs) {
         if (!isGitRun(run)) continue;
         let set = primed.get(run.repo);
-        if (!set) primed.set(run.repo, set = new Set());
+        if (!set) primed.set(run.repo, (set = new Set()));
         set.add(run.branch);
         set.add(run.baseRef);
       }
@@ -258,9 +273,17 @@ export function branchReader(): BranchReader {
  */
 export function parentRecord(id: string, git: BranchReader = oneByOne): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
-  try { record = readRun(id); } catch { return {}; }
+  try {
+    record = readRun(id);
+  } catch {
+    return {};
+  }
   let branches: string[];
-  try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
+  try {
+    branches = resultBranches(record);
+  } catch {
+    branches = [];
+  } // a pre-freeze record whose folder is gone names no steps
   const cut = isGitRun(record) ? record : undefined;
   const gone = cut ? branches.filter((b) => !git.has(cut.repo, b) && !git.shipped(cut, b)) : [];
   return { record, ...(gone.length ? { gone } : {}) };
@@ -291,18 +314,30 @@ export function refsOf(repo: string, branches: readonly string[]): Record<string
 export function artifacts(run: GitRun, branch: string): string[] {
   try {
     return git(run.repo, 'diff', '--diff-filter=A', '--name-only', `${run.baseRef}...${branch}`)
-      .split('\n').map((l) => l.trim()).filter(Boolean);
-  } catch { return []; }
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 /** One artifact's text, out of the branch. */
 export function readArtifact(run: GitRun, branch: string, file: string): string {
-  try { return git(run.repo, 'show', `${branch}:${file}`); } catch { return ''; }
+  try {
+    return git(run.repo, 'show', `${branch}:${file}`);
+  } catch {
+    return '';
+  }
 }
 
 /** How much the run changed, in one line. */
 export function diffStat(run: GitRun, branch: string): string {
-  try { return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`); } catch { return ''; }
+  try {
+    return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -313,7 +348,11 @@ export function diffStat(run: GitRun, branch: string): string {
 export function touchedBy(run: GitRun, branch: string): Radius | { error: string } {
   const numstat = gitSays(run.repo, '-c', 'core.quotePath=false', 'diff', '--numstat', '--find-renames', `${run.baseRef}...${branch}`);
   if (numstat === undefined) return { error: `git could not diff ${run.baseRef.slice(0, 12)}...${branch}` };
-  try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
+  try {
+    return radius(numstat, workspacesOf(run));
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }
 
 /**
@@ -325,7 +364,9 @@ function workspacesOf(run: GitRun): string[] {
     const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');
     const globs: unknown = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
     return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -337,7 +378,19 @@ export function sensitiveDiff(run: GitRun, t: Touched, globs: readonly string[])
   if ('error' in t.radius) return undefined;
   const paths = sensitivePaths(t.radius.changes, globs);
   if (!paths.length) return '';
-  return gitSays(run.repo, '-c', 'core.quotePath=false', '--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--find-renames', `${run.baseRef}...${t.branch}`, '--', ...paths);
+  return gitSays(
+    run.repo,
+    '-c',
+    'core.quotePath=false',
+    '--literal-pathspecs',
+    'diff',
+    '--no-color',
+    '--no-ext-diff',
+    '--find-renames',
+    `${run.baseRef}...${t.branch}`,
+    '--',
+    ...paths,
+  );
 }
 
 export function resultBranches(run: Run): string[] {

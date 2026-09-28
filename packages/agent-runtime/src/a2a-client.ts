@@ -10,10 +10,22 @@
 import { Effect, Layer } from 'effect';
 import { A2A_PROTOCOL_VERSION, TaskState } from '@a2a-js/sdk';
 import type {
-  AgentCard, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-  GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigsRequest,
-  ListTaskPushNotificationConfigsResponse, ListTasksRequest, ListTasksResponse, SendMessageRequest, StreamResponse,
-  SubscribeToTaskRequest, Task, TaskPushNotificationConfig, SendMessageResult,
+  AgentCard,
+  CancelTaskRequest,
+  DeleteTaskPushNotificationConfigRequest,
+  GetExtendedAgentCardRequest,
+  GetTaskPushNotificationConfigRequest,
+  GetTaskRequest,
+  ListTaskPushNotificationConfigsRequest,
+  ListTaskPushNotificationConfigsResponse,
+  ListTasksRequest,
+  ListTasksResponse,
+  SendMessageRequest,
+  StreamResponse,
+  SubscribeToTaskRequest,
+  Task,
+  TaskPushNotificationConfig,
+  SendMessageResult,
 } from '@a2a-js/sdk';
 import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
@@ -21,9 +33,24 @@ import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import type { Event, Sighting, Usage } from './domain.ts';
 import { Journal } from './journal.ts';
-import { Runner, RunnerError, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
-  cardOf, HarnessFailed, HarnessHandler, MOST_PER_PAGE, type RuntimeExtensionParams, type SessionMethods, type TranscriptRequest,
+  Runner,
+  RunnerError,
+  type ExpectedSession,
+  type Observation,
+  type RunnerOps,
+  type SpawnRequest,
+  type Transcript,
+  type TranscriptCursor,
+} from './runner.ts';
+import {
+  cardOf,
+  HarnessFailed,
+  HarnessHandler,
+  MOST_PER_PAGE,
+  type RuntimeExtensionParams,
+  type SessionMethods,
+  type TranscriptRequest,
 } from './a2a-handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './a2a-map.ts';
 
@@ -125,7 +152,9 @@ export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: strin
 
 /** What a card says of the runtime extension: the methods its agent answers, and whether a session takes words. */
 const extensionOf = (card: AgentCard): RuntimeExtensionParams => {
-  const params = card.capabilities?.extensions.find((e) => e.uri === RUNTIME_EXTENSION)?.params as Partial<RuntimeExtensionParams> | undefined;
+  const params = card.capabilities?.extensions.find((e) => e.uri === RUNTIME_EXTENSION)?.params as
+    | Partial<RuntimeExtensionParams>
+    | undefined;
   return { methods: params?.methods ?? [], say: params?.say === true };
 };
 
@@ -135,9 +164,11 @@ const extensionOf = (card: AgentCard): RuntimeExtensionParams => {
  */
 const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerError> =>
   Effect.tryPromise({ try: f, catch: (cause) => cause }).pipe(
-    Effect.catch((cause) => cause instanceof HarnessFailed || cause instanceof A2AError
-      ? Effect.fail(new RunnerError({ verb, message: (cause as Error).message }))
-      : Effect.die(cause)),
+    Effect.catch((cause) =>
+      cause instanceof HarnessFailed || cause instanceof A2AError
+        ? Effect.fail(new RunnerError({ verb, message: (cause as Error).message }))
+        : Effect.die(cause),
+    ),
   );
 
 /**
@@ -165,27 +196,46 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
   let names = new Map<string, string>();
 
   const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
-    call('spawn', () => client.sendMessage({
-      tenant: '', message: messageOf(r, randomUUID()), metadata: undefined,
-      configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-    })).pipe(Effect.flatMap((answer) => {
-      const state = 'status' in answer ? answer.status?.state : undefined;
-      if (state === TaskState.TASK_STATE_WORKING) return Effect.void;
-      const words = 'status' in answer ? wordsOf(answer) : undefined;
-      if (state === TaskState.TASK_STATE_REJECTED) {
-        return Effect.fail(new RunnerError({ verb: 'spawn', message: words ?? `the \`${harness}\` harness refused \`${r.name}\` and said nothing.`, refused: true }));
-      }
-      return Effect.fail(new RunnerError({
-        verb: 'spawn',
-        message: words ?? `the \`${harness}\` harness answered the spawn of \`${r.name}\` with ${state === undefined ? 'a message, not a task' : TaskState[state]}: whether a session started is not known.`,
-      }));
-    }));
+    call('spawn', () =>
+      client.sendMessage({
+        tenant: '',
+        message: messageOf(r, randomUUID()),
+        metadata: undefined,
+        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+      }),
+    ).pipe(
+      Effect.flatMap((answer) => {
+        const state = 'status' in answer ? answer.status?.state : undefined;
+        if (state === TaskState.TASK_STATE_WORKING) return Effect.void;
+        const words = 'status' in answer ? wordsOf(answer) : undefined;
+        if (state === TaskState.TASK_STATE_REJECTED) {
+          return Effect.fail(
+            new RunnerError({
+              verb: 'spawn',
+              message: words ?? `the \`${harness}\` harness refused \`${r.name}\` and said nothing.`,
+              refused: true,
+            }),
+          );
+        }
+        return Effect.fail(
+          new RunnerError({
+            verb: 'spawn',
+            message:
+              words ??
+              `the \`${harness}\` harness answered the spawn of \`${r.name}\` with ${state === undefined ? 'a message, not a task' : TaskState[state]}: whether a session started is not known.`,
+          }),
+        );
+      }),
+    );
 
   /** Each listed Task's sighting, by name, or the harness's words for one that carries none. */
   const sightingsOf = (verb: string, tasks: readonly Task[], seen: Map<string, Sighting>): Effect.Effect<void, RunnerError> => {
     for (const t of tasks) {
       const s = sightingOf(t);
-      if (!s) return Effect.fail(new RunnerError({ verb, message: `the \`${harness}\` harness listed \`${t.id}\` with no sighting it could be read by.` }));
+      if (!s)
+        return Effect.fail(
+          new RunnerError({ verb, message: `the \`${harness}\` harness listed \`${t.id}\` with no sighting it could be read by.` }),
+        );
       seen.set(t.id, s);
     }
     return Effect.void;
@@ -195,10 +245,18 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     const seen = new Map<string, Sighting>();
     let pageToken = '';
     do {
-      const page = yield* call('observe', () => client.listTasks({
-        tenant: '', contextId: '', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: MOST_PER_PAGE, pageToken,
-        historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: false,
-      }));
+      const page = yield* call('observe', () =>
+        client.listTasks({
+          tenant: '',
+          contextId: '',
+          status: TaskState.TASK_STATE_UNSPECIFIED,
+          pageSize: MOST_PER_PAGE,
+          pageToken,
+          historyLength: undefined,
+          statusTimestampAfter: undefined,
+          includeArtifacts: false,
+        }),
+      );
       yield* sightingsOf('observe', page.tasks, seen);
       pageToken = page.nextPageToken;
     } while (pageToken);
@@ -208,27 +266,39 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
 
   // What it lists is all `stop` has to go by, as for `observe`: a session it left out is listed in full when a stop asks for it.
   // What the driver could not look for crosses as it said it, names and nothing more.
-  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> => Effect.gen(function* () {
-    const seen = new Map<string, Sighting>();
-    const { tasks, unread } = yield* call('observe', () => transport.observeSessions({ expected }));
-    yield* sightingsOf('observe', tasks, seen);
-    names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
-    return { seen, unread: new Set(unread) };
-  });
+  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> =>
+    Effect.gen(function* () {
+      const seen = new Map<string, Sighting>();
+      const { tasks, unread } = yield* call('observe', () => transport.observeSessions({ expected }));
+      yield* sightingsOf('observe', tasks, seen);
+      names = new Map([...seen].map(([name, s]) => [s.sessionId, name]));
+      return { seen, unread: new Set(unread) };
+    });
 
-  const stop = (sessionId: string): Effect.Effect<void, RunnerError> => Effect.gen(function* () {
-    if (!names.has(sessionId)) yield* observe;
-    const name = names.get(sessionId);
-    if (name === undefined) {
-      return yield* Effect.fail(new RunnerError({ verb: 'stop', message: `the \`${harness}\` harness lists no session \`${sessionId}\`: there is nothing to stop.` }));
-    }
-    // A session that ended between the listing and the stop has nothing to stop, as a driver's stop of an ended session
-    // did nothing: the next pass reads how it ended.
-    yield* call('stop', () => client.cancelTask({ tenant: '', id: name, metadata: undefined }).then(
-      () => undefined,
-      (cause) => { if (cause instanceof TaskNotCancelableError) return undefined; throw cause; },
-    ));
-  });
+  const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>
+    Effect.gen(function* () {
+      if (!names.has(sessionId)) yield* observe;
+      const name = names.get(sessionId);
+      if (name === undefined) {
+        return yield* Effect.fail(
+          new RunnerError({
+            verb: 'stop',
+            message: `the \`${harness}\` harness lists no session \`${sessionId}\`: there is nothing to stop.`,
+          }),
+        );
+      }
+      // A session that ended between the listing and the stop has nothing to stop, as a driver's stop of an ended session
+      // did nothing: the next pass reads how it ended.
+      yield* call('stop', () =>
+        client.cancelTask({ tenant: '', id: name, metadata: undefined }).then(
+          () => undefined,
+          (cause) => {
+            if (cause instanceof TaskNotCancelableError) return undefined;
+            throw cause;
+          },
+        ),
+      );
+    });
 
   const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
     call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
@@ -240,21 +310,31 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     call('release', () => transport.releaseSession({ session, task })).pipe(Effect.map((r) => r.usage ?? undefined));
 
   const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> =>
-    call('say', () => client.sendMessage({
-      tenant: '', message: followUpOf(session.name, text, randomUUID()), metadata: undefined,
-      configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-    })).pipe(Effect.asVoid);
+    call('say', () =>
+      client.sendMessage({
+        tenant: '',
+        message: followUpOf(session.name, text, randomUUID()),
+        metadata: undefined,
+        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+      }),
+    ).pipe(Effect.asVoid);
 
   const transcriptOf = (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
     call('transcript', () => transport.sessionTranscript({ name, after }));
 
   // By id, a read always answers: the handler returns null only for a name it could not find a session under.
   const transcript = (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
-    call('transcript', () => transport.sessionTranscript({ sessionId, after }))
-      .pipe(Effect.flatMap((read) => read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`))));
+    call('transcript', () => transport.sessionTranscript({ sessionId, after })).pipe(
+      Effect.flatMap((read) =>
+        read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`)),
+      ),
+    );
 
   return {
-    spawn, observe, stop, logs,
+    spawn,
+    observe,
+    stop,
+    logs,
     ...(offered.methods.includes('findSession') ? { find } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
@@ -272,7 +352,9 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
  * file, which imports `runner.ts`.
  */
 export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runner, never, Journal> =>
-  Layer.unwrap(Effect.gen(function* () {
-    const journal = yield* Journal;
-    return Runner.layer(a2aOps(harness, ops, (taskId) => Effect.runPromise(journal.read(taskId))));
-  }));
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const journal = yield* Journal;
+      return Runner.layer(a2aOps(harness, ops, (taskId) => Effect.runPromise(journal.read(taskId))));
+    }),
+  );

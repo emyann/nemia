@@ -31,8 +31,18 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
   const line = daemonLine(standing, now);
   if (standing.kind === 'none' || standing.kind === 'unreadable') {
     return {
-      kind: standing.kind, ticking: false, pid: null, cwd: null, every: null, startedAt: null, passedAt: null, lastHeardAt: null, stoppedAt: null,
-      staleAfterMs: null, identity: null, line,
+      kind: standing.kind,
+      ticking: false,
+      pid: null,
+      cwd: null,
+      every: null,
+      startedAt: null,
+      passedAt: null,
+      lastHeardAt: null,
+      stoppedAt: null,
+      staleAfterMs: null,
+      identity: null,
+      line,
     };
   }
   const { file } = standing;

@@ -59,34 +59,67 @@ export type PromiseRunner = {
 
 /** A `PromiseRunner` as the engine's verbs. */
 export const promiseOps = (h: PromiseRunner): RunnerOps => ({
-  spawn: (r: SpawnRequest) => Effect.tryPromise({
-    try: () => h.spawn(r),
-    // A rejection is not proof that nothing started; a runner that knows says `refused`.
-    catch: (cause) => new RunnerError({
-      verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
-      ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+  spawn: (r: SpawnRequest) =>
+    Effect.tryPromise({
+      try: () => h.spawn(r),
+      // A rejection is not proof that nothing started; a runner that knows says `refused`.
+      catch: (cause) =>
+        new RunnerError({
+          verb: 'spawn',
+          message: cause instanceof Error ? cause.message : String(cause),
+          ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+        }),
     }),
-  }),
-  observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })).pipe(Effect.flatMap(inNames)),
-  ...(h.find ? {
-    find: (name: string) => wrap(() => h.find!(name), (m) => new RunnerError({ verb: 'find', message: m })),
-  } : {}),
-  stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
-  logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
-  ...(h.release ? {
-    release: (session: Sighting, task: { worktree?: string | boolean }) =>
-      wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })).pipe(
-        Effect.map((used) => used || undefined),
-      ),
-  } : {}),
-  ...(h.transcript ? {
-    transcript: (id: string, after?: TranscriptCursor) =>
-      wrap(() => h.transcript!(id, after), (m) => new RunnerError({ verb: 'transcript', message: m })),
-  } : {}),
-  ...(h.say ? {
-    say: (session: { name: string; sessionId: string }, text: string) =>
-      wrap(() => h.say!(session, text), (m) => new RunnerError({ verb: 'say', message: m })),
-  } : {}),
+  observe: wrap(
+    () => h.observe(),
+    (m) => new RunnerError({ verb: 'observe', message: m }),
+  ).pipe(Effect.flatMap(inNames)),
+  ...(h.find
+    ? {
+        find: (name: string) =>
+          wrap(
+            () => h.find!(name),
+            (m) => new RunnerError({ verb: 'find', message: m }),
+          ),
+      }
+    : {}),
+  stop: (id: string) =>
+    wrap(
+      () => h.stop(id),
+      (m) => new RunnerError({ verb: 'stop', message: m }),
+    ),
+  logs: (id: string) =>
+    wrap(
+      () => h.logs(id),
+      (m) => new RunnerError({ verb: 'logs', message: m }),
+    ),
+  ...(h.release
+    ? {
+        release: (session: Sighting, task: { worktree?: string | boolean }) =>
+          wrap(
+            () => h.release!(session, task),
+            (m) => new RunnerError({ verb: 'release', message: m }),
+          ).pipe(Effect.map((used) => used || undefined)),
+      }
+    : {}),
+  ...(h.transcript
+    ? {
+        transcript: (id: string, after?: TranscriptCursor) =>
+          wrap(
+            () => h.transcript!(id, after),
+            (m) => new RunnerError({ verb: 'transcript', message: m }),
+          ),
+      }
+    : {}),
+  ...(h.say
+    ? {
+        say: (session: { name: string; sessionId: string }, text: string) =>
+          wrap(
+            () => h.say!(session, text),
+            (m) => new RunnerError({ verb: 'say', message: m }),
+          ),
+      }
+    : {}),
 });
 
 /** What a `PromiseRunner` observed, every state in A2A's names — or refused, naming the session and the words it takes. */
@@ -95,10 +128,12 @@ const inNames = (seen: Map<string, PromiseSighting>): Effect.Effect<Map<string, 
   for (const [name, s] of seen) {
     const state = isSessionState(s.state) ? s.state : formerStateOf(s.state);
     if (!state) {
-      return Effect.fail(new RunnerError({
-        verb: 'observe',
-        message: `the harness reported session \`${name}\` as \`${String(s.state)}\`, which is no session state: report one of A2A's, ${SESSION_STATES.join(', ')} (or a former word, working, blocked, done, failed, stopped).`,
-      }));
+      return Effect.fail(
+        new RunnerError({
+          verb: 'observe',
+          message: `the harness reported session \`${name}\` as \`${String(s.state)}\`, which is no session state: report one of A2A's, ${SESSION_STATES.join(', ')} (or a former word, working, blocked, done, failed, stopped).`,
+        }),
+      );
     }
     out.set(name, { ...s, state });
   }
@@ -108,4 +143,3 @@ const inNames = (seen: Map<string, PromiseSighting>): Effect.Effect<Map<string, 
 /** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
 export const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
   Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
-

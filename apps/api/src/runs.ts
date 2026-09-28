@@ -5,7 +5,20 @@ import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt,
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
-import { type Asked, holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
+import {
+  type Asked,
+  holdsIn,
+  judge,
+  needsOf,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  standingsOf,
+  type StepNeeds,
+  waitsIn,
+} from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { restingMemo, restingRead } from './resting.ts';
 import { refusedBeforeReading, type Guarded } from './guard.ts';
@@ -86,7 +99,9 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const asked: Asked = { branches: [], failed: false };
-  const judged = judge(run, names, folder, views, await waitsIn(run, reader, git), await holdsIn(run, reader, git), (status, steps) => standingsOf(run, steps, status, git, asked));
+  const judged = judge(run, names, folder, views, await waitsIn(run, reader, git), await holdsIn(run, reader, git), (status, steps) =>
+    standingsOf(run, steps, status, git, asked),
+  );
   const summary = {
     id: run.id,
     repo: run.repo ?? null,
@@ -162,7 +177,7 @@ const pruneGuard = (route: string): Guarded => ({
   route,
   does: 'prunes a run',
   forAnother: 'prune one',
-  why: "a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved",
+  why: 'a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved',
   reach: "prune it on the board's run page",
   instead: "Prune it on the board's run page, or with `wf prune <run>`",
   shape: PRUNE_SHAPE,
@@ -170,13 +185,22 @@ const pruneGuard = (route: string): Guarded => ({
 
 /** A prune's body, as `wf prune` reads its flags: `artifacts` is `--artifacts` and `unmerged` is `--unmerged`, each absent or a boolean. */
 function pruneHowOf(body: unknown): { artifacts: boolean; unmerged: boolean } | { error: string } {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return { error: `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.` };
+  if (typeof body !== 'object' || body === null || Array.isArray(body))
+    return { error: `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.` };
   const said = body as Record<string, unknown>;
   const unknown = Object.keys(said).filter((key) => key !== 'artifacts' && key !== 'unmerged');
-  if (unknown.length) return { error: `POST …/prune does not take ${unknown.map((key) => `\`${key}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.` };
-  for (const [key, flag] of [['artifacts', '--artifacts'], ['unmerged', '--unmerged']] as const) {
+  if (unknown.length)
+    return {
+      error: `POST …/prune does not take ${unknown.map((key) => `\`${key}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.`,
+    };
+  for (const [key, flag] of [
+    ['artifacts', '--artifacts'],
+    ['unmerged', '--unmerged'],
+  ] as const) {
     if (said[key] !== undefined && typeof said[key] !== 'boolean') {
-      return { error: `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${flag} — and this request sent ${JSON.stringify(said[key])}.` };
+      return {
+        error: `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${flag} — and this request sent ${JSON.stringify(said[key])}.`,
+      };
     }
   }
   return { artifacts: said.artifacts === true, unmerged: said.unmerged === true };
@@ -235,7 +259,9 @@ export const runs = new Hono()
       judged.set(run.id, one);
       const was = kept.get(run.id);
       if (was && !isDeepStrictEqual(was, one.summary)) {
-        throw new Error(`The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`);
+        throw new Error(
+          `The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`,
+        );
       }
       if (was) continue;
       if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
@@ -262,12 +288,22 @@ export const runs = new Hono()
   .delete('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const route = `DELETE /api/runs/${id}`;
-    const refused = refusedBeforeReading(removeGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      removeGuard(route),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
     if (!tryOf(run)) {
-      return c.json({ error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.` }, 409);
+      return c.json(
+        {
+          error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.`,
+        },
+        409,
+      );
     }
     try {
       const gone = await forget(e, id);
@@ -286,7 +322,12 @@ export const runs = new Hono()
   .delete('/api/runs/:id/hold', async (c) => {
     const id = c.req.param('id');
     const route = `DELETE /api/runs/${id}/hold`;
-    const refused = refusedBeforeReading(liftGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      liftGuard(route),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
     try {
@@ -309,7 +350,12 @@ export const runs = new Hono()
   .post('/api/runs/:id/prune', async (c) => {
     const id = c.req.param('id');
     const route = `POST /api/runs/${id}/prune`;
-    const refused = refusedBeforeReading(pruneGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      pruneGuard(route),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     let body: unknown;
     try {

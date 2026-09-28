@@ -76,7 +76,7 @@ export function untriedOf(
     const into = yourAgentsDir(home);
     const files = [agent.file, ...(agent.schemaFile ? [path.join(path.dirname(agent.file), agent.schemaFile)] : [])];
     return {
-      why: 'Only an agent of yours can be tried — a try runs with no repository, in a folder of its own, and finds no agent of the repository\'s. Copy it to yours to try it.',
+      why: "Only an agent of yours can be tried — a try runs with no repository, in a folder of its own, and finds no agent of the repository's. Copy it to yours to try it.",
       copy: `mkdir -p ${quoted(into)} && cp ${files.map(quoted).join(' ')} ${quoted(`${into}/`)}`,
     };
   }
@@ -84,13 +84,22 @@ export function untriedOf(
   if (reserved) return { why: reserved, copy: null };
   const harness = agent.keys.harness;
   if (isRemoteHarness(harness)) {
-    return { why: `${agent.name} is a remote agent (\`harness: ${harness}\`), which another party runs: a try is fenced by Claude Code's permission mode and capped at $${TRY_BUDGET}, and neither reaches it. Only an agent on Claude Code is tried here.`, copy: null };
+    return {
+      why: `${agent.name} is a remote agent (\`harness: ${harness}\`), which another party runs: a try is fenced by Claude Code's permission mode and capped at $${TRY_BUDGET}, and neither reaches it. Only an agent on Claude Code is tried here.`,
+      copy: null,
+    };
   }
   if (harness !== undefined && !FENCED_HARNESSES.includes(harness)) {
-    return { why: `${agent.name} runs on \`${harness}\`, and a try is fenced by Claude Code's permission mode — \`dontAsk\` with \`Edit(**)\`, in a folder of its own — which ${harness} does not take. Only an agent on Claude Code is tried here: no \`harness:\` line, \`claude\` or \`claude-detached\`.`, copy: null };
+    return {
+      why: `${agent.name} runs on \`${harness}\`, and a try is fenced by Claude Code's permission mode — \`dontAsk\` with \`Edit(**)\`, in a folder of its own — which ${harness} does not take. Only an agent on Claude Code is tried here: no \`harness:\` line, \`claude\` or \`claude-detached\`.`,
+      copy: null,
+    };
   }
   if (agent.keys.remote === 'true') {
-    return { why: `${agent.name} says \`remote: true\`, which bridges a background session to claude.ai, and a try runs as a job (\`claude -p\`), which is never bridged. Delete \`remote: true\` to try it.`, copy: null };
+    return {
+      why: `${agent.name} says \`remote: true\`, which bridges a background session to claude.ai, and a try runs as a job (\`claude -p\`), which is never bridged. Delete \`remote: true\` to try it.`,
+      copy: null,
+    };
   }
   return null;
 }
@@ -104,12 +113,19 @@ export function writeTryFolder(name: string, version: string, home: string = HOM
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
     if (fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) {
-      throw Object.assign(new Error(`${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`), { exitCode: 2 });
+      throw Object.assign(
+        new Error(`${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`),
+        { exitCode: 2 },
+      );
     }
   }
   const text = tryText(name, version);
   let was: string | undefined;
-  try { was = fs.readFileSync(file, 'utf8'); } catch { /* not written yet */ }
+  try {
+    was = fs.readFileSync(file, 'utf8');
+  } catch {
+    /* not written yet */
+  }
   if (was === text) return dir;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, text);

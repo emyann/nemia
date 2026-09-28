@@ -56,7 +56,9 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'>
  * and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what is
  * asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
-export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null }): readonly string[] => {
+export const onYouOf = (
+  run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null },
+): readonly string[] => {
   const said = run.onYou ?? run.waitingOnYou;
   const decide = toDecideOf(run);
   return decide?.kind === 'approve' ? said.filter((one) => one !== `approve ${decide.step}`) : said;
@@ -66,7 +68,9 @@ export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readon
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
  */
-export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
+export const standingOf = (
+  run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>,
+): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
   run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
 type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> & { waiting?: RunSummary['waiting'] };
@@ -96,7 +100,11 @@ export function runClock(run: Clocked, now: number, finished: boolean): { words:
     const since = duration(now - Date.parse(run.createdAt));
     return run.cancelledAt !== null
       ? { words: `created ${since} ago`, at: run.createdAt, title: `${created} Called off before anything of it was filed.` }
-      : { words: `waiting for ${since}`, at: run.createdAt, title: `${created} Nothing of it is filed yet${run.waiting ? `: ${run.waiting.word}` : ''}.` };
+      : {
+          words: `waiting for ${since}`,
+          at: run.createdAt,
+          title: `${created} Nothing of it is filed yet${run.waiting ? `: ${run.waiting.word}` : ''}.`,
+        };
   }
   const since = duration(now - Date.parse(run.startedAt));
   const waited = waitedMs(run)!;
@@ -160,7 +168,12 @@ export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | '
     const after = [...new Set(child.after)].filter(onTheFloor);
     const held = [...new Set(child.heldUntil ?? [])].filter((parent) => onTheFloor(parent) && !after.includes(parent));
     return [
-      ...after.map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: started ? 'done' : 'to-come' })),
+      ...after.map((parent): RunEdge => ({
+        id: `after:${parent}->${child.id}`,
+        source: parent,
+        target: child.id,
+        state: started ? 'done' : 'to-come',
+      })),
       ...held.map((parent): RunEdge => ({ id: `hold:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
     ];
   });
@@ -168,10 +181,17 @@ export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | '
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
 export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
-  run.brief.split('\n').map((line) => line.replace(/^\s*#+\s*/, '').trim()).find(Boolean) ?? run.id;
+  run.brief
+    .split('\n')
+    .map((line) => line.replace(/^\s*#+\s*/, '').trim())
+    .find(Boolean) ?? run.id;
 
 /** The repo by its folder's name, which is what a person calls it; the full path is for machines. */
-export const repoName = (repo: string): string => repo.split(/[\\/]+/).filter(Boolean).at(-1) ?? repo;
+export const repoName = (repo: string): string =>
+  repo
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .at(-1) ?? repo;
 
 /** Oldest first, so a run that starts takes the next free cell and moves no card already down. */
 export const byAge = <T extends Pick<RunSummary, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
@@ -325,7 +345,8 @@ export function placeRuns(
   const standing = new Set(order.flatMap((id) => (onFloor.has(id) ? cellsOf(onFloor.get(id)!, spanOfId(id)) : [])));
   for (const id of order) {
     const left = saved?.get(id);
-    if (unfolding.has(id) && spans.has(id) && !onFloor.has(id) && left && free(left, ONE_CELL, standing) && free(left, spanOfId(id), taken)) put(id, left);
+    if (unfolding.has(id) && spans.has(id) && !onFloor.has(id) && left && free(left, ONE_CELL, standing) && free(left, spanOfId(id), taken))
+      put(id, left);
   }
   for (const id of order) {
     const here = onFloor.get(id);
@@ -371,8 +392,24 @@ export function placeRuns(
   const placeTogether = (members: readonly string[], strict: boolean): boolean => {
     const shape = shapeOf(members);
     const cell = (name: string) => shape.get(name)!;
-    const first = Math.max(0, ...members.flatMap((m) => parents.get(m)!.filter((p) => at.has(p)).map((p) => columnOf(p) + 1 - cell(m).x)));
-    const cap = Math.min(Infinity, ...members.flatMap((m) => children.get(m)!.filter((c) => at.has(c)).map((c) => columnOf(c) - 1 - cell(m).x)));
+    const first = Math.max(
+      0,
+      ...members.flatMap((m) =>
+        parents
+          .get(m)!
+          .filter((p) => at.has(p))
+          .map((p) => columnOf(p) + 1 - cell(m).x),
+      ),
+    );
+    const cap = Math.min(
+      Infinity,
+      ...members.flatMap((m) =>
+        children
+          .get(m)!
+          .filter((c) => at.has(c))
+          .map((c) => columnOf(c) - 1 - cell(m).x),
+      ),
+    );
     if (cap < first && strict) return false;
     const width = Math.max(...members.map((m) => cell(m).x + spanOfId(m).columns));
     // The last column an anchor can take and keep the whole in the row, or the first for one wider than the grid — and no further right

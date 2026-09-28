@@ -61,7 +61,12 @@ export const cardQuery = (name: string) =>
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export async function fileCard(card: { body: string; workflow?: string; from?: WorkflowListing['from']; repo?: string }): Promise<{ name: string }> {
+export async function fileCard(card: {
+  body: string;
+  workflow?: string;
+  from?: WorkflowListing['from'];
+  repo?: string;
+}): Promise<{ name: string }> {
   const res = await fetch('/api/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(card) });
   const body = (await res.json().catch(() => undefined)) as { name?: unknown; error?: unknown } | undefined;
   if (res.ok && typeof body?.name === 'string') return { name: body.name };
@@ -89,7 +94,14 @@ export async function dropCard(name: string): Promise<void> {
 }
 
 /** Mirrors `InboxQueueAnswer` in apps/api/src/inbox.ts: what `wf inbox queue` did, the card's `queued:` as it now reads, and its place once queued. */
-export type Queued = { name: string; file: string; was: 'queued' | 'taken back' | 'not queued'; queued: string | null; place: number | null; of: number | null };
+export type Queued = {
+  name: string;
+  file: string;
+  was: 'queued' | 'taken back' | 'not queued';
+  queued: string | null;
+  place: number | null;
+  of: number | null;
+};
 
 /**
  * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts the next
@@ -102,7 +114,7 @@ export async function queueCard(name: string, { off = false }: { off?: boolean }
   const route = `/api/inbox/${encodeURIComponent(name)}/queue`;
   const method = off ? 'DELETE' : 'POST';
   const res = await fetch(route, { method, headers: { 'content-type': 'application/json' } });
-  const body = (await res.json().catch(() => undefined)) as Partial<Queued> & { error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as (Partial<Queued> & { error?: unknown }) | undefined;
   if (res.ok && typeof body?.was === 'string') return body as Queued;
   if (res.ok) {
     throw new Error(

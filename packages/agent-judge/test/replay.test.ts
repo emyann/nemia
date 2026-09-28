@@ -27,11 +27,24 @@ test('a question replay has no record of rejects, naming it, and writes nothing'
   const record = tmp('replay');
   await judge({ model: MODEL, record, env: ENV, fetch: stub(answering({})).fetch }).ask(state, { web });
   const before = files(record);
-  const e = await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { web, plan }).then(() => assert.fail('it answered'), (e) => e);
+  const e = await judge({ model: MODEL, record, mode: 'replay' })
+    .ask(state, { web, plan })
+    .then(
+      () => assert.fail('it answered'),
+      (e) => e,
+    );
   assert.equal(e.exitCode, 2);
-  assert.match(e.message, /^judge: replay holds no record of `plan` \("Should `card` be planned first\?"\) under .*Ask it once with the recorded judge/);
+  assert.match(
+    e.message,
+    /^judge: replay holds no record of `plan` \("Should `card` be planned first\?"\) under .*Ask it once with the recorded judge/,
+  );
   assert.deepEqual(files(record), before);
-  const other = await judge({ model: MODEL, record, mode: 'replay' }).ask({ card: 'Another card.' }, { web }).then(() => assert.fail('it answered'), (e) => e);
+  const other = await judge({ model: MODEL, record, mode: 'replay' })
+    .ask({ card: 'Another card.' }, { web })
+    .then(
+      () => assert.fail('it answered'),
+      (e) => e,
+    );
   assert.match(other.message, /no record of `web`/, 'another state is another key');
 });
 
@@ -42,10 +55,22 @@ test('replay reads a failure as the failure, and a claim inside its deadline as 
   assert.equal(failed.answers.web.status === 'failed' && failed.answers.web.kind, 'unreachable');
   const key = keyOf(MODEL, plan, state);
   fs.mkdirSync(path.join(record, key));
-  fs.writeFileSync(path.join(record, key, '1.asked.json'), JSON.stringify({
-    v: 1, key, n: 1, id: 'plan', model: MODEL, question: questionOf(plan), state: stateHash(state), at: new Date().toISOString(),
-    deadline: new Date(Date.now() + 60_000).toISOString(), pid: 1, host: 'h',
-  }));
+  fs.writeFileSync(
+    path.join(record, key, '1.asked.json'),
+    JSON.stringify({
+      v: 1,
+      key,
+      n: 1,
+      id: 'plan',
+      model: MODEL,
+      question: questionOf(plan),
+      state: stateHash(state),
+      at: new Date().toISOString(),
+      deadline: new Date(Date.now() + 60_000).toISOString(),
+      pid: 1,
+      host: 'h',
+    }),
+  );
   const started = Date.now();
   const flying = await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { plan });
   assert.ok(Date.now() - started < 1_000);

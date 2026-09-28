@@ -1,7 +1,21 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
-import { acceptLoop, askRound, askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
+import {
+  acceptLoop,
+  askRound,
+  askTry,
+  decisionQuery,
+  type Decidable,
+  type DecideCommand,
+  type DiffFile,
+  type Group,
+  type Lesson,
+  type RetryMode,
+  type RunDetail,
+  type SensitiveDiff,
+  type Touched,
+} from '../lib/api';
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
@@ -37,13 +51,17 @@ export function Decide({ run }: { run: RunDetail }) {
 /** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
 function DecideFrame({ runId, children }: { runId: string; children: ReactNode }) {
   return (
-    <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800">
+    <section
+      aria-label="Decide"
+      id="decide"
+      className="scroll-mt-4 space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800"
+    >
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
           What <code>wf decide {runId}</code> shows. Copy a command to run it yourself; the board runs one of them, accepting a loop's work
-          as it stands with your reason, as <code>wf accept</code> does. An answer given here asks for a try as <code>wf retry</code> does, or a
-          round as <code>wf round</code> does; each row says what the tick does with it.
+          as it stands with your reason, as <code>wf accept</code> does. An answer given here asks for a try as <code>wf retry</code> does,
+          or a round as <code>wf round</code> does; each row says what the tick does with it.
         </p>
       </div>
       {children}
@@ -56,7 +74,17 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
  * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
  * here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first.
  */
-export function DecideSection({ runId, decision, offers = null, run = null }: { runId: string; decision: Decidable; offers?: ReactNode; run?: Pick<RunDetail, 'place' | 'work'> | null }) {
+export function DecideSection({
+  runId,
+  decision,
+  offers = null,
+  run = null,
+}: {
+  runId: string;
+  decision: Decidable;
+  offers?: ReactNode;
+  run?: Pick<RunDetail, 'place' | 'work'> | null;
+}) {
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
   // A folder run has no branch and nothing to merge, so nothing about one: where its work is instead. (`wf decide` says the same.)
   const inFolders = run?.place === 'folder';
@@ -66,7 +94,10 @@ export function DecideSection({ runId, decision, offers = null, run = null }: { 
 
       {/* Why each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. */}
       {overBudget && (
-        <p data-over-budget className="rounded bg-amber-100 px-3 py-2 font-mono text-xs break-words text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <p
+          data-over-budget
+          className="rounded bg-amber-100 px-3 py-2 font-mono text-xs break-words text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
           {overBudget}
         </p>
       )}
@@ -74,7 +105,9 @@ export function DecideSection({ runId, decision, offers = null, run = null }: { 
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-sm text-neutral-500">Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.</p>
+            <p className="text-sm text-neutral-500">
+              Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
+            </p>
             <Facts rows={[['work', pathRow(run!.work)]]} />
           </div>
         ) : touched.length ? (
@@ -122,7 +155,11 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
       </h3>
       <ul className="space-y-3">
         {offers.map((offer) =>
-          offer.kind === 'raise' ? <RaiseRow key={offer.step} runId={runId} offer={offer} /> : <OfferRow key={offer.step} runId={runId} offer={offer} />,
+          offer.kind === 'raise' ? (
+            <RaiseRow key={offer.step} runId={runId} offer={offer} />
+          ) : (
+            <OfferRow key={offer.step} runId={runId} offer={offer} />
+          ),
         )}
       </ul>
     </section>
@@ -148,7 +185,11 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
     case 'answer':
       return 'signed off blocked, and said nothing of what it needs';
     case 'try-again':
-      return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
+      return !offer.recheck
+        ? 'ended without the closeout it was asked for'
+        : offer.unfinished
+          ? 'has a check that did not finish: no verdict on the work'
+          : 'was refused by its check';
     case 'denied':
       return `signed off having been denied a call${offer.calls ? ` (${offer.calls})` : ''}, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it`;
   }
@@ -163,7 +204,9 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
   const [message, setMessage] = useState('');
   // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
   // A denied step, a new session first, as `wf decide` offers it: the one it had was denied, and carries on the same permissions.
-  const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : offer.kind === 'denied' ? 'fresh' : 'nudge');
+  const [mode, setMode] = useState<RetryMode>(
+    offer.kind === 'try-again' && offer.unfinished ? 'recheck' : offer.kind === 'denied' ? 'fresh' : 'nudge',
+  );
   const field = useId();
   // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
   const rechecking = mode === 'recheck';
@@ -185,9 +228,18 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
     );
   }
 
-  const modes: RetryMode[] = offer.kind === 'try-again' && offer.recheck ? ['nudge', 'fresh', 'recheck'] : offer.kind === 'denied' ? ['fresh', 'nudge'] : ['nudge', 'fresh'];
+  const modes: RetryMode[] =
+    offer.kind === 'try-again' && offer.recheck
+      ? ['nudge', 'fresh', 'recheck']
+      : offer.kind === 'denied'
+        ? ['fresh', 'nudge']
+        : ['nudge', 'fresh'];
   return (
-    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+    <li
+      data-offer={offer.kind}
+      data-step={offer.step}
+      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
+    >
       {offer.kind === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
       ) : (
@@ -283,14 +335,23 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
       <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
         <strong>{offer.step}</strong>{' '}
         <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
-          {tried.isSuccess ? askedSaid(tried.data) : rounded.isSuccess ? `round ${rounded.data.round} asked — the next tick files it` : null}
+          {tried.isSuccess
+            ? askedSaid(tried.data)
+            : rounded.isSuccess
+              ? `round ${rounded.data.round} asked — the next tick files it`
+              : null}
         </span>
       </li>
     );
   }
 
   return (
-    <li data-offer="raise" data-step={offer.step} data-by={offer.by} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+    <li
+      data-offer="raise"
+      data-step={offer.step}
+      data-by={offer.by}
+      className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
+    >
       <p className="break-words">
         <strong>{offer.step}</strong> <span className="font-mono text-xs">{offer.status}</span>
       </p>
@@ -349,7 +410,9 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <label htmlFor={field} className="flex items-center gap-1 text-xs">
             <span className="sr-only">{`The cap to raise ${offer.step} to, in dollars`}</span>
-            <span aria-hidden className="font-mono">$</span>
+            <span aria-hidden className="font-mono">
+              $
+            </span>
             <input
               id={field}
               type="number"
@@ -449,7 +512,8 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
   return useMutation({
     // `step` in the ask names another step to try instead, for an ending step's gate, where the send-back goes to the work and not to the
     // step at the gate (`sendBackTo` in agent-orchestrator); it is not part of the request the api takes.
-    mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) => askTry(runId, to ?? step, how),
+    mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) =>
+      askTry(runId, to ?? step, how),
     onSuccess: () => {
       onAsked();
       // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody. The run's own record alone
@@ -586,7 +650,12 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
       <p className="flex flex-wrap items-center gap-1.5">
         <span className="w-28 shrink-0 text-neutral-500">{label}</span>
         {files.map((file) => (
-          <span key={file} data-chip={kind} title={title} className={cn('break-all rounded px-1.5 py-0.5 font-mono text-[11px]', className)}>
+          <span
+            key={file}
+            data-chip={kind}
+            title={title}
+            className={cn('break-all rounded px-1.5 py-0.5 font-mono text-[11px]', className)}
+          >
             {file}
           </span>
         ))}
@@ -595,7 +664,13 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
   return (
     <div className="space-y-1.5 text-xs">
       {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300')}
-      {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, 'text-red-700 ring-1 ring-red-400 ring-inset dark:text-red-400 dark:ring-red-700')}
+      {row(
+        'check-affecting',
+        checkAffecting,
+        'check-affecting',
+        CHECK_AFFECTING,
+        'text-red-700 ring-1 ring-red-400 ring-inset dark:text-red-400 dark:ring-red-700',
+      )}
     </div>
   );
 }
@@ -604,10 +679,22 @@ export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly s
 export function LessonChip({ lesson }: { lesson: Lesson }) {
   const [text, title, className] =
     lesson.state === 'written'
-      ? [`lesson · ${lesson.said}`, 'The run changed a file where the next agent reads.', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300']
+      ? [
+          `lesson · ${lesson.said}`,
+          'The run changed a file where the next agent reads.',
+          'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+        ]
       : lesson.state === 'nothing'
-        ? [lesson.said, 'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").', 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300']
-        : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', 'border border-dashed border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400'];
+        ? [
+            lesson.said,
+            'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").',
+            'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
+          ]
+        : [
+            `lesson ${lesson.said}`,
+            'A branch could not be read, so nobody can say what it wrote.',
+            'border border-dashed border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400',
+          ];
   return (
     <p>
       <span data-lesson={lesson.state} title={title} className={cn('inline-block rounded px-2 py-0.5 font-mono text-xs', className)}>
@@ -621,14 +708,25 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; touched: readonly Touched[] }) {
   return (
     <section aria-label="In full" className="space-y-2">
-      <h3 className="text-xs font-medium text-neutral-500">In full: the check-affecting files — what a change could edit to make its check pass</h3>
+      <h3 className="text-xs font-medium text-neutral-500">
+        In full: the check-affecting files — what a change could edit to make its check pass
+      </h3>
       {sensitive.map(({ branch, files, error }) => (
         <div key={branch} className="space-y-1.5">
           {sensitive.length > 1 && <p className="break-all font-mono text-xs text-neutral-500">{branch}</p>}
           {error ? (
             <p className="text-sm text-red-700 dark:text-red-400">not read: {error}</p>
           ) : files.length ? (
-            files.map((file) => <DiffFileView key={file.path} file={file} counts={changeOf(touched.find((t) => t.branch === branch), file.path)} />)
+            files.map((file) => (
+              <DiffFileView
+                key={file.path}
+                file={file}
+                counts={changeOf(
+                  touched.find((t) => t.branch === branch),
+                  file.path,
+                )}
+              />
+            ))
           ) : (
             <p className="text-sm text-neutral-500">none</p>
           )}

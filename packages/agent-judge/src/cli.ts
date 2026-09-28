@@ -54,7 +54,8 @@ export const defaultRecord = (env: Readonly<Record<string, string | undefined>>)
 export type Asking = { readonly questions: number; readonly repeated: number; readonly sending: readonly string[] };
 
 export const wouldAsk = (record: string, briefs: readonly string[], reask: boolean, now = Date.now()): Asking => {
-  let questions = 0, repeated = 0;
+  let questions = 0,
+    repeated = 0;
   const sending: string[] = [];
   const counted = new Set<string>();
   for (const brief of briefs) {
@@ -63,7 +64,10 @@ export const wouldAsk = (record: string, briefs: readonly string[], reask: boole
     for (const question of Object.values(QUESTIONS)) {
       const key = keyOf(MODEL, question, state);
       // Counted already, by an earlier brief in this pass: that asking writes the record this one would read.
-      if (counted.has(key)) { repeated++; continue; }
+      if (counted.has(key)) {
+        repeated++;
+        continue;
+      }
       const r = reading(key, readFacts(record, key), question, MODEL, now);
       if (r.status === 'none' || (reask && r.status === 'failed')) {
         counted.add(key);
@@ -82,8 +86,14 @@ export const wouldAsk = (record: string, briefs: readonly string[], reask: boole
  * are one question to the judge, and the report says so. The brief itself is not a row's: what is scored is the two
  * properties.
  */
-const pick = (run: { id: string; first: string; folder: Row['folder']; web: boolean; plan: boolean }, card: string) =>
-  ({ id: run.id, first: run.first, folder: run.folder, web: run.web, plan: run.plan, card });
+const pick = (run: { id: string; first: string; folder: Row['folder']; web: boolean; plan: boolean }, card: string) => ({
+  id: run.id,
+  first: run.first,
+  folder: run.folder,
+  web: run.web,
+  plan: run.plan,
+  card,
+});
 
 export async function main(argv: readonly string[], io: Io = {}): Promise<number> {
   const env = io.env ?? process.env;
@@ -95,7 +105,10 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       out(status(env));
       return 0;
     case 'card': {
-      let file: string | undefined, text: string | undefined, record: string | undefined, reask = false;
+      let file: string | undefined,
+        text: string | undefined,
+        record: string | undefined,
+        reask = false;
       for (let i = 0; i < rest.length; i++) {
         const a = rest[i]!;
         const value = () => rest[++i] ?? refuse(`judge card: ${a} takes a value.\n${USAGE}`);
@@ -118,14 +131,21 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       }
       const state = cardState(text!);
       const dir = path.resolve(record ?? defaultRecord(env));
-      const j = judge({ model: MODEL, record: dir, env, ...(io.fetch ? { fetch: io.fetch } : {}), ...(io.retries !== undefined ? { retries: io.retries } : {}) });
+      const j = judge({
+        model: MODEL,
+        record: dir,
+        env,
+        ...(io.fetch ? { fetch: io.fetch } : {}),
+        ...(io.retries !== undefined ? { retries: io.retries } : {}),
+      });
       const asked = await j.ask(state, QUESTIONS, reask ? { reask: 'failed' } : {});
       for (const line of report(source, state.card.length, dir, asked)) out(line);
       return 0;
     }
     case 'runs': {
       let store: string | undefined, record: string | undefined, since: string | undefined, json: string | undefined;
-      let yes = false, reask = false;
+      let yes = false,
+        reask = false;
       for (let i = 0; i < rest.length; i++) {
         const a = rest[i]!;
         const value = () => rest[++i] ?? refuse(`judge runs: ${a} takes a value.\n${USAGE}`);
@@ -143,17 +163,29 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       const off = available(env) ? undefined : 'the judge is off: no TYPESAFE_API_KEY in the environment';
 
       // What it costs and what it sends, before anything is sent. `--yes` is needed only when a request would be made.
-      const asking = off ? { questions: 0, repeated: 0, sending: [] } : wouldAsk(dir, runs.map((r) => r.brief), reask);
+      const asking = off
+        ? { questions: 0, repeated: 0, sending: [] }
+        : wouldAsk(
+            dir,
+            runs.map((r) => r.brief),
+            reask,
+          );
       const characters = asking.sending.reduce((n, card) => n + card.length, 0);
       out(`judge runs: ${runs.length} runs in scope, ${skipped.length} skipped, of ${read} records in ${root}`);
       if (off) out(`  ${off}; nothing would be sent, and only the rival is scored.`);
-      else if (asking.repeated === 0) out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
+      else if (asking.repeated === 0)
+        out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
       // A brief dispatched twice is asked once: its second four questions are neither asked nor on record yet.
-      else out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; ${asking.repeated} more are the same questions of a brief already counted, ` +
-        `and ${runs.length * 4 - asking.questions - asking.repeated} are on record in ${dir}`);
+      else
+        out(
+          `  ${asking.questions} of ${runs.length * 4} questions would be asked; ${asking.repeated} more are the same questions of a brief already counted, ` +
+            `and ${runs.length * 4 - asking.questions - asking.repeated} are on record in ${dir}`,
+        );
       if (asking.questions > 0) {
-        out(`  about ${characters} characters would go to TypeSafe — ${asking.sending.length} of the ${runs.length} briefs, ` +
-          'stripped of their frontmatter, with the fixed description of the repository and nothing else');
+        out(
+          `  about ${characters} characters would go to TypeSafe — ${asking.sending.length} of the ${runs.length} briefs, ` +
+            'stripped of their frontmatter, with the fixed description of the repository and nothing else',
+        );
       } else if (!off) out('  nothing would be sent: every answer is already on record.');
       out("  TypeSafe's retention terms have not been read by this project: assume that what is sent may be kept.");
       if (asking.questions > 0 && !yes) {
@@ -164,7 +196,13 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       const rows: Row[] = [];
       const cost = { requests: 0, questions: 0, inputTokens: 0, ms: 0 };
       if (!off) {
-        const j = judge({ model: MODEL, record: dir, env, ...(io.fetch ? { fetch: io.fetch } : {}), ...(io.retries !== undefined ? { retries: io.retries } : {}) });
+        const j = judge({
+          model: MODEL,
+          record: dir,
+          env,
+          ...(io.fetch ? { fetch: io.fetch } : {}),
+          ...(io.retries !== undefined ? { retries: io.retries } : {}),
+        });
         for (const run of runs) {
           const state = cardState(run.brief);
           const asked = await j.ask(state, QUESTIONS, reask ? { reask: 'failed' } : {});
@@ -179,7 +217,12 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       }
 
       const report: Report = {
-        store: root, record: dir, model: MODEL, read, rows, skipped,
+        store: root,
+        record: dir,
+        model: MODEL,
+        read,
+        rows,
+        skipped,
         ...(since !== undefined ? { since } : {}),
         ...(off !== undefined ? { off } : { asked: cost as Cost }),
       };

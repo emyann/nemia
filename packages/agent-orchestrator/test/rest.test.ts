@@ -26,14 +26,20 @@ test('a finished run, frozen, settled, with nothing due, done, said or read of a
   assert.equal(atRest(RESTING), true);
   assert.equal(atRest({ ...RESTING, status: 'failed' }), true, 'failed, a gate waiting on a person included');
   assert.equal(atRest({ ...RESTING, status: 'cancelled' }), true);
-  assert.equal(atRest({ ...RESTING, status: 'running', run: { workflow: [], pruned: { at: '2026-09-25T10:00:00.000Z', worktrees: [] } } }), true,
-    'a pruned run rests, whatever its steps say: nothing more is filed for it');
+  assert.equal(
+    atRest({ ...RESTING, status: 'running', run: { workflow: [], pruned: { at: '2026-09-25T10:00:00.000Z', worktrees: [] } } }),
+    true,
+    'a pruned run rests, whatever its steps say: nothing more is filed for it',
+  );
 });
 
 test('REFUSED: a run still running, or held, rests nowhere', () => {
   assert.equal(atRest({ ...RESTING, status: 'running' }), false, 'running');
-  assert.equal(atRest({ ...RESTING, run: { workflow: [], hold: { at: '2026-09-25T10:00:00.000Z', until: ['other'] } } }), false,
-    'held: whether the runs it names shipped is theirs');
+  assert.equal(
+    atRest({ ...RESTING, run: { workflow: [], hold: { at: '2026-09-25T10:00:00.000Z', until: ['other'] } } }),
+    false,
+    'held: whether the runs it names shipped is theirs',
+  );
 });
 
 test('REFUSED: a record whose workflow is not frozen on it reads its folder, which the memo does not watch', () => {
@@ -45,9 +51,18 @@ test('REFUSED: a task not settled — at work, waiting for a word, unknown to th
 });
 
 test('REFUSED: anything due, and anything the pass did, is a pass the next must repeat', () => {
-  for (const key of ['ready', 'check', 'held'] as const) assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, [key]: ['work'] } }), false, key);
-  assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }), false, 'retry');
-  assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, round: [{ step: 'review', target: 'work', round: 2, by: 'again' }] } }), false, 'round');
+  for (const key of ['ready', 'check', 'held'] as const)
+    assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, [key]: ['work'] } }), false, key);
+  assert.equal(
+    atRest({ ...RESTING, due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }),
+    false,
+    'retry',
+  );
+  assert.equal(
+    atRest({ ...RESTING, due: { ...RESTING.due, round: [{ step: 'review', target: 'work', round: 2, by: 'again' }] } }),
+    false,
+    'round',
+  );
   assert.equal(atRest({ ...RESTING, acted: true }), false, 'acted');
 });
 
@@ -64,7 +79,7 @@ test('REFUSED: what another run says — a claim on the checkout, a run waited o
   assert.equal(atRest({ ...RESTING, held: true }), false, 'held by the cap');
 });
 
-test('restBlockers names each clause that holds a run out, and none of a run at rest: what the memo\'s check and a count by clause read', () => {
+test("restBlockers names each clause that holds a run out, and none of a run at rest: what the memo's check and a count by clause read", () => {
   assert.deepEqual(restBlockers(RESTING), []);
   const cases: Array<[string, Partial<RestFacts>]> = [
     ['status', { status: 'running' }],
@@ -90,14 +105,26 @@ test('restBlockers names each clause that holds a run out, and none of a run at 
     assert.deepEqual(restBlockers(f), [clause], clause);
     assert.equal(atRest(f), false, `${clause}: atRest agrees`);
   }
-  assert.deepEqual(restBlockers({ ...RESTING, settled: false, notes: ['said'], inFlight: true }), ['settled', 'notes', 'inFlight'], 'every clause, in order');
+  assert.deepEqual(
+    restBlockers({ ...RESTING, settled: false, notes: ['said'], inFlight: true }),
+    ['settled', 'notes', 'inFlight'],
+    'every clause, in order',
+  );
 });
 
 test('a task on the feed takes out the run whose id and a dash begin it — a step, a try, a check — and nothing else', () => {
   const ids = new Set(['fix-a', 'fix-a-b', 'other']);
   assert.deepEqual([...evictedBy(['fix-a-work'], ids)].sort(), ['fix-a'], 'a step');
-  assert.deepEqual([...evictedBy(['fix-a-work-try2-check'], ids)].sort(), ['fix-a'], 'a try\'s check');
-  assert.deepEqual([...evictedBy(['fix-a-b-work'], ids)].sort(), ['fix-a', 'fix-a-b'], 'a run whose id begins another\'s goes with it: more work, never less');
-  assert.deepEqual([...evictedBy(['fix-ab-work', 'otherwise-work', 'fix', 'other'], ids)], [], 'an id that only begins with the run\'s letters, or is the run\'s own, is none of its tasks');
+  assert.deepEqual([...evictedBy(['fix-a-work-try2-check'], ids)].sort(), ['fix-a'], "a try's check");
+  assert.deepEqual(
+    [...evictedBy(['fix-a-b-work'], ids)].sort(),
+    ['fix-a', 'fix-a-b'],
+    "a run whose id begins another's goes with it: more work, never less",
+  );
+  assert.deepEqual(
+    [...evictedBy(['fix-ab-work', 'otherwise-work', 'fix', 'other'], ids)],
+    [],
+    "an id that only begins with the run's letters, or is the run's own, is none of its tasks",
+  );
   assert.deepEqual([...evictedBy([], ids)], []);
 });

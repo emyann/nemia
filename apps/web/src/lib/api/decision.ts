@@ -26,15 +26,22 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /** Mirrors `DecideCommand` in apps/api/src/decision.ts: a command `wf decide` prints. The board runs one of them itself, `accept` (`acceptLoop`). */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
+export type DecideCommand = {
+  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
+  command: string;
+  said: string | null;
+};
 
 /**
  * Mirrors `Standing` in apps/api/src/decision.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
  * by N commits, or gone — with the fact in the package's words and how much it changed, as `wf decide` prints beside the branch (git's
  * `--shortstat`); `stat` is null where git said nothing of it.
  */
-export type Standing = ({ branch: string; where: 'on' } | { branch: string; where: 'ahead'; commits: number } | { branch: string; where: 'gone' })
-  & { said: string; stat: string | null; merge: StandingMerge | null };
+export type Standing = (
+  | { branch: string; where: 'on' }
+  | { branch: string; where: 'ahead'; commits: number }
+  | { branch: string; where: 'gone' }
+) & { said: string; stat: string | null; merge: StandingMerge | null };
 
 /**
  * Mirrors `StandingMerge` in apps/api/src/decision.ts: whether a branch ahead of the base still merges onto it as the base is now, as git's
@@ -68,7 +75,12 @@ export type Decidable = {
  * one a person holds too — `holding` alone for a run a person holds (`wf hold`), which offers nothing, `running` while nobody is waited on,
  * `nothing` for a run called off or shipped.
  */
-export type RunDecision = { waiting: RunWaiting; holding?: RunHolding } | { holding: RunHolding } | { running: true } | { nothing: string } | Decidable;
+export type RunDecision =
+  | { waiting: RunWaiting; holding?: RunHolding }
+  | { holding: RunHolding }
+  | { running: true }
+  | { nothing: string }
+  | Decidable;
 
 /**
  * What `wf decide` shows a person about a run. Read once for each state of the run, never on the page's beat: the api

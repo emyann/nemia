@@ -70,7 +70,12 @@ export function within<T>(kind: Kind, f: () => T): T {
   const frame: Frame = { kind };
   enter(m, frame);
   let out: T;
-  try { out = f(); } catch (err) { leave(m, frame); throw err; }
+  try {
+    out = f();
+  } catch (err) {
+    leave(m, frame);
+    throw err;
+  }
   if (out instanceof Promise) return out.finally(() => leave(m, frame)) as T;
   leave(m, frame);
   return out;
@@ -103,7 +108,11 @@ export const countRested = (): void => {
  * What the runtime reported of a call, added to the kind that made it — its bytes, reads and processes — with the time it spent observing
  * its harnesses and the processes those started moved from that kind to `observe` (`observed`, at most the call's own).
  */
-export const addRuntime = (kind: Kind, io: { bytes: number; reads: number; spawned: number }, observed: { ms: number; spawned: number; calls: number }): void => {
+export const addRuntime = (
+  kind: Kind,
+  io: { bytes: number; reads: number; spawned: number },
+  observed: { ms: number; spawned: number; calls: number },
+): void => {
   if (!meter) return;
   const t = meter.kinds[kind];
   const o = meter.kinds.observe;
@@ -127,7 +136,9 @@ export function aside<T>(f: () => T): T {
   if (!m) return f();
   const t0 = performance.now();
   charge(m, t0);
-  try { return f(); } finally {
+  try {
+    return f();
+  } finally {
     const t1 = performance.now();
     m.overheadMs += t1 - t0;
     m.mark = t1;
@@ -147,7 +158,14 @@ export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: n
     return { value: await f(), ms: performance.now() - t0 };
   }
   const t0 = performance.now();
-  const m: Meter = { kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>, records: 0, rested: 0, overheadMs: 0, stack: [], mark: t0 };
+  const m: Meter = {
+    kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>,
+    records: 0,
+    rested: 0,
+    overheadMs: 0,
+    stack: [],
+    mark: t0,
+  };
   meter = m;
   try {
     const value = await f();

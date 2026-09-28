@@ -13,7 +13,11 @@ export const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capab
 export async function sidebar(page: Page): Promise<void> {
   const menu = page.locator('[data-sidebar="sidebar"]');
   for (const place of PLACES) await expectVisible(menu.getByRole('link', { name: place }), `the sidebar has ${place}`);
-  await expectTexts(menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'), PLACES, 'the sidebar lists its places in order, the Inbox first');
+  await expectTexts(
+    menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'),
+    PLACES,
+    'the sidebar lists its places in order, the Inbox first',
+  );
 }
 
 /**
@@ -30,7 +34,8 @@ export async function nextVisit(page: Page, check: (again: Page) => Promise<void
     await check(again);
     await idle(again);
     const seen = problems();
-    if (seen.length) throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+    if (seen.length)
+      throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
   } finally {
     await again.close();
   }
@@ -54,21 +59,33 @@ export function fed(run: string, ...said: [string] | [string, string]): void {
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
-export const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+export const themeOf = (page: Page): Promise<string> =>
+  page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
 /** The places of the three queued cards, as the board says them. */
 export const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
 
 /** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
 export const filesIn = (dir: string): Array<[string, string]> =>
-  fs.readdirSync(dir).sort().map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
+  fs
+    .readdirSync(dir)
+    .sort()
+    .map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
 
 /** A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — and its list, a list. */
-export async function expectRendered(body: Locator, text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string }): Promise<void> {
+export async function expectRendered(
+  body: Locator,
+  text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string },
+): Promise<void> {
   await expectVisible(body.getByRole('heading', { level: 4, name: text.heading }), `its ## is a heading, an h4 (${text.heading})`);
   await expectTexts(body.locator('ul > li'), text.items, `its list is a list (${text.items.join(' · ')})`);
-  for (const cell of text.cells ?? []) await expectVisible(body.getByRole('cell', { name: cell, exact: true }), `its table is a table, with a cell ${cell}`);
-  if (text.code) await expectVisible(body.locator('[data-language="bash"]', { hasText: text.code }), `its fenced block is the board's code block, in bash (${text.code})`);
+  for (const cell of text.cells ?? [])
+    await expectVisible(body.getByRole('cell', { name: cell, exact: true }), `its table is a table, with a cell ${cell}`);
+  if (text.code)
+    await expectVisible(
+      body.locator('[data-language="bash"]', { hasText: text.code }),
+      `its fenced block is the board's code block, in bash (${text.code})`,
+    );
 }
 
 /**
@@ -82,9 +99,11 @@ export async function expectKeys(page: Page, file: Locator, api: string, set: Re
   const rows = file.locator('section[aria-label="Keys"] tr[data-key]');
   await expectCount(rows, keys.length, `a row per key (${keys.map((k) => k.key).join(', ')})`);
   const order = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-key')));
-  if (JSON.stringify(order) !== JSON.stringify(keys.map((k) => k.key))) throw new Refused(`the rows are in the package's order — ${order.join(', ')}`);
+  if (JSON.stringify(order) !== JSON.stringify(keys.map((k) => k.key)))
+    throw new Refused(`the rows are in the package's order — ${order.join(', ')}`);
   for (const { key, value, meaning } of keys) {
-    if (value !== (set[key] ?? null)) throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
+    if (value !== (set[key] ?? null))
+      throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
     const row = rows.filter({ has: page.locator(`th[scope="row"]`, { hasText: new RegExp(`^${key}$`) }) });
     await expectTexts(row.locator('[data-value]'), [value ?? 'not set'], `${key}'s value reads ${value ?? 'not set'}`);
     // The meaning is markdown: its code spans are drawn as code, so the text read has no backticks.
@@ -100,7 +119,10 @@ export async function expectSource(file: Locator, body: Locator, onDisk: string)
   await expectVisible(source, 'Source shows the file as written');
   const shown = await source.textContent();
   const written = fs.readFileSync(onDisk, 'utf8');
-  if (shown !== written) throw new Refused(`Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${onDisk} holds ${JSON.stringify(written)}`);
+  if (shown !== written)
+    throw new Refused(
+      `Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${onDisk} holds ${JSON.stringify(written)}`,
+    );
   if ((await toggle.getAttribute('aria-pressed')) !== 'true') throw new Refused('Source says it is pressed while the file is shown');
   await expectCount(file.locator('section[aria-label="Keys"]'), 0, 'in place of the rendered body and the keys');
   await toggle.click();

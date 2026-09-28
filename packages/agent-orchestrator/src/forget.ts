@@ -9,8 +9,48 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
-import { approvedFirst, branchFates, checkLogsOf, decision, filesPrunedWords, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneAgain, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruned, type Pruning, type Run } from './run.ts';
-import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
+import {
+  approvedFirst,
+  branchFates,
+  checkLogsOf,
+  decision,
+  filesPrunedWords,
+  forgetRefusal,
+  heldWorktree,
+  idRefusal,
+  isGitRun,
+  landsOnCheck,
+  namesInOrder,
+  parseWorktrees,
+  pruneAgain,
+  pruneRefusal,
+  runWorktrees,
+  type AskName,
+  type BranchFate,
+  type Decision,
+  type ForgetHow,
+  type Forgot,
+  type MergeState,
+  type Pruned,
+  type Pruning,
+  type Run,
+} from './run.ts';
+import {
+  HOME,
+  askFile,
+  asksDir,
+  cancelFile,
+  holdFile,
+  listRuns,
+  lstatOf,
+  pruneFile,
+  readAsks,
+  readRun,
+  roundAskFile,
+  runFile,
+  runsDir,
+  stepsOf,
+} from './store.ts';
 import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
@@ -18,7 +58,9 @@ import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, handOffOwed, r
 
 /** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
 const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
-  (isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none');
+  isGitRun(run) && steps?.some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo)
+    ? mergeState(run.repo, resultTips(run)).merging
+    : 'none';
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
@@ -55,7 +97,11 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   // A record from before runs froze their workflow reads its folder, which may be gone: judged without its steps (`forgetRefusal`).
   let steps: Workflow[] | undefined;
   let unfrozen: string | undefined;
-  try { steps = stepsOf(run); } catch (err) { unfrozen = (err as Error).message; }
+  try {
+    steps = stepsOf(run);
+  } catch (err) {
+    unfrozen = (err as Error).message;
+  }
   const { views, phaseOf } = await taskPhases(e, run);
   const { asks, rounds } = readAsks(id);
   const reader = closeoutReader(views, run);
@@ -76,7 +122,22 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   // Where the result stands against the base branch, for an ending that has not run: one whose result git already has holds nothing.
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
-  const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'rm', merging(run, steps));
+  const refusal = forgetRefusal(
+    steps,
+    run,
+    phaseOf,
+    others,
+    reader,
+    asked,
+    verdictOf,
+    asks,
+    rounds,
+    spendOf,
+    askAt,
+    standings,
+    'rm',
+    merging(run, steps),
+  );
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
   // A step's task held open that waits for a word nobody will give now: closed, since once the record is gone no pass reads the run to close
   // it. A refusal changes nothing here — the engine refuses a task answered, settled or stopped since it was read, none of which waits.
@@ -86,23 +147,45 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
 
   // 1. The worktrees, through git — which lists each by its real path, so the run's directory and the record's are read the same way.
   const within = resolved(dir);
-  const recorded = { ...run, steps: Object.fromEntries(Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st])) };
-  const { worktrees, unlisted } = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''));
+  const recorded = {
+    ...run,
+    steps: Object.fromEntries(
+      Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st]),
+    ),
+  };
+  const { worktrees, unlisted } = runWorktrees(
+    recorded,
+    namesInOrder(run, steps ?? []),
+    within,
+    parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''),
+  );
   const removed: string[] = [];
   const handedOff: Forgot['handedOff'] = [];
   const gone = unlisted.filter((p) => !lstatOf(p));
   const left: Forgot['left'] = [];
   for (const w of worktrees) {
     // Its directory is gone, or no longer a worktree git can read: pruned below, and a directory still there is found with the strays.
-    if (w.prunable && w.locked === undefined) { if (!lstatOf(w.path)) gone.push(w.path); continue; }
+    if (w.prunable && w.locked === undefined) {
+      if (!lstatOf(w.path)) gone.push(w.path);
+      continue;
+    }
     // Locked, or on no branch with something a removal would leave on none (`heldWorktree`): left as it is. Git is asked of a detached one only.
     const status = w.detached && w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
-    const onBranch = w.detached && w.head && w.locked === undefined ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim()) : false;
+    const onBranch =
+      w.detached && w.head && w.locked === undefined
+        ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
+        : false;
     const hold = heldWorktree(w, { clean: status !== undefined && !status.trim(), onBranch });
-    if (hold) { left.push({ path: w.path, ...hold }); continue; }
+    if (hold) {
+      left.push({ path: w.path, ...hold });
+      continue;
+    }
     // What it holds uncommitted, on its branch first. A hand-off git refuses leaves the work where it is, and says why.
     const handed = handOff(w.path, w.step, ', before its run was forgotten');
-    if (handed && 'error' in handed) { left.push({ path: w.path, step: w.step, uncommitted: handed.error }); continue; }
+    if (handed && 'error' in handed) {
+      left.push({ path: w.path, step: w.step, uncommitted: handed.error });
+      continue;
+    }
     if (handed) handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.commit });
     try {
       execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -113,18 +196,26 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   }
   if (worktrees.length) gitSays(run.repo, 'worktree', 'prune');
   let strays: string[] = [];
-  try { strays = fs.readdirSync(within).map((name) => path.join(within, name)); } catch { /* none cut, or already removed */ }
+  try {
+    strays = fs.readdirSync(within).map((name) => path.join(within, name));
+  } catch {
+    /* none cut, or already removed */
+  }
   for (const at of strays) if (!left.some((l) => l.path === at)) left.push({ path: at, unknown: true });
   if (left.length) return { ...said, kind: 'held', removed, handedOff, gone, left, branches: [], files: [] };
 
   // 2. The branches, as asked. Git says what is merged into the run's base branch, and whether it will delete a branch.
   const listed = (gitSays(run.repo, 'for-each-ref', '--format=%(refname)', `refs/heads/wf/${id}/`) ?? '')
-    .split('\n').filter(Boolean).map((ref) => ref.replace(/^refs\/heads\//, ''));
+    .split('\n')
+    .filter(Boolean)
+    .map((ref) => ref.replace(/^refs\/heads\//, ''));
   const merged = (branch: string): boolean => {
     try {
       execFileSync('git', ['merge-base', '--is-ancestor', `refs/heads/${branch}`, run.branch], { cwd: run.repo, stdio: 'ignore' });
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   };
   const branches = branchFates(run, listed, merged, how).map((b): BranchFate => {
     if (!b.deleted) return b;
@@ -163,7 +254,11 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
  * what was removed. A prune that removed nothing takes the marker back: gone on a run never pruned before, as it was on one that was. The
  * tick never calls this.
  */
-export async function prune(e: Engine, id: string, { unmerged = false, yes = false, artifacts = false }: { unmerged?: boolean; yes?: boolean; artifacts?: boolean } = {}): Promise<Pruning> {
+export async function prune(
+  e: Engine,
+  id: string,
+  { unmerged = false, yes = false, artifacts = false }: { unmerged?: boolean; yes?: boolean; artifacts?: boolean } = {},
+): Promise<Pruning> {
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw Object.assign(new Error(refusedId), { exitCode: 2 });
   const run = readRun(id);
@@ -174,18 +269,36 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   // The run's worktrees, as git lists them — a directory already gone is git's to forget (`git worktree prune`), not a removal.
   const within = resolved(path.join(HOME, 'worktrees', id));
   let steps: Workflow[] | undefined;
-  try { steps = stepsOf(run); } catch { /* a record from before runs froze their workflow, whose folder is gone: `pruneRefusal` says so */ }
-  const recorded = { ...run, steps: Object.fromEntries(Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st])) };
-  const listed = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? '')).worktrees
-    .filter((w) => !(w.prunable && w.locked === undefined));
+  try {
+    steps = stepsOf(run);
+  } catch {
+    /* a record from before runs froze their workflow, whose folder is gone: `pruneRefusal` says so */
+  }
+  const recorded = {
+    ...run,
+    steps: Object.fromEntries(
+      Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st]),
+    ),
+  };
+  const listed = runWorktrees(
+    recorded,
+    namesInOrder(run, steps ?? []),
+    within,
+    parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''),
+  ).worktrees.filter((w) => !(w.prunable && w.locked === undefined));
   // Its files directory, under `--artifacts`: a link there is removed as a link, and read as nothing to give back.
   const filesDir = path.join(runsDir(), id, 'artifacts');
   const files = artifacts && lstatOf(filesDir)?.isDirectory() ? filesDir : undefined;
   if (!listed.length && !files) {
-    const worktrees = run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts) ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (wf prune)`
-      : !run.isolate ? `it cut no worktree — it worked in ${run.repo} itself`
-      : 'no worktree of it is left';
-    const nothing = !artifacts ? worktrees : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
+    const worktrees =
+      run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts)
+        ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (wf prune)`
+        : !run.isolate
+          ? `it cut no worktree — it worked in ${run.repo} itself`
+          : 'no worktree of it is left';
+    const nothing = !artifacts
+      ? worktrees
+      : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
     if (yes && run.pruned) gitSays(run.repo, 'worktree', 'prune');
     return { id, kind: 'nothing', nothing, ...none };
   }
@@ -211,14 +324,36 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     // No other run is asked: one waiting on this run reads its record, which stays.
-    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps), pruneAgain(id, { unmerged, artifacts }));
+    held = forgetRefusal(
+      steps,
+      run,
+      phaseOf,
+      [],
+      reader,
+      asked,
+      verdictOf,
+      asks,
+      rounds,
+      spendOf,
+      askAt,
+      standings,
+      'prune',
+      merging(run, steps),
+      pruneAgain(id, { unmerged, artifacts }),
+    );
     owed = handOffOwed(steps, run, phaseOf);
   }
   // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.
   const facts = listed.map((w) => {
     const status = w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
-    const changes = (status ?? '').split('\n').filter(Boolean).map((line) => line.slice(3));
-    const onBranch = w.detached && w.head && w.locked === undefined ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim()) : false;
+    const changes = (status ?? '')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.slice(3));
+    const onBranch =
+      w.detached && w.head && w.locked === undefined
+        ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
+        : false;
     const hold = heldWorktree(w, { clean: status !== undefined && !changes.length, onBranch });
     // git could not read its status: taken as holding what nobody can see, and refused.
     const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
@@ -238,8 +373,13 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   const before = run.pruned?.worktrees ?? [];
   const filesBefore = run.pruned?.artifacts;
   const marker = (removed: Pruned['worktrees'], freed: number | undefined): Pruned => ({
-    at, worktrees: [...before, ...removed],
-    ...(freed !== undefined ? { artifacts: { at: now, bytes: (filesBefore?.bytes ?? 0) + freed } } : filesBefore ? { artifacts: filesBefore } : {}),
+    at,
+    worktrees: [...before, ...removed],
+    ...(freed !== undefined
+      ? { artifacts: { at: now, bytes: (filesBefore?.bytes ?? 0) + freed } }
+      : filesBefore
+        ? { artifacts: filesBefore }
+        : {}),
   });
   // Marked first — its files as gone too, when they are to go — so a pass, or the api, that reads the run while things go reads it pruned.
   fs.writeFileSync(pruneFile(id), JSON.stringify(marker([], kept?.bytes), null, 2));
@@ -254,7 +394,11 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     }
   }
   gitSays(run.repo, 'worktree', 'prune');
-  try { fs.rmdirSync(within); } catch { /* not empty: what git would not remove is still there */ }
+  try {
+    fs.rmdirSync(within);
+  } catch {
+    /* not empty: what git would not remove is still there */
+  }
   // Then its files: removed, not followed, a link among them included. What would not go is said, and counted out of what was freed.
   let freed: number | undefined;
   if (kept) {
@@ -274,7 +418,15 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   } else {
     fs.writeFileSync(pruneFile(id), JSON.stringify(marker(removed, filesWent ? freed : undefined), null, 2));
   }
-  return { id, kind: 'pruned', worktrees: removed, ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}), left, at, ...(unmerged ? { unmerged: true as const } : {}) };
+  return {
+    id,
+    kind: 'pruned',
+    worktrees: removed,
+    ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}),
+    left,
+    at,
+    ...(unmerged ? { unmerged: true as const } : {}),
+  };
 }
 
 /**
@@ -331,13 +483,27 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
   for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
   const checks = path.join(HOME, 'checks');
   let logs: string[] = [];
-  try { logs = fs.readdirSync(checks); } catch { /* no check ever ran */ }
+  try {
+    logs = fs.readdirSync(checks);
+  } catch {
+    /* no check ever ran */
+  }
   let otherIds: string[] = [];
-  try { if (!names) otherIds = fs.readdirSync(runsDir()).filter((f) => f.endsWith('.json')).map((f) => path.basename(f, '.json')); } catch { /* no runs at all */ }
+  try {
+    if (!names)
+      otherIds = fs
+        .readdirSync(runsDir())
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => path.basename(f, '.json'));
+  } catch {
+    /* no runs at all */
+  }
   for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
   try {
     fs.rmdirSync(path.join(HOME, 'worktrees', id));
     removed.push(`worktrees/${id}/`);
-  } catch { /* none, or not empty */ }
+  } catch {
+    /* none, or not empty */
+  }
   return removed;
 }

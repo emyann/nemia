@@ -62,19 +62,25 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
     if (!taken || stamp === taken.stamp || stamp === taken.next) return;
     setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   }, [stamp, taken]);
-  const said = taken && (stamp === (taken.next ?? taken.stamp)) ? taken.said : null;
+  const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
   // How long it has been at work, from its first filing — or, before that, how long it has waited (`runClock`).
   const clock = runClock(run, now, finished);
   // The flowchart, off the list's own record of the run: its graph, and each step's word.
   const names = useMemo(() => run.steps.map((step) => step.name), [run.steps]);
   const edgeSteps = useMemo(() => flowSteps(run), [run]);
   const rail = useMemo(() => railOf(names, run.graph, edgeSteps, cancelled), [names, run.graph, edgeSteps, cancelled]);
-  const tiles = useMemo(() => (open ? tilesOf(names, run.graph, edgeSteps, cancelled) : null), [open, names, run.graph, edgeSteps, cancelled]);
+  const tiles = useMemo(
+    () => (open ? tilesOf(names, run.graph, edgeSteps, cancelled) : null),
+    [open, names, run.graph, edgeSteps, cancelled],
+  );
 
   return (
     // Marked while nobody has decided its result, and not dimmed as a finished card is: nothing of it moves, so it is finished, and it is
     // on the floor because it is the one card there that is waiting for a person rather than for a machine.
-    <Card size="sm" className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${decide ? 'ring-1 ring-emerald-500/60' : finished ? 'opacity-50 hover:opacity-80' : ''}`}>
+    <Card
+      size="sm"
+      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${decide ? 'ring-1 ring-emerald-500/60' : finished ? 'opacity-50 hover:opacity-80' : ''}`}
+    >
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
           <div className="flex items-center gap-1">
@@ -112,7 +118,10 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             {run.try ? (
               <TryTag agent={run.try.agent} />
             ) : (
-              <span className="shrink-0" title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made')}>
+              <span
+                className="shrink-0"
+                title={run.repo ?? (run.work ? `Its steps work in folders under ${run.work}` : 'Its steps work in folders the run made')}
+              >
                 {run.repo ? repoName(run.repo) : 'folders'}
               </span>
             )}
@@ -213,14 +222,12 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             )}
           </span>
           <span className="flex items-center gap-1">
-            {decide && (
-              <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>
-            )}
-            {waitsOnYou(run) && (
-              <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>
-            )}
+            {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
+            {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
             {run.holding && !cancelled && (
-              <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">held</Badge>
+              <Badge title={run.holding.advice} className="bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                held
+              </Badge>
             )}
             {/* The hold lifted here, as `wf hold --off` lifts it: beside its chip, in the row the card already has. */}
             {run.holding && !cancelled && <CardLift id={run.id} />}

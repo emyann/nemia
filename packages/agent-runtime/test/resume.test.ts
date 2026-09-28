@@ -34,7 +34,9 @@ const fakeClaude = () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
   fs.writeFileSync(registry, '[]');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -53,7 +55,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId, state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -66,7 +70,11 @@ if (args[0] === '--bg') {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 // ─── the transcript ─────────────────────────────────────────────────────────
@@ -102,17 +110,39 @@ test("a session resumed under the same id is read for its new attempt: its own c
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
-    append(row!.sessionId, prompt('the prompt'), response('msg_1', call('tu_1', 'Read')), response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })));
+    append(
+      row!.sessionId,
+      prompt('the prompt'),
+      response('msg_1', call('tu_1', 'Read')),
+      response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
+    );
     // Last written long before it is read, so nothing but the attempt keeps that read from the next one.
     age(row!.sessionId, 30_000);
     claude.set(row!.name, { state: 'done' });
     await engine.tick();
     const [was] = (await engine.view(first)).state.attempts;
     assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' });
-    assert.deepEqual(was?.usage, { turns: 2, toolCalls: 2, inputTokens: 200, uncachedTokens: 20, cacheWriteTokens: 0, cacheReadTokens: 180, outputTokens: 10, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
+    assert.deepEqual(was?.usage, {
+      turns: 2,
+      toolCalls: 2,
+      inputTokens: 200,
+      uncachedTokens: 20,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 180,
+      outputTokens: 10,
+      peakContextTokens: 100,
+      firstContextTokens: 100,
+      firstCacheWriteTokens: 0,
+    });
 
     // The retry continues that session, and the harness keeps its id.
-    const retry = await engine.file({ config: { background: true }, brief: 'give your closeout', cwd: tmp('cwd'), closeoutSchema: schema, resumeFrom: row!.sessionId });
+    const retry = await engine.file({
+      config: { background: true },
+      brief: 'give your closeout',
+      cwd: tmp('cwd'),
+      closeoutSchema: schema,
+      resumeFrom: row!.sessionId,
+    });
     await engine.tick();
     const [resumed] = claude.rows();
     assert.equal(resumed?.name, `ae/${retry}/1`);
@@ -120,12 +150,22 @@ test("a session resumed under the same id is read for its new attempt: its own c
 
     // Listed final before it has written a word, to a view: the first try's read is not this attempt's.
     claude.set(resumed!.name, { state: 'done' });
-    assert.deepEqual((await engine.view(retry)).usage, { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 }, "nothing since its own start — not the first try's count");
+    assert.deepEqual(
+      (await engine.view(retry)).usage,
+      { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
+      "nothing since its own start — not the first try's count",
+    );
 
     // It carries on, gives a closeout of its own, and is listed done — in three responses, where the first try took two,
     // so a record of the first try's count cannot pass for the retry's.
     await sleep(10);
-    append(row!.sessionId, prompt('give your closeout'), response('msg_3', { type: 'text', text: 'Giving it.' }), response('msg_4', call('tu_3', 'Bash')), response('msg_5', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })));
+    append(
+      row!.sessionId,
+      prompt('give your closeout'),
+      response('msg_3', { type: 'text', text: 'Giving it.' }),
+      response('msg_4', call('tu_3', 'Bash')),
+      response('msg_5', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })),
+    );
     await engine.tick();
 
     const v = await engine.view(retry);
@@ -133,7 +173,22 @@ test("a session resumed under the same id is read for its new attempt: its own c
     const [is] = v.state.attempts;
     assert.deepEqual(is?.closeout, { outcome: 'done', by: 'retry' }, "its own statement, not the first try's");
     assert.notDeepEqual(is?.usage, was?.usage, "not the first try's count");
-    assert.deepEqual(is?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, uncachedTokens: 30, cacheWriteTokens: 0, cacheReadTokens: 270, outputTokens: 15, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 }, 'only the responses since its own start');
+    assert.deepEqual(
+      is?.usage,
+      {
+        turns: 3,
+        toolCalls: 2,
+        inputTokens: 300,
+        uncachedTokens: 30,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 270,
+        outputTokens: 15,
+        peakContextTokens: 100,
+        firstContextTokens: 100,
+        firstCacheWriteTokens: 0,
+      },
+      'only the responses since its own start',
+    );
   });
 });
 
@@ -141,7 +196,12 @@ test('a statement read as nothing from a final sighting is read again once the t
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' } });
+    const id = await engine.file({
+      config: { background: true },
+      brief: 'the prompt',
+      cwd: tmp('cwd'),
+      closeoutSchema: { type: 'object' },
+    });
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
@@ -150,7 +210,18 @@ test('a statement read as nothing from a final sighting is read again once the t
 
     // Listed final between two turns, for one observation, and seen only by a view: nothing said yet.
     claude.set(row!.name, { state: 'done' });
-    assert.deepEqual((await engine.view(id)).usage, { turns: 1, toolCalls: 1, inputTokens: 100, uncachedTokens: 10, cacheWriteTokens: 0, cacheReadTokens: 90, outputTokens: 5, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
+    assert.deepEqual((await engine.view(id)).usage, {
+      turns: 1,
+      toolCalls: 1,
+      inputTokens: 100,
+      uncachedTokens: 10,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 90,
+      outputTokens: 5,
+      peakContextTokens: 100,
+      firstContextTokens: 100,
+      firstCacheWriteTokens: 0,
+    });
     // Kept while the transcript says it has not been written since — shown by writing and putting the mtime back.
     append(row!.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
     age(row!.sessionId, 30_000);
@@ -164,6 +235,17 @@ test('a statement read as nothing from a final sighting is read again once the t
     assert.equal(v.state.settled, 'succeeded');
     const [a] = v.state.attempts;
     assert.deepEqual(a?.closeout, { outcome: 'done' }, 'found, not the nothing read before it was made');
-    assert.deepEqual(a?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, uncachedTokens: 30, cacheWriteTokens: 0, cacheReadTokens: 270, outputTokens: 15, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
+    assert.deepEqual(a?.usage, {
+      turns: 3,
+      toolCalls: 2,
+      inputTokens: 300,
+      uncachedTokens: 30,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 270,
+      outputTokens: 15,
+      peakContextTokens: 100,
+      firstContextTokens: 100,
+      firstCacheWriteTokens: 0,
+    });
   });
 });

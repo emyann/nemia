@@ -37,15 +37,25 @@ import { spawn } from 'node:child_process';
 
 const runFile = process.argv[2]!;
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
-  cmd: string; args: string[]; cwd: string; logFile: string; stopFile?: string; nativeIdPattern?: string; pid?: number;
+  cmd: string;
+  args: string[];
+  cwd: string;
+  logFile: string;
+  stopFile?: string;
+  nativeIdPattern?: string;
+  pid?: number;
   input?: { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
   inputAt?: number;
 };
 
 let status = {
-  ...plan, state: 'working' as string, pid: process.pid,
-  startedAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(),
-  nativeId: undefined as string | undefined, exitCode: undefined as number | undefined,
+  ...plan,
+  state: 'working' as string,
+  pid: process.pid,
+  startedAt: new Date().toISOString(),
+  heartbeatAt: new Date().toISOString(),
+  nativeId: undefined as string | undefined,
+  exitCode: undefined as number | undefined,
   // A harness started here has closed nothing yet, whatever the one before it did.
   inputClosed: undefined as true | undefined,
 };
@@ -84,11 +94,28 @@ const vanished = () => {
   stop();
 };
 const killGroup = () => {
-  try { process.kill(-child.pid!, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
+  try {
+    process.kill(-child.pid!, 'SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
 };
-const killLeft = () => { try { process.kill(-child.pid!, 'SIGKILL'); } catch { /* ended on SIGTERM */ } };
+const killLeft = () => {
+  try {
+    process.kill(-child.pid!, 'SIGKILL');
+  } catch {
+    /* ended on SIGTERM */
+  }
+};
 /** Whether anything is left in the harness's process group — the harness itself, or what it started. */
-const groupAlive = () => { try { process.kill(-child.pid!, 0); return true; } catch { return false; } };
+const groupAlive = () => {
+  try {
+    process.kill(-child.pid!, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
 /** Asks the harness's group to end, and gives it `STOP_GRACE_MS` from the first time it was asked. */
 const stop = () => {
   stopping = true;
@@ -164,7 +191,11 @@ if (input) {
   /** Every whole line appended past `at`, each written on after `inputAt` says it has been. A line still being appended waits. */
   const take = () => {
     let fd: number;
-    try { fd = fs.openSync(input.inbox, 'r'); } catch { return; } // nothing said yet
+    try {
+      fd = fs.openSync(input.inbox, 'r');
+    } catch {
+      return;
+    } // nothing said yet
     try {
       const base = at;
       const size = fs.fstatSync(fd).size;
@@ -192,7 +223,12 @@ if (input) {
   const { key, value } = input.closesOn;
   let pending = '';
   const closes = (line: string) => {
-    try { const o = JSON.parse(line) as Record<string, unknown> | null; return typeof o === 'object' && o !== null && o[key] === value; } catch { return false; }
+    try {
+      const o = JSON.parse(line) as Record<string, unknown> | null;
+      return typeof o === 'object' && o !== null && o[key] === value;
+    } catch {
+      return false;
+    }
   };
   child.stdout!.on('data', (chunk: Buffer) => {
     if (stdin.writableEnded) return;
@@ -215,17 +251,22 @@ if (input) {
  */
 const DRAIN_MS = 2_000;
 const closed = (s: NodeJS.ReadableStream & { closed?: boolean }) =>
-  new Promise<void>((resolve) => { if (s.closed) resolve(); else s.once('close', () => resolve()); });
+  new Promise<void>((resolve) => {
+    if (s.closed) resolve();
+    else s.once('close', () => resolve());
+  });
 
 child.on('exit', (code) => {
   clearInterval(beat);
   clearInterval(inbox);
   const drained = Promise.all([closed(child.stdout!), closed(child.stderr!)]);
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
-  void Promise.race([drained, bound]).then(() => log.end(() => {
-    write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
-    setTimeout(() => void leave(0), 50);
-  }));
+  void Promise.race([drained, bound]).then(() =>
+    log.end(() => {
+      write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
+      setTimeout(() => void leave(0), 50);
+    }),
+  );
 });
 
 child.on('error', (e) => {

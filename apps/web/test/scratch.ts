@@ -41,10 +41,12 @@ export type Proc = { pid: number; pgid: number; state: string; args: string; cwd
 /** Every process on the machine: from `/proc` where there is one, or else from `ps`, which says no working directory or environment. */
 const processes = (): Proc[] => {
   if (!fs.existsSync('/proc/self/stat')) {
-    return execFileSync('ps', ['-eo', 'pid=,pgid=,stat=,args='], { encoding: 'utf8' }).split('\n').flatMap((line) => {
-      const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
-      return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3]!, args: m[4]! }] : [];
-    });
+    return execFileSync('ps', ['-eo', 'pid=,pgid=,stat=,args='], { encoding: 'utf8' })
+      .split('\n')
+      .flatMap((line) => {
+        const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+        return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3]!, args: m[4]! }] : [];
+      });
   }
   const found: Proc[] = [];
   for (const entry of fs.readdirSync('/proc')) {
@@ -56,15 +58,31 @@ const processes = (): Proc[] => {
       const args = fs.readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0').join(' ').trim();
       let cwd: string | undefined;
       let env: string | undefined;
-      try { cwd = fs.readlinkSync(`/proc/${entry}/cwd`).replace(/ \(deleted\)$/, ''); } catch { /* another user's */ }
-      try { env = fs.readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').join(' '); } catch { /* another user's */ }
+      try {
+        cwd = fs.readlinkSync(`/proc/${entry}/cwd`).replace(/ \(deleted\)$/, '');
+      } catch {
+        /* another user's */
+      }
+      try {
+        env = fs.readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').join(' ');
+      } catch {
+        /* another user's */
+      }
       found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0]!, args, cwd, env });
-    } catch { /* gone while read */ }
+    } catch {
+      /* gone while read */
+    }
   }
   return found;
 };
 
-const realOf = (p: string) => { try { return fs.realpathSync(p); } catch { return p; } };
+const realOf = (p: string) => {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+};
 const pathIn = (text: string, dir: string) => {
   for (let at = text.indexOf(dir); at !== -1; at = text.indexOf(dir, at + 1)) {
     const next = text[at + dir.length];
@@ -76,9 +94,18 @@ const pathIn = (text: string, dir: string) => {
 /** The processes still alive in any of `dirs` — a zombie is not alive, and this process and its parent are never counted. */
 export const runningIn = (dirs: string[]): Proc[] => {
   const all = dirs.flatMap((d) => [d, realOf(d)]);
-  return processes().filter((p) => p.pid !== process.pid && p.pid !== process.ppid && !p.state.startsWith('Z')
-    && all.some((d) => pathIn(p.args, d) || (p.env !== undefined && pathIn(p.env, d))
-      || (p.cwd !== undefined && (p.cwd === d || p.cwd.startsWith(`${d}/`)))));
+  return processes().filter(
+    (p) =>
+      p.pid !== process.pid &&
+      p.pid !== process.ppid &&
+      !p.state.startsWith('Z') &&
+      all.some(
+        (d) =>
+          pathIn(p.args, d) ||
+          (p.env !== undefined && pathIn(p.env, d)) ||
+          (p.cwd !== undefined && (p.cwd === d || p.cwd.startsWith(`${d}/`))),
+      ),
+  );
 };
 
 /** What a test run left in `dir`: every entry still in it, and every process still alive in it. */
@@ -91,7 +118,13 @@ const until = async (ok: () => boolean, ms: number) => {
   }
   return true;
 };
-const signal = (pid: number, sig: NodeJS.Signals) => { try { process.kill(pid, sig); } catch { /* gone */ } };
+const signal = (pid: number, sig: NodeJS.Signals) => {
+  try {
+    process.kill(pid, sig);
+  } catch {
+    /* gone */
+  }
+};
 const isWorker = (p: Proc) => /\bae-worker\.ts\b/.test(p.args);
 
 /**
@@ -101,7 +134,10 @@ const isWorker = (p: Proc) => /\bae-worker\.ts\b/.test(p.args);
 export const reap = async (dirs: string[]): Promise<Proc[]> => {
   if (!dirs.length) return [];
   const workers = runningIn(dirs).filter(isWorker);
-  for (const w of workers) { signal(w.pid, 'SIGTERM'); signal(w.pid, 'SIGCONT'); }
+  for (const w of workers) {
+    signal(w.pid, 'SIGTERM');
+    signal(w.pid, 'SIGCONT');
+  }
   if (workers.length) await until(() => !runningIn(dirs).some(isWorker), 10_000);
   const own = processes().find((p) => p.pid === process.pid)?.pgid;
   const rest = runningIn(dirs);
@@ -114,17 +150,29 @@ export const reap = async (dirs: string[]): Promise<Proc[]> => {
   return runningIn(dirs);
 };
 
-beforeEach(() => { marks.push(roots.length); });
-afterEach(async () => { await reap(roots.slice(marks.pop() ?? roots.length)); });
+beforeEach(() => {
+  marks.push(roots.length);
+});
+afterEach(async () => {
+  await reap(roots.slice(marks.pop() ?? roots.length));
+});
 
 after(async () => {
   const alive = await reap(roots);
   const kept: string[] = [];
   for (const root of roots) {
-    try { fs.rmSync(root, { recursive: true, force: true, maxRetries: 3 }); } catch { kept.push(root); }
+    try {
+      fs.rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      kept.push(root);
+    }
   }
   if (alive.length || kept.length) {
-    throw new Error(`scratch: the file left ${alive.length} process(es) and ${kept.length} root(s) behind:\n${
-      [...alive.map((p) => `  ${p.pid} ${p.args}`), ...kept.map((r) => `  ${r}`)].join('\n')}`);
+    throw new Error(
+      `scratch: the file left ${alive.length} process(es) and ${kept.length} root(s) behind:\n${[
+        ...alive.map((p) => `  ${p.pid} ${p.args}`),
+        ...kept.map((r) => `  ${r}`),
+      ].join('\n')}`,
+    );
   }
 });

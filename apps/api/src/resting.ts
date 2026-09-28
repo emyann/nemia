@@ -63,7 +63,12 @@ export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.
     } else {
       const { entries, cursor } = await e.feed(memo.cursor);
       if (cursor < memo.cursor) memo.runs.clear();
-      else for (const id of evictedBy(entries.map((f) => f.taskId), new Set(memo.runs.keys()))) memo.runs.delete(id);
+      else
+        for (const id of evictedBy(
+          entries.map((f) => f.taskId),
+          new Set(memo.runs.keys()),
+        ))
+          memo.runs.delete(id);
       memo.cursor = cursor;
     }
   } catch {
@@ -80,8 +85,14 @@ export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.
     if (!heads.has(at)) heads.set(at, new Map(Object.entries(headsOf(at))));
     return heads.get(at)!;
   };
-  const tipsOf = (run: Run, branches: readonly string[], headsIn: (repo: string) => ReadonlyMap<string, string>): Record<string, string | null> =>
-    (isGitRun(run) && branches.length ? Object.fromEntries([...new Set([...branches, run.branch])].map((b) => [b, headsIn(run.repo).get(b) ?? null])) : {});
+  const tipsOf = (
+    run: Run,
+    branches: readonly string[],
+    headsIn: (repo: string) => ReadonlyMap<string, string>,
+  ): Record<string, string | null> =>
+    isGitRun(run) && branches.length
+      ? Object.fromEntries([...new Set([...branches, run.branch])].map((b) => [b, headsIn(run.repo).get(b) ?? null]))
+      : {};
   return {
     verify,
     kept(run) {
@@ -94,8 +105,12 @@ export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.
       if (!fed || memo.cursor !== readTo || stamp === undefined) return;
       memo.runs.set(run.id, { stamp, record: JSON.stringify(run), tips: tipsOf(run, branches, heads), answer });
     },
-    drop(run) { memo.runs.delete(run.id); },
-    hit() { memo.hits++; },
+    drop(run) {
+      memo.runs.delete(run.id);
+    },
+    hit() {
+      memo.hits++;
+    },
     only(ids) {
       const present = new Set(ids);
       for (const id of memo.runs.keys()) if (!present.has(id)) memo.runs.delete(id);

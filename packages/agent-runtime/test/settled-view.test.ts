@@ -24,7 +24,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 const check: HarnessSpec = {
   name: 'check',
-  command: () => ({ cmd: 'sh', args: ['-c', 'n=0; while [ -e hold ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done; echo checked; exit 3'] }),
+  command: () => ({
+    cmd: 'sh',
+    args: ['-c', 'n=0; while [ -e hold ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done; echo checked; exit 3'],
+  }),
 };
 
 const calls = (engine: ReturnType<typeof createEngine>) => engine.io().observed.check?.calls ?? 0;
@@ -70,7 +73,7 @@ test('an unsettled `check` task is still observed: in flight, and before its fir
   }
   before = calls(engine);
   assert.equal((await engine.view(id)).phase, 'running (working)');
-  assert.equal(calls(engine) - before, 1, 'an attempt in flight is observed: its phase is its session\'s state');
+  assert.equal(calls(engine) - before, 1, "an attempt in flight is observed: its phase is its session's state");
 
   fs.rmSync(path.join(cwd, 'hold'));
   await settle(engine, id);
@@ -84,11 +87,22 @@ test('REFUSED: a settled task on a harness that has `find` observes nothing eith
   const sessions = new Map<string, Sighting>();
   const counts = { observe: 0, find: 0 };
   const runner = {
-    async spawn(r: { name: string }) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
-    async observe() { counts.observe++; return new Map(sessions); },
-    async find(name: string) { counts.find++; const s = sessions.get(name); return s && s.state !== 'completed' ? { sessionId: s.sessionId } : undefined; },
+    async spawn(r: { name: string }) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      counts.observe++;
+      return new Map(sessions);
+    },
+    async find(name: string) {
+      counts.find++;
+      const s = sessions.get(name);
+      return s && s.state !== 'completed' ? { sessionId: s.sessionId } : undefined;
+    },
     async stop() {},
-    async logs(sessionId: string) { return `logs of ${sessionId}`; },
+    async logs(sessionId: string) {
+      return `logs of ${sessionId}`;
+    },
   };
   const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { mine: runner } });
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') });

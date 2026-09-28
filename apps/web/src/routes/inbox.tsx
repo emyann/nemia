@@ -2,16 +2,37 @@ import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
-import { dropCard, fileCard, inboxQuery, queueCard, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../lib/inbox';
+import {
+  dropCard,
+  fileCard,
+  inboxQuery,
+  queueCard,
+  repositoryQuery,
+  workflowNameOf,
+  workflowsQuery,
+  type InboxEntry,
+  type WorkflowListing,
+} from '../lib/api';
+import {
+  cardLines,
+  hasPage,
+  namedElsewhere,
+  newestCardsFirst,
+  presetOf,
+  queueable,
+  queuedWord,
+  queueOf,
+  triedLine,
+  workflowKey,
+  type CardRefusal,
+} from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
   component: InboxPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
-      Could not load the inbox: {error instanceof Error ? error.message : String(error)}. Is the api running
-      (<code>npm run dev</code>)?
+      Could not load the inbox: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });
@@ -43,14 +64,17 @@ function InboxPage() {
   return (
     <article className="space-y-6">
       <p className="text-sm text-neutral-500">
-        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as {code('wf inbox add')} parks
-        one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A card queued starts on its own, on the
-        workflow it names, when {code('wf up')} has a run slot free: the oldest queued first.
+        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as{' '}
+        {code('wf inbox add')} parks one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A
+        card queued starts on its own, on the workflow it names, when {code('wf up')} has a run slot free: the oldest queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
-          Cards <span data-count className="text-xs font-normal text-neutral-500">{cards.length}</span>
+          Cards{' '}
+          <span data-count className="text-xs font-normal text-neutral-500">
+            {cards.length}
+          </span>
           {queue > 0 && (
             <span data-queue-count className="text-xs font-normal text-neutral-500">
               · {queue} queued
@@ -110,7 +134,11 @@ function FileCard() {
   const inFolders = picked?.folderTeam ?? false;
   const file = useMutation({
     mutationFn: () =>
-      fileCard({ body: idea, ...(picked ? { workflow: picked.name, from: picked.from } : {}), ...(!inFolders && about.trim() ? { repo: about.trim() } : {}) }),
+      fileCard({
+        body: idea,
+        ...(picked ? { workflow: picked.name, from: picked.from } : {}),
+        ...(!inFolders && about.trim() ? { repo: about.trim() } : {}),
+      }),
     onSuccess: () => {
       setIdea('');
       setWorkflow('');
@@ -150,7 +178,9 @@ function FileCard() {
             <option value="">None: chosen at start</option>
             {workflows.data && <WorkflowOptions workflows={workflows.data} />}
           </select>
-          {workflows.error && <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows: {workflows.error.message}</p>}
+          {workflows.error && (
+            <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows: {workflows.error.message}</p>
+          )}
         </div>
         <div className="space-y-1.5">
           <label htmlFor={ids.repo} className="block text-sm font-medium">
@@ -158,8 +188,8 @@ function FileCard() {
           </label>
           {inFolders ? (
             <p data-in-folders className="text-xs text-neutral-600 dark:text-neutral-400">
-              {picked!.name} works in folders the run makes for it, and looks at no repository. The card names none, and the run says
-              where the work is.
+              {picked!.name} works in folders the run makes for it, and looks at no repository. The card names none, and the run says where
+              the work is.
             </p>
           ) : (
             <input
@@ -202,7 +232,12 @@ function FileCard() {
  * What its start or its drop was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot: the inbox is read
  * again after any answer, and a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
-function CardItem({ entry, entries, refusal, onRefused }: {
+function CardItem({
+  entry,
+  entries,
+  refusal,
+  onRefused,
+}: {
   entry: InboxEntry;
   /** The inbox as the page listed it, which says whether this entry has a page of its own (`hasPage`). */
   entries: readonly InboxEntry[];
@@ -243,11 +278,15 @@ function CardItem({ entry, entries, refusal, onRefused }: {
               folder, a name the api refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and is its name alone. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              <PageLink entry={entry} entries={entries}>{entry.title}</PageLink>
+              <PageLink entry={entry} entries={entries}>
+                {entry.title}
+              </PageLink>
             </p>
           ) : (
             <p className="font-mono text-sm break-all">
-              <PageLink entry={entry} entries={entries}>{entry.file}</PageLink>
+              <PageLink entry={entry} entries={entries}>
+                {entry.file}
+              </PageLink>
             </p>
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
@@ -287,17 +326,34 @@ function CardItem({ entry, entries, refusal, onRefused }: {
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {startable && (
-            <button type="button" aria-expanded={starting} onClick={() => setStarting(!starting)} className={starting ? SECONDARY : PRIMARY}>
+            <button
+              type="button"
+              aria-expanded={starting}
+              onClick={() => setStarting(!starting)}
+              className={starting ? SECONDARY : PRIMARY}
+            >
               {starting ? 'Close' : 'Start'}
             </button>
           )}
           {queueable(entry) && (
-            <button type="button" disabled={queue.isPending} onClick={() => queue.mutate(false)} className={SECONDARY} title="Start it on its own, on its workflow, when a run slot frees">
+            <button
+              type="button"
+              disabled={queue.isPending}
+              onClick={() => queue.mutate(false)}
+              className={SECONDARY}
+              title="Start it on its own, on its workflow, when a run slot frees"
+            >
               {queue.isPending ? 'Queueing…' : 'Queue'}
             </button>
           )}
           {entry.queued && (
-            <button type="button" disabled={queue.isPending} onClick={() => queue.mutate(true)} className={SECONDARY} title="Take it off the queue: it waits for you to start it">
+            <button
+              type="button"
+              disabled={queue.isPending}
+              onClick={() => queue.mutate(true)}
+              className={SECONDARY}
+              title="Take it off the queue: it waits for you to start it"
+            >
               {queue.isPending ? 'Unqueueing…' : 'Unqueue'}
             </button>
           )}
@@ -336,7 +392,11 @@ function CardItem({ entry, entries, refusal, onRefused }: {
         </div>
       )}
       {starting && startable && (
-        <StartCard entry={entry} onKept={setKept} onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })} />
+        <StartCard
+          entry={entry}
+          onKept={setKept}
+          onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })}
+        />
       )}
       {refusal && <Refused refusal={refusal} />}
     </li>
@@ -347,7 +407,11 @@ function CardItem({ entry, entries, refusal, onRefused }: {
 function PageLink({ entry, entries, children }: { entry: InboxEntry; entries: readonly InboxEntry[]; children: ReactNode }) {
   if (!hasPage(entry, entries)) return <>{children}</>;
   return (
-    <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
+    <Link
+      to="/inbox/$name"
+      params={{ name: entry.name }}
+      className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600"
+    >
       {children}
     </Link>
   );
@@ -399,12 +463,20 @@ function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry[
   );
 }
 
-const NOT_DONE: Record<CardRefusal['action'], string> = { start: 'Not started', remove: 'Not removed', queue: 'Not queued', unqueue: 'Not taken off the queue' };
+const NOT_DONE: Record<CardRefusal['action'], string> = {
+  start: 'Not started',
+  remove: 'Not removed',
+  queue: 'Not queued',
+  unqueue: 'Not taken off the queue',
+};
 
 /** What a start, a drop, a queue or its taking back was refused with, in the api's words. */
 function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
-    <div data-refused={refusal.action} className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+    <div
+      data-refused={refusal.action}
+      className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+    >
       <p className="text-sm font-medium text-red-800 dark:text-red-300">{NOT_DONE[refusal.action]}. The api refused it:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
     </div>
@@ -416,7 +488,11 @@ function Refused({ refusal }: { refusal: CardRefusal }) {
  * took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays. A refusal is
  * `onRefused`'s to show, since the form may not outlive it.
  */
-function StartCard({ entry, onKept, onRefused }: {
+function StartCard({
+  entry,
+  onKept,
+  onRefused,
+}: {
   entry: InboxEntry;
   onKept: (kept: { id: string; why: string }) => void;
   onRefused: (message: string | null) => void;
@@ -439,7 +515,9 @@ function StartCard({ entry, onKept, onRefused }: {
           Workflow
         </label>
         {workflows.error || repository.error ? (
-          <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}</p>
+          <p className="text-xs text-red-700 dark:text-red-400">
+            Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}
+          </p>
         ) : !workflows.data || here === undefined ? (
           <p className="text-xs text-neutral-500">Reading the workflows…</p>
         ) : (
@@ -454,8 +532,8 @@ function StartCard({ entry, onKept, onRefused }: {
           <p data-unlisted className="text-xs text-amber-700 dark:text-amber-400">
             {namedElsewhere(entry.workflow, entry.repo, here) ? (
               <>
-                The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s: pick the one
-                to run it on, or start it with {code('wf start')}, which finds that one.
+                The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:
+                pick the one to run it on, or start it with {code('wf start')}, which finds that one.
               </>
             ) : (
               <>The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.</>

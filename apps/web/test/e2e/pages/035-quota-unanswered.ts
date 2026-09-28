@@ -24,16 +24,36 @@ export default {
       await idle(page);
       const line = page.locator('[data-quota="unanswered"]');
       await expectVisible(
-        line.filter({ hasText: /^Claude Code is signed in to a subscription \(max\), but Anthropic's usage service gave it nothing this time\. The service may be limiting how often it is asked/ }),
+        line.filter({
+          hasText:
+            /^Claude Code is signed in to a subscription \(max\), but Anthropic's usage service gave it nothing this time\. The service may be limiting how often it is asked/,
+        }),
         'the header says the usage service gave nothing, and that it may be limiting how often it is asked',
       );
-      await expectVisible(line.filter({ hasText: /Asked again on the next read\./ }), 'and when it is asked again: here on every read, as the e2e sets it');
+      await expectVisible(
+        line.filter({ hasText: /Asked again on the next read\./ }),
+        'and when it is asked again: here on every read, as the e2e sets it',
+      );
       await expectCount(page.locator('[data-quota="unknown"]'), 0, 'not a shape the board does not read');
       await expectCount(page.locator('[data-quota-window]'), 0, 'and no number reads as now');
-      await expectCount(line.locator('[data-quota-last-window="five_hour"]'), 1, 'the last good reading\'s five-hour window, under the sentence');
-      await expectCount(line.locator('[data-quota-last-window="seven_day"][data-marked]'), 1, `and its week, ${QUOTA.week.used}% used, still marked`);
-      await expectVisible(line.locator('[data-quota-last-window="seven_day"]').filter({ hasText: new RegExp(`^week ${QUOTA.week.used}% · resets `) }), 'with its percentage and reset');
-      await expectVisible(line.locator('[data-quota-last-age]').filter({ hasText: /^as of \d{2}:\d{2}, just now$/ }), 'dated in the header itself: as of when, and how long ago');
+      await expectCount(
+        line.locator('[data-quota-last-window="five_hour"]'),
+        1,
+        "the last good reading's five-hour window, under the sentence",
+      );
+      await expectCount(
+        line.locator('[data-quota-last-window="seven_day"][data-marked]'),
+        1,
+        `and its week, ${QUOTA.week.used}% used, still marked`,
+      );
+      await expectVisible(
+        line.locator('[data-quota-last-window="seven_day"]').filter({ hasText: new RegExp(`^week ${QUOTA.week.used}% · resets `) }),
+        'with its percentage and reset',
+      );
+      await expectVisible(
+        line.locator('[data-quota-last-age]').filter({ hasText: /^as of \d{2}:\d{2}, just now$/ }),
+        'dated in the header itself: as of when, and how long ago',
+      );
       const opacity = Number(await line.locator('[data-quota-last]').evaluate((el) => getComputedStyle(el).opacity));
       if (!(opacity < 1)) throw new Refused(`the last reading is dimmed, so that nobody takes it for now — its opacity is ${opacity}`);
       await settled(page);
@@ -48,7 +68,11 @@ export default {
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);
-    await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again, and no last reading');
+    await expectCount(
+      page.locator('[data-quota="fresh"]'),
+      1,
+      'with the answer put back, the header shows the quota again, and no last reading',
+    );
     await expectCount(page.locator('[data-quota-last]'), 0, 'no last reading beside a fresh one');
   },
 } satisfies PageSpec;

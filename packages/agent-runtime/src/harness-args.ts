@@ -92,8 +92,18 @@ export type HarnessArgs = {
 
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
-  model: true, permissionMode: true, effort: true, tools: true, allowedTools: true, disallowedTools: true,
-  mcp: true, contextTokens: true, background: true, worktree: true, budgetUsd: true, claude: true,
+  model: true,
+  permissionMode: true,
+  effort: true,
+  tools: true,
+  allowedTools: true,
+  disallowedTools: true,
+  mcp: true,
+  contextTokens: true,
+  background: true,
+  worktree: true,
+  budgetUsd: true,
+  claude: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -181,13 +191,22 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (config.model === '') return "`model` is empty. Leave it out for the harness's default.";
   if (config.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
   // One name per entry: a comma inside one would split into two names on the way to the harness.
-  if (config.tools !== undefined && !(Array.isArray(config.tools) && config.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
+  if (
+    config.tools !== undefined &&
+    !(Array.isArray(config.tools) && config.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))
+  ) {
     return `\`tools: ${JSON.stringify(config.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
   }
-  if (config.disallowedTools !== undefined && !(Array.isArray(config.disallowedTools) && config.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+  if (
+    config.disallowedTools !== undefined &&
+    !(Array.isArray(config.disallowedTools) && config.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))
+  ) {
     return `\`disallowedTools: ${JSON.stringify(config.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
   }
-  if (config.allowedTools !== undefined && !(Array.isArray(config.allowedTools) && config.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+  if (
+    config.allowedTools !== undefined &&
+    !(Array.isArray(config.allowedTools) && config.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))
+  ) {
     return `\`allowedTools: ${JSON.stringify(config.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
   }
   const mcp = config.mcp === undefined ? undefined : mcpRefuses(config.mcp);
@@ -195,7 +214,10 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (config.background !== undefined && typeof config.background !== 'boolean') {
     return `\`background: ${JSON.stringify(config.background)}\` is not true or false. Give true to run the session as \`claude --bg\`, or leave it out to run it as a job.`;
   }
-  if (config.contextTokens !== undefined && !(typeof config.contextTokens === 'number' && Number.isSafeInteger(config.contextTokens) && config.contextTokens > 0)) {
+  if (
+    config.contextTokens !== undefined &&
+    !(typeof config.contextTokens === 'number' && Number.isSafeInteger(config.contextTokens) && config.contextTokens > 0)
+  ) {
     return `\`contextTokens: ${typeof config.contextTokens === 'number' ? config.contextTokens : JSON.stringify(config.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
   }
   if (config.budgetUsd !== undefined && !isDollars(config.budgetUsd)) {

@@ -29,9 +29,28 @@ export const WEB_PATHS = ['apps/web', 'apps/api'] as const;
 
 /** Words a person writing a brief uses when the design is not settled yet. */
 export const PLANNING_WORDS = [
-  'plan', 'plans', 'planned', 'planner', 'planning', 'design', 'designs', 'designed', 'decide', 'decides',
-  'decision', 'decisions', 'propose', 'proposes', 'proposal', 'challenge', 'challenges', 'options', 'trade-off',
-  'trade-offs', 'tradeoff', 'tradeoffs',
+  'plan',
+  'plans',
+  'planned',
+  'planner',
+  'planning',
+  'design',
+  'designs',
+  'designed',
+  'decide',
+  'decides',
+  'decision',
+  'decisions',
+  'propose',
+  'proposes',
+  'proposal',
+  'challenge',
+  'challenges',
+  'options',
+  'trade-off',
+  'trade-offs',
+  'tradeoff',
+  'tradeoffs',
 ] as const;
 
 /** The parts of the repository, as `card.ts`'s `REPOSITORY` names them: a change across three is a change that spans. */

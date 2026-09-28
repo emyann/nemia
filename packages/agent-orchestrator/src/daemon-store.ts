@@ -10,7 +10,17 @@ import path from 'node:path';
 import { HOME } from './store.ts';
 import { runCapOf } from './run.ts';
 import { parsePassCost, type PassCost } from './meter.ts';
-import { DAEMON_FILE, daemonStanding as standingOf, daemonText, holderAgainst, holdRefusal, parseDaemonFile, type DaemonFile, type DaemonStanding, type Identity } from './daemon.ts';
+import {
+  DAEMON_FILE,
+  daemonStanding as standingOf,
+  daemonText,
+  holderAgainst,
+  holdRefusal,
+  parseDaemonFile,
+  type DaemonFile,
+  type DaemonStanding,
+  type Identity,
+} from './daemon.ts';
 
 /**
  * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the tick's admission's
@@ -35,7 +45,9 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
     const c = JSON.parse(fs.readFileSync(tickFile(), 'utf8')) as { sessions?: unknown; runs?: unknown };
     const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
     return typeof c.sessions === 'number' && count(c.runs) ? { sessions: c.sessions, runs: c.runs } : undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -51,7 +63,9 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
     fs.mkdirSync(HOME, { recursive: true });
     fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
     fs.renameSync(hidden, tickFile());
-  } catch { /* read from the reader's own environment instead */ }
+  } catch {
+    /* read from the reader's own environment instead */
+  }
 }
 
 /**
@@ -63,7 +77,11 @@ export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
 /** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
 export function lastPassCost(): PassCost | undefined {
   let text: string;
-  try { text = fs.readFileSync(statsFile(), 'utf8'); } catch { return undefined; }
+  try {
+    text = fs.readFileSync(statsFile(), 'utf8');
+  } catch {
+    return undefined;
+  }
   return parsePassCost(text);
 }
 
@@ -78,7 +96,9 @@ export function recordPassCost(cost: PassCost): number {
     fs.mkdirSync(HOME, { recursive: true });
     fs.writeFileSync(hidden, JSON.stringify(cost, null, 2));
     fs.renameSync(hidden, statsFile());
-  } catch { /* the next pass writes it again */ }
+  } catch {
+    /* the next pass writes it again */
+  }
   return performance.now() - t0;
 }
 
@@ -89,7 +109,9 @@ export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
 
 /** The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged free. */
 function readDaemon(): string | undefined {
-  try { return fs.readFileSync(daemonFile(), 'utf8'); } catch (err) {
+  try {
+    return fs.readFileSync(daemonFile(), 'utf8');
+  } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
@@ -97,7 +119,12 @@ function readDaemon(): string | undefined {
 
 /** Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there. */
 export function alive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; } catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }
 
 /**
@@ -109,7 +136,9 @@ export function procStartOf(pid: number): number | undefined {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
     const start = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
     return Number.isInteger(start) ? start : undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 /** What the process table says of the file's pid (`Identity` in daemon.ts): alive, and whether it is the process that wrote the file. */
@@ -142,7 +171,14 @@ export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
 export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd: string; now?: number }): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
   const procStart = procStartOf(process.pid);
-  const held: DaemonFile = { pid: process.pid, startedAt: new Date(now).toISOString(), cwd, every, passedAt: null, ...(procStart !== undefined ? { procStart } : {}) };
+  const held: DaemonFile = {
+    pid: process.pid,
+    startedAt: new Date(now).toISOString(),
+    cwd,
+    every,
+    passedAt: null,
+    ...(procStart !== undefined ? { procStart } : {}),
+  };
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);
@@ -194,7 +230,9 @@ export function beat(held: DaemonFile, at = new Date().toISOString()): void {
     const text = readDaemon();
     const file = text === undefined ? undefined : parseDaemonFile(text);
     if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
-  } catch { /* the next pass writes the file, or fails saying why */ }
+  } catch {
+    /* the next pass writes the file, or fails saying why */
+  }
 }
 
 /**
@@ -207,7 +245,9 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
     const text = readDaemon();
     const file = text === undefined ? undefined : parseDaemonFile(text);
     if (file?.pid === held.pid && !file.stoppedAt) writeDaemon({ ...file, stoppedAt: at });
-  } catch { /* read as gone once the process is */ }
+  } catch {
+    /* read as gone once the process is */
+  }
 }
 
 /** Why a pass by hand may not run now — a daemon ticks the store — or undefined when it may. A `wf tick` never writes the file. */

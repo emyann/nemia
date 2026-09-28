@@ -28,15 +28,14 @@ import { waitedMs } from '../lib/factory';
  * inspector opens on (its Output tab, for a step that has signed off).
  */
 export const Route = createFileRoute('/runs/$runId')({
-  validateSearch: (search: Record<string, unknown>): { step?: string } => (typeof search.step === 'string' && search.step ? { step: search.step } : {}),
+  validateSearch: (search: Record<string, unknown>): { step?: string } =>
+    typeof search.step === 'string' && search.step ? { step: search.step } : {},
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
   component: RunPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
       <BackToRuns />
-      <p className="text-sm text-red-600">
-        Could not load this run: {error instanceof Error ? error.message : String(error)}
-      </p>
+      <p className="text-sm text-red-600">Could not load this run: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
 });
@@ -136,7 +135,11 @@ function Run({ run }: { run: RunDetail }) {
           )}
           {/* Beside it, what the same sessions read, by price — where every one of them measured it. */}
           {run.read && (
-            <p data-run-read className="text-sm" title="What every try of every step read: from the cache, written to it, and the largest context one response carried.">
+            <p
+              data-run-read
+              className="text-sm"
+              title="What every try of every step read: from the cache, written to it, and the largest context one response carried."
+            >
               <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
             </p>
           )}
@@ -172,7 +175,11 @@ function Run({ run }: { run: RunDetail }) {
             // work is instead — the one thing a person needs to find what it made.
             ...(run.place === 'folder'
               ? ([['work', pathRow(run.work)]] satisfies Array<[string, ReactNode]>)
-              : ([['repo', code(run.repo)], ['base', code(run.baseRef)], ['branch', code(run.branch)]] satisfies Array<[string, ReactNode]>)),
+              : ([
+                  ['repo', code(run.repo)],
+                  ['base', code(run.baseRef)],
+                  ['branch', code(run.branch)],
+                ] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
             // When it started — its first step filed — and the wait before it, which a run started `--after` runs spends doing nothing.
             ['started', startedRow(run)],
@@ -200,7 +207,10 @@ function Run({ run }: { run: RunDetail }) {
 function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
   const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
-  const title = [...worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`), ...(artifacts ? [`its files  ${bytesWord(artifacts.bytes)}`] : [])].join('\n');
+  const title = [
+    ...worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`),
+    ...(artifacts ? [`its files  ${bytesWord(artifacts.bytes)}`] : []),
+  ].join('\n');
   if (!artifacts) {
     return (
       <span data-pruned title={title}>
@@ -212,16 +222,28 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
   // One prune took both, or its files alone; or the files went later than the worktrees, each at its own time.
   return (
     <span data-pruned data-files-pruned title={title}>
-      {!worktrees.length ? <>{when(artifacts.at)} — removed {files}</>
-        : artifacts.at === at ? <>{when(at)} — removed {count}, {bytesWord(bytes)} freed, and {files}</>
-        : <>{when(at)} — removed {count}, {bytesWord(bytes)} freed; {when(artifacts.at)} — removed {files}</>}
+      {!worktrees.length ? (
+        <>
+          {when(artifacts.at)} — removed {files}
+        </>
+      ) : artifacts.at === at ? (
+        <>
+          {when(at)} — removed {count}, {bytesWord(bytes)} freed, and {files}
+        </>
+      ) : (
+        <>
+          {when(at)} — removed {count}, {bytesWord(bytes)} freed; {when(artifacts.at)} — removed {files}
+        </>
+      )}
     </span>
   );
 }
 
 /** What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`. */
 const deniedRow = (calls: readonly string[]): ReactNode => (
-  <span data-denied className="font-mono text-xs text-red-700 dark:text-red-400">{calls.join(', ')}</span>
+  <span data-denied className="font-mono text-xs text-red-700 dark:text-red-400">
+    {calls.join(', ')}
+  </span>
 );
 
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
@@ -353,7 +375,9 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
       aria-label="Waiting on runs"
       data-on-you={waiting.onYou}
       className={`space-y-1 rounded px-3 py-2 text-sm ${
-        waiting.onYou ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
+        waiting.onYou
+          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+          : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
       }`}
     >
       <p className="font-mono">{waiting.word}</p>
@@ -388,7 +412,9 @@ function HeldUntil({ run }: { run: RunDetail }) {
       aria-label="Held"
       data-on-you={holding.onYou}
       className={`space-y-1 rounded px-3 py-2 text-sm ${
-        holding.onYou ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200'
+        holding.onYou
+          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+          : 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200'
       }`}
     >
       <p className="font-mono">{holding.word}</p>

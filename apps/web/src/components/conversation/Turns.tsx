@@ -8,7 +8,17 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Markdown } from '@/components/Markdown';
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker';
 import { Message, MessageContent } from '@/components/ui/message';
-import { closeoutOf, CLOSEOUT_TOOL, detailOf, type CloseoutTurn, type ThinkingTurn, type ToldTurn, type ToolCall, type ToolsTurn, type Turn } from '@/lib/transcript';
+import {
+  closeoutOf,
+  CLOSEOUT_TOOL,
+  detailOf,
+  type CloseoutTurn,
+  type ThinkingTurn,
+  type ToldTurn,
+  type ToolCall,
+  type ToolsTurn,
+  type Turn,
+} from '@/lib/transcript';
 import { cn } from '@/lib/utils';
 
 /**
@@ -132,7 +142,17 @@ export function ToolCallView({ call, running, defaultOpen = false }: { call: Too
  * Calls with nothing said between them, as one line — "Ran 3 commands, read 3 files" — that opens to them. Every call in it
  * waits on the same thing: in the tail of a live session, each without a result is running, as a batch of parallel calls is.
  */
-export function ToolRun({ turn, live, tail, defaultOpen = false }: { turn: ToolsTurn; live: boolean; tail: boolean; defaultOpen?: boolean }) {
+export function ToolRun({
+  turn,
+  live,
+  tail,
+  defaultOpen = false,
+}: {
+  turn: ToolsTurn;
+  live: boolean;
+  tail: boolean;
+  defaultOpen?: boolean;
+}) {
   return (
     <Collapsible data-turn="tools" className="group/tools" defaultExpanded={defaultOpen}>
       {({ isExpanded }) => (
@@ -177,7 +197,9 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
             data-outcome={closeout.outcome}
             className={cn(
               'rounded-full px-2 py-0.5 font-mono text-xs',
-              closeout.outcome === 'blocked' ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'bg-secondary text-secondary-foreground',
+              closeout.outcome === 'blocked'
+                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+                : 'bg-secondary text-secondary-foreground',
             )}
           >
             {closeout.outcome}

@@ -74,7 +74,15 @@ const filedMs = (view: AdmissionView): number => {
  * in order — momentum first, higher first, then the earlier filing, then the lower id — each one admitted counted at once. Nothing
  * running is stopped for a waiting task, and a ceiling of 0 or less admits nothing.
  */
-export function toAdmit({ views, momentum, ceiling }: { views: readonly AdmissionView[]; momentum: (taskId: string) => number; ceiling: number }): string[] {
+export function toAdmit({
+  views,
+  momentum,
+  ceiling,
+}: {
+  views: readonly AdmissionView[];
+  momentum: (taskId: string) => number;
+  ceiling: number;
+}): string[] {
   const used = new Map<string, number>();
   for (const v of views) if (holdsSlot(v)) used.set(poolOf(v.state.harness), (used.get(poolOf(v.state.harness)) ?? 0) + 1);
   const waiting = views

@@ -31,7 +31,8 @@ const mode = path.join(bin, 'usage-mode');
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`), their request id made `@ID@`. */
 export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): string =>
-  fs.readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
+  fs
+    .readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 
 // Every answer the list's memo of runs at rest gives (`resting.ts`) is judged afresh too, and a difference fails the request.
@@ -41,30 +42,37 @@ fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');
 fs.writeFileSync(answer, recorded('plan'));
 fs.writeFileSync(mode, 'answer');
-fs.writeFileSync(path.join(bin, 'claude'), [
-  '#!/bin/sh',
-  `echo "$*" >> '${calls}'`,
-  `if [ "$1" = agents ]; then cat '${registry}'; fi`,
-  'if [ "$1" = -p ]; then',
-  `  echo "usage-env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_CODE_ENTRYPOINT=\${CLAUDE_CODE_ENTRYPOINT-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} CLAUDE_CODE_USE_BEDROCK=\${CLAUDE_CODE_USE_BEDROCK-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
-  `  case "$(cat '${mode}')" in`,
-  '    silent) exec sleep 30 ;;',
-  "    exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
-  '  esac',
-  '  read -r line',
-  `  id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
-  `  sed "s/@ID@/$id/g" '${answer}'`,
-  '  cat > /dev/null',
-  `  echo "usage-ended pid=$$" >> '${calls}'`,
-  'fi',
-  '',
-].join('\n'), { mode: 0o755 });
+fs.writeFileSync(
+  path.join(bin, 'claude'),
+  [
+    '#!/bin/sh',
+    `echo "$*" >> '${calls}'`,
+    `if [ "$1" = agents ]; then cat '${registry}'; fi`,
+    'if [ "$1" = -p ]; then',
+    `  echo "usage-env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_CODE_ENTRYPOINT=\${CLAUDE_CODE_ENTRYPOINT-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} CLAUDE_CODE_USE_BEDROCK=\${CLAUDE_CODE_USE_BEDROCK-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
+    `  case "$(cat '${mode}')" in`,
+    '    silent) exec sleep 30 ;;',
+    "    exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
+    '  esac',
+    '  read -r line',
+    `  id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
+    `  sed "s/@ID@/$id/g" '${answer}'`,
+    '  cat > /dev/null',
+    `  echo "usage-ended pid=$$" >> '${calls}'`,
+    'fi',
+    '',
+  ].join('\n'),
+  { mode: 0o755 },
+);
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 process.env.CLAUDE_CONFIG_DIR = scratch('hkb-api-harness-claude-');
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>
-  fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line === verb || line.startsWith(`${verb} `)).length;
+  fs
+    .readFileSync(calls, 'utf8')
+    .split('\n')
+    .filter((line) => line === verb || line.startsWith(`${verb} `)).length;
 
 /** How many times `claude agents` has run: an observation of the harness each. */
 export const observations = (): number => callsOf('agents');
@@ -83,8 +91,18 @@ export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8')
 
 /** What the last ask ran in: `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a variable it did not have. */
 export function lastAskEnv(): Record<string, string> {
-  const line = fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('usage-env ')).pop() ?? '';
-  return Object.fromEntries(line.slice('usage-env '.length).split(' ').map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]));
+  const line =
+    fs
+      .readFileSync(calls, 'utf8')
+      .split('\n')
+      .filter((l) => l.startsWith('usage-env '))
+      .pop() ?? '';
+  return Object.fromEntries(
+    line
+      .slice('usage-env '.length)
+      .split(' ')
+      .map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]),
+  );
 }
 
 /** What the fake prints to the next `get_usage` requests, and how it takes them. */

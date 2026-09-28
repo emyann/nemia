@@ -27,7 +27,9 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and left
  * no id. Pure; typed by what it reads, so this file imports no runtime.
  */
-export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined): string | undefined => {
+export const continuesFrom = (
+  attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined,
+): string | undefined => {
   const last = attempts?.at(-1);
   if (!last) return undefined;
   return last.nativeId ?? last.resumeFrom;
@@ -44,7 +46,10 @@ export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null;
  * back with its work (`sentBack`), whose next try is filed on a new approval.
  */
 export type EarlierTry = {
-  taskId: string; check?: { taskId: string }; then: 'retries' | 'signoff' | RetryMode | 'round' | 'back'; model?: string;
+  taskId: string;
+  check?: { taskId: string };
+  then: 'retries' | 'signoff' | RetryMode | 'round' | 'back';
+  model?: string;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
 };
@@ -73,7 +78,15 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string; budg
  * worked again since.
  */
 export type Retry = {
-  step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; by: 'retries' | 'signoff' | 'ask'; stopFirst?: true; runsOn?: true;
+  step: string;
+  try: number;
+  mode: RetryMode;
+  model?: string;
+  message?: string;
+  budget?: number;
+  by: 'retries' | 'signoff' | 'ask';
+  stopFirst?: true;
+  runsOn?: true;
   /** The endings that stopped on the base branch this try sends the work back from (`endingStopped`): filed, it moves each one's try behind (`sentBack`). */
   back?: string[];
 };
@@ -88,7 +101,8 @@ export function messageRefusal(how: RetryHow, command = 'wf retry <runId> <step>
   if (how.mode === 'recheck') {
     return `--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. Recheck without a message (${command} --recheck), or give the answer to a session: ${command} --message "<answer>".`;
   }
-  if (!how.message.trim()) return `--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — ${command} --message "<answer>" — or leave --message out.`;
+  if (!how.message.trim())
+    return `--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — ${command} --message "<answer>" — or leave --message out.`;
   return null;
 }
 
@@ -164,10 +178,12 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does: `its blocked session`
  * while its harness says so, and `its session` once it works again (`runsOn`).
  */
-export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
-  : r.by === 'signoff' ? `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`
-  : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
+export const dueNote = (step: Workflow, run: Run, r: Retry): string =>
+  r.by === 'ask'
+    ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
+    : r.by === 'signoff'
+      ? `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`
+      : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
 
 /**
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try

@@ -103,7 +103,11 @@ export type Closeout = {
 export function parseCloseout(value: unknown): Closeout | { error: string } {
   let raw = value;
   if (typeof raw === 'string') {
-    try { raw = JSON.parse(raw); } catch (e) { return { error: `unparseable: ${(e as Error).message}` }; }
+    try {
+      raw = JSON.parse(raw);
+    } catch (e) {
+      return { error: `unparseable: ${(e as Error).message}` };
+    }
   }
   // `typeof [] === 'object'`, so an array would otherwise read as an empty closeout.
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'not an object' };
@@ -128,7 +132,11 @@ export function parseCloseout(value: unknown): Closeout | { error: string } {
  * An empty `replies` is missing: the schema allows it, since round 1's answer is `[]` on a schema that is the same every round,
  * and a target handed findings that answers none of them has not answered.
  */
-export function declaredOutput(step: Workflow, said: Closeout | undefined, fields: readonly string[] = outputFields(step)): { given: Record<string, unknown>; missing: string[] } {
+export function declaredOutput(
+  step: Workflow,
+  said: Closeout | undefined,
+  fields: readonly string[] = outputFields(step),
+): { given: Record<string, unknown>; missing: string[] } {
   const given: Array<[string, unknown]> = [];
   const missing: string[] = [];
   const answered = (field: string, value: unknown) => field !== LOOP_REPLIES || !Array.isArray(value) || value.length > 0;
@@ -176,11 +184,16 @@ export function placeText(where: unknown): string {
   if (!where || typeof where !== 'object') return textOf(where);
   if (Array.isArray(where)) return where.map(placeText).join(', ');
   const o = where as Record<string, unknown>;
-  const lead = typeof o.file === 'string' ? [typeof o.line === 'number' ? `${o.file}:${o.line}` : o.file]
-    : typeof o.page === 'string' ? [typeof o.theme === 'string' ? `${o.page} · ${o.theme}` : o.page]
-    : [];
+  const lead =
+    typeof o.file === 'string'
+      ? [typeof o.line === 'number' ? `${o.file}:${o.line}` : o.file]
+      : typeof o.page === 'string'
+        ? [typeof o.theme === 'string' ? `${o.page} · ${o.theme}` : o.page]
+        : [];
   const led = typeof o.file === 'string' ? ['file', 'line'] : typeof o.page === 'string' ? ['page', 'theme'] : [];
-  const rest = Object.entries(o).filter(([k]) => !led.includes(k)).map(([k, v]) => `${k}: ${placeText(v)}`);
+  const rest = Object.entries(o)
+    .filter(([k]) => !led.includes(k))
+    .map(([k, v]) => `${k}: ${placeText(v)}`);
   return [...lead, ...rest].join(' · ') || '{}';
 }
 
@@ -218,9 +231,15 @@ function itemLines(item: unknown): string[] {
  */
 export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
   // A step's declared output is part of its closeout, so the step is told of it where it is told of the rest.
-  const declared = step?.output ? outputFields(step).map((f) => `\`${f}\``).join(', ') : '';
+  const declared = step?.output
+    ? outputFields(step)
+        .map((f) => `\`${f}\``)
+        .join(', ')
+    : '';
   return [
-    '', '## When you are finished', '',
+    '',
+    '## When you are finished',
+    '',
     'Your final answer is a structured closeout, and it is how this run knows you are done. The session',
     'asks you for it in the required shape when you finish — in Claude Code, by calling the',
     '`StructuredOutput` tool. There is no file to write.',
@@ -229,31 +248,37 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
     '  that reports success it did not have is worse than one that stops and says why.',
     '- `summary`: one to three sentences on what you did, for the person who decides what ships.',
     // A folder run has nothing to commit: what a step names is kept by being collected (`artifactsContract`).
-    ...(inFolder ? [
-      '- `artifacts`: files you wrote for someone else to read, such as `note.md`. The run keeps each one you',
-      '  name when you finish, so the steps after you and the person who decides receive it. A file you list',
-      '  that does not exist is reported as missing.',
-    ] : [
-      '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
-      '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
-      '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
-      '  **not** a reason to block. A file you list that does not exist is reported as missing.',
-    ]),
+    ...(inFolder
+      ? [
+          '- `artifacts`: files you wrote for someone else to read, such as `note.md`. The run keeps each one you',
+          '  name when you finish, so the steps after you and the person who decides receive it. A file you list',
+          '  that does not exist is reported as missing.',
+        ]
+      : [
+          '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
+          '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
+          '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
+          '  **not** a reason to block. A file you list that does not exist is reported as missing.',
+        ]),
     '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
-    ...(declared ? [
-      `- ${declared}: what this step declares (\`output: ${step!.output!.file}\`), in the shape the session`,
-      '  asks for. It is handed, as data, to a step that reads it; your `summary` is not. A closeout',
-      '  without it is unsigned, and nothing that waits on this step starts.',
-    ] : []),
-    ...(replies === 'owed' ? [
-      `- \`${LOOP_REPLIES}\`: your answer to each finding you were handed this round — \`fixed\` and what you changed, or`,
-      "  `won't fix` and why — in the shape the session asks for. The next round's review is handed it, as data;",
-      '  your `summary` is not. A closeout without it, or with an empty list, is unsigned.',
-    ] : []),
+    ...(declared
+      ? [
+          `- ${declared}: what this step declares (\`output: ${step!.output!.file}\`), in the shape the session`,
+          '  asks for. It is handed, as data, to a step that reads it; your `summary` is not. A closeout',
+          '  without it is unsigned, and nothing that waits on this step starts.',
+        ]
+      : []),
+    ...(replies === 'owed'
+      ? [
+          `- \`${LOOP_REPLIES}\`: your answer to each finding you were handed this round — \`fixed\` and what you changed, or`,
+          "  `won't fix` and why — in the shape the session asks for. The next round's review is handed it, as data;",
+          '  your `summary` is not. A closeout without it, or with an empty list, is unsigned.',
+        ]
+      : []),
     // Asked for on every try of a loop's target (`closeoutSchemaOf`), so the session keeps one schema; in round 1 there is nothing to answer.
-    ...(replies === 'none' ? [
-      `- \`${LOOP_REPLIES}\`: \`[]\`. You were handed no findings this round. If a later round hands you some, you answer each there.`,
-    ] : []),
+    ...(replies === 'none'
+      ? [`- \`${LOOP_REPLIES}\`: \`[]\`. You were handed no findings this round. If a later round hands you some, you answer each there.`]
+      : []),
     '',
     '**Give it once, and give it last**, after everything else. The run reads it as your final word',
     'and may start the next step on it.',
@@ -273,7 +298,8 @@ export const isLoopTarget = (steps: readonly Workflow[], name: string): boolean 
  */
 export const REPLIES_SCHEMA = {
   type: 'array',
-  description: "Your answer to each finding you were handed this round, one each. The next round's review is handed these as data. " +
+  description:
+    "Your answer to each finding you were handed this round, one each. The next round's review is handed these as data. " +
     'In the first round you were handed no findings: answer an empty list, [].',
   items: {
     type: 'object',

@@ -27,9 +27,17 @@ async function said(argv: string[]): Promise<{ out: string; err: string }> {
   const out: string[] = [];
   const err: string[] = [];
   const { log, error } = console;
-  console.log = (...args: unknown[]) => { out.push(args.join(' ')); };
-  console.error = (...args: unknown[]) => { err.push(args.join(' ')); };
-  try { await main(argv); } finally { Object.assign(console, { log, error }); }
+  console.log = (...args: unknown[]) => {
+    out.push(args.join(' '));
+  };
+  console.error = (...args: unknown[]) => {
+    err.push(args.join(' '));
+  };
+  try {
+    await main(argv);
+  } finally {
+    Object.assign(console, { log, error });
+  }
   return { out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -57,7 +65,11 @@ const REMOTE = team('remote', 'a2a:reviewer');
 
 for (const [what, text, why] of [
   ['refused as it stands', '{ reviewer: ', /a2a-agents\.json: is not JSON/],
-  ['with an entry the runtime refuses', JSON.stringify({ reviewer: { url: 'ftp://a.example' } }), /a2a-agents\.json: `reviewer`: .*the `a2a:reviewer` harness/],
+  [
+    'with an entry the runtime refuses',
+    JSON.stringify({ reviewer: { url: 'ftp://a.example' } }),
+    /a2a-agents\.json: `reviewer`: .*the `a2a:reviewer` harness/,
+  ],
 ] as const) {
   test(`a2a-agents.json ${what} leaves the engine made, wf ls and wf tick of a local run working, and refuses only a step that names it`, async () => {
     fs.rmSync(FILE, { force: true });
@@ -67,13 +79,19 @@ for (const [what, text, why] of [
       const made = await said(['ls']);
       assert.match(made.out, new RegExp(id), made.out);
       assert.match(made.err, why, 'engine() says why it left the file or the entry out');
-      assert.match(made.err, /It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held/);
+      assert.match(
+        made.err,
+        /It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held/,
+      );
       const ticked = await said(['tick']);
       assert.match(ticked.err, why);
       assert.ok(readRun(id).steps.work, `the local step was filed: ${JSON.stringify(readRun(id).steps)}`);
       // `wf start` of a step on the agent is refused, in the file's words, and writes no run.
       const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
-      await assert.rejects(said(['start', 'a review', '--workflows', REMOTE]), (err: Error & { exitCode?: number }) => err.exitCode === 2 && why.test(err.message));
+      await assert.rejects(
+        said(['start', 'a review', '--workflows', REMOTE]),
+        (err: Error & { exitCode?: number }) => err.exitCode === 2 && why.test(err.message),
+      );
       assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
     } finally {
       fs.rmSync(FILE, { force: true });

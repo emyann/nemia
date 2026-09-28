@@ -21,11 +21,14 @@ const tmp = () => scratch('ae-brief-');
 
 /** Refused with exit code 2 and a message that matches — never a raw exception, never a default. */
 const refuses = (text: string, says: RegExp) =>
-  assert.throws(() => parse(text), (e: Error & { exitCode?: number }) => {
-    assert.equal(e.exitCode, 2, `exit code 2 for: ${e.message}`);
-    assert.match(e.message, says);
-    return true;
-  });
+  assert.throws(
+    () => parse(text),
+    (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, `exit code 2 for: ${e.message}`);
+      assert.match(e.message, says);
+      return true;
+    },
+  );
 
 test('every key a brief has reaches the spec — none is accepted and then dropped', () => {
   const dir = tmp();
@@ -61,14 +64,20 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
 
 test('an unknown key is refused by name, with the list of keys a brief has', () => {
   refuses(brief('afer: implement'), /`afer` is not a key a brief has/);
-  assert.throws(() => parse(brief('maxAtempts: 3')), (e: Error) => BRIEF_KEYS.every((k) => e.message.includes(k)));
+  assert.throws(
+    () => parse(brief('maxAtempts: 3')),
+    (e: Error) => BRIEF_KEYS.every((k) => e.message.includes(k)),
+  );
 });
 
 test('`background:` is true or false, as written — anything else is refused, not read as a job', () => {
   assert.equal(parse(brief('background: false')).config?.background, false, 'false is a job, said out loud');
   assert.equal(parse(brief('model: opus')).config?.background, undefined, 'absent: the harness default, a job');
   for (const bad of ['yes', 'True', '1', 'bg']) {
-    refuses(brief(`background: ${bad}`), /is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job/);
+    refuses(
+      brief(`background: ${bad}`),
+      /is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job/,
+    );
   }
 });
 
@@ -76,7 +85,10 @@ test('`queued:` is true or false, as written — the one way to hold a task back
   assert.equal(parse(brief('queued: false')).queued, false);
   assert.equal('queued' in parse(brief('model: opus')), false, 'absent: starts on the next tick');
   for (const bad of ['yes', 'True', '1', 'held']) {
-    refuses(brief(`queued: ${bad}`), /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/);
+    refuses(
+      brief(`queued: ${bad}`),
+      /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/,
+    );
   }
 });
 
@@ -91,20 +103,26 @@ test('a budgetUsd that is not dollars above 0, in digits, is refused', () => {
   for (const bad of ['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)]) {
     refuses(brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/);
   }
-  assert.equal(parse(brief('budgetUsd: .5')).config?.budgetUsd, 0.5, 'filed under `config`, where the harness\'s arguments go');
+  assert.equal(parse(brief('budgetUsd: .5')).config?.budgetUsd, 0.5, "filed under `config`, where the harness's arguments go");
 });
 
 test('a contextTokens that is not a whole number of tokens, in digits, is refused — and `200k` is written back as its digits', () => {
-  refuses(brief('contextTokens: 200k'), /`contextTokens: 200k` is not a number of tokens\. Write a whole number in digits — `contextTokens: 200000`/);
+  refuses(
+    brief('contextTokens: 200k'),
+    /`contextTokens: 200k` is not a number of tokens\. Write a whole number in digits — `contextTokens: 200000`/,
+  );
   refuses(brief('contextTokens: 1M'), /`contextTokens: 1000000`/);
   for (const bad of ['0', '-1', '1e5', '200000.5', 'lots', '9'.repeat(400)]) {
     refuses(brief(`contextTokens: ${bad}`), /is not a number of tokens.*like `contextTokens: 200000`/);
   }
-  assert.equal(parse(brief('contextTokens: 150000')).config?.contextTokens, 150000, 'the range is file()\'s to check');
+  assert.equal(parse(brief('contextTokens: 150000')).config?.contextTokens, 150000, "the range is file()'s to check");
 });
 
 test('maxAttempts and resume are retired: refused at what were their defaults, pointing at filing again, retries: and wf retry', () => {
-  refuses(brief('maxAttempts: 1'), /^brief: `maxAttempts` is retired: the runtime makes one attempt per start.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/);
+  refuses(
+    brief('maxAttempts: 1'),
+    /^brief: `maxAttempts` is retired: the runtime makes one attempt per start.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/,
+  );
   refuses(brief('maxAttempts: 3'), /^brief: `maxAttempts` is retired/);
   refuses(brief('resume: interrupted'), /^brief: `resume` is retired: .*`retries:`.*`wf retry <run> <step>`/);
   refuses(brief('resume: sometimes'), /^brief: `resume` is retired/);
@@ -188,9 +206,15 @@ test('`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too:
   for (const value of ['3', '1', '']) {
     for (const args of [['ls'], ['tick']]) {
       const dir = tmp();
-      const r = spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: dir, AE_MAX_CONCURRENT: value }, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, [ae, ...args], {
+        env: { ...process.env, AE_ROOT: dir, AE_MAX_CONCURRENT: value },
+        encoding: 'utf8',
+      });
       assert.equal(r.status, 2, `${args} with ${JSON.stringify(value)}: ${r.stderr}`);
-      assert.match(r.stderr, /^ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given\. Unset it, file with `queued: true` and start each with `ae admit <id>`/);
+      assert.match(
+        r.stderr,
+        /^ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given\. Unset it, file with `queued: true` and start each with `ae admit <id>`/,
+      );
       assert.deepEqual(fs.readdirSync(dir), [], 'nothing written');
     }
   }

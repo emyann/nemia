@@ -61,7 +61,9 @@ export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): 
     body: [
       step.body.trimEnd(),
       'No skill is loaded with the Skill tool for this step — the folder the run rendered its agent into is gone — so each is told whole here.',
-      ...skills.map((s) => `## Skill \`${s.name}\`\n\n${'text' in s ? s.text.trim() : `Not told: ${s.missing} Sign off blocked if you need it.`}`),
+      ...skills.map(
+        (s) => `## Skill \`${s.name}\`\n\n${'text' in s ? s.text.trim() : `Not told: ${s.missing} Sign off blocked if you need it.`}`,
+      ),
     ].join('\n\n'),
     agent,
   };
@@ -80,35 +82,49 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
   const plugin = pluginOf(agent.name);
   const named = skills.filter((s) => s.whole === undefined);
   const whole = skills.filter((s) => s.whole !== undefined);
-  return [
-    ...(agent.instructions ? [agent.instructions.trimEnd()] : []),
-    ...(named.length ? [`Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`] : []),
-    ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole!.trim()}`),
-  ].join('\n\n') + '\n';
+  return (
+    [
+      ...(agent.instructions ? [agent.instructions.trimEnd()] : []),
+      ...(named.length
+        ? [
+            `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,
+          ]
+        : []),
+      ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole!.trim()}`),
+    ].join('\n\n') + '\n'
+  );
 }
 
 /** The output style `systemPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks` (F17). */
-export const noCodingStyle = (agent: string): string => [
-  '---',
-  `name: ${NO_CODING_STYLE}`,
-  `description: Claude Code's system prompt less its coding instructions, for the ${agent} agent, which does not write code.`,
-  'keep-coding-instructions: false',
-  '---',
-  '',
-  'Follow the instructions appended after this prompt: they say what you are for and how you work.',
-  '',
-].join('\n');
+export const noCodingStyle = (agent: string): string =>
+  [
+    '---',
+    `name: ${NO_CODING_STYLE}`,
+    `description: Claude Code's system prompt less its coding instructions, for the ${agent} agent, which does not write code.`,
+    'keep-coding-instructions: false',
+    '---',
+    '',
+    'Follow the instructions appended after this prompt: they say what you are for and how you work.',
+    '',
+  ].join('\n');
 
 /** The manifest of a step's plugin, naming its namespace on purpose (F4). */
 export const pluginManifest = (agent: string): string =>
-  JSON.stringify({ name: pluginOf(agent), version: '0.0.0', description: `The skills of the ${agent} agent, for one step of one run.` }, null, 2) + '\n';
+  JSON.stringify(
+    { name: pluginOf(agent), version: '0.0.0', description: `The skills of the ${agent} agent, for one step of one run.` },
+    null,
+    2,
+  ) + '\n';
 
 /**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
  * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and the style chosen (`no-coding`). Undefined for a
  * step not rendered (`rendersAgent`), which is filed as before.
  */
-export function renderedFlags(step: Workflow, dir: string): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
+export function renderedFlags(
+  step: Workflow,
+  dir: string,
+): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
   if (!rendersAgent(step)) return undefined;
   const agent = step.agent!;
   const prompt = path.join(dir, PROMPT_FILE);

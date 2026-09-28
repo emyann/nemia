@@ -33,7 +33,10 @@ const marked = async <A>(f: () => Promise<A>): Promise<A> => {
   const proto = HarnessHandler.prototype as unknown as Record<string, unknown>;
   const names = Object.getOwnPropertyNames(proto).filter((k) => k !== 'constructor' && typeof proto[k] === 'function');
   const kept = new Map(names.map((k) => [k, proto[k] as (...a: unknown[]) => unknown]));
-  for (const [k, method] of kept) proto[k] = function (this: unknown, ...a: unknown[]) { return inCall.run(true, () => method.apply(this, a)); };
+  for (const [k, method] of kept)
+    proto[k] = function (this: unknown, ...a: unknown[]) {
+      return inCall.run(true, () => method.apply(this, a));
+    };
   try {
     return await f();
   } finally {
@@ -52,17 +55,38 @@ const spy = () => {
   };
   let n = 0;
   const runner: PromiseRunner = {
-    async spawn(r) { saw('spawn'); sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true }); },
-    async observe() { saw('observe'); return new Map(sessions); },
-    async find(name) { saw('find'); const s = sessions.get(name); return s && { sessionId: s.sessionId }; },
+    async spawn(r) {
+      saw('spawn');
+      sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
+    },
+    async observe() {
+      saw('observe');
+      return new Map(sessions);
+    },
+    async find(name) {
+      saw('find');
+      const s = sessions.get(name);
+      return s && { sessionId: s.sessionId };
+    },
     async stop(id) {
       saw('stop');
       for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
-    async logs(id) { saw('logs'); return `logs of ${id}`; },
-    async release() { saw('release'); return { turns: 1 }; },
-    async transcript() { saw('transcript'); return { events: [], cursor: '' }; },
-    async say() { saw('say'); },
+    async logs(id) {
+      saw('logs');
+      return `logs of ${id}`;
+    },
+    async release() {
+      saw('release');
+      return { turns: 1 };
+    },
+    async transcript() {
+      saw('transcript');
+      return { events: [], cursor: '' };
+    },
+    async say() {
+      saw('say');
+    },
   };
   return { runner, sessions, direct, asked };
 };

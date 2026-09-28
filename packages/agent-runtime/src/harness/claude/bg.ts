@@ -1,219 +1,29 @@
 /**
- * The compute seam — the ONLY file that knows what runs an agent.
+ * Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out.
  *
- * Four verbs the engine cannot run without: spawn one, observe all, stop one, read one's logs. A
- * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
- * whose registry would otherwise keep it for ever. So is a sixth, `transcript`: the same session's
- * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
- * a person's words handed to a session while it runs, which the engine journals and never acts on. And an
- * eighth, `find`: one session by its name, without observing every other, for a read that needs only which
- * session it is. Swap the layer and the same engine drives a different harness; `Runner.test()` drives
- * nothing at all, which is how the engine's tests cost zero dollars.
+ * The layer shells out on purpose. `claude --bg` hands the session to the harness, which already owns resume, stop,
+ * cross-session messaging and a registry that outlives us — the thing a scheduler on someone's laptop should be leaning on
+ * rather than rebuilding.
  *
- * The Claude layer shells out on purpose. `claude --bg` hands the session to the harness, which
- * already owns resume, stop, cross-session messaging and a registry that outlives us — the thing
- * a scheduler on someone's laptop should be leaning on rather than rebuilding.
- *
- * Claude Code's `--bg` runner (`claudeOps`) stays here, beside the seam: `Runner.claude` needs it as a value, and it
- * builds `RunnerError`, so in a file of its own the two would import each other. What it reads and writes lives beside
- * this file, each in its own: the transcript reader (`harness/transcript.ts`), a Claude session's transcript and usage
- * (`harness/claude/transcript.ts`), Claude Code's vocabulary (`harness/claude/vocabulary.ts`), its inbox
- * (`harness/claude/inbox.ts`), and MCP (`harness/mcp.ts`).
+ * What it reads and writes lives beside it, each in its own file: the transcript reader (`harness/transcript.ts`), a
+ * Claude session's transcript and usage (`harness/claude/transcript.ts`), Claude Code's vocabulary
+ * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), and MCP (`harness/mcp.ts`).
  */
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState } from './core/session.ts';
-import type { Sighting, Usage } from './core/domain.ts';
-import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './harness/claude/inbox.ts';
-import {
-  claudeTranscriptEvents,
-  lastStructuredOutput,
-  renderTranscript,
-  transcriptFile,
-  transcriptUsage,
-} from './harness/claude/transcript.ts';
-import { claudeFlagsOf, worktreeName } from './harness/claude/vocabulary.ts';
-import { argsRefusalOf, type HarnessArgs } from './harness/args.ts';
-import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './harness/mcp.ts';
-import { readTranscript } from './harness/transcript.ts';
-import { countSpawn, readTextAsync } from './core/engine/tally.ts';
-
-export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
-  verb: Schema.String,
-  message: Schema.String,
-  /**
-   * The harness vouches that nothing started: no session can exist under the name. Set by a spawn,
-   * and only when that is certain — the OS would not create the process, or a detached worker was
-   * never launched. Absent, a failed spawn may still have left a session running.
-   */
-  refused: Schema.optionalKey(Schema.Boolean),
-}) {}
-
-export type SpawnRequest = {
-  /** The join key, ours, chosen before the session exists. */
-  name: string;
-  brief: string;
-  cwd: string;
-  /** Which harness should run it. The composite runner dispatches on this; others ignore it. */
-  harness?: string;
-  /** The harness's arguments, as the task was filed with them: this runner's to read, and nobody else's. Absent: none. */
-  config?: HarnessArgs;
-  /** A previous session of this harness to continue instead of starting cold. */
-  resumeFrom?: string;
-  /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
-  closeoutSchema?: object;
-};
-
-/**
- * One MCP server — a process the harness starts beside the session, or an address it connects to —
- * in the shape a `.mcp.json` entry gives it: Claude Code's own, so a task's servers are written for
- * it as they are. Harness vocabulary: carried on the task, read by a runner, never by `decide`. A
- * `url` needs its `type`, because Claude Code loads nothing from one without it.
- */
-export type McpServer =
-  | { type?: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
-  | { type: 'http' | 'sse'; url: string; headers?: Record<string, string> };
-
-/**
- * One thing that happened in a session's conversation, in the same shape for every harness.
- *
- * `id` is the harness's own, so the same record read again gives the same id. A `tool_result` carries
- * its call's `id`: that is how a result pairs to its call, and why an event is unique by `id` and
- * `kind` together, not by `id` alone. `at` is the time on the harness's own record, never the time it
- * was read — so a resumed Claude session's inherited conversation keeps its parent's times, and the
- * caller decides what to show. A tool result is `user`, as the model receives it.
- */
-export type TranscriptEvent = {
-  id: string;
-  /** ISO 8601, from the harness's record. */
-  at: string;
-  role: 'assistant' | 'user' | 'system';
-  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
-  text?: string;
-  tool?: { name: string; input: unknown };
-  result?: { text: string; isError: boolean };
-};
-
-/**
- * Where a transcript read stopped, to hand back to the next: the byte offset after the last whole line
- * read, and a hash of the bytes just before it. The offset alone cannot tell a file that was replaced
- * and has grown past it from the same file grown longer; the hash can, and so can it a file cut shorter.
- */
-export type TranscriptCursor = string;
-
-/** A read of a session's conversation: the events from the cursor asked with, and the cursor to ask again with. */
-export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor };
-
-/** A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), and the harness its task was filed on. */
-export type ExpectedSession = { name: string; harness?: string };
-
-/**
- * What a look told what to expect saw (`observeFor`): the sessions it listed, by name, and the names expected of it that it could
- * not look for this time — a harness, or one mode of it, whose read failed (`claude agents` timing out, the registry busy). A name
- * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
- * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
- * an absence.
- */
-export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string> };
-
-/**
- * The seam itself, as a plain value.
- *
- * Four verbs. A harness that cannot do one of them is not a harness this engine can drive, and a
- * harness that needs another to be driven is asking the engine to learn something about it — which is
- * the line this type exists to hold. `release` does not cross it: optional, told only what the record
- * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
- * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
- * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
- * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same.
- */
-export type RunnerOps = {
-  readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
-  /** Every session this runner knows about, BY NAME. One call per pass, never per task. */
-  readonly observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
-  /**
-   * `observe`, told which sessions the journal expects: at least every one named in `expected` that the harness lists,
-   * and whatever else it lists for no more. Optional — for a harness that can leave out a costly registry when nothing
-   * expected can be in it (Claude Code: `claude agents`, when every name expected is a job's). A runner without it is
-   * observed in full. Told names, never asked for them: the pass reads them off the journal on every pass, so a session
-   * started before a restart is expected on the first pass after it. `harness` is the harness the task was filed on, for
-   * a runner that routes (`composite`), and read by no other.
-   *
-   * Answers what it listed and what it could not read (`Observation`): a runner that reads in parts — several harnesses,
-   * or Claude Code's jobs and its registry — says which expected names a failed part left unread, and fails as a whole only
-   * when it read nothing. `observe` keeps its Map: a full listing is read by views and verbs, where an unread harness is
-   * nothing observed, and by no rule that ends or forgets on an absence.
-   */
-  readonly observeFor?: (expected: readonly ExpectedSession[]) => Effect.Effect<Observation, RunnerError>;
-  /**
-   * The one session running under `name`, found without observing every other: which session it is, and nothing of
-   * its state. Optional — for a harness that can answer by name for less than `observe` costs (Claude Code: the
-   * session's registration file, where `observe` runs `claude agents`). Resolves `undefined` when none runs under the
-   * name. A read that needs a session's state asks `observe`, and where the two differ, `observe`'s word is taken.
-   */
-  readonly find?: (name: string) => Effect.Effect<{ sessionId: string } | undefined, RunnerError>;
-  readonly stop: (sessionId: string) => Effect.Effect<void, RunnerError>;
-  readonly logs: (sessionId: string) => Effect.Effect<string, RunnerError>;
-  /**
-   * Let go of a session whose attempt's end the engine has written down: stop it if it still runs,
-   * and take it out of the harness's registry. Optional — a harness whose registry is the record
-   * (a detached runner's run files, which `logs` reads) has nothing to let go of.
-   *
-   * Asked on every pass that still observes such a session, so it must be idempotent and needs no
-   * memory: one that fails is asked again next pass. Given the session as observed, to tell a live one
-   * from one that has exited, and the task's `worktree`, since a harness may remove the one it cut.
-   *
-   * Resolves with what the session consumed, read once this call has stopped it, for a harness that writes part of that
-   * only as a session's process exits — after its end was written (Claude Code's cost). The engine records it on the
-   * attempt. Nothing when it stopped nothing.
-   */
-  readonly release?: (session: Sighting, task: { worktree?: string | boolean }) => Effect.Effect<Usage | void, RunnerError>;
-  /**
-   * The session's conversation as events, from `after` on, and the cursor to ask again with. Optional:
-   * a harness that keeps no record of its conversation has `logs`, and that is all. Pull-only and
-   * level-triggered — a caller polls with the cursor it was given, nothing is pushed, and nothing is
-   * remembered between reads that the cursor does not carry.
-   */
-  readonly transcript?: (sessionId: string, after?: TranscriptCursor) => Effect.Effect<Transcript, RunnerError>;
-  /**
-   * Hand `text` to a session that is running, as a person's words: optional, for a harness with a channel
-   * into a live session. Given the session as the engine knows it — the name it chose, and the id `observe`
-   * listed it under on the pass just made — and resolves once the harness has taken the words; rejects when
-   * it did not, and then nothing was said. What the session does with them is its own affair: the engine
-   * journals that they were said, and `decide` never reads that.
-   */
-  readonly say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
-  /**
-   * Why this runner would not take a task, as a sentence that says what to write instead — or `undefined`. Asked by `file`
-   * before anything is journalled, so a task no harness could start is never a promise the loop keeps trying to honour.
-   * Optional: every runner made a `Runner` by `Runner.layer` refuses what no harness could use (`argsRefusalOf`) before
-   * it is asked, so a runner answers for its own vocabulary alone; `file` asks those checks itself too, for a runner built
-   * with `Runner.of` and no layer.
-   */
-  readonly refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
-};
-
-export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
-  /**
-   * Any implementation becomes a Layer. This is the only way a runner reaches the engine. Its `refuses` asks first what
-   * no harness could use (`argsRefusalOf`), then the runner's own: the harness arguments are the adapter's, so they are
-   * refused on the adapter's side of the seam, beneath every runner, and so at the Effect door as at `createEngine().file()`.
-   */
-  static layer = (ops: RunnerOps) =>
-    Layer.succeed(Runner)(
-      Runner.of({
-        ...ops,
-        refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
-      }),
-    );
-
-  static claude = (options?: ClaudeOptions) => Runner.layer(claudeOps(options));
-
-  static test = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }) => Runner.layer(testOps(control));
-}
+import type { SessionState } from '../../core/session.ts';
+import type { Sighting, Usage } from '../../core/domain.ts';
+import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
+import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
+import { claudeFlagsOf, worktreeName } from './vocabulary.ts';
+import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
+import { readTranscript } from '../transcript.ts';
+import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
+import { RunnerError } from '../error.ts';
+import type { RunnerOps } from '../seam.ts';
 
 /**
  * How long a `working` session must write nothing before this harness reports it quiet — stopped, rather than
@@ -729,30 +539,6 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         catch: (cause) =>
           new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),
-  };
-};
-
-/**
- * A harness that costs nothing: sessions are a map, and a test moves them by hand. Every spawn request is pushed to
- * `spawned`, so a test can assert what the harness was actually asked for.
- */
-export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
-  const sessions = control?.sessions ?? new Map<string, Sighting>();
-  const spawned = control?.spawned ?? [];
-  let n = 0;
-  return {
-    spawn: (r) =>
-      Effect.sync(() => {
-        const id = `fake-${++n}`;
-        sessions.set(r.name, { sessionId: id, state: 'working', nativeId: id });
-        spawned.push(r);
-      }),
-    observe: Effect.sync(() => new Map(sessions)),
-    stop: (id) =>
-      Effect.sync(() => {
-        for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled' });
-      }),
-    logs: () => Effect.succeed('(fake runner: no logs)'),
   };
 };
 

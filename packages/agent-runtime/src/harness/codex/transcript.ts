@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { TranscriptEvent } from '../../runner.ts';
+import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 
 const rollouts = new Map<string, string>();

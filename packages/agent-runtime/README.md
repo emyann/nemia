@@ -1695,7 +1695,9 @@ selector, and it is why no attempt can ever run twice.
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — and Claude Code's `--bg` runner, which stays beside it: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so apart the two files would import each other |
+| `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
+| `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
+| `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
@@ -1705,10 +1707,8 @@ selector, and it is why no attempt can ever run twice.
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
-| `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
-| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape |
+| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
-| `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |

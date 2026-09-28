@@ -43,7 +43,8 @@ export type { RefusedMove, TaskView } from './core/engine/engine.ts';
 export { Journal, JournalError } from './core/engine/journal.ts';
 export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/journal.ts';
 
-export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
+export { Runner, RunnerError, testOps } from './harness/seam.ts';
+export { claudeOps } from './harness/claude/bg.ts';
 export type {
   ExpectedSession,
   McpServer,
@@ -53,7 +54,7 @@ export type {
   Transcript,
   TranscriptCursor,
   TranscriptEvent,
-} from './runner.ts';
+} from './harness/seam.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/args.ts';
 export type { HarnessArgs } from './harness/args.ts';
 export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
@@ -62,8 +63,8 @@ export type { HarnessSpec } from './harness/detached/detached.ts';
 export { remoteOps } from './a2a-remote.ts';
 export type { Credentials, RemoteAgent } from './a2a-remote.ts';
 export { codex } from './harness/codex/codex.ts';
-export { claudeDetached } from './runner-claude-detached.ts';
-export { composite } from './runner-composite.ts';
+export { claudeDetached } from './harness/claude/code.ts';
+export { composite } from './harness/seam.ts';
 export { sdkRunner } from './harness/sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 

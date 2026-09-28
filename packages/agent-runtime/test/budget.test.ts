@@ -23,7 +23,7 @@ import { createEngine } from '../src/facade.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { tick } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/runner.ts';
+import { Runner } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-budget-${label}-`);

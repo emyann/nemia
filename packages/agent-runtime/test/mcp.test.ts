@@ -18,7 +18,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
-import { claudeOps } from '../src/runner.ts';
+import { claudeOps } from '../src/harness/claude/bg.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames } from '../src/harness/mcp.ts';

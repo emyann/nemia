@@ -42,8 +42,8 @@ import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/
 import { trustedProjects } from '../src/harness/codex/codex.ts';
 import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
-import { composite } from '../src/runner-composite.ts';
-import { RunnerError, testOps } from '../src/runner.ts';
+import { composite } from '../src/harness/seam.ts';
+import { RunnerError, testOps } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
@@ -827,7 +827,7 @@ test('the composite sends a release only to the harness that reported the sessio
 });
 
 test('a worktree is always NAMED for Claude — a bare --worktree would eat the prompt', async () => {
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const args = claudeDetached.command({ name: 'ae/t-abc/2', brief: 'the prompt', cwd: '/r', config: { worktree: true } }).args;
   const i = args.indexOf('--worktree');
   assert.notEqual(i, -1);
@@ -836,7 +836,7 @@ test('a worktree is always NAMED for Claude — a bare --worktree would eat the 
 });
 
 test('a task may name its own worktree', async () => {
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const args = claudeDetached.command({ name: 'ae/t-abc/2', brief: 'b', cwd: '/r', config: { worktree: 'my-branch' } }).args;
   assert.equal(args[args.indexOf('--worktree') + 1], 'my-branch');
 });
@@ -849,7 +849,7 @@ test("codex's worktree flag takes no value, so the prompt still follows it safel
 });
 
 test('the default permission mode is `auto` — a fleet cannot wait for a person', async () => {
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const args = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
   assert.equal(
     args[args.indexOf('--permission-mode') + 1],
@@ -876,7 +876,7 @@ test('codex runs read-only when the task says read-only — never widened to wor
 
 test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const task = (permissionMode: string) => ({ brief: 'b', cwd: '/r', config: { permissionMode } });
   assert.match(codex.refuses!(task('acceptEdits')) ?? '', /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/);
   assert.match(claudeDetached.refuses!(task('read-only')) ?? '', /not a mode Claude Code has/);
@@ -1024,7 +1024,7 @@ test('the runner merges what a spec prepares into what its command is given', as
 
 test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const c = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
   assert.equal(
     c.some((a) => a.startsWith('model_reasoning_effort')),
@@ -1052,7 +1052,7 @@ test('codex runs read-only when its tools have none of Bash, Write or Edit — w
 
 test('effort reaches codex as a config override before `resume`, and claude-detached as --effort', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const c = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', config: { effort: 'high' }, resumeFrom: 'abc' }).args;
   const i = c.indexOf('model_reasoning_effort="high"');
   assert.ok(i > 0 && c[i - 1] === '-c', '-c model_reasoning_effort="high"');
@@ -1072,7 +1072,7 @@ test('effort reaches codex as a config override before `resume`, and claude-deta
 
 test('an effort a harness does not have is refused by that harness, in its own words', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const task = (effort: string) => ({ brief: 'b', cwd: '/r', config: { effort } });
   assert.match(codex.refuses!(task('extreme')) ?? '', /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/);
   assert.match(
@@ -1184,7 +1184,7 @@ const resultLine = (o: object) =>
   JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
 
 test('claude-detached is asked for JSON, and for the schema as --json-schema when the task gives one', async () => {
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const schema = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
   const args = claudeDetached.command({
     name: 'ae/t/1',
@@ -1226,7 +1226,7 @@ test("claude -p's answer is its result object's structured_output, and nothing e
 
 test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex, which has no spend cap — in its own words', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', config: { budgetUsd: 0.25 }, resumeFrom: 'abc' }).args;
   assert.equal(d[d.indexOf('--max-budget-usd') + 1], '0.25');
   assert.equal(
@@ -1250,7 +1250,7 @@ test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex
 
 test('a context window reaches claude -p as --autocompact, which it keeps — and codex declares none, so file() refuses one there', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const d = claudeDetached.command({
     name: 'ae/t/1',
     brief: 'the prompt',

@@ -21,7 +21,7 @@ import {
 import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
 import type { Event, Sighting } from '../src/core/domain.ts';
-import { RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/harness/seam.ts';
 
 const ctx = new ServerCallContext();
 

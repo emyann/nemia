@@ -174,7 +174,7 @@ keeps the json form, and this issue, as the harness there to compare against.
 
 ### 12. `said` means the words were handed to the inbox, not that the session read them
 
-**Where.** `claudeOps.say` in `agent-runtime/src/runner.ts`: a line posted to the session's inbox socket, which
+**Where.** `claudeOps.say` in `agent-runtime/src/harness/claude/bg.ts`: a line posted to the session's inbox socket, which
 writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
 
 **Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
@@ -306,7 +306,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 ### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
-(`claudeOps` in `agent-runtime/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
+(`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
 2.1.273 (agent-orchestrator `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
 an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
 that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-orchestrator's `check` — naming the
@@ -1011,7 +1011,7 @@ review — the run waits for a person to notice, and the closeout on the transcr
 not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
 
 **Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
-own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/runner.ts`;
+own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`;
 `lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
 session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
 an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
@@ -1161,7 +1161,7 @@ step read `unsigned`. The nudged retry (`…-try2`) `--resume`d the same id, gav
 `StructuredOutput` at 22:58:32Z, and its `ended` carried no closeout and usage identical to the first's
 (turns 29, tool calls 93, the same tokens). Only a daemon restart and a third try made it read.
 
-**What the code allowed.** `finalStatements` and `finalUsage` in `runner.ts` were keyed by session id,
+**What the code allowed.** `finalStatements` and `finalUsage` in `harness/claude/bg.ts` were keyed by session id,
 set on the first sighting the registry listed `done`, `failed` or `stopped` (and not busy), and never
 cleared. A resume keeps the id, so try 2 was handed try 1's pins: a statement of `undefined`, and try
 1's usage.

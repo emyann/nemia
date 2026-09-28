@@ -18,7 +18,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { TranscriptEvent } from '../src/runner.ts';
+import type { TranscriptEvent } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-transcript-${label}-`);
@@ -27,12 +27,12 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
-const { claudeOps } = await import('../src/runner.ts');
+const { claudeOps } = await import('../src/harness/claude/bg.ts');
 const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
 const { detachedOps } = await import('../src/harness/detached/detached.ts');
 const { codex } = await import('../src/harness/codex/codex.ts');
 const { codexRolloutEvents } = await import('../src/harness/codex/transcript.ts');
-const { claudeDetached } = await import('../src/runner-claude-detached.ts');
+const { claudeDetached } = await import('../src/harness/claude/code.ts');
 
 /** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns are. */
 const T0 = Date.now() - 3_600_000;

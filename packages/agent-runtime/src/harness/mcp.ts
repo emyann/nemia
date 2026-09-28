@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { McpServer } from '../runner.ts';
+import type { McpServer } from './seam.ts';
 import type { HarnessArgs } from './args.ts';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

@@ -75,7 +75,7 @@ test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type
   const planted: Array<[string, string, string]> = [
     ['src/core/engine/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
     ['src/facade.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
-    ['src/runner.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
+    ['src/harness/seam.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
     ['src/index.ts', "export { TaskNotFoundError } from '@a2a-js/sdk/errors';", '@a2a-js/sdk/errors'],
     ['bin/ae.ts', "const sdk = await import('@a2a-js/sdk');", '@a2a-js/sdk'],
     ['src/a2a.ts', "import { Role } from '@a2a-js/sdk';", '@a2a-js/sdk'],

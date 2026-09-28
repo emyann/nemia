@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { SpawnRequest } from '../../runner.ts';
+import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
 import { codexOutput } from '../detached/output.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';

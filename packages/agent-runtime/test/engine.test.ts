@@ -21,15 +21,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/runner.ts';
+import { Runner } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
 import { GRACE_MS, Lifecycle, LIVE, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
 import { decide, fold, nameFor, type Event, type Sighting } from '../src/core/domain.ts';
 import type { SessionState } from '../src/core/session.ts';
-import type { SpawnRequest } from '../src/runner.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
-import { composite } from '../src/runner-composite.ts';
+import { composite } from '../src/harness/seam.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -810,7 +810,7 @@ test('LIVE is exactly the states decide waits on — `busy` is not a state, so i
   assert.equal((LIVE as ReadonlySet<string>).has('busy'), false);
 });
 
-import { RunnerError, testOps } from '../src/runner.ts';
+import { RunnerError, testOps } from '../src/harness/seam.ts';
 
 /**
  * A board whose harness fails some spawns, two ways.

@@ -36,7 +36,7 @@ import { createEngine, nameFor } from '../src/facade.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
-import type { SpawnRequest } from '../src/runner.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 
 /** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */

@@ -30,7 +30,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
 const { createEngine } = await import('../src/facade.ts');
-const { claudeOps } = await import('../src/runner.ts');
+const { claudeOps } = await import('../src/harness/claude/bg.ts');
 const { claudeRegistered, processStart } = await import('../src/harness/claude/inbox.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };

@@ -8,7 +8,7 @@
  * is refused them too. What one harness takes and refuses — its modes, its efforts, its windows — stays with that
  * harness's runner.
  */
-import type { McpServer } from '../runner.ts';
+import type { McpServer } from './seam.ts';
 import type { ClaudeFlags } from './claude/vocabulary.ts';
 import { mcpRefuses } from './mcp.ts';
 

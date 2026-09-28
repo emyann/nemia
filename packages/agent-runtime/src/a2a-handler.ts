@@ -49,7 +49,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { fold, waitsForInput, type Event, type Sighting, type Usage } from './core/domain.ts';
 import { isLive, phaseWordOf } from './core/session.ts';
-import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './harness/seam.ts';
 import {
   canceledTask,
   contextRefusal,

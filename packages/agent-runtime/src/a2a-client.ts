@@ -43,7 +43,7 @@ import {
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
-} from './runner.ts';
+} from './harness/seam.ts';
 import {
   cardOf,
   HarnessFailed,
@@ -347,8 +347,8 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
 /**
  * The same seam beneath the Effect door: a runner's session verbs through the A2A client, its agent answering off the
  * `Journal` the program provides. `Runner.layer(ops)` calls the driver directly; this is the one to use for the path `createEngine`
- * takes. A function beside `Runner`, as `sdkRunner` is, rather than a static on it: `runner.ts` would then import this
- * file, which imports `runner.ts`.
+ * takes. A function beside `Runner`, as `sdkRunner` is, rather than a static on it: `harness/seam.ts` would then import
+ * this file, which imports `harness/seam.ts`.
  */
 export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runner, never, Journal> =>
   Layer.unwrap(

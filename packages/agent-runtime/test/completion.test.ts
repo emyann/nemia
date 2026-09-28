@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { claudeOps, QUIESCENT_AFTER_MS } from '../src/runner.ts';
+import { claudeOps, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
 import { createEngine } from '../src/facade.ts';
 import { Journal } from '../src/core/engine/journal.ts';
@@ -524,7 +524,7 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
   }
 });
 
-import type { SpawnRequest } from '../src/runner.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
 
 /** The argv `claudeOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
 const argvOf = async (r: Partial<SpawnRequest>) => {

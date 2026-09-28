@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import type { Transcript, TranscriptCursor, TranscriptEvent } from '../runner.ts';
+import type { Transcript, TranscriptCursor, TranscriptEvent } from './seam.ts';
 
 /**
  * How much of a file, before a cursor's offset, its hash covers. Past the end of what every line of one

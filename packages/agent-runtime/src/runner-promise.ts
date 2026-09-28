@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type SessionState } from './core/session.ts';
 import type { Sighting, Usage } from './core/domain.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './harness/seam.ts';
 
 /**
  * A session as a `PromiseRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five former

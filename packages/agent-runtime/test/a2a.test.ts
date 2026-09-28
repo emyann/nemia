@@ -37,7 +37,7 @@ import {
 import { nameParts } from '../src/core/domain.ts';
 import { SESSION_STATES, type Ended, type SessionState } from '../src/core/session.ts';
 import type { Attempt, Sighting } from '../src/core/domain.ts';
-import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
+import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/harness/seam.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */
 const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)));

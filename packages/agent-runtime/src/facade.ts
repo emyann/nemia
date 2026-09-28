@@ -17,15 +17,16 @@ import { fold, nameFor, type Event, type Input, type Said, type Sighting, type S
 import { isLive, phaseWordOf, waitsOnPerson } from './core/session.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness/args.ts';
 import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './core/engine/journal.ts';
-import { claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
+import { claudeOps } from './harness/claude/bg.ts';
+import { Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './harness/seam.ts';
 import { claudeSayRefuses } from './harness/claude/inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './harness/claude/vocabulary.ts';
 import { claudeCodeOps, isClaudeJob } from './harness/claude/code.ts';
 import { isTranscriptCursor, noTranscript } from './harness/transcript.ts';
 import { detachedOps, type HarnessSpec } from './harness/detached/detached.ts';
 import { codex } from './harness/codex/codex.ts';
-import { claudeDetached } from './runner-claude-detached.ts';
-import { composite } from './runner-composite.ts';
+import { claudeDetached } from './harness/claude/code.ts';
+import { composite } from './harness/seam.ts';
 import { a2aOps, type SeamOps } from './a2a-client.ts';
 import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from './a2a-remote.ts';
 import { ioCounts, type IoCounts } from './core/engine/tally.ts';
@@ -889,7 +890,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
 export type { PromiseRunner, PromiseSighting } from './runner-promise.ts';
 export { codex } from './harness/codex/codex.ts';
-export { claudeDetached } from './runner-claude-detached.ts';
+export { claudeDetached } from './harness/claude/code.ts';
 /** The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to. */
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
@@ -904,7 +905,7 @@ export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, I
 export type { SessionState, Ended, Outcome } from './core/session.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness/args.ts';
 export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
-export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
+export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/seam.ts';
 export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/journal.ts';
 export type { IoCounts } from './core/engine/tally.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/engine.ts';

@@ -24,7 +24,7 @@ import {
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
-import { Runner, type ExpectedSession } from '../../runner.ts';
+import { Runner, type ExpectedSession } from '../../harness/seam.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { ADMIT_INSTEAD } from './filing.ts';

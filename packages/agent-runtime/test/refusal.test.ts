@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/runner.ts';
+import { Runner } from '../src/harness/seam.ts';
 import { file, type Filing } from '../src/core/engine/filing.ts';
 import { createEngine, type Event, type HarnessArgs, type PromiseJournal, type Sighting } from '../src/facade.ts';
 

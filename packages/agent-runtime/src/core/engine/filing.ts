@@ -8,7 +8,7 @@ import path from 'node:path';
 import { awaitsAdmission, fold, waitsForInput, type Input, type State } from '../domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
-import { Runner } from '../../runner.ts';
+import { Runner } from '../../harness/seam.ts';
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {

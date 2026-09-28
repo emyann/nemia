@@ -1,13 +1,13 @@
 /**
  * A Claude Code session's transcript, read: where it is, the closeout it gave, its lines as events, and what it
- * consumed. Read by both runners that run Claude Code — `claude --bg` (`runner.ts`) and `claude -p`
- * (`runner-claude-detached.ts`) — and `renderTranscript` by the Agent SDK's (`harness/sdk.ts`).
+ * consumed. Read by both runners that run Claude Code — `claude --bg` (`harness/claude/bg.ts`) and `claude -p`
+ * (`harness/claude/code.ts`) — and `renderTranscript` by the Agent SDK's (`harness/sdk.ts`).
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Usage } from '../../core/domain.ts';
-import type { TranscriptEvent } from '../../runner.ts';
+import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 
 /** The folder Claude Code writes its transcripts under, one folder per project: `projects` in `CLAUDE_CONFIG_DIR` or `~/.claude`. */

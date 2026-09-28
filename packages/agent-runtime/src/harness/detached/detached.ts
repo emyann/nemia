@@ -14,7 +14,7 @@
  *
  * What it buys: this file has no idea what a harness is. It needs a command, a working directory
  * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The two shipped are
- * `codex` (`harness/codex/codex.ts`) and `claudeDetached` (`runner-claude-detached.ts`).
+ * `codex` (`harness/codex/codex.ts`) and `claudeDetached` (`harness/claude/code.ts`).
  */
 import { Effect, Result, Schema, SchemaIssue } from 'effect';
 import fs from 'node:fs';
@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage } from '../../core/domain.ts';
 import type { SessionState } from '../../core/session.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../../runner.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readText } from '../../core/engine/tally.ts';

@@ -33,6 +33,11 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
   on a name a subpath no longer exports, so before moving a name out of `run.ts` or `workflow.ts`, re-export from `run.ts` what the api
   reads there.
 
+## Refusals
+
+- **A refusal is thrown as `Missing`, `Conflict` or `Invalid`** (`src/refusal/refusal.ts`, `exitCode` 2): no such run, a state that
+  forbids the verb, an input that is wrong. `test/refusal.test.ts` refuses `exitCode: 2` set by hand anywhere under `src`.
+
 ## Runs, phases and asks
 
 - **The runtime's phase is free text compared exactly** (`needs-human` in `harnessBlocked`, the api's `needsOf`, the web's `stepState`,
@@ -47,13 +52,13 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
   field its agent's `output:` schema requires.
 - **`wf decide` of a shipped run prints no step's closeout**: a test of a step's artifact lines reads a run still awaiting a decision.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
-- **What the store reads back is decoded by a schema in a store file, never a pure one** (`boundary.test.ts` refuses Effect in a pure
-  file: the api loads `./run` and `./workflow`). A run record, a person's ask, `daemon.json`, `tick.json`, `tick-stats.json` and a queue
-  try each have one, a `StructWithRest` where the file is written back (a `Struct` strips the keys it does not name, and a record
-  written by a newer tick keeps them). `Struct({})` accepts an array; a struct with a key refuses one. A record that does not decode is
-  refused by `readRun` with exit 2, naming the file and its first wrong field (`UnreadableRecord`), and left out of `listRuns`, said
-  once on stderr, so one bad file stops no other run. The frozen steps are the one cast left on a record (`frozenSteps`), until phase 2
-  checks them with the parser's own words.
+- **What the store reads back is decoded by a schema in a store file, never a pure one** (`boundary.test.ts` refuses Effect in a pure file
+  but `effect/Data`: the api loads `./run` and `./workflow`, whose modules `test/refusal.test.ts` pins). A run record, a person's ask,
+  `daemon.json`, `tick.json`, `tick-stats.json` and a queue try each have one, a `StructWithRest` where the file is written back (a
+  `Struct` strips the keys it does not name, and a record written by a newer tick keeps them). `Struct({})` accepts an array; a struct
+  with a key refuses one. A record that does not decode is refused by `readRun` with exit 2, naming the file and its first wrong field
+  (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. The frozen steps are the one
+  cast left on a record (`frozenSteps`), until phase 2 checks them with the parser's own words.
 
 ## The tick
 

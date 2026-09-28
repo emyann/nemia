@@ -430,9 +430,9 @@ export function unhold(id: string): Holding {
     throw new Conflict({
       message: `${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`,
     });
-  if (!removeHold(id, run.hold!.at) && fs.existsSync(holdFile(id)))
+  if (!removeHold(id, run.hold.at) && fs.existsSync(holdFile(id)))
     throw new Conflict({
       message: `${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`,
     });
-  return { run, hold: run.hold! };
+  return { run, hold: run.hold };
 }

@@ -118,8 +118,9 @@ sets that file's **own ceiling**: its measure today, rule by rule, and nothing h
 }
 ```
 
-I checked that oxlint 1.86 reads such an override: globs are relative to the config's folder, and one line added to `tick.ts` fails with
-"Maximum allowed is 1188". So **lint itself refuses a baselined file that grows**. A ceiling is safer than turning the rule off, which
+I checked that oxlint 1.86 reads such an override: globs are relative to the config's folder, and with a ceiling one below `tick.ts`'s
+measure (1,188 against its 1,189 code lines) lint fails with "Maximum allowed is 1188". At 1,189 it passes, and the 1,190th code line fails
+in the same way. So **lint itself refuses a baselined file that grows**. A ceiling is safer than turning the rule off, which
 would let an offender grow for free.
 
 **A test, `limits.test.ts`.** It lives in the orchestrator's `test/`, beside `suite.test.ts`, which already reads the whole repository. It
@@ -230,7 +231,7 @@ Pure layering, leaf first. "code" is today's code lines moving in, from the decl
 | `retry/` | `retry.ts`, `retry-words.ts`, `retry-ask.ts`, `retry.verb.ts`, `index.ts` | `run.ts` 2064–2761: `retryable`, `retriesDue`, `retryRefusal` → `retry.ts` (~310); `tryNote`, `retryLines`, `deniedOffer`, `answerLines` → `retry-words.ts`; today's `retry.ts` → `retry-ask.ts`; `verbs.ts`'s `retry` |
 | `tick/` | `assess.ts`, `tick.verb.ts`, `advance.verb.ts`, `file-tries.verb.ts`, `file-steps.verb.ts`, `rest.verb.ts` | `run.ts`'s `assess`; `tick.ts` (see below) |
 | `cap/` | `cap.ts`, `pool.ts`, `index.ts` | `run.ts` 1211–1320, `heldCheckouts`, `inFlight`; `admission.ts` → `pool.ts` |
-| `branches/` | `tips.ts`, `radius.ts`, `branches.store.ts`, `tips.verb.ts`, `index.ts` | `run.ts` 1574–1670; `radius.ts` without the usage words; `branches.ts`; `tick.ts`'s `resultTips` |
+| `branches/` | `tips.ts`, `radius.ts`, `branches.store.ts`, `index.ts` | `run.ts` 1574–1670; `radius.ts` without the usage words; `branches.ts` and `tick.ts`'s `resultTips` (it reads refs from git and takes no engine: a store, beside `refsOf`) → `branches.store.ts` |
 | `workspace/` | `workspace.ts`, `deps.ts`, `worktree.store.ts`, `deps.store.ts`, `index.ts` | `run.ts` 5979–end plus `handOffDue`, `downstreamOf`; `deps.ts`; `worktree.ts`, its dependency provisioning (`provisionDeps`, `lockfileParts`) → `deps.store.ts` |
 | `say/` | `say.ts`, `say.verb.ts` | `run.ts` 2761–2817; `verbs.ts`'s `say`, `strayAsk` |
 | `cancel/` | `cancel.ts`, `cancel.verb.ts` | `run.ts` 3347–3442 (`cancelPlan`); `verbs.ts`'s `cancel` |
@@ -251,13 +252,13 @@ Pure layering, leaf first. "code" is today's code lines moving in, from the decl
 | `folder/` | `folder.ts`, `folder.store.ts` | `workflow.ts` 2115–2203 and 2721–2737 (a folder of markdown is a workflow); `workflow-store.ts`'s roots and loading; `authoring.ts`'s `writeWorkflow` |
 | `agents/` | `agents.ts`, `spawn.ts`, `agents.store.ts`, `agents-write.store.ts`, `index.ts` | `workflow.ts` 2203–2658; `rendering.ts` → `spawn.ts`; `workflow-store.ts`'s `loadAgents`, `agentUsers`, `agentVersion`; `store.ts`'s `agentFilesDir`, `writeAgentFiles`, `skillsAgain`; `authoring.ts`'s agent half |
 | `skills/` | `skills.ts`, `skills.store.ts` | `workflow.ts` 1749–2046; `workflow-store.ts`'s skill reads; `authoring.ts`'s `copySkill`, `writeSkill` |
-| `inbox/` | `inbox.ts`, `inbox.store.ts`, `inbox.verb.ts` | `inbox.ts` (319 code, kept whole); `inbox-store.ts`, `inboxDir`; `start.ts`'s `startFromInbox`, `startQueued` |
-| `plan/` | `plan.ts`, `plan.verb.ts` | `plan.ts`; `start.ts`'s `readPlan`, `startPlan` |
+| `inbox/` | `inbox.ts`, `inbox.store.ts`, `inbox.verb.ts` | `inbox.ts` (319 code, kept whole); `inbox-store.ts`, `inboxDir`; `start.ts`'s `startFromInbox`, `startQueued` (they start a run through `start/start.verb.ts`) |
+| `plan/` | `plan.ts`, `plan.store.ts`, `plan.verb.ts` | `plan.ts`; `start.ts`'s `readPlan` (a folder read, no engine) → `plan.store.ts`; `startPlan` (it starts each card through `start/start.verb.ts`) → `plan.verb.ts` |
 | `daemon/` | `daemon.ts`, `daemon.store.ts` | `daemon.ts`; `daemon-store.ts` |
 | `meter/` | `meter.ts`, `tally.store.ts`, `meter.verb.ts` | `meter.ts`; `tally.ts`; `tick.ts` 1568–1671 (what the pass cost) |
 | `rest/` | `rest.ts` | `rest.ts` (the runs-at-rest memo goes with the tick, below) |
 | `views/` | `views-words.ts`, `views.verb.ts` | `views.ts`: its words (`phaseOfView`, `waitsForWord`, `endWords`, `engineWord`, `wordOfView`) and its engine reads |
-| `cli/` | `main.ts`, `start.ts`, `watch.ts`, `runs.ts`, `decide.ts`, `asks.ts` | `cli.ts` (see below); `bin/wf.ts` imports `../src/cli/main.ts` |
+| `cli/` | `main.ts`, `flags.ts`, `start.ts`, `runs.ts`, `decide.ts`, `asks.ts` | `cli.ts` (see below); `bin/wf.ts` imports `../src/cli/main.ts` |
 
 Every file of today, where it goes:
 
@@ -290,10 +291,10 @@ Every file of today, where it goes:
 | `run.ts` | the folders above; `src/run.ts` stays as the barrel |
 | `runner.ts` | stays |
 | `runtime-client.ts` | stays |
-| `start.ts` | `start/start.verb.ts`, `plan/plan.verb.ts`, `inbox/inbox.verb.ts` |
+| `start.ts` | `start/start.verb.ts`, `plan/plan.store.ts`, `plan/plan.verb.ts`, `inbox/inbox.verb.ts` |
 | `store.ts` | `record/record.store.ts`, `record/asks.store.ts`, `agents/agents.store.ts`, `inbox/inbox.store.ts` |
 | `tally.ts` | `meter/tally.store.ts` |
-| `tick.ts` | `tick/`, `ending/ending.verb.ts`, `branches/tips.verb.ts`, `meter/meter.verb.ts` |
+| `tick.ts` | `tick/`, `ending/ending.verb.ts`, `branches/branches.store.ts`, `meter/meter.verb.ts` |
 | `timeline.ts` | `timeline/timeline.ts` |
 | `verbs.ts` | `cancel/`, `retry/`, `gate/`, `say/`, `round/`, `wait/` — one `.verb.ts` each |
 | `views.ts` | `views/` |
@@ -359,21 +360,26 @@ Each placement is checked by the declaration graph above; the card that makes th
 its family, with its flag parser and its paragraph of help. `main.ts` composes `HELP` from those paragraphs, so a verb's help sits beside
 the verb.
 
+The imports run one way: `main.ts` → the families → `flags.ts`. The flag reader every family calls (`readFlags`) sits in `flags.ts`, below
+the families, and never in `main.ts`, which imports them: that would be a value cycle, refused by the `cycles` rule and the cycle test. The
+daemon's own verbs (`tick`, `up`, `feed`, `watch`, about 190 lines with their parsers) stay in `main.ts` beside the table, rather than in a
+seventh file: `main.ts` is then about 290 code lines, and the folder keeps to six.
+
 | lines | section | goes to |
 |---|---|---|
 | 1–144 | imports | each file's own; `cli/` still reaches only `src/runner.ts` and `src/workflow.ts` |
-| 144–311 | `HELP`, `usage`, `exitCodeOf`, `PLAN_HELP`, `INBOX_HELP`, `DECIDE_HELP` | `usage`, `exitCodeOf`, the composed `HELP` → `main.ts`; each `*_HELP` beside its verb |
-| 311–849 | flag parsers: `readFlags`, `FlagRules`, `confirmed`, `amountOf` | `main.ts` |
+| 144–311 | `HELP`, `usage`, `exitCodeOf`, `PLAN_HELP`, `INBOX_HELP`, `DECIDE_HELP` | `exitCodeOf`, the composed `HELP` → `main.ts`; `usage` → `flags.ts` (a family throws it); each `*_HELP` beside its verb |
+| 311–849 | flag parsers: `readFlags`, `FlagRules`, `confirmed`, `amountOf` | `flags.ts` |
 | | `startHow`, `START_TAKES`, `planHow`, `inboxQueueHow`, `inboxAddHow` | `start.ts` |
 | | `rmHow`, `pruneHow`, `holdHow`, `agentsHow` | `runs.ts` |
 | | `decideHow` | `decide.ts` |
 | | `retryHow`, `RETRY_FLAGS`, `approveHow`, `roundHow`, `acceptHow` | `asks.ts` |
-| | `feedCursor`, `watchPrinted` | `watch.ts` |
-| 853–1073 | cases `start`, `plan`, `inbox` | `start.ts` |
-| 1040–1199 | cases `tick`, `up`, `feed`, `watch` | `watch.ts` |
-| 1199–1388, 1784–1852 | cases `ls`, `cancel`, `rm`, `prune`, `hold`, `show`, `logs`, `agents` | `runs.ts` |
-| 1388–1704 | case `decide` (about 316 lines) | `decide.ts`, as named steps under 80 lines each |
-| 1704–1784 | cases `retry`, `approve`, `round`, `accept`, `say` | `asks.ts` |
+| | `feedCursor`, `watchPrinted` | `main.ts` |
+| 853–1039 | cases `start`, `plan`, `inbox` | `start.ts` |
+| 1040–1198 | cases `tick`, `up`, `feed`, `watch` | `main.ts` |
+| 1199–1387, 1784–1852 | cases `ls`, `cancel`, `rm`, `prune`, `hold`, `show`, `logs`, `agents` | `runs.ts` |
+| 1388–1703 | case `decide` (about 316 lines) | `decide.ts`, as named steps under 80 lines each |
+| 1704–1783 | cases `retry`, `approve`, `round`, `accept`, `say` | `asks.ts` |
 
 `cli.ts` holds `//` comments against the house rule; they become JSDoc or go as the code moves.
 
@@ -394,7 +400,7 @@ at the level of each decision.
 | 868–1017 | checks filed, ready roots filed with their parents' closeouts | `tick/file-steps.verb.ts` |
 | 1018–1090 | slot held first, tips, record written, rest facts | `tick/advance.verb.ts` |
 | 1090–1300 | `handOffOwed`, `closeHeld`, `closeWaitingTasks`, `answerHeld` | `tick/advance.verb.ts` |
-| | `resultTips` | `branches/tips.verb.ts` |
+| | `resultTips` | `branches/branches.store.ts` |
 | | `landEnding` | `ending/ending.verb.ts` |
 | | `localFields`, `toldOf`, `parentCloseouts` | `tick/file-steps.verb.ts` |
 | 1300–1430 | `Pass`, `refusalLines`, `tick`, `pass`; `runSlots` (1671) | `tick/tick.verb.ts` |
@@ -403,7 +409,8 @@ at the level of each decision.
 
 ### The kinds, by path
 
-`boundary.test.ts` keeps its four kinds and every rule it has. What changes is how it finds a file's kind.
+`boundary.test.ts` keeps its four kinds and every refusal it makes. What changes is how it finds a file's kind, and two rules that name
+single files today (`CLI_REACHES`, and every controller importing the client) read the new tree as below.
 
 - **It walks `src` and `bin` recursively.** Today `packageSources()` reads each folder flat, so a file in a folder would go unseen and
   every rule would pass for nothing.
@@ -411,13 +418,30 @@ at the level of each decision.
   - `src/runner.ts`: controller;
   - `src/run.ts`, `src/workflow.ts`: pure;
   - `src/runtime-client.ts`: client;
-  - `src/cli/*.ts`: controller, the door, reaching only `src/runner.ts` and `src/workflow.ts` (`CLI_REACHES`);
-  - `bin/wf.ts`: reaching only `src/cli/main.ts` (`BIN_REACHES`).
+  - `src/cli/*.ts`: controller, the door, reaching only `src/runner.ts`, `src/workflow.ts` and each other (`CLI_REACHES`: the two
+    files and the folder `src/cli/`). A plant of `src/cli/start.ts` importing `src/record/record.store.ts` is refused, as `src/cli.ts`
+    importing `src/store.ts` is today;
+  - `bin/wf.ts`: reaching only `src/cli/main.ts` (`BIN_REACHES`); a plant importing `src/cli/flags.ts` is refused.
 
   Any other file at the root of `src`, or any `.ts` it cannot place, is of no kind and fails `unsorted` as today.
 - **`STORE_BOTTOM` becomes** `record/places.store.ts`, `folder/folder.store.ts`, `meter/tally.store.ts`. **`STORE_SHARED`:**
   `record/record.store.ts` and `record/asks.store.ts` may import only the bottom and each other; `workspace/worktree.store.ts` only the
   record's stores, the places and the tally.
+- **A controller reaches the client through controllers.** Today `clientBreaks` refuses any controller beneath the CLI that does not
+  import `runtime-client.ts` itself. Every `*.verb.ts` in the map above does, because each takes an `Engine`, whose type comes from the
+  client, with two exceptions that start a run by calling `start`: `plan/plan.verb.ts` and `inbox/inbox.verb.ts`, both importing
+  `start/start.verb.ts`. Two files that would have had nothing of the runtime are not verbs: `resultTips` is a store
+  (`branches.store.ts`) and `readPlan` is a store (`plan.store.ts`). The rule becomes: **every controller beneath the CLI imports the
+  client, or imports a controller that reaches it**, followed through controller imports. What it refuses is unchanged:
+  - a file other than the client importing `agent-runtime`;
+  - `CLIENT` naming a file that imports no `agent-runtime`;
+  - a file named as a verb that reaches no runtime at all. Under kinds by name this is the refusal that matters, since it stops a disk file
+    named `x.verb.ts` to escape the store tree. Its plant is `plan/plan.verb.ts` with its import of `start/start.verb.ts` taken out, which
+    must be refused.
+
+  The alternative that keeps the rule word for word puts the three starters back in one file with `start` (about 365 code lines today,
+  over the limit on day one) or gives each verb an import of the client it does not use; both are worse than the rule read through
+  controllers.
 - **Each rule's REFUSED plant is rewritten at a new path** and still makes its rule refuse. The test's own checks on its plants stay.
 - **Two rules join it:**
   - a pure file outside a folder imports that folder's pure code only through its face;
@@ -433,7 +457,7 @@ root.
 | `src/facade.ts` | stays, entry `agent-runtime`: a barrel of today's names, and its "vocabulary" section (932–951) |
 | `src/index.ts` | stays, entry `agent-runtime/effect`; its paths change |
 | `core/session.ts` | `domain.ts` 47–130: `SESSION_STATES`, `isLive`, `endOf`, `phaseWordOf`, `formerStateOf`, `Outcome`. **This breaks the `domain` ↔ `lifecycle` cycle**: both import `session.ts`, and `lifecycle.ts` no longer imports `domain.ts`. |
-| `core/domain.ts` | the rest of `domain.ts`: sightings, the journal's events and `fold`, a task held open, the decision (`decide`, `observe`, `lifecycleOf`). It stays **the whole judgement** in one file, as the root `CLAUDE.md` says: ~330 code lines, under the limit once the states move out. |
+| `core/domain.ts` | the rest of `domain.ts`, and `nameParts` from `a2a-map.ts` (the inverse of `nameFor`, which is here: it reads a session name, and the Claude driver and the A2A map both use it): sightings, the journal's events and `fold`, a task held open, the decision (`decide`, `observe`, `lifecycleOf`). It stays **the whole judgement** in one file, as the root `CLAUDE.md` says: ~330 code lines, under the limit once the states move out. |
 | `core/lifecycle.ts` | `lifecycle.ts` |
 | `core/index.ts` | the core's face |
 | `core/engine/filing.ts` | `engine.ts` 83–342: filing, admitting, answering, closing, and their refusals |
@@ -462,15 +486,19 @@ root.
 | `facade/engine.ts` | `facade.ts` 512–932: `createEngine` (330-line function: baseline, split into named steps in the same file) |
 | `facade/promise.ts` | `runner-promise.ts`: a harness a consumer writes in Promises is a door concern |
 | `cli/brief.ts` | `cli.ts`'s `BRIEF_KEYS`, `parseBrief` |
-| `cli/main.ts` | `cli.ts`'s `main` and its line formatters; `bin/ae.ts` imports it |
+| `cli/main.ts` | `cli.ts`'s `main` and its line formatters; imports `cli/brief.ts`; `bin/ae.ts` imports it |
 
 `facade/` has no `index.ts`: `src/facade.ts` is its face.
 
-**Rules by path**, in a new `test/layout.test.ts`. Each holds today, and each gets a plant that makes it refuse:
+**Rules by path**, in a new `test/layout.test.ts`. Each gets a plant that makes it refuse:
 
 - `core/**` imports from `harness/` only `seam.ts`, `args.ts` and `index.ts`, and nothing from `a2a/`, `facade/` or `cli/`;
 - `harness/**` imports nothing from `a2a/`, `facade/` or `cli/`;
-- `cli/**` imports only `src/facade.ts`, as `cli.ts` does today.
+- `cli/**` imports only `src/facade.ts` and other files of `cli/`, as `cli.ts` imports only `facade.ts` today.
+
+They hold on today's imports, mapped to the new paths, but for one edge: `runner-claude-code.ts` imports `nameParts` from `a2a-map.ts`,
+which would be `harness/claude/code.ts` → `a2a/map.ts`. `nameParts` moves to `core/domain.ts` beside `nameFor` in the card that makes the
+core, before the harness moves, and both callers import it from the core's face.
 
 ## The api
 
@@ -524,7 +552,12 @@ where its `tsconfig` and the e2e under their own config expect them.
 
 Other tests that read the tree flat, and would pass for nothing once files move into folders, become recursive in the first card:
 
-- the runtime's `readme.test.ts` (`filesIn`: every source file named in the README);
+- the runtime's `readme.test.ts`, in two places:
+  - `filesIn` (every source file named in the README) walks recursively and skips `*.test.ts`, or every test beside the code would have
+    to be named in the README;
+  - `missingFiles` matches a README path with `(?:src|bin|test|docs)\/[\w.-]+\.(?:ts|md)`, which cannot cross a `/`: a README naming a
+    gone `src/core/x.ts` would pass unseen. The pattern takes nested paths (`(?:src|bin|test|docs)(?:\/[\w.-]+)+\.(?:ts|md)`), and its
+    plant, a README naming a missing `src/core/gone.ts`, is refused;
 - the api's `harness.test.ts`.
 
 Tests that read source text by path follow their file, each slice ending on a name that must exist:
@@ -617,7 +650,8 @@ The typecheck finds every one it reads. The ones it does not read are:
 - `await import('../src/…')` with a computed path;
 - paths in strings;
 - **paths built from a file's own place**, which move silently:
-  - the runtime's `runner-detached.ts:149` builds the worker's path (`'..', 'bin', 'ae-worker.ts'`) and needs one `..` more;
+  - the runtime's `runner-detached.ts:149` builds the worker's path (`'..', 'bin', 'ae-worker.ts'`); at `src/harness/detached/detached.ts`
+    it is two folders deeper and needs two `..` more (`'..', '..', '..', 'bin', 'ae-worker.ts'`);
   - the api's `HOME_REPO` needs one too.
 
   Each gets a test that resolves the path and checks the file exists.
@@ -630,8 +664,9 @@ The typecheck finds every one it reads. The ones it does not read are:
 - the JSDoc of `src`.
 
 Each card updates the names of the files it moves in the same commit. `grep -rn '<old name>\.ts'` over `*.md` and `src` is empty
-before it commits. The runtime's `readme.test.ts` already refuses a source file its README does not name, and once recursive it holds the
-new paths. The dated docs (`night-*.md`, `eval-*`, `design-*`) are records and keep the names they were written with. `architecture.md`'s
+before it commits. The runtime's `readme.test.ts` already refuses a source file its README does not name, and with the two changes above (a
+recursive walk that skips tests, a pattern that takes nested paths) it holds the new paths both ways: a file not named, and a name with no
+file. The dated docs (`night-*.md`, `eval-*`, `design-*`) are records and keep the names they were written with. `architecture.md`'s
 store list, which omits `a2a-agents`, is corrected when that file moves.
 
 **Order within a package**, in cards small enough to review. Each card is one or a few features, green on its own:
@@ -707,3 +742,6 @@ per step after the split than before, the anti-fragmentation rules are wrong som
 3. **`max-lines` at 350 code lines** rather than 300, from the owner's "about 500 lines, one read" and the measured density.
 4. **About 39 folders in the orchestrator.** Small features (`say`, `cancel`, `timeline`) are folders of one or two files, because each is
    a verb a person asks for by name. Merging them into neighbours would save folders, not reads.
+5. **A controller reaches the client through controllers** (see "The kinds, by path"). This is the one rule of `boundary.test.ts` whose
+   reading changes. It is followed through imports so that `plan.verb.ts` and `inbox.verb.ts` can start a run through `start.verb.ts`
+   without importing a client they do not use. Every refusal it makes today is kept.

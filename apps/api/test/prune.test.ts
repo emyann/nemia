@@ -86,6 +86,25 @@ gitRun('p-merged', { merge: true });
 gitRun('p-unmerged', { merge: false });
 gitRun('p-running', { merge: false, working: true });
 
+// A run whose step failed and whose branch a person merged by hand all the same: on the base, however it got there, so shipped.
+gitRun('p-failed-merged', { merge: true });
+journal('p-failed-merged-implement', [
+  filed,
+  { kind: 'starting', at: at(1), attempt: 1 },
+  { kind: 'spawned', at: at(1), attempt: 1 },
+  { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ae/p-failed-merged-implement/1', observed: 'failed', reason: 'harness' },
+  { kind: 'settled', at: at(9), outcome: 'failed' },
+]);
+
+// A run that worked on main itself (`--no-worktree`): no branch of its own to merge, and it waits on your decision all the same.
+signedOff('p-direct-implement');
+write(path.join(filesDir('p-direct'), 'implement', 'shot.png'), 'a picture');
+write(path.join(root, 'runs', 'p-direct.json'), JSON.stringify({
+  id: 'p-direct', repo, workspace: repo, baseRef: base, branch: 'main', isolate: false, brief: 'Run p-direct', createdAt: at(0),
+  workflowDir: path.join(root, 'no-such-workflow'), workflow: [implement],
+  steps: { implement: { taskId: 'p-direct-implement', workspace: repo, branch: 'main', handedOff: 'p-direct-implement' } },
+}));
+
 // A folder run whose one step signed off: its folder is its work, and never pruned.
 const work = path.join(root, 'folders', 'p-folder');
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
@@ -132,6 +151,26 @@ const hasBranch = (branch: string) => git('branch', '--list', branch).trim() !==
 
 /** What `wf prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
 const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => prune(engine(), id, how);
+
+test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand", async () => {
+  const awaiting = new Map<string, unknown>();
+  for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
+    const res = await app.request(`/api/runs/${id}/decision`);
+    assert.equal(res.status, 200, id);
+    const body = await res.json() as { awaiting?: unknown };
+    awaiting.set(id, body.awaiting ?? null);
+    const said = await packageSays(id, { artifacts: true });
+    const refusedUnmerged = said.kind === 'refused' && said.refusal.includes(`wf prune ${id} --unmerged`);
+    assert.equal(body.awaiting != null, refusedUnmerged, `${id}: ${JSON.stringify(body)} beside ${JSON.stringify(said)}`);
+  }
+  assert.deepEqual(Object.fromEntries(awaiting), {
+    'p-merged': null,
+    'p-unmerged': { branches: [branchOf('p-unmerged')], direct: false },
+    'p-running': null,
+    'p-failed-merged': null,
+    'p-direct': { branches: ['main'], direct: true },
+  });
+});
 
 test('a finished, merged run pruned on the board with its files is pruned as `wf prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so', async () => {
   const before = await listed();

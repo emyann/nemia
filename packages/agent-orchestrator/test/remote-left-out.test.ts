@@ -19,6 +19,9 @@ const ROOT = scratch('wf-remote-left-out-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+// Each case leaves its step held at work on the agent, so by the second a pool of two sessions (the default) is full and the queued
+// step is never admitted to be refused. A check the run executes inherits the daemon's ceiling (50 on the owner's machine), which hid it.
+process.env.WF_MAX_CONCURRENT = '10';
 const BIN = scratch('wf-remote-left-out-bin-');
 const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });

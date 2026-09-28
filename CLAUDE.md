@@ -104,6 +104,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the line reads what the merge brings and the e2e runs there once. The shipped lines read what was touched and hold the e2e for the
   merged tree on that one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
   runs each both ways; learned by the run that took the e2e out of the rounds).
+- **A check the run executes inherits the daemon's environment, so a test that reads a `WF_` default passes there and fails by hand.**
+  `wf up` on the owner's machine runs with `WF_MAX_CONCURRENT=50`, and every check a step's run files is its child: `remote-left-out.test.ts`
+  deleted `WF_MAX_RUNS` and left the ceiling to the environment, and at the default of two its second case queued a step never admitted,
+  failing every `npm test` typed by hand since stage 6 part 2 while every run's check passed. A test that depends on a ceiling sets it itself,
+  and is run once with the variable unset and once set low (learned by the run that installed oxlint).
 - **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
   `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
   the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'

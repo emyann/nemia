@@ -27,12 +27,12 @@ import {
   type Sighting,
   type State,
   type Usage,
-} from './domain.ts';
+} from '../domain.ts';
 import { Journal } from './journal.ts';
-import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
-import { Runner, type ExpectedSession } from './runner.ts';
-import { transition, type Move, type Refusal } from './lifecycle.ts';
-import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './tick-memo.ts';
+import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness-args.ts';
+import { Runner, type ExpectedSession } from '../../runner.ts';
+import { transition, type Move, type Refusal } from '../lifecycle.ts';
+import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 
 /**
  * The lifecycle `step` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a

@@ -20,13 +20,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { Journal, type FeedEntry, type JournalOps } from '../src/journal.ts';
+import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/runner.ts';
-import { admit, answer, file, GRACE_MS, Lifecycle, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
-import { withoutEdge } from '../src/lifecycle.ts';
-import { decide, fold, nameFor, type Event, type SessionState, type Sighting } from '../src/domain.ts';
+import { admit, answer, file, GRACE_MS, Lifecycle, LIVE, requestStop, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
+import { withoutEdge } from '../src/core/lifecycle.ts';
+import { decide, fold, nameFor, type Event, type SessionState, type Sighting } from '../src/core/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
-import { tickMemoLayer } from '../src/tick-memo.ts';
+import { tickMemoLayer } from '../src/core/engine/memo.ts';
 import { composite } from '../src/runner-composite.ts';
 
 /**
@@ -658,7 +658,7 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
-  const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
   const from = source.indexOf('export function decide(');
   assert.ok(from >= 0, 'found decide');
   const body = source.slice(from);
@@ -669,7 +669,7 @@ test('decide never reads tools, effort, MCP servers, a budget, a context window,
     'export function needsHuman(',
   ])
     assert.ok(body.includes(name), `the slice holds ${name}`);
-  const machine = fs.readFileSync(new URL('../src/lifecycle.ts', import.meta.url), 'utf8');
+  const machine = fs.readFileSync(new URL('../src/core/lifecycle.ts', import.meta.url), 'utf8');
   for (const read of [body, machine])
     assert.doesNotMatch(
       read,

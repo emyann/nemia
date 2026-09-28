@@ -9,7 +9,7 @@
  * the seam was drawn in the right place.
  */
 import { Effect } from 'effect';
-import type { Sighting } from './domain.ts';
+import type { Sighting } from './core/domain.ts';
 import { RunnerError, type Observation, type RunnerOps } from './runner.ts';
 
 /**

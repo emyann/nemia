@@ -63,7 +63,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { formerStateOf, isSessionState, type SessionState, type Sighting } from './domain.ts';
+import { formerStateOf, isSessionState, type SessionState, type Sighting } from './core/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from './runner.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './a2a-map.ts';
 

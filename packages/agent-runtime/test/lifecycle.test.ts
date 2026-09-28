@@ -26,7 +26,7 @@ import {
   type Action,
   type Event,
   type Sighting,
-} from '../src/domain.ts';
+} from '../src/core/domain.ts';
 import {
   diagram,
   edgesOf,
@@ -38,7 +38,7 @@ import {
   withoutEdge,
   type LifecycleEvent,
   type LifecycleState,
-} from '../src/lifecycle.ts';
+} from '../src/core/lifecycle.ts';
 import { at, corpusOf, ended, filed, JOURNALS, S, spawned, starting, T0, TASK, type Case } from './lifecycle-corpus.ts';
 
 /**
@@ -292,7 +292,7 @@ test("the README's lifecycle diagram is the machine's, generated", () => {
   const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const block = readme.match(/<!-- lifecycle:begin.*-->\n```mermaid\n([\s\S]*?)\n```\n<!-- lifecycle:end -->/);
   assert.ok(block, 'the README holds the diagram between its markers');
-  assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/lifecycle.ts\').then((m) => console.log(m.diagram()))"');
+  assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/core/lifecycle.ts\').then((m) => console.log(m.diagram()))"');
   assert.notEqual(diagram(machineWithout('working', 'LOST')), diagram(), 'the pin sees an edge taken away');
 });
 

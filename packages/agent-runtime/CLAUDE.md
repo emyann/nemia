@@ -1,6 +1,6 @@
 # packages/agent-runtime — `ae`
 
-One session run to completion, durably, on one harness. `decide` (`src/domain.ts`) is the whole judgement, pure; `src/facade.ts` and
+One session run to completion, durably, on one harness. `decide` (`src/core/domain.ts`) is the whole judgement, pure; `src/facade.ts` and
 `src/index.ts` are the only doors.
 
 ## The pass

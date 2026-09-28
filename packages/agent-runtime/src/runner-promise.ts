@@ -4,7 +4,7 @@
  * handed to the A2A seam (`a2a-client.ts`) and reached only through it.
  */
 import { Effect } from 'effect';
-import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type SessionState, type Sighting, type Usage } from './domain.ts';
+import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type SessionState, type Sighting, type Usage } from './core/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 
 /**

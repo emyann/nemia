@@ -29,7 +29,7 @@ import {
   type SpawnRequest,
 } from '../src/index.ts';
 import { createEngine, type PromiseJournal, type PromiseRunner } from '../src/facade.ts';
-import { fold } from '../src/domain.ts';
+import { fold } from '../src/core/domain.ts';
 import { parseBrief, taskLine } from '../src/cli.ts';
 import { scratch } from './scratch.ts';
 

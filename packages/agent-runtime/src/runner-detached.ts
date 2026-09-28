@@ -21,11 +21,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Denial, SessionState, Sighting, Usage } from './domain.ts';
+import type { Denial, SessionState, Sighting, Usage } from './core/domain.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
 import { writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
-import { countSpawn, readText } from './io-tally.ts';
+import { countSpawn, readText } from './core/engine/tally.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {

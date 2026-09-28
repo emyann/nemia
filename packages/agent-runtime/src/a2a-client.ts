@@ -32,8 +32,8 @@ import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
 import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { Event, Sighting, Usage } from './domain.ts';
-import { Journal } from './journal.ts';
+import type { Event, Sighting, Usage } from './core/domain.ts';
+import { Journal } from './core/engine/journal.ts';
 import {
   Runner,
   RunnerError,

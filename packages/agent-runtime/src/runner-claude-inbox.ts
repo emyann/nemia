@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { readTextAsync } from './io-tally.ts';
+import { readTextAsync } from './core/engine/tally.ts';
 
 /**
  * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and

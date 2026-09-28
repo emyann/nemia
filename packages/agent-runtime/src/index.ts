@@ -52,11 +52,11 @@ export {
   settleTask,
   StepRefused,
   GRACE_MS,
-} from './engine.ts';
-export type { Filing, RefusedMove, TaskView } from './engine.ts';
+} from './core/engine/engine.ts';
+export type { Filing, RefusedMove, TaskView } from './core/engine/engine.ts';
 
-export { Journal, JournalError } from './journal.ts';
-export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './journal.ts';
+export { Journal, JournalError } from './core/engine/journal.ts';
+export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/journal.ts';
 
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
 export type {
@@ -82,7 +82,7 @@ export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
-export type { Event, State, Attempt, SessionState, Ended, Outcome, Sighting, EndReason, Usage, Said, Denial, Input } from './domain.ts';
-export { denialText, fold, nameFor } from './domain.ts';
+export type { Event, State, Attempt, SessionState, Ended, Outcome, Sighting, EndReason, Usage, Said, Denial, Input } from './core/domain.ts';
+export { denialText, fold, nameFor } from './core/domain.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';

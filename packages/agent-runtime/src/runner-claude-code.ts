@@ -16,7 +16,7 @@
 import { Effect } from 'effect';
 import os from 'node:os';
 import path from 'node:path';
-import type { Sighting } from './domain.ts';
+import type { Sighting } from './core/domain.ts';
 import { nameParts } from './a2a-map.ts';
 import { claudeOps, type ClaudeOptions, type Observation, type RunnerOps } from './runner.ts';
 import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';

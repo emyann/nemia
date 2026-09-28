@@ -25,7 +25,7 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState, Sighting, Usage } from './domain.ts';
+import type { SessionState, Sighting, Usage } from './core/domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
 import {
   claudeTranscriptEvents,
@@ -38,7 +38,7 @@ import { claudeFlagsOf, worktreeName } from './runner-claude-vocabulary.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
 import { readTranscript } from './runner-transcript.ts';
-import { countSpawn, readTextAsync } from './io-tally.ts';
+import { countSpawn, readTextAsync } from './core/engine/tally.ts';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
   verb: Schema.String,

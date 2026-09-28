@@ -79,7 +79,7 @@ cannot be told apart from what its parent spent. `claude-detached` records what 
 
 ### 6. The Effect door's `file` refuses no harness's words
 
-**Where.** `file` in `agent-runtime/src/engine.ts` refuses what the task says of itself; the refusals in a harness's
+**Where.** `file` in `agent-runtime/src/core/engine/engine.ts` refuses what the task says of itself; the refusals in a harness's
 words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
@@ -626,7 +626,7 @@ What `codex exec` cannot do, said and not faked:
   transcript is read from a cursor.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
-attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/engine.ts`), and Codex writes
+attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/core/engine/engine.ts`), and Codex writes
 `-o` before it exits; the worker writes `done` only once Codex has exited and its pipes have drained. For that moment `view`
 says `input-required` while `getTask` still answers the harness's `WORKING`, and the process is still there. It closes by
 itself, and the test pins both sides of it with a fake that holds its exit (`test/codex-agent.test.ts`). Nothing reads the
@@ -660,9 +660,9 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
 
 ### 33. A pass reads every task's journal, settled or not (2026-09-25; the pass fixed the same day, two gaps left)
 
-`tick()` (`src/engine.ts`) listed every id in the journal and folded each on every pass, twice, so a store's runtime phase
+`tick()` (`src/core/engine/engine.ts`) listed every id in the journal and folded each on every pass, twice, so a store's runtime phase
 grew with every task ever filed: on this machine's store, 16 MB of journals over 1,167 tasks. **Fixed for an engine's passes
-after its first** (`src/tick-memo.ts`): an engine keeps a cursor into its own feed and the settled tasks it has folded, and a
+after its first** (`src/core/engine/memo.ts`): an engine keeps a cursor into its own feed and the settled tasks it has folded, and a
 pass folds only the tasks not settled, the tasks the feed named since the last pass, and the ones this engine never folded.
 A settled task it skips is still let go of its sessions off what the memo kept, and a `measured` that writes goes through
 the feed, so the next pass folds it again. `decide` of a settled task is nothing in every journal shape, whatever is appended
@@ -892,7 +892,7 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 - **Resuming a Codex task** (`f63dc55`). The argument order is checked against Codex's own parser; no
   workflow has resumed a Codex step, so whether exec-level `-C` and `-s` apply to the resumed session
   is unknown.
-- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/engine.ts`). In the
+- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/core/engine/engine.ts`). In the
   one live resumed step, the session was busy for as long as only its parent's `StructuredOutput` call
   existed, so the busy rule alone explains why it did not settle early.
 - **A resumed attempt's own closeout and usage** (engine `00e301b`). A fake `claude` that keeps a
@@ -1064,7 +1064,7 @@ for a long implement: the model summarises and stops.
 **Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
 and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
 Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
-cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/domain.ts`). The words are the
+cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/core/domain.ts`). The words are the
 fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.

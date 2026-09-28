@@ -11,7 +11,7 @@ import { Context, Effect, Layer, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { Event } from './domain.ts';
+import type { Event } from '../domain.ts';
 import {
   entryWords,
   HarnessArgsSchema,
@@ -19,9 +19,9 @@ import {
   StoredEventsSchema,
   StoredFeedEntrySchema,
   type StoredEvent,
-} from './event-schema.ts';
-import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
-import { countRead, readText } from './io-tally.ts';
+} from '../event-schema.ts';
+import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness-args.ts';
+import { countRead, readText } from './tally.ts';
 
 /**
  * One entry of the board-wide feed: an event, and which task it happened to.

@@ -64,8 +64,8 @@
       // bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
       // value such a file still takes by a cast keeps its guard with an `oxlint-disable-next-line` saying why.
       "files": [
-        "packages/agent-runtime/src/event-schema.ts",
-        "packages/agent-runtime/src/journal.ts",
+        "packages/agent-runtime/src/core/event-schema.ts",
+        "packages/agent-runtime/src/core/engine/journal.ts",
         "packages/agent-runtime/src/runner-detached.ts",
         "packages/agent-orchestrator/src/store.ts",
         "packages/agent-orchestrator/src/daemon-store.ts",

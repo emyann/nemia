@@ -29,8 +29,8 @@ import {
   type Action,
   type SessionState,
   type Sighting,
-} from '../src/domain.ts';
-import { viewOfState } from '../src/engine.ts';
+} from '../src/core/domain.ts';
+import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/runner.ts';
 import { detachedStateOf } from '../src/runner-detached.ts';
 import { promiseOps } from '../src/runner-promise.ts';

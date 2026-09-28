@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner-claude-transcript.ts';
 import { codexOutput } from '../src/runner-detached-output.ts';
 import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
-import { fold, type Event } from '../src/domain.ts';
+import { fold, type Event } from '../src/core/domain.ts';
 
 const line = (o: object) => JSON.stringify(o);
 const TOKENS = { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 1000, output_tokens: 5 };

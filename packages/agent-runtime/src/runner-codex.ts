@@ -10,7 +10,7 @@ import type { HarnessSpec } from './runner-detached.ts';
 import { codexOutput } from './runner-detached-output.ts';
 import { codexRolloutEvents, codexRolloutFile } from './runner-codex-transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from './runner-mcp.ts';
-import { countSpawn } from './io-tally.ts';
+import { countSpawn } from './core/engine/tally.ts';
 
 /**
  * The project paths a Codex config trusts.

@@ -47,7 +47,7 @@ import {
   UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import { fold, isLive, phaseWordOf, waitsForInput, type Event, type Sighting, type Usage } from './domain.ts';
+import { fold, isLive, phaseWordOf, waitsForInput, type Event, type Sighting, type Usage } from './core/domain.ts';
 import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import {
   canceledTask,

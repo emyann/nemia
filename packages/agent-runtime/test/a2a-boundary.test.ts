@@ -56,7 +56,7 @@ const sourceFiles = () =>
 test('the scan reads the seam and the rest of the package — or it would pass by reading nothing', () => {
   const files = sourceFiles();
   assert.deepEqual(files.filter(inSeam), ['src/a2a-client.ts', 'src/a2a-handler.ts', 'src/a2a-map.ts', 'src/a2a-remote.ts']);
-  assert.ok(files.includes('src/facade.ts') && files.includes('src/engine.ts') && files.includes('bin/ae.ts'));
+  assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   assert.ok(
     files.filter(inSeam).every((f) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK))),
     'and every seam file imports the SDK, so the pattern matches an import of it',
@@ -73,7 +73,7 @@ test('only src/a2a-*.ts import @a2a-js/sdk, by any entry', () => {
 test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type, a re-export, a dynamic import', () => {
   const why = 'only src/a2a-*.ts speak A2A — reach a harness through RunnerOps, and put what needs the SDK in the seam';
   const planted: Array<[string, string, string]> = [
-    ['src/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
+    ['src/core/engine/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
     ['src/facade.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
     ['src/runner.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
     ['src/index.ts', "export { TaskNotFoundError } from '@a2a-js/sdk/errors';", '@a2a-js/sdk/errors'],
@@ -86,7 +86,7 @@ test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type
   }
   assert.deepEqual(sdkBreaches('src/a2a-client.ts', "import { Client } from '@a2a-js/sdk/client';"), [], 'not refused: the seam itself');
   assert.deepEqual(
-    sdkBreaches('src/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"),
+    sdkBreaches('src/core/engine/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"),
     [],
     'not refused: prose that names the SDK',
   );

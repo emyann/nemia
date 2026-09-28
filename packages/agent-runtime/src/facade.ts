@@ -24,9 +24,9 @@ import {
   type Said,
   type Sighting,
   type State,
-} from './domain.ts';
+} from './core/domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
-import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './journal.ts';
+import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './core/engine/journal.ts';
 import { claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
@@ -38,8 +38,8 @@ import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps, type SeamOps } from './a2a-client.ts';
 import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from './a2a-remote.ts';
-import { ioCounts, type IoCounts } from './io-tally.ts';
-import { tickMemoLayer } from './tick-memo.ts';
+import { ioCounts, type IoCounts } from './core/engine/tally.ts';
+import { tickMemoLayer } from './core/engine/memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
 import {
   ADMIT_INSTEAD,
@@ -59,7 +59,7 @@ import {
   type RefusedMove,
   type TaskList,
   type TaskView,
-} from './engine.ts';
+} from './core/engine/engine.ts';
 
 /**
  * A store, in Promises. Implement this to keep the engine's records in your own database. Every `append` goes on the `feed`
@@ -915,12 +915,12 @@ export type { HarnessSpec } from './runner-detached.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.ts';
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
 export { remoteConfigRefusal } from './a2a-remote.ts';
-export { denialText, nameFor } from './domain.ts';
-export { refusedText, retiredKeyRefusal } from './engine.ts';
-export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './domain.ts';
+export { denialText, nameFor } from './core/domain.ts';
+export { refusedText, retiredKeyRefusal } from './core/engine/engine.ts';
+export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
-export type { FeedEntry, FeedRefusal, Cursor } from './journal.ts';
-export type { IoCounts } from './io-tally.ts';
-export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './engine.ts';
+export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/journal.ts';
+export type { IoCounts } from './core/engine/tally.ts';
+export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/engine.ts';

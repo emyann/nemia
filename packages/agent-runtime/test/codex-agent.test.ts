@@ -33,7 +33,7 @@ import { clientOf } from '../src/a2a-client.ts';
 import { cardOf } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a-map.ts';
 import { createEngine, nameFor } from '../src/facade.ts';
-import { Journal } from '../src/journal.ts';
+import { Journal } from '../src/core/engine/journal.ts';
 import { codex } from '../src/runner-codex.ts';
 import { detachedOps } from '../src/runner-detached.ts';
 import type { SpawnRequest } from '../src/runner.ts';
@@ -157,7 +157,7 @@ const until = async (ok: () => boolean | Promise<boolean>, what: string, ms = 15
 };
 
 /** The codex agent over a store at `root`, as the engine's seam builds it, with no journal behind it unless given one. */
-const agent = (root: string, events: (taskId: string) => Promise<readonly import('../src/domain.ts').Event[]> = async () => []) =>
+const agent = (root: string, events: (taskId: string) => Promise<readonly import('../src/core/domain.ts').Event[]> = async () => []) =>
   clientOf('codex', detachedOps(codex, root), events);
 const send = (client: Client, r: SpawnRequest) =>
   client.sendMessage({

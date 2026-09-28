@@ -13,7 +13,7 @@
  */
 import { Context, Layer, Schema } from 'effect';
 import { isDeepStrictEqual } from 'node:util';
-import { settledQuiet, type Attempt, type State } from './domain.ts';
+import { settledQuiet, type Attempt, type State } from '../domain.ts';
 import type { Cursor } from './journal.ts';
 
 /**

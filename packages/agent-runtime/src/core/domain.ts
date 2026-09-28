@@ -22,7 +22,7 @@
  * file can tell which kind of harness produced it.
  */
 
-import type { HarnessArgs } from './harness-args.ts';
+import type { HarnessArgs } from '../harness-args.ts';
 import { transition, type LifecycleEvent, type LifecycleState, type Move, type Refusal } from './lifecycle.ts';
 
 /**

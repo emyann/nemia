@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { HARNESS_ARGS } from '../src/harness-args.ts';
 
-const CORE = ['src/domain.ts', 'src/engine.ts', 'src/lifecycle.ts'];
+const CORE = ['src/core/domain.ts', 'src/core/engine/engine.ts', 'src/core/lifecycle.ts'];
 
 /** The code alone: block comments and line comments out, so a sentence about a model is not a read of one. */
 const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
@@ -74,7 +74,7 @@ test('the check refuses every way of opening config, and is not refused by carry
 });
 
 test('engine.ts hands the whole config to every spawn, so a runner is given what the task was filed with, and a spawn that dropped it would run every harness bare', () => {
-  const code = codeOf(fs.readFileSync('src/engine.ts', 'utf8'));
+  const code = codeOf(fs.readFileSync('src/core/engine/engine.ts', 'utf8'));
   assert.match(
     code,
     /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s,

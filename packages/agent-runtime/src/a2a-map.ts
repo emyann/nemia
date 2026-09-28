@@ -18,7 +18,7 @@
  * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameFor, type Attempt, type SessionState, type Sighting } from './domain.ts';
+import { nameFor, type Attempt, type SessionState, type Sighting } from './core/domain.ts';
 import type { SpawnRequest } from './runner.ts';
 
 /** The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`. */

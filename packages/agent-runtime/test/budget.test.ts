@@ -20,8 +20,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { createEngine } from '../src/facade.ts';
-import { file, tick } from '../src/engine.ts';
-import { Journal } from '../src/journal.ts';
+import { file, tick } from '../src/core/engine/engine.ts';
+import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 

@@ -2030,7 +2030,7 @@ the feed takes, from which a read gives exactly the lines after it, with a non-A
 ### Still to build: the board follows the feed (a card of its own)
 
 *Built since; noted 2026-09-28, the list below kept as it was asked.* The board holds one stream of the feed (`useFeed` in
-`apps/web/src/lib/feed.ts`), and each event invalidates exactly what it can change (`keysOf`). While the stream is open, the runs, a
+`apps/web/src/lib/useFeed.ts`), and each event invalidates exactly what it can change (`keysOf` in `apps/web/src/lib/feed.ts`). While the stream is open, the runs, a
 run's record and the ceilings are polled once a minute (`FALLBACK_MS`, `pace(5_000)`), and every 5 s while it is down. The header says
 whether the board follows the feed (`data-feed`). An e2e page that edits the store by hand says so on the feed (`fed()` in the e2e's
 `board.ts`). CLAUDE.md keeps what it taught.

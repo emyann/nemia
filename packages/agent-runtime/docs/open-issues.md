@@ -939,7 +939,7 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 Moved out of the open list on 2026-09-28, each as it was written. Issues 19 to 21 moved to agent-orchestrator with admission
 (thin runtime stage 4c, 2026-09-25), and what they leave is its to keep; 22 is retired. 24 and 25 were fixed on 2026-09-17,
 held by fake registries and transcripts, and what they did not measure stays said under each. 30 was fixed on 2026-09-23, in
-review of stage 3, and says how under its heading. 19 to 25 each have their row in *Fixed*, below.
+review of stage 3, and says how under its heading. 19 to 22, 24 and 25 each have their row in *Fixed*, below.
 
 ### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
 
